@@ -1,0 +1,22 @@
+# Node modules (don't send to Docker daemon)
+node_modules
+# Git metadata
+.git
+# Logs and temp
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs
+*.log
+# Local env and editor files
+.env
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+# Build/test artifacts
+coverage
+dist
+.tmp
+# Optional large folders you may have
+node_modules/**/*
