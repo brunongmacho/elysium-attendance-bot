@@ -1,0 +1,12 @@
+{
+  "main_guild_id": "1401784124469149736",
+  "timer_server_id": "1415293879590195202",
+  "timer_channel_id": "1415293880462741516",
+  "attendance_channel_id": "1429059892735508531",
+  "admin_logs_channel_id": "1429074047529914439",
+  "admin_roles": ["GUILD LEADER", "ELITE", "Admin"],
+  "week_start": "Sunday",
+  "sheet_webhook_url": "https://script.google.com/macros/s/AKfycbyojVmPR165yAKqDtNNIF4SJuC0LgHzC7IE7eYgkty5Ie-x0GOPD_vdgPPacFJFYQox/exec",
+  "timezone": "GMT+8",
+  "auto_archive_minutes": 60
+}
