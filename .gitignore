@@ -8,9 +8,11 @@ yarn-debug.log*
 yarn-error.log*
 # Env files
 .env
-# OS files
+# OS/editor
 .DS_Store
 Thumbs.db
-# Optional: ignore editor/project files
 .vscode/
 .idea/
+# Build/test artifacts
+coverage/
+dist/
