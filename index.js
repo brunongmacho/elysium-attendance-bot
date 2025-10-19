@@ -235,15 +235,20 @@ client.on(Events.MessageCreate, async (message) => {
     // ATTENDANCE CHECK-IN (in attendance threads)
     // ==========================================
     if (message.channel.isThread()) {
+      console.log(`📝 Message in thread, parent: ${message.channel.parentId}`);
+      
       const parentId = message.channel.parentId;
       
       if (parentId === config.attendance_channel_id) {
+        console.log('✅ Thread is under attendance channel!');
+        
         const content = message.content.trim().toLowerCase();
         const parts = content.split(/\s+/);
         const keyword = parts[0];
 
         // Check for attendance keywords
         if (['present', 'here', 'join', 'checkin', 'check-in'].includes(keyword)) {
+          console.log(`✅ Attendance keyword detected: ${keyword}`);
           
           // Require screenshot attachment
           if (!message.attachments || message.attachments.size === 0) {
