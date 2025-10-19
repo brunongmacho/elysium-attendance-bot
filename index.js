@@ -104,7 +104,102 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
-    // Detect boss spawn announcements from timer server
+    // ==========================================
+    // ATTENDANCE CHECK-IN (in attendance threads)
+    // CHECK THIS FIRST before timer detection!
+    // ==========================================
+    if (message.channel.isThread()) {
+      console.log(`📝 Message in thread, parent: ${message.channel.parentId}`);
+      
+      const parentId = message.channel.parentId;
+      
+      if (parentId === config.attendance_channel_id) {
+        console.log('✅ Thread is under attendance channel!');
+        
+        const content = message.content.trim().toLowerCase();
+        const parts = content.split(/\s+/);
+        const keyword = parts[0];
+
+        // Check for attendance keywords
+        if (['present', 'here', 'join', 'checkin', 'check-in'].includes(keyword)) {
+          console.log(`✅ Attendance keyword detected: ${keyword}`);
+          
+          // Require screenshot attachment
+          if (!message.attachments || message.attachments.size === 0) {
+            await message.reply('⚠️ **Screenshot required!** Please attach a screenshot showing the boss and timestamp.');
+            return;
+          }
+
+          // Extract spawn info from thread name: [date] Boss (#n)
+          const threadName = message.channel.name;
+          const match = threadName.match(/^\[(.*?)\]\s+(.*?)\s+\(#(\d+)\)/);
+          
+          let spawnKey = null;
+          let bossMatched = null;
+
+          if (match) {
+            const date = match[1];
+            const threadBoss = match[2];
+            const num = Number(match[3]);
+
+            // Find active spawn
+            for (const k of Object.keys(activeSpawns)) {
+              const s = activeSpawns[k];
+              if (s.boss === threadBoss && s.spawnNum === num && s.date === date) {
+                spawnKey = k;
+                bossMatched = threadBoss;
+                break;
+              }
+            }
+          }
+
+          // Allow boss name override in message
+          if (parts.length >= 2) {
+            const overrideBoss = findBossMatch(parts[1]);
+            if (overrideBoss) bossMatched = overrideBoss;
+          }
+
+          if (!bossMatched) {
+            await message.reply('❓ Could not identify boss. Please ensure you\'re in the correct spawn thread.');
+            return;
+          }
+
+          // Add checkmark reaction for admin verification
+          try {
+            await message.react('✅');
+          } catch (e) {
+            console.error('Failed to add reaction:', e);
+          }
+
+          // Store pending attendance
+          const pendingKey = `pending|${message.id}`;
+          activeSpawns[pendingKey] = {
+            messageId: message.id,
+            author: message.author.username,
+            authorId: message.author.id,
+            boss: bossMatched,
+            spawnKey,
+            timestamp: Date.now()
+          };
+
+          const embed = new EmbedBuilder()
+            .setColor(0xFFA500)
+            .setDescription(`⏳ Registered **${message.author.username}** for **${bossMatched}**\n\nWaiting for admin verification...`)
+            .setFooter({text: 'An admin will react with ✅ to confirm'});
+
+          await message.reply({embeds: [embed]});
+          
+          console.log(`📝 Pending attendance: ${message.author.username} for ${bossMatched}`);
+        }
+      }
+      // If thread but not attendance channel, just ignore (don't process as timer message)
+      return;
+    }
+
+    // ==========================================
+    // TIMER SERVER DETECTION
+    // Only check this if message is NOT in a thread
+    // ==========================================
     if (message.guild && message.guild.id === config.timer_server_id) {
       console.log('✅ Message is in timer server!');
       
@@ -228,95 +323,6 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         console.log(`✅ Created threads for ${bossName} spawn #${spawnNum}`);
-      }
-    }
-
-    // ==========================================
-    // ATTENDANCE CHECK-IN (in attendance threads)
-    // ==========================================
-    if (message.channel.isThread()) {
-      console.log(`📝 Message in thread, parent: ${message.channel.parentId}`);
-      
-      const parentId = message.channel.parentId;
-      
-      if (parentId === config.attendance_channel_id) {
-        console.log('✅ Thread is under attendance channel!');
-        
-        const content = message.content.trim().toLowerCase();
-        const parts = content.split(/\s+/);
-        const keyword = parts[0];
-
-        // Check for attendance keywords
-        if (['present', 'here', 'join', 'checkin', 'check-in'].includes(keyword)) {
-          console.log(`✅ Attendance keyword detected: ${keyword}`);
-          
-          // Require screenshot attachment
-          if (!message.attachments || message.attachments.size === 0) {
-            await message.reply('⚠️ **Screenshot required!** Please attach a screenshot showing the boss and timestamp.');
-            return;
-          }
-
-          // Extract spawn info from thread name: [date] Boss (#n)
-          const threadName = message.channel.name;
-          const match = threadName.match(/^\[(.*?)\]\s+(.*?)\s+\(#(\d+)\)/);
-          
-          let spawnKey = null;
-          let bossMatched = null;
-
-          if (match) {
-            const date = match[1];
-            const threadBoss = match[2];
-            const num = Number(match[3]);
-
-            // Find active spawn
-            for (const k of Object.keys(activeSpawns)) {
-              const s = activeSpawns[k];
-              if (s.boss === threadBoss && s.spawnNum === num && s.date === date) {
-                spawnKey = k;
-                bossMatched = threadBoss;
-                break;
-              }
-            }
-          }
-
-          // Allow boss name override in message
-          if (parts.length >= 2) {
-            const overrideBoss = findBossMatch(parts[1]);
-            if (overrideBoss) bossMatched = overrideBoss;
-          }
-
-          if (!bossMatched) {
-            await message.reply('❓ Could not identify boss. Please ensure you\'re in the correct spawn thread.');
-            return;
-          }
-
-          // Add checkmark reaction for admin verification
-          try {
-            await message.react('✅');
-          } catch (e) {
-            console.error('Failed to add reaction:', e);
-          }
-
-          // Store pending attendance
-          const pendingKey = `pending|${message.id}`;
-          activeSpawns[pendingKey] = {
-            messageId: message.id,
-            author: message.author.username,
-            authorId: message.author.id,
-            boss: bossMatched,
-            spawnKey,
-            timestamp: Date.now()
-          };
-
-          const embed = new EmbedBuilder()
-            .setColor(0xFFA500)
-            .setDescription(`⏳ Registered **${message.author.username}** for **${bossMatched}**\n\nWaiting for admin verification...`)
-            .setFooter({text: 'An admin will react with ✅ to confirm'});
-
-          await message.reply({embeds: [embed]});
-          
-          console.log(`📝 Pending attendance: ${message.author.username} for ${bossMatched}`);
-        }
       }
     }
 
