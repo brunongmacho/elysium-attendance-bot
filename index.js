@@ -96,29 +96,44 @@ client.once(Events.ClientReady, () => {
 // ==========================================
 client.on(Events.MessageCreate, async (message) => {
   try {
-    if (message.author.bot) return;
+    // Log ALL messages for debugging
+    console.log(`📨 Message received: "${message.content}" in channel ${message.channel.id} from ${message.author.tag}`);
+    
+    if (message.author.bot) {
+      console.log('⏭️ Skipping bot message');
+      return;
+    }
 
     // Detect boss spawn announcements from timer server
     if (message.guild && message.guild.id === config.timer_server_id) {
+      console.log('✅ Message is in timer server!');
+      
       // If timer_channel_id is specified, only listen to that channel
       if (config.timer_channel_id && message.channel.id !== config.timer_channel_id) {
+        console.log(`⏭️ Ignoring - not in timer channel. Expected: ${config.timer_channel_id}, Got: ${message.channel.id}`);
         return; // Ignore messages from other channels
       }
       
+      console.log('✅ Message is in correct channel!');
+      
       // Look for pattern: "BossName will spawn in" or "**BossName** will spawn in"
       if (/will spawn in/i.test(message.content)) {
+        console.log('✅ Message contains "will spawn in"!');
+        
         let detectedBoss = null;
         
         // Try pattern 1: "**BossName** will spawn in" (bold)
         let match = message.content.match(/\*\*(.*?)\*\*/);
         if (match) {
           detectedBoss = match[1].trim();
+          console.log(`📝 Pattern 1 matched (bold): ${detectedBoss}`);
         } else {
           // Try pattern 2: "BossName will spawn in" (plain text)
           // Extract first word/phrase before "will spawn in"
           match = message.content.match(/^([\w\s]+?)\s+will spawn in/i);
           if (match) {
             detectedBoss = match[1].trim();
+            console.log(`📝 Pattern 2 matched (plain): ${detectedBoss}`);
           }
         }
         
