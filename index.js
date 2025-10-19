@@ -129,10 +129,11 @@ client.on(Events.MessageCreate, async (message) => {
           console.log(`📝 Pattern 1 matched (bold): ${detectedBoss}`);
         } else {
           // Try pattern 2: "BossName will spawn in" (plain text)
-          // Extract first word/phrase before "will spawn in"
-          match = message.content.match(/^([\w\s]+?)\s+will spawn in/i);
+          // Extract text before "will spawn in", handling emojis and special chars
+          match = message.content.match(/(.+?)\s+will spawn in/i);
           if (match) {
-            detectedBoss = match[1].trim();
+            // Remove emojis and special characters, keep only letters and spaces
+            detectedBoss = match[1].replace(/[^\w\s]/g, '').trim();
             console.log(`📝 Pattern 2 matched (plain): ${detectedBoss}`);
           }
         }
