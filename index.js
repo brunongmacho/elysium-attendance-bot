@@ -56,7 +56,7 @@ function findBossMatch(input) {
  * Get timezone-adjusted date string
  */
 function getDateString() {
-  return new Date().toLocaleDateString('en-US', {timeZone: config.timezone});
+  return new Date().toLocaleDateString('en-US', {timeZone: 'Asia/Manila'});
 }
 
 /**
