@@ -105,12 +105,27 @@ client.on(Events.MessageCreate, async (message) => {
         return; // Ignore messages from other channels
       }
       
-      // Look for pattern: "**BossName** will spawn in"
+      // Look for pattern: "BossName will spawn in" or "**BossName** will spawn in"
       if (/will spawn in/i.test(message.content)) {
-        const match = message.content.match(/\*\*(.*?)\*\*/);
-        const detectedBoss = match ? match[1].trim() : null;
+        let detectedBoss = null;
         
-        if (!detectedBoss) return;
+        // Try pattern 1: "**BossName** will spawn in" (bold)
+        let match = message.content.match(/\*\*(.*?)\*\*/);
+        if (match) {
+          detectedBoss = match[1].trim();
+        } else {
+          // Try pattern 2: "BossName will spawn in" (plain text)
+          // Extract first word/phrase before "will spawn in"
+          match = message.content.match(/^([\w\s]+?)\s+will spawn in/i);
+          if (match) {
+            detectedBoss = match[1].trim();
+          }
+        }
+        
+        if (!detectedBoss) {
+          console.log('⚠️ Could not extract boss name from message:', message.content);
+          return;
+        }
 
         // Match detected boss to our boss list
         const bossName = findBossMatch(detectedBoss);
