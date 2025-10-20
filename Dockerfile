@@ -25,6 +25,7 @@ ENV PORT=3000
 
 # Expose port if your app listens on one
 EXPOSE 3000
+EXPOSE 8000
 
 # Start the bot
 CMD ["index.js"]
