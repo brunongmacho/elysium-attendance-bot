@@ -8,6 +8,7 @@ yarn-debug.log*
 yarn-error.log*
 # Env files
 .env
+Code.gs
 # OS/editor
 .DS_Store
 Thumbs.db
