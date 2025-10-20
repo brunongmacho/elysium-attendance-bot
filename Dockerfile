@@ -6,7 +6,7 @@ COPY package*.json ./
 RUN npm ci --production --no-audit --progress=false
 
 # Final image
-FROM node:18-alpine
+FROM mirror.gcr.io/library/node:18-alpine AS final
 WORKDIR /app
 # Copy only installed deps from the deps stage
 COPY --from=deps /app/node_modules ./node_modules
