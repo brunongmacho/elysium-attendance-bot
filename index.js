@@ -1005,17 +1005,16 @@ if (!process.env.DISCORD_TOKEN) {
 
 client.login(process.env.DISCORD_TOKEN);
 
-// --- KEEP THIS AT THE END OF YOUR FILE ---
+// --- Health Check Server for Koyeb ---
 import express from "express";
 
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// Simple health check route
 app.get("/", (req, res) => {
-  res.send("Bot is running fine!");
+  res.status(200).send("OK");
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`🌐 Health check server running on port ${PORT}`);
 });
