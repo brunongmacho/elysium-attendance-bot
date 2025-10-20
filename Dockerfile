@@ -1,18 +1,30 @@
-# Stage: install dependencies (cached if package*.json unchanged)
+# Stage 1: Install dependencies
 FROM mirror.gcr.io/library/node:18-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-# Use npm ci for reproducible installs; adjust flags if you need devDependencies
 RUN npm ci --production --no-audit --progress=false
 
-# Final image
-FROM mirror.gcr.io/library/node:18-alpine AS final
+# Stage 2: Copy source and build (if applicable)
+FROM mirror.gcr.io/library/node:18-alpine AS builder
 WORKDIR /app
-# Copy only installed deps from the deps stage
 COPY --from=deps /app/node_modules ./node_modules
-# Copy app source
 COPY . .
-# Expose port if your app listens on one (adjust)
+# Uncomment the next line if you have a build step (e.g., React, TypeScript)
+# RUN npm run build
+
+# Stage 3: Use Distroless for production (no DockerHub dependency)
+FROM gcr.io/distroless/nodejs18
+WORKDIR /app
+
+# Copy built app and dependencies
+COPY --from=builder /app .
+
+# Optional: set environment variables
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Expose port if your app listens on one
 EXPOSE 3000
-# Adjust start command if different (e.g., npm start)
-CMD ["node", "index.js"]
+
+# Start the bot
+CMD ["index.js"]
