@@ -108,6 +108,159 @@ function isAdmin(member) {
 }
 
 /**
+ * Handle spawn detection from timer bot
+ */
+async function handleSpawnDetection(message) {
+  const guild = message.guild;
+  
+  // Check for spawn announcement patterns
+  // Pattern: "Boss will spawn in X minutes! (YYYY-MM-DD HH:MM)"
+  if (/will spawn in.*minutes?!/i.test(message.content)) {
+    let detectedBoss = null;
+    let timestamp = null;
+    
+    // Extract timestamp from parentheses first
+    const timestampMatch = message.content.match(/\((\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\)/);
+    if (timestampMatch) {
+      timestamp = timestampMatch[1]; // "2025-10-20 19:00"
+    }
+    
+    // Try to extract boss name
+    // Try bold format first: ⚠️ **Boss** will spawn
+    const matchBold = message.content.match(/[⚠️🔔⏰]*\s*\*\*(.*?)\*\*\s*will spawn/i);
+    if (matchBold) {
+      detectedBoss = matchBold[1].trim();
+    } else {
+      // Try emoji + name: ⚠️ Boss will spawn
+      const matchEmoji = message.content.match(/[⚠️🔔⏰]+\s*([A-Za-z\s]+?)\s*will spawn/i);
+      if (matchEmoji) {
+        detectedBoss = matchEmoji[1].trim();
+      } else {
+        // Try plain format: Boss will spawn
+        const matchPlain = message.content.match(/^([A-Za-z\s]+?)\s*will spawn/i);
+        if (matchPlain) {
+          detectedBoss = matchPlain[1].trim();
+        }
+      }
+    }
+
+    if (!detectedBoss) {
+      console.log(`⚠️ Could not extract boss name from: ${message.content}`);
+      return;
+    }
+
+    const bossName = findBossMatch(detectedBoss);
+    if (!bossName) {
+      console.log(`⚠️ Unknown boss: ${detectedBoss}`);
+      return;
+    }
+
+    console.log(`🎯 Boss spawn detected: ${bossName} (from ${message.author.username})`);
+
+    const mainGuild = await client.guilds.fetch(config.main_guild_id).catch(() => null);
+    if (!mainGuild) return;
+
+    const attChannel = await mainGuild.channels.fetch(config.attendance_channel_id).catch(() => null);
+    const adminLogs = await mainGuild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
+
+    if (!attChannel || !adminLogs) {
+      console.error('❌ Could not find channels');
+      return;
+    }
+
+    // Use timestamp from message if available, otherwise use current time
+    let dateStr, timeStr, fullTimestamp;
+    
+    if (timestamp) {
+      // Parse timestamp from timer message: "2025-10-20 19:00"
+      const [datePart, timePart] = timestamp.split(' ');
+      const [year, month, day] = datePart.split('-');
+      dateStr = `${month}/${day}/${year.substring(2)}`;
+      timeStr = timePart;
+      fullTimestamp = `${dateStr} ${timeStr}`;
+      console.log(`⏰ Using timestamp from timer: ${fullTimestamp}`);
+    } else {
+      // Fallback to current time
+      const ts = getCurrentTimestamp();
+      dateStr = ts.date;
+      timeStr = ts.time;
+      fullTimestamp = ts.full;
+      console.log(`⏰ Using current timestamp: ${fullTimestamp}`);
+    }
+
+    const threadTitle = `[${dateStr} ${timeStr}] ${bossName}`;
+
+    // Check if column already exists
+    const columnExists = await checkColumnExists(bossName, fullTimestamp);
+    if (columnExists) {
+      console.log(`⚠️ Column already exists for ${bossName} at ${fullTimestamp}. Blocking spawn.`);
+      await adminLogs.send(
+        `⚠️ **BLOCKED SPAWN:** ${bossName} at ${fullTimestamp}\n` +
+        `A column for this boss at this timestamp already exists. Close the existing thread first.`
+      );
+      return;
+    }
+
+    // Create threads
+    const attThread = await attChannel.threads.create({
+      name: threadTitle,
+      autoArchiveDuration: config.auto_archive_minutes,
+      reason: `Boss spawn: ${bossName}`
+    }).catch(err => {
+      console.error('Failed to create attendance thread:', err);
+      return null;
+    });
+
+    const confirmThread = await adminLogs.threads.create({
+      name: `✅ ${threadTitle}`,
+      autoArchiveDuration: config.auto_archive_minutes,
+      reason: `Confirmation thread: ${bossName}`
+    }).catch(err => {
+      console.error('Failed to create confirmation thread:', err);
+      return null;
+    });
+
+    if (!attThread) return;
+
+    // Store spawn info
+    activeSpawns[attThread.id] = {
+      boss: bossName,
+      date: dateStr,
+      time: timeStr,
+      timestamp: fullTimestamp,
+      members: [],
+      confirmThreadId: confirmThread ? confirmThread.id : null,
+      closed: false
+    };
+
+    // Mark column as active
+    activeColumns[`${bossName}|${fullTimestamp}`] = attThread.id;
+
+    // Post instructions
+    const embed = new EmbedBuilder()
+      .setColor(0xFFD700)
+      .setTitle(`🎯 ${bossName}`)
+      .setDescription(`Boss detected! Please check in below.`)
+      .addFields(
+        {name: '📸 How to Check In', value: '1. Post `present` or `here`\n2. Attach a screenshot (admins exempt)\n3. Wait for admin ✅'},
+        {name: '📊 Points', value: `${bossPoints[bossName].points} points`, inline: true},
+        {name: '🕐 Time', value: timeStr, inline: true},
+        {name: '📅 Date', value: dateStr, inline: true}
+      )
+      .setFooter({text: 'Admins: type "close" to finalize and submit attendance'})
+      .setTimestamp();
+    
+    await attThread.send({embeds: [embed]});
+
+    if (confirmThread) {
+      await confirmThread.send(`🟨 **${bossName}** spawn detected (${fullTimestamp}). Verifications will appear here.`);
+    }
+
+    console.log(`✅ Created threads for ${bossName} at ${fullTimestamp}`);
+  }
+}
+
+/**
  * Parse thread name to extract info
  */
 function parseThreadName(name) {
@@ -202,6 +355,17 @@ client.once(Events.ClientReady, () => {
 // ==========================================
 client.on(Events.MessageCreate, async (message) => {
   try {
+    // Special handling for timer server - allow bot messages for spawn detection
+    if (message.guild && message.guild.id === config.timer_server_id) {
+      // Allow timer bot messages in timer channel
+      if (config.timer_channel_id && message.channel.id === config.timer_channel_id) {
+        // Process spawn detection even from bots
+        await handleSpawnDetection(message);
+        return;
+      }
+    }
+
+    // For all other messages, ignore bots
     if (message.author.bot) return;
 
     const guild = message.guild;
