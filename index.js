@@ -22,9 +22,53 @@ const fetch = require('node-fetch');
 const levenshtein = require('fast-levenshtein');
 const fs = require('fs');
 
-const config = JSON.parse(fs.readFileSync('./config.json'));
-const bossPoints = JSON.parse(fs.readFileSync('./boss_points.json'));
+const config = {
+  "main_guild_id": "1401784124469149736",
+  "timer_server_id": "1401784124469149736",
+  "timer_channel_id": "1429074047529914439",
+  "attendance_channel_id": "1429059892735508531",
+  "admin_logs_channel_id": "1429074047529914439",
+  "admin_roles": ["GUILD LEADER", "ELITE", "Admin", "Martin Romualdez", "BOT"],
+  "week_start": "Sunday",
+  "sheet_webhook_url": "https://script.google.com/macros/s/AKfycbzRjqg1tUDAIWvQ3WjQDsF85-ifOSyEdNeefdfkx8FL_vcgCQsIJ9cAGjR-6TfyE-Cs/exec",
+  "timezone": "Asia/Manila",
+  "auto_archive_minutes": 60
+};
 
+const bossPoints = {
+  "Venatus": {"points":1, "aliases":["venatus"]},
+  "Viorent": {"points":1, "aliases":["viorent"]},
+  "Ego": {"points":1, "aliases":["ego"]},
+  "Clemantis": {"points":1, "aliases":["clemantis"]},
+  "Livera": {"points":1, "aliases":["livera"]},
+  "Araneo": {"points":1, "aliases":["araneo"]},
+  "Undomiel": {"points":1, "aliases":["undomiel"]},
+  "Saphirus": {"points":1, "aliases":["saphirus"]},
+  "Neutro": {"points":1, "aliases":["neutro"]},
+  "Lady Dalia": {"points":1, "aliases":["lady dalia","dalia","lady"]},
+  "General Aquleus": {"points":1, "aliases":["aqueleus","aquleus","general"]},
+  "Thymele": {"points":1, "aliases":["thymele"]},
+  "Amentis": {"points":1, "aliases":["amentis"]},
+  "Baron Braudmore": {"points":1, "aliases":["baron","braudmore"]},
+  "Milavy": {"points":2, "aliases":["milavy"]},
+  "Wannitas": {"points":2, "aliases":["wannitas"]},
+  "Metus": {"points":2, "aliases":["metus"]},
+  "Duplican": {"points":2, "aliases":["duplican"]},
+  "Shuliar": {"points":2, "aliases":["shuliar"]},
+  "Ringor": {"points":2, "aliases":["ringor"]},
+  "Roderick": {"points":2, "aliases":["roderick"]},
+  "Gareth": {"points":2, "aliases":["gareth"]},
+  "Titore": {"points":2, "aliases":["titore"]},
+  "Larba": {"points":2, "aliases":["larba"]},
+  "Catena": {"points":3, "aliases":["catena"]},
+  "Auraq": {"points":3, "aliases":["auraq"]},
+  "Secreta": {"points":3, "aliases":["secreta"]},
+  "Ordo": {"points":3, "aliases":["ordo"]},
+  "Asta": {"points":3, "aliases":["asta"]},
+  "Supero": {"points":3, "aliases":["supero"]},
+  "Chaiflock": {"points":3, "aliases":["chaiflock"]},
+  "Benji": {"points":3, "aliases":["benji"]}
+};
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
