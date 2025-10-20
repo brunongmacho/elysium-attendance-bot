@@ -1,13 +1,14 @@
 {
   "name": "guild-attendance-bot",
   "version": "1.0.0",
+  "description": "Boss attendance + points bot for ELYSIUM guild",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.15.3",
-    "node-fetch": "^3.3.2",
-    "fast-levenshtein": "^3.0.0"
+    "discord.js": "^14.11.0",
+    "node-fetch": "^2.6.7",
+    "fast-levenshtein": "^2.0.6"
   }
 }
