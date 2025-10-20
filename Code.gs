@@ -1,13 +1,12 @@
 /**
- * ELYSIUM Guild Attendance Tracker - Google Apps Script (Enhanced)
+ * ELYSIUM Guild Attendance Tracker - Version 2.0 (Simplified)
  * 
- * Features:
- * - Weekly sheets (ELYSIUM_WEEK_YYYYMMDD)
- * - Checkbox-based attendance
- * - Boss spawn numbering (BARON #1, #2, #3)
- * - Finalize spawn (mark absent members)
- * - Auto-add new members
- * - Audit logging
+ * NEW APPROACH:
+ * - No SpawnLog needed
+ * - Batch attendance submission
+ * - Column check before creation
+ * - Single column per boss per timestamp
+ * - AttendanceLog for audit trail
  */
 
 // ==========================================
@@ -27,169 +26,232 @@ const CONFIG = {
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents || '{}');
-    const action = data.action || 'recordAttendance';
+    const action = data.action || 'unknown';
     
-    Logger.log(`📥 Received action: ${action}`);
+    Logger.log(`🔥 Received action: ${action}`);
+    Logger.log(`📦 Full payload: ${JSON.stringify(data)}`);
     
-    if (action === 'createColumn') {
-      return handleCreateColumn(data);
+    if (action === 'checkColumn') {
+      return handleCheckColumn(data);
     }
     
-    if (action === 'recordAttendance') {
-      return handleAttendance(data);
+    if (action === 'submitAttendance') {
+      return handleSubmitAttendance(data);
     }
     
-    if (action === 'finalizeSpawn') {
-      return handleFinalizeSpawn(data);
-    }
-    
+    Logger.log(`❌ Unknown action: ${action}`);
     return createResponse('error', 'Unknown action: ' + action);
     
   } catch (err) {
     Logger.log('❌ Error in doPost: ' + err.toString());
+    Logger.log('❌ Stack trace: ' + err.stack);
     return createResponse('error', err.toString());
   }
 }
 
 /**
- * Handle column creation when thread is created
+ * Check if column exists for boss + timestamp
  */
-function handleCreateColumn(data) {
-  const threadId = (data.threadId || '').toString().trim();
-  const boss = (data.boss || '').toString().trim();
-  const spawnNum = data.spawnNum || 1;
-  const date = data.date || Utilities.formatDate(new Date(), CONFIG.TIMEZONE, CONFIG.DATE_FORMAT);
+function handleCheckColumn(data) {
+  const boss = (data.boss || '').toString().trim().toUpperCase();
+  const timestamp = (data.timestamp || '').toString().trim();
   
-  if (!threadId || !boss) {
-    return createResponse('error', 'Missing threadId or boss');
+  Logger.log(`🔍 Checking column: boss=${boss}, timestamp=${timestamp}`);
+  
+  if (!boss || !timestamp) {
+    Logger.log(`❌ Missing data: boss=${boss}, timestamp=${timestamp}`);
+    return createResponse('error', 'Missing boss or timestamp');
   }
 
   const sheet = getCurrentWeekSheet();
-  const spawnLog = getOrCreateSpawnLog();
-  
-  // Check if this thread already has a column
-  const existingColumn = findColumnByThreadId(spawnLog, threadId);
-  if (existingColumn) {
-    return createResponse('ok', 'Column already exists', {column: existingColumn});
-  }
-  
-  // Create the column
-  const columnInfo = createBossColumn(sheet, boss, date, spawnNum);
-  
-  // Log the thread ID → column mapping
-  spawnLog.appendRow([
-    new Date(),
-    threadId,
-    boss,
-    spawnNum,
-    date,
-    columnInfo.column,
-    columnInfo.bossName
-  ]);
-  
-  Logger.log(`✅ Created column for thread ${threadId}: ${columnInfo.bossName}`);
-  
-  return createResponse('ok', 'Column created', {
-    column: columnInfo.column,
-    bossName: columnInfo.bossName
-  });
-}
-
-/**
- * Handle attendance recording
- */
-function handleAttendance(data) {
-  const threadId = (data.threadId || '').toString().trim();
-  const user = (data.user || '').toString().trim();
-  const verifier = (data.verifier || '').toString().trim();
-  
-  if (!threadId || !user) {
-    return createResponse('error', 'Missing threadId or user');
-  }
-
-  const sheet = getCurrentWeekSheet();
-  const spawnLog = getOrCreateSpawnLog();
-  
-  // Find the column for this thread
-  const columnIndex = findColumnByThreadId(spawnLog, threadId);
-  
-  if (!columnIndex) {
-    return createResponse('error', 'Spawn column not found for this thread');
-  }
-  
-  // Find or create user row
-  const userRow = getUserRow(sheet, user);
-  
-  // Check for duplicate
-  const alreadyMarked = checkIfAlreadyMarked(sheet, userRow, columnIndex);
-  if (alreadyMarked) {
-    return createResponse('duplicate', 'User already marked');
-  }
-  
-  // Mark attendance
-  setCheckbox(sheet, userRow, columnIndex, true);
-  
-  // Log verification
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
-  const bossInfo = getBossInfoFromColumn(spawnLog, columnIndex);
-  logVerification(ss, user, bossInfo.boss, bossInfo.bossName, verifier);
-  
-  return createResponse('ok', `Attendance recorded: ${user}`, {
-    column: bossInfo.bossName
-  });
-}
-
-/**
- * Handle spawn finalization - mark all absent members
- */
-function handleFinalizeSpawn(data) {
-  const boss = (data.boss || '').toString().trim();
-  const spawnNum = data.spawnNum || 1;
-  const date = data.date || Utilities.formatDate(new Date(), CONFIG.TIMEZONE, CONFIG.DATE_FORMAT);
-  
-  const sheet = getCurrentWeekSheet();
-  if (!sheet) {
-    return createResponse('error', 'Could not get current week sheet');
-  }
-  
-  // Find the column for this specific spawn
-  const targetBossName = `${boss.toUpperCase()} #${spawnNum}`;
   const lastCol = sheet.getLastColumn();
   
-  const dates = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  const bosses = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
+  if (lastCol < 5) {
+    return createResponse('ok', 'No columns exist', {exists: false});
+  }
   
-  let targetColumn = -1;
-  for (let i = 4; i < dates.length; i++) {
-    const cellDate = (dates[i] || '').toString().trim();
-    const cellBoss = (bosses[i] || '').toString().trim();
+  const row1 = sheet.getRange(1, 5, 1, lastCol - 4).getValues()[0];
+  const row2 = sheet.getRange(2, 5, 1, lastCol - 4).getValues()[0];
+  
+  for (let i = 0; i < row1.length; i++) {
+    const cellTimestamp = (row1[i] || '').toString().trim();
+    const cellBoss = (row2[i] || '').toString().trim().toUpperCase();
     
-    if (cellDate === date && cellBoss === targetBossName) {
-      targetColumn = i + 1;
-      break;
+    if (cellTimestamp === timestamp && cellBoss === boss) {
+      Logger.log(`✅ Column exists: ${boss} at ${timestamp}`);
+      return createResponse('ok', 'Column exists', {exists: true, column: i + 5});
     }
   }
   
-  if (targetColumn === -1) {
-    return createResponse('error', `Could not find spawn column: ${targetBossName}`);
-  }
+  Logger.log(`❌ Column not found: ${boss} at ${timestamp}`);
+  return createResponse('ok', 'Column does not exist', {exists: false});
+}
+
+/**
+ * Submit batch attendance and create column
+ */
+function handleSubmitAttendance(data) {
+  const boss = (data.boss || '').toString().trim().toUpperCase();
+  const timestamp = (data.timestamp || '').toString().trim();
+  const members = data.members || [];
+  const date = (data.date || '').toString().trim();
+  const time = (data.time || '').toString().trim();
   
-  // Mark all empty cells in this column as UNCHECKED
-  const lastRow = sheet.getLastRow();
-  if (lastRow >= 3) {
-    const memberRange = sheet.getRange(3, targetColumn, lastRow - 2, 1);
-    const values = memberRange.getValues();
+  Logger.log(`📝 Submitting attendance: ${boss} at ${timestamp}`);
+  Logger.log(`👥 Members (${members.length}): ${members.join(', ')}`);
+  
+  if (!boss || !timestamp || members.length === 0) {
+    return createResponse('error', 'Missing boss, timestamp, or members list');
+  }
+
+  const sheet = getCurrentWeekSheet();
+  
+  // Check if column already exists
+  const lastCol = sheet.getLastColumn();
+  let targetColumn = null;
+  
+  if (lastCol >= 5) {
+    const row1 = sheet.getRange(1, 5, 1, lastCol - 4).getValues()[0];
+    const row2 = sheet.getRange(2, 5, 1, lastCol - 4).getValues()[0];
     
-    for (let i = 0; i < values.length; i++) {
-      if (values[i][0] !== true) {
-        const cellRow = i + 3;
-        setCheckbox(sheet, cellRow, targetColumn, false);
+    for (let i = 0; i < row1.length; i++) {
+      const cellTimestamp = (row1[i] || '').toString().trim();
+      const cellBoss = (row2[i] || '').toString().trim().toUpperCase();
+      
+      if (cellTimestamp === timestamp && cellBoss === boss) {
+        targetColumn = i + 5;
+        Logger.log(`⚠️ Column already exists at ${targetColumn}`);
+        break;
       }
     }
   }
   
-  Logger.log(`🔒 Finalized spawn: ${targetBossName}`);
-  return createResponse('ok', `Spawn finalized: ${targetBossName}`);
+  // If column exists, return error
+  if (targetColumn) {
+    return createResponse('error', `Column already exists for ${boss} at ${timestamp}. Cannot create duplicate.`);
+  }
+  
+  // Create new column
+  const newCol = lastCol + 1;
+  
+  sheet.getRange(1, newCol)
+    .setValue(timestamp)
+    .setFontWeight('bold')
+    .setBackground('#E8F4F8')
+    .setHorizontalAlignment('center');
+  
+  sheet.getRange(2, newCol)
+    .setValue(boss)
+    .setFontWeight('bold')
+    .setBackground('#E8F4F8')
+    .setHorizontalAlignment('center');
+  
+  sheet.setColumnWidth(newCol, 120);
+  
+  Logger.log(`✅ Created column ${newCol}: ${timestamp} | ${boss}`);
+  
+  // Get all members in sheet
+  const lastRow = sheet.getLastRow();
+  const checkboxRule = SpreadsheetApp.newDataValidation()
+    .requireCheckbox()
+    .setAllowInvalid(false)
+    .build();
+  
+  if (lastRow >= 3) {
+    const memberNames = sheet.getRange(3, 1, lastRow - 2, 1).getValues().flat();
+    
+    // Mark attendance for each member
+    let markedCount = 0;
+    let newMembersCount = 0;
+    
+    for (const member of members) {
+      const memberLower = member.toLowerCase();
+      let found = false;
+      
+      // Find member row
+      for (let i = 0; i < memberNames.length; i++) {
+        const sheetMember = (memberNames[i] || '').toString().trim();
+        if (sheetMember.toLowerCase() === memberLower) {
+          const row = i + 3;
+          const cell = sheet.getRange(row, newCol);
+          cell.setDataValidation(checkboxRule);
+          cell.setValue(true);
+          markedCount++;
+          found = true;
+          Logger.log(`✅ Marked attendance: ${member} at row ${row}`);
+          break;
+        }
+      }
+      
+      // If member not found, add them
+      if (!found) {
+        const newRow = lastRow + newMembersCount + 1;
+        sheet.getRange(newRow, 1).setValue(member);
+        
+        // Initialize all columns with checkboxes
+        for (let col = 5; col <= newCol; col++) {
+          const cell = sheet.getRange(newRow, col);
+          cell.setDataValidation(checkboxRule);
+          if (col === newCol) {
+            cell.setValue(true); // Mark present for current spawn
+          } else {
+            cell.setValue(false); // Mark absent for previous spawns
+          }
+        }
+        
+        newMembersCount++;
+        markedCount++;
+        Logger.log(`➕ Added new member: ${member} at row ${newRow}`);
+      }
+    }
+    
+    // Mark all other members as absent (unchecked)
+    const totalRows = lastRow + newMembersCount;
+    if (totalRows >= 3) {
+      const allMembers = sheet.getRange(3, 1, totalRows - 2, 1).getValues().flat();
+      
+      for (let i = 0; i < allMembers.length; i++) {
+        const sheetMember = (allMembers[i] || '').toString().trim();
+        if (sheetMember === '') continue;
+        
+        const memberLower = sheetMember.toLowerCase();
+        const isPresent = members.some(m => m.toLowerCase() === memberLower);
+        
+        if (!isPresent) {
+          const row = i + 3;
+          const cell = sheet.getRange(row, newCol);
+          cell.setDataValidation(checkboxRule);
+          cell.setValue(false);
+        }
+      }
+    }
+    
+    Logger.log(`✅ Attendance marked: ${markedCount} present, ${newMembersCount} new members added`);
+  } else {
+    // No members exist yet, add all from scratch
+    let row = 3;
+    for (const member of members) {
+      sheet.getRange(row, 1).setValue(member);
+      
+      const cell = sheet.getRange(row, newCol);
+      cell.setDataValidation(checkboxRule);
+      cell.setValue(true);
+      
+      row++;
+      Logger.log(`➕ Added member: ${member}`);
+    }
+  }
+  
+  // Log to AttendanceLog
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  logAttendance(ss, boss, timestamp, members);
+  
+  return createResponse('ok', `Attendance submitted: ${members.length} members`, {
+    column: newCol,
+    boss: boss,
+    timestamp: timestamp,
+    membersCount: members.length
+  });
 }
 
 /**
@@ -233,7 +295,7 @@ function getCurrentWeekSheet() {
     
     copyMembersFromPreviousWeek(ss, sheet);
     
-    Logger.log('Created new weekly sheet: ' + sheetName);
+    Logger.log('✅ Created new weekly sheet: ' + sheetName);
   }
   
   return sheet;
@@ -262,171 +324,40 @@ function copyMembersFromPreviousWeek(spreadsheet, newSheet) {
         }
       }
       
-      Logger.log(`Copied ${members.length} members from previous week`);
+      Logger.log(`✅ Copied ${members.length} members from previous week`);
     }
   }
 }
 
 /**
- * Find or create boss spawn column with numbering
+ * Log attendance to AttendanceLog sheet
  */
-function findOrCreateBossColumn(sheet, bossName) {
-  const today = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, CONFIG.DATE_FORMAT);
-  const lastCol = sheet.getLastColumn();
-  
-  const dates = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  const bosses = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
-  
-  // Count spawns of this boss today
-  let spawnCount = 0;
-  for (let i = 4; i < dates.length; i++) {
-    const cellDate = (dates[i] || '').toString().trim();
-    const cellBoss = (bosses[i] || '').toString().trim().toUpperCase();
-    
-    if (cellDate === today) {
-      const escapedBoss = bossName.toUpperCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const bossPattern = new RegExp(`^${escapedBoss}(\\s*#\\d+)?$`, 'i');
-      if (bossPattern.test(cellBoss)) {
-        spawnCount++;
-      }
-    }
-  }
-  
-  const spawnNumber = spawnCount + 1;
-  const formattedBossName = `${bossName.toUpperCase()} #${spawnNumber}`;
-  
-  // Create new column
-  const newCol = lastCol + 1;
-  
-  sheet.getRange(1, newCol)
-    .setValue(today)
-    .setFontWeight('bold')
-    .setBackground('#E8F4F8')
-    .setHorizontalAlignment('center');
-  
-  sheet.getRange(2, newCol)
-    .setValue(formattedBossName)
-    .setFontWeight('bold')
-    .setBackground('#E8F4F8')
-    .setHorizontalAlignment('center');
-  
-  sheet.setColumnWidth(newCol, 120);
-  
-  // Initialize all members with UNCHECKED checkboxes
-  const lastRow = sheet.getLastRow();
-  if (lastRow >= 3) {
-    const checkboxRule = SpreadsheetApp.newDataValidation()
-      .requireCheckbox()
-      .setAllowInvalid(false)
-      .build();
-    
-    const memberRange = sheet.getRange(3, newCol, lastRow - 2, 1);
-    memberRange.setDataValidation(checkboxRule);
-    
-    const uncheckedValues = [];
-    for (let i = 0; i < lastRow - 2; i++) {
-      uncheckedValues.push([false]);
-    }
-    memberRange.setValues(uncheckedValues);
-  }
-  
-  Logger.log(`Created: ${today} - ${formattedBossName}`);
-  
-  return {
-    column: newCol,
-    bossName: formattedBossName
-  };
-}
-
-/**
- * Get or create user row
- */
-function getUserRow(sheet, username) {
-  const lastRow = sheet.getLastRow();
-  
-  if (lastRow >= 3) {
-    const members = sheet.getRange(3, 1, lastRow - 2, 1).getValues().flat();
-    
-    for (let i = 0; i < members.length; i++) {
-      const memberName = (members[i] || '').toString().trim();
-      if (memberName !== '' && memberName.toLowerCase() === username.toLowerCase()) {
-        Logger.log(`Found member: ${username} at row ${i + 3}`);
-        return i + 3;
-      }
-    }
-  }
-  
-  // Add new member
-  const newRow = lastRow + 1;
-  sheet.getRange(newRow, 1).setValue(username);
-  
-  // Initialize checkboxes for all existing spawn columns
-  const lastCol = sheet.getLastColumn();
-  if (lastCol >= 5) {
-    const checkboxRule = SpreadsheetApp.newDataValidation()
-      .requireCheckbox()
-      .setAllowInvalid(false)
-      .build();
-    
-    for (let col = 5; col <= lastCol; col++) {
-      const cell = sheet.getRange(newRow, col);
-      cell.setDataValidation(checkboxRule);
-      cell.setValue(false);
-    }
-  }
-  
-  Logger.log(`Added new member: ${username} at row ${newRow}`);
-  return newRow;
-}
-
-/**
- * Set checkbox value
- */
-function setCheckbox(sheet, row, col, checked) {
-  const cell = sheet.getRange(row, col);
-  
-  const checkboxRule = SpreadsheetApp.newDataValidation()
-    .requireCheckbox()
-    .setAllowInvalid(false)
-    .build();
-  
-  cell.setDataValidation(checkboxRule);
-  cell.setValue(checked);
-}
-
-/**
- * Check if already marked
- */
-function checkIfAlreadyMarked(sheet, userRow, columnIndex) {
-  const cellValue = sheet.getRange(userRow, columnIndex).getValue();
-  return cellValue === true;
-}
-
-/**
- * Log verification
- */
-function logVerification(spreadsheet, user, boss, column, verifier) {
+function logAttendance(spreadsheet, boss, timestamp, members) {
   try {
     let logSheet = spreadsheet.getSheetByName('AttendanceLog');
     
     if (!logSheet) {
       logSheet = spreadsheet.insertSheet('AttendanceLog');
-      logSheet.appendRow(['Timestamp', 'User', 'Boss', 'Column', 'Verifier']);
+      logSheet.appendRow(['Timestamp', 'Boss', 'Spawn Time', 'Members', 'Count']);
       logSheet.getRange(1, 1, 1, 5)
         .setFontWeight('bold')
         .setBackground('#4A90E2')
         .setFontColor('#FFFFFF');
+      
+      Logger.log('✅ Created AttendanceLog sheet');
     }
     
     logSheet.appendRow([
       new Date(),
-      user,
       boss,
-      column,
-      verifier || 'System'
+      timestamp,
+      members.join(', '),
+      members.length
     ]);
+    
+    Logger.log(`✅ Logged attendance: ${boss} at ${timestamp}`);
   } catch (err) {
-    Logger.log('Error logging: ' + err);
+    Logger.log('❌ Error logging attendance: ' + err);
   }
 }
 
@@ -454,18 +385,17 @@ function createResponse(status, message, data) {
 // ==========================================
 
 /**
- * Test attendance recording
+ * Test column check
  */
-function testAttendance() {
-  Logger.log('=== TESTING ATTENDANCE ===');
+function testCheckColumn() {
+  Logger.log('=== TESTING CHECK COLUMN ===');
   
   const testPayload = {
     postData: {
       contents: JSON.stringify({
-        action: 'attendance',
-        user: 'TestUser',
-        boss: 'Larba',
-        verifier: 'AdminTest'
+        action: 'checkColumn',
+        boss: 'Baron',
+        timestamp: '10/19/25 20:30'
       })
     }
   };
@@ -475,18 +405,20 @@ function testAttendance() {
 }
 
 /**
- * Test spawn finalization
+ * Test attendance submission
  */
-function testFinalize() {
-  Logger.log('=== TESTING FINALIZE ===');
+function testSubmitAttendance() {
+  Logger.log('=== TESTING SUBMIT ATTENDANCE ===');
   
   const testPayload = {
     postData: {
       contents: JSON.stringify({
-        action: 'finalizeSpawn',
+        action: 'submitAttendance',
         boss: 'Larba',
-        spawnNum: 1,
-        date: Utilities.formatDate(new Date(), CONFIG.TIMEZONE, CONFIG.DATE_FORMAT)
+        date: '10/19/25',
+        time: '20:30',
+        timestamp: '10/19/25 20:30',
+        members: ['TestUser1', 'TestUser2', 'TestUser3']
       })
     }
   };
@@ -500,20 +432,93 @@ function testFinalize() {
  */
 function showCurrentWeek() {
   const sheet = getCurrentWeekSheet();
-  Logger.log(`Current week: ${sheet.getName()}`);
-  Logger.log(`Total columns: ${sheet.getLastColumn()}`);
-  Logger.log(`Total rows: ${sheet.getLastRow()}`);
+  Logger.log(`📊 Current week: ${sheet.getName()}`);
+  Logger.log(`📊 Total columns: ${sheet.getLastColumn()}`);
+  Logger.log(`📊 Total rows: ${sheet.getLastRow()}`);
   
   const lastCol = sheet.getLastColumn();
   if (lastCol >= 5) {
-    const dates = sheet.getRange(1, 5, 1, lastCol - 4).getValues()[0];
-    const bosses = sheet.getRange(2, 5, 1, lastCol - 4).getValues()[0];
+    const row1 = sheet.getRange(1, 5, 1, lastCol - 4).getValues()[0];
+    const row2 = sheet.getRange(2, 5, 1, lastCol - 4).getValues()[0];
     
-    Logger.log('\nSpawn columns:');
-    for (let i = 0; i < dates.length; i++) {
-      if (dates[i] && bosses[i]) {
-        Logger.log(`  ${dates[i]} - ${bosses[i]}`);
+    Logger.log('\n📋 Spawn columns:');
+    for (let i = 0; i < row1.length; i++) {
+      if (row1[i] && row2[i]) {
+        Logger.log(`  Column ${i + 5}: ${row1[i]} | ${row2[i]}`);
       }
     }
+  } else {
+    Logger.log('No spawn columns yet.');
   }
+}
+
+/**
+ * Show AttendanceLog
+ */
+function showAttendanceLog() {
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const logSheet = ss.getSheetByName('AttendanceLog');
+  
+  if (!logSheet) {
+    Logger.log('❌ AttendanceLog sheet does not exist');
+    return;
+  }
+  
+  const data = logSheet.getDataRange().getValues();
+  
+  Logger.log('=== ATTENDANCE LOG ===');
+  for (let i = 0; i < data.length; i++) {
+    Logger.log(`Row ${i}: ${JSON.stringify(data[i])}`);
+  }
+}
+
+/**
+ * Clear all spawn columns (for testing)
+ */
+function clearSpawnColumns() {
+  const sheet = getCurrentWeekSheet();
+  const lastCol = sheet.getLastColumn();
+  
+  if (lastCol > 4) {
+    sheet.deleteColumns(5, lastCol - 4);
+    Logger.log(`✅ Deleted columns 5-${lastCol}`);
+  } else {
+    Logger.log('No spawn columns to delete');
+  }
+}
+
+/**
+ * Clear AttendanceLog (for testing)
+ */
+function clearAttendanceLog() {
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const logSheet = ss.getSheetByName('AttendanceLog');
+  
+  if (!logSheet) {
+    Logger.log('❌ AttendanceLog sheet does not exist');
+    return;
+  }
+  
+  const lastRow = logSheet.getLastRow();
+  if (lastRow > 1) {
+    logSheet.deleteRows(2, lastRow - 1);
+    Logger.log(`✅ Cleared AttendanceLog (deleted rows 2-${lastRow})`);
+  } else {
+    Logger.log('AttendanceLog already empty');
+  }
+}
+
+function quickTest() {
+  var payload = {
+    postData: {
+      contents: JSON.stringify({
+        action: 'checkColumn',
+        boss: 'Viorent',
+        timestamp: '10/20/25 09:10'
+      })
+    }
+  };
+  
+  var result = doPost(payload);
+  Logger.log('Response: ' + result.getContent());
 }
