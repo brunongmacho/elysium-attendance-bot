@@ -4,7 +4,7 @@
   "timer_channel_id": "1415293880462741516",
   "attendance_channel_id": "1429059892735508531",
   "admin_logs_channel_id": "1429074047529914439",
-  "admin_roles": ["GUILD LEADER", "ELITE", "Admin"],
+  "admin_roles": ["GUILD LEADER", "ELITE", "Admin", "Martin Romualdez"],
   "week_start": "Sunday",
   "sheet_webhook_url": "https://script.google.com/macros/s/AKfycbzRjqg1tUDAIWvQ3WjQDsF85-ifOSyEdNeefdfkx8FL_vcgCQsIJ9cAGjR-6TfyE-Cs/exec",
   "timezone": "Asia/Manila",

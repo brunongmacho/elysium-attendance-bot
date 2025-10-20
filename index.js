@@ -411,6 +411,22 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
 
+      // Check for pending verifications in this thread
+      const pendingInThread = Object.values(pendingVerifications).filter(
+        p => p.threadId === message.channel.id
+      );
+
+      if (pendingInThread.length > 0) {
+        const pendingMembers = pendingInThread.map(p => p.author).join(', ');
+        await message.reply(
+          `⚠️ **Cannot close spawn!**\n\n` +
+          `There are **${pendingInThread.length} pending verification(s)**:\n` +
+          `${pendingMembers}\n\n` +
+          `Please verify (✅) or deny (❌) all check-ins first, then type \`close\` again.`
+        );
+        return;
+      }
+
       const confirmMsg = await message.reply(
         `🔒 Close spawn **${spawnInfo.boss}** (${spawnInfo.timestamp})?\n\n` +
         `**${spawnInfo.members.length} members** will be submitted to Google Sheets.\n\n` +
