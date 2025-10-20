@@ -1,5 +1,5 @@
 # Stage: install dependencies (cached if package*.json unchanged)
-FROM node:18-alpine AS deps
+FROM mirror.gcr.io/library/node:18-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 # Use npm ci for reproducible installs; adjust flags if you need devDependencies
