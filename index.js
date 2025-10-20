@@ -207,6 +207,155 @@ client.on(Events.MessageCreate, async (message) => {
     const guild = message.guild;
     if (!guild) return;
 
+    // ========== MANUAL THREAD CREATION (ADMIN ONLY, ADMIN LOGS ONLY) ==========
+    if (message.channel.id === config.admin_logs_channel_id && message.content.startsWith('!addthread')) {
+      const member = await guild.members.fetch(message.author.id).catch(() => null);
+      if (!member || !isAdmin(member)) {
+        await message.reply('⚠️ Only admins can use this command.');
+        return;
+      }
+
+      // Parse command: !addthread Boss will spawn in X minutes! (YYYY-MM-DD HH:MM)
+      const fullText = message.content.substring('!addthread'.length).trim();
+      
+      // Extract timestamp from parentheses
+      const timestampMatch = fullText.match(/\((\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\)/);
+      if (!timestampMatch) {
+        await message.reply(
+          '⚠️ **Invalid format!**\n\n' +
+          '**Usage:** `!addthread BossName will spawn in X minutes! (YYYY-MM-DD HH:MM)`\n\n' +
+          '**Example:** `!addthread Clemantis will spawn in 5 minutes! (2025-10-20 11:30)`'
+        );
+        return;
+      }
+
+      const timestampStr = timestampMatch[1]; // "2025-10-20 11:30"
+      
+      // Extract boss name (text before "will spawn")
+      const bossMatch = fullText.match(/^(.+?)\s+will spawn/i);
+      if (!bossMatch) {
+        await message.reply(
+          '⚠️ **Cannot detect boss name!**\n\n' +
+          'Make sure your message follows this format:\n' +
+          '`!addthread BossName will spawn in X minutes! (YYYY-MM-DD HH:MM)`'
+        );
+        return;
+      }
+
+      const detectedBoss = bossMatch[1].trim();
+      const bossName = findBossMatch(detectedBoss);
+      
+      if (!bossName) {
+        await message.reply(
+          `⚠️ **Unknown boss:** "${detectedBoss}"\n\n` +
+          `Make sure the boss name matches one in the boss list.\n` +
+          `**Available bosses:** ${Object.keys(bossPoints).join(', ')}`
+        );
+        return;
+      }
+
+      // Parse timestamp
+      const [datePart, timePart] = timestampStr.split(' ');
+      const [year, month, day] = datePart.split('-');
+      const [hour, minute] = timePart.split(':');
+      
+      // Convert to MM/DD/YY HH:MM format
+      const dateStr = `${month}/${day}/${year.substring(2)}`;
+      const timeStr = `${hour}:${minute}`;
+      const fullTimestamp = `${dateStr} ${timeStr}`;
+
+      console.log(`🔧 Manual spawn creation: ${bossName} at ${fullTimestamp} by ${message.author.username}`);
+
+      const attChannel = await guild.channels.fetch(config.attendance_channel_id).catch(() => null);
+      const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
+
+      if (!attChannel || !adminLogs) {
+        await message.reply('❌ Could not find required channels.');
+        return;
+      }
+
+      // Check if column already exists
+      const columnExists = await checkColumnExists(bossName, fullTimestamp);
+      if (columnExists) {
+        await message.reply(
+          `⚠️ **Column already exists** for ${bossName} at ${fullTimestamp}.\n\n` +
+          `A spawn thread for this boss at this exact timestamp already exists. Close it first before creating a new one.`
+        );
+        return;
+      }
+
+      const threadTitle = `[${dateStr} ${timeStr}] ${bossName}`;
+
+      // Create threads
+      const attThread = await attChannel.threads.create({
+        name: threadTitle,
+        autoArchiveDuration: config.auto_archive_minutes,
+        reason: `Manual spawn creation by ${message.author.username}`
+      }).catch(err => {
+        console.error('Failed to create attendance thread:', err);
+        return null;
+      });
+
+      const confirmThread = await adminLogs.threads.create({
+        name: `✅ ${threadTitle}`,
+        autoArchiveDuration: config.auto_archive_minutes,
+        reason: `Manual confirmation thread for ${bossName}`
+      }).catch(err => {
+        console.error('Failed to create confirmation thread:', err);
+        return null;
+      });
+
+      if (!attThread) {
+        await message.reply('❌ Failed to create attendance thread.');
+        return;
+      }
+
+      // Store spawn info
+      activeSpawns[attThread.id] = {
+        boss: bossName,
+        date: dateStr,
+        time: timeStr,
+        timestamp: fullTimestamp,
+        members: [],
+        confirmThreadId: confirmThread ? confirmThread.id : null,
+        closed: false
+      };
+
+      // Mark column as active
+      activeColumns[`${bossName}|${fullTimestamp}`] = attThread.id;
+
+      // Post instructions
+      const embed = new EmbedBuilder()
+        .setColor(0xFFD700)
+        .setTitle(`🎯 ${bossName}`)
+        .setDescription(`Manual spawn created by admin. Please check in below.`)
+        .addFields(
+          {name: '📸 How to Check In', value: '1. Post `present` or `here`\n2. Attach a screenshot (admins exempt)\n3. Wait for admin ✅'},
+          {name: '📊 Points', value: `${bossPoints[bossName].points} points`, inline: true},
+          {name: '🕐 Time', value: timeStr, inline: true},
+          {name: '📅 Date', value: dateStr, inline: true}
+        )
+        .setFooter({text: 'Manually created spawn | Admins: type "close" to finalize'})
+        .setTimestamp();
+      
+      await attThread.send({embeds: [embed]});
+
+      if (confirmThread) {
+        await confirmThread.send(`🟨 **${bossName}** spawn manually created by ${message.author.username} (${fullTimestamp}). Verifications will appear here.`);
+      }
+
+      await message.reply(
+        `✅ **Spawn thread created successfully!**\n\n` +
+        `**Boss:** ${bossName}\n` +
+        `**Time:** ${fullTimestamp}\n` +
+        `**Thread:** ${attThread.toString()}\n\n` +
+        `Members can now check in!`
+      );
+
+      console.log(`✅ Manual thread created: ${bossName} at ${fullTimestamp} by ${message.author.username}`);
+      return;
+    }
+
     // ========== ADMIN OVERRIDE: !verify @member ==========
     if (message.channel.isThread() && message.content.startsWith('!verify')) {
       const member = await guild.members.fetch(message.author.id).catch(() => null);
