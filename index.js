@@ -490,20 +490,42 @@ client.on(Events.MessageCreate, async (message) => {
     if (guild.id === config.timer_server_id) {
       if (config.timer_channel_id && message.channel.id !== config.timer_channel_id) return;
 
-      if (/will spawn in/i.test(message.content)) {
+      // Check for spawn announcement patterns
+      // Pattern 1: "Boss will spawn in X minutes! (YYYY-MM-DD HH:MM)"
+      // Pattern 2: "**Boss** will spawn in X minutes! (YYYY-MM-DD HH:MM)"
+      if (/will spawn in.*minutes?!/i.test(message.content)) {
         let detectedBoss = null;
+        let timestamp = null;
         
-        const matchBold = message.content.match(/\*\*(.*?)\*\*/);
+        // Extract timestamp from parentheses first
+        const timestampMatch = message.content.match(/\((\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\)/);
+        if (timestampMatch) {
+          timestamp = timestampMatch[1]; // "2025-10-20 14:47"
+        }
+        
+        // Try to extract boss name
+        // Try bold format first: ⚠️ **Boss** will spawn
+        const matchBold = message.content.match(/[⚠️🔔⏰]*\s*\*\*(.*?)\*\*\s*will spawn/i);
         if (matchBold) {
           detectedBoss = matchBold[1].trim();
         } else {
-          const matchPlain = message.content.match(/(.+?)\s+will spawn in/i);
-          if (matchPlain) {
-            detectedBoss = matchPlain[1].replace(/[^\w\s]/g, '').trim();
+          // Try emoji + name: ⚠️ Boss will spawn
+          const matchEmoji = message.content.match(/[⚠️🔔⏰]+\s*([A-Za-z\s]+?)\s*will spawn/i);
+          if (matchEmoji) {
+            detectedBoss = matchEmoji[1].trim();
+          } else {
+            // Try plain format: Boss will spawn
+            const matchPlain = message.content.match(/^([A-Za-z\s]+?)\s*will spawn/i);
+            if (matchPlain) {
+              detectedBoss = matchPlain[1].trim();
+            }
           }
         }
 
-        if (!detectedBoss) return;
+        if (!detectedBoss) {
+          console.log(`⚠️ Could not extract boss name from: ${message.content}`);
+          return;
+        }
 
         const bossName = findBossMatch(detectedBoss);
         if (!bossName) {
@@ -524,15 +546,34 @@ client.on(Events.MessageCreate, async (message) => {
           return;
         }
 
-        const ts = getCurrentTimestamp();
-        const threadTitle = `[${ts.date} ${ts.time}] ${bossName}`;
+        // Use timestamp from message if available, otherwise use current time
+        let dateStr, timeStr, fullTimestamp;
+        
+        if (timestamp) {
+          // Parse timestamp from timer message: "2025-10-20 14:47"
+          const [datePart, timePart] = timestamp.split(' ');
+          const [year, month, day] = datePart.split('-');
+          dateStr = `${month}/${day}/${year.substring(2)}`;
+          timeStr = timePart;
+          fullTimestamp = `${dateStr} ${timeStr}`;
+          console.log(`⏰ Using timestamp from timer: ${fullTimestamp}`);
+        } else {
+          // Fallback to current time
+          const ts = getCurrentTimestamp();
+          dateStr = ts.date;
+          timeStr = ts.time;
+          fullTimestamp = ts.full;
+          console.log(`⏰ Using current timestamp: ${fullTimestamp}`);
+        }
+
+        const threadTitle = `[${dateStr} ${timeStr}] ${bossName}`;
 
         // Check if column already exists
-        const columnExists = await checkColumnExists(bossName, ts.full);
+        const columnExists = await checkColumnExists(bossName, fullTimestamp);
         if (columnExists) {
-          console.log(`⚠️ Column already exists for ${bossName} at ${ts.full}. Blocking spawn.`);
+          console.log(`⚠️ Column already exists for ${bossName} at ${fullTimestamp}. Blocking spawn.`);
           await adminLogs.send(
-            `⚠️ **BLOCKED SPAWN:** ${bossName} at ${ts.full}\n` +
+            `⚠️ **BLOCKED SPAWN:** ${bossName} at ${fullTimestamp}\n` +
             `A column for this boss at this timestamp already exists. Close the existing thread first.`
           );
           return;
@@ -562,16 +603,16 @@ client.on(Events.MessageCreate, async (message) => {
         // Store spawn info
         activeSpawns[attThread.id] = {
           boss: bossName,
-          date: ts.date,
-          time: ts.time,
-          timestamp: ts.full,
+          date: dateStr,
+          time: timeStr,
+          timestamp: fullTimestamp,
           members: [],
           confirmThreadId: confirmThread ? confirmThread.id : null,
           closed: false
         };
 
         // Mark column as active
-        activeColumns[`${bossName}|${ts.full}`] = attThread.id;
+        activeColumns[`${bossName}|${fullTimestamp}`] = attThread.id;
 
         // Post instructions
         const embed = new EmbedBuilder()
@@ -581,8 +622,8 @@ client.on(Events.MessageCreate, async (message) => {
           .addFields(
             {name: '📸 How to Check In', value: '1. Post `present` or `here`\n2. Attach a screenshot (admins exempt)\n3. Wait for admin ✅'},
             {name: '📊 Points', value: `${bossPoints[bossName].points} points`, inline: true},
-            {name: '🕐 Time', value: ts.time, inline: true},
-            {name: '📅 Date', value: ts.date, inline: true}
+            {name: '🕐 Time', value: timeStr, inline: true},
+            {name: '📅 Date', value: dateStr, inline: true}
           )
           .setFooter({text: 'Admins: type "close" to finalize and submit attendance'})
           .setTimestamp();
@@ -590,10 +631,10 @@ client.on(Events.MessageCreate, async (message) => {
         await attThread.send({embeds: [embed]});
 
         if (confirmThread) {
-          await confirmThread.send(`🟨 **${bossName}** spawn detected (${ts.full}). Verifications will appear here.`);
+          await confirmThread.send(`🟨 **${bossName}** spawn detected (${fullTimestamp}). Verifications will appear here.`);
         }
 
-        console.log(`✅ Created threads for ${bossName} at ${ts.full}`);
+        console.log(`✅ Created threads for ${bossName} at ${fullTimestamp}`);
       }
     }
 
