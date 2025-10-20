@@ -1004,3 +1004,18 @@ if (!process.env.DISCORD_TOKEN) {
 }
 
 client.login(process.env.DISCORD_TOKEN);
+
+// --- KEEP THIS AT THE END OF YOUR FILE ---
+import express from "express";
+
+const app = express();
+const PORT = process.env.PORT || 8000;
+
+// Simple health check route
+app.get("/", (req, res) => {
+  res.send("Bot is running fine!");
+});
+
+app.listen(PORT, () => {
+  console.log(`🌐 Health check server running on port ${PORT}`);
+});
