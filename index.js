@@ -1,3 +1,22 @@
+/**
+ * ELYSIUM Guild Attendance Bot - Version 2.0 (Simplified)
+ * 
+ * NEW FLOW:
+ * 1. Boss spawns → Create thread with timestamp
+ * 2. Members check in → Admins verify → Store in memory
+ * 3. Admin closes thread → Batch send all attendance → Archive thread
+ * 4. ONE column per boss per timestamp (blocks duplicates)
+ * 5. No spawn numbering, no SpawnLog
+ * 
+ * Features:
+ * - Timestamp-based thread naming
+ * - Memory-based attendance collection
+ * - Batch submission on thread close
+ * - Hybrid column checking (memory + sheet)
+ * - Admin override: !verify @member
+ * - Screenshot required (except for admins)
+ */
+
 const { Client, GatewayIntentBits, Partials, Events, EmbedBuilder } = require('discord.js');
 const fetch = require('node-fetch');
 const levenshtein = require('fast-levenshtein');
@@ -11,22 +30,54 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMessageReactions
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.GuildMembers
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-// Runtime state - stores active spawns and pending verifications
-let activeSpawns = {}; // key: spawnId -> {boss, spawnNum, date, threadId, confirmThreadId, createdAt}
+// ==========================================
+// RUNTIME STATE
+// ==========================================
+let activeSpawns = {}; // threadId -> {boss, date, time, timestamp, members: [], confirmThreadId, closed}
+let activeColumns = {}; // "boss|timestamp" -> threadId (for duplicate check)
+let pendingVerifications = {}; // messageId -> {author, authorId, threadId, timestamp}
+let pendingClosures = {}; // messageId -> {threadId, adminId}
+
+// Rate limiting
+let lastSheetCall = 0;
+const MIN_SHEET_DELAY = 2000;
 
 /**
- * Fuzzy match boss name from user input
- * Returns exact boss name from boss_points.json or null
+ * Get current timestamp in Manila timezone
+ */
+function getCurrentTimestamp() {
+  const date = new Date();
+  const dateStr = date.toLocaleDateString('en-US', {
+    timeZone: 'Asia/Manila',
+    year: '2-digit',
+    month: 'numeric',
+    day: 'numeric'
+  });
+  const timeStr = date.toLocaleTimeString('en-US', {
+    timeZone: 'Asia/Manila',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  return {
+    date: dateStr,
+    time: timeStr,
+    full: `${dateStr} ${timeStr}`
+  };
+}
+
+/**
+ * Fuzzy match boss name
  */
 function findBossMatch(input) {
   const q = input.toLowerCase().trim();
   
-  // First: exact match on name or aliases
   for (const name of Object.keys(bossPoints)) {
     if (name.toLowerCase() === q) return name;
     const meta = bossPoints[name];
@@ -35,7 +86,6 @@ function findBossMatch(input) {
     }
   }
   
-  // Second: fuzzy match using Levenshtein distance
   let best = {name: null, dist: 999};
   for (const name of Object.keys(bossPoints)) {
     const dist = levenshtein.get(q, name.toLowerCase());
@@ -47,34 +97,7 @@ function findBossMatch(input) {
     }
   }
   
-  // Allow small typos (distance <= 2)
-  if (best.dist <= 2) return best.name;
-  return null;
-}
-
-/**
- * Get timezone-adjusted date string
- */
-function getDateString() {
-  return new Date().toLocaleDateString('en-US', {timeZone: 'Asia/Manila'});
-}
-
-/**
- * Post attendance data to Google Apps Script webhook
- */
-async function postAttendanceToSheet(payload) {
-  try {
-    const res = await fetch(config.sheet_webhook_url, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload)
-    });
-    const text = await res.text();
-    return {ok: res.ok, status: res.status, text};
-  } catch (err) {
-    console.error('Webhook post error:', err);
-    return {ok: false, err: err.toString()};
-  }
+  return best.dist <= 2 ? best.name : null;
 }
 
 /**
@@ -84,192 +107,289 @@ function isAdmin(member) {
   return member.roles.cache.some(r => config.admin_roles.includes(r.name));
 }
 
+/**
+ * Parse thread name to extract info
+ */
+function parseThreadName(name) {
+  const match = name.match(/^\[(.*?)\s+(.*?)\]\s+(.+)$/);
+  if (!match) return null;
+  return {
+    date: match[1],
+    time: match[2],
+    timestamp: `${match[1]} ${match[2]}`,
+    boss: match[3]
+  };
+}
+
+/**
+ * Post to Google Sheets with rate limiting
+ */
+async function postToSheet(payload) {
+  try {
+    const now = Date.now();
+    const timeSinceLastCall = now - lastSheetCall;
+    if (timeSinceLastCall < MIN_SHEET_DELAY) {
+      const waitTime = MIN_SHEET_DELAY - timeSinceLastCall;
+      console.log(`⏳ Rate limiting: waiting ${waitTime}ms...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+    
+    lastSheetCall = Date.now();
+    
+    const res = await fetch(config.sheet_webhook_url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    
+    const text = await res.text();
+    console.log(`📊 Sheet response: ${res.status} - ${text.substring(0, 200)}`);
+    
+    if (res.status === 429) {
+      console.error('❌ Rate limit hit! Waiting 5 seconds...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      return postToSheet(payload);
+    }
+    
+    return {ok: res.ok, status: res.status, text};
+  } catch (err) {
+    console.error('❌ Webhook error:', err);
+    return {ok: false, err: err.toString()};
+  }
+}
+
+/**
+ * Check if column exists (hybrid: memory + sheet)
+ */
+async function checkColumnExists(boss, timestamp) {
+  const key = `${boss}|${timestamp}`;
+  
+  // Check memory first
+  if (activeColumns[key]) {
+    console.log(`✅ Column exists in memory: ${key}`);
+    return true;
+  }
+  
+  // Fallback: Check sheet
+  console.log(`🔍 Checking sheet for column: ${key}`);
+  const resp = await postToSheet({
+    action: 'checkColumn',
+    boss,
+    timestamp
+  });
+  
+  if (resp.ok) {
+    try {
+      const data = JSON.parse(resp.text);
+      return data.exists === true;
+    } catch (e) {
+      return false;
+    }
+  }
+  
+  return false;
+}
+
 client.once(Events.ClientReady, () => {
-  console.log(`✅ Guild Attendance Bot logged in as ${client.user.tag}`);
+  console.log(`✅ Bot logged in as ${client.user.tag}`);
   console.log(`📊 Tracking ${Object.keys(bossPoints).length} bosses`);
   console.log(`🏠 Main Guild: ${config.main_guild_id}`);
   console.log(`⏰ Timer Server: ${config.timer_server_id}`);
 });
 
 // ==========================================
-// TIMER SERVER DETECTION
+// MESSAGE HANDLER
 // ==========================================
 client.on(Events.MessageCreate, async (message) => {
   try {
-    // Log ALL messages for debugging
-    console.log(`📨 Message received: "${message.content}" in channel ${message.channel.id} from ${message.author.tag}`);
-    
-    if (message.author.bot) {
-      console.log('⏭️ Skipping bot message');
+    if (message.author.bot) return;
+
+    const guild = message.guild;
+    if (!guild) return;
+
+    // ========== ADMIN OVERRIDE: !verify @member ==========
+    if (message.channel.isThread() && message.content.startsWith('!verify')) {
+      const member = await guild.members.fetch(message.author.id).catch(() => null);
+      if (!member || !isAdmin(member)) return;
+
+      const mentioned = message.mentions.users.first();
+      if (!mentioned) {
+        await message.reply('⚠️ Usage: `!verify @member`');
+        return;
+      }
+
+      const spawnInfo = activeSpawns[message.channel.id];
+      if (!spawnInfo || spawnInfo.closed) {
+        await message.reply('⚠️ This spawn is closed or not found.');
+        return;
+      }
+
+      // Get the mentioned member's nickname or username
+      const mentionedMember = await guild.members.fetch(mentioned.id).catch(() => null);
+      const username = mentionedMember ? (mentionedMember.nickname || mentioned.username) : mentioned.username;
+      
+      // Check duplicate
+      if (spawnInfo.members.includes(username)) {
+        await message.reply(`⚠️ **${username}** is already verified for this spawn.`);
+        return;
+      }
+
+      // Add to members
+      spawnInfo.members.push(username);
+
+      await message.reply(`✅ **${username}** manually verified by ${message.author.username}`);
+      
+      // Log to confirmation thread
+      if (spawnInfo.confirmThreadId) {
+        const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
+        if (confirmThread) {
+          await confirmThread.send(`✅ **${username}** verified by ${message.author.username} (manual override)`);
+        }
+      }
+
+      console.log(`✅ Manual verify: ${username} for ${spawnInfo.boss} by ${message.author.username}`);
       return;
     }
 
-    // ==========================================
-    // ATTENDANCE CHECK-IN (in attendance threads)
-    // CHECK THIS FIRST before timer detection!
-    // ==========================================
-    if (message.channel.isThread()) {
-      console.log(`📝 Message in thread, parent: ${message.channel.parentId}`);
-      
-      const parentId = message.channel.parentId;
-      
-      if (parentId === config.attendance_channel_id) {
-        console.log('✅ Thread is under attendance channel!');
-        
-        const content = message.content.trim().toLowerCase();
-        const parts = content.split(/\s+/);
-        const keyword = parts[0];
+    // ========== ADMIN CLOSE COMMAND ==========
+    if (message.channel.isThread() && message.content.trim().toLowerCase() === 'close') {
+      const member = await guild.members.fetch(message.author.id).catch(() => null);
+      if (!member || !isAdmin(member)) return;
 
-        // Check for attendance keywords
-        if (['present', 'here', 'join', 'checkin', 'check-in'].includes(keyword)) {
-          console.log(`✅ Attendance keyword detected: ${keyword}`);
-          
-          // Require screenshot attachment
-          if (!message.attachments || message.attachments.size === 0) {
-            await message.reply('⚠️ **Screenshot required!** Please attach a screenshot showing the boss and timestamp.');
-            return;
-          }
-
-          // Extract spawn info from thread name: [date] Boss (#n)
-          const threadName = message.channel.name;
-          const match = threadName.match(/^\[(.*?)\]\s+(.*?)\s+\(#(\d+)\)/);
-          
-          let spawnKey = null;
-          let bossMatched = null;
-
-          if (match) {
-            const date = match[1];
-            const threadBoss = match[2];
-            const num = Number(match[3]);
-
-            // Find active spawn
-            for (const k of Object.keys(activeSpawns)) {
-              const s = activeSpawns[k];
-              if (s.boss === threadBoss && s.spawnNum === num && s.date === date) {
-                spawnKey = k;
-                bossMatched = threadBoss;
-                break;
-              }
-            }
-          }
-
-          // Allow boss name override in message
-          if (parts.length >= 2) {
-            const overrideBoss = findBossMatch(parts[1]);
-            if (overrideBoss) bossMatched = overrideBoss;
-          }
-
-          if (!bossMatched) {
-            await message.reply('❓ Could not identify boss. Please ensure you\'re in the correct spawn thread.');
-            return;
-          }
-
-          // Add checkmark reaction for admin verification
-          try {
-            await message.react('✅');
-          } catch (e) {
-            console.error('Failed to add reaction:', e);
-          }
-
-          // Store pending attendance
-          const pendingKey = `pending|${message.id}`;
-          activeSpawns[pendingKey] = {
-            messageId: message.id,
-            author: message.author.username,
-            authorId: message.author.id,
-            boss: bossMatched,
-            spawnKey,
-            timestamp: Date.now()
-          };
-
-          const embed = new EmbedBuilder()
-            .setColor(0xFFA500)
-            .setDescription(`⏳ Registered **${message.author.username}** for **${bossMatched}**\n\nWaiting for admin verification...`)
-            .setFooter({text: 'An admin will react with ✅ to confirm'});
-
-          await message.reply({embeds: [embed]});
-          
-          console.log(`📝 Pending attendance: ${message.author.username} for ${bossMatched}`);
-        }
+      const spawnInfo = activeSpawns[message.channel.id];
+      if (!spawnInfo || spawnInfo.closed) {
+        await message.reply('⚠️ This spawn is already closed or not found.');
+        return;
       }
-      // If thread but not attendance channel, just ignore (don't process as timer message)
+
+      const confirmMsg = await message.reply(
+        `🔒 Close spawn **${spawnInfo.boss}** (${spawnInfo.timestamp})?\n\n` +
+        `**${spawnInfo.members.length} members** will be submitted to Google Sheets.\n\n` +
+        `React ✅ to confirm or ❌ to cancel.`
+      );
+      
+      await confirmMsg.react('✅');
+      await confirmMsg.react('❌');
+      
+      pendingClosures[confirmMsg.id] = {
+        threadId: message.channel.id,
+        adminId: message.author.id
+      };
+      
       return;
     }
 
-    // ==========================================
-    // TIMER SERVER DETECTION
-    // Only check this if message is NOT in a thread
-    // ==========================================
-    if (message.guild && message.guild.id === config.timer_server_id) {
-      console.log('✅ Message is in timer server!');
-      
-      // If timer_channel_id is specified, only listen to that channel
-      if (config.timer_channel_id && message.channel.id !== config.timer_channel_id) {
-        console.log(`⏭️ Ignoring - not in timer channel. Expected: ${config.timer_channel_id}, Got: ${message.channel.id}`);
-        return; // Ignore messages from other channels
-      }
-      
-      console.log('✅ Message is in correct channel!');
-      
-      // Look for pattern: "BossName will spawn in" or "**BossName** will spawn in"
-      if (/will spawn in/i.test(message.content)) {
-        console.log('✅ Message contains "will spawn in"!');
+    // ========== MEMBER CHECK-IN ==========
+    if (message.channel.isThread() && message.channel.parentId === config.attendance_channel_id) {
+      const content = message.content.trim().toLowerCase();
+      const parts = content.split(/\s+/);
+      const keyword = parts[0];
+
+      if (['present', 'here', 'join', 'checkin', 'check-in'].includes(keyword)) {
+        const spawnInfo = activeSpawns[message.channel.id];
         
-        let detectedBoss = null;
-        
-        // Try pattern 1: "**BossName** will spawn in" (bold)
-        let match = message.content.match(/\*\*(.*?)\*\*/);
-        if (match) {
-          detectedBoss = match[1].trim();
-          console.log(`📝 Pattern 1 matched (bold): ${detectedBoss}`);
-        } else {
-          // Try pattern 2: "BossName will spawn in" (plain text)
-          // Extract text before "will spawn in", handling emojis and special chars
-          match = message.content.match(/(.+?)\s+will spawn in/i);
-          if (match) {
-            // Remove emojis and special characters, keep only letters and spaces
-            detectedBoss = match[1].replace(/[^\w\s]/g, '').trim();
-            console.log(`📝 Pattern 2 matched (plain): ${detectedBoss}`);
-          }
-        }
-        
-        if (!detectedBoss) {
-          console.log('⚠️ Could not extract boss name from message:', message.content);
+        if (!spawnInfo || spawnInfo.closed) {
+          await message.reply('⚠️ This spawn is closed. No more check-ins accepted.');
           return;
         }
 
-        // Match detected boss to our boss list
+        const member = await guild.members.fetch(message.author.id).catch(() => null);
+        const userIsAdmin = member && isAdmin(member);
+
+        // Screenshot requirement (except for admins)
+        if (!userIsAdmin) {
+          if (!message.attachments || message.attachments.size === 0) {
+            await message.reply('⚠️ **Screenshot required!** Attach a screenshot showing boss and timestamp.');
+            return;
+          }
+        }
+
+        // Use nickname if available, otherwise username
+        const username = member ? (member.nickname || message.author.username) : message.author.username;
+
+        // Check duplicate
+        if (spawnInfo.members.includes(username)) {
+          await message.reply(`⚠️ You already checked in for this spawn.`);
+          return;
+        }
+
+        // Add reactions
+        await message.react('✅');
+        await message.react('❌');
+
+        // Store pending verification
+        pendingVerifications[message.id] = {
+          author: username,
+          authorId: message.author.id,
+          threadId: message.channel.id,
+          timestamp: Date.now()
+        };
+
+        const embed = new EmbedBuilder()
+          .setColor(0xFFA500)
+          .setDescription(`⏳ **${username}** registered for **${spawnInfo.boss}**\n\nWaiting for admin verification...`)
+          .setFooter({text: 'Admins: React ✅ to verify, ❌ to deny'});
+
+        await message.reply({embeds: [embed]});
+        console.log(`📝 Pending: ${username} for ${spawnInfo.boss}`);
+      }
+      
+      return;
+    }
+
+    // ========== TIMER SPAWN DETECTION ==========
+    if (guild.id === config.timer_server_id) {
+      if (config.timer_channel_id && message.channel.id !== config.timer_channel_id) return;
+
+      if (/will spawn in/i.test(message.content)) {
+        let detectedBoss = null;
+        
+        const matchBold = message.content.match(/\*\*(.*?)\*\*/);
+        if (matchBold) {
+          detectedBoss = matchBold[1].trim();
+        } else {
+          const matchPlain = message.content.match(/(.+?)\s+will spawn in/i);
+          if (matchPlain) {
+            detectedBoss = matchPlain[1].replace(/[^\w\s]/g, '').trim();
+          }
+        }
+
+        if (!detectedBoss) return;
+
         const bossName = findBossMatch(detectedBoss);
         if (!bossName) {
-          console.log(`⚠️ Detected unknown boss: ${detectedBoss}`);
+          console.log(`⚠️ Unknown boss: ${detectedBoss}`);
           return;
         }
 
         console.log(`🎯 Boss spawn detected: ${bossName}`);
 
-        // Fetch main guild and channels
-        const guild = await client.guilds.fetch(config.main_guild_id).catch(() => null);
-        if (!guild) return;
+        const mainGuild = await client.guilds.fetch(config.main_guild_id).catch(() => null);
+        if (!mainGuild) return;
 
-        const attChannel = await guild.channels.fetch(config.attendance_channel_id).catch(() => null);
-        const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
+        const attChannel = await mainGuild.channels.fetch(config.attendance_channel_id).catch(() => null);
+        const adminLogs = await mainGuild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
 
         if (!attChannel || !adminLogs) {
-          console.error('❌ Could not find attendance or admin logs channel');
+          console.error('❌ Could not find channels');
           return;
         }
 
-        // Count spawns for this boss today
-        const today = getDateString();
-        const sameSpawnsToday = Object.values(activeSpawns).filter(
-          s => s.boss === bossName && s.date === today
-        );
-        const spawnNum = sameSpawnsToday.length + 1;
-        
-        const threadTitle = `[${today}] ${bossName} (#${spawnNum})`;
-        const spawnId = `${today}|${bossName}|${spawnNum}|${Date.now()}`;
+        const ts = getCurrentTimestamp();
+        const threadTitle = `[${ts.date} ${ts.time}] ${bossName}`;
 
-        // Create attendance thread
+        // Check if column already exists
+        const columnExists = await checkColumnExists(bossName, ts.full);
+        if (columnExists) {
+          console.log(`⚠️ Column already exists for ${bossName} at ${ts.full}. Blocking spawn.`);
+          await adminLogs.send(
+            `⚠️ **BLOCKED SPAWN:** ${bossName} at ${ts.full}\n` +
+            `A column for this boss at this timestamp already exists. Close the existing thread first.`
+          );
+          return;
+        }
+
+        // Create threads
         const attThread = await attChannel.threads.create({
           name: threadTitle,
           autoArchiveDuration: config.auto_archive_minutes,
@@ -279,7 +399,6 @@ client.on(Events.MessageCreate, async (message) => {
           return null;
         });
 
-        // Create confirmation thread for admins
         const confirmThread = await adminLogs.threads.create({
           name: `✅ ${threadTitle}`,
           autoArchiveDuration: config.auto_archive_minutes,
@@ -289,40 +408,43 @@ client.on(Events.MessageCreate, async (message) => {
           return null;
         });
 
+        if (!attThread) return;
+
         // Store spawn info
-        activeSpawns[spawnId] = {
+        activeSpawns[attThread.id] = {
           boss: bossName,
-          spawnNum,
-          date: today,
-          threadId: attThread ? attThread.id : null,
+          date: ts.date,
+          time: ts.time,
+          timestamp: ts.full,
+          members: [],
           confirmThreadId: confirmThread ? confirmThread.id : null,
-          createdAt: Date.now()
+          closed: false
         };
 
-        // Post instructions in attendance thread
-        if (attThread) {
-          const embed = new EmbedBuilder()
-            .setColor(0xFFD700)
-            .setTitle(`🎯 ${bossName} - Spawn #${spawnNum}`)
-            .setDescription(`Boss detected! Please check in below.`)
-            .addFields(
-              {name: '📸 How to Check In', value: '1. Post `present` or `here` in this thread\n2. Attach a screenshot showing boss and timestamp\n3. Wait for admin verification (✅)'},
-              {name: '📊 Points', value: `${bossPoints[bossName].points} points`, inline: true},
-              {name: '📅 Date', value: today, inline: true},
-              {name: '🔢 Spawn Number', value: `#${spawnNum}`, inline: true}
-            )
-            .setFooter({text: 'ELYSIUM Guild Attendance System'})
-            .setTimestamp();
-          
-          await attThread.send({embeds: [embed]});
-        }
+        // Mark column as active
+        activeColumns[`${bossName}|${ts.full}`] = attThread.id;
 
-        // Post in confirmation thread
+        // Post instructions
+        const embed = new EmbedBuilder()
+          .setColor(0xFFD700)
+          .setTitle(`🎯 ${bossName}`)
+          .setDescription(`Boss detected! Please check in below.`)
+          .addFields(
+            {name: '📸 How to Check In', value: '1. Post `present` or `here`\n2. Attach a screenshot (admins exempt)\n3. Wait for admin ✅'},
+            {name: '📊 Points', value: `${bossPoints[bossName].points} points`, inline: true},
+            {name: '🕐 Time', value: ts.time, inline: true},
+            {name: '📅 Date', value: ts.date, inline: true}
+          )
+          .setFooter({text: 'Admins: type "close" to finalize and submit attendance'})
+          .setTimestamp();
+        
+        await attThread.send({embeds: [embed]});
+
         if (confirmThread) {
-          await confirmThread.send(`🟨 **${bossName}** spawn #${spawnNum} detected (${today}). React ✅ to member messages to verify attendance.`);
+          await confirmThread.send(`🟨 **${bossName}** spawn detected (${ts.full}). Verifications will appear here.`);
         }
 
-        console.log(`✅ Created threads for ${bossName} spawn #${spawnNum}`);
+        console.log(`✅ Created threads for ${bossName} at ${ts.full}`);
       }
     }
 
@@ -332,122 +454,159 @@ client.on(Events.MessageCreate, async (message) => {
 });
 
 // ==========================================
-// ADMIN VERIFICATION (reaction handler)
+// REACTION HANDLER
 // ==========================================
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
   try {
     if (user.bot) return;
 
-    // Fetch partials if needed
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();
 
-    if (reaction.emoji.name !== '✅') return;
-
     const msg = reaction.message;
-    const pendingKey = `pending|${msg.id}`;
-    const pending = activeSpawns[pendingKey];
-
-    if (!pending) return; // Not a pending attendance message
-
     const guild = msg.guild;
     const adminMember = await guild.members.fetch(user.id).catch(() => null);
     
-    if (!adminMember) return;
-
-    // Check if user is admin
-    if (!isAdmin(adminMember)) {
+    if (!adminMember || !isAdmin(adminMember)) {
       try {
         await reaction.users.remove(user.id);
       } catch (e) {}
       return;
     }
 
-    // Prevent self-verification
-    if (user.id === pending.authorId) {
-      await msg.channel.send(`⚠️ <@${user.id}>, you cannot verify your own attendance.`);
-      try {
-        await reaction.users.remove(user.id);
-      } catch (e) {}
+    // ========== CLOSE CONFIRMATION ==========
+    const closePending = pendingClosures[msg.id];
+    
+    if (closePending) {
+      const spawnInfo = activeSpawns[closePending.threadId];
+      
+      if (reaction.emoji.name === '✅') {
+        if (!spawnInfo || spawnInfo.closed) {
+          await msg.channel.send('⚠️ Spawn already closed or not found.');
+          delete pendingClosures[msg.id];
+          return;
+        }
+
+        // Mark as closed
+        spawnInfo.closed = true;
+
+        await msg.channel.send(`🔒 Closing spawn **${spawnInfo.boss}**... Submitting ${spawnInfo.members.length} members to Google Sheets...`);
+
+        // Send attendance to Google Sheets
+        const payload = {
+          action: 'submitAttendance',
+          boss: spawnInfo.boss,
+          date: spawnInfo.date,
+          time: spawnInfo.time,
+          timestamp: spawnInfo.timestamp,
+          members: spawnInfo.members
+        };
+
+        const resp = await postToSheet(payload);
+
+        if (resp.ok) {
+          await msg.channel.send(`✅ Attendance submitted successfully! Archiving thread...`);
+          
+          // Delete confirmation thread
+          if (spawnInfo.confirmThreadId) {
+            const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
+            if (confirmThread) {
+              await confirmThread.delete().catch(console.error);
+              console.log(`🗑️ Deleted confirmation thread for ${spawnInfo.boss}`);
+            }
+          }
+
+          // Archive attendance thread
+          await msg.channel.setArchived(true, `Closed by ${user.username}`).catch(console.error);
+
+          // Clean up memory
+          delete activeSpawns[closePending.threadId];
+          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+
+          console.log(`🔒 Spawn closed: ${spawnInfo.boss} at ${spawnInfo.timestamp} (${spawnInfo.members.length} members)`);
+        } else {
+          await msg.channel.send(
+            `⚠️ **Failed to submit attendance!**\n\n` +
+            `Error: ${resp.text || resp.err}\n\n` +
+            `**Members list (for manual entry):**\n${spawnInfo.members.join(', ')}\n\n` +
+            `Please manually update the Google Sheet.`
+          );
+        }
+
+        delete pendingClosures[msg.id];
+        
+      } else if (reaction.emoji.name === '❌') {
+        await msg.channel.send('❌ Spawn close canceled.');
+        delete pendingClosures[msg.id];
+      }
+      
       return;
     }
 
-    // Get spawn info
-    const spawnInfo = pending.spawnKey ? activeSpawns[pending.spawnKey] : null;
-    const spawnLabel = spawnInfo 
-      ? `${spawnInfo.date} | ${spawnInfo.boss} #${spawnInfo.spawnNum}`
-      : pending.boss;
+    // ========== ATTENDANCE VERIFICATION ==========
+    const pending = pendingVerifications[msg.id];
+    
+    if (pending) {
+      const spawnInfo = activeSpawns[pending.threadId];
 
-    console.log(`✅ Admin ${user.username} verifying ${pending.author} for ${pending.boss}`);
-
-    // Send to Google Sheets
-    const payload = {
-      user: pending.author,
-      boss: pending.boss,
-      spawnLabel,
-      verifier: user.username,
-      verifierId: user.id,
-      timestamp: new Date().toISOString()
-    };
-
-    const resp = await postAttendanceToSheet(payload);
-
-    if (resp.ok) {
-      // Success!
-      const embed = new EmbedBuilder()
-        .setColor(0x00FF00)
-        .setTitle('✅ Attendance Verified')
-        .setDescription(`**${pending.author}** verified for **${pending.boss}**`)
-        .addFields(
-          {name: 'Verified By', value: user.username, inline: true},
-          {name: 'Points', value: `+${bossPoints[pending.boss].points}`, inline: true}
-        )
-        .setTimestamp();
-
-      // Post in confirmation thread if exists
-      if (spawnInfo && spawnInfo.confirmThreadId) {
-        const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
-        if (confirmThread && confirmThread.send) {
-          await confirmThread.send({embeds: [embed]});
-        }
-      } else {
-        // Post in admin logs
-        const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
-        if (adminLogs && adminLogs.send) {
-          await adminLogs.send({embeds: [embed]});
-        }
+      if (!spawnInfo || spawnInfo.closed) {
+        await msg.reply('⚠️ This spawn is already closed.');
+        delete pendingVerifications[msg.id];
+        return;
       }
 
-      // Update original message
-      await msg.reply(`✅ Attendance verified by **${user.username}**! Points have been added to the sheet.`);
+      if (reaction.emoji.name === '✅') {
+        // Check if already verified
+        if (spawnInfo.members.includes(pending.author)) {
+          await msg.reply(`⚠️ **${pending.author}** is already verified. Ignoring duplicate.`);
+          try {
+            await reaction.users.remove(user.id);
+          } catch (e) {}
+          return;
+        }
 
-      // Cleanup
-      delete activeSpawns[pendingKey];
-      
-      // Remove admin's checkmark to prevent confusion
-      try {
-        await reaction.users.remove(user.id);
-      } catch (e) {}
+        // Add to members list
+        spawnInfo.members.push(pending.author);
 
-    } else {
-      // Error from Google Sheets (likely duplicate)
-      const errorEmbed = new EmbedBuilder()
-        .setColor(0xFF0000)
-        .setTitle('⚠️ Verification Failed')
-        .setDescription(`Could not verify **${pending.author}** for **${pending.boss}**`)
-        .addFields({name: 'Error', value: resp.text || resp.err || 'Unknown error'})
-        .setTimestamp();
+        // Clear reactions
+        await msg.reactions.removeAll().catch(() => {});
 
-      const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
-      if (adminLogs && adminLogs.send) {
-        await adminLogs.send({embeds: [errorEmbed]});
+        // Reply with confirmation
+        await msg.reply(`✅ **${pending.author}** verified by ${user.username}!`);
+
+        // Log to confirmation thread
+        if (spawnInfo.confirmThreadId) {
+          const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
+          if (confirmThread) {
+            const embed = new EmbedBuilder()
+              .setColor(0x00FF00)
+              .setTitle('✅ Attendance Verified')
+              .setDescription(`**${pending.author}** verified for **${spawnInfo.boss}**`)
+              .addFields(
+                {name: 'Verified By', value: user.username, inline: true},
+                {name: 'Points', value: `+${bossPoints[spawnInfo.boss].points}`, inline: true},
+                {name: 'Total Verified', value: `${spawnInfo.members.length}`, inline: true}
+              )
+              .setTimestamp();
+            
+            await confirmThread.send({embeds: [embed]});
+          }
+        }
+
+        delete pendingVerifications[msg.id];
+        console.log(`✅ Verified: ${pending.author} for ${spawnInfo.boss} by ${user.username}`);
+
+      } else if (reaction.emoji.name === '❌') {
+        // Deny
+        await msg.delete().catch(() => {});
+        await msg.channel.send(
+          `<@${pending.authorId}>, your attendance was **denied** by ${user.username}. ` +
+          `Please repost with a proper screenshot.`
+        );
+        
+        delete pendingVerifications[msg.id];
+        console.log(`❌ Denied: ${pending.author} for ${spawnInfo.boss} by ${user.username}`);
       }
-
-      await msg.reply(`⚠️ Verification failed: ${resp.text || 'Already verified or error occurred'}`);
-      
-      try {
-        await reaction.users.remove(user.id);
-      } catch (e) {}
     }
 
   } catch (err) {
@@ -471,7 +630,6 @@ process.on('unhandledRejection', error => {
 // ==========================================
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ DISCORD_TOKEN environment variable not set!');
-  console.error('Set it in Railway or locally: export DISCORD_TOKEN=your_token');
   process.exit(1);
 }
 

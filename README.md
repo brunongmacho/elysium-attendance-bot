@@ -1,5 +1,18 @@
 # Elysium Attendance Bot
 
+<!-- Code review summary: added -->
+## Code review summary — quick findings
+- Security: DISCORD_TOKEN is required via env — ensure it's stored in Railway/GitHub secrets. The Google Apps Script webhook URL is in config.json; treat it as a secret and move to env/secrets.
+- Persistency: activeSpawns and pending attendance are kept in-memory only. A process restart loses pending state; consider persisting to a small DB or file in persistent storage.
+- Repo hygiene: node_modules and large artifacts are committed in your history — remove them from the index and add .gitignore/.dockerignore to speed pushes and builds.
+- Docker/Railway: use .dockerignore and the multi-stage Dockerfile (already present) to reduce context upload and leverage caching.
+- Robustness: index.js uses fuzzy matching and webhook posting; validate webhook responses and handle network errors / rate-limits gracefully.
+- Recommended next steps:
+  - Move secrets out of config.json to environment variables.
+  - Add persistent store for pending checks (SQLite or Railway persistent storage).
+  - Harden webhook auth (shared secret header) and validate it on Code.gs.
+  - Remove node_modules from the repo and purge large files from history if needed (BFG/git filter-repo).
+
 Purpose
 - A Discord bot to detect boss spawn announcements (from a "timer" server), create attendance threads in the main guild, accept member check-ins with screenshots, and record verified attendance into a Google Sheet via a webhook.
 - Points per boss are defined in `boss_points.json`. Verification is performed by admins reacting with ✅.
