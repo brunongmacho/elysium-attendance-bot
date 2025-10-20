@@ -17,12 +17,6 @@
  * - Screenshot required (except for admins)
  */
 
-import express from "express";
-const app = express();
-
-app.get("/", (req, res) => res.send("OK"));
-app.listen(8000, () => console.log("Health check server running on port 8000"));
-
 const { Client, GatewayIntentBits, Partials, Events, EmbedBuilder } = require('discord.js');
 const fetch = require('node-fetch');
 const levenshtein = require('fast-levenshtein');
