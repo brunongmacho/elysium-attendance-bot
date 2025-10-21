@@ -1,10 +1,11 @@
 /**
- * ELYSIUM Guild Attendance Bot - Version 2.1 (OPTIMIZED)
+ * ELYSIUM Guild Attendance Bot - Version 2.2 (FULLY OPTIMIZED)
  * 
- * OPTIMIZATIONS:
- * - Case-insensitive member duplicate check
- * - Better code organization
- * - Consistent error handling
+ * OPTIMIZATIONS APPLIED:
+ * ✅ Case-insensitive member duplicate check (no duplicates)
+ * ✅ Better code organization (clear sections)
+ * ✅ Consistent error handling (all errors logged properly)
+ * ✅ HTTP health check server for Koyeb deployment
  * 
  * Features:
  * - Timestamp-based thread naming
@@ -13,7 +14,7 @@
  * - Hybrid column checking (memory + sheet)
  * - Admin override: !verify @member
  * - Screenshot required (except for admins)
- * - HTTP health check server for Koyeb
+ * - Force close: !forceclose (emergency)
  */
 
 const { Client, GatewayIntentBits, Partials, Events, EmbedBuilder } = require('discord.js');
@@ -70,7 +71,11 @@ let pendingClosures = {}; // messageId -> {threadId, adminId}
 
 // Rate limiting
 let lastSheetCall = 0;
-const MIN_SHEET_DELAY = 2000;
+const MIN_SHEET_DELAY = 2000; // 2 seconds between API calls
+
+// ==========================================
+// UTILITY FUNCTIONS
+// ==========================================
 
 /**
  * Get current timestamp in Manila timezone
@@ -97,11 +102,12 @@ function getCurrentTimestamp() {
 }
 
 /**
- * Fuzzy match boss name
+ * Fuzzy match boss name with error tolerance
  */
 function findBossMatch(input) {
   const q = input.toLowerCase().trim();
   
+  // Exact match first
   for (const name of Object.keys(bossPoints)) {
     if (name.toLowerCase() === q) return name;
     const meta = bossPoints[name];
@@ -110,6 +116,7 @@ function findBossMatch(input) {
     }
   }
   
+  // Fuzzy match with levenshtein distance
   let best = {name: null, dist: 999};
   for (const name of Object.keys(bossPoints)) {
     const dist = levenshtein.get(q, name.toLowerCase());
@@ -132,7 +139,7 @@ function isAdmin(member) {
 }
 
 /**
- * Parse thread name to extract info
+ * Parse thread name to extract spawn info
  */
 function parseThreadName(name) {
   const match = name.match(/^\[(.*?)\s+(.*?)\]\s+(.+)$/);
@@ -169,10 +176,11 @@ async function postToSheet(payload) {
     const text = await res.text();
     console.log(`📊 Sheet response: ${res.status} - ${text.substring(0, 200)}`);
     
+    // Handle rate limiting with retry
     if (res.status === 429) {
       console.error('❌ Rate limit hit! Waiting 5 seconds...');
       await new Promise(resolve => setTimeout(resolve, 5000));
-      return postToSheet(payload);
+      return postToSheet(payload); // Retry
     }
     
     return {ok: res.ok, status: res.status, text};
@@ -188,13 +196,13 @@ async function postToSheet(payload) {
 async function checkColumnExists(boss, timestamp) {
   const key = `${boss}|${timestamp}`;
   
-  // Check memory first
+  // Check memory first (fast)
   if (activeColumns[key]) {
     console.log(`✅ Column exists in memory: ${key}`);
     return true;
   }
   
-  // Fallback: Check sheet
+  // Fallback: Check sheet (slower but reliable)
   console.log(`🔍 Checking sheet for column: ${key}`);
   const resp = await postToSheet({
     action: 'checkColumn',
@@ -214,6 +222,10 @@ async function checkColumnExists(boss, timestamp) {
   return false;
 }
 
+// ==========================================
+// SPAWN THREAD CREATION
+// ==========================================
+
 /**
  * Create spawn threads with @everyone mention
  */
@@ -229,7 +241,7 @@ async function createSpawnThreads(bossName, dateStr, timeStr, fullTimestamp, tri
     return;
   }
 
-  // Check if column already exists
+  // Check if column already exists (prevents duplicates)
   const columnExists = await checkColumnExists(bossName, fullTimestamp);
   if (columnExists) {
     console.log(`⚠️ Column already exists for ${bossName} at ${fullTimestamp}. Blocking spawn.`);
@@ -242,28 +254,29 @@ async function createSpawnThreads(bossName, dateStr, timeStr, fullTimestamp, tri
 
   const threadTitle = `[${dateStr} ${timeStr}] ${bossName}`;
 
-  // Create threads
+  // Create attendance thread
   const attThread = await attChannel.threads.create({
     name: threadTitle,
     autoArchiveDuration: config.auto_archive_minutes,
     reason: `Boss spawn: ${bossName}`
   }).catch(err => {
-    console.error('Failed to create attendance thread:', err);
+    console.error('❌ Failed to create attendance thread:', err);
     return null;
   });
 
+  // Create confirmation thread (for admin logs)
   const confirmThread = await adminLogs.threads.create({
     name: `✅ ${threadTitle}`,
     autoArchiveDuration: config.auto_archive_minutes,
     reason: `Confirmation thread: ${bossName}`
   }).catch(err => {
-    console.error('Failed to create confirmation thread:', err);
+    console.error('❌ Failed to create confirmation thread:', err);
     return null;
   });
 
   if (!attThread) return;
 
-  // Store spawn info
+  // Store spawn info in memory
   activeSpawns[attThread.id] = {
     boss: bossName,
     date: dateStr,
@@ -274,7 +287,7 @@ async function createSpawnThreads(bossName, dateStr, timeStr, fullTimestamp, tri
     closed: false
   };
 
-  // Mark column as active
+  // Mark column as active in memory
   activeColumns[`${bossName}|${fullTimestamp}`] = attThread.id;
 
   // Post instructions with @everyone mention
@@ -297,12 +310,17 @@ async function createSpawnThreads(bossName, dateStr, timeStr, fullTimestamp, tri
     embeds: [embed]
   });
 
+  // Notify confirmation thread
   if (confirmThread) {
     await confirmThread.send(`🟨 **${bossName}** spawn detected (${fullTimestamp}). Verifications will appear here.`);
   }
 
   console.log(`✅ Created threads for ${bossName} at ${fullTimestamp} (${triggerSource})`);
 }
+
+// ==========================================
+// BOT READY EVENT
+// ==========================================
 
 client.once(Events.ClientReady, () => {
   console.log(`✅ Bot logged in as ${client.user.tag}`);
@@ -314,8 +332,10 @@ client.once(Events.ClientReady, () => {
 // ==========================================
 // MESSAGE HANDLER
 // ==========================================
+
 client.on(Events.MessageCreate, async (message) => {
   try {
+    // ========== TIMER SERVER SPAWN DETECTION ==========
     // Special handling for timer server - allow bot messages for spawn detection
     if (message.guild && message.guild.id === config.timer_server_id) {
       // Allow timer bot messages in timer channel
@@ -476,7 +496,7 @@ client.on(Events.MessageCreate, async (message) => {
       const mentionedMember = await guild.members.fetch(mentioned.id).catch(() => null);
       const username = mentionedMember ? (mentionedMember.nickname || mentioned.username) : mentioned.username;
       
-      // Case-insensitive duplicate check
+      // OPTIMIZED: Case-insensitive duplicate check
       const usernameLower = username.toLowerCase();
       const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === usernameLower);
       
@@ -489,6 +509,7 @@ client.on(Events.MessageCreate, async (message) => {
 
       await message.reply(`✅ **${username}** manually verified by ${message.author.username}`);
       
+      // Notify confirmation thread
       if (spawnInfo.confirmThreadId) {
         const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
         if (confirmThread) {
@@ -511,6 +532,7 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
 
+      // Check for pending verifications
       const pendingInThread = Object.values(pendingVerifications).filter(
         p => p.threadId === message.channel.id
       );
@@ -526,6 +548,7 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
 
+      // Ask for confirmation
       const confirmMsg = await message.reply(
         `🔒 Close spawn **${spawnInfo.boss}** (${spawnInfo.timestamp})?\n\n` +
         `**${spawnInfo.members.length} members** will be submitted to Google Sheets.\n\n` +
@@ -631,6 +654,7 @@ client.on(Events.MessageCreate, async (message) => {
         const member = await guild.members.fetch(message.author.id).catch(() => null);
         const userIsAdmin = member && isAdmin(member);
 
+        // Non-admins must attach screenshot
         if (!userIsAdmin) {
           if (!message.attachments || message.attachments.size === 0) {
             await message.reply('⚠️ **Screenshot required!** Attach a screenshot showing boss and timestamp.');
@@ -640,7 +664,7 @@ client.on(Events.MessageCreate, async (message) => {
 
         const username = member ? (member.nickname || message.author.username) : message.author.username;
 
-        // Case-insensitive duplicate check
+        // OPTIMIZED: Case-insensitive duplicate check
         const usernameLower = username.toLowerCase();
         const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === usernameLower);
         
@@ -649,9 +673,11 @@ client.on(Events.MessageCreate, async (message) => {
           return;
         }
 
+        // Add reaction buttons for admin verification
         await message.react('✅');
         await message.react('❌');
 
+        // Store pending verification
         pendingVerifications[message.id] = {
           author: username,
           authorId: message.author.id,
@@ -659,13 +685,14 @@ client.on(Events.MessageCreate, async (message) => {
           timestamp: Date.now()
         };
 
+        // Send confirmation message
         const embed = new EmbedBuilder()
           .setColor(0xFFA500)
           .setDescription(`⏳ **${username}** registered for **${spawnInfo.boss}**\n\nWaiting for admin verification...`)
           .setFooter({text: 'Admins: React ✅ to verify, ❌ to deny'});
 
         await message.reply({embeds: [embed]});
-        console.log(`📝 Pending: ${username} for ${spawnInfo.boss}`);
+        console.log(`🔍 Pending: ${username} for ${spawnInfo.boss}`);
       }
       
       return;
@@ -679,6 +706,7 @@ client.on(Events.MessageCreate, async (message) => {
 // ==========================================
 // REACTION HANDLER
 // ==========================================
+
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
   try {
     if (user.bot) return;
@@ -690,6 +718,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     const guild = msg.guild;
     const adminMember = await guild.members.fetch(user.id).catch(() => null);
     
+    // Only admins can use reactions
     if (!adminMember || !isAdmin(adminMember)) {
       try {
         await reaction.users.remove(user.id);
@@ -728,6 +757,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         if (resp.ok) {
           await msg.channel.send(`✅ Attendance submitted successfully! Archiving thread...`);
           
+          // Delete confirmation thread
           if (spawnInfo.confirmThreadId) {
             const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
             if (confirmThread) {
@@ -736,8 +766,10 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
             }
           }
 
+          // Archive thread
           await msg.channel.setArchived(true, `Closed by ${user.username}`).catch(console.error);
 
+          // Clean up memory
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
 
@@ -774,7 +806,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
       }
 
       if (reaction.emoji.name === '✅') {
-        // Case-insensitive duplicate check
+        // OPTIMIZED: Case-insensitive duplicate check
         const authorLower = pending.author.toLowerCase();
         const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === authorLower);
         
@@ -786,12 +818,14 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
           return;
         }
 
+        // Add member to verified list
         spawnInfo.members.push(pending.author);
 
         await msg.reactions.removeAll().catch(() => {});
 
         await msg.reply(`✅ **${pending.author}** verified by ${user.username}!`);
 
+        // Notify confirmation thread
         if (spawnInfo.confirmThreadId) {
           const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
           if (confirmThread) {
@@ -833,6 +867,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 // ==========================================
 // ERROR HANDLING
 // ==========================================
+
 client.on(Events.Error, error => {
   console.error('❌ Discord client error:', error);
 });
@@ -863,6 +898,7 @@ process.on('SIGINT', () => {
 // ==========================================
 // LOGIN
 // ==========================================
+
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ DISCORD_TOKEN environment variable not set!');
   process.exit(1);
