@@ -1,12 +1,10 @@
 /**
- * ELYSIUM Guild Attendance Bot - Version 2.0 (Koyeb Compatible)
+ * ELYSIUM Guild Attendance Bot - Version 2.1 (OPTIMIZED)
  * 
- * NEW FLOW:
- * 1. Boss spawns → Create thread with timestamp
- * 2. Members check in → Admins verify → Store in memory
- * 3. Admin closes thread → Batch send all attendance → Archive thread
- * 4. ONE column per boss per timestamp (blocks duplicates)
- * 5. No spawn numbering, no SpawnLog
+ * OPTIMIZATIONS:
+ * - Case-insensitive member duplicate check
+ * - Better code organization
+ * - Consistent error handling
  * 
  * Features:
  * - Timestamp-based thread naming
@@ -478,7 +476,11 @@ client.on(Events.MessageCreate, async (message) => {
       const mentionedMember = await guild.members.fetch(mentioned.id).catch(() => null);
       const username = mentionedMember ? (mentionedMember.nickname || mentioned.username) : mentioned.username;
       
-      if (spawnInfo.members.includes(username)) {
+      // Case-insensitive duplicate check
+      const usernameLower = username.toLowerCase();
+      const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === usernameLower);
+      
+      if (isDuplicate) {
         await message.reply(`⚠️ **${username}** is already verified for this spawn.`);
         return;
       }
@@ -638,7 +640,11 @@ client.on(Events.MessageCreate, async (message) => {
 
         const username = member ? (member.nickname || message.author.username) : message.author.username;
 
-        if (spawnInfo.members.includes(username)) {
+        // Case-insensitive duplicate check
+        const usernameLower = username.toLowerCase();
+        const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === usernameLower);
+        
+        if (isDuplicate) {
           await message.reply(`⚠️ You already checked in for this spawn.`);
           return;
         }
@@ -768,7 +774,11 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
       }
 
       if (reaction.emoji.name === '✅') {
-        if (spawnInfo.members.includes(pending.author)) {
+        // Case-insensitive duplicate check
+        const authorLower = pending.author.toLowerCase();
+        const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === authorLower);
+        
+        if (isDuplicate) {
           await msg.reply(`⚠️ **${pending.author}** is already verified. Ignoring duplicate.`);
           try {
             await reaction.users.remove(user.id);
