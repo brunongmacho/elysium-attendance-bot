@@ -541,6 +541,77 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
+    // ========== ADMIN FORCE CLOSE (EMERGENCY) ==========
+    if (message.channel.isThread() && message.content.trim().toLowerCase() === '!forceclose') {
+      const member = await guild.members.fetch(message.author.id).catch(() => null);
+      if (!member || !isAdmin(member)) {
+        await message.reply('⚠️ Only admins can use this command.');
+        return;
+      }
+
+      const spawnInfo = activeSpawns[message.channel.id];
+      if (!spawnInfo || spawnInfo.closed) {
+        await message.reply('⚠️ This spawn is already closed or not found.');
+        return;
+      }
+
+      // Clear any pending verifications for this thread
+      const pendingInThread = Object.keys(pendingVerifications).filter(
+        msgId => pendingVerifications[msgId].threadId === message.channel.id
+      );
+      pendingInThread.forEach(msgId => delete pendingVerifications[msgId]);
+
+      // Force close without confirmation
+      await message.reply(
+        `⚠️ **FORCE CLOSING** spawn **${spawnInfo.boss}**...\n` +
+        `Submitting ${spawnInfo.members.length} members (ignoring ${pendingInThread.length} pending verifications)`
+      );
+      
+      spawnInfo.closed = true;
+
+      const payload = {
+        action: 'submitAttendance',
+        boss: spawnInfo.boss,
+        date: spawnInfo.date,
+        time: spawnInfo.time,
+        timestamp: spawnInfo.timestamp,
+        members: spawnInfo.members
+      };
+
+      const resp = await postToSheet(payload);
+
+      if (resp.ok) {
+        await message.channel.send(`✅ Attendance submitted successfully! (${spawnInfo.members.length} members)`);
+        
+        // Delete confirmation thread
+        if (spawnInfo.confirmThreadId) {
+          const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
+          if (confirmThread) {
+            await confirmThread.delete().catch(console.error);
+            console.log(`🗑️ Deleted confirmation thread for ${spawnInfo.boss}`);
+          }
+        }
+
+        // Archive thread
+        await message.channel.setArchived(true, `Force closed by ${message.author.username}`).catch(console.error);
+
+        // Clean up memory
+        delete activeSpawns[message.channel.id];
+        delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+
+        console.log(`🔒 FORCE CLOSE: ${spawnInfo.boss} at ${spawnInfo.timestamp} by ${message.author.username} (${spawnInfo.members.length} members)`);
+      } else {
+        await message.channel.send(
+          `⚠️ **Failed to submit attendance!**\n\n` +
+          `Error: ${resp.text || resp.err}\n\n` +
+          `**Members list (for manual entry):**\n${spawnInfo.members.join(', ')}\n\n` +
+          `Please manually update the Google Sheet.`
+        );
+      }
+      
+      return;
+    }
+
     // ========== MEMBER CHECK-IN ==========
     if (message.channel.isThread() && message.channel.parentId === config.attendance_channel_id) {
       const content = message.content.trim().toLowerCase();
