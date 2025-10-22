@@ -413,6 +413,12 @@ async function recoverStateFromThreads() {
     for (const { thread, parsed, bossName, messages } of threadDataResults) {
       if (!messages) continue;
 
+      // Skip archived threads (these are closed spawns)
+      if (thread.archived) {
+        console.log(`⏭️ Skipping archived thread: ${bossName} at ${parsed.timestamp}`);
+        continue;
+      }
+
       // Find matching confirmation thread
       let confirmThreadId = null;
       if (adminThreads) {
@@ -1617,6 +1623,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         if (!spawnInfo || spawnInfo.closed) {
           await msg.channel.send('⚠️ Spawn already closed or not found.');
           delete pendingClosures[msg.id];
+          await msg.reactions.removeAll().catch(() => {}); // Clean up reactions
           return;
         }
 
@@ -1637,6 +1644,9 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 
         if (resp.ok) {
           await msg.channel.send(`✅ Attendance submitted successfully! Archiving thread...`);
+          
+          // Clean up close confirmation reactions
+          await msg.reactions.removeAll().catch(() => {});
           
           // Delete confirmation thread
           if (spawnInfo.confirmThreadId) {
@@ -1662,12 +1672,14 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
             `**Members list (for manual entry):**\n${spawnInfo.members.join(', ')}\n\n` +
             `Please manually update the Google Sheet.`
           );
+          await msg.reactions.removeAll().catch(() => {}); // Clean up reactions even on failure
         }
 
         delete pendingClosures[msg.id];
         
       } else if (reaction.emoji.name === '❌') {
         await msg.channel.send('❌ Spawn close canceled.');
+        await msg.reactions.removeAll().catch(() => {}); // Clean up reactions
         delete pendingClosures[msg.id];
       }
       
