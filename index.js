@@ -1045,20 +1045,21 @@ async function handleStatus(message, member) {
   const guild = message.guild;
   const uptime = formatUptime(Date.now() - BOT_START_TIME);
   
-  // Build active spawn list with clickable links
-  const activeSpawnList = [];
-  for (const [threadId, info] of Object.entries(activeSpawns)) {
-    const threadLink = `https://discord.com/channels/${guild.id}/${threadId}`;
-    activeSpawnList.push(
-      `• **${info.boss}** (${info.timestamp}) - ${info.members.length} verified - [Jump to Thread](${threadLink})`
-    );
-  }
-
-  const spawnListText = activeSpawnList.length > 0 ? activeSpawnList.join('\n') : 'None';
-
   const timeSinceSheet = lastSheetCall > 0 
     ? `${Math.floor((Date.now() - lastSheetCall) / 1000)} seconds ago`
     : 'Never';
+
+  const totalSpawns = Object.keys(activeSpawns).length;
+  
+  // Build active spawn list with clickable links (max 10 to avoid embed limit)
+  const activeSpawnEntries = Object.entries(activeSpawns);
+  const spawnList = activeSpawnEntries.slice(0, 10).map(([threadId, info]) => {
+    const threadLink = `https://discord.com/channels/${guild.id}/${threadId}`;
+    return `• **${info.boss}** (${info.timestamp}) - ${info.members.length} verified - [Jump](${threadLink})`;
+  });
+  
+  const spawnListText = spawnList.length > 0 ? spawnList.join('\n') : 'None';
+  const moreSpawns = totalSpawns > 10 ? `\n\n*+${totalSpawns - 10} more spawns (use close to clear old ones)*` : '';
 
   const embed = new EmbedBuilder()
     .setColor(0x00FF00)
@@ -1067,8 +1068,8 @@ async function handleStatus(message, member) {
     .addFields(
       {name: '⏱️ Uptime', value: uptime, inline: true},
       {name: '🤖 Version', value: BOT_VERSION, inline: true},
-      {name: '🎯 Active Spawns', value: `${Object.keys(activeSpawns).length}`, inline: true},
-      {name: '📋 Active Spawn Threads', value: spawnListText},
+      {name: '🎯 Active Spawns', value: `${totalSpawns}`, inline: true},
+      {name: '📋 Recent Spawn Threads', value: spawnListText + moreSpawns},
       {name: '⏳ Pending Verifications', value: `${Object.keys(pendingVerifications).length}`, inline: true},
       {name: '📊 Last Sheet Call', value: timeSinceSheet, inline: true},
       {name: '💾 Memory', value: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`, inline: true}
