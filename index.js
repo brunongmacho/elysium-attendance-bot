@@ -1051,15 +1051,14 @@ async function handleStatus(message, member) {
 
   const totalSpawns = Object.keys(activeSpawns).length;
   
-  // Build active spawn list with clickable links (max 10 to avoid embed limit)
+  // Build active spawn list with Discord channel mentions (max 10 to avoid embed limit)
   const activeSpawnEntries = Object.entries(activeSpawns);
   const spawnList = activeSpawnEntries.slice(0, 10).map(([threadId, info]) => {
-    const threadLink = `https://discord.com/channels/${guild.id}/${threadId}`;
-    return `• **${info.boss}** (${info.timestamp}) - ${info.members.length} verified - [Jump](${threadLink})`;
+    return `• **${info.boss}** (${info.timestamp}) - ${info.members.length} verified - <#${threadId}>`;
   });
   
   const spawnListText = spawnList.length > 0 ? spawnList.join('\n') : 'None';
-  const moreSpawns = totalSpawns > 10 ? `\n\n*+${totalSpawns - 10} more spawns (use close to clear old ones)*` : '';
+  const moreSpawns = totalSpawns > 10 ? `\n\n*+${totalSpawns - 10} more spawns (close old ones to clear)*` : '';
 
   const embed = new EmbedBuilder()
     .setColor(0x00FF00)
@@ -1252,8 +1251,14 @@ client.on(Events.MessageCreate, async (message) => {
 
     const userIsAdmin = isAdmin(member);
 
-    // ========== HELP COMMAND (ANYWHERE) ==========
+    // ========== HELP COMMAND (ANYWHERE EXCEPT SPAWN THREADS) ==========
     if (message.content.toLowerCase().match(/^(!help|!commands|!\?)/)) {
+      // Block help in spawn threads to keep them clean
+      if (message.channel.isThread() && message.channel.parentId === config.attendance_channel_id) {
+        await message.reply('⚠️ Please use `!help` in admin logs channel to avoid cluttering spawn threads.');
+        return;
+      }
+      
       const args = message.content.split(/\s+/).slice(1);
       const specificCommand = args.length > 0 ? args.join(' ') : null;
       await showHelp(message, member, specificCommand);
