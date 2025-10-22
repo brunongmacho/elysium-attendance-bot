@@ -1496,7 +1496,12 @@ client.on(Events.MessageCreate, async (message) => {
 
     // ========== ADMIN-ONLY COMMANDS IN ADMIN LOGS ==========
     if (!userIsAdmin) return;
-    if (message.channel.id !== config.admin_logs_channel_id) return;
+    
+    // Check if in admin logs channel OR a thread within admin logs
+    const inAdminLogs = message.channel.id === config.admin_logs_channel_id || 
+                        (message.channel.isThread() && message.channel.parentId === config.admin_logs_channel_id);
+    
+    if (!inAdminLogs) return;
 
     // Admin logs override commands
     const adminLogsCommands = ['!clearstate', '!status'];
