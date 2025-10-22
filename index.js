@@ -1,5 +1,77 @@
-/**
- * ELYSIUM Guild Attendance Bot - Version 2.4 (FINAL OPTIMIZED)
+case 'clearstate':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setTitle('🔧 Command: !clearstate')
+        .setDescription('⚠️ Clear all bot memory (nuclear option)')
+        .addFields(
+          {
+            name: '📍 Where to Use',
+            value: '**Admin logs channel only**'
+          },
+          {
+            name: '📝 Syntax',
+            value: '```!clearstate```'
+          },
+          {
+            name: '⚠️ Warning',
+            value: '**This is a destructive command!**\n' +
+                   'Clears all active spawns, pending verifications, etc.'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'closeallthread':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF6600)
+        .setTitle('🔥 Command: !closeallthread')
+        .setDescription('Mass close all open spawn threads (auto-verify + submit all)')
+        .addFields(
+          {
+            name: '📍 Where to Use',
+            value: '**Admin logs channel only**'
+          },
+          {
+            name: '📝 Syntax',
+            value: '```!closeallthread```'
+          },
+          {
+            name: '✨ What It Does',
+            value: '1. Finds all open spawn threads\n' +
+                   '2. Auto-verifies ALL pending members in each thread\n' +
+                   '3. Closes and submits to Google Sheets\n' +
+                   '4. Archives threads\n' +
+                   '5. Processes one by one with retry logic'
+          },
+          {
+            name: '🎯 Use When',
+            value: '• End of boss rush event\n' +
+                   '• Multiple spawns left open\n' +
+                   '• Need to bulk close everything\n' +
+                   '• Clean up before maintenance'
+          },
+          {
+            name: '⚠️ Important',
+            value: '• Takes ~3-5 seconds per thread\n' +
+                   '• Shows progress bar\n' +
+                   '• Retries failed submissions once\n' +
+                   '• Requires confirmation (React ✅)'
+          },
+          {
+            name: '📊 Example',
+            value: '```\nAdmin: !closeallthread\nBot: Found 5 threads, will take ~25 seconds\nAdmin: Reacts ✅\nBot: [1/5] ████░░░░░░░░░░░░░░░░ 20%\n     Processing Baron      embed = new EmbedBuilder()
+        .setColor(0x4A90E2)
+        .setTitle('🔍 Command: !debugthread')
+        .setDescription('/**
+ * ELYSIUM Guild Attendance Bot - Version 2.3 (FINAL COMPLETE)
  * 
  * ALL FEATURES INCLUDED:
  * ✅ 25x faster attendance submission
@@ -12,9 +84,6 @@
  * ✅ Override commands (admin safety)
  * ✅ Help system (full documentation)
  * ✅ HTTP health check for Koyeb
- * ✅ Smart command routing (admin logs vs threads)
- * ✅ Admin fast-track check-in (skip screenshot, still verify)
- * ✅ Status with clickable thread links
  */
 
 const { Client, GatewayIntentBits, Partials, Events, EmbedBuilder } = require('discord.js');
@@ -41,7 +110,7 @@ const client = new Client({
 // HTTP HEALTH CHECK SERVER FOR KOYEB
 // ==========================================
 const PORT = process.env.PORT || 8000;
-const BOT_VERSION = '2.5';
+const BOT_VERSION = '2.3';
 const BOT_START_TIME = Date.now();
 
 const server = http.createServer((req, res) => {
@@ -413,12 +482,6 @@ async function recoverStateFromThreads() {
     for (const { thread, parsed, bossName, messages } of threadDataResults) {
       if (!messages) continue;
 
-      // Skip archived threads (these are closed spawns)
-      if (thread.archived) {
-        console.log(`⏭️ Skipping archived thread: ${bossName} at ${parsed.timestamp}`);
-        continue;
-      }
-
       // Find matching confirmation thread
       let confirmThreadId = null;
       if (adminThreads) {
@@ -444,6 +507,12 @@ async function recoverStateFromThreads() {
         
         // Look for pending verifications (messages with ✅ ❌ reactions from bot, no verification reply)
         if (msg.reactions.cache.has('✅') && msg.reactions.cache.has('❌')) {
+          // SKIP close confirmation messages (these say "Close spawn" in content)
+          if (msg.content.includes('Close spawn') || msg.content.includes('close spawn')) {
+            console.log(`⏭️ Skipping close confirmation message: ${msgId}`);
+            continue;
+          }
+          
           const hasVerificationReply = messages.some(m => 
             m.reference?.messageId === msgId && m.author.id === client.user.id && m.content.includes('verified')
           );
@@ -547,23 +616,23 @@ async function showHelp(message, member, specificCommand = null) {
       .setDescription('Complete command reference for administrators')
       .addFields(
         {
-          name: '🎯 Spawn Management (Admin Logs Only)',
+          name: '🎯 Spawn Management',
           value: '`!addthread` - Manually create spawn thread\n' +
-                 '`!clearstate` - Clear all bot memory (nuclear option)\n' +
-                 '`!status` - Show bot health and all active spawns'
+                 '`close` - Close spawn and submit to Google Sheets\n' +
+                 '`!forceclose` - Force close without pending check'
         },
         {
-          name: '📝 Spawn Actions (Use in Spawn Thread)',
-          value: '`close` - Close spawn and submit to Google Sheets\n' +
-                 '`!forceclose` - Force close without pending check\n' +
-                 '`!forcesubmit` - Submit attendance without closing\n' +
-                 '`!debugthread` - Show current thread state\n' +
-                 '`!resetpending` - Clear stuck pending verifications'
-        },
-        {
-          name: '✅ Verification (Use in Spawn Thread)',
+          name: '✅ Verification',
           value: 'React ✅/❌ - Verify or deny member check-ins\n' +
                  '`!verify @member` - Manually verify without screenshot'
+        },
+        {
+          name: '🔧 Override Commands',
+          value: '`!clearstate` - Clear all bot memory (nuclear option)\n' +
+                 '`!forcesubmit` - Submit attendance without closing thread\n' +
+                 '`!status` - Show bot health and statistics\n' +
+                 '`!debugthread` - Show current thread state\n' +
+                 '`!resetpending` - Clear stuck pending verifications'
         },
         {
           name: '📖 Help',
@@ -613,7 +682,7 @@ async function showCommandHelp(message, command, isAdmin) {
   switch (cmd) {
     case 'addthread':
       if (!isAdmin) {
-        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        await message.reply('⚠️ This command is admin-only.');
         return;
       }
       embed = new EmbedBuilder()
@@ -621,10 +690,6 @@ async function showCommandHelp(message, command, isAdmin) {
         .setTitle('🔧 Command: !addthread')
         .setDescription('Manually create a boss spawn thread')
         .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Admin logs channel only**'
-          },
           {
             name: '📝 Syntax',
             value: '```!addthread [BossName] will spawn in X minutes! (YYYY-MM-DD HH:MM)```'
@@ -634,7 +699,19 @@ async function showCommandHelp(message, command, isAdmin) {
             value: '```\n' +
                    '!addthread Baron Braudmore will spawn in 5 minutes! (2025-10-22 14:30)\n' +
                    '!addthread Larba will spawn in 10 minutes! (2025-10-22 18:00)\n' +
+                   '!addthread Clemantis will spawn in 3 minutes! (2025-10-22 11:30)\n' +
                    '```'
+          },
+          {
+            name: '⚙️ Requirements',
+            value: '• Admin only\n' +
+                   '• Must be used in admin logs channel\n' +
+                   '• Boss name must match boss list\n' +
+                   '• Timestamp format: `YYYY-MM-DD HH:MM`'
+          },
+          {
+            name: '📋 Available Bosses',
+            value: Object.keys(bossPoints).slice(0, 10).join(', ') + '... (and more)'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
@@ -642,7 +719,7 @@ async function showCommandHelp(message, command, isAdmin) {
 
     case 'close':
       if (!isAdmin) {
-        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        await message.reply('⚠️ This command is admin-only.');
         return;
       }
       embed = new EmbedBuilder()
@@ -650,10 +727,6 @@ async function showCommandHelp(message, command, isAdmin) {
         .setTitle('🔒 Command: close')
         .setDescription('Close spawn thread and submit attendance to Google Sheets')
         .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Spawn thread only**'
-          },
           {
             name: '📝 Syntax',
             value: '```close```'
@@ -663,7 +736,27 @@ async function showCommandHelp(message, command, isAdmin) {
             value: '1. Type `close` in the spawn thread\n' +
                    '2. Bot checks for pending verifications\n' +
                    '3. If none pending, shows confirmation\n' +
-                   '4. React ✅ to confirm submission'
+                   '4. React ✅ to confirm submission\n' +
+                   '5. React ❌ to cancel'
+          },
+          {
+            name: '⚙️ Requirements',
+            value: '• Admin only\n' +
+                   '• Must be in spawn thread\n' +
+                   '• All pending verifications must be resolved first'
+          },
+          {
+            name: '✨ What Happens',
+            value: '• Submits verified members to Google Sheets\n' +
+                   '• Archives the thread\n' +
+                   '• Deletes confirmation thread\n' +
+                   '• Updates attendance points'
+          },
+          {
+            name: '🔧 Troubleshooting',
+            value: '• If pending exist: Verify (✅) or deny (❌) them first\n' +
+                   '• If stuck: Use `!resetpending` or `!forceclose`\n' +
+                   '• If thread broken: Use `!forcesubmit` to save data'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
@@ -671,7 +764,7 @@ async function showCommandHelp(message, command, isAdmin) {
 
     case 'status':
       if (!isAdmin) {
-        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        await message.reply('⚠️ This command is admin-only.');
         return;
       }
       embed = new EmbedBuilder()
@@ -680,103 +773,28 @@ async function showCommandHelp(message, command, isAdmin) {
         .setDescription('Show bot health, active spawns, and system statistics')
         .addFields(
           {
-            name: '📍 Where to Use',
-            value: '**Admin logs channel only**'
-          },
-          {
             name: '📝 Syntax',
             value: '```!status```'
           },
           {
             name: '📊 Output Shows',
             value: '• Bot uptime and version\n' +
-                   '• Active spawn threads with clickable links\n' +
-                   '• Pending verifications count\n' +
-                   '• Last sheet API call time'
-          }
-        )
-        .setFooter({text: 'Type !help for full command list'});
-      break;
-
-    case 'forcesubmit':
-      if (!isAdmin) {
-        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
-        return;
-      }
-      embed = new EmbedBuilder()
-        .setColor(0xFF9900)
-        .setTitle('🔧 Command: !forcesubmit')
-        .setDescription('Submit attendance without closing thread')
-        .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Spawn thread only**'
+                   '• Active spawn threads (count + list)\n' +
+                   '• Pending verifications (count)\n' +
+                   '• Last sheet API call time\n' +
+                   '• Memory usage'
           },
           {
-            name: '📝 Syntax',
-            value: '```!forcesubmit```'
-          },
-          {
-            name: '🎯 Use When',
-            value: '• Thread is broken but need to save data\n' +
-                   '• Can\'t close normally\n' +
-                   '• Want to submit without closing'
-          }
-        )
-        .setFooter({text: 'Type !help for full command list'});
-      break;
-
-    case 'debugthread':
-      if (!isAdmin) {
-        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
-        return;
-      }
-      embed = new EmbedBuilder()
-        .setColor(0x4A90E2)
-        .setTitle('🔍 Command: !debugthread')
-        .setDescription('Show detailed state of current thread')
-        .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Spawn thread only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!debugthread```'
-          },
-          {
-            name: '🎯 Use When',
-            value: '• Thread seems stuck\n' +
-                   '• Want to see what bot knows\n' +
-                   '• Verifying state before closing'
-          }
-        )
-        .setFooter({text: 'Type !help for full command list'});
-      break;
-
-    case 'resetpending':
-      if (!isAdmin) {
-        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
-        return;
-      }
-      embed = new EmbedBuilder()
-        .setColor(0xFF9900)
-        .setTitle('🔧 Command: !resetpending')
-        .setDescription('Clear stuck pending verifications for current thread')
-        .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Spawn thread only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!resetpending```'
-          },
-          {
-            name: '🎯 Use When',
-            value: '• Pending verifications won\'t clear\n' +
-                   '• Can\'t close thread due to pending\n' +
-                   '• Need to force close thread'
+            name: '💡 Example Output',
+            value: '```\n' +
+                   '✅ Bot Status - Healthy\n' +
+                   '⏱️ Uptime: 2h 34m 12s\n' +
+                   '🎯 Active Spawns: 2\n' +
+                   '  └─ Baron (10/22/25 14:30) - 5 verified\n' +
+                   '  └─ Larba (10/22/25 18:00) - 3 verified\n' +
+                   '⏳ Pending Verifications: 1\n' +
+                   '📊 Last Sheet Call: 12 seconds ago\n' +
+                   '```'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
@@ -784,7 +802,7 @@ async function showCommandHelp(message, command, isAdmin) {
 
     case 'clearstate':
       if (!isAdmin) {
-        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        await message.reply('⚠️ This command is admin-only.');
         return;
       }
       embed = new EmbedBuilder()
@@ -793,17 +811,182 @@ async function showCommandHelp(message, command, isAdmin) {
         .setDescription('⚠️ Clear all bot memory (nuclear option)')
         .addFields(
           {
-            name: '📍 Where to Use',
-            value: '**Admin logs channel only**'
-          },
-          {
             name: '📝 Syntax',
             value: '```!clearstate```'
           },
           {
             name: '⚠️ Warning',
             value: '**This is a destructive command!**\n' +
-                   'Clears all active spawns, pending verifications, etc.'
+                   'Clears all bot memory including:\n' +
+                   '• Active spawns\n' +
+                   '• Active columns\n' +
+                   '• Pending verifications\n' +
+                   '• Pending closures'
+          },
+          {
+            name: '🎯 Use When',
+            value: '• Bot memory is corrupted\n' +
+                   '• Duplicate threads appearing\n' +
+                   '• Stuck state that won\'t clear\n' +
+                   '• Need fresh start without restart'
+          },
+          {
+            name: '🛡️ Safety',
+            value: '• Requires confirmation (React ✅)\n' +
+                   '• Logs all usage\n' +
+                   '• 10 second cooldown'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'forcesubmit':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF9900)
+        .setTitle('🔧 Command: !forcesubmit')
+        .setDescription('Submit attendance without closing thread')
+        .addFields(
+          {
+            name: '📝 Syntax',
+            value: '```!forcesubmit```'
+          },
+          {
+            name: '🎯 Use When',
+            value: '• Thread is broken but need to save data\n' +
+                   '• Can\'t close normally\n' +
+                   '• Emergency submission needed\n' +
+                   '• Want to submit without closing'
+          },
+          {
+            name: '✨ What Happens',
+            value: '• Submits current verified members to Google Sheets\n' +
+                   '• Does NOT close the thread\n' +
+                   '• Does NOT archive thread\n' +
+                   '• Can be used multiple times if needed'
+          },
+          {
+            name: '⚙️ Requirements',
+            value: '• Admin only\n' +
+                   '• Must be in spawn thread\n' +
+                   '• Requires confirmation (React ✅)'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'debugthread':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0x4A90E2)
+        .setTitle('🔍 Command: !debugthread')
+        .setDescription('Show detailed state of current thread')
+        .addFields(
+          {
+            name: '📝 Syntax',
+            value: '```!debugthread```'
+          },
+          {
+            name: '📊 Output Shows',
+            value: '• Boss name and timestamp\n' +
+                   '• Verified members list\n' +
+                   '• Pending verifications count\n' +
+                   '• Thread closed status\n' +
+                   '• Confirmation thread ID\n' +
+                   '• Whether thread is in bot memory'
+          },
+          {
+            name: '🎯 Use When',
+            value: '• Thread seems stuck\n' +
+                   '• Want to see what bot knows\n' +
+                   '• Debugging issues\n' +
+                   '• Verifying state before closing'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'resetpending':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF9900)
+        .setTitle('🔧 Command: !resetpending')
+        .setDescription('Clear stuck pending verifications for current thread')
+        .addFields(
+          {
+            name: '📝 Syntax',
+            value: '```!resetpending```'
+          },
+          {
+            name: '🎯 Use When',
+            value: '• Pending verifications won\'t clear\n' +
+                   '• Can\'t close thread due to pending\n' +
+                   '• Verification reactions stuck\n' +
+                   '• Need to force close thread'
+          },
+          {
+            name: '✨ What Happens',
+            value: '• Clears all pending verifications for this thread\n' +
+                   '• Members NOT added to verified list\n' +
+                   '• Allows closing thread after clearing\n' +
+                   '• Does not affect other threads'
+          },
+          {
+            name: '⚙️ Requirements',
+            value: '• Admin only\n' +
+                   '• Must be in spawn thread\n' +
+                   '• Requires confirmation (React ✅)'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'verify':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0x4A90E2)
+        .setTitle('✅ Command: !verify')
+        .setDescription('Manually verify member without screenshot')
+        .addFields(
+          {
+            name: '📝 Syntax',
+            value: '```!verify @member```'
+          },
+          {
+            name: '💡 Example',
+            value: '```!verify @PlayerOne```'
+          },
+          {
+            name: '🎯 Use When',
+            value: '• Member forgot screenshot\n' +
+                   '• You witnessed attendance yourself\n' +
+                   '• Need to add member manually\n' +
+                   '• Override normal verification process'
+          },
+          {
+            name: '✨ What Happens',
+            value: '• Adds member to verified list immediately\n' +
+                   '• No screenshot required\n' +
+                   '• Logs verification in confirmation thread\n' +
+                   '• Cannot add same member twice'
+          },
+          {
+            name: '⚙️ Requirements',
+            value: '• Admin only\n' +
+                   '• Must be in spawn thread\n' +
+                   '• Member must be mentioned with @'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
@@ -812,22 +995,20 @@ async function showCommandHelp(message, command, isAdmin) {
     case 'present':
     case 'here':
     case 'checkin':
+    case 'check-in':
       embed = new EmbedBuilder()
         .setColor(0xFFD700)
         .setTitle('📸 Command: Check-In')
         .setDescription('Check in for current boss spawn')
         .addFields(
           {
-            name: '📍 Where to Use',
-            value: '**Spawn thread only**'
-          },
-          {
             name: '📝 Syntax',
-            value: '```present```\nor: `here`, `join`, `checkin`'
+            value: '```present```\nor: `here`, `join`, `checkin`, `check-in`'
           },
           {
             name: '📋 Requirements',
-            value: '• Must attach screenshot showing:\n' +
+            value: '• Must be in spawn thread\n' +
+                   '• Must attach screenshot showing:\n' +
                    '  └─ Boss name\n' +
                    '  └─ Timestamp\n' +
                    '• Admins exempt from screenshot'
@@ -837,7 +1018,14 @@ async function showCommandHelp(message, command, isAdmin) {
             value: '1. Bot adds ✅ and ❌ reactions\n' +
                    '2. Your check-in appears in confirmation thread\n' +
                    '3. Admin verifies (✅) or denies (❌)\n' +
-                   '4. You get confirmation message'
+                   '4. You get confirmation message\n' +
+                   '5. Attendance recorded in Google Sheets when spawn closes'
+          },
+          {
+            name: '⚠️ Important',
+            value: '• Can only check in once per spawn\n' +
+                   '• Case-insensitive (PlayerOne = playerone)\n' +
+                   '• Wait for admin verification before leaving'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
@@ -855,52 +1043,13 @@ async function showCommandHelp(message, command, isAdmin) {
 }
 
 // ==========================================
-// OVERRIDE COMMANDS (THREAD-SPECIFIC)
+// OVERRIDE COMMANDS
 // ==========================================
 
 /**
- * Handle thread-specific override commands
+ * Handle override commands with safety checks
  */
-async function handleThreadOverrideCommand(message, member, command) {
-  const guild = message.guild;
-  
-  // Check cooldown
-  const now = Date.now();
-  if (now - lastOverrideTime < OVERRIDE_COOLDOWN) {
-    const remaining = Math.ceil((OVERRIDE_COOLDOWN - (now - lastOverrideTime)) / 1000);
-    await message.reply(`⚠️ Please wait ${remaining} seconds between override commands.`);
-    return;
-  }
-
-  lastOverrideTime = now;
-
-  // Log usage
-  console.log(`🔧 Override: ${command} used by ${member.user.username} in thread ${message.channel.id}`);
-  
-  const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
-  if (adminLogs) {
-    await adminLogs.send(`🔧 **Override Command Used:** \`${command}\` by ${member.user.username} in thread <#${message.channel.id}>`);
-  }
-
-  switch (command) {
-    case '!forcesubmit':
-      await handleForceSubmit(message, member);
-      break;
-    
-    case '!debugthread':
-      await handleDebugThread(message, member);
-      break;
-    
-    case '!resetpending':
-      await handleResetPending(message, member);
-      break;
-  }
-}
-
-/**
- * Handle admin logs override commands
- */
-async function handleAdminLogsOverrideCommand(message, member, command) {
+async function handleOverrideCommand(message, member, command) {
   const guild = message.guild;
   
   // Check cooldown
@@ -926,8 +1075,20 @@ async function handleAdminLogsOverrideCommand(message, member, command) {
       await handleClearState(message, member);
       break;
     
+    case '!forcesubmit':
+      await handleForceSubmit(message, member);
+      break;
+    
     case '!status':
       await handleStatus(message, member);
+      break;
+    
+    case '!debugthread':
+      await handleDebugThread(message, member);
+      break;
+    
+    case '!resetpending':
+      await handleResetPending(message, member);
       break;
   }
 }
@@ -978,19 +1139,44 @@ async function handleClearState(message, member) {
 }
 
 /**
- * !forcesubmit - Submit without closing
+ * !forcesubmit - Submit without closing (must provide thread ID in admin logs)
  */
 async function handleForceSubmit(message, member) {
-  const spawnInfo = activeSpawns[message.channel.id];
+  const guild = message.guild;
+  
+  // Extract thread ID from message
+  const args = message.content.split(/\s+/).slice(1);
+  let threadId = args[0];
+  
+  // If no thread ID provided, show usage
+  if (!threadId) {
+    const activeThreadsList = Object.entries(activeSpawns).map(([id, info]) => {
+      const threadLink = `https://discord.com/channels/${guild.id}/${id}`;
+      return `• [${info.boss} (${info.timestamp})](${threadLink}) - ID: \`${id}\``;
+    }).join('\n') || '• None';
+    
+    await message.reply(
+      `📋 **Usage:** \`!forcesubmit <thread_id>\`\n\n` +
+      `**Active Threads:**\n${activeThreadsList}\n\n` +
+      `**Example:** \`!forcesubmit 1234567890123456789\``
+    );
+    return;
+  }
+  
+  // Clean thread ID
+  threadId = threadId.replace(/[^0-9]/g, '');
+  
+  const spawnInfo = activeSpawns[threadId];
   if (!spawnInfo) {
-    await message.reply('⚠️ This thread is not in bot memory. Use !debugthread to check state.');
+    await message.reply(`⚠️ Thread ID \`${threadId}\` not in bot memory. Use \`!debugthread\` to check available threads.`);
     return;
   }
 
+  const threadLink = `https://discord.com/channels/${guild.id}/${threadId}`;
+  
   const confirmMsg = await message.reply(
     `📊 **Force submit attendance?**\n\n` +
-    `**Boss:** ${spawnInfo.boss}\n` +
-    `**Timestamp:** ${spawnInfo.timestamp}\n` +
+    `**Thread:** [${spawnInfo.boss} (${spawnInfo.timestamp})](${threadLink})\n` +
     `**Members:** ${spawnInfo.members.length}\n\n` +
     `This will submit to Google Sheets WITHOUT closing the thread.\n\n` +
     `React ✅ to confirm or ❌ to cancel.`
@@ -1024,7 +1210,8 @@ async function handleForceSubmit(message, member) {
       if (resp.ok) {
         await message.channel.send(
           `✅ **Attendance submitted successfully!**\n\n` +
-          `${spawnInfo.members.length} members recorded.\n` +
+          `**Thread:** [${spawnInfo.boss}](${threadLink})\n` +
+          `**Members:** ${spawnInfo.members.length}\n\n` +
           `Thread remains open for additional verifications if needed.`
         );
         
@@ -1051,20 +1238,22 @@ async function handleStatus(message, member) {
   const guild = message.guild;
   const uptime = formatUptime(Date.now() - BOT_START_TIME);
   
+  // Build active spawn list with clickable links
+  const activeSpawnEntries = Object.entries(activeSpawns);
+  let activeSpawnList = '';
+  
+  if (activeSpawnEntries.length === 0) {
+    activeSpawnList = '  └─ None';
+  } else {
+    for (const [threadId, info] of activeSpawnEntries) {
+      const threadLink = `https://discord.com/channels/${guild.id}/${threadId}`;
+      activeSpawnList += `  └─ [${info.boss} (${info.timestamp})](${threadLink}) - ${info.members.length} verified\n`;
+    }
+  }
+
   const timeSinceSheet = lastSheetCall > 0 
     ? `${Math.floor((Date.now() - lastSheetCall) / 1000)} seconds ago`
     : 'Never';
-
-  const totalSpawns = Object.keys(activeSpawns).length;
-  
-  // Build active spawn list with Discord channel mentions (max 10 to avoid embed limit)
-  const activeSpawnEntries = Object.entries(activeSpawns);
-  const spawnList = activeSpawnEntries.slice(0, 10).map(([threadId, info]) => {
-    return `• **${info.boss}** (${info.timestamp}) - ${info.members.length} verified - <#${threadId}>`;
-  });
-  
-  const spawnListText = spawnList.length > 0 ? spawnList.join('\n') : 'None';
-  const moreSpawns = totalSpawns > 10 ? `\n\n*+${totalSpawns - 10} more spawns (close old ones to clear)*` : '';
 
   const embed = new EmbedBuilder()
     .setColor(0x00FF00)
@@ -1073,34 +1262,57 @@ async function handleStatus(message, member) {
     .addFields(
       {name: '⏱️ Uptime', value: uptime, inline: true},
       {name: '🤖 Version', value: BOT_VERSION, inline: true},
-      {name: '🎯 Active Spawns', value: `${totalSpawns}`, inline: true},
-      {name: '📋 Recent Spawn Threads', value: spawnListText + moreSpawns},
+      {name: '🎯 Active Spawns', value: `${activeSpawnEntries.length}`, inline: true},
+      {name: '📋 Active Spawn Details (Click to Jump)', value: activeSpawnList},
       {name: '⏳ Pending Verifications', value: `${Object.keys(pendingVerifications).length}`, inline: true},
       {name: '📊 Last Sheet Call', value: timeSinceSheet, inline: true},
       {name: '💾 Memory', value: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`, inline: true}
     )
-    .setFooter({text: `Requested by ${member.user.username}`})
+    .setFooter({text: `Requested by ${member.user.username} • Click thread links to jump directly`})
     .setTimestamp();
 
   await message.reply({embeds: [embed]});
 }
 
 /**
- * !debugthread - Show thread state
+ * !debugthread - Show thread state (must provide thread ID in admin logs)
  */
 async function handleDebugThread(message, member) {
-  const threadId = message.channel.id;
+  const guild = message.guild;
+  
+  // Extract thread ID from message
+  const args = message.content.split(/\s+/).slice(1);
+  let threadId = args[0];
+  
+  // If no thread ID provided, show usage
+  if (!threadId) {
+    const activeThreadsList = Object.entries(activeSpawns).map(([id, info]) => {
+      const threadLink = `https://discord.com/channels/${guild.id}/${id}`;
+      return `• [${info.boss} (${info.timestamp})](${threadLink}) - ID: \`${id}\``;
+    }).join('\n') || '• None';
+    
+    await message.reply(
+      `📋 **Usage:** \`!debugthread <thread_id>\`\n\n` +
+      `**Active Threads:**\n${activeThreadsList}\n\n` +
+      `**Example:** \`!debugthread 1234567890123456789\``
+    );
+    return;
+  }
+  
+  // Clean thread ID (remove any extra characters)
+  threadId = threadId.replace(/[^0-9]/g, '');
+  
   const spawnInfo = activeSpawns[threadId];
 
   if (!spawnInfo) {
     await message.reply(
       `⚠️ **Thread not in bot memory!**\n\n` +
-      `This thread is not being tracked by the bot.\n` +
-      `It may have been:\n` +
+      `Thread ID: \`${threadId}\`\n\n` +
+      `This thread is not being tracked. It may have been:\n` +
       `• Created before bot started\n` +
       `• Manually created without bot\n` +
       `• Cleared from memory\n\n` +
-      `Try using \`!clearstate\` and restarting, or use \`!forceclose\` to close it.`
+      `Try \`!clearstate\` or \`!forceclose\` in the thread.`
     );
     return;
   }
@@ -1108,10 +1320,16 @@ async function handleDebugThread(message, member) {
   const pendingInThread = Object.values(pendingVerifications).filter(
     p => p.threadId === threadId
   );
+  
+  const threadLink = `https://discord.com/channels/${guild.id}/${threadId}`;
+  const confirmThreadLink = spawnInfo.confirmThreadId 
+    ? `https://discord.com/channels/${guild.id}/${spawnInfo.confirmThreadId}`
+    : 'None';
 
   const embed = new EmbedBuilder()
     .setColor(0x4A90E2)
     .setTitle('🔍 Thread Debug Info')
+    .setDescription(`[Click to jump to thread](${threadLink})`)
     .addFields(
       {name: '🎯 Boss', value: spawnInfo.boss, inline: true},
       {name: '⏰ Timestamp', value: spawnInfo.timestamp, inline: true},
@@ -1119,7 +1337,8 @@ async function handleDebugThread(message, member) {
       {name: '✅ Verified Members', value: `${spawnInfo.members.length}`},
       {name: '👥 Member List', value: spawnInfo.members.join(', ') || 'None'},
       {name: '⏳ Pending Verifications', value: `${pendingInThread.length}`},
-      {name: '📋 Confirmation Thread', value: spawnInfo.confirmThreadId ? `<#${spawnInfo.confirmThreadId}>` : 'None'},
+      {name: '📋 Confirmation Thread', value: spawnInfo.confirmThreadId ? `[Jump to confirmation](${confirmThreadLink})` : 'None'},
+      {name: '🆔 Thread ID', value: `\`${threadId}\``},
       {name: '💾 In Memory', value: '✅ Yes'}
     )
     .setFooter({text: `Requested by ${member.user.username}`})
@@ -1129,21 +1348,59 @@ async function handleDebugThread(message, member) {
 }
 
 /**
- * !resetpending - Clear pending verifications for this thread
+ * !resetpending - Clear pending verifications for a thread (must provide thread ID in admin logs)
  */
 async function handleResetPending(message, member) {
-  const threadId = message.channel.id;
+  const guild = message.guild;
+  
+  // Extract thread ID from message
+  const args = message.content.split(/\s+/).slice(1);
+  let threadId = args[0];
+  
+  // If no thread ID provided, show usage
+  if (!threadId) {
+    const threadsWithPending = Object.values(pendingVerifications).reduce((acc, p) => {
+      if (!acc[p.threadId]) {
+        acc[p.threadId] = [];
+      }
+      acc[p.threadId].push(p.author);
+      return acc;
+    }, {});
+    
+    const pendingList = Object.entries(threadsWithPending).map(([id, authors]) => {
+      const info = activeSpawns[id];
+      const threadLink = `https://discord.com/channels/${guild.id}/${id}`;
+      const bossName = info ? info.boss : 'Unknown';
+      return `• [${bossName}](${threadLink}) - ${authors.length} pending - ID: \`${id}\``;
+    }).join('\n') || '• None';
+    
+    await message.reply(
+      `📋 **Usage:** \`!resetpending <thread_id>\`\n\n` +
+      `**Threads with Pending Verifications:**\n${pendingList}\n\n` +
+      `**Example:** \`!resetpending 1234567890123456789\``
+    );
+    return;
+  }
+  
+  // Clean thread ID
+  threadId = threadId.replace(/[^0-9]/g, '');
+  
   const pendingInThread = Object.keys(pendingVerifications).filter(
     msgId => pendingVerifications[msgId].threadId === threadId
   );
 
   if (pendingInThread.length === 0) {
-    await message.reply('✅ No pending verifications in this thread.');
+    await message.reply(`✅ No pending verifications in thread ID \`${threadId}\`.`);
     return;
   }
+  
+  const spawnInfo = activeSpawns[threadId];
+  const threadLink = `https://discord.com/channels/${guild.id}/${threadId}`;
+  const bossName = spawnInfo ? spawnInfo.boss : 'Unknown';
 
   const confirmMsg = await message.reply(
     `⚠️ **Clear ${pendingInThread.length} pending verification(s)?**\n\n` +
+    `**Thread:** [${bossName}](${threadLink})\n\n` +
     `This will remove all pending verifications for this thread.\n` +
     `Members will NOT be added to verified list.\n\n` +
     `React ✅ to confirm or ❌ to cancel.`
@@ -1166,6 +1423,7 @@ async function handleResetPending(message, member) {
 
       await message.reply(
         `✅ **Cleared ${pendingInThread.length} pending verification(s).**\n\n` +
+        `**Thread:** [${bossName}](${threadLink})\n\n` +
         `You can now close the thread.`
       );
       
@@ -1175,266 +1433,6 @@ async function handleResetPending(message, member) {
     }
   } catch (err) {
     await message.reply('⏱️ Confirmation timed out. Reset pending canceled.');
-  }
-}
-
-/**
- * !closeallthread - Close all open threads in attendance channel
- * Verifies all pending, closes, and submits to Google Sheets (one by one)
- */
-async function handleCloseAllThreads(message, member) {
-  const guild = message.guild;
-  
-  // Get all active threads from attendance channel
-  const attChannel = await guild.channels.fetch(config.attendance_channel_id).catch(() => null);
-  if (!attChannel) {
-    await message.reply('❌ Could not find attendance channel.');
-    return;
-  }
-
-  const attThreads = await attChannel.threads.fetchActive().catch(() => null);
-  if (!attThreads || attThreads.threads.size === 0) {
-    await message.reply('📭 No active threads found in attendance channel.');
-    return;
-  }
-
-  // Filter threads that are in bot memory
-  const openSpawns = [];
-  for (const [threadId, thread] of attThreads.threads) {
-    const spawnInfo = activeSpawns[threadId];
-    if (spawnInfo && !spawnInfo.closed) {
-      openSpawns.push({threadId, thread, spawnInfo});
-    }
-  }
-
-  if (openSpawns.length === 0) {
-    await message.reply('📭 No open spawn threads found in bot memory.');
-    return;
-  }
-
-  // Show confirmation
-  const confirmMsg = await message.reply(
-    `⚠️ **MASS CLOSE ALL THREADS?**\n\n` +
-    `This will:\n` +
-    `• Verify ALL pending members in ALL threads\n` +
-    `• Close and submit ${openSpawns.length} spawn thread(s)\n` +
-    `• Process one thread at a time (to avoid rate limits)\n\n` +
-    `**Threads to close:**\n` +
-    openSpawns.map((s, i) => `${i + 1}. **${s.spawnInfo.boss}** (${s.spawnInfo.timestamp}) - ${s.spawnInfo.members.length} verified`).join('\n') +
-    `\n\nReact ✅ to confirm or ❌ to cancel.\n\n` +
-    `⏱️ This will take approximately ${openSpawns.length * 5} seconds.`
-  );
-  
-  await confirmMsg.react('✅');
-  await confirmMsg.react('❌');
-  
-  const filter = (reaction, user) => {
-    return ['✅', '❌'].includes(reaction.emoji.name) && user.id === member.user.id;
-  };
-
-  try {
-    const collected = await confirmMsg.awaitReactions({ filter, max: 1, time: 30000, errors: ['time'] });
-    const reaction = collected.first();
-
-    if (reaction.emoji.name === '❌') {
-      await message.reply('❌ Mass close canceled.');
-      return;
-    }
-
-    // User confirmed - start processing
-    await message.reply(
-      `🔄 **Starting mass close...**\n\n` +
-      `Processing ${openSpawns.length} thread(s) one by one...\n` +
-      `Please wait, this may take a few minutes.`
-    );
-
-    let successCount = 0;
-    let failCount = 0;
-    const results = [];
-
-    // Process each thread one by one
-    for (let i = 0; i < openSpawns.length; i++) {
-      const {threadId, thread, spawnInfo} = openSpawns[i];
-      
-      try {
-        await message.channel.send(
-          `📋 **[${i + 1}/${openSpawns.length}]** Processing: **${spawnInfo.boss}** (${spawnInfo.timestamp})...`
-        );
-
-        // Step 1: Auto-verify all pending members in this thread
-        const pendingInThread = Object.entries(pendingVerifications).filter(
-          ([msgId, p]) => p.threadId === threadId
-        );
-
-        if (pendingInThread.length > 0) {
-          await message.channel.send(
-            `   ├─ Found ${pendingInThread.length} pending verification(s)... Auto-verifying all...`
-          );
-
-          for (const [msgId, p] of pendingInThread) {
-            const authorLower = p.author.toLowerCase();
-            const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === authorLower);
-            
-            if (!isDuplicate) {
-              spawnInfo.members.push(p.author);
-            }
-
-            // Clean up emojis from the message
-            try {
-              const msg = await thread.messages.fetch(msgId).catch(() => null);
-              if (msg) {
-                await msg.reactions.removeAll().catch(() => {});
-              }
-            } catch (e) {
-              // Ignore errors
-            }
-
-            delete pendingVerifications[msgId];
-          }
-
-          await message.channel.send(
-            `   ├─ ✅ Auto-verified ${pendingInThread.length} member(s)`
-          );
-        }
-
-        // Step 2: Mark as closed
-        spawnInfo.closed = true;
-
-        // Step 3: Submit to Google Sheets
-        await message.channel.send(
-          `   ├─ 📊 Submitting ${spawnInfo.members.length} member(s) to Google Sheets...`
-        );
-
-        const payload = {
-          action: 'submitAttendance',
-          boss: spawnInfo.boss,
-          date: spawnInfo.date,
-          time: spawnInfo.time,
-          timestamp: spawnInfo.timestamp,
-          members: spawnInfo.members
-        };
-
-        const resp = await postToSheet(payload);
-
-        if (resp.ok) {
-          // Step 4: Delete confirmation thread
-          if (spawnInfo.confirmThreadId) {
-            const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
-            if (confirmThread) {
-              await confirmThread.delete().catch(() => {});
-            }
-          }
-
-          // Step 5: Archive thread
-          await thread.setArchived(true, `Mass close by ${member.user.username}`).catch(() => {});
-
-          // Step 6: Clean up memory
-          delete activeSpawns[threadId];
-          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
-
-          successCount++;
-          results.push(`✅ **${spawnInfo.boss}** - ${spawnInfo.members.length} members submitted`);
-          
-          await message.channel.send(
-            `   └─ ✅ **Success!** Thread closed and archived.`
-          );
-
-          console.log(`🔒 Mass close: ${spawnInfo.boss} at ${spawnInfo.timestamp} (${spawnInfo.members.length} members)`);
-        } else {
-          failCount++;
-          results.push(`❌ **${spawnInfo.boss}** - Failed to submit (${resp.text || resp.err})`);
-          
-          await message.channel.send(
-            `   └─ ❌ **Failed!** Could not submit to Google Sheets.\n` +
-            `   Members: ${spawnInfo.members.join(', ')}`
-          );
-        }
-
-        // Add delay between threads to avoid rate limits (5 seconds)
-        if (i < openSpawns.length - 1) {
-          await message.channel.send(`   ⏳ Waiting 5 seconds before next thread...`);
-          await new Promise(resolve => setTimeout(resolve, 5000));
-        }
-
-      } catch (err) {
-        failCount++;
-        results.push(`❌ **${spawnInfo.boss}** - Error: ${err.message}`);
-        
-        await message.channel.send(
-          `   └─ ❌ **Error!** ${err.message}`
-        );
-        
-        console.error(`❌ Mass close error for ${spawnInfo.boss}:`, err);
-      }
-    }
-
-    // Final summary
-    const summaryEmbed = new EmbedBuilder()
-      .setColor(successCount === openSpawns.length ? 0x00FF00 : 0xFFA500)
-      .setTitle('🎉 Mass Close Complete!')
-      .setDescription(
-        `**Summary:**\n` +
-        `✅ Success: ${successCount}\n` +
-        `❌ Failed: ${failCount}\n` +
-        `📊 Total: ${openSpawns.length}`
-      )
-      .addFields({
-        name: '📋 Detailed Results',
-        value: results.join('\n')
-      })
-      .setFooter({text: `Executed by ${member.user.username}`})
-      .setTimestamp();
-
-    await message.reply({embeds: [summaryEmbed]});
-
-    console.log(`🔧 Mass close complete: ${successCount}/${openSpawns.length} successful by ${member.user.username}`);
-
-  } catch (err) {
-    if (err.message === 'time') {
-      await message.reply('⏱️ Confirmation timed out. Mass close canceled.');
-    } else {
-      await message.reply(`❌ Error during mass close: ${err.message}`);
-      console.error('❌ Mass close error:', err);
-    }
-  }
-}
-
-/**
- * Handle admin logs override commands
- */
-async function handleAdminLogsOverrideCommand(message, member, command) {
-  const guild = message.guild;
-  
-  // Check cooldown
-  const now = Date.now();
-  if (now - lastOverrideTime < OVERRIDE_COOLDOWN) {
-    const remaining = Math.ceil((OVERRIDE_COOLDOWN - (now - lastOverrideTime)) / 1000);
-    await message.reply(`⚠️ Please wait ${remaining} seconds between override commands.`);
-    return;
-  }
-
-  lastOverrideTime = now;
-
-  // Log usage
-  console.log(`🔧 Override: ${command} used by ${member.user.username}`);
-  
-  const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
-  if (adminLogs) {
-    await adminLogs.send(`🔧 **Override Command Used:** \`${command}\` by ${member.user.username}`);
-  }
-
-  switch (command) {
-    case '!clearstate':
-      await handleClearState(message, member);
-      break;
-    
-    case '!status':
-      await handleStatus(message, member);
-      break;
-    
-    case '!closeallthread':
-      await handleCloseAllThreads(message, member);
-      break;
   }
 }
 
@@ -1456,11 +1454,11 @@ client.on(Events.MessageCreate, async (message) => {
             timestamp = timestampMatch[1];
           }
           
-          const matchBold = message.content.match(/[⚠️📢⏰]*\s*\*\*(.*?)\*\*\s*will spawn/i);
+          const matchBold = message.content.match(/[⚠️🔔⏰]*\s*\*\*(.*?)\*\*\s*will spawn/i);
           if (matchBold) {
             detectedBoss = matchBold[1].trim();
           } else {
-            const matchEmoji = message.content.match(/[⚠️📢⏰]+\s*([A-Za-z\s]+?)\s*will spawn/i);
+            const matchEmoji = message.content.match(/[⚠️🔔⏰]+\s*([A-Za-z\s]+?)\s*will spawn/i);
             if (matchEmoji) {
               detectedBoss = matchEmoji[1].trim();
             } else {
@@ -1515,23 +1513,15 @@ client.on(Events.MessageCreate, async (message) => {
     const member = await guild.members.fetch(message.author.id).catch(() => null);
     if (!member) return;
 
-    const userIsAdmin = isAdmin(member);
-
-    // ========== HELP COMMAND (ANYWHERE EXCEPT SPAWN THREADS) ==========
+    // ========== HELP COMMAND ==========
     if (message.content.toLowerCase().match(/^(!help|!commands|!\?)/)) {
-      // Block help in spawn threads to keep them clean
-      if (message.channel.isThread() && message.channel.parentId === config.attendance_channel_id) {
-        await message.reply('⚠️ Please use `!help` in admin logs channel to avoid cluttering spawn threads.');
-        return;
-      }
-      
       const args = message.content.split(/\s+/).slice(1);
       const specificCommand = args.length > 0 ? args.join(' ') : null;
       await showHelp(message, member, specificCommand);
       return;
     }
 
-    // ========== MEMBER CHECK-IN (THREADS ONLY) ==========
+    // ========== MEMBER/ADMIN CHECK-IN (BOTH CAN CHECK IN) ==========
     if (message.channel.isThread() && message.channel.parentId === config.attendance_channel_id) {
       const content = message.content.trim().toLowerCase();
       const parts = content.split(/\s+/);
@@ -1545,7 +1535,9 @@ client.on(Events.MessageCreate, async (message) => {
           return;
         }
 
-        // Admins can skip screenshot but still need verification
+        const userIsAdmin = isAdmin(member);
+
+        // Non-admins must attach screenshot
         if (!userIsAdmin) {
           if (!message.attachments || message.attachments.size === 0) {
             await message.reply('⚠️ **Screenshot required!** Attach a screenshot showing boss and timestamp.');
@@ -1575,217 +1567,36 @@ client.on(Events.MessageCreate, async (message) => {
           timestamp: Date.now()
         };
 
-        const statusText = userIsAdmin 
-          ? `⏩ **${username}** (Admin) registered for **${spawnInfo.boss}**\n\nFast-track verification (no screenshot required)...`
-          : `⏳ **${username}** registered for **${spawnInfo.boss}**\n\nWaiting for admin verification...`;
-
         const embed = new EmbedBuilder()
-          .setColor(userIsAdmin ? 0x00FF00 : 0xFFA500)
-          .setDescription(statusText)
+          .setColor(0xFFA500)
+          .setDescription(`⏳ **${username}** registered for **${spawnInfo.boss}**\n\nWaiting for admin verification...`)
           .setFooter({text: 'Admins: React ✅ to verify, ❌ to deny'});
 
         await message.reply({embeds: [embed]});
-        
-        // Notify confirmation thread
-        if (spawnInfo.confirmThreadId) {
-          const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
-          if (confirmThread) {
-            const notifText = userIsAdmin 
-              ? `⏩ **${username}** (Admin) - Fast-track check-in (no screenshot)`
-              : `⏳ **${username}** - Pending verification`;
-            await confirmThread.send(notifText);
-          }
-        }
-        
-        console.log(`📝 Pending: ${username} for ${spawnInfo.boss}${userIsAdmin ? ' (admin fast-track)' : ''}`);
+        console.log(`📝 Pending: ${username} for ${spawnInfo.boss}`);
         return;
       }
-
-      // ========== ADMIN COMMANDS IN THREADS ==========
-      if (!userIsAdmin) return;
-
-      // Thread-specific override commands
-      const threadOverrideCommands = ['!forcesubmit', '!debugthread', '!resetpending'];
-      const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
-      
-      if (threadOverrideCommands.includes(cmd)) {
-        await handleThreadOverrideCommand(message, member, cmd);
-        return;
-      }
-
-      // ========== ADMIN OVERRIDE: !verify @member ==========
-      if (message.content.startsWith('!verify')) {
-        const mentioned = message.mentions.users.first();
-        if (!mentioned) {
-          await message.reply('⚠️ Usage: `!verify @member`\n💡 Type `!help verify` for details');
-          return;
-        }
-
-        const spawnInfo = activeSpawns[message.channel.id];
-        if (!spawnInfo || spawnInfo.closed) {
-          await message.reply('⚠️ This spawn is closed or not found.');
-          return;
-        }
-
-        const mentionedMember = await guild.members.fetch(mentioned.id).catch(() => null);
-        const username = mentionedMember ? (mentionedMember.nickname || mentioned.username) : mentioned.username;
-        
-        const usernameLower = username.toLowerCase();
-        const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === usernameLower);
-        
-        if (isDuplicate) {
-          await message.reply(`⚠️ **${username}** is already verified for this spawn.`);
-          return;
-        }
-
-        spawnInfo.members.push(username);
-
-        await message.reply(`✅ **${username}** manually verified by ${message.author.username}`);
-        
-        if (spawnInfo.confirmThreadId) {
-          const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
-          if (confirmThread) {
-            await confirmThread.send(`✅ **${username}** verified by ${message.author.username} (manual override)`);
-          }
-        }
-
-        console.log(`✅ Manual verify: ${username} for ${spawnInfo.boss} by ${message.author.username}`);
-        return;
-      }
-
-      // ========== ADMIN CLOSE COMMAND ==========
-      if (message.content.trim().toLowerCase() === 'close') {
-        const spawnInfo = activeSpawns[message.channel.id];
-        if (!spawnInfo || spawnInfo.closed) {
-          await message.reply('⚠️ This spawn is already closed or not found.');
-          return;
-        }
-
-        const pendingInThread = Object.entries(pendingVerifications).filter(
-          ([msgId, p]) => p.threadId === message.channel.id
-        );
-
-        if (pendingInThread.length > 0) {
-          const pendingList = pendingInThread.map(([msgId, p]) => {
-            const messageLink = `https://discord.com/channels/${guild.id}/${message.channel.id}/${msgId}`;
-            return `• **${p.author}** - [View Message](${messageLink})`;
-          }).join('\n');
-          
-          await message.reply(
-            `⚠️ **Cannot close spawn!**\n\n` +
-            `There are **${pendingInThread.length} pending verification(s)**:\n\n` +
-            `${pendingList}\n\n` +
-            `Please verify (✅) or deny (❌) all check-ins first, then type \`close\` again.\n\n` +
-            `💡 Or use \`!resetpending\` to clear them, or \`!help close\` for more options.`
-          );
-          return;
-        }
-
-        const confirmMsg = await message.reply(
-          `🔒 Close spawn **${spawnInfo.boss}** (${spawnInfo.timestamp})?\n\n` +
-          `**${spawnInfo.members.length} members** will be submitted to Google Sheets.\n\n` +
-          `React ✅ to confirm or ❌ to cancel.`
-        );
-        
-        await confirmMsg.react('✅');
-        await confirmMsg.react('❌');
-        
-        pendingClosures[confirmMsg.id] = {
-          threadId: message.channel.id,
-          adminId: message.author.id
-        };
-        
-        return;
-      }
-
-      // ========== ADMIN FORCE CLOSE (EMERGENCY) ==========
-      if (message.content.trim().toLowerCase() === '!forceclose') {
-        const spawnInfo = activeSpawns[message.channel.id];
-        if (!spawnInfo || spawnInfo.closed) {
-          await message.reply('⚠️ This spawn is already closed or not found.');
-          return;
-        }
-
-        // Clear any pending verifications for this thread
-        const pendingInThread = Object.keys(pendingVerifications).filter(
-          msgId => pendingVerifications[msgId].threadId === message.channel.id
-        );
-        pendingInThread.forEach(msgId => delete pendingVerifications[msgId]);
-
-        // Force close without confirmation
-        await message.reply(
-          `⚠️ **FORCE CLOSING** spawn **${spawnInfo.boss}**...\n` +
-          `Submitting ${spawnInfo.members.length} members (ignoring ${pendingInThread.length} pending verifications)`
-        );
-        
-        spawnInfo.closed = true;
-
-        const payload = {
-          action: 'submitAttendance',
-          boss: spawnInfo.boss,
-          date: spawnInfo.date,
-          time: spawnInfo.time,
-          timestamp: spawnInfo.timestamp,
-          members: spawnInfo.members
-        };
-
-        const resp = await postToSheet(payload);
-
-        if (resp.ok) {
-          await message.channel.send(`✅ Attendance submitted successfully! (${spawnInfo.members.length} members)`);
-          
-          // Delete confirmation thread
-          if (spawnInfo.confirmThreadId) {
-            const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
-            if (confirmThread) {
-              await confirmThread.delete().catch(console.error);
-              console.log(`🗑️ Deleted confirmation thread for ${spawnInfo.boss}`);
-            }
-          }
-
-          // Archive thread
-          await message.channel.setArchived(true, `Force closed by ${message.author.username}`).catch(console.error);
-
-          // Clean up memory
-          delete activeSpawns[message.channel.id];
-          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
-
-          console.log(`🔒 FORCE CLOSE: ${spawnInfo.boss} at ${spawnInfo.timestamp} by ${message.author.username} (${spawnInfo.members.length} members)`);
-        } else {
-          await message.channel.send(
-            `⚠️ **Failed to submit attendance!**\n\n` +
-            `Error: ${resp.text || resp.err}\n\n` +
-            `**Members list (for manual entry):**\n${spawnInfo.members.join(', ')}\n\n` +
-            `Please manually update the Google Sheet.`
-          );
-        }
-        
-        return;
-      }
-
-      return;
     }
 
-    // ========== ADMIN-ONLY COMMANDS IN ADMIN LOGS ==========
-    if (!userIsAdmin) return;
-    
-    // Check if in admin logs channel OR a thread within admin logs
-    const inAdminLogs = message.channel.id === config.admin_logs_channel_id || 
-                        (message.channel.isThread() && message.channel.parentId === config.admin_logs_channel_id);
-    
-    if (!inAdminLogs) return;
+    // ========== ADMIN-ONLY COMMANDS (MUST BE IN ADMIN LOGS) ==========
+    if (!isAdmin(member)) return;
 
-    // Admin logs override commands
-    const adminLogsCommands = ['!clearstate', '!status', '!closeallthread'];
+    // ========== OVERRIDE COMMANDS (ADMIN LOGS ONLY) ==========
+    const overrideCommands = ['!clearstate', '!forcesubmit', '!status', '!debugthread', '!resetpending'];
     const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
     
-    if (adminLogsCommands.includes(cmd)) {
-      await handleAdminLogsOverrideCommand(message, member, cmd);
+    if (overrideCommands.includes(cmd)) {
+      // Must be in admin logs channel
+      if (message.channel.id !== config.admin_logs_channel_id) {
+        await message.reply('⚠️ This command must be used in admin logs channel.');
+        return;
+      }
+      await handleOverrideCommand(message, member, cmd);
       return;
     }
 
     // ========== MANUAL THREAD CREATION ==========
-    if (message.content.startsWith('!addthread')) {
+    if (message.channel.id === config.admin_logs_channel_id && message.content.startsWith('!addthread')) {
       const fullText = message.content.substring('!addthread'.length).trim();
       
       const timestampMatch = fullText.match(/\((\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\)/);
@@ -1845,6 +1656,156 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
+    // ========== ADMIN OVERRIDE: !verify @member ==========
+    if (message.channel.isThread() && message.content.startsWith('!verify')) {
+      const mentioned = message.mentions.users.first();
+      if (!mentioned) {
+        await message.reply('⚠️ Usage: `!verify @member`\n💡 Type `!help verify` for details');
+        return;
+      }
+
+      const spawnInfo = activeSpawns[message.channel.id];
+      if (!spawnInfo || spawnInfo.closed) {
+        await message.reply('⚠️ This spawn is closed or not found.');
+        return;
+      }
+
+      const mentionedMember = await guild.members.fetch(mentioned.id).catch(() => null);
+      const username = mentionedMember ? (mentionedMember.nickname || mentioned.username) : mentioned.username;
+      
+      const usernameLower = username.toLowerCase();
+      const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === usernameLower);
+      
+      if (isDuplicate) {
+        await message.reply(`⚠️ **${username}** is already verified for this spawn.`);
+        return;
+      }
+
+      spawnInfo.members.push(username);
+
+      await message.reply(`✅ **${username}** manually verified by ${message.author.username}`);
+      
+      if (spawnInfo.confirmThreadId) {
+        const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
+        if (confirmThread) {
+          await confirmThread.send(`✅ **${username}** verified by ${message.author.username} (manual override)`);
+        }
+      }
+
+      console.log(`✅ Manual verify: ${username} for ${spawnInfo.boss} by ${message.author.username}`);
+      return;
+    }
+
+    // ========== ADMIN CLOSE COMMAND ==========
+    if (message.channel.isThread() && message.content.trim().toLowerCase() === 'close') {
+      const spawnInfo = activeSpawns[message.channel.id];
+      if (!spawnInfo || spawnInfo.closed) {
+        await message.reply('⚠️ This spawn is already closed or not found.');
+        return;
+      }
+
+      const pendingInThread = Object.entries(pendingVerifications).filter(
+        ([msgId, p]) => p.threadId === message.channel.id
+      );
+
+      if (pendingInThread.length > 0) {
+        const pendingList = pendingInThread.map(([msgId, p]) => {
+          const messageLink = `https://discord.com/channels/${guild.id}/${message.channel.id}/${msgId}`;
+          return `• **${p.author}** - [View Message](${messageLink})`;
+        }).join('\n');
+        
+        await message.reply(
+          `⚠️ **Cannot close spawn!**\n\n` +
+          `There are **${pendingInThread.length} pending verification(s)**:\n\n` +
+          `${pendingList}\n\n` +
+          `Please verify (✅) or deny (❌) all check-ins first, then type \`close\` again.\n\n` +
+          `💡 Or use \`!resetpending\` to clear them, or \`!help close\` for more options.`
+        );
+        return;
+      }
+
+      const confirmMsg = await message.reply(
+        `🔒 Close spawn **${spawnInfo.boss}** (${spawnInfo.timestamp})?\n\n` +
+        `**${spawnInfo.members.length} members** will be submitted to Google Sheets.\n\n` +
+        `React ✅ to confirm or ❌ to cancel.`
+      );
+      
+      await confirmMsg.react('✅');
+      await confirmMsg.react('❌');
+      
+      pendingClosures[confirmMsg.id] = {
+        threadId: message.channel.id,
+        adminId: message.author.id
+      };
+      
+      return;
+    }
+
+    // ========== ADMIN FORCE CLOSE (EMERGENCY) ==========
+    if (message.channel.isThread() && message.content.trim().toLowerCase() === '!forceclose') {
+      const spawnInfo = activeSpawns[message.channel.id];
+      if (!spawnInfo || spawnInfo.closed) {
+        await message.reply('⚠️ This spawn is already closed or not found.');
+        return;
+      }
+
+      // Clear any pending verifications for this thread
+      const pendingInThread = Object.keys(pendingVerifications).filter(
+        msgId => pendingVerifications[msgId].threadId === message.channel.id
+      );
+      pendingInThread.forEach(msgId => delete pendingVerifications[msgId]);
+
+      // Force close without confirmation
+      await message.reply(
+        `⚠️ **FORCE CLOSING** spawn **${spawnInfo.boss}**...\n` +
+        `Submitting ${spawnInfo.members.length} members (ignoring ${pendingInThread.length} pending verifications)`
+      );
+      
+      spawnInfo.closed = true;
+
+      const payload = {
+        action: 'submitAttendance',
+        boss: spawnInfo.boss,
+        date: spawnInfo.date,
+        time: spawnInfo.time,
+        timestamp: spawnInfo.timestamp,
+        members: spawnInfo.members
+      };
+
+      const resp = await postToSheet(payload);
+
+      if (resp.ok) {
+        await message.channel.send(`✅ Attendance submitted successfully! (${spawnInfo.members.length} members)`);
+        
+        // Delete confirmation thread
+        if (spawnInfo.confirmThreadId) {
+          const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
+          if (confirmThread) {
+            await confirmThread.delete().catch(console.error);
+            console.log(`🗑️ Deleted confirmation thread for ${spawnInfo.boss}`);
+          }
+        }
+
+        // Archive thread
+        await message.channel.setArchived(true, `Force closed by ${message.author.username}`).catch(console.error);
+
+        // Clean up memory
+        delete activeSpawns[message.channel.id];
+        delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+
+        console.log(`🔒 FORCE CLOSE: ${spawnInfo.boss} at ${spawnInfo.timestamp} by ${message.author.username} (${spawnInfo.members.length} members)`);
+      } else {
+        await message.channel.send(
+          `⚠️ **Failed to submit attendance!**\n\n` +
+          `Error: ${resp.text || resp.err}\n\n` +
+          `**Members list (for manual entry):**\n${spawnInfo.members.join(', ')}\n\n` +
+          `Please manually update the Google Sheet.`
+        );
+      }
+      
+      return;
+    }
+
   } catch (err) {
     console.error('❌ Message handler error:', err);
   }
@@ -1883,7 +1844,6 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         if (!spawnInfo || spawnInfo.closed) {
           await msg.channel.send('⚠️ Spawn already closed or not found.');
           delete pendingClosures[msg.id];
-          await msg.reactions.removeAll().catch(() => {}); // Clean up reactions
           return;
         }
 
@@ -1904,9 +1864,6 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 
         if (resp.ok) {
           await msg.channel.send(`✅ Attendance submitted successfully! Archiving thread...`);
-          
-          // Clean up close confirmation reactions
-          await msg.reactions.removeAll().catch(() => {});
           
           // Delete confirmation thread
           if (spawnInfo.confirmThreadId) {
@@ -1932,14 +1889,12 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
             `**Members list (for manual entry):**\n${spawnInfo.members.join(', ')}\n\n` +
             `Please manually update the Google Sheet.`
           );
-          await msg.reactions.removeAll().catch(() => {}); // Clean up reactions even on failure
         }
 
         delete pendingClosures[msg.id];
         
       } else if (reaction.emoji.name === '❌') {
         await msg.channel.send('❌ Spawn close canceled.');
-        await msg.reactions.removeAll().catch(() => {}); // Clean up reactions
         delete pendingClosures[msg.id];
       }
       
