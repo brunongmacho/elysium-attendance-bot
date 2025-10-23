@@ -1,5 +1,14 @@
+# Core Discord bot framework
 discord.py==2.4.0
-aiohttp==3.10.5
+
+# Async HTTP requests (used for Google Sheet webhook + health server)
+aiohttp==3.9.5
+
+# Fuzzy boss name matching
+rapidfuzz==3.9.1
+
+# Optional system metrics for !status (memory, uptime)
+psutil==5.9.8
+
+# Environment variable management (if using .env locally)
 python-dotenv==1.0.1
-rapidfuzz==3.9.4
-psutil==6.1.0
