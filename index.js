@@ -843,7 +843,7 @@ async function showCommandHelp(message, command, isAdmin) {
                    '• Shows progress bar\n' +
                    '• Retries failed submissions once\n' +
                    '• Requires confirmation (React ✅)'
-          }
+          },
           {
         name: '🧹 Cleanup Process',
         value: '• Removes reactions from up to 100 messages per thread\n' +
