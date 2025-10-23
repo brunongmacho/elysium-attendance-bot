@@ -1,33 +1,31 @@
-# ---------- BASE IMAGE ----------
-FROM python:3.12-slim
+# Stage 1: Install dependencies
+FROM mirror.gcr.io/library/node:18-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --production --no-audit --progress=false
 
-# ---------- ENVIRONMENT ----------
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    TZ=Asia/Manila
+# Stage 2: Copy source and build (if applicable)
+FROM mirror.gcr.io/library/node:18-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+# Uncomment the next line if you have a build step (e.g., React, TypeScript)
+# RUN npm run build
 
-# ---------- WORKDIR ----------
+# Stage 3: Use Distroless for production (no DockerHub dependency)
+FROM gcr.io/distroless/nodejs18
 WORKDIR /app
 
-# ---------- DEPENDENCIES ----------
-# Install system dependencies (for psutil, aiohttp, etc.)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# Copy built app and dependencies
+COPY --from=builder /app .
 
-# Copy requirement files first for caching
-COPY requirements.txt .
+# Optional: set environment variables
+ENV NODE_ENV=production
+ENV PORT=3000
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# ---------- COPY BOT SOURCE ----------
-COPY . .
-
-# ---------- PORTS ----------
-# (For Koyeb health checks)
+# Expose port if your app listens on one
+EXPOSE 3000
 EXPOSE 8000
 
-# ---------- STARTUP ----------
-# Run your Python bot (auto-start)
-CMD ["python", "bot.py"]
+# Start the bot
+CMD ["index.js"]

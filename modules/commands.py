@@ -5,27 +5,108 @@ from modules.state_manager import active_spawns, pending_verifications, pending_
 from modules.logger import info
 
 BOT_VERSION = "2.8"
+PREFIX = "!"
 
+# -----------------------------
+# HELP COMMAND
+# -----------------------------
 async def handle_help(message, args):
-    """Respond to !help and subcommands."""
-    prefix = "!"
+    """Show !help and detailed per-command help."""
+    user = message.author
+
+    # ---- Detailed Help for Specific Command ----
     if args:
         cmd = args[0].lower()
-        details = {
-            "help": "Displays all available bot commands.",
-            "status": "Shows current bot uptime, threads, and memory usage.",
-            "debugthread": "Displays debug info for the current thread.",
-            "addthread": "Manually creates a boss attendance thread.",
-        }
-        desc = details.get(cmd, "No details found for this command.")
-        await message.reply(f"**Help detail for:** `{cmd}`\n{desc}")
-    else:
-        cmds = ["help", "status", "debugthread", "addthread"]
-        await message.reply(
-            "**Available Commands:**\n" + "\n".join([f"• `{prefix}{c}`" for c in cmds])
-        )
-    info(f"{message.author} used !help {' '.join(args) if args else ''}")
 
+        if cmd == "status":
+            embed = (
+                discord.Embed(
+                    title="📊 Command: !status",
+                    description="Show bot health, active spawns, and system statistics.",
+                    color=0x4A90E2,
+                )
+                .add_field(name="📍 Where to Use", value="Admin logs channel only", inline=False)
+                .add_field(name="📝 Syntax", value="!status", inline=False)
+                .add_field(
+                    name="📊 Output Shows",
+                    value="• Bot uptime and version\n• Active spawn threads with clickable links\n• Sorted oldest first with age indicators\n• Pending verifications count\n• Last sheet API call time",
+                    inline=False,
+                )
+                .set_footer(text="Type !help for full command list")
+            )
+            await message.reply(embed=embed)
+            info(f"{user.name} used !help {cmd}")
+            return
+
+        elif cmd == "addthread":
+            embed = (
+                discord.Embed(
+                    title="🧵 Command: !addthread",
+                    description="Manually create a spawn attendance thread for a specific boss.",
+                    color=0x4A90E2,
+                )
+                .add_field(name="📍 Where to Use", value="Any text channel", inline=False)
+                .add_field(name="📝 Syntax", value="!addthread <BossName>", inline=False)
+                .add_field(name="📊 Example", value="!addthread Venatus", inline=False)
+                .set_footer(text="Type !help for full command list")
+            )
+            await message.reply(embed=embed)
+            info(f"{user.name} used !help {cmd}")
+            return
+
+        elif cmd == "debugthread":
+            embed = (
+                discord.Embed(
+                    title="🔍 Command: !debugthread",
+                    description="Show internal memory and verification details of this thread.",
+                    color=0x4A90E2,
+                )
+                .add_field(name="📍 Where to Use", value="Inside an attendance thread", inline=False)
+                .add_field(name="📝 Syntax", value="!debugthread", inline=False)
+                .set_footer(text="Type !help for full command list")
+            )
+            await message.reply(embed=embed)
+            info(f"{user.name} used !help {cmd}")
+            return
+
+        elif cmd == "reload":
+            embed = (
+                discord.Embed(
+                    title="♻️ Command: !reload",
+                    description="Reload boss list from file without restarting the bot.",
+                    color=0x4A90E2,
+                )
+                .add_field(name="📝 Syntax", value="!reload", inline=False)
+                .set_footer(text="Type !help for full command list")
+            )
+            await message.reply(embed=embed)
+            info(f"{user.name} used !help {cmd}")
+            return
+
+        # Unknown subcommand
+        await message.reply(f"❓ No detailed help found for `{cmd}`.")
+        info(f"{user.name} used !help {cmd} (unknown)")
+        return
+
+    # ---- General Help ----
+    embed = (
+        discord.Embed(
+            title="📖 ELYSIUM Attendance Bot Commands",
+            description="Use `!help <command>` for detailed info on a specific command.",
+            color=0x4A90E2,
+        )
+        .add_field(name="🧵 !addthread", value="Manually create a spawn attendance thread for a boss.", inline=False)
+        .add_field(name="📊 !status", value="Show bot health, uptime, and active spawns.", inline=False)
+        .add_field(name="🔍 !debugthread", value="Display debug info for current thread.", inline=False)
+        .add_field(name="♻️ !reload", value="Reload boss list from file.", inline=False)
+        .set_footer(text="ELYSIUM Attendance Bot • Type !help <command> for details")
+    )
+    await message.reply(embed=embed)
+    info(f"{user.name} used !help")
+
+# -----------------------------
+# STATUS COMMAND
+# -----------------------------
 async def handle_status(message, bot_start_time, last_sheet_call):
     """Show current bot statistics."""
     uptime = datetime.now(timezone.utc) - bot_start_time
@@ -41,7 +122,11 @@ async def handle_status(message, bot_start_time, last_sheet_call):
     )
     embed.timestamp = datetime.now(timezone.utc)
     await message.reply(embed=embed)
+    info(f"{message.author.name} used !status")
 
+# -----------------------------
+# DEBUG THREAD
+# -----------------------------
 async def handle_debug_thread(message):
     """Debug information for current thread."""
     tid = message.channel.id
@@ -69,3 +154,4 @@ async def handle_debug_thread(message):
     )
     embed.timestamp = datetime.now(timezone.utc)
     await message.reply(embed=embed)
+    info(f"{message.author.name} used !debugthread")
