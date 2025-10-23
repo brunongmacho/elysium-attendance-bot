@@ -1,25 +1,31 @@
-# Dockerfile
-# Use a minimal Python image as the base
-FROM python:3.11-slim
+# Stage 1: Install dependencies
+FROM mirror.gcr.io/library/node:18-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --production --no-audit --progress=false
 
-# Set the working directory inside the container
-WORKDIR /usr/src/app
-
-# Copy the requirements file and install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Create the modules directory structure
-RUN mkdir -p modules
-
-# Copy all local files into the container
-# NOTE: Ensure config.json, boss_points.json, and the modules/ directory are present
+# Stage 2: Copy source and build (if applicable)
+FROM mirror.gcr.io/library/node:18-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Uncomment the next line if you have a build step (e.g., React, TypeScript)
+# RUN npm run build
 
-# Expose the port (Koyeb requires this for the health check)
-# The actual port number will be read from the PORT environment variable by the bot
+# Stage 3: Use Distroless for production (no DockerHub dependency)
+FROM gcr.io/distroless/nodejs18
+WORKDIR /app
+
+# Copy built app and dependencies
+COPY --from=builder /app .
+
+# Optional: set environment variables
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Expose port if your app listens on one
+EXPOSE 3000
 EXPOSE 8000
 
-# The command to run the bot.py file
-# Koyeb will automatically set PORT and monitor the /health endpoint
-CMD ["python", "bot.py"]
+# Start the bot
+CMD ["index.js"]
