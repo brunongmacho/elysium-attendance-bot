@@ -2179,76 +2179,77 @@ if (reaction.emoji.name === '✅') {
       return;
     }
 
-    // ========== ATTENDANCE VERIFICATION ==========
-    const pending = pendingVerifications[msg.id];
-    
-    if (pending) {
-      const spawnInfo = activeSpawns[pending.threadId];
+// ========== ATTENDANCE VERIFICATION ==========
+const pending = pendingVerifications[msg.id];
 
-      if (!spawnInfo || spawnInfo.closed) {
-        await msg.reply('⚠️ This spawn is already closed.');
-        delete pendingVerifications[msg.id];
-        return;
-      }
+if (pending) {
+  const spawnInfo = activeSpawns[pending.threadId];
 
-if (reaction.emoji.name === '✅') {
-  // OPTIMIZED: Case-insensitive duplicate check
-  const authorLower = pending.author.toLowerCase();
-  const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === authorLower);
-  
-  if (isDuplicate) {
-    await msg.reply(`⚠️ **${pending.author}** is already verified. Ignoring duplicate.`);
-    await removeAllReactionsWithRetry(msg);  // ← Use helper
-    delete pendingVerifications[msg.id];  // ← Clean up immediately
+  if (!spawnInfo || spawnInfo.closed) {
+    await msg.reply('⚠️ This spawn is already closed.');
+    delete pendingVerifications[msg.id];
     return;
   }
 
-  // Add member to verified list
-  spawnInfo.members.push(pending.author);
-
-  // IMPORTANT: Clean reactions BEFORE replying (prevents race condition)
-  const cleanupSuccess = await removeAllReactionsWithRetry(msg);
-  if (!cleanupSuccess) {
-    console.warn(`⚠️ Could not clean reactions for ${msg.id}, but continuing...`);
-  }
-
-  await msg.reply(`✅ **${pending.author}** verified by ${user.username}!`);
-
-  // Notify confirmation thread
-  if (spawnInfo.confirmThreadId) {
-    const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
-    if (confirmThread) {
-      const embed = new EmbedBuilder()
-        .setColor(0x00FF00)
-        .setTitle('✅ Attendance Verified')
-        .setDescription(`**${pending.author}** verified for **${spawnInfo.boss}**`)
-        .addFields(
-          {name: 'Verified By', value: user.username, inline: true},
-          {name: 'Points', value: `+${bossPoints[spawnInfo.boss].points}`, inline: true},
-          {name: 'Total Verified', value: `${spawnInfo.members.length}`, inline: true}
-        )
-        .setTimestamp();
-      
-      await confirmThread.send({embeds: [embed]});
+  if (reaction.emoji.name === '✅') {
+    // OPTIMIZED: Case-insensitive duplicate check
+    const authorLower = pending.author.toLowerCase();
+    const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === authorLower);
+    
+    if (isDuplicate) {
+      await msg.reply(`⚠️ **${pending.author}** is already verified. Ignoring duplicate.`);
+      await removeAllReactionsWithRetry(msg);
+      delete pendingVerifications[msg.id];
+      return;
     }
+
+    // Add member to verified list
+    spawnInfo.members.push(pending.author);
+
+    // IMPORTANT: Clean reactions BEFORE replying (prevents race condition)
+    const cleanupSuccess = await removeAllReactionsWithRetry(msg);
+    if (!cleanupSuccess) {
+      console.warn(`⚠️ Could not clean reactions for ${msg.id}, but continuing...`);
+    }
+
+    await msg.reply(`✅ **${pending.author}** verified by ${user.username}!`);
+
+    // Notify confirmation thread
+    if (spawnInfo.confirmThreadId) {
+      const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
+      if (confirmThread) {
+        const embed = new EmbedBuilder()
+          .setColor(0x00FF00)
+          .setTitle('✅ Attendance Verified')
+          .setDescription(`**${pending.author}** verified for **${spawnInfo.boss}**`)
+          .addFields(
+            {name: 'Verified By', value: user.username, inline: true},
+            {name: 'Points', value: `+${bossPoints[spawnInfo.boss].points}`, inline: true},
+            {name: 'Total Verified', value: `${spawnInfo.members.length}`, inline: true}
+          )
+          .setTimestamp();
+        
+        await confirmThread.send({embeds: [embed]});
+      }
+    }
+
+    // IMPORTANT: Delete from pending AFTER all operations complete
+    delete pendingVerifications[msg.id];
+    console.log(`✅ Verified: ${pending.author} for ${spawnInfo.boss} by ${user.username}`);
+
+  } else if (reaction.emoji.name === '❌') {
+    // Delete message (denial)
+    await msg.delete().catch(() => {});
+    await msg.channel.send(
+      `<@${pending.authorId}>, your attendance was **denied** by ${user.username}. ` +
+      `Please repost with a proper screenshot.`
+    );
+    
+    delete pendingVerifications[msg.id];
+    console.log(`❌ Denied: ${pending.author} for ${spawnInfo.boss} by ${user.username}`);
   }
-
-  // IMPORTANT: Delete from pending AFTER all operations complete
-  delete pendingVerifications[msg.id];
-  console.log(`✅ Verified: ${pending.author} for ${spawnInfo.boss} by ${user.username}`);
-
-} else if (reaction.emoji.name === '❌') {
-  // Delete message (denial)
-  await msg.delete().catch(() => {});
-  await msg.channel.send(
-    `<@${pending.authorId}>, your attendance was **denied** by ${user.username}. ` +
-    `Please repost with a proper screenshot.`
-  );
-  
-  delete pendingVerifications[msg.id];
-  console.log(`❌ Denied: ${pending.author} for ${spawnInfo.boss} by ${user.username}`);
 }
-
+      
   } catch (err) {
     console.error('❌ Reaction handler error:', err);
   }
