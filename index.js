@@ -32,6 +32,17 @@ const http = require('http');
 const config = JSON.parse(fs.readFileSync('./config.json'));
 const bossPoints = JSON.parse(fs.readFileSync('./boss_points.json'));
 
+// Timing constants
+const TIMING = {
+  MIN_SHEET_DELAY: 2000,        // 2 seconds between API calls
+  OVERRIDE_COOLDOWN: 10000,      // 10 seconds between override commands
+  CONFIRMATION_TIMEOUT: 30000,   // 30 seconds for user confirmations
+  RETRY_DELAY: 5000,             // 5 seconds before retry
+  MASS_CLOSE_DELAY: 3000,        // 3 seconds between thread processing
+  REACTION_RETRY_ATTEMPTS: 3,    // Retry reaction cleanup 3 times
+  REACTION_RETRY_DELAY: 1000     // 1 second between retry attempts
+};
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -47,7 +58,7 @@ const client = new Client({
 // HTTP HEALTH CHECK SERVER FOR KOYEB
 // ==========================================
 const PORT = process.env.PORT || 8000;
-const BOT_VERSION = '2.6';
+const BOT_VERSION = '2.7';
 const BOT_START_TIME = Date.now();
 
 const server = http.createServer((req, res) => {
@@ -78,15 +89,14 @@ server.listen(PORT, () => {
 let activeSpawns = {}; // threadId -> {boss, date, time, timestamp, members: [], confirmThreadId, closed}
 let activeColumns = {}; // "boss|timestamp" -> threadId (for duplicate check)
 let pendingVerifications = {}; // messageId -> {author, authorId, threadId, timestamp}
-let pendingClosures = {}; // messageId -> {threadId, adminId}
+let pendingClosures = {}; // messageId -> {threadId, adminId, type: 'close'|'clearstate'|etc}
+let confirmationMessages = {}; // threadId -> [messageIds] (for cleanup tracking)
 
-// Rate limiting
+// Rate limiting (using TIMING constants)
 let lastSheetCall = 0;
-const MIN_SHEET_DELAY = 2000; // 2 seconds between API calls
 
 // Override command cooldown
 let lastOverrideTime = 0;
-const OVERRIDE_COOLDOWN = 10000; // 10 seconds
 
 // ==========================================
 // UTILITY FUNCTIONS
@@ -129,6 +139,77 @@ function formatUptime(ms) {
   if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
   if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
   return `${seconds}s`;
+}
+
+/**
+ * Remove all reactions from a message with retry logic
+ * @param {Message} message - Discord message object
+ * @param {number} attempts - Number of retry attempts (default: 3)
+ * @returns {Promise<boolean>} - True if successful, false otherwise
+ */
+async function removeAllReactionsWithRetry(message, attempts = TIMING.REACTION_RETRY_ATTEMPTS) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await message.reactions.removeAll();
+      console.log(`✅ Reactions removed from message ${message.id} (attempt ${i + 1})`);
+      return true;
+    } catch (err) {
+      console.warn(`⚠️ Failed to remove reactions from ${message.id} (attempt ${i + 1}/${attempts}): ${err.message}`);
+      
+      if (i < attempts - 1) {
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, TIMING.REACTION_RETRY_DELAY));
+      }
+    }
+  }
+  
+  console.error(`❌ Failed to remove reactions from ${message.id} after ${attempts} attempts`);
+  return false;
+}
+
+/**
+ * Remove all reactions from all messages in a thread
+ * @param {ThreadChannel} thread - Discord thread object
+ * @returns {Promise<{success: number, failed: number}>} - Cleanup statistics
+ */
+async function cleanupAllThreadReactions(thread) {
+  try {
+    console.log(`🧹 Cleaning up all reactions in thread: ${thread.name}`);
+    
+    // Fetch all messages (up to 100, which should cover most threads)
+    const messages = await thread.messages.fetch({ limit: 100 }).catch(() => null);
+    
+    if (!messages) {
+      console.warn(`⚠️ Could not fetch messages for thread ${thread.id}`);
+      return { success: 0, failed: 0 };
+    }
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    // Process messages in batches to avoid rate limits
+    for (const [msgId, msg] of messages) {
+      // Skip if no reactions
+      if (msg.reactions.cache.size === 0) continue;
+      
+      const success = await removeAllReactionsWithRetry(msg);
+      if (success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+      
+      // Small delay between messages to avoid rate limits
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
+    console.log(`✅ Thread cleanup complete: ${successCount} success, ${failCount} failed`);
+    return { success: successCount, failed: failCount };
+    
+  } catch (err) {
+    console.error(`❌ Error cleaning thread reactions: ${err.message}`);
+    return { success: 0, failed: 0 };
+  }
 }
 
 /**
@@ -448,13 +529,20 @@ async function recoverStateFromThreads() {
           }
         }
         
-        // Look for pending verifications (messages with ✅ ❌ reactions from bot, no verification reply)
-        if (msg.reactions.cache.has('✅') && msg.reactions.cache.has('❌')) {
-          // SKIP close confirmation messages (these say "Close spawn" in content)
-          if (msg.content.includes('Close spawn') || msg.content.includes('close spawn')) {
-            console.log(`⏭️ Skipping close confirmation message: ${msgId}`);
-            continue;
-          }
+// Look for pending verifications (messages with ✅ ❌ reactions from bot, no verification reply)
+if (msg.reactions.cache.has('✅') && msg.reactions.cache.has('❌')) {
+  // IMPROVED: Skip confirmation messages more reliably
+  const isConfirmation = msg.content.includes('Close spawn') || 
+                         msg.content.includes('close spawn') ||
+                         msg.content.includes('React ✅ to confirm') ||
+                         msg.content.includes('Clear all bot memory') ||
+                         msg.content.includes('Force submit attendance') ||
+                         msg.content.includes('MASS CLOSE ALL THREADS');
+  
+  if (isConfirmation) {
+    console.log(`⏭️ Skipping confirmation message: ${msgId}`);
+    continue;
+  }
           
           const hasVerificationReply = messages.some(m => 
             m.reference?.messageId === msgId && m.author.id === client.user.id && m.content.includes('verified')
@@ -530,6 +618,7 @@ client.once(Events.ClientReady, () => {
   console.log(`🏠 Main Guild: ${config.main_guild_id}`);
   console.log(`⏰ Timer Server: ${config.timer_server_id}`);
   console.log(`🤖 Version: ${BOT_VERSION}`);
+  console.log(`⚙️ Timing: Sheet delay=${TIMING.MIN_SHEET_DELAY}ms, Retry attempts=${TIMING.REACTION_RETRY_ATTEMPTS}`);
   
   // Auto-recover state from existing threads
   recoverStateFromThreads();
@@ -730,14 +819,17 @@ async function showCommandHelp(message, command, isAdmin) {
             name: '📝 Syntax',
             value: '```!closeallthread```'
           },
-          {
-            name: '✨ What It Does',
-            value: '1. Finds all open spawn threads\n' +
-                   '2. Auto-verifies ALL pending members in each thread\n' +
-                   '3. Closes and submits to Google Sheets\n' +
-                   '4. Archives threads\n' +
-                   '5. Processes one by one with retry logic'
-          },
+{
+        name: '✨ What It Does',
+        value: '1. Finds all open spawn threads\n' +
+               '2. Auto-verifies ALL pending members in each thread\n' +
+               '3. Posts closure message in spawn thread\n' +
+               '4. Submits attendance to Google Sheets\n' +
+               '5. Posts confirmation in confirmation thread\n' +
+               '6. **Removes ALL reactions from ALL messages**\n' +
+               '7. Archives threads and cleans up memory\n' +
+               '8. Processes one by one with retry logic'
+      },
           {
             name: '🎯 Use When',
             value: '• End of boss rush event\n' +
@@ -752,6 +844,13 @@ async function showCommandHelp(message, command, isAdmin) {
                    '• Retries failed submissions once\n' +
                    '• Requires confirmation (React ✅)'
           }
+          {
+        name: '🧹 Cleanup Process',
+        value: '• Removes reactions from up to 100 messages per thread\n' +
+               '• Retries failed cleanups automatically\n' +
+               '• Shows cleanup statistics in final summary\n' +
+               '• Prevents restart detection issues'
+      },
         )
         .setFooter({text: 'Type !help for full command list'});
       break;
@@ -940,16 +1039,17 @@ async function handleClearState(message, member) {
     const collected = await confirmMsg.awaitReactions({ filter, max: 1, time: 30000, errors: ['time'] });
     const reaction = collected.first();
 
-    if (reaction.emoji.name === '✅') {
-      activeSpawns = {};
-      activeColumns = {};
-      pendingVerifications = {};
-      pendingClosures = {};
+if (reaction.emoji.name === '✅') {
+  activeSpawns = {};
+  activeColumns = {};
+  pendingVerifications = {};
+  pendingClosures = {};
+  confirmationMessages = {};  // ← NEW: Also clear confirmation tracking
 
-      await message.reply(
-        `✅ **State cleared successfully!**\n\n` +
-        `All bot memory has been reset. Fresh start.`
-      );
+  await message.reply(
+    `✅ **State cleared successfully!**\n\n` +
+    `All bot memory has been reset. Fresh start.`
+  );
       
       console.log(`🔧 State cleared by ${member.user.username}`);
     } else {
@@ -970,17 +1070,24 @@ async function handleForceSubmit(message, member) {
     return;
   }
 
-  const confirmMsg = await message.reply(
-    `📊 **Force submit attendance?**\n\n` +
-    `**Boss:** ${spawnInfo.boss}\n` +
-    `**Timestamp:** ${spawnInfo.timestamp}\n` +
-    `**Members:** ${spawnInfo.members.length}\n\n` +
-    `This will submit to Google Sheets WITHOUT closing the thread.\n\n` +
-    `React ✅ to confirm or ❌ to cancel.`
-  );
-  
-  await confirmMsg.react('✅');
-  await confirmMsg.react('❌');
+const confirmMsg = await message.reply(
+  `📊 **Force submit attendance?**\n\n` +
+  `**Boss:** ${spawnInfo.boss}\n` +
+  `**Timestamp:** ${spawnInfo.timestamp}\n` +
+  `**Members:** ${spawnInfo.members.length}\n\n` +
+  `This will submit to Google Sheets WITHOUT closing the thread.\n\n` +
+  `React ✅ to confirm or ❌ to cancel.`
+);
+
+await confirmMsg.react('✅');
+await confirmMsg.react('❌');
+
+// NEW: Track as pending closure for proper cleanup
+pendingClosures[confirmMsg.id] = {
+  threadId: message.channel.id,
+  adminId: message.author.id,
+  type: 'forcesubmit'
+};
   
   const filter = (reaction, user) => {
     return ['✅', '❌'].includes(reaction.emoji.name) && user.id === member.user.id;
@@ -1018,9 +1125,13 @@ async function handleForceSubmit(message, member) {
           `Error: ${resp.text || resp.err}\n\n` +
           `**Members list (for manual entry):**\n${spawnInfo.members.join(', ')}`
         );
+        await removeAllReactionsWithRetry(msg);  // ← Add this
+        delete pendingClosures[msg.id];  // ← Add this
       }
     } else {
       await message.reply('❌ Force submit canceled.');
+      await removeAllReactionsWithRetry(msg);  // ← Add this
+      delete pendingClosures[msg.id];  // ← Add this
     }
   } catch (err) {
     await message.reply('⏱️ Confirmation timed out. Force submit canceled.');
@@ -1073,19 +1184,20 @@ async function handleStatus(message, member) {
   const spawnListText = spawnList.length > 0 ? spawnList.join('\n') : 'None';
   const moreSpawns = totalSpawns > 10 ? `\n\n*+${totalSpawns - 10} more spawns (sorted oldest first - close old ones first!)*` : '';
 
-  const embed = new EmbedBuilder()
-    .setColor(0x00FF00)
-    .setTitle('📊 Bot Status')
-    .setDescription('✅ **Healthy**')
-    .addFields(
-      {name: '⏱️ Uptime', value: uptime, inline: true},
-      {name: '🤖 Version', value: BOT_VERSION, inline: true},
-      {name: '🎯 Active Spawns', value: `${totalSpawns}`, inline: true},
-      {name: '📋 Recent Spawn Threads (Oldest First)', value: spawnListText + moreSpawns},
-      {name: '⏳ Pending Verifications', value: `${Object.keys(pendingVerifications).length}`, inline: true},
-      {name: '📊 Last Sheet Call', value: timeSinceSheet, inline: true},
-      {name: '💾 Memory', value: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`, inline: true}
-    )
+const embed = new EmbedBuilder()
+  .setColor(0x00FF00)
+  .setTitle('📊 Bot Status')
+  .setDescription('✅ **Healthy**')
+  .addFields(
+    {name: '⏱️ Uptime', value: uptime, inline: true},
+    {name: '🤖 Version', value: BOT_VERSION, inline: true},
+    {name: '🎯 Active Spawns', value: `${totalSpawns}`, inline: true},
+    {name: '📋 Recent Spawn Threads (Oldest First)', value: spawnListText + moreSpawns},
+    {name: '⏳ Pending Verifications', value: `${Object.keys(pendingVerifications).length}`, inline: true},
+    {name: '🔒 Pending Closures', value: `${Object.keys(pendingClosures).length}`, inline: true},  // ← NEW
+    {name: '📊 Last Sheet Call', value: timeSinceSheet, inline: true},
+    {name: '💾 Memory', value: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`, inline: true}
+  )
     .setFooter({text: `Requested by ${member.user.username} • Threads sorted by age (oldest first)`})
     .setTimestamp();
 
@@ -1253,14 +1365,18 @@ async function handleCloseAllThreads(message, member) {
     let failCount = 0;
     const results = [];
 
-    for (let i = 0; i < openSpawns.length; i++) {
-      const {threadId, thread, spawnInfo} = openSpawns[i];
-      const operationStartTime = Date.now();
-      
-      try {
-        const progress = Math.floor(((i + 1) / openSpawns.length) * 20);
-        const progressBar = '█'.repeat(progress) + '░'.repeat(20 - progress);
-        const progressPercent = Math.floor(((i + 1) / openSpawns.length) * 100);
+// NEW: Track cleanup statistics
+let totalReactionsRemoved = 0;
+let totalReactionsFailed = 0;
+
+for (let i = 0; i < openSpawns.length; i++) {
+  const {threadId, thread, spawnInfo} = openSpawns[i];
+  const operationStartTime = Date.now();
+  
+  try {
+    const progress = Math.floor(((i + 1) / openSpawns.length) * 20);
+    const progressBar = '█'.repeat(progress) + '░'.repeat(20 - progress);
+    const progressPercent = Math.floor(((i + 1) / openSpawns.length) * 100);
         
         await message.channel.send(
           `📋 **[${i + 1}/${openSpawns.length}]** ${progressBar} ${progressPercent}%\n` +
@@ -1304,11 +1420,16 @@ async function handleCloseAllThreads(message, member) {
           );
         }
 
-        spawnInfo.closed = true;
+// NEW: Post closure message in spawn thread (like normal close)
+await thread.send(`🔒 Closing spawn **${spawnInfo.boss}** (${spawnInfo.timestamp})... Submitting ${spawnInfo.members.length} members to Google Sheets...`).catch(err => {
+  console.warn(`⚠️ Could not post to spawn thread ${threadId}: ${err.message}`);
+});
 
-        await message.channel.send(
-          `   ├─ 📊 Submitting ${spawnInfo.members.length} member(s) to Google Sheets...`
-        );
+spawnInfo.closed = true;
+
+await message.channel.send(
+  `   ├─ 📊 Submitting ${spawnInfo.members.length} member(s) to Google Sheets...`
+);
 
         const payload = {
           action: 'submitAttendance',
@@ -1321,18 +1442,38 @@ async function handleCloseAllThreads(message, member) {
 
         const resp = await postToSheet(payload);
 
-        if (resp.ok) {
-          if (spawnInfo.confirmThreadId) {
-            const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
-            if (confirmThread) {
-              await confirmThread.delete().catch(() => {});
-            }
-          }
+if (resp.ok) {
+  // NEW: Post success message in spawn thread
+  await thread.send(`✅ Attendance submitted successfully! Archiving thread...`).catch(err => {
+    console.warn(`⚠️ Could not post success to spawn thread ${threadId}: ${err.message}`);
+  });
+  
+  // Post to confirmation thread before deleting it
+  if (spawnInfo.confirmThreadId) {
+    const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
+    if (confirmThread) {
+      await confirmThread.send(`✅ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - ${spawnInfo.members.length} members recorded`).catch(() => {});
+      await confirmThread.delete().catch(() => {});
+    }
+  }
 
-          await thread.setArchived(true, `Mass close by ${member.user.username}`).catch(() => {});
+  // CRITICAL: Clean ALL reactions from thread before archiving
+  await message.channel.send(`   ├─ 🧹 Cleaning up reactions from thread...`);
+  const cleanupStats = await cleanupAllThreadReactions(thread);
+  totalReactionsRemoved += cleanupStats.success;
+  totalReactionsFailed += cleanupStats.failed;
+  
+  if (cleanupStats.failed > 0) {
+    await message.channel.send(`   ├─ ⚠️ Warning: ${cleanupStats.failed} message(s) still have reactions`);
+  }
 
-          delete activeSpawns[threadId];
-          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+  // Archive thread
+  await thread.setArchived(true, `Mass close by ${member.user.username}`).catch(() => {});
+
+  // IMPORTANT: Delete memory AFTER all operations complete
+  delete activeSpawns[threadId];
+  delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+  delete confirmationMessages[threadId];  // NEW: Clean up confirmation tracking
 
           successCount++;
           results.push(`✅ **${spawnInfo.boss}** - ${spawnInfo.members.length} members submitted`);
@@ -1410,21 +1551,28 @@ async function handleCloseAllThreads(message, member) {
       }
     }
 
-    const summaryEmbed = new EmbedBuilder()
-      .setColor(successCount === openSpawns.length ? 0x00FF00 : 0xFFA500)
-      .setTitle('🎉 Mass Close Complete!')
-      .setDescription(
-        `**Summary:**\n` +
-        `✅ Success: ${successCount}\n` +
-        `❌ Failed: ${failCount}\n` +
-        `📊 Total: ${openSpawns.length}`
-      )
-      .addFields({
-        name: '📋 Detailed Results',
-        value: results.join('\n')
-      })
-      .setFooter({text: `Executed by ${member.user.username}`})
-      .setTimestamp();
+const summaryEmbed = new EmbedBuilder()
+  .setColor(successCount === openSpawns.length ? 0x00FF00 : 0xFFA500)
+  .setTitle('🎉 Mass Close Complete!')
+  .setDescription(
+    `**Summary:**\n` +
+    `✅ Success: ${successCount}\n` +
+    `❌ Failed: ${failCount}\n` +
+    `📊 Total: ${openSpawns.length}`
+  )
+  .addFields(
+    {
+      name: '📋 Detailed Results',
+      value: results.join('\n')
+    },
+    {
+      name: '🧹 Cleanup Statistics',
+      value: `✅ Reactions removed: ${totalReactionsRemoved}\n❌ Failed cleanups: ${totalReactionsFailed}`,
+      inline: false
+    }
+  )
+  .setFooter({text: `Executed by ${member.user.username}`})
+  .setTimestamp();
 
     await message.reply({embeds: [summaryEmbed]});
 
@@ -1711,19 +1859,26 @@ client.on(Events.MessageCreate, async (message) => {
           return;
         }
 
-        const confirmMsg = await message.reply(
-          `🔒 Close spawn **${spawnInfo.boss}** (${spawnInfo.timestamp})?\n\n` +
-          `**${spawnInfo.members.length} members** will be submitted to Google Sheets.\n\n` +
-          `React ✅ to confirm or ❌ to cancel.`
-        );
-        
-        await confirmMsg.react('✅');
-        await confirmMsg.react('❌');
-        
-        pendingClosures[confirmMsg.id] = {
-          threadId: message.channel.id,
-          adminId: message.author.id
-        };
+          const confirmMsg = await message.reply(
+            `🔒 Close spawn **${spawnInfo.boss}** (${spawnInfo.timestamp})?\n\n` +
+            `**${spawnInfo.members.length} members** will be submitted to Google Sheets.\n\n` +
+            `React ✅ to confirm or ❌ to cancel.`
+          );
+
+          await confirmMsg.react('✅');
+          await confirmMsg.react('❌');
+
+          pendingClosures[confirmMsg.id] = {
+            threadId: message.channel.id,
+            adminId: message.author.id,
+            type: 'close'  // ← ADDED: Track confirmation type
+          };
+
+          // Track this confirmation message for cleanup
+          if (!confirmationMessages[message.channel.id]) {
+            confirmationMessages[message.channel.id] = [];
+          }
+          confirmationMessages[message.channel.id].push(confirmMsg.id);
         
         return;
       }
@@ -1920,6 +2075,26 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 
     const msg = reaction.message;
     const guild = msg.guild;
+    
+    // NEW: Guard against reactions on closed threads
+    if (msg.channel.isThread() && msg.channel.parentId === config.attendance_channel_id) {
+      const spawnInfo = activeSpawns[msg.channel.id];
+      
+      // If thread is closed or not tracked, remove the reaction immediately
+      if (!spawnInfo || spawnInfo.closed) {
+        try {
+          await reaction.users.remove(user.id);
+          await msg.channel.send(
+            `⚠️ <@${user.id}>, this spawn is closed. Your reaction was removed to prevent confusion.\n` +
+            `(Closed threads should not have reactions to avoid restart detection issues)`
+          ).then(m => setTimeout(() => m.delete().catch(() => {}), 5000));  // Auto-delete after 5s
+        } catch (err) {
+          console.warn(`⚠️ Could not remove reaction from closed thread ${msg.channel.id}: ${err.message}`);
+        }
+        return;
+      }
+    }
+    
     const adminMember = await guild.members.fetch(user.id).catch(() => null);
     
     // Only admins can use reactions
@@ -1936,77 +2111,70 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     if (closePending) {
       const spawnInfo = activeSpawns[closePending.threadId];
       
-      if (reaction.emoji.name === '✅') {
-        if (!spawnInfo || spawnInfo.closed) {
-          await msg.channel.send('⚠️ Spawn already closed or not found.');
-          delete pendingClosures[msg.id];
-          await msg.reactions.removeAll().catch((err) => {
-            console.warn(`⚠️ Failed to clean up close confirmation reactions on message ${msg.id}: ${err.message}`);
-          });
-          return;
-        }
+if (reaction.emoji.name === '✅') {
+  if (!spawnInfo || spawnInfo.closed) {
+    await msg.channel.send('⚠️ Spawn already closed or not found.');
+    delete pendingClosures[msg.id];
+    await removeAllReactionsWithRetry(msg);  // ← Use helper function
+    return;
+  }
 
-        spawnInfo.closed = true;
+  spawnInfo.closed = true;
 
-        await msg.channel.send(`🔒 Closing spawn **${spawnInfo.boss}**... Submitting ${spawnInfo.members.length} members to Google Sheets...`);
+  await msg.channel.send(`🔒 Closing spawn **${spawnInfo.boss}**... Submitting ${spawnInfo.members.length} members to Google Sheets...`);
 
-        const payload = {
-          action: 'submitAttendance',
-          boss: spawnInfo.boss,
-          date: spawnInfo.date,
-          time: spawnInfo.time,
-          timestamp: spawnInfo.timestamp,
-          members: spawnInfo.members
-        };
+  const payload = {
+    action: 'submitAttendance',
+    boss: spawnInfo.boss,
+    date: spawnInfo.date,
+    time: spawnInfo.time,
+    timestamp: spawnInfo.timestamp,
+    members: spawnInfo.members
+  };
 
-        const resp = await postToSheet(payload);
+  const resp = await postToSheet(payload);
 
-        if (resp.ok) {
-          await msg.channel.send(`✅ Attendance submitted successfully! Archiving thread...`);
-          
-          // Clean up close confirmation reactions
-          await msg.reactions.removeAll().catch((err) => {
-            console.warn(`⚠️ Failed to clean up close confirmation reactions on message ${msg.id}: ${err.message}`);
-          });
-          
-          // Delete confirmation thread
-          if (spawnInfo.confirmThreadId) {
-            const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
-            if (confirmThread) {
-              await confirmThread.delete().catch(console.error);
-              console.log(`🗑️ Deleted confirmation thread for ${spawnInfo.boss}`);
-            }
-          }
-
-          // Archive thread
-          await msg.channel.setArchived(true, `Closed by ${user.username}`).catch(console.error);
-
-          // Clean up memory
-          delete activeSpawns[closePending.threadId];
-          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
-
-          console.log(`🔒 Spawn closed: ${spawnInfo.boss} at ${spawnInfo.timestamp} (${spawnInfo.members.length} members)`);
-        } else {
-          await msg.channel.send(
-            `⚠️ **Failed to submit attendance!**\n\n` +
-            `Error: ${resp.text || resp.err}\n\n` +
-            `**Members list (for manual entry):**\n${spawnInfo.members.join(', ')}\n\n` +
-            `Please manually update the Google Sheet.`
-          );
-          await msg.reactions.removeAll().catch((err) => {
-            console.warn(`⚠️ Failed to clean up reactions on failed submission ${msg.id}: ${err.message}`);
-          });
-        }
-
-        delete pendingClosures[msg.id];
-        
-      } else if (reaction.emoji.name === '❌') {
-        await msg.channel.send('❌ Spawn close canceled.');
-        await msg.reactions.removeAll().catch((err) => {
-          console.warn(`⚠️ Failed to clean up canceled close reactions on message ${msg.id}: ${err.message}`);
-        });
-        delete pendingClosures[msg.id];
+  if (resp.ok) {
+    await msg.channel.send(`✅ Attendance submitted successfully! Archiving thread...`);
+    
+    // IMPROVED: Use retry logic for reaction cleanup
+    await removeAllReactionsWithRetry(msg);
+    
+    // Delete confirmation thread
+    if (spawnInfo.confirmThreadId) {
+      const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
+      if (confirmThread) {
+        await confirmThread.send(`✅ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - ${spawnInfo.members.length} members recorded`);
+        await confirmThread.delete().catch(console.error);
+        console.log(`🗑️ Deleted confirmation thread for ${spawnInfo.boss}`);
       }
+    }
+
+    // Archive thread
+    await msg.channel.setArchived(true, `Closed by ${user.username}`).catch(console.error);
+
+    // IMPORTANT: Clean up memory AFTER all operations complete
+    delete activeSpawns[closePending.threadId];
+    delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+    delete pendingClosures[msg.id];
+    delete confirmationMessages[closePending.threadId];  // ← NEW: Clean up confirmation tracking
+
+    console.log(`🔒 Spawn closed: ${spawnInfo.boss} at ${spawnInfo.timestamp} (${spawnInfo.members.length} members)`);
+  } else {
+    await msg.channel.send(
+      `⚠️ **Failed to submit attendance!**\n\n` +
+      `Error: ${resp.text || resp.err}\n\n` +
+      `**Members list (for manual entry):**\n${spawnInfo.members.join(', ')}\n\n` +
+      `Please manually update the Google Sheet.`
+    );
+    await removeAllReactionsWithRetry(msg);  // ← Clean up even on failure
+  }
+
+} else if (reaction.emoji.name === '❌') {
+  await msg.channel.send('❌ Spawn close canceled.');
+  await removeAllReactionsWithRetry(msg);  // ← Use helper function
+  delete pendingClosures[msg.id];
+}
       
       return;
     }
@@ -2023,61 +2191,63 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         return;
       }
 
-      if (reaction.emoji.name === '✅') {
-        // OPTIMIZED: Case-insensitive duplicate check
-        const authorLower = pending.author.toLowerCase();
-        const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === authorLower);
-        
-        if (isDuplicate) {
-          await msg.reply(`⚠️ **${pending.author}** is already verified. Ignoring duplicate.`);
-          try {
-            await reaction.users.remove(user.id);
-          } catch (e) {}
-          return;
-        }
+if (reaction.emoji.name === '✅') {
+  // OPTIMIZED: Case-insensitive duplicate check
+  const authorLower = pending.author.toLowerCase();
+  const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === authorLower);
+  
+  if (isDuplicate) {
+    await msg.reply(`⚠️ **${pending.author}** is already verified. Ignoring duplicate.`);
+    await removeAllReactionsWithRetry(msg);  // ← Use helper
+    delete pendingVerifications[msg.id];  // ← Clean up immediately
+    return;
+  }
 
-        // Add member to verified list
-        spawnInfo.members.push(pending.author);
+  // Add member to verified list
+  spawnInfo.members.push(pending.author);
 
-        await msg.reactions.removeAll().catch((err) => {
-          console.warn(`⚠️ Failed to clean up verification reactions on message ${msg.id}: ${err.message}`);
-        });
+  // IMPORTANT: Clean reactions BEFORE replying (prevents race condition)
+  const cleanupSuccess = await removeAllReactionsWithRetry(msg);
+  if (!cleanupSuccess) {
+    console.warn(`⚠️ Could not clean reactions for ${msg.id}, but continuing...`);
+  }
 
-        await msg.reply(`✅ **${pending.author}** verified by ${user.username}!`);
+  await msg.reply(`✅ **${pending.author}** verified by ${user.username}!`);
 
-        // Notify confirmation thread
-        if (spawnInfo.confirmThreadId) {
-          const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
-          if (confirmThread) {
-            const embed = new EmbedBuilder()
-              .setColor(0x00FF00)
-              .setTitle('✅ Attendance Verified')
-              .setDescription(`**${pending.author}** verified for **${spawnInfo.boss}**`)
-              .addFields(
-                {name: 'Verified By', value: user.username, inline: true},
-                {name: 'Points', value: `+${bossPoints[spawnInfo.boss].points}`, inline: true},
-                {name: 'Total Verified', value: `${spawnInfo.members.length}`, inline: true}
-              )
-              .setTimestamp();
-            
-            await confirmThread.send({embeds: [embed]});
-          }
-        }
-
-        delete pendingVerifications[msg.id];
-        console.log(`✅ Verified: ${pending.author} for ${spawnInfo.boss} by ${user.username}`);
-
-      } else if (reaction.emoji.name === '❌') {
-        await msg.delete().catch(() => {});
-        await msg.channel.send(
-          `<@${pending.authorId}>, your attendance was **denied** by ${user.username}. ` +
-          `Please repost with a proper screenshot.`
-        );
-        
-        delete pendingVerifications[msg.id];
-        console.log(`❌ Denied: ${pending.author} for ${spawnInfo.boss} by ${user.username}`);
-      }
+  // Notify confirmation thread
+  if (spawnInfo.confirmThreadId) {
+    const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
+    if (confirmThread) {
+      const embed = new EmbedBuilder()
+        .setColor(0x00FF00)
+        .setTitle('✅ Attendance Verified')
+        .setDescription(`**${pending.author}** verified for **${spawnInfo.boss}**`)
+        .addFields(
+          {name: 'Verified By', value: user.username, inline: true},
+          {name: 'Points', value: `+${bossPoints[spawnInfo.boss].points}`, inline: true},
+          {name: 'Total Verified', value: `${spawnInfo.members.length}`, inline: true}
+        )
+        .setTimestamp();
+      
+      await confirmThread.send({embeds: [embed]});
     }
+  }
+
+  // IMPORTANT: Delete from pending AFTER all operations complete
+  delete pendingVerifications[msg.id];
+  console.log(`✅ Verified: ${pending.author} for ${spawnInfo.boss} by ${user.username}`);
+
+} else if (reaction.emoji.name === '❌') {
+  // Delete message (denial)
+  await msg.delete().catch(() => {});
+  await msg.channel.send(
+    `<@${pending.authorId}>, your attendance was **denied** by ${user.username}. ` +
+    `Please repost with a proper screenshot.`
+  );
+  
+  delete pendingVerifications[msg.id];
+  console.log(`❌ Denied: ${pending.author} for ${spawnInfo.boss} by ${user.username}`);
+}
 
   } catch (err) {
     console.error('❌ Reaction handler error:', err);
