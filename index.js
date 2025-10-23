@@ -1,5 +1,5 @@
 /**
- * ELYSIUM Guild Attendance Bot - Version 2.6 (FINAL COMPLETE)
+ * ELYSIUM Guild Attendance Bot - Version 2.8 (PRODUCTION READY)
  * 
  * ALL FEATURES + ALL OPTIMIZATIONS:
  * ✅ 25x faster attendance submission
@@ -18,9 +18,13 @@
  * ✅ Mass close all threads (!closeallthread)
  * ✅ Batch pending verification cleanup (5-10x faster)
  * ✅ Retry logic for failed submissions
- * ✅ Adaptive rate limiting
+ * ✅ Adaptive rate limiting with TIMING constants
  * ✅ Progress bars for long operations
  * ✅ Fixed close confirmation emoji bug
+ * ✅ Reaction cleanup with retry logic (prevents restart issues)
+ * ✅ Thread-wide reaction cleanup for mass close
+ * ✅ Proper memory cleanup and state management
+ * ✅ Guard against reactions on closed threads
  */
 
 const { Client, GatewayIntentBits, Partials, Events, EmbedBuilder } = require('discord.js');
@@ -58,7 +62,7 @@ const client = new Client({
 // HTTP HEALTH CHECK SERVER FOR KOYEB
 // ==========================================
 const PORT = process.env.PORT || 8000;
-const BOT_VERSION = '2.7';
+const BOT_VERSION = '2.8';
 const BOT_START_TIME = Date.now();
 
 const server = http.createServer((req, res) => {
@@ -662,10 +666,11 @@ async function showHelp(message, member, specificCommand = null) {
                  '`!debugthread` - Show current thread state\n' +
                  '`!resetpending` - Clear stuck pending verifications'
         },
-        {
+{
           name: '✅ Verification (Use in Spawn Thread)',
           value: 'React ✅/❌ - Verify or deny member check-ins\n' +
-                 '`!verify @member` - Manually verify without screenshot'
+                 '`!verify @member` - Manually verify without screenshot\n' +
+                 '`!verifyall` - Bulk verify ALL pending members'
         },
         {
           name: '📖 Help',
@@ -737,6 +742,50 @@ async function showCommandHelp(message, command, isAdmin) {
                    '!addthread Baron Braudmore will spawn in 5 minutes! (2025-10-22 14:30)\n' +
                    '!addthread Larba will spawn in 10 minutes! (2025-10-22 18:00)\n' +
                    '```'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+case 'verifyall':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0x00FF00)
+        .setTitle('✅ Command: !verifyall')
+        .setDescription('Bulk verify all pending members in current thread')
+        .addFields(
+          {
+            name: '📍 Where to Use',
+            value: '**Spawn thread only**'
+          },
+          {
+            name: '📝 Syntax',
+            value: '```!verifyall```'
+          },
+          {
+            name: '✨ What It Does',
+            value: '1. Shows all pending verifications\n' +
+                   '2. Asks for confirmation\n' +
+                   '3. Verifies ALL pending members at once\n' +
+                   '4. Skips duplicates automatically\n' +
+                   '5. Removes reactions from all messages\n' +
+                   '6. Shows summary of verified members'
+          },
+          {
+            name: '🎯 Use When',
+            value: '• Multiple members waiting for verification\n' +
+                   '• Need to quickly verify everyone\n' +
+                   '• End of spawn event cleanup\n' +
+                   '• Trust all pending members are legitimate'
+          },
+          {
+            name: '⚠️ Important',
+            value: '• Cannot be undone once confirmed\n' +
+                   '• Duplicates are automatically skipped\n' +
+                   '• Removes ALL pending verifications for thread'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
@@ -1796,7 +1845,7 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
 
-      // ========== ADMIN OVERRIDE: !verify @member ==========
+// ========== ADMIN OVERRIDE: !verify @member ==========
       if (message.content.startsWith('!verify')) {
         const mentioned = message.mentions.users.first();
         if (!mentioned) {
@@ -1833,6 +1882,110 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         console.log(`✅ Manual verify: ${username} for ${spawnInfo.boss} by ${message.author.username}`);
+        return;
+      }
+
+      // ========== ADMIN OVERRIDE: !verifyall ==========
+      if (message.content.trim().toLowerCase() === '!verifyall') {
+        const spawnInfo = activeSpawns[message.channel.id];
+        if (!spawnInfo || spawnInfo.closed) {
+          await message.reply('⚠️ This spawn is closed or not found.');
+          return;
+        }
+
+        // Get all pending verifications for this thread
+        const pendingInThread = Object.entries(pendingVerifications).filter(
+          ([msgId, p]) => p.threadId === message.channel.id
+        );
+
+        if (pendingInThread.length === 0) {
+          await message.reply('ℹ️ No pending verifications in this thread.');
+          return;
+        }
+
+        const confirmMsg = await message.reply(
+          `⚠️ **Verify ALL ${pendingInThread.length} pending member(s)?**\n\n` +
+          `This will automatically verify:\n` +
+          pendingInThread.map(([msgId, p]) => `• **${p.author}**`).join('\n') +
+          `\n\nReact ✅ to confirm or ❌ to cancel.`
+        );
+
+        await confirmMsg.react('✅');
+        await confirmMsg.react('❌');
+
+        const filter = (reaction, user) => {
+          return ['✅', '❌'].includes(reaction.emoji.name) && user.id === message.author.id;
+        };
+
+        try {
+          const collected = await confirmMsg.awaitReactions({ 
+            filter, 
+            max: 1, 
+            time: TIMING.CONFIRMATION_TIMEOUT, 
+            errors: ['time'] 
+          });
+          const reaction = collected.first();
+
+          if (reaction.emoji.name === '✅') {
+            let verifiedCount = 0;
+            let duplicateCount = 0;
+            const verifiedMembers = [];
+
+            // Process each pending verification
+            for (const [msgId, pending] of pendingInThread) {
+              // Check for duplicates (case-insensitive)
+              const authorLower = pending.author.toLowerCase();
+              const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === authorLower);
+
+              if (!isDuplicate) {
+                spawnInfo.members.push(pending.author);
+                verifiedMembers.push(pending.author);
+                verifiedCount++;
+              } else {
+                duplicateCount++;
+              }
+
+              // Remove reactions from the original message
+              const originalMsg = await message.channel.messages.fetch(msgId).catch(() => null);
+              if (originalMsg) {
+                await removeAllReactionsWithRetry(originalMsg);
+              }
+
+              // Delete from pending
+              delete pendingVerifications[msgId];
+            }
+
+            // Send summary
+            await message.reply(
+              `✅ **Verify All Complete!**\n\n` +
+              `✅ Verified: ${verifiedCount}\n` +
+              `⚠️ Duplicates skipped: ${duplicateCount}\n` +
+              `📊 Total processed: ${pendingInThread.length}\n\n` +
+              `**Verified members:**\n${verifiedMembers.join(', ') || 'None (all were duplicates)'}`
+            );
+
+            // Notify confirmation thread
+            if (spawnInfo.confirmThreadId && verifiedCount > 0) {
+              const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
+              if (confirmThread) {
+                await confirmThread.send(
+                  `✅ **Bulk Verification by ${message.author.username}**\n` +
+                  `Verified ${verifiedCount} member(s): ${verifiedMembers.join(', ')}`
+                );
+              }
+            }
+
+            console.log(`✅ Verify all: ${verifiedCount} verified, ${duplicateCount} duplicates for ${spawnInfo.boss} by ${message.author.username}`);
+          } else {
+            await message.reply('❌ Verify all canceled.');
+          }
+
+          await removeAllReactionsWithRetry(confirmMsg);
+        } catch (err) {
+          await message.reply('⏱️ Confirmation timed out. Verify all canceled.');
+          await removeAllReactionsWithRetry(confirmMsg);
+        }
+
         return;
       }
 
