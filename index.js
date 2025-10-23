@@ -270,8 +270,8 @@ async function postToSheet(payload) {
   try {
     const now = Date.now();
     const timeSinceLastCall = now - lastSheetCall;
-    if (timeSinceLastCall < MIN_SHEET_DELAY) {
-      const waitTime = MIN_SHEET_DELAY - timeSinceLastCall;
+    if (timeSinceLastCall < TIMING.MIN_SHEET_DELAY) {
+      const waitTime = TIMING.MIN_SHEET_DELAY - timeSinceLastCall;
       console.log(`⏳ Rate limiting: waiting ${waitTime}ms...`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
@@ -290,7 +290,7 @@ async function postToSheet(payload) {
     // Handle rate limiting with retry
     if (res.status === 429) {
       console.error('❌ Rate limit hit! Waiting 5 seconds...');
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise(resolve => setTimeout(resolve, TIMING.RETRY_DELAY));
       return postToSheet(payload); // Retry
     }
     
@@ -1036,7 +1036,7 @@ async function handleClearState(message, member) {
   };
 
   try {
-    const collected = await confirmMsg.awaitReactions({ filter, max: 1, time: 30000, errors: ['time'] });
+    const collected = await confirmMsg.awaitReactions({ filter, max: 1, time: TIMING.CONFIRMATION_TIMEOUT, errors: ['time'] });
     const reaction = collected.first();
 
 if (reaction.emoji.name === '✅') {
@@ -1094,7 +1094,7 @@ pendingClosures[confirmMsg.id] = {
   };
 
   try {
-    const collected = await confirmMsg.awaitReactions({ filter, max: 1, time: 30000, errors: ['time'] });
+    const collected = await confirmMsg.awaitReactions({ filter, max: 1, time: TIMING.CONFIRMATION_TIMEOUT, errors: ['time'] });
     const reaction = collected.first();
 
     if (reaction.emoji.name === '✅') {
@@ -1276,7 +1276,7 @@ async function handleResetPending(message, member) {
   };
 
   try {
-    const collected = await confirmMsg.awaitReactions({ filter, max: 1, time: 30000, errors: ['time'] });
+    const collected = await confirmMsg.awaitReactions({ filter, max: 1, time: TIMING.CONFIRMATION_TIMEOUT, errors: ['time'] });
     const reaction = collected.first();
 
     if (reaction.emoji.name === '✅') {
@@ -1347,7 +1347,7 @@ async function handleCloseAllThreads(message, member) {
   };
 
   try {
-    const collected = await confirmMsg.awaitReactions({ filter, max: 1, time: 30000, errors: ['time'] });
+    const collected = await confirmMsg.awaitReactions({ filter, max: 1, time: TIMING.CONFIRMATION_TIMEOUT, errors: ['time'] });
     const reaction = collected.first();
 
     if (reaction.emoji.name === '❌') {
@@ -1488,7 +1488,7 @@ if (resp.ok) {
           await message.channel.send(
             `   ├─ ⚠️ First attempt failed, retrying in 5 seconds...`
           );
-          await new Promise(resolve => setTimeout(resolve, 5000));
+          await new Promise(resolve => setTimeout(resolve, TIMING.RETRY_DELAY));
           
           const retryResp = await postToSheet(payload);
           
@@ -1527,7 +1527,7 @@ if (resp.ok) {
         }
 
         const operationTime = Date.now() - operationStartTime;
-        const minDelay = 3000;
+        const minDelay = TIMING.MASS_CLOSE_DELAY;
         const remainingDelay = Math.max(0, minDelay - operationTime);
 
         if (i < openSpawns.length - 1) {
