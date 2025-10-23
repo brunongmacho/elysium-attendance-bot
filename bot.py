@@ -108,6 +108,8 @@ async def on_message(message):
 #  ENTRY POINT
 # ---------------------------------------------------------------------
 async def main():
+    # Start health check server BEFORE the bot connects
+    await health_server.start_health_server()
     await bot.start(DISCORD_TOKEN)
 
 if __name__ == "__main__":
