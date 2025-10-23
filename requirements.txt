@@ -1,6 +1,0 @@
-# requirements.txt
-discord.py~=2.3
-aiohttp~=3.8
-python-dotenv~=1.0
-rapidfuzz==3.14.1
-pytz~=2023.3  # Recommended for robust timezone handling
