@@ -218,7 +218,6 @@ def parse_thread_name(name):
     return {"date": m.group(1), "time": m.group(2), "timestamp": f"{m.group(1)} {m.group(2)}", "boss": m.group(3)}
 
 # Thread creation -----------------------------------------------------------
-
 async def create_spawn_threads(boss_name, date_str, time_str, full_timestamp, trigger_source="manual"):
     guild = bot.get_guild(int(CONFIG["main_guild_id"]))
     if not guild:
@@ -233,25 +232,37 @@ async def create_spawn_threads(boss_name, date_str, time_str, full_timestamp, tr
 
     if await check_column_exists(boss_name, full_timestamp):
         if admin_logs:
-            await admin_logs.send(f"⚠️ **BLOCKED SPAWN:** {boss_name} at {full_timestamp}\nA column for this boss at this timestamp already exists. Close the existing thread first.")
+            await admin_logs.send(
+                f"⚠️ **BLOCKED SPAWN:** {boss_name} at {full_timestamp}\n"
+                f"A column for this boss at this timestamp already exists. Close the existing thread first."
+            )
         return
 
     thread_title = f"[{date_str} {time_str}] {boss_name}"
     att_thread = None
     confirm_thread = None
+
     try:
-        att_thread = await att_channel.create_thread(name=thread_title, auto_archive_duration=CONFIG.get("auto_archive_minutes", 60))
+        att_thread = await att_channel.create_thread(
+            name=thread_title,
+            auto_archive_duration=CONFIG.get("auto_archive_minutes", 60)
+        )
     except Exception:
         log.exception("Failed to create attendance thread")
+
     if admin_logs:
         try:
-            confirm_thread = await admin_logs.create_thread(name=f"✅ {thread_title}", auto_archive_duration=CONFIG.get("auto_archive_minutes", 60))
+            confirm_thread = await admin_logs.create_thread(
+                name=f"✅ {thread_title}",
+                auto_archive_duration=CONFIG.get("auto_archive_minutes", 60)
+            )
         except Exception:
             log.exception("Failed to create confirm thread")
 
     if not att_thread:
         return
 
+    # register active spawn
     active_spawns[att_thread.id] = {
         "boss": boss_name,
         "date": date_str,
@@ -263,20 +274,35 @@ async def create_spawn_threads(boss_name, date_str, time_str, full_timestamp, tr
     }
     active_columns[f"{boss_name}|{full_timestamp}"] = att_thread.id
 
+    # build embed
     points = BOSS_POINTS.get(boss_name, {}).get("points", "N/A")
-    embed = (Embed(title=f"🎯 {boss_name}", description="Boss detected! Please check in below.")
-             .add_field(name="📸 How to Check In", value="1. Post `present` or `here`\n2. Attach a screenshot (admins exempt)\n3. Wait for admin ✅", inline=False)
-             .add_field(name="📊 Points", value=f"{points} points", inline=True)
-             .add_field(name="🕐 Time", value=time_str, inline=True)
-             .add_field(name="📅 Date", value=date_str, inline=True)
-             .set_footer(text='Admins: type "close" to finalize and submit attendance')
-             .set_timestamp(datetime.now(timezone.utc)))
+
+    embed = (
+        Embed(
+            title=f"🎯 {boss_name}",
+            description="Boss detected! Please check in below."
+        )
+        .add_field(
+            name="📸 How to Check In",
+            value="1. Post `present` or `here`\n2. Attach a screenshot (admins exempt)\n3. Wait for admin ✅",
+            inline=False
+        )
+        .add_field(name="📊 Points", value=f"{points} points", inline=True)
+        .add_field(name="🕐 Time", value=time_str, inline=True)
+        .add_field(name="📅 Date", value=date_str, inline=True)
+        .set_footer(text='Admins: type "close" to finalize and submit attendance')
+    )
+    embed.timestamp = datetime.now(timezone.utc)
+
     try:
         await att_thread.send(content="@everyone", embed=embed)
         if confirm_thread:
-            await confirm_thread.send(f"🟨 **{boss_name}** spawn detected ({full_timestamp}). Verifications will appear here.")
+            await confirm_thread.send(
+                f"🟨 **{boss_name}** spawn detected ({full_timestamp}). Verifications will appear here."
+            )
     except Exception:
         log.exception("Failed to send spawn messages")
+
     log.info("Created threads for %s at %s (%s)", boss_name, full_timestamp, trigger_source)
 
 # State recovery ------------------------------------------------------------
@@ -332,13 +358,27 @@ async def recover_state_from_threads():
                     members.append(m.group(1))
             # pending: reactions include check and x
             has_yes = any((r.emoji == "✅") or (getattr(r.emoji, "name", None) == "✅") for r in msg.reactions)
-            has_no  = any((r.emoji == "❌") or (getattr(r.emoji, "name", None) == "❌") for r in msg.reactions)
+            has_no = any((r.emoji == "❌") or (getattr(r.emoji, "name", None) == "❌") for r in msg.reactions)
             if has_yes and has_no:
-                is_conf = any(k in (msg.content or "").lower() for k in ["close spawn", "react ✅ to confirm", "clear all bot memory", "force submit attendance", "mass close"])
+                is_conf = any(
+                    k in (msg.content or "").lower()
+                    for k in [
+                        "close spawn",
+                        "react ✅ to confirm",
+                        "clear all bot memory",
+                        "force submit attendance",
+                        "mass close",
+                    ]
+                )
                 if is_conf:
                     continue
                 # check if bot replied referencing this message
-                bot_replied = any(m.reference and getattr(m.reference, "message_id", None) == msg.id and m.author == bot.user for m in messages)
+                bot_replied = any(
+                    m.reference
+                    and getattr(m.reference, "message_id", None) == msg.id
+                    and m.author == bot.user
+                    for m in messages
+                )
                 if not bot_replied:
                     # add to pending_verifications
                     try:
@@ -346,7 +386,12 @@ async def recover_state_from_threads():
                         author_name = getattr(member_obj, "nick", None) or msg.author.name
                     except Exception:
                         author_name = msg.author.name
-                    pending_verifications[msg.id] = {"author": author_name, "author_id": msg.author.id, "thread_id": thread.id, "timestamp": msg.created_at.timestamp()}
+                    pending_verifications[msg.id] = {
+                        "author": author_name,
+                        "author_id": msg.author.id,
+                        "thread_id": thread.id,
+                        "timestamp": msg.created_at.timestamp(),
+                    }
                     pending_count += 1
 
         active_spawns[thread.id] = {
@@ -356,7 +401,7 @@ async def recover_state_from_threads():
             "timestamp": parsed["timestamp"],
             "members": members,
             "confirm_thread_id": None,
-            "closed": False
+            "closed": False,
         }
         active_columns[f"{boss}|{parsed['timestamp']}"] = thread.id
         recovered += 1
@@ -364,10 +409,16 @@ async def recover_state_from_threads():
     if recovered > 0:
         log.info("Recovered %d spawns, %d pending verifications", recovered, pending_count)
         if admin_logs:
-            embed = (Embed(title="🔄 Bot State Recovered", description="Bot restarted and recovered existing threads")
-                     .add_field(name="Spawns Recovered", value=str(recovered), inline=True)
-                     .add_field(name="Pending Verifications", value=str(pending_count), inline=True)
-                     .set_timestamp(datetime.now(timezone.utc)))
+            embed = (
+                Embed(
+                    title="🔄 Bot State Recovered",
+                    description="Bot restarted and recovered existing threads",
+                )
+                .add_field(name="Spawns Recovered", value=str(recovered), inline=True)
+                .add_field(name="Pending Verifications", value=str(pending_count), inline=True)
+            )
+            embed.timestamp = datetime.now(timezone.utc)
+
             try:
                 await admin_logs.send(embed=embed)
             except Exception:
@@ -617,44 +668,75 @@ async def handle_force_submit(message, member):
 async def handle_status(message, member):
     uptime_ms = (datetime.now(timezone.utc) - BOT_START_TIME).total_seconds() * 1000
     uptime = format_uptime(uptime_ms)
-    time_since_sheet = f"{int((asyncio.get_event_loop().time() * 1000 - last_sheet_call)/1000)} seconds ago" if last_sheet_call else "Never"
+    time_since_sheet = (
+        f"{int((asyncio.get_event_loop().time() * 1000 - last_sheet_call)/1000)} seconds ago"
+        if last_sheet_call
+        else "Never"
+    )
     total_spawns = len(active_spawns)
+
     # sort spawns by timestamp oldest first
     def parse_ts(ts):
         try:
-            date, time = ts.split(' ')
-            m,d,y = date.split('/')
-            h,mi = time.split(':')
-            return datetime(int("20"+y), int(m), int(d), int(h), int(mi)).timestamp()
+            date, time = ts.split(" ")
+            m, d, y = date.split("/")
+            h, mi = time.split(":")
+            return datetime(int("20" + y), int(m), int(d), int(h), int(mi)).timestamp()
         except Exception:
             return 0
-    sorted_spawns = sorted(active_spawns.items(), key=lambda kv: parse_ts(kv[1].get("timestamp","")))
+
+    sorted_spawns = sorted(
+        active_spawns.items(), key=lambda kv: parse_ts(kv[1].get("timestamp", ""))
+    )
+
     spawn_list = []
-    for i,(tid, info) in enumerate(sorted_spawns[:10], start=1):
-        spawn_time = parse_ts(info.get("timestamp",""))
+    for i, (tid, info) in enumerate(sorted_spawns[:10], start=1):
+        spawn_time = parse_ts(info.get("timestamp", ""))
         age_ms = (datetime.now().timestamp() - spawn_time) * 1000
         age_hours = int(age_ms // 3600000)
         age_minutes = int((age_ms % 3600000) // 60000)
-        age_text = f"{age_hours}h ago" if age_hours>0 else f"{age_minutes}m ago"
-        spawn_list.append(f"{i}. **{info['boss']}** ({info['timestamp']}) - {len(info['members'])} verified - {age_text} - <#{tid}>")
+        age_text = f"{age_hours}h ago" if age_hours > 0 else f"{age_minutes}m ago"
+        spawn_list.append(
+            f"{i}. **{info['boss']}** ({info['timestamp']}) - {len(info['members'])} verified - {age_text} - <#{tid}>"
+        )
+
     spawnListText = "\n".join(spawn_list) if spawn_list else "None"
-    moreSpawns = f"\n\n*+{total_spawns - 10} more spawns (sorted oldest first - close old ones first!)*" if total_spawns > 10 else ""
-    embed = (Embed(title="📊 Bot Status", color=0x00FF00)
-             .set_footer(text=f"Requested by {message.author.name} • Version {BOT_VERSION}")
-             .set_timestamp(datetime.now(timezone.utc)))
+    moreSpawns = (
+        f"\n\n*+{total_spawns - 10} more spawns (sorted oldest first - close old ones first!)*"
+        if total_spawns > 10
+        else ""
+    )
+
+    embed = (
+        Embed(title="📊 Bot Status", color=0x00FF00)
+        .set_footer(text=f"Requested by {message.author.name} • Version {BOT_VERSION}")
+    )
+    embed.timestamp = datetime.now(timezone.utc)
+
     embed.add_field(name="⏱️ Uptime", value=uptime, inline=True)
     embed.add_field(name="🤖 Version", value=BOT_VERSION, inline=True)
     embed.add_field(name="🎯 Active Spawns", value=str(total_spawns), inline=True)
-    embed.add_field(name="📋 Recent Spawn Threads (Oldest First)", value=spawnListText + moreSpawns, inline=False)
-    embed.add_field(name="⏳ Pending Verifications", value=str(len(pending_verifications)), inline=True)
-    embed.add_field(name="🔒 Pending Closures", value=str(len(pending_closures)), inline=True)
+    embed.add_field(
+        name="📋 Recent Spawn Threads (Oldest First)",
+        value=spawnListText + moreSpawns,
+        inline=False,
+    )
+    embed.add_field(
+        name="⏳ Pending Verifications", value=str(len(pending_verifications)), inline=True
+    )
+    embed.add_field(
+        name="🔒 Pending Closures", value=str(len(pending_closures)), inline=True
+    )
     embed.add_field(name="📊 Last Sheet Call", value=time_since_sheet, inline=True)
+
     try:
         import psutil, os as _os
         mem_mb = int(psutil.Process(_os.getpid()).memory_info().rss / 1024 / 1024)
     except Exception:
         mem_mb = "N/A"
+
     embed.add_field(name="💾 Memory", value=f"{mem_mb}MB", inline=True)
+
     await message.reply(embed=embed)
 
 async def handle_debug_thread(message, member):
@@ -663,18 +745,50 @@ async def handle_debug_thread(message, member):
     if not spawn:
         await message.reply("⚠️ Thread not in bot memory!")
         return
-    pending_in_thread = [p for p in pending_verifications.values() if p["thread_id"] == tid]
-    embed = (Embed(title="🔍 Thread Debug Info", color=0x4A90E2)
-             .add_field(name="🎯 Boss", value=spawn["boss"], inline=True)
-             .add_field(name="⏰ Timestamp", value=spawn["timestamp"], inline=True)
-             .add_field(name="🔒 Closed", value="Yes" if spawn.get("closed") else "No", inline=True)
-             .add_field(name="✅ Verified Members", value=str(len(spawn["members"])), inline=False)
-             .add_field(name="👥 Member List", value=", ".join(spawn["members"]) or "None", inline=False)
-             .add_field(name="⏳ Pending Verifications", value=str(len(pending_in_thread)), inline=True)
-             .add_field(name="📋 Confirmation Thread", value=(f"<#{spawn['confirm_thread_id']}>" if spawn.get("confirm_thread_id") else "None"), inline=True)
-             .set_footer(text=f"Requested by {message.author.name}")
-             .set_timestamp(datetime.now(timezone.utc)))
+
+    pending_in_thread = [
+        p for p in pending_verifications.values() if p["thread_id"] == tid
+    ]
+
+    embed = (
+        Embed(title="🔍 Thread Debug Info", color=0x4A90E2)
+        .add_field(name="🎯 Boss", value=spawn["boss"], inline=True)
+        .add_field(name="⏰ Timestamp", value=spawn["timestamp"], inline=True)
+        .add_field(
+            name="🔒 Closed",
+            value="Yes" if spawn.get("closed") else "No",
+            inline=True,
+        )
+        .add_field(
+            name="✅ Verified Members",
+            value=str(len(spawn["members"])),
+            inline=False,
+        )
+        .add_field(
+            name="👥 Member List",
+            value=", ".join(spawn["members"]) or "None",
+            inline=False,
+        )
+        .add_field(
+            name="⏳ Pending Verifications",
+            value=str(len(pending_in_thread)),
+            inline=True,
+        )
+        .add_field(
+            name="📋 Confirmation Thread",
+            value=(
+                f"<#{spawn['confirm_thread_id']}>"
+                if spawn.get("confirm_thread_id")
+                else "None"
+            ),
+            inline=True,
+        )
+        .set_footer(text=f"Requested by {message.author.name}")
+    )
+    embed.timestamp = datetime.now(timezone.utc)
+
     await message.reply(embed=embed)
+
 
 async def handle_reset_pending(message, member):
     tid = message.channel.id
