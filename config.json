@@ -1,9 +1,10 @@
 {
-  "version": "2.8",
+  "version": "2.9",
   "main_guild_id": "1401784124469149736",
   "timer_server_id": "1401784124469149736",
   "timer_channel_id": "1429074047529914439",
   "attendance_channel_id": "1429059892735508531",
+  "bidding_channel_id": "1430924721691689011",
   "admin_logs_channel_id": "1429074047529914439",
   "admin_roles": ["GUILD LEADER", "ELITE", "Admin", "Martin Romualdez", "BOT"],
   "week_start": "Sunday",

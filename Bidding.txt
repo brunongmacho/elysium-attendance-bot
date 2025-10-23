@@ -1,0 +1,60 @@
+function updateBiddingPoints() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const bpSheet = ss.getSheetByName("BiddingPoints");
+  if (!bpSheet) {
+    ss.insertSheet("BiddingPoints");
+  }
+
+  // Get existing members and consumed points
+  const lastRow = bpSheet.getLastRow();
+  const existingData = bpSheet.getRange("A2:C" + lastRow).getValues(); // A=Member, B=Points Left, C=Consumed
+  let memberMap = {}; // member => { row, consumed }
+  existingData.forEach((row, i) => {
+    const member = row[0];
+    if(member) {
+      memberMap[member] = {
+        row: i + 2, // actual row in sheet
+        consumed: Number(row[2]) || 0
+      };
+    }
+  });
+
+  const sheets = ss.getSheets();
+  let totals = {}; // member => total weekly points
+
+  // Loop through all weekly sheets
+  sheets.forEach(sheet => {
+    if(sheet.getName().startsWith("ELYSIUM_WEEK_")) {
+      const data = sheet.getRange("A2:D").getValues(); // Column A = Member, D = weekly points
+      data.forEach(row => {
+        const member = row[0];
+        const points = Number(row[3]) || 0;
+        if(member) {
+          totals[member] = (totals[member] || 0) + points;
+        }
+      });
+    }
+  });
+
+  // Combine members: existing + any new members
+  const allMembers = new Set([...Object.keys(memberMap), ...Object.keys(totals)]);
+
+  // Update BiddingPoints sheet
+  let currentRow = lastRow + 1; // row to append new members
+  allMembers.forEach(member => {
+    const weeklyTotal = totals[member] || 0;
+    const consumed = memberMap[member]?.consumed || 0;
+    const pointsLeft = weeklyTotal - consumed;
+
+    if(memberMap[member]) {
+      // Existing member: update Column B
+      bpSheet.getRange(memberMap[member].row, 2).setValue(pointsLeft);
+    } else {
+      // New member: append to bottom
+      bpSheet.getRange(currentRow, 1).setValue(member);       // Column A = Member
+      bpSheet.getRange(currentRow, 2).setValue(pointsLeft);   // Column B = Bidding Points Left
+      bpSheet.getRange(currentRow, 3).setValue(0);            // Column C = Consumed
+      currentRow++;
+    }
+  });
+}

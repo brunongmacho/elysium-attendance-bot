@@ -33,6 +33,8 @@ const levenshtein = require('fast-levenshtein');
 const fs = require('fs');
 const http = require('http');
 
+const bidding = require('./bidding.js');
+
 const config = JSON.parse(fs.readFileSync('./config.json'));
 const bossPoints = JSON.parse(fs.readFileSync('./boss_points.json'));
 
@@ -62,7 +64,7 @@ const client = new Client({
 // HTTP HEALTH CHECK SERVER FOR KOYEB
 // ==========================================
 const PORT = process.env.PORT || 8000;
-const BOT_VERSION = '2.8';
+const BOT_VERSION = '2.9';
 const BOT_START_TIME = Date.now();
 
 const server = http.createServer((req, res) => {
@@ -626,6 +628,9 @@ client.once(Events.ClientReady, () => {
   
   // Auto-recover state from existing threads
   recoverStateFromThreads();
+
+  // Auto-recover bidding state
+  bidding.recoverBiddingState(client, config);
 });
 
 // ==========================================
@@ -647,10 +652,34 @@ async function showHelp(message, member, specificCommand = null) {
   if (isAdminUser) {
     // Admin help menu
     const embed = new EmbedBuilder()
-      .setColor(0x4A90E2)
-      .setTitle('🛡️ ELYSIUM Attendance Bot - Admin Commands')
-      .setDescription('Complete command reference for administrators')
-      .addFields(
+    .setColor(0x4A90E2)
+    .setTitle('🛡️ ELYSIUM Attendance Bot - Admin Commands')
+    .setDescription('Complete command reference for administrators')
+    .addFields(
+      {
+        name: '🎯 Spawn Management (Admin Logs Only)',
+        value: '`!addthread` - Manually create spawn thread\n' +
+               '`!clearstate` - Clear all bot memory (nuclear option)\n' +
+               '`!status` - Show bot health and all active spawns\n' +
+               '`!closeallthread` - Mass close all open spawns (auto-verify + submit)'
+      },
+      // ✅ ADD THIS FIELD
+      {
+        name: '🏆 Bidding System (Bidding Channel)',
+        value: '`!auction` - Add item to auction queue\n' +
+               '`!startauction` - Start auction session\n' +
+               '`!bidstatus` - Show bidding system status\n' +
+               '`!dryrun on/off` - Toggle test mode\n' +
+               '`!cancelauction` - Cancel all auctions'
+      },
+      {
+        name: '🔒 Spawn Actions (Use in Spawn Thread)',
+        value: '`close` - Close spawn and submit to Google Sheets\n' +
+               '`!forceclose` - Force close without pending check\n' +
+               '`!forcesubmit` - Submit attendance without closing\n' +
+               '`!debugthread` - Show current thread state\n' +
+               '`!resetpending` - Clear stuck pending verifications'
+      },
         {
           name: '🎯 Spawn Management (Admin Logs Only)',
           value: '`!addthread` - Manually create spawn thread\n' +
@@ -2215,6 +2244,119 @@ lastOverrideTime = now;
 
       return;
     }
+    // ========== BIDDING COMMANDS ==========
+    
+    // Check if message is in bidding channel or bidding threads
+    const inBiddingChannel = message.channel.id === config.bidding_channel_id;
+    const inBiddingThread = message.channel.isThread() && 
+                           message.channel.parentId === config.bidding_channel_id;
+    
+    if (inBiddingChannel || inBiddingThread) {
+      const content = message.content.trim();
+      const args = content.split(/\s+/).slice(1);
+      const command = content.split(/\s+/)[0].toLowerCase();
+      
+      // Member commands (bidding channel)
+      if (inBiddingChannel) {
+        if (command === '!auction') {
+          await bidding.handleAuctionCommand(message, args, config);
+          return;
+        }
+        
+        if (command === '!queuelist') {
+          await bidding.handleQueueListCommand(message);
+          return;
+        }
+        
+        if (command === '!removeitem') {
+          await bidding.handleRemoveItemCommand(message, args);
+          return;
+        }
+        
+        if (command === '!startauction') {
+          // Pass client instance for thread creation
+          await bidding.handleStartAuctionCommand(message, client, config);
+          return;
+        }
+        
+        if (command === '!mybids') {
+          await bidding.handleMyBidsCommand(message);
+          return;
+        }
+        
+        if (command === '!bidstatus') {
+          await bidding.handleBidStatusCommand(message, isAdmin(member));
+          return;
+        }
+        
+        // Admin commands (bidding channel)
+        if (userIsAdmin) {
+          if (command === '!dryrun') {
+            await bidding.handleDryRunCommand(message, args);
+            return;
+          }
+          
+          if (command === '!cancelauction') {
+            await bidding.handleCancelAuctionCommand(message, client, config);
+            return;
+          }
+          
+          if (command === '!clearqueue') {
+            await bidding.handleClearQueueCommand(message);
+            return;
+          }
+          
+          if (command === '!forcesync') {
+            await bidding.handleForceSyncCommand(message, config);
+            return;
+          }
+          
+          if (command === '!setbidpoints') {
+            await bidding.handleSetBidPointsCommand(message, args);
+            return;
+          }
+          
+          if (command === '!resetbids') {
+            await bidding.handleResetBidsCommand(message);
+            return;
+          }
+        }
+      }
+      
+      // Bid command (auction threads only)
+      if (inBiddingThread && command === '!bid') {
+        await bidding.handleBidCommand(message, args, config);
+        return;
+      }
+      
+      // Admin commands (auction threads)
+      if (inBiddingThread && userIsAdmin) {
+        if (command === '!endauction') {
+          await bidding.handleEndAuctionCommand(message, client, config);
+          return;
+        }
+        
+        if (command === '!extendtime') {
+          await bidding.handleExtendTimeCommand(message, args, client, config);
+          return;
+        }
+        
+        if (command === '!forcewinner') {
+          await bidding.handleForceWinnerCommand(message, args);
+          return;
+        }
+        
+        if (command === '!cancelbid') {
+          await bidding.handleCancelBidCommand(message, args);
+          return;
+        }
+        
+        if (command === '!debugauction') {
+          await bidding.handleDebugAuctionCommand(message);
+          return;
+        }
+      }
+    }
 
   } catch (err) {
     console.error('❌ Message handler error:', err);
@@ -2409,9 +2551,21 @@ if (pending) {
   }
 }
       
-  } catch (err) {
-    console.error('❌ Reaction handler error:', err);
-  }
+  // ========== BIDDING BID CONFIRMATIONS ==========
+      const biddingState = bidding.getBiddingState();
+      
+      if (biddingState.pendingConfirmations[msg.id]) {
+        if (reaction.emoji.name === '✅') {
+          await bidding.confirmBid(reaction, user, config);
+        } else if (reaction.emoji.name === '❌') {
+          await bidding.cancelBid(reaction, user);
+        }
+        return;
+      }
+        
+    } catch (err) {
+      console.error('❌ Reaction handler error:', err);
+    }
 });
 
 // ==========================================
