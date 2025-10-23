@@ -1761,8 +1761,8 @@ client.on(Events.MessageCreate, async (message) => {
       if (threadOverrideCommands.includes(cmd)) {
         // Check cooldown
         const now = Date.now();
-        if (now - lastOverrideTime < OVERRIDE_COOLDOWN) {
-          const remaining = Math.ceil((OVERRIDE_COOLDOWN - (now - lastOverrideTime)) / 1000);
+        if (now - lastOverrideTime < TIMING.OVERRIDE_COOLDOWN) {
+          const remaining = Math.ceil((TIMING.OVERRIDE_COOLDOWN - (now - lastOverrideTime)) / 1000);
           await message.reply(`⚠️ Please wait ${remaining} seconds between override commands.`);
           return;
         }
@@ -1966,14 +1966,15 @@ client.on(Events.MessageCreate, async (message) => {
     
     if (adminLogsCommands.includes(cmd)) {
       // Check cooldown
-      const now = Date.now();
-      if (now - lastOverrideTime < OVERRIDE_COOLDOWN) {
-        const remaining = Math.ceil((OVERRIDE_COOLDOWN - (now - lastOverrideTime)) / 1000);
-        await message.reply(`⚠️ Please wait ${remaining} seconds between override commands.`);
-        return;
-      }
+// Check cooldown
+const now = Date.now();
+if (now - lastOverrideTime < TIMING.TIMING.OVERRIDE_COOLDOWN) {
+  const remaining = Math.ceil((TIMING.TIMING.OVERRIDE_COOLDOWN - (now - lastOverrideTime)) / 1000);
+  await message.reply(`⚠️ Please wait ${remaining} seconds between override commands.`);
+  return;
+}
 
-      lastOverrideTime = now;
+lastOverrideTime = now;
 
       // Log usage
       console.log(`🔧 Override: ${cmd} used by ${member.user.username}`);
