@@ -71,7 +71,13 @@ confirmation_messages = {} # thread_id -> [msg ids]
 last_sheet_call = 0
 
 # aiohttp session
-aiohttp_sess = aiohttp.ClientSession()
+aiohttp_sess = None  # declare globally
+
+async def create_http_session():
+    global aiohttp_sess
+    if aiohttp_sess is None or aiohttp_sess.closed:
+        aiohttp_sess = aiohttp.ClientSession()
+
 
 # timezone
 MANILA = zoneinfo.ZoneInfo(CONFIG.get("timezone", "Asia/Manila"))
@@ -926,9 +932,18 @@ async def start_health_server():
 
 # Startup & graceful shutdown ------------------------------------------------
 
+# ---------- startup ----------
+# ---------- startup ----------
 async def main():
+    # start health server
     await start_health_server()
+    # create aiohttp session
+    await create_http_session()
+    # start the bot
     await bot.start(DISCORD_TOKEN)
+
+
+
 
 if __name__ == "__main__":
     async def runner():
