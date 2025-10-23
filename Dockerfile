@@ -1,31 +1,29 @@
-# Stage 1: Install dependencies
-FROM mirror.gcr.io/library/node:18-alpine AS deps
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --production --no-audit --progress=false
+# ----------------------------
+# Discord Attendance Bot - Python v2.8
+# ----------------------------
 
-# Stage 2: Copy source and build (if applicable)
-FROM mirror.gcr.io/library/node:18-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-# Uncomment the next line if you have a build step (e.g., React, TypeScript)
-# RUN npm run build
+FROM python:3.12-slim
 
-# Stage 3: Use Distroless for production (no DockerHub dependency)
-FROM gcr.io/distroless/nodejs18
+# Set working directory
 WORKDIR /app
 
-# Copy built app and dependencies
-COPY --from=builder /app .
+# Copy dependency files first
+COPY requirements.txt .
 
-# Optional: set environment variables
-ENV NODE_ENV=production
-ENV PORT=3000
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose port if your app listens on one
-EXPOSE 3000
+# Copy bot files
+COPY bot.py .
+COPY config.json .
+COPY boss_points.json .
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PORT=8000
+
+# Expose port for Koyeb healthcheck
 EXPOSE 8000
 
 # Start the bot
-CMD ["index.js"]
+CMD ["python", "bot.py"]
