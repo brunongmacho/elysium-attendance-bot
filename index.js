@@ -1968,8 +1968,8 @@ client.on(Events.MessageCreate, async (message) => {
       // Check cooldown
 // Check cooldown
 const now = Date.now();
-if (now - lastOverrideTime < TIMING.TIMING.OVERRIDE_COOLDOWN) {
-  const remaining = Math.ceil((TIMING.TIMING.OVERRIDE_COOLDOWN - (now - lastOverrideTime)) / 1000);
+if (now - lastOverrideTime < TIMING.OVERRIDE_COOLDOWN) {
+  const remaining = Math.ceil((TIMING.OVERRIDE_COOLDOWN - (now - lastOverrideTime)) / 1000);
   await message.reply(`⚠️ Please wait ${remaining} seconds between override commands.`);
   return;
 }
