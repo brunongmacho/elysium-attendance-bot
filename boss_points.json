@@ -28,7 +28,7 @@
   "Secreta": {"points":3, "aliases":["secreta"]},
   "Ordo": {"points":3, "aliases":["ordo"]},
   "Asta": {"points":3, "aliases":["asta"]},
-  "Supero": {"points":3, "aliases":["supero"]},
+  "Supore": {"points":3, "aliases":["supore"]},
   "Chaiflock": {"points":3, "aliases":["chaiflock"]},
   "Benji": {"points":3, "aliases":["benji"]}
 }
