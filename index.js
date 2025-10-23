@@ -1070,24 +1070,24 @@ async function handleForceSubmit(message, member) {
     return;
   }
 
-const confirmMsg = await message.reply(
-  `📊 **Force submit attendance?**\n\n` +
-  `**Boss:** ${spawnInfo.boss}\n` +
-  `**Timestamp:** ${spawnInfo.timestamp}\n` +
-  `**Members:** ${spawnInfo.members.length}\n\n` +
-  `This will submit to Google Sheets WITHOUT closing the thread.\n\n` +
-  `React ✅ to confirm or ❌ to cancel.`
-);
+  const confirmMsg = await message.reply(
+    `📊 **Force submit attendance?**\n\n` +
+    `**Boss:** ${spawnInfo.boss}\n` +
+    `**Timestamp:** ${spawnInfo.timestamp}\n` +
+    `**Members:** ${spawnInfo.members.length}\n\n` +
+    `This will submit to Google Sheets WITHOUT closing the thread.\n\n` +
+    `React ✅ to confirm or ❌ to cancel.`
+  );
 
-await confirmMsg.react('✅');
-await confirmMsg.react('❌');
+  await confirmMsg.react('✅');
+  await confirmMsg.react('❌');
 
-// NEW: Track as pending closure for proper cleanup
-pendingClosures[confirmMsg.id] = {
-  threadId: message.channel.id,
-  adminId: message.author.id,
-  type: 'forcesubmit'
-};
+  // NEW: Track as pending closure for proper cleanup
+  pendingClosures[confirmMsg.id] = {
+    threadId: message.channel.id,
+    adminId: message.author.id,
+    type: 'forcesubmit'
+  };
   
   const filter = (reaction, user) => {
     return ['✅', '❌'].includes(reaction.emoji.name) && user.id === member.user.id;
@@ -1118,6 +1118,9 @@ pendingClosures[confirmMsg.id] = {
           `Thread remains open for additional verifications if needed.`
         );
         
+        await removeAllReactionsWithRetry(confirmMsg);  // ← CHANGED from msg to confirmMsg
+        delete pendingClosures[confirmMsg.id];  // ← CHANGED from msg to confirmMsg
+        
         console.log(`🔧 Force submit: ${spawnInfo.boss} by ${member.user.username} (${spawnInfo.members.length} members)`);
       } else {
         await message.channel.send(
@@ -1125,16 +1128,18 @@ pendingClosures[confirmMsg.id] = {
           `Error: ${resp.text || resp.err}\n\n` +
           `**Members list (for manual entry):**\n${spawnInfo.members.join(', ')}`
         );
-        await removeAllReactionsWithRetry(msg);  // ← Add this
-        delete pendingClosures[msg.id];  // ← Add this
+        await removeAllReactionsWithRetry(confirmMsg);  // ← CHANGED from msg to confirmMsg
+        delete pendingClosures[confirmMsg.id];  // ← CHANGED from msg to confirmMsg
       }
     } else {
       await message.reply('❌ Force submit canceled.');
-      await removeAllReactionsWithRetry(msg);  // ← Add this
-      delete pendingClosures[msg.id];  // ← Add this
+      await removeAllReactionsWithRetry(confirmMsg);  // ← CHANGED from msg to confirmMsg
+      delete pendingClosures[confirmMsg.id];  // ← CHANGED from msg to confirmMsg
     }
   } catch (err) {
     await message.reply('⏱️ Confirmation timed out. Force submit canceled.');
+    await removeAllReactionsWithRetry(confirmMsg);  // ← ADD THIS LINE
+    delete pendingClosures[confirmMsg.id];  // ← ADD THIS LINE
   }
 }
 
