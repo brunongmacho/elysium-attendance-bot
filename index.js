@@ -1845,47 +1845,7 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
 
-// ========== ADMIN OVERRIDE: !verify @member ==========
-      if (message.content.startsWith('!verify')) {
-        const mentioned = message.mentions.users.first();
-        if (!mentioned) {
-          await message.reply('⚠️ Usage: `!verify @member`\n💡 Type `!help verify` for details');
-          return;
-        }
-
-        const spawnInfo = activeSpawns[message.channel.id];
-        if (!spawnInfo || spawnInfo.closed) {
-          await message.reply('⚠️ This spawn is closed or not found.');
-          return;
-        }
-
-        const mentionedMember = await guild.members.fetch(mentioned.id).catch(() => null);
-        const username = mentionedMember ? (mentionedMember.nickname || mentioned.username) : mentioned.username;
-        
-        const usernameLower = username.toLowerCase();
-        const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === usernameLower);
-        
-        if (isDuplicate) {
-          await message.reply(`⚠️ **${username}** is already verified for this spawn.`);
-          return;
-        }
-
-        spawnInfo.members.push(username);
-
-        await message.reply(`✅ **${username}** manually verified by ${message.author.username}`);
-        
-        if (spawnInfo.confirmThreadId) {
-          const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
-          if (confirmThread) {
-            await confirmThread.send(`✅ **${username}** verified by ${message.author.username} (manual override)`);
-          }
-        }
-
-        console.log(`✅ Manual verify: ${username} for ${spawnInfo.boss} by ${message.author.username}`);
-        return;
-      }
-
-      // ========== ADMIN OVERRIDE: !verifyall ==========
+// ========== ADMIN OVERRIDE: !verifyall (CHECK THIS FIRST) ==========
       if (message.content.trim().toLowerCase() === '!verifyall') {
         const spawnInfo = activeSpawns[message.channel.id];
         if (!spawnInfo || spawnInfo.closed) {
@@ -1986,6 +1946,46 @@ client.on(Events.MessageCreate, async (message) => {
           await removeAllReactionsWithRetry(confirmMsg);
         }
 
+        return;
+      }
+
+      // ========== ADMIN OVERRIDE: !verify @member (CHECK AFTER !verifyall) ==========
+      if (message.content.startsWith('!verify')) {
+        const mentioned = message.mentions.users.first();
+        if (!mentioned) {
+          await message.reply('⚠️ Usage: `!verify @member`\n💡 Type `!help verify` for details');
+          return;
+        }
+
+        const spawnInfo = activeSpawns[message.channel.id];
+        if (!spawnInfo || spawnInfo.closed) {
+          await message.reply('⚠️ This spawn is closed or not found.');
+          return;
+        }
+
+        const mentionedMember = await guild.members.fetch(mentioned.id).catch(() => null);
+        const username = mentionedMember ? (mentionedMember.nickname || mentioned.username) : mentioned.username;
+        
+        const usernameLower = username.toLowerCase();
+        const isDuplicate = spawnInfo.members.some(m => m.toLowerCase() === usernameLower);
+        
+        if (isDuplicate) {
+          await message.reply(`⚠️ **${username}** is already verified for this spawn.`);
+          return;
+        }
+
+        spawnInfo.members.push(username);
+
+        await message.reply(`✅ **${username}** manually verified by ${message.author.username}`);
+        
+        if (spawnInfo.confirmThreadId) {
+          const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
+          if (confirmThread) {
+            await confirmThread.send(`✅ **${username}** verified by ${message.author.username} (manual override)`);
+          }
+        }
+
+        console.log(`✅ Manual verify: ${username} for ${spawnInfo.boss} by ${message.author.username}`);
         return;
       }
 
