@@ -2153,7 +2153,6 @@ client.on(Events.MessageCreate, async (message) => {
     
     if (adminLogsCommands.includes(cmd)) {
       // Check cooldown
-// Check cooldown
 const now = Date.now();
 if (now - lastOverrideTime < TIMING.OVERRIDE_COOLDOWN) {
   const remaining = Math.ceil((TIMING.OVERRIDE_COOLDOWN - (now - lastOverrideTime)) / 1000);
@@ -2244,93 +2243,35 @@ lastOverrideTime = now;
 
       return;
     }
-    // ========== BIDDING COMMANDS ==========
+    // ========== BIDDING COMMANDS (CORRECTED ROUTING) ==========
     
-    // Check if message is in bidding channel or bidding threads
-    const inBiddingChannel = message.channel.id === config.bidding_channel_id;
+    // Check if in bidding thread (for member + admin thread commands)
     const inBiddingThread = message.channel.isThread() && 
                            message.channel.parentId === config.bidding_channel_id;
     
-    if (inBiddingChannel || inBiddingThread) {
+    if (inBiddingThread) {
       const content = message.content.trim();
       const args = content.split(/\s+/).slice(1);
       const command = content.split(/\s+/)[0].toLowerCase();
       
-      // Member commands (bidding channel)
-      if (inBiddingChannel) {
-        if (command === '!auction') {
-          await bidding.handleAuctionCommand(message, args, config);
-          return;
-        }
-        
-        if (command === '!queuelist') {
-          await bidding.handleQueueListCommand(message);
-          return;
-        }
-        
-        if (command === '!removeitem') {
-          await bidding.handleRemoveItemCommand(message, args);
-          return;
-        }
-        
-        if (command === '!startauction') {
-          // Pass client instance for thread creation
-          await bidding.handleStartAuctionCommand(message, client, config);
-          return;
-        }
-        
-        if (command === '!mybids') {
-          await bidding.handleMyBidsCommand(message);
-          return;
-        }
-        
-        if (command === '!bidstatus') {
-          await bidding.handleBidStatusCommand(message, isAdmin(member));
-          return;
-        }
-        
-        // Admin commands (bidding channel)
-        if (userIsAdmin) {
-          if (command === '!dryrun') {
-            await bidding.handleDryRunCommand(message, args);
-            return;
-          }
-          
-          if (command === '!cancelauction') {
-            await bidding.handleCancelAuctionCommand(message, client, config);
-            return;
-          }
-          
-          if (command === '!clearqueue') {
-            await bidding.handleClearQueueCommand(message);
-            return;
-          }
-          
-          if (command === '!forcesync') {
-            await bidding.handleForceSyncCommand(message, config);
-            return;
-          }
-          
-          if (command === '!setbidpoints') {
-            await bidding.handleSetBidPointsCommand(message, args);
-            return;
-          }
-          
-          if (command === '!resetbids') {
-            await bidding.handleResetBidsCommand(message);
-            return;
-          }
-        }
-      }
-      
-      // Bid command (auction threads only)
-      if (inBiddingThread && command === '!bid') {
+      // MEMBER COMMANDS (inside bidding threads)
+      if (command === '!bid') {
         await bidding.handleBidCommand(message, args, config);
         return;
       }
       
-      // Admin commands (auction threads)
-      if (inBiddingThread && userIsAdmin) {
+      if (command === '!bidstatus') {
+        await bidding.handleBidStatusCommand(message, isAdmin(member));
+        return;
+      }
+      
+      if (command === '!mybids') {
+        await bidding.handleMyBidsCommand(message);
+        return;
+      }
+      
+      // ADMIN COMMANDS (inside bidding threads)
+      if (userIsAdmin) {
         if (command === '!endauction') {
           await bidding.handleEndAuctionCommand(message, client, config);
           return;
@@ -2355,8 +2296,71 @@ lastOverrideTime = now;
           await bidding.handleDebugAuctionCommand(message);
           return;
         }
+        
+        if (command === '!cancelauction') {
+          await bidding.handleCancelAuctionCommand(message, client, config);
+          return;
+        }
       }
+      
+      // Don't process any other commands in bidding threads
+      return;
     }
+    
+    // Check if in admin logs (for admin-only bidding setup commands)
+    const inAdminLogsForBidding = message.channel.id === config.admin_logs_channel_id || 
+                                  (message.channel.isThread() && message.channel.parentId === config.admin_logs_channel_id);
+    
+    if (inAdminLogsForBidding && userIsAdmin) {
+      const content = message.content.trim();
+      const args = content.split(/\s+/).slice(1);
+      const command = content.split(/\s+/)[0].toLowerCase();
+      
+      // ADMIN SETUP COMMANDS (in admin logs channel)
+      if (command === '!auction') {
+        await bidding.handleAuctionCommand(message, args, config);
+        return;
+      }
+      
+      if (command === '!queuelist') {
+        await bidding.handleQueueListCommand(message);
+        return;
+      }
+      
+      if (command === '!removeitem') {
+        await bidding.handleRemoveItemCommand(message, args);
+        return;
+      }
+      
+      if (command === '!startauction') {
+        await bidding.handleStartAuctionCommand(message, client, config);
+        return;
+      }
+      
+      if (command === '!dryrun') {
+        await bidding.handleDryRunCommand(message, args);
+        return;
+      }
+      
+      if (command === '!clearqueue') {
+        await bidding.handleClearQueueCommand(message);
+        return;
+      }
+      
+      if (command === '!forcesync') {
+        await bidding.handleForceSyncCommand(message, config);
+        return;
+      }
+      
+      if (command === '!setbidpoints') {
+        await bidding.handleSetBidPointsCommand(message, args);
+        return;
+      }
+      
+      if (command === '!resetbids') {
+        await bidding.handleResetBidsCommand(message);
+        return;
+      }
 
   } catch (err) {
     console.error('❌ Message handler error:', err);
