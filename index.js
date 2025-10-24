@@ -652,71 +652,63 @@ async function showHelp(message, member, specificCommand = null) {
   if (isAdminUser) {
     // Admin help menu
     const embed = new EmbedBuilder()
-    .setColor(0x4A90E2)
-    .setTitle('🛡️ ELYSIUM Attendance Bot - Admin Commands')
-    .setDescription('Complete command reference for administrators')
-    .addFields(
-      {
-        name: '🎯 Spawn Management (Admin Logs Only)',
-        value: '`!addthread` - Manually create spawn thread\n' +
-               '`!clearstate` - Clear all bot memory (nuclear option)\n' +
-               '`!status` - Show bot health and all active spawns\n' +
-               '`!closeallthread` - Mass close all open spawns (auto-verify + submit)'
-      },
-      // ✅ ADD THIS FIELD
-      {
-        name: '🏆 Bidding System (Admin Logs)',
-        value: '`!auction` - Add item to auction queue\n' +
-               '`!startauction` - Start auction session\n' +
-               '`!queuelist` - Show all queued items\n' +
-               '`!removeitem` - Remove item from queue\n' +
-               '`!dryrun on/off` - Toggle test mode\n' +
-               '`!cancelauction` - Cancel all auctions\n' +
-               '`!forcesync` - Sync points from sheet\n' +
-               '`!resetbids` - Clear all bidding memory\n' +
-               '`!help auction` for detailed docs'
-      },
-      {
-        name: '💰 Bidding (Members - In Threads)',
-        value: '`!bid <amount>` - Place bid in auction\n' +
-               '`!mybids` - Show your bidding status\n' +
-               '`!bidstatus` - Show auction system status'
-      },
-      {
-        name: '🔒 Spawn Actions (Use in Spawn Thread)',
-        value: '`close` - Close spawn and submit to Google Sheets\n' +
-               '`!forceclose` - Force close without pending check\n' +
-               '`!forcesubmit` - Submit attendance without closing\n' +
-               '`!debugthread` - Show current thread state\n' +
-               '`!resetpending` - Clear stuck pending verifications'
-      },
+      .setColor(0x4A90E2)
+      .setTitle('🛡️ ELYSIUM Attendance Bot - Admin Commands')
+      .setDescription('Complete command reference for administrators')
+      .addFields(
         {
-          name: '🎯 Spawn Management (Admin Logs Only)',
+          name: '🎯 Spawn Management (Admin Logs)',
           value: '`!addthread` - Manually create spawn thread\n' +
-                 '`!clearstate` - Clear all bot memory (nuclear option)\n' +
-                 '`!status` - Show bot health and all active spawns\n' +
-                 '`!closeallthread` - Mass close all open spawns (auto-verify + submit)'
+                 '`!status` - Show bot health and active spawns\n' +
+                 '`!closeallthread` - Mass close all open spawns\n' +
+                 '`!clearstate` - Clear all bot memory (nuclear)'
         },
         {
-          name: '🔒 Spawn Actions (Use in Spawn Thread)',
-          value: '`close` - Close spawn and submit to Google Sheets\n' +
-                 '`!forceclose` - Force close without pending check\n' +
-                 '`!forcesubmit` - Submit attendance without closing\n' +
-                 '`!debugthread` - Show current thread state\n' +
-                 '`!resetpending` - Clear stuck pending verifications'
+          name: '🏆 Bidding Setup (Admin Logs)',
+          value: '`!auction` - Add item to auction queue\n' +
+                 '`!queuelist` - Show all queued items\n' +
+                 '`!removeitem` - Remove item from queue\n' +
+                 '`!startauction` - Start auction session\n' +
+                 '`!dryrun on/off` - Toggle test mode\n' +
+                 '`!clearqueue` - Clear auction queue\n' +
+                 '`!forcesync` - Sync points from sheet\n' +
+                 '`!setbidpoints` - Set test points (dry run)\n' +
+                 '`!resetbids` - Clear all bidding memory'
         },
-{
-          name: '✅ Verification (Use in Spawn Thread)',
-          value: 'React ✅/❌ - Verify or deny member check-ins\n' +
-                 '`!verify @member` - Manually verify without screenshot\n' +
-                 '`!verifyall` - Bulk verify ALL pending members'
+        {
+          name: '🔒 Spawn Actions (Spawn Thread)',
+          value: '`close` - Close spawn and submit to sheets\n' +
+                 '`!forceclose` - Force close without checks\n' +
+                 '`!forcesubmit` - Submit without closing\n' +
+                 '`!verify @user` - Manually verify member\n' +
+                 '`!verifyall` - Bulk verify all pending\n' +
+                 '`!debugthread` - Show thread state\n' +
+                 '`!resetpending` - Clear stuck verifications'
+        },
+        {
+          name: '💰 Bidding Actions (Bidding Thread)',
+          value: '`!bid <amount>` - Place bid (members too)\n' +
+                 '`!mybids` - Show bidding status (members too)\n' +
+                 '`!bidstatus` - Show auction status (members too)\n' +
+                 '`!endauction` - Force end auction early\n' +
+                 '`!extendtime` - Add time to auction\n' +
+                 '`!forcewinner` - Manually assign winner\n' +
+                 '`!cancelbid` - Remove someone\'s bid\n' +
+                 '`!cancelauction` - Cancel all auctions\n' +
+                 '`!debugauction` - Show auction debug info'
+        },
+        {
+          name: '✅ Verification (Spawn Thread)',
+          value: 'React ✅/❌ - Verify or deny check-ins\n' +
+                 'React ✅/❌ - Confirm close/override actions'
         },
         {
           name: '📖 Help',
-          value: '`!help [command]` - Detailed help for specific command'
+          value: '`!help [command]` - Detailed help for specific command\n' +
+                 '**Examples:** `!help auction`, `!help bid`, `!help verifyall`'
         }
       )
-      .setFooter({text: `💡 Type !help addthread for examples • Version ${BOT_VERSION}`})
+      .setFooter({text: `💡 Type !help <command> for examples • Version ${BOT_VERSION}`})
       .setTimestamp();
 
     await message.reply({embeds: [embed]});
@@ -725,23 +717,41 @@ async function showHelp(message, member, specificCommand = null) {
     const embed = new EmbedBuilder()
       .setColor(0xFFD700)
       .setTitle('📚 ELYSIUM Attendance Bot - Member Commands')
-      .setDescription('How to check in for boss spawns')
+      .setDescription('How to participate in spawns and auctions')
       .addFields(
         {
-          name: '📸 Check-In Commands',
+          name: '🎯 Spawn Check-In (Spawn Thread)',
           value: '`present` / `here` / `join` / `checkin`\n' +
-                 '└─ Check in for current boss spawn\n' +
-                 '└─ Must attach screenshot (admins exempt)\n' +
-                 '└─ Wait for admin verification (✅)'
+                 '├─ Check in for current boss spawn\n' +
+                 '├─ Must attach screenshot (shows boss + time)\n' +
+                 '├─ Wait for admin ✅ verification\n' +
+                 '└─ Admins exempt from screenshot'
+        },
+        {
+          name: '💰 Auction Bidding (Bidding Thread)',
+          value: '`!bid <amount>` - Place bid on auction item\n' +
+                 '`!mybids` - Show your current bids and locked points\n' +
+                 '`!bidstatus` - Show current auction status\n' +
+                 '├─ Confirm bids with ✅ reaction (30s timeout)\n' +
+                 '├─ Points locked until outbid\n' +
+                 '├─ Must bid HIGHER than current bid\n' +
+                 '└─ Bids in last minute extend timer +1 min'
         },
         {
           name: '📋 Need Help?',
           value: '• Contact an admin if you have issues\n' +
-                 '• Make sure screenshot shows boss + timestamp\n' +
-                 '• You can only check in once per spawn'
+                 '• Screenshot must show boss name + timestamp\n' +
+                 '• You can only check in once per spawn\n' +
+                 '• Cannot bid more than available points\n' +
+                 '• Use `!mybids` to check locked points'
+        },
+        {
+          name: '💡 Examples',
+          value: '**Spawn:** `present` (with screenshot attached)\n' +
+                 '**Bidding:** `!bid 150` then click ✅ to confirm'
         }
       )
-      .setFooter({text: `💡 Type !help for more info • Version ${BOT_VERSION}`})
+      .setFooter({text: `💡 Type !help bid for detailed bidding help • Version ${BOT_VERSION}`})
       .setTimestamp();
 
     await message.reply({embeds: [embed]});
@@ -757,6 +767,10 @@ async function showCommandHelp(message, command, isAdmin) {
   let embed;
 
   switch (cmd) {
+    // ==========================================
+    // SPAWN MANAGEMENT COMMANDS
+    // ==========================================
+    
     case 'addthread':
       if (!isAdmin) {
         await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
@@ -767,93 +781,15 @@ async function showCommandHelp(message, command, isAdmin) {
         .setTitle('🔧 Command: !addthread')
         .setDescription('Manually create a boss spawn thread')
         .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Admin logs channel only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!addthread [BossName] will spawn in X minutes! (YYYY-MM-DD HH:MM)```'
-          },
+          {name: '📍 Where to Use', value: '**Admin logs channel only**'},
+          {name: '📝 Syntax', value: '```!addthread [BossName] will spawn in X minutes! (YYYY-MM-DD HH:MM)```'},
           {
             name: '💡 Examples',
-            value: '```\n' +
-                   '!addthread Baron Braudmore will spawn in 5 minutes! (2025-10-22 14:30)\n' +
-                   '!addthread Larba will spawn in 10 minutes! (2025-10-22 18:00)\n' +
-                   '```'
-          }
-        )
-        .setFooter({text: 'Type !help for full command list'});
-      break;
-
-case 'verifyall':
-      if (!isAdmin) {
-        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
-        return;
-      }
-      embed = new EmbedBuilder()
-        .setColor(0x00FF00)
-        .setTitle('✅ Command: !verifyall')
-        .setDescription('Bulk verify all pending members in current thread')
-        .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Spawn thread only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!verifyall```'
+            value: '```\n!addthread Baron Braudmore will spawn in 5 minutes! (2025-10-22 14:30)\n!addthread Larba will spawn in 10 minutes! (2025-10-22 18:00)\n```'
           },
           {
             name: '✨ What It Does',
-            value: '1. Shows all pending verifications\n' +
-                   '2. Asks for confirmation\n' +
-                   '3. Verifies ALL pending members at once\n' +
-                   '4. Skips duplicates automatically\n' +
-                   '5. Removes reactions from all messages\n' +
-                   '6. Shows summary of verified members'
-          },
-          {
-            name: '🎯 Use When',
-            value: '• Multiple members waiting for verification\n' +
-                   '• Need to quickly verify everyone\n' +
-                   '• End of spawn event cleanup\n' +
-                   '• Trust all pending members are legitimate'
-          },
-          {
-            name: '⚠️ Important',
-            value: '• Cannot be undone once confirmed\n' +
-                   '• Duplicates are automatically skipped\n' +
-                   '• Removes ALL pending verifications for thread'
-          }
-        )
-        .setFooter({text: 'Type !help for full command list'});
-      break;
-
-    case 'close':
-      if (!isAdmin) {
-        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
-        return;
-      }
-      embed = new EmbedBuilder()
-        .setColor(0x4A90E2)
-        .setTitle('🔒 Command: close')
-        .setDescription('Close spawn thread and submit attendance to Google Sheets')
-        .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Spawn thread only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```close```'
-          },
-          {
-            name: '📖 Usage',
-            value: '1. Type `close` in the spawn thread\n' +
-                   '2. Bot checks for pending verifications\n' +
-                   '3. If none pending, shows confirmation\n' +
-                   '4. React ✅ to confirm submission'
+            value: '1. Creates attendance thread\n2. Creates confirmation thread\n3. Posts @everyone notification\n4. Ready for member check-ins'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
@@ -869,21 +805,11 @@ case 'verifyall':
         .setTitle('📊 Command: !status')
         .setDescription('Show bot health, active spawns, and system statistics')
         .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Admin logs channel only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!status```'
-          },
+          {name: '📍 Where to Use', value: '**Admin logs channel only**'},
+          {name: '📝 Syntax', value: '```!status```'},
           {
             name: '📊 Output Shows',
-            value: '• Bot uptime and version\n' +
-                   '• Active spawn threads with clickable links\n' +
-                   '• Sorted oldest first with age indicators\n' +
-                   '• Pending verifications count\n' +
-                   '• Last sheet API call time'
+            value: '• Bot uptime and version\n• Active spawn threads (clickable links)\n• Sorted oldest first with age\n• Pending verifications count\n• Pending closures count\n• Last sheet API call time\n• Memory usage'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
@@ -897,48 +823,84 @@ case 'verifyall':
       embed = new EmbedBuilder()
         .setColor(0xFF6600)
         .setTitle('🔥 Command: !closeallthread')
-        .setDescription('Mass close all open spawn threads (auto-verify + submit all)')
+        .setDescription('Mass close all open spawn threads')
         .addFields(
+          {name: '📍 Where to Use', value: '**Admin logs channel only**'},
+          {name: '📝 Syntax', value: '```!closeallthread```'},
           {
-            name: '📍 Where to Use',
-            value: '**Admin logs channel only**'
+            name: '✨ What It Does',
+            value: '1. Auto-verifies ALL pending members\n2. Submits each spawn to sheets\n3. Posts confirmation in each thread\n4. Removes ALL reactions (100+ messages)\n5. Archives all threads\n6. Shows progress bar\n7. Retries failed submissions\n8. Shows cleanup statistics'
           },
-          {
-            name: '📝 Syntax',
-            value: '```!closeallthread```'
-          },
-{
-        name: '✨ What It Does',
-        value: '1. Finds all open spawn threads\n' +
-               '2. Auto-verifies ALL pending members in each thread\n' +
-               '3. Posts closure message in spawn thread\n' +
-               '4. Submits attendance to Google Sheets\n' +
-               '5. Posts confirmation in confirmation thread\n' +
-               '6. **Removes ALL reactions from ALL messages**\n' +
-               '7. Archives threads and cleans up memory\n' +
-               '8. Processes one by one with retry logic'
-      },
           {
             name: '🎯 Use When',
-            value: '• End of boss rush event\n' +
-                   '• Multiple spawns left open\n' +
-                   '• Need to bulk close everything\n' +
-                   '• Clean up before maintenance'
+            value: '• End of boss rush event\n• Multiple spawns left open\n• Need to bulk close everything\n• Clean up before maintenance'
           },
+          {name: '⏱️ Speed', value: '~3-5 seconds per thread'}
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'clearstate':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setTitle('🔧 Command: !clearstate')
+        .setDescription('⚠️ Clear all bot memory (nuclear option)')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Admin logs channel only**'},
+          {name: '📝 Syntax', value: '```!clearstate```'},
           {
-            name: '⚠️ Important',
-            value: '• Takes ~3-5 seconds per thread\n' +
-                   '• Shows progress bar\n' +
-                   '• Retries failed submissions once\n' +
-                   '• Requires confirmation (React ✅)'
+            name: '⚠️ Warning',
+            value: '**This is destructive!**\n• Clears all active spawns\n• Clears all pending verifications\n• Clears all active columns\n• Requires confirmation'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    // ==========================================
+    // SPAWN THREAD COMMANDS
+    // ==========================================
+
+    case 'close':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0x4A90E2)
+        .setTitle('🔒 Command: close')
+        .setDescription('Close spawn thread and submit to Google Sheets')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Spawn thread only**'},
+          {name: '📝 Syntax', value: '```close```'},
+          {
+            name: '📖 Usage',
+            value: '1. Type `close` in spawn thread\n2. Bot checks for pending verifications\n3. If none pending, shows confirmation\n4. React ✅ to confirm submission\n5. Attendance submitted to sheet\n6. Thread archived'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'forceclose':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF6600)
+        .setTitle('⚡ Command: !forceclose')
+        .setDescription('Force close spawn without checks (emergency)')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Spawn thread only**'},
+          {name: '📝 Syntax', value: '```!forceclose```'},
+          {
+            name: '⚠️ What It Does',
+            value: '• Ignores pending verifications\n• Submits current verified members\n• No confirmation required\n• Immediate closure'
           },
-          {
-        name: '🧹 Cleanup Process',
-        value: '• Removes reactions from up to 100 messages per thread\n' +
-               '• Retries failed cleanups automatically\n' +
-               '• Shows cleanup statistics in final summary\n' +
-               '• Prevents restart detection issues'
-      },
+          {name: '🎯 Use When', value: '• Thread stuck\n• Need emergency close\n• Pending verifications broken'}
         )
         .setFooter({text: 'Type !help for full command list'});
       break;
@@ -953,19 +915,56 @@ case 'verifyall':
         .setTitle('🔧 Command: !forcesubmit')
         .setDescription('Submit attendance without closing thread')
         .addFields(
+          {name: '📍 Where to Use', value: '**Spawn thread only**'},
+          {name: '📝 Syntax', value: '```!forcesubmit```'},
           {
-            name: '📍 Where to Use',
-            value: '**Spawn thread only**'
-          },
+            name: '🎯 Use When',
+            value: '• Thread broken but need to save data\n• Can\'t close normally\n• Want to submit without closing\n• Keep thread open for more verifications'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'verify':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0x00FF00)
+        .setTitle('✅ Command: !verify')
+        .setDescription('Manually verify member without screenshot')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Spawn thread only**'},
+          {name: '📝 Syntax', value: '```!verify @member```'},
+          {name: '💡 Example', value: '```!verify @Player1```'},
           {
-            name: '📝 Syntax',
-            value: '```!forcesubmit```'
+            name: '🎯 Use When',
+            value: '• Member forgot screenshot\n• Technical issues\n• Trust the member\n• Admin discretion'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'verifyall':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0x00FF00)
+        .setTitle('✅ Command: !verifyall')
+        .setDescription('Bulk verify all pending members in thread')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Spawn thread only**'},
+          {name: '📝 Syntax', value: '```!verifyall```'},
+          {
+            name: '✨ What It Does',
+            value: '1. Shows all pending verifications\n2. Asks for confirmation\n3. Verifies ALL at once\n4. Skips duplicates\n5. Removes reactions\n6. Shows summary'
           },
           {
             name: '🎯 Use When',
-            value: '• Thread is broken but need to save data\n' +
-                   '• Can\'t close normally\n' +
-                   '• Want to submit without closing'
+            value: '• Multiple members waiting\n• End of spawn event\n• Trust all pending members\n• Quick bulk verification'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
@@ -981,19 +980,11 @@ case 'verifyall':
         .setTitle('🔍 Command: !debugthread')
         .setDescription('Show detailed state of current thread')
         .addFields(
+          {name: '📍 Where to Use', value: '**Spawn thread only**'},
+          {name: '📝 Syntax', value: '```!debugthread```'},
           {
-            name: '📍 Where to Use',
-            value: '**Spawn thread only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!debugthread```'
-          },
-          {
-            name: '🎯 Use When',
-            value: '• Thread seems stuck\n' +
-                   '• Want to see what bot knows\n' +
-                   '• Verifying state before closing'
+            name: '📊 Shows',
+            value: '• Boss name and timestamp\n• Closed status\n• Verified members list\n• Pending verifications\n• Confirmation thread link\n• Memory status'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
@@ -1007,88 +998,23 @@ case 'verifyall':
       embed = new EmbedBuilder()
         .setColor(0xFF9900)
         .setTitle('🔧 Command: !resetpending')
-        .setDescription('Clear stuck pending verifications for current thread')
+        .setDescription('Clear stuck pending verifications')
         .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Spawn thread only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!resetpending```'
-          },
+          {name: '📍 Where to Use', value: '**Spawn thread only**'},
+          {name: '📝 Syntax', value: '```!resetpending```'},
           {
             name: '🎯 Use When',
-            value: '• Pending verifications won\'t clear\n' +
-                   '• Can\'t close thread due to pending\n' +
-                   '• Need to force close thread'
+            value: '• Pending verifications stuck\n• Can\'t close due to pending\n• Need to force close thread\n• Cleanup stuck state'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
       break;
 
-    case 'clearstate':
-      if (!isAdmin) {
-        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
-        return;
-      }
-      embed = new EmbedBuilder()
-        .setColor(0xFF0000)
-        .setTitle('🔧 Command: !clearstate')
-        .setDescription('⚠️ Clear all bot memory (nuclear option)')
-        .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Admin logs channel only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!clearstate```'
-          },
-          {
-            name: '⚠️ Warning',
-            value: '**This is a destructive command!**\n' +
-                   'Clears all active spawns, pending verifications, etc.'
-          }
-        )
-        .setFooter({text: 'Type !help for full command list'});
-      break;
+    // ==========================================
+    // BIDDING SETUP COMMANDS (ADMIN LOGS)
+    // ==========================================
 
-    case 'present':
-    case 'here':
-    case 'checkin':
-      embed = new EmbedBuilder()
-        .setColor(0xFFD700)
-        .setTitle('📸 Command: Check-In')
-        .setDescription('Check in for current boss spawn')
-        .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Spawn thread only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```present```\nor: `here`, `join`, `checkin`'
-          },
-          {
-            name: '📋 Requirements',
-            value: '• Must attach screenshot showing:\n' +
-                   '  └─ Boss name\n' +
-                   '  └─ Timestamp\n' +
-                   '• Admins exempt from screenshot'
-          },
-          {
-            name: '✨ What Happens',
-            value: '1. Bot adds ✅ and ❌ reactions\n' +
-                   '2. Your check-in appears in confirmation thread\n' +
-                   '3. Admin verifies (✅) or denies (❌)\n' +
-                   '4. You get confirmation message'
-          }
-        )
-        .setFooter({text: 'Type !help for full command list'});
-      break;
-
-case 'auction':
+    case 'auction':
       if (!isAdmin) {
         await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
         return;
@@ -1098,215 +1024,15 @@ case 'auction':
         .setTitle('🏆 Command: !auction')
         .setDescription('Add item to auction queue')
         .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Admin logs channel only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!auction <item name> <starting price> <duration in minutes>```'
-          },
+          {name: '📍 Where to Use', value: '**Admin logs channel only**'},
+          {name: '📝 Syntax', value: '```!auction <item name> <starting price> <duration in minutes>```'},
           {
             name: '💡 Examples',
-            value: '```\n' +
-                   '!auction Dragon Sword 100 30\n' +
-                   '!auction GRAY DAWN LOAFERS - BARON 150 45\n' +
-                   '!auction Magic Shield 50 20\n' +
-                   '```'
-          },
-          {
-            name: '✨ What It Does',
-            value: '1. Adds item to auction queue\n' +
-                   '2. Shows position in queue\n' +
-                   '3. Wait for `!startauction` to begin\n' +
-                   '4. Items are auctioned one-by-one'
-          },
-          {
-            name: '⚠️ Notes',
-            value: '• Item name can have spaces\n' +
-                   '• Last two arguments are ALWAYS price and duration\n' +
-                   '• Use `!queuelist` to see all queued items'
-          }
-        )
-        .setFooter({text: 'Type !help for full command list'});
-      break;
-
-    case 'startauction':
-      if (!isAdmin) {
-        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
-        return;
-      }
-      embed = new EmbedBuilder()
-        .setColor(0xFFD700)
-        .setTitle('🚀 Command: !startauction')
-        .setDescription('Start auction session (all queued items)')
-        .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Admin logs channel only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!startauction```'
-          },
-          {
-            name: '✨ What It Does',
-            value: '1. Shows confirmation with all queued items\n' +
-                   '2. Creates threads for each item (one-by-one)\n' +
-                   '3. 20-second preview before bidding starts\n' +
-                   '4. Automatic "going once, going twice" announcements\n' +
-                   '5. Auto-extends by 1 min if bid placed in last minute'
-          },
-          {
-            name: '⏱️ Timeline',
-            value: '• 20s preview per item\n' +
-                   '• Auction duration per item\n' +
-                   '• 20s buffer between items\n' +
-                   '• Auto-submit results to Google Sheets when done'
-          }
-        )
-        .setFooter({text: 'Type !help for full command list'});
-      break;
-
-    case 'bid':
-      embed = new EmbedBuilder()
-        .setColor(0xFFD700)
-        .setTitle('💰 Command: !bid')
-        .setDescription('Place bid in active auction')
-        .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Bidding thread only** (during active auction)'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!bid <amount>```'
-          },
-          {
-            name: '💡 Examples',
-            value: '```\n!bid 150\n!bid 200\n!bid 500\n```'
-          },
-          {
-            name: '✨ How It Works',
-            value: '1. Type `!bid <amount>` in auction thread\n' +
-                   '2. Bot shows confirmation with ✅/❌\n' +
-                   '3. Click ✅ to confirm bid (30 second timeout)\n' +
-                   '4. Your points are locked until outbid\n' +
-                   '5. If outbid, points return automatically'
-          },
-          {
-            name: '📊 Rules',
-            value: '• Must bid HIGHER than current bid\n' +
-                   '• Cannot bid same amount as current\n' +
-                   '• Must have enough available points\n' +
-                   '• Points locked across ALL active auctions\n' +
-                   '• Bid in last minute extends timer by 1 min'
-          },
-          {
-            name: '🎯 Tips',
-            value: '• Use `!mybids` to see your locked points\n' +
-                   '• Use `!bidstatus` to see current auction info'
-          }
-        )
-        .setFooter({text: 'Type !help for full command list'});
-      break;
-
-    case 'bidstatus':
-      embed = new EmbedBuilder()
-        .setColor(0x4A90E2)
-        .setTitle('📊 Command: !bidstatus')
-        .setDescription('Show auction system status')
-        .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Bidding thread** or **Admin logs channel**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!bidstatus```'
-          },
-          {
-            name: '📊 Shows',
-            value: '• Queued items (waiting to auction)\n' +
-                   '• Active auction details\n' +
-                   '• Current high bid and winner\n' +
-                   '• Time remaining\n' +
-                   '• Total bids placed\n' +
-                   '• Dry run mode status (if admin)'
-          }
-        )
-        .setFooter({text: 'Type !help for full command list'});
-      break;
-
-    case 'mybids':
-      embed = new EmbedBuilder()
-        .setColor(0x4A90E2)
-        .setTitle('💳 Command: !mybids')
-        .setDescription('Show your bidding status')
-        .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Bidding thread only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!mybids```'
-          },
-          {
-            name: '📊 Shows',
-            value: '• Current auction item\n' +
-                   '• Your locked points (reserved in bids)\n' +
-                   '• Winning status (✅ if you\'re winning)\n' +
-                   '• Your current bid amount\n' +
-                   '• Time remaining'
-          },
-          {
-            name: '💡 Use When',
-            value: '• Want to check if you\'re still winning\n' +
-                   '• Need to know available points\n' +
-                   '• Verify your bid went through'
-          }
-        )
-        .setFooter({text: 'Type !help for full command list'});
-      break;
-
-    case 'dryrun':
-      if (!isAdmin) {
-        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
-        return;
-      }
-      embed = new EmbedBuilder()
-        .setColor(0xFF9900)
-        .setTitle('🧪 Command: !dryrun')
-        .setDescription('Toggle test mode for bidding system')
-        .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Admin logs channel only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!dryrun on\n!dryrun off```'
-          },
-          {
-            name: '🧪 Dry Run Mode (ON)',
-            value: '• Uses TestBiddingPoints sheet (fake data)\n' +
-                   '• No real points deducted\n' +
-                   '• Results saved to test sheet\n' +
-                   '• Perfect for testing with members'
-          },
-          {
-            name: '💰 Live Mode (OFF)',
-            value: '• Uses real BiddingPoints sheet\n' +
-                   '• Real points deducted from winners\n' +
-                   '• Results saved to live sheet\n' +
-                   '• Production mode'
+            value: '```\n!auction Dragon Sword 100 30\n!auction GRAY DAWN LOAFERS - BARON 150 45\n!auction Magic Shield 50 20\n```'
           },
           {
             name: '⚠️ Important',
-            value: '• Cannot toggle during active auction\n' +
-                   '• Always test with dry run first!\n' +
-                   '• Members can see dry run indicator'
+            value: '• Item name can have spaces\n• Last TWO arguments are ALWAYS price and duration\n• Use `!queuelist` to see queue\n• Use `!startauction` to begin'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
@@ -1322,21 +1048,11 @@ case 'auction':
         .setTitle('📋 Command: !queuelist')
         .setDescription('Show all queued auction items')
         .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Admin logs channel only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!queuelist```'
-          },
+          {name: '📍 Where to Use', value: '**Admin logs channel only**'},
+          {name: '📝 Syntax', value: '```!queuelist```'},
           {
             name: '📊 Shows',
-            value: '• All queued items\n' +
-                   '• Starting prices\n' +
-                   '• Auction durations\n' +
-                   '• Position in queue\n' +
-                   '• Total estimated time'
+            value: '• All queued items\n• Starting prices\n• Durations\n• Position in queue\n• Total estimated time'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
@@ -1352,23 +1068,297 @@ case 'auction':
         .setTitle('🗑️ Command: !removeitem')
         .setDescription('Remove item from auction queue')
         .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Admin logs channel only**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!removeitem <item name>```'
-          },
-          {
-            name: '💡 Example',
-            value: '```!removeitem Dragon Sword\n!removeitem GRAY DAWN LOAFERS - BARON```'
-          },
+          {name: '📍 Where to Use', value: '**Admin logs channel only**'},
+          {name: '📝 Syntax', value: '```!removeitem <item name>```'},
+          {name: '💡 Example', value: '```!removeitem Dragon Sword```'},
           {
             name: '⚠️ Notes',
-            value: '• Item name must match exactly (case-insensitive)\n' +
-                   '• Cannot remove during active auction\n' +
-                   '• Use `!queuelist` to see all items'
+            value: '• Item name must match (case-insensitive)\n• Cannot remove during active auction\n• Use `!queuelist` to see all items'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'startauction':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFFD700)
+        .setTitle('🚀 Command: !startauction')
+        .setDescription('Start auction session (all queued items)')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Admin logs channel only**'},
+          {name: '📝 Syntax', value: '```!startauction```'},
+          {
+            name: '✨ What It Does',
+            value: '1. Shows confirmation with queue\n2. Creates threads one-by-one\n3. 20s preview per item\n4. Bidding opens automatically\n5. "Going once, twice" announcements\n6. Auto-extends if bid in last minute\n7. Submits results to sheet when done'
+          },
+          {
+            name: '⏱️ Timeline',
+            value: '• 20s preview\n• Auction duration\n• 20s buffer between items\n• Auto-submit at end'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'dryrun':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF9900)
+        .setTitle('🧪 Command: !dryrun')
+        .setDescription('Toggle test mode for bidding')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Admin logs channel only**'},
+          {name: '📝 Syntax', value: '```!dryrun on\n!dryrun off```'},
+          {
+            name: '🧪 Dry Run (ON)',
+            value: '• Uses TestBiddingPoints sheet\n• No real points deducted\n• Results saved to test sheet\n• Perfect for testing'
+          },
+          {
+            name: '💰 Live (OFF)',
+            value: '• Uses BiddingPoints sheet\n• Real points deducted\n• Results saved to live sheet\n• Production mode'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'clearqueue':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF6600)
+        .setTitle('🗑️ Command: !clearqueue')
+        .setDescription('Clear all queued auction items')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Admin logs channel only**'},
+          {name: '📝 Syntax', value: '```!clearqueue```'},
+          {
+            name: '⚠️ Warning',
+            value: '• Removes ALL queued items\n• Cannot undo\n• Cannot use during active auction\n• Use `!cancelauction` to stop active auction'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'forcesync':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0x4A90E2)
+        .setTitle('🔄 Command: !forcesync')
+        .setDescription('Force sync bidding points from Google Sheets')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Admin logs channel only**'},
+          {name: '📝 Syntax', value: '```!forcesync```'},
+          {
+            name: '🎯 Use When',
+            value: '• Points seem out of sync\n• Manual sheet updates made\n• Verify point accuracy\n• Troubleshooting'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'setbidpoints':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF9900)
+        .setTitle('🔧 Command: !setbidpoints')
+        .setDescription('Set test points (dry run only)')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Admin logs channel only**'},
+          {name: '📝 Syntax', value: '```!setbidpoints @member <amount>```'},
+          {name: '💡 Example', value: '```!setbidpoints @Player1 500```'},
+          {
+            name: '⚠️ Important',
+            value: '• Only works in dry run mode\n• Changes are temporary\n• For testing purposes only\n• Use `!dryrun on` first'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'resetbids':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setTitle('🔧 Command: !resetbids')
+        .setDescription('Clear all bidding memory (nuclear option)')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Admin logs channel only**'},
+          {name: '📝 Syntax', value: '```!resetbids```'},
+          {
+            name: '⚠️ Warning',
+            value: '• Cancels active auction\n• Clears queue\n• Clears history\n• Returns all locked points\n• Requires confirmation'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    // ==========================================
+    // BIDDING COMMANDS (MEMBERS + ADMINS)
+    // ==========================================
+
+    case 'bid':
+      embed = new EmbedBuilder()
+        .setColor(0xFFD700)
+        .setTitle('💰 Command: !bid')
+        .setDescription('Place bid in active auction')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Bidding thread only**'},
+          {name: '📝 Syntax', value: '```!bid <amount>```'},
+          {name: '💡 Examples', value: '```!bid 150\n!bid 200\n!bid 500```'},
+          {
+            name: '✨ How It Works',
+            value: '1. Type `!bid <amount>`\n2. Bot shows confirmation ✅/❌\n3. Click ✅ (30s timeout)\n4. Points locked until outbid\n5. Points return if outbid'
+          },
+          {
+            name: '📊 Rules',
+            value: '• Must bid HIGHER than current\n• Cannot bid same amount\n• Must have enough points\n• Points locked across ALL auctions\n• Bid in last minute = +1 min extension'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'mybids':
+      embed = new EmbedBuilder()
+        .setColor(0x4A90E2)
+        .setTitle('💳 Command: !mybids')
+        .setDescription('Show your bidding status')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Bidding thread only**'},
+          {name: '📝 Syntax', value: '```!mybids```'},
+          {
+            name: '📊 Shows',
+            value: '• Current auction item\n• Locked points\n• Winning status (✅/⚪)\n• Current bid amount\n• Time remaining'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'bidstatus':
+      embed = new EmbedBuilder()
+        .setColor(0x4A90E2)
+        .setTitle('📊 Command: !bidstatus')
+        .setDescription('Show auction system status')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Bidding thread**'},
+          {name: '📝 Syntax', value: '```!bidstatus```'},
+          {
+            name: '📊 Shows',
+            value: '• Queued items\n• Active auction\n• Current bid & winner\n• Time remaining\n• Total bids\n• Mode (dry run/live)'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    // ==========================================
+    // BIDDING ADMIN COMMANDS (THREADS)
+    // ==========================================
+
+    case 'endauction':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF6600)
+        .setTitle('⏹️ Command: !endauction')
+        .setDescription('Force end current auction early')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Bidding thread only**'},
+          {name: '📝 Syntax', value: '```!endauction```'},
+          {
+            name: '✨ What It Does',
+            value: '1. Shows confirmation with status\n2. Ends auction immediately\n3. Declares current winner\n4. Moves to next item\n5. Results submitted at end'
+          },
+          {
+            name: '🎯 Use When',
+            value: '• Speed up auction\n• Clear winner, no more bids\n• Timer issues\n• Skip to next item'
+          },
+          {
+            name: '⚠️ vs !cancelauction',
+            value: '**!endauction** - Ends ONE, keeps winner\n**!cancelauction** - Cancels ALL, no winners'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'extendtime':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0x00FF00)
+        .setTitle('⏱️ Command: !extendtime')
+        .setDescription('Add time to current auction')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Bidding thread only**'},
+          {name: '📝 Syntax', value: '```!extendtime <minutes>```'},
+          {name: '💡 Examples', value: '```!extendtime 5\n!extendtime 10```'},
+          {
+            name: '🎯 Use When',
+            value: '• Members need more time\n• Technical issues\n• Want longer bidding\n• Competitive auction'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'forcewinner':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFFD700)
+        .setTitle('👑 Command: !forcewinner')
+        .setDescription('Manually assign winner')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Bidding thread only**'},
+          {name: '📝 Syntax', value: '```!forcewinner @member```'},
+          {name: '💡 Example', value: '```!forcewinner @Player1```'},
+          {
+            name: '⚠️ Important',
+            value: '• Assigns winner at CURRENT bid price\n• Unlocks previous winner\'s points\n• Locks new winner\'s points\n• Use for corrections/overrides'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'cancelbid':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF6600)
+        .setTitle('❌ Command: !cancelbid')
+        .setDescription('Remove someone\'s bid')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Bidding thread only**'},
+          {name: '📝 Syntax', value: '```!cancelbid @member```'},
+          {name: '💡 Example', value: '```!cancelbid @Player1```'},
+          {
+            name: '✨ What It Does',
+            value: '• Removes member\'s bid\n• Unlocks their points\n• Reverts to previous high bid\n• Or resets to starting price if no other bids'
+          },
+          {
+            name: '🎯 Use When',
+            value: '• Accidental bid\n• Member request\n• Rule violation\n• Override needed'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
@@ -1384,81 +1374,75 @@ case 'auction':
         .setTitle('❌ Command: !cancelauction')
         .setDescription('Cancel all active auctions')
         .addFields(
-          {
-            name: '📍 Where to Use',
-            value: '**Admin logs channel** or **Bidding thread**'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!cancelauction```'
-          },
+          {name: '📍 Where to Use', value: '**Admin logs or Bidding thread**'},
+          {name: '📝 Syntax', value: '```!cancelauction```'},
           {
             name: '⚠️ What It Does',
-            value: '• Cancels current auction\n' +
-                   '• Clears all queued items\n' +
-                   '• Returns ALL locked points to members\n' +
-                   '• Does NOT submit results to Google Sheets\n' +
-                   '• Archives all auction threads'
+            value: '• Cancels current auction\n• Clears ALL queued items\n• Returns ALL locked points\n• Does NOT submit results\n• Archives all threads'
           },
           {
             name: '🎯 Use When',
-            value: '• Emergency stop needed\n' +
-                   '• Bot malfunction\n' +
-                   '• Need to restart auction system\n' +
-                   '• Testing went wrong'
+            value: '• Emergency stop\n• Bot malfunction\n• Restart system\n• Testing went wrong'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
       break;
 
-    case 'endauction':
+    case 'debugauction':
       if (!isAdmin) {
         await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
         return;
       }
       embed = new EmbedBuilder()
-        .setColor(0xFF6600)
-        .setTitle('⏹️ Command: !endauction')
-        .setDescription('Force end current auction early')
+        .setColor(0x4A90E2)
+        .setTitle('🔍 Command: !debugauction')
+        .setDescription('Show detailed auction debug info')
         .addFields(
+          {name: '📍 Where to Use', value: '**Bidding thread only**'},
+          {name: '📝 Syntax', value: '```!debugauction```'},
           {
-            name: '📍 Where to Use',
-            value: '**Bidding thread only** (active auction)'
-          },
-          {
-            name: '📝 Syntax',
-            value: '```!endauction```'
-          },
-          {
-            name: '✨ What It Does',
-            value: '1. Shows confirmation with current auction status\n' +
-                   '2. Ends auction immediately (ignores timer)\n' +
-                   '3. Declares current high bidder as winner\n' +
-                   '4. Moves to next item in queue automatically\n' +
-                   '5. Results submitted at end of session'
-          },
-          {
-            name: '🎯 Use When',
-            value: '• Need to speed up auction\n' +
-                   '• Clear winner, no more bids expected\n' +
-                   '• Technical issues with timer\n' +
-                   '• Want to skip to next item'
-          },
-          {
-            name: '⚠️ vs !cancelauction',
-            value: '**!endauction** - Ends ONE auction, keeps winner, continues session\n' +
-                   '**!cancelauction** - Cancels EVERYTHING, no winners, clears all'
-          },
-          {
-            name: '💡 Note',
-            value: '• Requires confirmation (✅/❌)\n' +
-                   '• Cannot be undone\n' +
-                   '• Winner gets the item at current bid price\n' +
-                   '• 20-second buffer before next item starts'
+            name: '📊 Shows',
+            value: '• Item details\n• Current bid & winner\n• Status (preview/active/ended)\n• Total bids placed\n• Extension count\n• Time remaining\n• Recent bid history\n• Locked points (top 5)\n• Mode (dry run/live)\n• Auction ID'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
       break;
+
+    // ==========================================
+    // MEMBER COMMANDS
+    // ==========================================
+
+    case 'present':
+    case 'here':
+    case 'checkin':
+    case 'check-in':
+    case 'join':
+      embed = new EmbedBuilder()
+        .setColor(0xFFD700)
+        .setTitle('📸 Command: Check-In')
+        .setDescription('Check in for current boss spawn')
+        .addFields(
+          {name: '📍 Where to Use', value: '**Spawn thread only**'},
+          {name: '📝 Syntax', value: '```present```\nor: `here`, `join`, `checkin`'},
+          {
+            name: '📋 Requirements',
+            value: '• Must attach screenshot showing:\n  ├─ Boss name\n  └─ Timestamp\n• Admins exempt from screenshot'
+          },
+          {
+            name: '✨ What Happens',
+            value: '1. Bot adds ✅ and ❌ reactions\n2. Check-in appears in confirmation thread\n3. Admin verifies (✅) or denies (❌)\n4. You get confirmation message'
+          },
+          {
+            name: '⚠️ Rules',
+            value: '• Only one check-in per spawn\n• Screenshot required (non-admins)\n• Wait for admin verification\n• Cannot check in if spawn closed'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    // ==========================================
+    // DEFAULT (UNKNOWN COMMAND)
+    // ==========================================
 
     default:
       await message.reply(
