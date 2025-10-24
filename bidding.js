@@ -59,7 +59,19 @@ const STATE_FILE = './bidding-state.json';
  */
 function saveBiddingState() {
   try {
-    fs.writeFileSync(STATE_FILE, JSON.stringify(biddingState, null, 2));
+    // Create a copy without timer handles (they can't be serialized)
+    const stateToSave = {
+      auctionQueue: biddingState.auctionQueue,
+      activeAuction: biddingState.activeAuction,
+      lockedPoints: biddingState.lockedPoints,
+      auctionHistory: biddingState.auctionHistory,
+      isDryRun: biddingState.isDryRun,
+      pendingConfirmations: biddingState.pendingConfirmations,
+      sessionDate: biddingState.sessionDate
+      // NOTE: timerHandles are NOT saved - they will be rescheduled on recovery
+    };
+    
+    fs.writeFileSync(STATE_FILE, JSON.stringify(stateToSave, null, 2));
     console.log('💾 Bidding state saved');
   } catch (err) {
     console.error('❌ Failed to save bidding state:', err);
@@ -1784,7 +1796,7 @@ async function handleForceSyncCommand(message, config) {
 }
 
 /**
- * !endauction - Force end current auction (in thread)
+ * !endauction - Force end current auction (in thread) with confirmation
  */
 async function handleEndAuctionCommand(message, client, config) {
   const auction = biddingState.activeAuction;
@@ -1797,10 +1809,56 @@ async function handleEndAuctionCommand(message, client, config) {
     return await message.reply('❌ This command must be used in the active auction thread');
   }
   
-  await message.reply('⚠️ Force ending auction...');
+  // Show confirmation
+  const confirmEmbed = new EmbedBuilder()
+    .setColor(0xFF6600)
+    .setTitle('⚠️ Force End Auction?')
+    .setDescription(
+      `**Item:** ${auction.item}\n` +
+      `**Current Bid:** ${auction.currentBid} points\n` +
+      `**Current Winner:** ${auction.currentWinner || 'No bids yet'}\n` +
+      `**Time Left:** ${auction.status === 'active' ? formatTimeRemaining(auction.endTime - Date.now()) : auction.status}\n\n` +
+      `This will:\n` +
+      `• End the auction immediately\n` +
+      `• Declare current high bidder as winner\n` +
+      `• Move to next item in queue (if any)\n` +
+      `• Submit results at end of session`
+    )
+    .setFooter({text: 'React ✅ to confirm or ❌ to cancel'});
   
-  clearAllTimers();
-  await endAuction(client, config);
+  const confirmMsg = await message.reply({embeds: [confirmEmbed]});
+  await confirmMsg.react('✅');
+  await confirmMsg.react('❌');
   
-  console.log(`🔧 Auction force-ended by ${message.author.username}`);
+  const filter = (reaction, user) => {
+    return ['✅', '❌'].includes(reaction.emoji.name) && user.id === message.author.id;
+  };
+  
+  try {
+    const collected = await confirmMsg.awaitReactions({ filter, max: 1, time: 30000, errors: ['time'] });
+    const reaction = collected.first();
+    
+    if (reaction.emoji.name === '✅') {
+      await confirmMsg.reactions.removeAll().catch(() => {});
+      await message.channel.send('⚠️ **Force ending auction...**');
+      
+      clearAllTimers();
+      await endAuction(client, config);
+      
+      console.log(`🔧 Auction force-ended by ${message.author.username}`);
+    } else {
+      await confirmMsg.reactions.removeAll().catch(() => {});
+      await confirmMsg.edit({
+        embeds: [confirmEmbed.setColor(0x808080).setFooter({text: '❌ Force end canceled'})]
+      });
+    }
+  } catch (err) {
+    await confirmMsg.reactions.removeAll().catch(() => {});
+    await confirmMsg.edit({
+      embeds: [confirmEmbed.setColor(0x808080).setFooter({text: '⏱️ Confirmation timed out'})]
+    });
+  }
 }
+
+/**
+ */

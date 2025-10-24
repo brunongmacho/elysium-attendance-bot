@@ -665,12 +665,22 @@ async function showHelp(message, member, specificCommand = null) {
       },
       // ✅ ADD THIS FIELD
       {
-        name: '🏆 Bidding System (Bidding Channel)',
+        name: '🏆 Bidding System (Admin Logs)',
         value: '`!auction` - Add item to auction queue\n' +
                '`!startauction` - Start auction session\n' +
-               '`!bidstatus` - Show bidding system status\n' +
+               '`!queuelist` - Show all queued items\n' +
+               '`!removeitem` - Remove item from queue\n' +
                '`!dryrun on/off` - Toggle test mode\n' +
-               '`!cancelauction` - Cancel all auctions'
+               '`!cancelauction` - Cancel all auctions\n' +
+               '`!forcesync` - Sync points from sheet\n' +
+               '`!resetbids` - Clear all bidding memory\n' +
+               '`!help auction` for detailed docs'
+      },
+      {
+        name: '💰 Bidding (Members - In Threads)',
+        value: '`!bid <amount>` - Place bid in auction\n' +
+               '`!mybids` - Show your bidding status\n' +
+               '`!bidstatus` - Show auction system status'
       },
       {
         name: '🔒 Spawn Actions (Use in Spawn Thread)',
@@ -1073,6 +1083,378 @@ case 'verifyall':
                    '2. Your check-in appears in confirmation thread\n' +
                    '3. Admin verifies (✅) or denies (❌)\n' +
                    '4. You get confirmation message'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+case 'auction':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFFD700)
+        .setTitle('🏆 Command: !auction')
+        .setDescription('Add item to auction queue')
+        .addFields(
+          {
+            name: '📍 Where to Use',
+            value: '**Admin logs channel only**'
+          },
+          {
+            name: '📝 Syntax',
+            value: '```!auction <item name> <starting price> <duration in minutes>```'
+          },
+          {
+            name: '💡 Examples',
+            value: '```\n' +
+                   '!auction Dragon Sword 100 30\n' +
+                   '!auction GRAY DAWN LOAFERS - BARON 150 45\n' +
+                   '!auction Magic Shield 50 20\n' +
+                   '```'
+          },
+          {
+            name: '✨ What It Does',
+            value: '1. Adds item to auction queue\n' +
+                   '2. Shows position in queue\n' +
+                   '3. Wait for `!startauction` to begin\n' +
+                   '4. Items are auctioned one-by-one'
+          },
+          {
+            name: '⚠️ Notes',
+            value: '• Item name can have spaces\n' +
+                   '• Last two arguments are ALWAYS price and duration\n' +
+                   '• Use `!queuelist` to see all queued items'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'startauction':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFFD700)
+        .setTitle('🚀 Command: !startauction')
+        .setDescription('Start auction session (all queued items)')
+        .addFields(
+          {
+            name: '📍 Where to Use',
+            value: '**Admin logs channel only**'
+          },
+          {
+            name: '📝 Syntax',
+            value: '```!startauction```'
+          },
+          {
+            name: '✨ What It Does',
+            value: '1. Shows confirmation with all queued items\n' +
+                   '2. Creates threads for each item (one-by-one)\n' +
+                   '3. 20-second preview before bidding starts\n' +
+                   '4. Automatic "going once, going twice" announcements\n' +
+                   '5. Auto-extends by 1 min if bid placed in last minute'
+          },
+          {
+            name: '⏱️ Timeline',
+            value: '• 20s preview per item\n' +
+                   '• Auction duration per item\n' +
+                   '• 20s buffer between items\n' +
+                   '• Auto-submit results to Google Sheets when done'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'bid':
+      embed = new EmbedBuilder()
+        .setColor(0xFFD700)
+        .setTitle('💰 Command: !bid')
+        .setDescription('Place bid in active auction')
+        .addFields(
+          {
+            name: '📍 Where to Use',
+            value: '**Bidding thread only** (during active auction)'
+          },
+          {
+            name: '📝 Syntax',
+            value: '```!bid <amount>```'
+          },
+          {
+            name: '💡 Examples',
+            value: '```\n!bid 150\n!bid 200\n!bid 500\n```'
+          },
+          {
+            name: '✨ How It Works',
+            value: '1. Type `!bid <amount>` in auction thread\n' +
+                   '2. Bot shows confirmation with ✅/❌\n' +
+                   '3. Click ✅ to confirm bid (30 second timeout)\n' +
+                   '4. Your points are locked until outbid\n' +
+                   '5. If outbid, points return automatically'
+          },
+          {
+            name: '📊 Rules',
+            value: '• Must bid HIGHER than current bid\n' +
+                   '• Cannot bid same amount as current\n' +
+                   '• Must have enough available points\n' +
+                   '• Points locked across ALL active auctions\n' +
+                   '• Bid in last minute extends timer by 1 min'
+          },
+          {
+            name: '🎯 Tips',
+            value: '• Use `!mybids` to see your locked points\n' +
+                   '• Use `!bidstatus` to see current auction info'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'bidstatus':
+      embed = new EmbedBuilder()
+        .setColor(0x4A90E2)
+        .setTitle('📊 Command: !bidstatus')
+        .setDescription('Show auction system status')
+        .addFields(
+          {
+            name: '📍 Where to Use',
+            value: '**Bidding thread** or **Admin logs channel**'
+          },
+          {
+            name: '📝 Syntax',
+            value: '```!bidstatus```'
+          },
+          {
+            name: '📊 Shows',
+            value: '• Queued items (waiting to auction)\n' +
+                   '• Active auction details\n' +
+                   '• Current high bid and winner\n' +
+                   '• Time remaining\n' +
+                   '• Total bids placed\n' +
+                   '• Dry run mode status (if admin)'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'mybids':
+      embed = new EmbedBuilder()
+        .setColor(0x4A90E2)
+        .setTitle('💳 Command: !mybids')
+        .setDescription('Show your bidding status')
+        .addFields(
+          {
+            name: '📍 Where to Use',
+            value: '**Bidding thread only**'
+          },
+          {
+            name: '📝 Syntax',
+            value: '```!mybids```'
+          },
+          {
+            name: '📊 Shows',
+            value: '• Current auction item\n' +
+                   '• Your locked points (reserved in bids)\n' +
+                   '• Winning status (✅ if you\'re winning)\n' +
+                   '• Your current bid amount\n' +
+                   '• Time remaining'
+          },
+          {
+            name: '💡 Use When',
+            value: '• Want to check if you\'re still winning\n' +
+                   '• Need to know available points\n' +
+                   '• Verify your bid went through'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'dryrun':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF9900)
+        .setTitle('🧪 Command: !dryrun')
+        .setDescription('Toggle test mode for bidding system')
+        .addFields(
+          {
+            name: '📍 Where to Use',
+            value: '**Admin logs channel only**'
+          },
+          {
+            name: '📝 Syntax',
+            value: '```!dryrun on\n!dryrun off```'
+          },
+          {
+            name: '🧪 Dry Run Mode (ON)',
+            value: '• Uses TestBiddingPoints sheet (fake data)\n' +
+                   '• No real points deducted\n' +
+                   '• Results saved to test sheet\n' +
+                   '• Perfect for testing with members'
+          },
+          {
+            name: '💰 Live Mode (OFF)',
+            value: '• Uses real BiddingPoints sheet\n' +
+                   '• Real points deducted from winners\n' +
+                   '• Results saved to live sheet\n' +
+                   '• Production mode'
+          },
+          {
+            name: '⚠️ Important',
+            value: '• Cannot toggle during active auction\n' +
+                   '• Always test with dry run first!\n' +
+                   '• Members can see dry run indicator'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'queuelist':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0x4A90E2)
+        .setTitle('📋 Command: !queuelist')
+        .setDescription('Show all queued auction items')
+        .addFields(
+          {
+            name: '📍 Where to Use',
+            value: '**Admin logs channel only**'
+          },
+          {
+            name: '📝 Syntax',
+            value: '```!queuelist```'
+          },
+          {
+            name: '📊 Shows',
+            value: '• All queued items\n' +
+                   '• Starting prices\n' +
+                   '• Auction durations\n' +
+                   '• Position in queue\n' +
+                   '• Total estimated time'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'removeitem':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF6600)
+        .setTitle('🗑️ Command: !removeitem')
+        .setDescription('Remove item from auction queue')
+        .addFields(
+          {
+            name: '📍 Where to Use',
+            value: '**Admin logs channel only**'
+          },
+          {
+            name: '📝 Syntax',
+            value: '```!removeitem <item name>```'
+          },
+          {
+            name: '💡 Example',
+            value: '```!removeitem Dragon Sword\n!removeitem GRAY DAWN LOAFERS - BARON```'
+          },
+          {
+            name: '⚠️ Notes',
+            value: '• Item name must match exactly (case-insensitive)\n' +
+                   '• Cannot remove during active auction\n' +
+                   '• Use `!queuelist` to see all items'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'cancelauction':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setTitle('❌ Command: !cancelauction')
+        .setDescription('Cancel all active auctions')
+        .addFields(
+          {
+            name: '📍 Where to Use',
+            value: '**Admin logs channel** or **Bidding thread**'
+          },
+          {
+            name: '📝 Syntax',
+            value: '```!cancelauction```'
+          },
+          {
+            name: '⚠️ What It Does',
+            value: '• Cancels current auction\n' +
+                   '• Clears all queued items\n' +
+                   '• Returns ALL locked points to members\n' +
+                   '• Does NOT submit results to Google Sheets\n' +
+                   '• Archives all auction threads'
+          },
+          {
+            name: '🎯 Use When',
+            value: '• Emergency stop needed\n' +
+                   '• Bot malfunction\n' +
+                   '• Need to restart auction system\n' +
+                   '• Testing went wrong'
+          }
+        )
+        .setFooter({text: 'Type !help for full command list'});
+      break;
+
+    case 'endauction':
+      if (!isAdmin) {
+        await message.reply('⚠️ This command is admin-only. Type `!help` for member commands.');
+        return;
+      }
+      embed = new EmbedBuilder()
+        .setColor(0xFF6600)
+        .setTitle('⏹️ Command: !endauction')
+        .setDescription('Force end current auction early')
+        .addFields(
+          {
+            name: '📍 Where to Use',
+            value: '**Bidding thread only** (active auction)'
+          },
+          {
+            name: '📝 Syntax',
+            value: '```!endauction```'
+          },
+          {
+            name: '✨ What It Does',
+            value: '1. Shows confirmation with current auction status\n' +
+                   '2. Ends auction immediately (ignores timer)\n' +
+                   '3. Declares current high bidder as winner\n' +
+                   '4. Moves to next item in queue automatically\n' +
+                   '5. Results submitted at end of session'
+          },
+          {
+            name: '🎯 Use When',
+            value: '• Need to speed up auction\n' +
+                   '• Clear winner, no more bids expected\n' +
+                   '• Technical issues with timer\n' +
+                   '• Want to skip to next item'
+          },
+          {
+            name: '⚠️ vs !cancelauction',
+            value: '**!endauction** - Ends ONE auction, keeps winner, continues session\n' +
+                   '**!cancelauction** - Cancels EVERYTHING, no winners, clears all'
+          },
+          {
+            name: '💡 Note',
+            value: '• Requires confirmation (✅/❌)\n' +
+                   '• Cannot be undone\n' +
+                   '• Winner gets the item at current bid price\n' +
+                   '• 20-second buffer before next item starts'
           }
         )
         .setFooter({text: 'Type !help for full command list'});
