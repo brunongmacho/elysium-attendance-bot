@@ -2967,7 +2967,7 @@ if (pending) {
 });
 
 /**
- * ADD THIS TO YOUR index.js - DIAGNOSTIC COMMAND
+ * ADD THIS TO YOUR index.js - DIAGNOSTIC COMMAND (FIXED)
  * Place this in the admin logs command section (around line 1400)
  */
 
@@ -2977,9 +2977,9 @@ if (message.content.toLowerCase() === '!testbidding') {
     message.reply('⚠️ Admin only command').catch(console.error);
     return;
   }
-  
-message.reply('🔍 **Testing Bidding System...**\n\nPlease wait...').catch(console.error);
-  
+
+  message.reply('🔍 **Testing Bidding System...**\n\nPlease wait...').catch(console.error);
+
   // Test 1: Config check
   const configCheck = {
     hasWebhook: !!config.sheet_webhook_url,
@@ -2987,7 +2987,7 @@ message.reply('🔍 **Testing Bidding System...**\n\nPlease wait...').catch(cons
     hasBiddingChannel: !!config.bidding_channel_id,
     biddingChannel: config.bidding_channel_id || 'MISSING'
   };
-  
+
   // Test 2: Try fetching points
   let pointsTest = {
     success: false,
@@ -2995,132 +2995,140 @@ message.reply('🔍 **Testing Bidding System...**\n\nPlease wait...').catch(cons
     error: null,
     sampleMembers: []
   };
-  
-  try {
-    console.log('🔗 Attempting to fetch bidding points...');
-    const biddingModule = require('./bidding.js');
-    const biddingState = biddingModule.getBiddingState();
-    
-    const response = await fetch(config.sheet_webhook_url, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        action: 'getBiddingPoints',
-        dryRun: biddingState.isDryRun
-      })
-    });
-    
-    console.log(`📊 Sheet response: ${response.status}`);
-    
-    if (response.ok) {
-      const text = await response.text();
-      const data = JSON.parse(text);
-      
-      if (data.points) {
-        pointsTest.success = true;
-        pointsTest.memberCount = Object.keys(data.points).length;
-        pointsTest.sampleMembers = Object.entries(data.points)
-          .slice(0, 5)
-          .map(([member, points]) => `${member}: ${points}pts`);
-      }
-    } else {
-      pointsTest.error = `HTTP ${response.status}: ${await response.text()}`;
-    }
-  } catch (err) {
-    pointsTest.error = err.message;
-  }
-  
-  // Test 3: Bidding state
+
   const biddingModule = require('./bidding.js');
   const biddingState = biddingModule.getBiddingState();
-  const stateInfo = {
-    isDryRun: biddingState.isDryRun,
-    queueLength: biddingState.auctionQueue.length,
-    hasActiveAuction: !!biddingState.activeAuction,
-    activeAuctionItem: biddingState.activeAuction ? biddingState.activeAuction.item : 'None',
-    lockedPointsCount: Object.keys(biddingState.lockedPoints).length
-  };
-  
-  // Test 4: Channel access
-  let channelTest = {
-    canAccessChannel: false,
-    channelName: 'Unknown',
-    isThread: false
-  };
-  
-  try {
-    const biddingChannel = await client.channels.fetch(config.bidding_channel_id);
-    if (biddingChannel) {
-      channelTest.canAccessChannel = true;
-      channelTest.channelName = biddingChannel.name;
-      channelTest.isThread = biddingChannel.isThread();
-    }
-  } catch (err) {
-    channelTest.error = err.message;
-  }
-  
-  // Build diagnostic report
-  const { EmbedBuilder } = require('discord.js');
-  const embed = new EmbedBuilder()
-    .setColor(pointsTest.success ? 0x00FF00 : 0xFF0000)
-    .setTitle('🔍 Bidding System Diagnostics')
-    .setDescription('Complete system health check')
-    .addFields(
-      {
-        name: '⚙️ Configuration',
-        value: `✅ Webhook URL: ${configCheck.hasWebhook ? 'Configured' : '❌ MISSING'}\n` +
-               `✅ Bidding Channel: ${configCheck.hasBiddingChannel ? 'Configured' : '❌ MISSING'}\n` +
-               `📍 Webhook: \`${configCheck.webhookUrl}\`\n` +
-               `📍 Channel ID: \`${configCheck.biddingChannel}\``
-      },
-      {
-        name: '📊 Google Sheets Connection',
-        value: pointsTest.success 
-          ? `✅ **Connected Successfully**\n` +
-            `👥 Members: ${pointsTest.memberCount}\n` +
-            `📋 Sample:\n${pointsTest.sampleMembers.join('\n')}`
-          : `❌ **Connection Failed**\n` +
-            `Error: ${pointsTest.error || 'Unknown error'}\n\n` +
-            `**Troubleshooting:**\n` +
-            `1. Check webhook URL in config.json\n` +
-            `2. Verify Apps Script is deployed\n` +
-            `3. Check BiddingPoints sheet exists\n` +
-            `4. Verify sheet has data`
-      },
-      {
-        name: '🎯 Bidding State',
-        value: `🧪 Dry Run: ${stateInfo.isDryRun ? '✅ Enabled' : '⚪ Disabled'}\n` +
-               `📋 Queue: ${stateInfo.queueLength} item(s)\n` +
-               `🔴 Active Auction: ${stateInfo.hasActiveAuction ? `✅ ${stateInfo.activeAuctionItem}` : '⚪ None'}\n` +
-               `🔒 Locked Points: ${stateInfo.lockedPointsCount} member(s)`
-      },
-      {
-        name: '📺 Channel Access',
-        value: channelTest.canAccessChannel
-          ? `✅ **Can access channel**\n` +
-            `📌 Name: ${channelTest.channelName}\n` +
-            `📍 Type: ${channelTest.isThread ? 'Thread' : 'Channel'}`
-          : `❌ **Cannot access channel**\n` +
-            `Error: ${channelTest.error || 'Unknown error'}`
+
+  console.log('🔗 Attempting to fetch bidding points...');
+
+  fetch(config.sheet_webhook_url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'getBiddingPoints',
+      dryRun: biddingState.isDryRun
+    })
+  })
+    .then(async (response) => {
+      console.log(`📊 Sheet response: ${response.status}`);
+      if (response.ok) {
+        const text = await response.text();
+        const data = JSON.parse(text);
+        if (data.points) {
+          pointsTest.success = true;
+          pointsTest.memberCount = Object.keys(data.points).length;
+          pointsTest.sampleMembers = Object.entries(data.points)
+            .slice(0, 5)
+            .map(([member, points]) => `${member}: ${points}pts`);
+        }
+      } else {
+        pointsTest.error = `HTTP ${response.status}: ${await response.text()}`;
       }
-    )
-    .setFooter({text: 'If any tests failed, check the troubleshooting steps above'})
-    .setTimestamp();
-  
-  await message.reply({embeds: [embed]});
-  
-  // Log full details to console
-  console.log('═══════════════════════════════════════');
-  console.log('🔍 BIDDING SYSTEM DIAGNOSTICS');
-  console.log('═══════════════════════════════════════');
-  console.log('Config:', JSON.stringify(configCheck, null, 2));
-  console.log('Points Test:', JSON.stringify(pointsTest, null, 2));
-  console.log('State:', JSON.stringify(stateInfo, null, 2));
-  console.log('Channel:', JSON.stringify(channelTest, null, 2));
-  console.log('═══════════════════════════════════════');
-  
+    })
+    .catch((err) => {
+      pointsTest.error = err.message;
+    })
+    .finally(() => {
+      // Test 3: Bidding state
+      const stateInfo = {
+        isDryRun: biddingState.isDryRun,
+        queueLength: biddingState.auctionQueue.length,
+        hasActiveAuction: !!biddingState.activeAuction,
+        activeAuctionItem: biddingState.activeAuction ? biddingState.activeAuction.item : 'None',
+        lockedPointsCount: Object.keys(biddingState.lockedPoints).length
+      };
+
+      // Test 4: Channel access
+      let channelTest = {
+        canAccessChannel: false,
+        channelName: 'Unknown',
+        isThread: false
+      };
+
+      client.channels
+        .fetch(config.bidding_channel_id)
+        .then((biddingChannel) => {
+          if (biddingChannel) {
+            channelTest.canAccessChannel = true;
+            channelTest.channelName = biddingChannel.name;
+            channelTest.isThread = biddingChannel.isThread();
+          }
+        })
+        .catch((err) => {
+          channelTest.error = err.message;
+        })
+        .finally(() => {
+          // Build diagnostic report
+          const { EmbedBuilder } = require('discord.js');
+          const embed = new EmbedBuilder()
+            .setColor(pointsTest.success ? 0x00ff00 : 0xff0000)
+            .setTitle('🔍 Bidding System Diagnostics')
+            .setDescription('Complete system health check')
+            .addFields(
+              {
+                name: '⚙️ Configuration',
+                value:
+                  `✅ Webhook URL: ${configCheck.hasWebhook ? 'Configured' : '❌ MISSING'}\n` +
+                  `✅ Bidding Channel: ${configCheck.hasBiddingChannel ? 'Configured' : '❌ MISSING'}\n` +
+                  `📍 Webhook: \`${configCheck.webhookUrl}\`\n` +
+                  `📍 Channel ID: \`${configCheck.biddingChannel}\``
+              },
+              {
+                name: '📊 Google Sheets Connection',
+                value: pointsTest.success
+                  ? `✅ **Connected Successfully**\n` +
+                    `👥 Members: ${pointsTest.memberCount}\n` +
+                    `📋 Sample:\n${pointsTest.sampleMembers.join('\n')}`
+                  : `❌ **Connection Failed**\n` +
+                    `Error: ${pointsTest.error || 'Unknown error'}\n\n` +
+                    `**Troubleshooting:**\n` +
+                    `1. Check webhook URL in config.json\n` +
+                    `2. Verify Apps Script is deployed\n` +
+                    `3. Check BiddingPoints sheet exists\n` +
+                    `4. Verify sheet has data`
+              },
+              {
+                name: '🎯 Bidding State',
+                value:
+                  `🧪 Dry Run: ${stateInfo.isDryRun ? '✅ Enabled' : '⚪ Disabled'}\n` +
+                  `📋 Queue: ${stateInfo.queueLength} item(s)\n` +
+                  `🔴 Active Auction: ${
+                    stateInfo.hasActiveAuction ? `✅ ${stateInfo.activeAuctionItem}` : '⚪ None'
+                  }\n` +
+                  `🔒 Locked Points: ${stateInfo.lockedPointsCount} member(s)`
+              },
+              {
+                name: '📺 Channel Access',
+                value: channelTest.canAccessChannel
+                  ? `✅ **Can access channel**\n` +
+                    `📌 Name: ${channelTest.channelName}\n` +
+                    `📍 Type: ${channelTest.isThread ? 'Thread' : 'Channel'}`
+                  : `❌ **Cannot access channel**\n` +
+                    `Error: ${channelTest.error || 'Unknown error'}`
+              }
+            )
+            .setFooter({
+              text: 'If any tests failed, check the troubleshooting steps above'
+            })
+            .setTimestamp();
+
+          message.reply({ embeds: [embed] }).catch(console.error);
+
+          // Log full details to console
+          console.log('═══════════════════════════════════════');
+          console.log('🔍 BIDDING SYSTEM DIAGNOSTICS');
+          console.log('═══════════════════════════════════════');
+          console.log('Config:', JSON.stringify(configCheck, null, 2));
+          console.log('Points Test:', JSON.stringify(pointsTest, null, 2));
+          console.log('State:', JSON.stringify(stateInfo, null, 2));
+          console.log('Channel:', JSON.stringify(channelTest, null, 2));
+          console.log('═══════════════════════════════════════');
+        });
+    });
+
   return;
 }
+
 
 // ==========================================
 // ERROR HANDLING
