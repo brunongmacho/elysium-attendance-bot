@@ -2609,68 +2609,87 @@ lastOverrideTime = now;
 
       return;
     }
-    // ========== BIDDING COMMANDS (CORRECTED ROUTING) ==========
+    // ========== BIDDING COMMANDS (FIXED ROUTING) ==========
     
-    // Check if in bidding thread (for member + admin thread commands)
-    const inBiddingThread = message.channel.isThread() && 
-                           message.channel.parentId === config.bidding_channel_id;
+    // Check if in bidding channel (parent channel or its threads)
+    const inBiddingChannel = message.channel.id === config.bidding_channel_id || 
+                            (message.channel.isThread() && message.channel.parentId === config.bidding_channel_id);
     
-    if (inBiddingThread) {
+    if (inBiddingChannel) {
       const content = message.content.trim();
       const args = content.split(/\s+/).slice(1);
       const command = content.split(/\s+/)[0].toLowerCase();
       
-      // MEMBER COMMANDS (inside bidding threads)
+      console.log(`🎯 Bidding command detected: ${command} in channel ${message.channel.id}`);
+      
+      // MEMBER COMMANDS (work in bidding threads)
       if (command === '!bid') {
+        console.log(`💰 Processing !bid command with args: ${args.join(' ')}`);
         await bidding.handleBidCommand(message, args, config);
         return;
       }
       
       if (command === '!bidstatus') {
-        await bidding.handleBidStatusCommand(message, isAdmin(member));
+        console.log(`📊 Processing !bidstatus command`);
+        await bidding.handleBidStatusCommand(message, userIsAdmin);
         return;
       }
       
       if (command === '!mybids') {
+        console.log(`💳 Processing !mybids command`);
         await bidding.handleMyBidsCommand(message);
         return;
       }
       
-      // ADMIN COMMANDS (inside bidding threads)
+      // ADMIN COMMANDS (work in bidding threads)
       if (userIsAdmin) {
         if (command === '!endauction') {
+          console.log(`⏹️ Processing !endauction command`);
           await bidding.handleEndAuctionCommand(message, client, config);
           return;
         }
         
         if (command === '!extendtime') {
+          console.log(`⏱️ Processing !extendtime command`);
           await bidding.handleExtendTimeCommand(message, args, client, config);
           return;
         }
         
         if (command === '!forcewinner') {
+          console.log(`👑 Processing !forcewinner command`);
           await bidding.handleForceWinnerCommand(message, args);
           return;
         }
         
         if (command === '!cancelbid') {
+          console.log(`❌ Processing !cancelbid command`);
           await bidding.handleCancelBidCommand(message, args);
           return;
         }
         
         if (command === '!debugauction') {
+          console.log(`🔍 Processing !debugauction command`);
           await bidding.handleDebugAuctionCommand(message);
           return;
         }
         
         if (command === '!cancelauction') {
+          console.log(`🚫 Processing !cancelauction command`);
           await bidding.handleCancelAuctionCommand(message, client, config);
           return;
         }
       }
       
-      // Don't process any other commands in bidding threads
-      return;
+      // If we got here and it's a bidding command, it means the command wasn't recognized
+      if (command.startsWith('!')) {
+        console.log(`⚠️ Unknown bidding command: ${command}`);
+      }
+      
+      // Don't return here - let other handlers process non-command messages
+      // Only return if we actually handled a command
+      if (['!bid', '!bidstatus', '!mybids', '!endauction', '!extendtime', '!forcewinner', '!cancelbid', '!debugauction', '!cancelauction'].includes(command)) {
+        return;
+      }
     }
     
     // Check if in admin logs (for admin-only bidding setup commands)
@@ -2684,46 +2703,55 @@ lastOverrideTime = now;
       
       // ADMIN SETUP COMMANDS (in admin logs channel)
       if (command === '!auction') {
+        console.log(`🏆 Processing !auction command`);
         await bidding.handleAuctionCommand(message, args, config);
         return;
       }
       
       if (command === '!queuelist') {
+        console.log(`📋 Processing !queuelist command`);
         await bidding.handleQueueListCommand(message);
         return;
       }
       
       if (command === '!removeitem') {
+        console.log(`🗑️ Processing !removeitem command`);
         await bidding.handleRemoveItemCommand(message, args);
         return;
       }
       
       if (command === '!startauction') {
+        console.log(`🚀 Processing !startauction command`);
         await bidding.handleStartAuctionCommand(message, client, config);
         return;
       }
       
       if (command === '!dryrun') {
+        console.log(`🧪 Processing !dryrun command`);
         await bidding.handleDryRunCommand(message, args);
         return;
       }
       
       if (command === '!clearqueue') {
+        console.log(`🗑️ Processing !clearqueue command`);
         await bidding.handleClearQueueCommand(message);
         return;
       }
       
       if (command === '!forcesync') {
+        console.log(`🔄 Processing !forcesync command`);
         await bidding.handleForceSyncCommand(message, config);
         return;
       }
       
       if (command === '!setbidpoints') {
+        console.log(`🔧 Processing !setbidpoints command`);
         await bidding.handleSetBidPointsCommand(message, args);
         return;
       }
       
       if (command === '!resetbids') {
+        console.log(`🔧 Processing !resetbids command`);
         await bidding.handleResetBidsCommand(message);
         return;
       }
@@ -2937,6 +2965,162 @@ if (pending) {
       console.error('❌ Reaction handler error:', err);
     }
 });
+
+/**
+ * ADD THIS TO YOUR index.js - DIAGNOSTIC COMMAND
+ * Place this in the admin logs command section (around line 1400)
+ */
+
+// ========== DIAGNOSTIC: Test bidding system ==========
+if (message.content.toLowerCase() === '!testbidding') {
+  if (!userIsAdmin) {
+    await message.reply('⚠️ Admin only command');
+    return;
+  }
+  
+  await message.reply('🔍 **Testing Bidding System...**\n\nPlease wait...');
+  
+  // Test 1: Config check
+  const configCheck = {
+    hasWebhook: !!config.sheet_webhook_url,
+    webhookUrl: config.sheet_webhook_url ? config.sheet_webhook_url.substring(0, 50) + '...' : 'MISSING',
+    hasBiddingChannel: !!config.bidding_channel_id,
+    biddingChannel: config.bidding_channel_id || 'MISSING'
+  };
+  
+  // Test 2: Try fetching points
+  let pointsTest = {
+    success: false,
+    memberCount: 0,
+    error: null,
+    sampleMembers: []
+  };
+  
+  try {
+    console.log('🔗 Attempting to fetch bidding points...');
+    const biddingModule = require('./bidding.js');
+    const biddingState = biddingModule.getBiddingState();
+    
+    const response = await fetch(config.sheet_webhook_url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        action: 'getBiddingPoints',
+        dryRun: biddingState.isDryRun
+      })
+    });
+    
+    console.log(`📊 Sheet response: ${response.status}`);
+    
+    if (response.ok) {
+      const text = await response.text();
+      const data = JSON.parse(text);
+      
+      if (data.points) {
+        pointsTest.success = true;
+        pointsTest.memberCount = Object.keys(data.points).length;
+        pointsTest.sampleMembers = Object.entries(data.points)
+          .slice(0, 5)
+          .map(([member, points]) => `${member}: ${points}pts`);
+      }
+    } else {
+      pointsTest.error = `HTTP ${response.status}: ${await response.text()}`;
+    }
+  } catch (err) {
+    pointsTest.error = err.message;
+  }
+  
+  // Test 3: Bidding state
+  const biddingModule = require('./bidding.js');
+  const biddingState = biddingModule.getBiddingState();
+  const stateInfo = {
+    isDryRun: biddingState.isDryRun,
+    queueLength: biddingState.auctionQueue.length,
+    hasActiveAuction: !!biddingState.activeAuction,
+    activeAuctionItem: biddingState.activeAuction ? biddingState.activeAuction.item : 'None',
+    lockedPointsCount: Object.keys(biddingState.lockedPoints).length
+  };
+  
+  // Test 4: Channel access
+  let channelTest = {
+    canAccessChannel: false,
+    channelName: 'Unknown',
+    isThread: false
+  };
+  
+  try {
+    const biddingChannel = await client.channels.fetch(config.bidding_channel_id);
+    if (biddingChannel) {
+      channelTest.canAccessChannel = true;
+      channelTest.channelName = biddingChannel.name;
+      channelTest.isThread = biddingChannel.isThread();
+    }
+  } catch (err) {
+    channelTest.error = err.message;
+  }
+  
+  // Build diagnostic report
+  const { EmbedBuilder } = require('discord.js');
+  const embed = new EmbedBuilder()
+    .setColor(pointsTest.success ? 0x00FF00 : 0xFF0000)
+    .setTitle('🔍 Bidding System Diagnostics')
+    .setDescription('Complete system health check')
+    .addFields(
+      {
+        name: '⚙️ Configuration',
+        value: `✅ Webhook URL: ${configCheck.hasWebhook ? 'Configured' : '❌ MISSING'}\n` +
+               `✅ Bidding Channel: ${configCheck.hasBiddingChannel ? 'Configured' : '❌ MISSING'}\n` +
+               `📍 Webhook: \`${configCheck.webhookUrl}\`\n` +
+               `📍 Channel ID: \`${configCheck.biddingChannel}\``
+      },
+      {
+        name: '📊 Google Sheets Connection',
+        value: pointsTest.success 
+          ? `✅ **Connected Successfully**\n` +
+            `👥 Members: ${pointsTest.memberCount}\n` +
+            `📋 Sample:\n${pointsTest.sampleMembers.join('\n')}`
+          : `❌ **Connection Failed**\n` +
+            `Error: ${pointsTest.error || 'Unknown error'}\n\n` +
+            `**Troubleshooting:**\n` +
+            `1. Check webhook URL in config.json\n` +
+            `2. Verify Apps Script is deployed\n` +
+            `3. Check BiddingPoints sheet exists\n` +
+            `4. Verify sheet has data`
+      },
+      {
+        name: '🎯 Bidding State',
+        value: `🧪 Dry Run: ${stateInfo.isDryRun ? '✅ Enabled' : '⚪ Disabled'}\n` +
+               `📋 Queue: ${stateInfo.queueLength} item(s)\n` +
+               `🔴 Active Auction: ${stateInfo.hasActiveAuction ? `✅ ${stateInfo.activeAuctionItem}` : '⚪ None'}\n` +
+               `🔒 Locked Points: ${stateInfo.lockedPointsCount} member(s)`
+      },
+      {
+        name: '📺 Channel Access',
+        value: channelTest.canAccessChannel
+          ? `✅ **Can access channel**\n` +
+            `📌 Name: ${channelTest.channelName}\n` +
+            `📍 Type: ${channelTest.isThread ? 'Thread' : 'Channel'}`
+          : `❌ **Cannot access channel**\n` +
+            `Error: ${channelTest.error || 'Unknown error'}`
+      }
+    )
+    .setFooter({text: 'If any tests failed, check the troubleshooting steps above'})
+    .setTimestamp();
+  
+  await message.reply({embeds: [embed]});
+  
+  // Log full details to console
+  console.log('═══════════════════════════════════════');
+  console.log('🔍 BIDDING SYSTEM DIAGNOSTICS');
+  console.log('═══════════════════════════════════════');
+  console.log('Config:', JSON.stringify(configCheck, null, 2));
+  console.log('Points Test:', JSON.stringify(pointsTest, null, 2));
+  console.log('State:', JSON.stringify(stateInfo, null, 2));
+  console.log('Channel:', JSON.stringify(channelTest, null, 2));
+  console.log('═══════════════════════════════════════');
+  
+  return;
+}
 
 // ==========================================
 // ERROR HANDLING
