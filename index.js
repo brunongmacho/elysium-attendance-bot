@@ -2974,7 +2974,7 @@ if (pending) {
 // ========== DIAGNOSTIC: Test bidding system ==========
 if (message.content.toLowerCase() === '!testbidding') {
   if (!userIsAdmin) {
-    await message.reply('⚠️ Admin only command');
+    message.reply('⚠️ Admin only command').catch(console.error);
     return;
   }
   
