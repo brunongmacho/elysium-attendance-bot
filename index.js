@@ -2361,7 +2361,7 @@ lastOverrideTime = now;
         await bidding.handleResetBidsCommand(message);
         return;
       }
-
+    }
   } catch (err) {
     console.error('❌ Message handler error:', err);
   }
