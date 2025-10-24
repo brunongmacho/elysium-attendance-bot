@@ -2978,7 +2978,7 @@ if (message.content.toLowerCase() === '!testbidding') {
     return;
   }
   
-  await message.reply('🔍 **Testing Bidding System...**\n\nPlease wait...');
+message.reply('🔍 **Testing Bidding System...**\n\nPlease wait...').catch(console.error);
   
   // Test 1: Config check
   const configCheck = {
