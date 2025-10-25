@@ -601,6 +601,14 @@ async function finalizeAuctionSession(client, config) {
 // BIDDING LOGIC
 // ==========================================
 
+function hasElysiumRole(member, config) {
+  // Check if member has ELYSIUM role or any admin role
+  return member.roles.cache.some(r => 
+    r.name === "ELYSIUM" || 
+    config.admin_roles.includes(r.name)
+  );
+}
+
 async function processBid(message, amount, config) {
   const auction = biddingState.activeAuction;
 
@@ -611,9 +619,17 @@ async function processBid(message, amount, config) {
   if (!auction) return { success: false, message: "No active auction" };
   if (auction.status !== "active") return { success: false, message: "Auction not started yet. Wait for bidding to open." };
   
-  // FIXED: Check if message is in the correct auction thread
+  // Check if message is in the correct auction thread
   if (message.channel.id !== auction.threadId) {
     return { success: false, message: "Wrong thread. Bid in the active auction thread." };
+  }
+
+  // ✅ NEW: Check if user has ELYSIUM role
+  if (!hasElysiumRole(message.member, config)) {
+    return { 
+      success: false, 
+      message: "❌ You need the **ELYSIUM** role to participate in bidding.\n\nPlease contact an admin if you believe this is an error." 
+    };
   }
 
   const bidAmount = parseInt(amount);
@@ -626,7 +642,7 @@ async function processBid(message, amount, config) {
   const member = message.member;
   const username = member.nickname || message.author.username;
 
-  console.log(`👤 ${username} (${message.author.id})`);
+  console.log(`👤 ${username} (${message.author.id}) - Has ELYSIUM role: ✅`);
 
   let allPoints = await fetchBiddingPoints(config.sheet_webhook_url, biddingState.isDryRun);
 
@@ -682,9 +698,9 @@ async function processBid(message, amount, config) {
 
   biddingState.timerHandles[`confirm_${confirmMsg.id}`] = setTimeout(async () => {
     if (biddingState.pendingConfirmations[confirmMsg.id]) {
-      console.log(`⏱️ Confirmation timeout for ${username}'s bid of ${bidAmount}`);
+      console.log(`⏰ Confirmation timeout for ${username}'s bid of ${bidAmount}`);
       await confirmMsg.reactions.removeAll().catch(() => {});
-      await confirmMsg.edit({ embeds: [confirmEmbed.setColor(0x808080).setFooter({ text: "⏱️ Confirmation timed out" })] });
+      await confirmMsg.edit({ embeds: [confirmEmbed.setColor(0x808080).setFooter({ text: "⏰ Confirmation timed out" })] });
       delete biddingState.pendingConfirmations[confirmMsg.id];
       saveBiddingState();
     }
@@ -913,6 +929,7 @@ module.exports = {
   loadBiddingState,
   saveBiddingState,
   getBiddingState: () => biddingState,
+  hasElysiumRole,
 
   handleCommand,
 
