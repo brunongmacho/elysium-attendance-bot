@@ -38,6 +38,19 @@ let biddingState = {
 
 const STATE_FILE = "./bidding-state.json";
 
+function hasElysiumRole(member) {
+  // Check if member has ELYSIUM role
+  const hasRole = member.roles.cache.some(r => r.name === "ELYSIUM");
+  console.log(`🔍 Role check for ${member.user.username}: ELYSIUM=${hasRole}, Roles: ${member.roles.cache.map(r => r.name).join(", ")}`);
+  return hasRole;
+}
+
+function isAdmin(member, config) {
+  const isAdminUser = member.roles.cache.some(r => config.admin_roles.includes(r.name));
+  console.log(`🔍 Admin check for ${member.user.username}: Admin=${isAdminUser}`);
+  return isAdminUser;
+}
+
 function saveBiddingState() {
   try {
     fs.writeFileSync(STATE_FILE, JSON.stringify({
@@ -601,14 +614,6 @@ async function finalizeAuctionSession(client, config) {
 // BIDDING LOGIC
 // ==========================================
 
-function hasElysiumRole(member, config) {
-  // Check if member has ELYSIUM role or any admin role
-  return member.roles.cache.some(r => 
-    r.name === "ELYSIUM" || 
-    config.admin_roles.includes(r.name)
-  );
-}
-
 async function processBid(message, amount, config) {
   const auction = biddingState.activeAuction;
 
@@ -624,30 +629,50 @@ async function processBid(message, amount, config) {
     return { success: false, message: "Wrong thread. Bid in the active auction thread." };
   }
 
-  // ✅ NEW: Check if user has ELYSIUM role
-  if (!hasElysiumRole(message.member, config)) {
-    return { 
-      success: false, 
-      message: "❌ You need the **ELYSIUM** role to participate in bidding.\n\nPlease contact an admin if you believe this is an error." 
-    };
+  const member = message.member;
+  const username = member.nickname || message.author.username;
+
+  // ✅ FIXED: Check ELYSIUM role properly
+  const hasRole = hasElysiumRole(member);
+  const adminStatus = isAdmin(member, config);
+
+  console.log(`👤 User: ${username}`);
+  console.log(`🎭 Has ELYSIUM role: ${hasRole ? "✅ YES" : "❌ NO"}`);
+  console.log(`👑 Is Admin: ${adminStatus ? "✅ YES" : "❌ NO"}`);
+
+  if (!hasRole && !adminStatus) {
+    await message.reply(
+      `❌ **Access Denied**\n\n` +
+      `You need the **ELYSIUM** role to participate in bidding.\n\n` +
+      `**Your roles:** ${member.roles.cache.filter(r => r.name !== "@everyone").map(r => r.name).join(", ") || "None"}\n\n` +
+      `Please contact an admin if you believe this is an error.`
+    );
+    return { success: false, message: "No ELYSIUM role" };
   }
+
+  console.log(`✅ Role check passed!`);
 
   const bidAmount = parseInt(amount);
   if (isNaN(bidAmount) || bidAmount <= 0) return { success: false, message: "Invalid bid amount" };
 
   console.log(`📦 Auction: ${auction.item}, 💰 Current: ${auction.currentBid}, 💵 Bid: ${bidAmount}`);
 
-  if (bidAmount <= auction.currentBid) return { success: false, message: `Bid must be higher than current bid (${auction.currentBid} points)` };
-
-  const member = message.member;
-  const username = member.nickname || message.author.username;
-
-  console.log(`👤 ${username} (${message.author.id}) - Has ELYSIUM role: ✅`);
+  if (bidAmount <= auction.currentBid) {
+    await message.reply(`❌ Bid must be higher than current bid (${auction.currentBid} points)`);
+    return { success: false, message: `Bid too low` };
+  }
 
   let allPoints = await fetchBiddingPoints(config.sheet_webhook_url, biddingState.isDryRun);
 
   if (!allPoints) {
-    return { success: false, message: `❌ Failed to fetch bidding points from Google Sheets.\n\n**Troubleshooting:**\n• Check webhook URL in config.json\n• Verify Apps Script is deployed\n• Check BiddingPoints sheet exists` };
+    await message.reply(
+      `❌ Failed to fetch bidding points from Google Sheets.\n\n` +
+      `**Troubleshooting:**\n` +
+      `• Check webhook URL in config.json\n` +
+      `• Verify Apps Script is deployed\n` +
+      `• Check BiddingPoints sheet exists`
+    );
+    return { success: false, message: "Sheet fetch failed" };
   }
 
   let totalPoints = allPoints[username];
@@ -661,9 +686,20 @@ async function processBid(message, amount, config) {
 
   console.log(`💳 Total: ${totalPoints}, Locked: ${biddingState.lockedPoints[username] || 0}, Available: ${availablePoints}`);
 
-  if (totalPoints === 0) return { success: false, message: `❌ You have no bidding points available.` };
+  if (totalPoints === 0) {
+    await message.reply(`❌ You have no bidding points available.`);
+    return { success: false, message: "No points" };
+  }
+
   if (bidAmount > availablePoints) {
-    return { success: false, message: `❌ Insufficient points!\n\n💰 Total: ${totalPoints}\n💳 Locked: ${biddingState.lockedPoints[username] || 0}\n📊 Available: ${availablePoints}\n\nYou need **${bidAmount}** but only have **${availablePoints}** available.` };
+    await message.reply(
+      `❌ **Insufficient points!**\n\n` +
+      `💰 Total: ${totalPoints}\n` +
+      `💳 Locked: ${biddingState.lockedPoints[username] || 0}\n` +
+      `📊 Available: ${availablePoints}\n\n` +
+      `You need **${bidAmount}** but only have **${availablePoints}** available.`
+    );
+    return { success: false, message: "Insufficient points" };
   }
 
   console.log(`✅ BID VALID - SHOWING CONFIRMATION`);
@@ -684,23 +720,33 @@ async function processBid(message, amount, config) {
   await confirmMsg.react("✅");
   await confirmMsg.react("❌");
 
+  // ✅ Store who can confirm this bid (owner + admins)
   biddingState.pendingConfirmations[confirmMsg.id] = {
     userId: message.author.id,
     username,
     threadId: auction.threadId,
     amount: bidAmount,
     timestamp: Date.now(),
+    originalMessageId: message.id, // ✅ Store original !bid message
   };
 
   saveBiddingState();
 
-  console.log(`✅ Confirmation message created: ${confirmMsg.id}\n${"=".repeat(50)}\n`);
+  console.log(`✅ Confirmation message created: ${confirmMsg.id}`);
+  console.log(`👤 Can be confirmed by: ${username} (${message.author.id}) or admins\n${"=".repeat(50)}\n`);
 
   biddingState.timerHandles[`confirm_${confirmMsg.id}`] = setTimeout(async () => {
     if (biddingState.pendingConfirmations[confirmMsg.id]) {
       console.log(`⏰ Confirmation timeout for ${username}'s bid of ${bidAmount}`);
       await confirmMsg.reactions.removeAll().catch(() => {});
       await confirmMsg.edit({ embeds: [confirmEmbed.setColor(0x808080).setFooter({ text: "⏰ Confirmation timed out" })] });
+      
+      // ✅ Delete confirmation message after timeout
+      setTimeout(async () => {
+        await confirmMsg.delete().catch(() => {});
+        console.log(`🗑️ Deleted timed-out confirmation ${confirmMsg.id}`);
+      }, 3000);
+      
       delete biddingState.pendingConfirmations[confirmMsg.id];
       saveBiddingState();
     }
@@ -930,111 +976,226 @@ module.exports = {
   saveBiddingState,
   getBiddingState: () => biddingState,
   hasElysiumRole,
+  isAdmin,
 
   handleCommand,
 
   confirmBid: async function (reaction, user, config) {
-    const pending = biddingState.pendingConfirmations[reaction.message.id];
-    if (!pending || pending.userId !== user.id) return;
+  const pending = biddingState.pendingConfirmations[reaction.message.id];
+  if (!pending) return;
 
-    const auction = biddingState.activeAuction;
-    if (!auction || auction.status !== "active") {
-      await reaction.message.reply("❌ Auction is no longer active");
-      delete biddingState.pendingConfirmations[reaction.message.id];
-      saveBiddingState();
-      return;
-    }
+  console.log(`\n${"=".repeat(50)}`);
+  console.log(`🎯 BID CONFIRMATION ATTEMPT`);
+  console.log(`${"=".repeat(50)}`);
+  console.log(`👤 Confirming user: ${user.username} (${user.id})`);
+  console.log(`👤 Bid owner: ${pending.username} (${pending.userId})`);
 
-    if (pending.amount <= auction.currentBid) {
-      await reaction.message.reply(`❌ Bid no longer valid. Current bid is now ${auction.currentBid} points.`);
-      delete biddingState.pendingConfirmations[reaction.message.id];
-      saveBiddingState();
-      return;
-    }
+  // ✅ FIXED: Only allow bid owner OR admins to confirm
+  const guild = reaction.message.guild;
+  const member = await guild.members.fetch(user.id).catch(() => null);
+  
+  if (!member) {
+    console.log(`❌ Could not fetch member data`);
+    return;
+  }
 
-    if (auction.currentWinner) {
-      unlockPoints(auction.currentWinner, auction.currentBid);
-      const outbidEmbed = new EmbedBuilder().setColor(0xff6600).setTitle("❌ You've Been Outbid!")
-        .setDescription(`Someone bid **${pending.amount} points** on **${auction.item}**`);
-      await reaction.message.channel.send({ content: `<@${auction.currentWinnerId}>`, embeds: [outbidEmbed] });
-    }
+  const isOwner = pending.userId === user.id;
+  const isAdminUser = isAdmin(member, config);
 
-    lockPoints(pending.username, pending.amount);
+  console.log(`👑 Is Owner: ${isOwner ? "✅" : "❌"}`);
+  console.log(`👑 Is Admin: ${isAdminUser ? "✅" : "❌"}`);
 
-    const previousBid = auction.currentBid;
-    auction.currentBid = pending.amount;
-    auction.currentWinner = pending.username;
-    auction.currentWinnerId = pending.userId;
-    auction.bids.push({
-      user: pending.username,
-      userId: pending.userId,
-      amount: pending.amount,
-      timestamp: Date.now(),
-    });
+  if (!isOwner && !isAdminUser) {
+    console.log(`❌ User ${user.username} cannot confirm this bid (not owner or admin)`);
+    // Remove their reaction silently
+    await reaction.users.remove(user.id).catch(() => {});
+    return;
+  }
 
-    const timeLeft = auction.endTime - Date.now();
-    if (timeLeft < 60000 && auction.extendedCount < 10) {
-      auction.endTime += 60000;
-      auction.extendedCount++;
-      auction.goingOnceAnnounced = false;
-      auction.goingTwiceAnnounced = false;
-    }
+  console.log(`✅ Confirmation authorized!`);
 
-    if (biddingState.timerHandles[`confirm_${reaction.message.id}`]) {
-      clearTimeout(biddingState.timerHandles[`confirm_${reaction.message.id}`]);
-      delete biddingState.timerHandles[`confirm_${reaction.message.id}`];
-    }
-
-    const successEmbed = new EmbedBuilder().setColor(0x00ff00).setTitle("✅ Bid Confirmed!")
-      .setDescription(`You are now the highest bidder on **${auction.item}**`)
-      .addFields(
-        { name: "💰 Your Bid", value: `${pending.amount} points`, inline: true },
-        { name: "📊 Previous", value: `${previousBid} points`, inline: true },
-        { name: "⏱️ Time Left", value: formatTimeRemaining(auction.endTime - Date.now()), inline: true }
-      )
-      .setFooter({ text: timeLeft < 60000 ? "⏰ Timer extended!" : "Good luck!" });
-
-    await reaction.message.edit({ embeds: [successEmbed] });
+  const auction = biddingState.activeAuction;
+  if (!auction || auction.status !== "active") {
+    await reaction.message.channel.send(`❌ <@${user.id}> Auction is no longer active`);
+    
+    // ✅ Clean up
     await reaction.message.reactions.removeAll().catch(() => {});
-
-    const announceEmbed = new EmbedBuilder().setColor(0xffd700).setTitle("🔔 New High Bid!")
-      .addFields(
-        { name: "💰 Amount", value: `${pending.amount} points`, inline: true },
-        { name: "👤 Bidder", value: pending.username, inline: true }
-      );
-
-    await reaction.message.channel.send({ embeds: [announceEmbed] });
-
+    await reaction.message.delete().catch(() => {});
+    
     delete biddingState.pendingConfirmations[reaction.message.id];
     saveBiddingState();
+    return;
+  }
 
-    // Reschedule timers if extended
-    if (timeLeft < 60000) {
-      const client = reaction.client;
-      scheduleAuctionTimers(client, config);
-    }
-
-    console.log(`✅ Bid confirmed: ${pending.username} - ${pending.amount}pts on ${auction.item}`);
-  },
-
-  cancelBid: async function (reaction, user) {
-    const pending = biddingState.pendingConfirmations[reaction.message.id];
-    if (!pending || pending.userId !== user.id) return;
-
-    const cancelEmbed = new EmbedBuilder().setColor(0x808080).setTitle("❌ Bid Canceled")
-      .setDescription("Your bid was not placed");
-
-    await reaction.message.edit({ embeds: [cancelEmbed] });
+  if (pending.amount <= auction.currentBid) {
+    await reaction.message.channel.send(
+      `❌ <@${user.id}> Bid no longer valid. Current bid is now ${auction.currentBid} points.`
+    );
+    
+    // ✅ Clean up
     await reaction.message.reactions.removeAll().catch(() => {});
-
-    if (biddingState.timerHandles[`confirm_${reaction.message.id}`]) {
-      clearTimeout(biddingState.timerHandles[`confirm_${reaction.message.id}`]);
-      delete biddingState.timerHandles[`confirm_${reaction.message.id}`];
-    }
-
+    await reaction.message.delete().catch(() => {});
+    
     delete biddingState.pendingConfirmations[reaction.message.id];
     saveBiddingState();
-  },
+    return;
+  }
+
+  // Outbid previous winner
+  if (auction.currentWinner) {
+    unlockPoints(auction.currentWinner, auction.currentBid);
+    const outbidEmbed = new EmbedBuilder().setColor(0xff6600).setTitle("❌ You've Been Outbid!")
+      .setDescription(`Someone bid **${pending.amount} points** on **${auction.item}**`);
+    await reaction.message.channel.send({ content: `<@${auction.currentWinnerId}>`, embeds: [outbidEmbed] });
+  }
+
+  lockPoints(pending.username, pending.amount);
+
+  const previousBid = auction.currentBid;
+  auction.currentBid = pending.amount;
+  auction.currentWinner = pending.username;
+  auction.currentWinnerId = pending.userId;
+  auction.bids.push({
+    user: pending.username,
+    userId: pending.userId,
+    amount: pending.amount,
+    timestamp: Date.now(),
+  });
+
+  const timeLeft = auction.endTime - Date.now();
+  if (timeLeft < 60000 && auction.extendedCount < 10) {
+    auction.endTime += 60000;
+    auction.extendedCount++;
+    auction.goingOnceAnnounced = false;
+    auction.goingTwiceAnnounced = false;
+  }
+
+  if (biddingState.timerHandles[`confirm_${reaction.message.id}`]) {
+    clearTimeout(biddingState.timerHandles[`confirm_${reaction.message.id}`]);
+    delete biddingState.timerHandles[`confirm_${reaction.message.id}`];
+  }
+
+  const successEmbed = new EmbedBuilder().setColor(0x00ff00).setTitle("✅ Bid Confirmed!")
+    .setDescription(`You are now the highest bidder on **${auction.item}**`)
+    .addFields(
+      { name: "💰 Your Bid", value: `${pending.amount} points`, inline: true },
+      { name: "📊 Previous", value: `${previousBid} points`, inline: true },
+      { name: "⏱️ Time Left", value: formatTimeRemaining(auction.endTime - Date.now()), inline: true }
+    )
+    .setFooter({ text: timeLeft < 60000 ? "⏰ Timer extended!" : "Good luck!" });
+
+  // ✅ Edit confirmation message to show success
+  await reaction.message.edit({ embeds: [successEmbed] });
+  
+  // ✅ REMOVE ALL REACTIONS from confirmation message
+  await reaction.message.reactions.removeAll().catch(() => {});
+
+  const announceEmbed = new EmbedBuilder().setColor(0xffd700).setTitle("🔔 New High Bid!")
+    .addFields(
+      { name: "💰 Amount", value: `${pending.amount} points`, inline: true },
+      { name: "👤 Bidder", value: pending.username, inline: true }
+    );
+
+  await reaction.message.channel.send({ embeds: [announceEmbed] });
+
+  // ✅ DELETE the confirmation message after 5 seconds
+  setTimeout(async () => {
+    await reaction.message.delete().catch(() => {});
+    console.log(`🗑️ Deleted confirmation message ${reaction.message.id}`);
+  }, 5000);
+
+  // ✅ DELETE the original !bid message
+  if (pending.originalMessageId) {
+    const originalMsg = await reaction.message.channel.messages.fetch(pending.originalMessageId).catch(() => null);
+    if (originalMsg) {
+      await originalMsg.delete().catch(() => {});
+      console.log(`🗑️ Deleted original !bid message ${pending.originalMessageId}`);
+    }
+  }
+
+  delete biddingState.pendingConfirmations[reaction.message.id];
+  saveBiddingState();
+
+  // Reschedule timers if extended
+  if (timeLeft < 60000) {
+    const client = reaction.client;
+    scheduleAuctionTimers(client, config);
+  }
+
+  console.log(`✅ Bid confirmed: ${pending.username} - ${pending.amount}pts on ${auction.item}`);
+  console.log(`${"=".repeat(50)}\n`);
+},
+
+  cancelBid: async function (reaction, user, config) {
+  const pending = biddingState.pendingConfirmations[reaction.message.id];
+  if (!pending) return;
+
+  console.log(`\n${"=".repeat(50)}`);
+  console.log(`❌ BID CANCELLATION ATTEMPT`);
+  console.log(`${"=".repeat(50)}`);
+  console.log(`👤 Cancelling user: ${user.username} (${user.id})`);
+  console.log(`👤 Bid owner: ${pending.username} (${pending.userId})`);
+
+  // ✅ Only allow bid owner OR admins to cancel
+  const guild = reaction.message.guild;
+  const member = await guild.members.fetch(user.id).catch(() => null);
+  
+  if (!member) {
+    console.log(`❌ Could not fetch member data`);
+    return;
+  }
+
+  const isOwner = pending.userId === user.id;
+  const isAdminUser = isAdmin(member, config);
+
+  console.log(`👑 Is Owner: ${isOwner ? "✅" : "❌"}`);
+  console.log(`👑 Is Admin: ${isAdminUser ? "✅" : "❌"}`);
+
+  if (!isOwner && !isAdminUser) {
+    console.log(`❌ User ${user.username} cannot cancel this bid (not owner or admin)`);
+    // Remove their reaction silently
+    await reaction.users.remove(user.id).catch(() => {});
+    return;
+  }
+
+  console.log(`✅ Cancellation authorized!`);
+
+  const cancelEmbed = new EmbedBuilder()
+    .setColor(0x808080)
+    .setTitle("❌ Bid Canceled")
+    .setDescription("Your bid was not placed");
+
+  await reaction.message.edit({ embeds: [cancelEmbed] });
+  
+  // ✅ REMOVE ALL REACTIONS
+  await reaction.message.reactions.removeAll().catch(() => {});
+
+  // ✅ DELETE confirmation message after 3 seconds
+  setTimeout(async () => {
+    await reaction.message.delete().catch(() => {});
+    console.log(`🗑️ Deleted cancelled confirmation ${reaction.message.id}`);
+  }, 3000);
+
+  // ✅ DELETE the original !bid message
+  if (pending.originalMessageId) {
+    const originalMsg = await reaction.message.channel.messages.fetch(pending.originalMessageId).catch(() => null);
+    if (originalMsg) {
+      await originalMsg.delete().catch(() => {});
+      console.log(`🗑️ Deleted original !bid message ${pending.originalMessageId}`);
+    }
+  }
+
+  if (biddingState.timerHandles[`confirm_${reaction.message.id}`]) {
+    clearTimeout(biddingState.timerHandles[`confirm_${reaction.message.id}`]);
+    delete biddingState.timerHandles[`confirm_${reaction.message.id}`];
+  }
+
+  delete biddingState.pendingConfirmations[reaction.message.id];
+  saveBiddingState();
+  
+  console.log(`❌ Bid cancelled by ${user.username}`);
+  console.log(`${"=".repeat(50)}\n`);
+},
 
   recoverBiddingState: async (client, config) => {
     if (loadBiddingState()) {
