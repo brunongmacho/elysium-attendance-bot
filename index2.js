@@ -1633,16 +1633,33 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     // BIDDING COMMANDS - Bidding channel and auction threads
-    if (inBiddingChannel) {
+    // ✅ MOVED: Check for !bid BEFORE the inBiddingChannel check
+    if (message.content.trim().toLowerCase().startsWith("!bid")) {
+      console.log(`🔍 !bid detected - Checking channel validity...`);
+      console.log(`   Channel: ${message.channel.name} (${message.channel.id})`);
+      console.log(`   Is Thread: ${message.channel.isThread()}`);
+      console.log(`   Parent ID: ${message.channel.parentId}`);
+      console.log(`   Expected Parent: ${config.bidding_channel_id}`);
+      console.log(`   inBiddingChannel: ${inBiddingChannel}`);
+
+      if (!inBiddingChannel) {
+        console.log(`❌ !bid blocked - not in bidding channel/thread`);
+        await message.reply("❌ You can only use `!bid` in the auction threads!");
+        return;
+      }
+
       const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
       const args = message.content.trim().split(/\s+/).slice(1);
 
-      // !bid command - works in bidding channel and auction threads
-      if (cmd === "!bid") {
-        console.log(`🎯 Bid command detected in ${message.channel.isThread() ? 'thread' : 'channel'}: ${message.channel.name}`);
-        await bidding.handleCommand(cmd, message, args, client, config);
-        return;
-      }
+      console.log(`🎯 Bid command detected in ${message.channel.isThread() ? 'thread' : 'channel'}: ${message.channel.name}`);
+      await bidding.handleCommand(cmd, message, args, client, config);
+      return;
+    }
+
+    // Other bidding commands (admin only)
+    if (inBiddingChannel) {
+      const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
+      const args = message.content.trim().split(/\s+/).slice(1);
 
       // !bidstatus - also available to members
       if (cmd === "!bidstatus") {
@@ -1651,6 +1668,7 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
     }
+
   } catch (err) {
     console.error("❌ Message handler error:", err);
   }
@@ -1841,7 +1859,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         await bidding.confirmBid(reaction, user, config);
       } else if (reaction.emoji.name === "❌") {
         console.log(`❌ Canceling bid...`);
-        await bidding.cancelBid(reaction, user);
+        await bidding.cancelBid(reaction, user, config);  // ✅ FIXED: Added config
       }
       return;
     }
