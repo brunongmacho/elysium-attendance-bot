@@ -1,6 +1,6 @@
 /**
- * Enhanced Help System for ELYSIUM Bot v5.0
- * Fixed version with proper initialization
+ * Enhanced Help System for ELYSIUM Bot v6.0
+ * Updated with all new features and command aliases
  */
 
 const { EmbedBuilder } = require("discord.js");
@@ -122,93 +122,93 @@ const COMMAND_HELP = {
 
   // === BIDDING COMMANDS ===
   auction: {
-    usage: "!auction <item> <startPrice> <duration>",
-    description: "Add item to auction queue",
+    usage: "!auction <item> <startPrice> <duration> [quantity]",
+    description: "Add item to auction queue (supports batch auctions)",
     category: "Bidding",
     adminOnly: true,
-    example: "!auction Dragon Sword 500 30",
+    example: "!auction Dragon Sword 500 30 3",
     details:
-      "Queue management:\n• Item name (spaces allowed)\n• Start price (integer only)\n• Duration in minutes\n• Items auction sequentially\n• Max 15-minute extensions",
+      "Queue management:\n• Item name (spaces allowed)\n• Start price (integer only)\n• Duration in minutes\n• Quantity (optional, default 1)\n• Batch auctions: Top N bidders win\n• Items auction sequentially\n• Max 15-minute extensions\n• Max 10 items per batch",
   },
 
   queuelist: {
-    usage: "!queuelist",
+    usage: "!queuelist (or !ql, !queue)",
     description: "View all items in auction queue",
     category: "Bidding",
     adminOnly: true,
-    example: "!queuelist",
+    example: "!ql",
     details:
-      "Shows:\n• Item names\n• Start prices\n• Durations\n• Queue position\n• Total count",
+      "Shows:\n• Item names\n• Start prices\n• Durations\n• Quantities (for batch auctions)\n• Queue position\n• Total count\n\nAliases: !ql, !queue",
   },
 
   removeitem: {
-    usage: "!removeitem <itemName>",
+    usage: "!removeitem <itemName> (or !rm)",
     description: "Remove item from queue",
     category: "Bidding",
     adminOnly: true,
-    example: "!removeitem Dragon Sword",
+    example: "!rm Dragon Sword",
     details:
-      "Removes before auction starts:\n• Cannot remove during active auction\n• Full item name required\n• Updates queue positions",
+      "Removes before auction starts:\n• Cannot remove during active auction\n• Full item name required\n• Updates queue positions\n\nAlias: !rm",
   },
 
   clearqueue: {
     usage: "!clearqueue",
-    description: "Remove ALL items from queue",
+    description: "Remove ALL items from queue (requires confirmation)",
     category: "Bidding",
     adminOnly: true,
     example: "!clearqueue",
     details:
-      "Emergency clear:\n• Cannot clear during auction\n• Requires confirmation\n• Clears entire queue\n• Does NOT refund points",
+      "Emergency clear:\n• Cannot clear during auction\n• Requires ✅ confirmation\n• Clears entire queue\n• Does NOT refund points",
   },
 
   startauction: {
-    usage: "!startauction",
+    usage: "!startauction (or !start)",
     description: "Begin auction session with queued items",
     category: "Bidding",
     adminOnly: true,
-    example: "!startauction",
+    example: "!start",
     details:
-      "Starts session:\n• Loads points cache (instant bidding)\n• Shows preview of items\n• Confirms dry run mode\n• Processes items one-by-one\n• Auto-submits at end",
+      "Starts session:\n• Loads points cache (instant bidding)\n• Auto-refreshes cache every 30min\n• Shows preview of items\n• 30-second item preview\n• Processes items one-by-one\n• Auto-submits at end\n• Concurrent start protection\n\nAlias: !start",
   },
 
   bid: {
-    usage: "!bid <amount>",
+    usage: "!bid <amount> (or !b)",
     description: "Place bid on current auction item",
     category: "Bidding",
     adminOnly: false,
-    example: "!bid 750",
+    example: "!b 750",
     details:
-      "Bidding rules:\n• Integers only (no decimals)\n• Must exceed current bid\n• 10-second confirmation\n• 3-second rate limit\n• Self-overbid = incremental locking\n• Last 10s bids pause timer\n• Max 15 extensions",
+      "Bidding rules:\n• Integers only (no decimals)\n• Must exceed current bid\n• 10-second confirmation with countdown\n• 3-second rate limit\n• Self-overbid = incremental locking\n• Last 10s bids pause timer\n• Max 15 extensions\n• Batch auctions: Top N bidders win\n\nAlias: !b",
   },
 
   bidstatus: {
-    usage: "!bidstatus",
+    usage: "!bidstatus (or !bstatus)",
     description: "View bidding system status",
     category: "Bidding",
     adminOnly: false,
-    example: "!bidstatus",
+    example: "!bstatus",
     details:
-      "Shows:\n• Cache status and age\n• Queue items (first 5)\n• Active auction item\n• Current bid and winner\n• Time remaining\n• Dry run mode",
+      "Shows:\n• Cache status and age\n• Auto-refresh status\n• Queue items (first 5)\n• Active auction item\n• Current bid and winner\n• Time remaining\n• Dry run mode indicator\n\nAlias: !bstatus",
   },
 
   mypoints: {
-    usage: "!mypoints",
+    usage: "!mypoints (or !pts)",
     description: "Check your available bidding points",
     category: "Bidding",
     adminOnly: false,
-    example: "!mypoints",
+    example: "!pts",
     details:
-      'Personal points check:\n• Use ONLY in bidding channel (not threads)\n• Cannot use during active auction\n• Fetches fresh from Sheets\n• Auto-deletes after 30 seconds\n• Shows "Not found" if not in system',
+      'Personal points check:\n• Use ONLY in bidding channel (not threads)\n• Cannot use during active auction\n• Fetches fresh from Sheets\n• Auto-deletes after 30 seconds\n• Shows "Not found" if not in system\n\nAlias: !pts',
   },
 
   dryrun: {
-    usage: "!dryrun <on|off>",
-    description: "Toggle test mode (no real points deduction)",
+    usage: "Automatic - No command needed",
+    description: "Dry run mode shows yellow embeds automatically",
     category: "Bidding",
     adminOnly: true,
-    example: "!dryrun on",
+    example: "N/A - Visual distinction only",
     details:
-      "Test mode:\n• ON = Uses TestBiddingPoints sheet\n• OFF = Uses live BiddingPoints sheet\n• Cannot toggle during auction\n• Shows mode in all embeds",
+      "Dry run visual indicators:\n• Bright YELLOW embed borders (#FFFF00)\n• ⚠️ DRY RUN MODE in footers\n• Uses TestBiddingPoints sheet\n• No manual toggle needed\n• Automatic visual distinction",
   },
 
   cancelitem: {
@@ -233,22 +233,22 @@ const COMMAND_HELP = {
 
   resetbids: {
     usage: "!resetbids",
-    description: "Reset entire bidding system",
+    description: "Reset entire bidding system (requires confirmation)",
     category: "Bidding",
     adminOnly: true,
     example: "!resetbids",
     details:
-      "DANGER - Full reset:\n• Clears queue\n• Stops active auction\n• Unlocks all points\n• Clears history\n• Deletes cache\n• Does NOT submit to Sheets",
+      "DANGER - Full reset:\n• Requires ✅ confirmation\n• Clears queue\n• Stops active auction\n• Unlocks all points\n• Clears history\n• Deletes cache\n• Stops auto-refresh\n• Does NOT submit to Sheets",
   },
 
   forcesubmitresults: {
     usage: "!forcesubmitresults",
-    description: "Manually submit auction results to Sheets",
+    description: "Manually submit auction results to Sheets (requires confirmation)",
     category: "Bidding",
     adminOnly: true,
     example: "!forcesubmitresults",
     details:
-      "Manual submission:\n• Shows current results\n• Requires confirmation\n• Auto-populates 0 for non-winners\n• Updates ALL members in sheet\n• Clears cache after\n• Use if auto-submit failed",
+      "Manual submission:\n• Shows current results\n• Requires ✅ confirmation\n• Auto-populates 0 for non-winners\n• Updates ALL members in sheet\n• Clears cache after\n• Stops auto-refresh\n• Use if auto-submit failed",
   },
 
   testbidding: {
@@ -321,7 +321,7 @@ async function handleHelp(message, args, member) {
           inline: true,
         },
         {
-          name: "🔐 Access",
+          name: "🔓 Access",
           value: cmdInfo.adminOnly ? "👑 Admin Only" : "👥 All Members",
           inline: true,
         }
@@ -353,7 +353,7 @@ async function handleHelp(message, args, member) {
       .setColor(0x4a90e2)
       .setTitle("🛡️ ELYSIUM Bot - Admin Commands")
       .setDescription(
-        "**Comprehensive command reference**\n\n💡 Use `!help <command>` for detailed info"
+        "**Comprehensive command reference**\n\n💡 Use `!help <command>` for detailed info\n\n**New Features in v6.0:**\n✨ Cache auto-refresh every 30min\n✨ Extended 30s preview\n✨ Countdown timers on confirmations\n✨ Command aliases (!b, !ql, !bstatus, !pts, etc.)\n✨ Batch auctions (multiple items)\n✨ Concurrent start protection\n✨ Yellow embeds for dry run mode"
       )
       .addFields(
         {
@@ -374,7 +374,7 @@ async function handleHelp(message, args, member) {
         {
           name: "📖 Quick Tips",
           value:
-            "• Type `present` in spawn threads to check in\n• Use `!bid <amount>` in auction threads\n• Commands are case-insensitive\n• Admin commands work in admin logs only",
+            "• Type `present` in spawn threads to check in\n• Use `!bid <amount>` or `!b <amount>` in auction threads\n• Commands are case-insensitive\n• Admin commands work in admin logs only\n• Many commands now have shortcuts!",
           inline: false,
         }
       )
@@ -398,7 +398,7 @@ async function handleHelp(message, args, member) {
       .setColor(0xffd700)
       .setTitle("📚 ELYSIUM Bot - Member Guide")
       .setDescription(
-        "**Available commands for all members**\n\n💡 Use `!help <command>` for detailed info"
+        "**Available commands for all members**\n\n💡 Use `!help <command>` for detailed info\n\n**New Shortcuts:**\n• !b = !bid\n• !bstatus = !bidstatus\n• !pts = !mypoints"
       )
       .addFields(
         {
@@ -415,13 +415,13 @@ async function handleHelp(message, args, member) {
         {
           name: "💰 Bidding Process",
           value:
-            "1. Wait for auction thread to open\n2. Type `!bid <amount>` (e.g., `!bid 500`)\n3. React ✅ to confirm within 10 seconds\n4. Winner announced at end",
+            "1. Wait for auction thread to open\n2. Type `!bid <amount>` or `!b <amount>`\n3. React ✅ to confirm within 10 seconds (countdown shown)\n4. Winner announced at end\n5. Batch auctions: Top N bidders win!",
           inline: false,
         },
         {
           name: "⚠️ Important Rules",
           value:
-            "• Screenshot required for attendance\n• Bids must be integers (no decimals)\n• 3-second cooldown between bids\n• Can overbid yourself (pays difference)\n• Last 10s bids pause timer",
+            "• Screenshot required for attendance\n• Bids must be integers (no decimals)\n• 3-second cooldown between bids\n• Can overbid yourself (pays difference)\n• Last 10s bids pause timer\n• Confirmations have countdown timers",
           inline: false,
         }
       )
