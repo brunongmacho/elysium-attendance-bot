@@ -1,0 +1,493 @@
+/**
+ * ELYSIUM Guild System - Google Apps Script v4.0
+ * Consolidated Attendance + Bidding System
+ *
+ * FEATURES:
+ * - Attendance tracking with weekly sheets
+ * - Bidding points management
+ * - Timestamped auction results (MM/DD/YYYY HH:MM for multiple auctions per day)
+ * - Automatic Points Left calculation
+ * - Dry run support
+ */
+
+const CONFIG = {
+  SHEET_ID: "1dGLGjmRhvG0io1Yta5ikfN-b_U-SSJJfWIHznK18qYQ",
+  SHEET_NAME_PREFIX: "ELYSIUM_WEEK_",
+  BOSS_POINTS_SHEET: "BossPoints",
+  BIDDING_SHEET: "BiddingPoints",
+  TEST_BIDDING_SHEET: "TestBiddingPoints",
+  TIMEZONE: "Asia/Manila",
+};
+
+const COLUMNS = {
+  MEMBERS: 1,
+  POINTS_CONSUMED: 2,
+  POINTS_LEFT: 3,
+  ATTENDANCE_POINTS: 4,
+  FIRST_SPAWN: 5,
+};
+
+// ==========================================
+// MAIN WEBHOOK HANDLER
+// ==========================================
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents || "{}");
+    const action = data.action || "unknown";
+
+    Logger.log(`📥 Action received: ${action}`);
+
+    if (["checkColumn", "submitAttendance"].includes(action)) {
+      if (action === "checkColumn") return handleCheckColumn(data);
+      if (action === "submitAttendance") return handleSubmitAttendance(data);
+    }
+
+    if (["getBiddingPoints", "submitBiddingResults"].includes(action)) {
+      if (action === "getBiddingPoints") return handleGetBiddingPoints(data);
+      if (action === "submitBiddingResults")
+        return handleSubmitBiddingResults(data);
+    }
+
+    Logger.log(`❌ Unknown action: ${action}`);
+    return createResponse("error", "Unknown action: " + action);
+  } catch (err) {
+    Logger.log("❌ Error in doPost: " + err.toString());
+    Logger.log(err.stack);
+    return createResponse("error", err.toString());
+  }
+}
+
+// ==========================================
+// ATTENDANCE FUNCTIONS
+// ==========================================
+
+function handleCheckColumn(data) {
+  const boss = (data.boss || "").toString().trim().toUpperCase();
+  const timestamp = (data.timestamp || "").toString().trim();
+
+  if (!boss || !timestamp)
+    return createResponse("error", "Missing boss or timestamp");
+
+  const sheet = getCurrentWeekSheet();
+  const lastCol = sheet.getLastColumn();
+
+  if (lastCol < COLUMNS.FIRST_SPAWN)
+    return createResponse("ok", "No columns exist", { exists: false });
+
+  const spawnData = sheet
+    .getRange(1, COLUMNS.FIRST_SPAWN, 2, lastCol - COLUMNS.FIRST_SPAWN + 1)
+    .getValues();
+  const row1 = spawnData[0];
+  const row2 = spawnData[1];
+
+  for (let i = 0; i < row1.length; i++) {
+    if (
+      (row1[i] || "").toString().trim() === timestamp &&
+      (row2[i] || "").toString().trim().toUpperCase() === boss
+    ) {
+      return createResponse("ok", "Column exists", {
+        exists: true,
+        column: i + COLUMNS.FIRST_SPAWN,
+      });
+    }
+  }
+
+  return createResponse("ok", "Column does not exist", { exists: false });
+}
+
+function handleSubmitAttendance(data) {
+  const boss = (data.boss || "").toString().trim().toUpperCase();
+  const timestamp = (data.timestamp || "").toString().trim();
+  const members = (data.members || []).map((m) => m.trim());
+
+  if (!boss || !timestamp || members.length === 0) {
+    return createResponse("error", "Missing boss, timestamp, or members list");
+  }
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (e) {
+    return createResponse("error", "Could not acquire lock");
+  }
+
+  try {
+    const sheet = getCurrentWeekSheet();
+    let lastCol = sheet.getLastColumn();
+    let targetColumn = null;
+
+    if (lastCol >= COLUMNS.FIRST_SPAWN) {
+      const spawnData = sheet
+        .getRange(1, COLUMNS.FIRST_SPAWN, 2, lastCol - COLUMNS.FIRST_SPAWN + 1)
+        .getValues();
+      const row1 = spawnData[0],
+        row2 = spawnData[1];
+      for (let i = 0; i < row1.length; i++) {
+        if (
+          (row1[i] || "").toString().trim() === timestamp &&
+          (row2[i] || "").toString().trim().toUpperCase() === boss
+        ) {
+          targetColumn = i + COLUMNS.FIRST_SPAWN;
+          break;
+        }
+      }
+    }
+    if (targetColumn)
+      return createResponse(
+        "error",
+        `Column already exists for ${boss} at ${timestamp}`
+      );
+
+    const newCol = lastCol + 1;
+    sheet
+      .getRange(1, newCol, 2, 1)
+      .setValues([[timestamp], [boss]])
+      .setFontWeight("bold")
+      .setBackground("#E8F4F8")
+      .setHorizontalAlignment("center");
+    sheet.setColumnWidth(newCol, 120);
+
+    const lastRow = sheet.getLastRow();
+    const checkboxRule = SpreadsheetApp.newDataValidation()
+      .requireCheckbox()
+      .setAllowInvalid(false)
+      .build();
+
+    if (lastRow >= 3) {
+      const memberNames = sheet
+        .getRange(3, COLUMNS.MEMBERS, lastRow - 2, 1)
+        .getValues()
+        .flat();
+      const membersLower = members.map((m) => m.toLowerCase());
+      const sheetMembersLower = memberNames.map((m) =>
+        (m || "").toString().trim().toLowerCase()
+      );
+
+      const newMembers = [];
+      let newMembersCount = 0;
+      for (let i = 0; i < members.length; i++) {
+        if (!sheetMembersLower.includes(membersLower[i])) {
+          const newRow = lastRow + newMembersCount + 1;
+          newMembers.push({ name: members[i], row: newRow });
+          newMembersCount++;
+        }
+      }
+
+      if (newMembers.length > 0) {
+        const newMemberData = newMembers.map((m) => [m.name]);
+        sheet
+          .getRange(lastRow + 1, COLUMNS.MEMBERS, newMembers.length, 1)
+          .setValues(newMemberData);
+        if (newCol > COLUMNS.FIRST_SPAWN) {
+          const falseArray = Array(newMembers.length)
+            .fill(null)
+            .map(() => Array(newCol - COLUMNS.FIRST_SPAWN).fill(false));
+          sheet
+            .getRange(
+              lastRow + 1,
+              COLUMNS.FIRST_SPAWN,
+              newMembers.length,
+              newCol - COLUMNS.FIRST_SPAWN
+            )
+            .setValues(falseArray)
+            .setDataValidation(checkboxRule);
+        }
+      }
+
+      const totalRows = lastRow + newMembersCount;
+      if (totalRows >= 3) {
+        const allMemberNames = sheet
+          .getRange(3, COLUMNS.MEMBERS, totalRows - 2, 1)
+          .getValues()
+          .flat();
+        const allMembersLower = allMemberNames.map((m) =>
+          (m || "").toString().trim().toLowerCase()
+        );
+        const attendanceData = allMembersLower.map((m) => [
+          membersLower.includes(m),
+        ]);
+        sheet
+          .getRange(3, newCol, attendanceData.length, 1)
+          .setValues(attendanceData)
+          .setDataValidation(checkboxRule);
+      }
+    } else {
+      sheet
+        .getRange(3, COLUMNS.MEMBERS, members.length, 1)
+        .setValues(members.map((m) => [m]));
+      sheet
+        .getRange(3, newCol, members.length, 1)
+        .setValues(members.map(() => [true]))
+        .setDataValidation(checkboxRule);
+    }
+
+    logAttendance(
+      SpreadsheetApp.openById(CONFIG.SHEET_ID),
+      boss,
+      timestamp,
+      members
+    );
+    return createResponse(
+      "ok",
+      `Attendance submitted: ${members.length} members`,
+      { column: newCol, boss, timestamp, membersCount: members.length }
+    );
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function getCurrentWeekSheet() {
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const now = new Date();
+  const sunday = new Date(now);
+  sunday.setDate(sunday.getDate() - sunday.getDay());
+  const weekIndex = Utilities.formatDate(sunday, CONFIG.TIMEZONE, "yyyyMMdd");
+  const sheetName = CONFIG.SHEET_NAME_PREFIX + weekIndex;
+  let sheet = ss.getSheetByName(sheetName);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    const headerData = [
+      ["MEMBERS", "POINTS CONSUMED", "POINTS LEFT", "ATTENDANCE POINTS"],
+    ];
+    sheet
+      .getRange(1, COLUMNS.MEMBERS, 1, COLUMNS.ATTENDANCE_POINTS)
+      .setValues(headerData)
+      .setFontWeight("bold")
+      .setBackground("#4A90E2")
+      .setFontColor("#FFFFFF")
+      .setHorizontalAlignment("center");
+    sheet
+      .getRange(2, COLUMNS.MEMBERS, 1, COLUMNS.ATTENDANCE_POINTS)
+      .setBackground("#E8F4F8");
+    sheet
+      .setColumnWidth(COLUMNS.MEMBERS, 150)
+      .setColumnWidth(COLUMNS.POINTS_CONSUMED, 120)
+      .setColumnWidth(COLUMNS.POINTS_LEFT, 100)
+      .setColumnWidth(COLUMNS.ATTENDANCE_POINTS, 150);
+    copyMembersFromPreviousWeek(ss, sheet);
+  }
+
+  return sheet;
+}
+
+function copyMembersFromPreviousWeek(spreadsheet, newSheet) {
+  const weekSheets = spreadsheet
+    .getSheets()
+    .filter((s) => s.getName().startsWith(CONFIG.SHEET_NAME_PREFIX))
+    .sort((a, b) => b.getName().localeCompare(a.getName()));
+  if (weekSheets.length > 1) {
+    const prevSheet = weekSheets[1];
+    const lastRow = prevSheet.getLastRow();
+    if (lastRow >= 3) {
+      const members = prevSheet
+        .getRange(3, COLUMNS.MEMBERS, lastRow - 2, 1)
+        .getValues()
+        .filter((m) => m[0] && m[0].toString().trim() !== "");
+      if (members.length > 0)
+        newSheet
+          .getRange(3, COLUMNS.MEMBERS, members.length, 1)
+          .setValues(members);
+    }
+  }
+}
+
+function logAttendance(spreadsheet, boss, timestamp, members) {
+  let logSheet = spreadsheet.getSheetByName("AttendanceLog");
+  if (!logSheet) {
+    logSheet = spreadsheet.insertSheet("AttendanceLog");
+    logSheet
+      .getRange(1, 1, 1, 5)
+      .setValues([["Timestamp", "Boss", "Spawn Time", "Members", "Count"]])
+      .setFontWeight("bold")
+      .setBackground("#4A90E2")
+      .setFontColor("#FFFFFF");
+  }
+  logSheet.appendRow([
+    new Date(),
+    boss,
+    timestamp,
+    members.join(", "),
+    members.length,
+  ]);
+}
+
+// ==========================================
+// BIDDING FUNCTIONS
+// ==========================================
+
+function handleGetBiddingPoints(data) {
+  const isDryRun = data.dryRun || false;
+  const sheetName = isDryRun ? CONFIG.TEST_BIDDING_SHEET : CONFIG.BIDDING_SHEET;
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet && isDryRun) sheet = createTestBiddingSheet(ss);
+  if (!sheet) return createResponse("error", `Sheet not found: ${sheetName}`);
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2)
+    return createResponse("ok", "No members found", { points: {} });
+
+  const dataRange = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  const points = {};
+  dataRange.forEach((r) => {
+    const member = (r[0] || "").toString().trim();
+    if (member) points[member] = Number(r[1]) || 0;
+  });
+
+  return createResponse("ok", "Points fetched", { points });
+}
+
+function handleSubmitBiddingResults(data) {
+  const results = data.results || [];
+  const timestamp = data.timestamp || "";
+  const isDryRun = data.dryRun || false;
+  const sheetName = isDryRun ? CONFIG.TEST_BIDDING_SHEET : CONFIG.BIDDING_SHEET;
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet && isDryRun) sheet = createTestBiddingSheet(ss);
+  if (!sheet) return createResponse("error", `Sheet not found: ${sheetName}`);
+  if (!timestamp || results.length === 0)
+    return createResponse("error", "Missing timestamp or results");
+
+  const lastRow = sheet.getLastRow(),
+    lastCol = sheet.getLastColumn();
+  let timestampColumn = -1;
+
+  if (lastCol >= 3) {
+    const headers = sheet.getRange(1, 3, 1, lastCol - 2).getValues()[0];
+    for (let i = 0; i < headers.length; i++) {
+      if (headers[i].toString().trim() === timestamp) {
+        timestampColumn = i + 3;
+        break;
+      }
+    }
+  }
+
+  if (timestampColumn === -1) {
+    timestampColumn = lastCol + 1;
+    sheet
+      .getRange(1, timestampColumn)
+      .setValue(timestamp)
+      .setFontWeight("bold")
+      .setBackground("#4A90E2")
+      .setFontColor("#FFFFFF")
+      .setHorizontalAlignment("center");
+  }
+
+  const memberNames = sheet
+    .getRange(2, 1, lastRow - 1, 1)
+    .getValues()
+    .flat();
+  const updates = [];
+  results.forEach((r) => {
+    const member = r.member.trim();
+    const total = r.totalSpent || 0;
+    let rowIndex = memberNames.findIndex(
+      (m) => (m || "").toString().trim().toLowerCase() === member.toLowerCase()
+    );
+    if (rowIndex !== -1) {
+      updates.push({ row: rowIndex + 2, amount: total });
+    }
+  });
+
+  updates.forEach((u) =>
+    sheet.getRange(u.row, timestampColumn).setValue(u.amount)
+  );
+
+  if (!isDryRun) updateBiddingPoints();
+
+  return createResponse(
+    "ok",
+    `Results submitted: ${updates.length} members updated`,
+    {
+      timestampColumn,
+      membersUpdated: updates.length,
+      timestamp,
+    }
+  );
+}
+
+function createTestBiddingSheet(ss) {
+  const sheet = ss.insertSheet(CONFIG.TEST_BIDDING_SHEET);
+  sheet
+    .getRange(1, 1, 1, 3)
+    .setValues([["Member", "Bidding Points Left", "Consumed"]])
+    .setFontWeight("bold")
+    .setBackground("#4A90E2")
+    .setFontColor("#FFFFFF")
+    .setHorizontalAlignment("center");
+
+  const liveSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
+  if (liveSheet) {
+    const lastRow = liveSheet.getLastRow();
+    if (lastRow > 1) {
+      sheet
+        .getRange(2, 1, lastRow - 1, 3)
+        .setValues(liveSheet.getRange(2, 1, lastRow - 1, 3).getValues());
+    }
+  } else {
+    sheet.getRange(2, 1, 5, 3).setValues([
+      ["TestPlayer1", 1000, 0],
+      ["TestPlayer2", 1000, 0],
+      ["TestPlayer3", 1000, 0],
+      ["TestPlayer4", 1000, 0],
+      ["TestPlayer5", 1000, 0],
+    ]);
+  }
+
+  sheet.setColumnWidths(1, 3, 150);
+  sheet.getRange("A1").setNote("🧪 TEST SHEET - Dry run only");
+  return sheet;
+}
+
+function updateBiddingPoints() {
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const bpSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
+  if (!bpSheet) return;
+
+  const lastRow = bpSheet.getLastRow();
+  if (lastRow < 2) return;
+
+  const existingData = bpSheet.getRange(2, 1, lastRow - 1, 3).getValues();
+  let memberMap = {};
+  existingData.forEach((r, i) => {
+    const m = (r[0] || "").toString().trim();
+    if (m) memberMap[m] = { row: i + 2, consumed: Number(r[2]) || 0 };
+  });
+
+  const sheets = ss.getSheets();
+  let totals = {};
+  sheets.forEach((s) => {
+    if (s.getName().startsWith(CONFIG.SHEET_NAME_PREFIX)) {
+      const data = s.getRange("A2:D").getValues();
+      data.forEach((r) => {
+        const m = (r[0] || "").toString().trim();
+        if (m) totals[m] = (totals[m] || 0) + Number(r[3] || 0);
+      });
+    }
+  });
+
+  Object.keys(memberMap).forEach((m) => {
+    const left = (totals[m] || 0) - memberMap[m].consumed;
+    bpSheet.getRange(memberMap[m].row, 2).setValue(left);
+  });
+}
+
+// ==========================================
+// UTILITIES
+// ==========================================
+
+function createResponse(status, message, data) {
+  const response = {
+    status,
+    message,
+    timestamp: new Date().toISOString(),
+  };
+  if (data) Object.assign(response, data);
+  return ContentService.createTextOutput(JSON.stringify(response)).setMimeType(
+    ContentService.MimeType.JSON
+  );
+}
