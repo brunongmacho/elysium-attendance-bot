@@ -1158,7 +1158,18 @@ client.once(Events.ClientReady, () => {
 
 client.on(Events.MessageCreate, async (message) => {
   try {
-    // Timer server spawn detection
+    // ✅ ADD THIS DEBUG CODE RIGHT HERE
+    if (message.content.startsWith("!bid")) {
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log("🔔 !BID DETECTED FROM ANY USER");
+      console.log(`👤 Author: ${message.author.username} (${message.author.id})`);
+      console.log(`📝 Content: ${message.content}`);
+      console.log(`📍 Channel: ${message.channel.name} (${message.channel.id})`);
+      console.log(`🤖 Is Bot: ${message.author.bot}`);
+      console.log(`🏰 Guild: ${message.guild?.name}`);
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    }
+    //Timer server spawn detection
     if (message.guild && message.guild.id === config.timer_server_id) {
       if (config.timer_channel_id && message.channel.id === config.timer_channel_id) {
         if (/will spawn in.*minutes?!/i.test(message.content)) {
