@@ -133,23 +133,42 @@ async function fetchBiddingPoints(webhookUrl, isDryRun = false) {
 }
 
 async function submitAuctionResults(webhookUrl, results, timestamp, isDryRun = false) {
+  // Validate inputs before attempting submission
+  if (!timestamp || !results || results.length === 0) {
+    console.error("❌ Invalid submission data:", { timestamp, resultsCount: results?.length || 0 });
+    return { success: false, error: "Missing timestamp or results data" };
+  }
+
+  console.log(`📊 Preparing submission:`, {
+    timestamp,
+    resultsCount: results.length,
+    isDryRun,
+    members: results.map(r => r.member).join(", ")
+  });
+
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       console.log(`📊 Submitting results (attempt ${attempt}/3)...`);
 
+      const payload = {
+        action: "submitBiddingResults",
+        results,
+        timestamp,
+        dryRun: isDryRun,
+      };
+
+      console.log(`📤 Payload:`, JSON.stringify(payload, null, 2));
+
       const response = await fetch(webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "submitBiddingResults",
-          results,
-          timestamp,
-          dryRun: isDryRun,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
+
+      console.log(`📥 Response:`, JSON.stringify(data, null, 2));
 
       if (data.status === "ok") {
         console.log("✅ Auction results submitted successfully");
@@ -769,11 +788,21 @@ async function handleCommand(cmd, message, args, client, config) {
         const fsCol = await fsMsg.awaitReactions({ filter: fsFilter, max: 1, time: 30000, errors: ["time"] });
         if (fsCol.first().emoji.name === "✅") {
           console.log("📊 Force submitting results...");
+          
+          // Check if we have a valid session date
+          if (!biddingState.sessionDate) {
+            biddingState.sessionDate = getCurrentTimestamp();
+            console.log(`⚠️ No session date found, using current: ${biddingState.sessionDate}`);
+          }
+          
           const memberTotals = {};
           biddingState.auctionHistory.forEach(auction => {
             memberTotals[auction.winner] = (memberTotals[auction.winner] || 0) + auction.amount;
           });
           const results = Object.entries(memberTotals).map(([member, total]) => ({ member, totalSpent: total }));
+          
+          console.log(`📊 Submitting: ${results.length} member(s), timestamp: ${biddingState.sessionDate}`);
+          
           const submission = await submitAuctionResults(config.sheet_webhook_url, results, biddingState.sessionDate, biddingState.isDryRun);
           
           if (submission.success) {
@@ -788,6 +817,12 @@ async function handleCommand(cmd, message, args, client, config) {
             const winnerList = biddingState.auctionHistory.map(a => `• **${a.item}**: ${a.winner} - ${a.amount}pts`).join("\n");
             successEmbed.addFields({ name: "📋 Winners", value: winnerList });
             await message.channel.send({ embeds: [successEmbed] });
+            
+            // Clear history after successful submission
+            biddingState.auctionHistory = [];
+            biddingState.sessionDate = null;
+            biddingState.lockedPoints = {};
+            saveBiddingState();
           } else {
             const failEmbed = new EmbedBuilder().setColor(0xff0000).setTitle("❌ Force Submit Failed")
               .setDescription(`**Error:** ${submission.error}`)
@@ -795,7 +830,10 @@ async function handleCommand(cmd, message, args, client, config) {
             await message.channel.send({ embeds: [failEmbed] });
           }
         }
-      } catch (err) {}
+      } catch (err) {
+        console.error("❌ Force submit error:", err);
+        await message.reply("❌ Error during force submit: " + err.message);
+      }
       break;
   }
 }
