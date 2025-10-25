@@ -626,12 +626,15 @@ async function recoverStateFromThreads() {
 // COMMAND HANDLERS
 // ==========================================
 
+// REPLACE ALL COMMAND HANDLERS in index2.js with this corrected version:
+
 const commandHandlers = {
-  // Help command - Enhanced but concise
+  // Help command
   help: async (message, member) => {
     const args = message.content.trim().split(/\s+/).slice(1);
     await helpSystem.handleHelp(message, args, member);
   },
+
   status: async (message, member) => {
     const guild = message.guild;
     const uptime = formatUptime(Date.now() - BOT_START_TIME);
@@ -679,9 +682,9 @@ const commandHandlers = {
         : "";
 
     const biddingState = bidding.getBiddingState();
-    const biddingStatus = biddingState.activeAuction
-      ? `🔴 Active: **${biddingState.activeAuction.item}** (${biddingState.activeAuction.currentBid}pts)`
-      : `🟢 Queue: ${biddingState.auctionQueue.length} item(s)`;
+    const biddingStatus = biddingState.a
+      ? `🔴 Active: **${biddingState.a.item}** (${biddingState.a.curBid}pts)`
+      : `🟢 Queue: ${biddingState.q.length} item(s)`;
 
     const embed = new EmbedBuilder()
       .setColor(0x00ff00)
@@ -705,8 +708,9 @@ const commandHandlers = {
         },
         { name: "📊 Last Sheet Call", value: timeSinceSheet, inline: true },
         {
-          name: "📋 Spawn Threads (Oldest First)",
+          name: "🔗 Spawn Threads (Oldest First)",
           value: spawnListText + moreSpawns,
+          inline: false,
         },
         { name: "💰 Bidding System", value: biddingStatus, inline: false }
       )
@@ -796,7 +800,7 @@ const commandHandlers = {
         `⏱️ This will take approximately ${openSpawns.length * 5} seconds.`,
       async (confirmMsg) => {
         await message.reply(
-          `🔄 **Starting mass close...**\n\n` +
+          `📁 **Starting mass close...**\n\n` +
             `Processing ${openSpawns.length} thread(s) one by one...\n` +
             `Please wait, this may take a few minutes.`
         );
@@ -873,7 +877,7 @@ const commandHandlers = {
 
             await thread
               .send(
-                `🔒 Closing spawn **${spawnInfo.boss}** (${spawnInfo.timestamp})... Submitting ${spawnInfo.members.length} members to Google Sheets...`
+                `📍 Closing spawn **${spawnInfo.boss}** (${spawnInfo.timestamp})... Submitting ${spawnInfo.members.length} members to Google Sheets...`
               )
               .catch((err) =>
                 console.warn(
@@ -954,7 +958,7 @@ const commandHandlers = {
               );
 
               console.log(
-                `🔒 Mass close: ${spawnInfo.boss} at ${spawnInfo.timestamp} (${spawnInfo.members.length} members)`
+                `📍 Mass close: ${spawnInfo.boss} at ${spawnInfo.timestamp} (${spawnInfo.members.length} members)`
               );
             } else {
               console.warn(
@@ -997,7 +1001,7 @@ const commandHandlers = {
                 );
 
                 console.log(
-                  `🔒 Mass close (retry): ${spawnInfo.boss} at ${spawnInfo.timestamp} (${spawnInfo.members.length} members)`
+                  `📍 Mass close (retry): ${spawnInfo.boss} at ${spawnInfo.timestamp} (${spawnInfo.members.length} members)`
                 );
               } else {
                 failCount++;
@@ -1060,7 +1064,7 @@ const commandHandlers = {
               `📊 Total: ${openSpawns.length}`
           )
           .addFields(
-            { name: "📋 Detailed Results", value: results.join("\n") },
+            { name: "📋 Detailed Results", value: results.join("\n"), inline: false },
             {
               name: "🧹 Cleanup Statistics",
               value: `✅ Reactions removed: ${totalReactionsRemoved}\n❌ Failed cleanups: ${totalReactionsFailed}`,
@@ -1168,28 +1172,35 @@ const commandHandlers = {
       .setTitle("🔍 Thread Debug Info")
       .addFields(
         { name: "🎯 Boss", value: spawnInfo.boss, inline: true },
-        { name: "⏰ Timestamp", value: spawnInfo.timestamp, inline: true },
+        { name: "🕐 Timestamp", value: spawnInfo.timestamp, inline: true },
         {
           name: "🔒 Closed",
           value: spawnInfo.closed ? "Yes" : "No",
           inline: true,
         },
-        { name: "✅ Verified Members", value: `${spawnInfo.members.length}` },
+        {
+          name: "✅ Verified Members",
+          value: `${spawnInfo.members.length}`,
+          inline: false,
+        },
         {
           name: "👥 Member List",
           value: spawnInfo.members.join(", ") || "None",
+          inline: false,
         },
         {
           name: "⏳ Pending Verifications",
           value: `${pendingInThread.length}`,
+          inline: false,
         },
         {
-          name: "📋 Confirmation Thread",
+          name: "🔗 Confirmation Thread",
           value: spawnInfo.confirmThreadId
             ? `<#${spawnInfo.confirmThreadId}>`
             : "None",
+          inline: false,
         },
-        { name: "💾 In Memory", value: "✅ Yes" }
+        { name: "💾 In Memory", value: "✅ Yes", inline: false }
       )
       .setFooter({ text: `Requested by ${member.user.username}` })
       .setTimestamp();
@@ -1253,7 +1264,7 @@ const commandHandlers = {
     };
 
     try {
-      console.log("🔗 Attempting to fetch bidding points...");
+      console.log("🔬 Attempting to fetch bidding points...");
       const biddingState = bidding.getBiddingState();
 
       const response = await fetch(config.sheet_webhook_url, {
@@ -1261,7 +1272,7 @@ const commandHandlers = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "getBiddingPoints",
-          dryRun: biddingState.isDryRun,
+          dryRun: biddingState.dry,
         }),
       });
 
@@ -1287,13 +1298,13 @@ const commandHandlers = {
 
     const biddingState = bidding.getBiddingState();
     const stateInfo = {
-      isDryRun: biddingState.isDryRun,
-      queueLength: biddingState.auctionQueue.length,
-      hasActiveAuction: !!biddingState.activeAuction,
-      activeAuctionItem: biddingState.activeAuction
-        ? biddingState.activeAuction.item
+      isDryRun: biddingState.dry,
+      queueLength: biddingState.q.length,
+      hasActiveAuction: !!biddingState.a,
+      activeAuctionItem: biddingState.a
+        ? biddingState.a.item
         : "None",
-      lockedPointsCount: Object.keys(biddingState.lockedPoints).length,
+      lockedPointsCount: Object.keys(biddingState.lp).length,
     };
 
     let channelTest = {
@@ -1331,6 +1342,7 @@ const commandHandlers = {
             }\n` +
             `🔗 Webhook: \`${configCheck.webhookUrl}\`\n` +
             `🔗 Channel ID: \`${configCheck.biddingChannel}\``,
+          inline: false,
         },
         {
           name: "📊 Google Sheets Connection",
@@ -1345,6 +1357,7 @@ const commandHandlers = {
               `2. Verify Apps Script is deployed\n` +
               `3. Check BiddingPoints sheet exists\n` +
               `4. Verify sheet has data`,
+          inline: false,
         },
         {
           name: "🎯 Bidding State",
@@ -1356,18 +1369,20 @@ const commandHandlers = {
             `🔴 Active Auction: ${
               stateInfo.hasActiveAuction
                 ? `✅ ${stateInfo.activeAuctionItem}`
-                : "⚪ None"
+                : `⚪ None`
             }\n` +
             `🔒 Locked Points: ${stateInfo.lockedPointsCount} member(s)`,
+          inline: false,
         },
         {
-          name: "📺 Channel Access",
+          name: "📡 Channel Access",
           value: channelTest.canAccessChannel
             ? `✅ **Can access channel**\n` +
               `📌 Name: ${channelTest.channelName}\n` +
-              `📖 Type: ${channelTest.isThread ? "Thread" : "Channel"}`
+              `📝 Type: ${channelTest.isThread ? "Thread" : "Channel"}`
             : `❌ **Cannot access channel**\n` +
               `Error: ${channelTest.error || "Unknown error"}`,
+          inline: false,
         }
       )
       .setFooter({
@@ -1377,14 +1392,14 @@ const commandHandlers = {
 
     await message.reply({ embeds: [embed] });
 
-    console.log("╔═══════════════════════════════════════╗");
+    console.log("╔════════════════════════════════════════════");
     console.log("🔍 BIDDING SYSTEM DIAGNOSTICS");
-    console.log("╚═══════════════════════════════════════╝");
+    console.log("╚════════════════════════════════════════════");
     console.log("Config:", JSON.stringify(configCheck, null, 2));
     console.log("Points Test:", JSON.stringify(pointsTest, null, 2));
     console.log("State:", JSON.stringify(stateInfo, null, 2));
     console.log("Channel:", JSON.stringify(channelTest, null, 2));
-    console.log("╚═══════════════════════════════════════╝");
+    console.log("╚════════════════════════════════════════════");
   },
 };
 
@@ -1554,6 +1569,19 @@ client.on(Events.MessageCreate, async (message) => {
           message.channel.isThread() ? "thread" : "channel"
         }: ${message.channel.name}`
       );
+      await bidding.handleCommand(cmd, message, args, client, config);
+      return;
+    }
+
+    // ✅ HANDLE !MYPOINTS - BIDDING CHANNEL ONLY
+    if (
+      message.content.trim().toLowerCase().startsWith("!mypoints") &&
+      inBiddingChannel &&
+      !message.channel.isThread()
+    ) {
+      const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
+      const args = message.content.trim().split(/\s+/).slice(1);
+      console.log(`🎯 My points command: ${cmd}`);
       await bidding.handleCommand(cmd, message, args, client, config);
       return;
     }
@@ -2333,7 +2361,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     // Bidding bid confirmations
     const biddingState = bidding.getBiddingState();
 
-    if (biddingState.pendingConfirmations[msg.id]) {
+    if (biddingState.pc[msg.id]) {  // ✅ FIXED: Changed from pendingConfirmations to pc
       console.log(
         `🎯 Bidding confirmation reaction detected: ${reaction.emoji.name} by ${user.username}`
       );
@@ -2343,7 +2371,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         await bidding.confirmBid(reaction, user, config);
       } else if (reaction.emoji.name === "❌") {
         console.log(`❌ Canceling bid...`);
-        await bidding.cancelBid(reaction, user, config); // ✅ FIXED: Added config
+        await bidding.cancelBid(reaction, user, config);
       }
       return;
     }
