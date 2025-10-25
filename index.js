@@ -2502,16 +2502,6 @@ client.on(Events.MessageCreate, async (message) => {
 
     if (message.author.bot) return;
 
-    const guild = message.guild;
-    if (!guild) return;
-
-    const member = await guild.members
-      .fetch(message.author.id)
-      .catch(() => null);
-    if (!member) return;
-
-    const userIsAdmin = isAdmin(member);
-
     // ==========================================
     // BIDDING COMMANDS (COMPLETE FIXED ROUTING)
     // ==========================================
@@ -2673,6 +2663,16 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
     }
+
+    const guild = message.guild;
+    if (!guild) return;
+
+    const member = await guild.members
+      .fetch(message.author.id)
+      .catch(() => null);
+    if (!member) return;
+
+    const userIsAdmin = isAdmin(member);
 
     // ========== HELP COMMAND (ANYWHERE EXCEPT SPAWN THREADS) ==========
     if (message.content.toLowerCase().match(/^(!help|!commands|!\?)/)) {
