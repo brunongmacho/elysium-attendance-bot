@@ -36,12 +36,15 @@ const isAdm = (m, c) =>
   m.roles.cache.some((r) => c.admin_roles.includes(r.name));
 const ts = () => {
   const d = new Date();
-  return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(
-    d.getDate()
-  ).padStart(2, "0")}/${d.getFullYear()} ${String(d.getHours()).padStart(
+  // Convert to Manila time (UTC+8)
+  const manilaTime = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  
+  return `${String(manilaTime.getMonth() + 1).padStart(2, "0")}/${String(
+    manilaTime.getDate()
+  ).padStart(2, "0")}/${manilaTime.getFullYear()} ${String(manilaTime.getHours()).padStart(
     2,
     "0"
-  )}:${String(d.getMinutes()).padStart(2, "0")}`;
+  )}:${String(manilaTime.getMinutes()).padStart(2, "0")}`;
 };
 const fmtDur = (m) =>
   m < 60

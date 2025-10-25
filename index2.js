@@ -96,13 +96,13 @@ server.listen(PORT, () =>
 function getCurrentTimestamp() {
   const date = new Date();
   const dateStr = date.toLocaleDateString("en-US", {
-    timeZone: "Asia/Manila",
+    timeZone: "Asia/Manila",  // ✅ Already correct!
     year: "2-digit",
     month: "numeric",
     day: "numeric",
   });
   const timeStr = date.toLocaleTimeString("en-US", {
-    timeZone: "Asia/Manila",
+    timeZone: "Asia/Manila",  // ✅ Already correct!
     hour12: false,
     hour: "2-digit",
     minute: "2-digit",
