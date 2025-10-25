@@ -712,70 +712,215 @@ async function finalizeAuctionSession(client, config) {
 // ==========================================
 
 /**
- * Process bid command
+ * COMPLETE FIXED processBid FUNCTION
+ * Replace the existing processBid function in bidding.js (around line 580)
+ * This version includes all fixes for Google Sheets integration
  */
+
 async function processBid(message, amount, config) {
   const auction = biddingState.activeAuction;
   
-  // Validation
+  console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+  console.log(`🎯 PROCESSING BID`);
+  console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+  
+  // Validation: Active auction exists
   if (!auction) {
+    console.log(`❌ No active auction`);
     return {success: false, message: 'No active auction'};
   }
   
+  console.log(`📦 Auction: ${auction.item}`);
+  console.log(`📊 Status: ${auction.status}`);
+  console.log(`💰 Current bid: ${auction.currentBid} points`);
+  
+  // Validation: Auction is active (not in preview)
   if (auction.status !== 'active') {
+    console.log(`❌ Auction status is "${auction.status}" (must be "active")`);
     return {success: false, message: 'Auction not started yet. Wait for bidding to open.'};
   }
   
+  // Validation: Correct thread
   if (message.channel.id !== auction.threadId) {
+    console.log(`❌ Wrong thread. Expected: ${auction.threadId}, Got: ${message.channel.id}`);
     return {success: false, message: 'Wrong thread. Bid in the active auction thread.'};
   }
   
+  // Parse bid amount
   const bidAmount = parseInt(amount);
   
   if (isNaN(bidAmount) || bidAmount <= 0) {
+    console.log(`❌ Invalid bid amount: "${amount}"`);
     return {success: false, message: 'Invalid bid amount'};
   }
   
+  console.log(`💵 Bid amount: ${bidAmount} points`);
+  
+  // Validation: Bid must be higher than current
   if (bidAmount <= auction.currentBid) {
+    console.log(`❌ Bid too low (current: ${auction.currentBid}, bid: ${bidAmount})`);
     return {success: false, message: `Bid must be higher than current bid (${auction.currentBid} points)`};
   }
   
+  // Validation: Cannot bid exact same amount (prevents ties)
   if (bidAmount === auction.currentBid) {
+    console.log(`❌ Bid equals current bid`);
     return {success: false, message: 'You cannot bid the same amount as the current bid. Please bid higher.'};
   }
   
-  // Fetch member's available points
+  // Get member info
   const member = message.member;
   const username = member.nickname || message.author.username;
   
-  const allPoints = await fetchBiddingPoints(config.sheet_webhook_url, biddingState.isDryRun);
-  if (!allPoints) {
-    return {success: false, message: 'Failed to fetch bidding points. Please try again.'};
+  console.log(`\n👤 BIDDER INFO`);
+  console.log(`   Username: ${username}`);
+  console.log(`   User ID: ${message.author.id}`);
+  console.log(`   Display name: ${member.nickname || 'None (using username)'}`);
+  
+  // ═══════════════════════════════════════════════════════
+  // CRITICAL: FETCH BIDDING POINTS FROM GOOGLE SHEETS
+  // ═══════════════════════════════════════════════════════
+  
+  console.log(`\n📊 FETCHING POINTS FROM GOOGLE SHEETS`);
+  console.log(`   Webhook URL: ${config.sheet_webhook_url}`);
+  console.log(`   Dry run mode: ${biddingState.isDryRun}`);
+  console.log(`   Looking for member: "${username}"`);
+  
+  let allPoints = null;
+  let fetchError = null;
+  
+  try {
+    allPoints = await fetchBiddingPoints(config.sheet_webhook_url, biddingState.isDryRun);
+    
+    if (!allPoints) {
+      fetchError = 'fetchBiddingPoints returned null';
+      console.error(`❌ ${fetchError}`);
+    } else {
+      console.log(`✅ Points fetched successfully`);
+      console.log(`   Total members in sheet: ${Object.keys(allPoints).length}`);
+      
+      // Debug: Show first 5 members
+      const sampleMembers = Object.entries(allPoints).slice(0, 5);
+      console.log(`   Sample members:`);
+      sampleMembers.forEach(([name, pts]) => {
+        console.log(`      • ${name}: ${pts} points`);
+      });
+      
+      // Debug: Check if user exists (case-insensitive)
+      const userInSheet = Object.keys(allPoints).find(
+        name => name.toLowerCase() === username.toLowerCase()
+      );
+      
+      if (userInSheet) {
+        console.log(`   ✅ User found in sheet as: "${userInSheet}"`);
+        if (userInSheet !== username) {
+          console.log(`   ⚠️ Name mismatch! Discord: "${username}", Sheet: "${userInSheet}"`);
+        }
+      } else {
+        console.log(`   ❌ User NOT found in sheet`);
+        console.log(`   Available names: ${Object.keys(allPoints).join(', ')}`);
+      }
+    }
+  } catch (err) {
+    fetchError = err.message;
+    console.error(`❌ Error fetching points: ${fetchError}`);
+    console.error(err.stack);
   }
   
-  const totalPoints = allPoints[username] || 0;
-  const availablePoints = getAvailablePoints(username, totalPoints);
-  
-  if (bidAmount > availablePoints) {
+  // Handle fetch failure
+  if (!allPoints) {
+    console.log(`\n❌ FETCH FAILED - ABORTING BID`);
     return {
       success: false, 
-      message: `Insufficient points. You have ${availablePoints} available (${totalPoints} total, ${biddingState.lockedPoints[username] || 0} locked in other bids)`
+      message: `❌ Failed to fetch bidding points from Google Sheets.\n\n` +
+               `**Error:** ${fetchError || 'Unknown error'}\n\n` +
+               `**Troubleshooting:**\n` +
+               `• Check webhook URL in config.json\n` +
+               `• Verify Apps Script is deployed\n` +
+               `• Check BiddingPoints sheet exists\n` +
+               `• Run \`!testbidding\` for diagnostics\n\n` +
+               `Contact an admin if issue persists.`
     };
   }
   
-  // Check for duplicate simultaneous bids
+  // Get user's points (exact match first, then case-insensitive)
+  let totalPoints = allPoints[username];
+  
+  if (totalPoints === undefined) {
+    // Try case-insensitive match
+    const matchedName = Object.keys(allPoints).find(
+      name => name.toLowerCase() === username.toLowerCase()
+    );
+    
+    if (matchedName) {
+      totalPoints = allPoints[matchedName];
+      console.log(`   ℹ️ Using case-insensitive match: "${matchedName}"`);
+    } else {
+      totalPoints = 0;
+    }
+  }
+  
+  totalPoints = totalPoints || 0;
+  
+  // Calculate available points (total - locked)
+  const lockedPoints = biddingState.lockedPoints[username] || 0;
+  const availablePoints = Math.max(0, totalPoints - lockedPoints);
+  
+  console.log(`\n💳 POINTS BREAKDOWN`);
+  console.log(`   Total points: ${totalPoints}`);
+  console.log(`   Locked points: ${lockedPoints}`);
+  console.log(`   Available: ${availablePoints}`);
+  
+  // Validation: User has points in sheet
+  if (totalPoints === 0) {
+    console.log(`❌ User has no points in sheet`);
+    return {
+      success: false,
+      message: `❌ You have no bidding points available.\n\n` +
+               `**Your username in sheet:** "${username}"\n\n` +
+               `**Possible issues:**\n` +
+               `• Your name is not in the BiddingPoints sheet\n` +
+               `• There's a typo in your Discord nickname\n` +
+               `• Your points column (B) is empty\n\n` +
+               `Contact an admin to verify your points.`
+    };
+  }
+  
+  // Validation: User has enough available points
+  if (bidAmount > availablePoints) {
+    console.log(`❌ Insufficient points (need: ${bidAmount}, have: ${availablePoints})`);
+    return {
+      success: false, 
+      message: `❌ Insufficient points!\n\n` +
+               `💰 **Your Points:**\n` +
+               `• Total: ${totalPoints}\n` +
+               `• Locked: ${lockedPoints}\n` +
+               `• Available: ${availablePoints}\n\n` +
+               `You need **${bidAmount}** but only have **${availablePoints}** available.\n\n` +
+               `${lockedPoints > 0 ? '💡 Tip: Points are locked when you\'re winning other auctions.' : ''}`
+    };
+  }
+  
+  // Check for duplicate simultaneous bids (race condition)
   const recentBids = auction.bids.filter(b => 
     Date.now() - b.timestamp < 1000 && b.amount === bidAmount
   );
   
   if (recentBids.length > 0) {
+    console.log(`❌ Duplicate bid detected (${recentBids.length} recent bid(s) with same amount)`);
     return {
       success: false,
       message: '❌ **Duplicate bid detected!** Someone else bid the same amount at the same time. Please bid again.'
     };
   }
   
-  // Create confirmation embed
+  // ═══════════════════════════════════════════════════════
+  // CREATE CONFIRMATION EMBED
+  // ═══════════════════════════════════════════════════════
+  
+  console.log(`\n✅ BID VALID - SHOWING CONFIRMATION`);
+  
+  const { EmbedBuilder } = require('discord.js');
   const confirmEmbed = new EmbedBuilder()
     .setColor(0xFFD700)
     .setTitle('⏳ Confirm Your Bid')
@@ -783,7 +928,7 @@ async function processBid(message, amount, config) {
     .addFields(
       {name: '💰 Your Bid', value: `${bidAmount} points`, inline: true},
       {name: '📊 Current Bid', value: `${auction.currentBid} points`, inline: true},
-      {name: '💳 Available', value: `${availablePoints} points`, inline: true}
+      {name: '💳 Available After', value: `${availablePoints - bidAmount} points`, inline: true}
     )
     .setFooter({text: 'React ✅ to confirm or ❌ to cancel • 30 second timeout'});
   
@@ -805,9 +950,13 @@ async function processBid(message, amount, config) {
   
   saveBiddingState();
   
+  console.log(`✅ Confirmation message created: ${confirmMsg.id}`);
+  console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+  
   // Set timeout for confirmation (30 seconds)
   biddingState.timerHandles[`confirm_${confirmMsg.id}`] = setTimeout(async () => {
     if (biddingState.pendingConfirmations[confirmMsg.id]) {
+      console.log(`⏱️ Confirmation timeout for ${username}'s bid of ${bidAmount}`);
       await confirmMsg.reactions.removeAll().catch(() => {});
       await confirmMsg.edit({
         embeds: [confirmEmbed.setColor(0x808080).setFooter({text: '⏱️ Confirmation timed out'})]
@@ -818,150 +967,6 @@ async function processBid(message, amount, config) {
   }, 30000);
   
   return {success: true, confirmationMessageId: confirmMsg.id};
-}
-
-/**
- * Confirm bid (after ✅ reaction)
- */
-async function confirmBid(reaction, user, config) {
-  const pending = biddingState.pendingConfirmations[reaction.message.id];
-  if (!pending || pending.userId !== user.id) return;
-  
-  const auction = biddingState.activeAuction;
-  if (!auction || auction.status !== 'active') {
-    await reaction.message.reply('❌ Auction is no longer active');
-    delete biddingState.pendingConfirmations[reaction.message.id];
-    saveBiddingState();
-    return;
-  }
-  
-  // Validate bid is still higher than current
-  if (pending.amount <= auction.currentBid) {
-    await reaction.message.reply(`❌ Bid no longer valid. Current bid is now ${auction.currentBid} points.`);
-    delete biddingState.pendingConfirmations[reaction.message.id];
-    saveBiddingState();
-    return;
-  }
-  
-  // Check for duplicate amount (race condition)
-  if (pending.amount === auction.currentBid) {
-    await reaction.message.reply('❌ **Duplicate bid!** Someone bid the same amount. Please bid higher.');
-    delete biddingState.pendingConfirmations[reaction.message.id];
-    saveBiddingState();
-    return;
-  }
-  
-  // Unlock previous winner's points
-  if (auction.currentWinner) {
-    unlockPoints(auction.currentWinner, auction.currentBid);
-    
-    // Notify previous winner
-    const outbidEmbed = new EmbedBuilder()
-      .setColor(0xFF6600)
-      .setTitle('❌ You\'ve Been Outbid!')
-      .setDescription(`Someone bid **${pending.amount} points** on **${auction.item}**`)
-      .addFields(
-        {name: '💸 Your Points Returned', value: `${auction.currentBid} points`, inline: true},
-        {name: '💰 New High Bid', value: `${pending.amount} points`, inline: true}
-      )
-      .setFooter({text: 'You can bid again if you want'});
-    
-    await reaction.message.channel.send({
-      content: `<@${auction.currentWinnerId}>`,
-      embeds: [outbidEmbed]
-    });
-  }
-  
-  // Lock new winner's points
-  lockPoints(pending.username, pending.amount);
-  
-  // Update auction state
-  const previousBid = auction.currentBid;
-  auction.currentBid = pending.amount;
-  auction.currentWinner = pending.username;
-  auction.currentWinnerId = pending.userId;
-  auction.bids.push({
-    user: pending.username,
-    userId: pending.userId,
-    amount: pending.amount,
-    timestamp: Date.now()
-  });
-  
-  // Check if bid was placed in last minute (extend timer)
-  const timeLeft = auction.endTime - Date.now();
-  if (timeLeft < 60000 && auction.extendedCount < 10) { // Max 10 extensions
-    auction.endTime += 60000; // Add 1 minute
-    auction.extendedCount++;
-    auction.goingOnceAnnounced = false;
-    auction.goingTwiceAnnounced = false;
-    
-    // Reschedule timers
-    scheduleAuctionTimers(config.client, config);
-  }
-  
-  // Clear confirmation timeout
-  if (biddingState.timerHandles[`confirm_${reaction.message.id}`]) {
-    clearTimeout(biddingState.timerHandles[`confirm_${reaction.message.id}`]);
-    delete biddingState.timerHandles[`confirm_${reaction.message.id}`];
-  }
-  
-  // Update confirmation message
-  const successEmbed = new EmbedBuilder()
-    .setColor(0x00FF00)
-    .setTitle('✅ Bid Confirmed!')
-    .setDescription(`You are now the highest bidder on **${auction.item}**`)
-    .addFields(
-      {name: '💰 Your Bid', value: `${pending.amount} points`, inline: true},
-      {name: '📊 Previous Bid', value: `${previousBid} points`, inline: true},
-      {name: '⏱️ Time Left', value: formatTimeRemaining(auction.endTime - Date.now()), inline: true}
-    )
-    .setFooter({text: timeLeft < 60000 ? '⏰ Timer extended by 1 minute!' : 'Good luck!'});
-  
-  await reaction.message.edit({embeds: [successEmbed]});
-  await reaction.message.reactions.removeAll().catch(() => {});
-  
-  // Announce new high bid in thread
-  const announceEmbed = new EmbedBuilder()
-    .setColor(0xFFD700)
-    .setTitle('🔔 New High Bid!')
-    .addFields(
-      {name: '💰 Amount', value: `${pending.amount} points`, inline: true},
-      {name: '👤 Bidder', value: pending.username, inline: true},
-      {name: '⏱️ Time Left', value: formatTimeRemaining(auction.endTime - Date.now()), inline: true}
-    );
-  
-  await reaction.message.channel.send({embeds: [announceEmbed]});
-  
-  delete biddingState.pendingConfirmations[reaction.message.id];
-  saveBiddingState();
-  
-  console.log(`✅ Bid confirmed: ${pending.username} - ${pending.amount} points on ${auction.item}`);
-}
-
-/**
- * Cancel bid (after ❌ reaction)
- */
-async function cancelBid(reaction, user) {
-  const pending = biddingState.pendingConfirmations[reaction.message.id];
-  if (!pending || pending.userId !== user.id) return;
-  
-  const cancelEmbed = new EmbedBuilder()
-    .setColor(0x808080)
-    .setTitle('❌ Bid Canceled')
-    .setDescription('Your bid was not placed')
-    .setFooter({text: 'You can bid again anytime'});
-  
-  await reaction.message.edit({embeds: [cancelEmbed]});
-  await reaction.message.reactions.removeAll().catch(() => {});
-  
-  // Clear timeout
-  if (biddingState.timerHandles[`confirm_${reaction.message.id}`]) {
-    clearTimeout(biddingState.timerHandles[`confirm_${reaction.message.id}`]);
-    delete biddingState.timerHandles[`confirm_${reaction.message.id}`];
-  }
-  
-  delete biddingState.pendingConfirmations[reaction.message.id];
-  saveBiddingState();
 }
 
 // ==========================================
