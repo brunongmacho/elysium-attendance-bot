@@ -137,8 +137,9 @@ const COMMAND_HELP = {
     category: "Bidding",
     adminOnly: true,
     example: "!ql",
+    aliases: ["!ql", "!queue"],
     details:
-      "Shows:\n• Item names\n• Start prices\n• Durations\n• Quantities (for batch auctions)\n• Queue position\n• Total count\n\nAliases: !ql, !queue",
+      "Shows:\n• Item names\n• Start prices\n• Durations\n• Quantities (for batch auctions)\n• Queue position\n• Total count\n\n**Aliases:** !ql, !queue",
   },
 
   removeitem: {
@@ -147,8 +148,9 @@ const COMMAND_HELP = {
     category: "Bidding",
     adminOnly: true,
     example: "!rm Dragon Sword",
+    aliases: ["!rm"],
     details:
-      "Removes before auction starts:\n• Cannot remove during active auction\n• Full item name required\n• Updates queue positions\n\nAlias: !rm",
+      "Removes before auction starts:\n• Cannot remove during active auction\n• Full item name required\n• Updates queue positions\n\n**Alias:** !rm",
   },
 
   clearqueue: {
@@ -167,8 +169,9 @@ const COMMAND_HELP = {
     category: "Bidding",
     adminOnly: true,
     example: "!start",
+    aliases: ["!start"],
     details:
-      "Starts session:\n• Loads points cache (instant bidding)\n• Auto-refreshes cache every 30min\n• Shows preview of items\n• 30-second item preview\n• Processes items one-by-one\n• Auto-submits at end\n• Concurrent start protection\n\nAlias: !start",
+      "Starts session:\n• Loads points cache (instant bidding)\n• Auto-refreshes cache every 30min\n• Shows preview of items\n• 30-second item preview\n• Processes items one-by-one\n• Auto-submits at end\n• Concurrent start protection\n\n**Alias:** !start",
   },
 
   bid: {
@@ -177,28 +180,31 @@ const COMMAND_HELP = {
     category: "Bidding",
     adminOnly: false,
     example: "!b 750",
+    aliases: ["!b"],
     details:
-      "Bidding rules:\n• Integers only (no decimals)\n• Must exceed current bid\n• 10-second confirmation with countdown\n• 3-second rate limit\n• Self-overbid = incremental locking\n• Last 10s bids pause timer\n• Max 15 extensions\n• Batch auctions: Top N bidders win\n\nAlias: !b",
+      "Bidding rules:\n• Integers only (no decimals)\n• Must exceed current bid\n• 10-second confirmation with countdown\n• 3-second rate limit\n• Self-overbid = incremental locking\n• Last 10s bids pause timer\n• Max 15 extensions\n• Batch auctions: Top N bidders win\n\n**Aliases:** !b",
   },
 
   bidstatus: {
-    usage: "!bidstatus (or !bstatus)",
+    usage: "!bidstatus (or !bstatus, !bs)",
     description: "View bidding system status",
     category: "Bidding",
     adminOnly: false,
     example: "!bstatus",
+    aliases: ["!bstatus", "!bs"],
     details:
-      "Shows:\n• Cache status and age\n• Auto-refresh status\n• Queue items (first 5)\n• Active auction item\n• Current bid and winner\n• Time remaining\n• Dry run mode indicator\n\nAlias: !bstatus",
+      "Shows:\n• Cache status and age\n• Auto-refresh status\n• Queue items (first 5)\n• Active auction item\n• Current bid and winner\n• Time remaining\n• Dry run mode indicator\n\n**Aliases:** !bstatus, !bs",
   },
 
-  mypoints: {
-    usage: "!mypoints (or !pts)",
+mypoints: {
+    usage: "!mypoints (or !pts, !mypts, !mp)",
     description: "Check your available bidding points",
     category: "Bidding",
     adminOnly: false,
     example: "!pts",
+    aliases: ["!pts", "!mypts", "!mp"],
     details:
-      'Personal points check:\n• Use ONLY in bidding channel (not threads)\n• Cannot use during active auction\n• Fetches fresh from Sheets\n• Auto-deletes after 30 seconds\n• Shows "Not found" if not in system\n\nAlias: !pts',
+      'Personal points check:\n• Use ONLY in bidding channel (not threads)\n• Cannot use during active auction\n• Fetches fresh from Sheets\n• Auto-deletes after 30 seconds\n• Shows "Not found" if not in system\n\n**Aliases:** !pts, !mypts, !mp',
   },
 
   dryrun: {

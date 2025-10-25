@@ -63,6 +63,8 @@ const COMMAND_ALIASES = {
   '!start': '!startauction',
   '!bstatus': '!bidstatus',
   '!pts': '!mypoints',
+  '!mypts': '!mypoints',
+  '!mp': '!mypoints',
 };
 
 // STATE

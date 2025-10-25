@@ -18,6 +18,48 @@ const http = require("http");
 const bidding = require("./bidding.js");
 const helpSystem = require("./help-system.js");
 
+const COMMAND_ALIASES = {
+  // Help commands
+  '!?': '!help',
+  '!commands': '!help',
+  '!cmds': '!help',
+  
+  // Attendance commands (admin)
+  '!st': '!status',
+  '!addth': '!addthread',
+  '!v': '!verify',
+  '!vall': '!verifyall',
+  '!resetpend': '!resetpending',
+  '!fs': '!forcesubmit',
+  '!fc': '!forceclose',
+  '!debug': '!debugthread',
+  '!closeall': '!closeallthread',
+  '!clear': '!clearstate',
+  
+  // Bidding commands (admin)
+  '!auc': '!auction',
+  '!ql': '!queuelist',
+  '!queue': '!queuelist',
+  '!rm': '!removeitem',
+  '!start': '!startauction',
+  '!clearq': '!clearqueue',
+  '!resetb': '!resetbids',
+  '!forcesubmit': '!forcesubmitresults',
+  '!testbid': '!testbidding',
+  
+  // Bidding commands (member)
+  '!b': '!bid',
+  '!bstatus': '!bidstatus',
+  '!bs': '!bidstatus',
+  '!pts': '!mypoints',
+  '!mypts': '!mypoints',
+  '!mp': '!mypoints',
+  
+  // Auction control commands
+  '!cancel': '!cancelitem',
+  '!skip': '!skipitem',
+};
+
 // Load configuration
 const config = JSON.parse(fs.readFileSync("./config.json"));
 const bossPoints = JSON.parse(fs.readFileSync("./boss_points.json"));
@@ -92,6 +134,11 @@ server.listen(PORT, () =>
 // ==========================================
 // UTILITY FUNCTIONS
 // ==========================================
+
+function resolveCommandAlias(cmd) {
+  const lowerCmd = cmd.toLowerCase();
+  return COMMAND_ALIASES[lowerCmd] || lowerCmd;
+}
 
 function getCurrentTimestamp() {
   const date = new Date();
@@ -1428,20 +1475,16 @@ client.once(Events.ClientReady, () => {
 
 client.on(Events.MessageCreate, async (message) => {
   try {
-    // ✅ ADD THIS DEBUG CODE RIGHT HERE
-    if (message.content.startsWith("!bid")) {
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log("🔔 !BID DETECTED FROM ANY USER");
-      console.log(
-        `👤 Author: ${message.author.username} (${message.author.id})`
-      );
+    // Debug for !bid detection
+    if (message.content.startsWith("!bid") || message.content.startsWith("!b")) {
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log("🔔 BID COMMAND DETECTED");
+      console.log(`👤 Author: ${message.author.username} (${message.author.id})`);
       console.log(`📝 Content: ${message.content}`);
-      console.log(
-        `📍 Channel: ${message.channel.name} (${message.channel.id})`
-      );
+      console.log(`📍 Channel: ${message.channel.name} (${message.channel.id})`);
       console.log(`🤖 Is Bot: ${message.author.bot}`);
       console.log(`🏰 Guild: ${message.guild?.name}`);
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
     //Timer server spawn detection
     if (message.guild && message.guild.id === config.timer_server_id) {
@@ -1543,12 +1586,14 @@ client.on(Events.MessageCreate, async (message) => {
       (message.channel.isThread() &&
         message.channel.parentId === config.bidding_channel_id);
 
-    // ✅ HANDLE !BID IMMEDIATELY - BEFORE ANY OTHER CHECKS
-    if (message.content.trim().toLowerCase().startsWith("!bid")) {
-      console.log(`🔍 !bid detected - Checking channel validity...`);
-      console.log(
-        `   Channel: ${message.channel.name} (${message.channel.id})`
-      );
+    // ✅ HANDLE !BID AND ALIASES IMMEDIATELY
+    const rawCmd = message.content.trim().toLowerCase().split(/\s+/)[0];
+    const resolvedCmd = resolveCommandAlias(rawCmd);
+
+    if (resolvedCmd === "!bid") {
+      console.log(`🔍 !bid or alias detected - Checking channel validity...`);
+      console.log(`   Raw command: ${rawCmd} -> Resolved: ${resolvedCmd}`);
+      console.log(`   Channel: ${message.channel.name} (${message.channel.id})`);
       console.log(`   Is Thread: ${message.channel.isThread()}`);
       console.log(`   Parent ID: ${message.channel.parentId}`);
       console.log(`   Expected Parent: ${config.bidding_channel_id}`);
@@ -1557,12 +1602,11 @@ client.on(Events.MessageCreate, async (message) => {
       if (!inBiddingChannel) {
         console.log(`❌ !bid blocked - not in bidding channel/thread`);
         await message.reply(
-          "❌ You can only use `!bid` in the auction threads!"
+          `❌ You can only use \`${rawCmd}\` in the auction threads!`
         );
         return;
       }
 
-      const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
       const args = message.content.trim().split(/\s+/).slice(1);
 
       console.log(
@@ -1570,37 +1614,32 @@ client.on(Events.MessageCreate, async (message) => {
           message.channel.isThread() ? "thread" : "channel"
         }: ${message.channel.name}`
       );
-      await bidding.handleCommand(cmd, message, args, client, config);
+      await bidding.handleCommand(resolvedCmd, message, args, client, config);
       return;
     }
 
-    // ✅ HANDLE !MYPOINTS - BIDDING CHANNEL ONLY
+    // ✅ HANDLE !MYPOINTS AND ALIASES - BIDDING CHANNEL ONLY
     if (
-      message.content.trim().toLowerCase().startsWith("!mypoints") &&
+      resolvedCmd === "!mypoints" &&
       inBiddingChannel &&
       !message.channel.isThread()
     ) {
-      const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
       const args = message.content.trim().split(/\s+/).slice(1);
-      console.log(`🎯 My points command: ${cmd}`);
-      await bidding.handleCommand(cmd, message, args, client, config);
+      console.log(`🎯 My points command (${rawCmd}): ${resolvedCmd}`);
+      await bidding.handleCommand(resolvedCmd, message, args, client, config);
       return;
     }
 
-    // ✅ HANDLE !BIDSTATUS IMMEDIATELY TOO
-    if (
-      message.content.trim().toLowerCase().startsWith("!bidstatus") &&
-      inBiddingChannel
-    ) {
-      const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
+    // ✅ HANDLE !BIDSTATUS AND ALIASES
+    if (resolvedCmd === "!bidstatus" && inBiddingChannel) {
       const args = message.content.trim().split(/\s+/).slice(1);
-      console.log(`🎯 Bidding status command: ${cmd}`);
-      await bidding.handleCommand(cmd, message, args, client, config);
+      console.log(`🎯 Bidding status command (${rawCmd}): ${resolvedCmd}`);
+      await bidding.handleCommand(resolvedCmd, message, args, client, config);
       return;
     }
 
     // Help command (anywhere except spawn threads)
-    if (message.content.toLowerCase().match(/^(!help|!commands|!\?)/)) {
+    if (resolvedCmd === "!help") {
       if (
         message.channel.isThread() &&
         message.channel.parentId === config.attendance_channel_id
@@ -1698,9 +1737,9 @@ client.on(Events.MessageCreate, async (message) => {
       if (!userIsAdmin) return;
 
       const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
-
+const spawnCmd = resolveCommandAlias(rawCmd);
       // !verifyall
-      if (cmd === "!verifyall") {
+      if (spawnCmd === "!verifyall") {
         const spawnInfo = activeSpawns[message.channel.id];
         if (!spawnInfo || spawnInfo.closed) {
           await message.reply("⚠️ This spawn is closed or not found.");
@@ -1788,7 +1827,7 @@ client.on(Events.MessageCreate, async (message) => {
       }
 
       // !verify @member
-      if (cmd === "!verify") {
+      if (spawnCmd === "!verify") {
         const mentioned = message.mentions.users.first();
         if (!mentioned) {
           await message.reply("⚠️ Usage: `!verify @member`");
@@ -1895,7 +1934,7 @@ client.on(Events.MessageCreate, async (message) => {
       }
 
       // !forceclose
-      if (cmd === "!forceclose") {
+      if (spawnCmd === "!forceclose") {
         const spawnInfo = activeSpawns[message.channel.id];
         if (!spawnInfo || spawnInfo.closed) {
           await message.reply("⚠️ This spawn is already closed or not found.");
@@ -1967,7 +2006,11 @@ client.on(Events.MessageCreate, async (message) => {
       }
 
       // Thread-specific override commands
-      if (["!forcesubmit", "!debugthread", "!resetpending"].includes(cmd)) {
+            if ([
+        "!forcesubmit",
+        "!debugthread",
+        "!resetpending"
+      ].includes(spawnCmd)) {
         const now = Date.now();
         if (now - lastOverrideTime < TIMING.OVERRIDE_COOLDOWN) {
           const remaining = Math.ceil(
@@ -1981,14 +2024,14 @@ client.on(Events.MessageCreate, async (message) => {
 
         lastOverrideTime = now;
         console.log(
-          `🔧 Override: ${cmd} used by ${member.user.username} in thread ${message.channel.id}`
+          `🔧 Override (${rawCmd} -> ${spawnCmd}): used by ${member.user.username} in thread ${message.channel.id}`
         );
 
-        if (cmd === "!forcesubmit")
+        if (spawnCmd === "!forcesubmit")
           await commandHandlers.forcesubmit(message, member);
-        else if (cmd === "!debugthread")
+        else if (spawnCmd === "!debugthread")
           await commandHandlers.debugthread(message, member);
-        else if (cmd === "!resetpending")
+        else if (spawnCmd === "!resetpending")
           await commandHandlers.resetpending(message, member);
         return;
       }
@@ -2000,14 +2043,17 @@ client.on(Events.MessageCreate, async (message) => {
     if (!userIsAdmin) return;
 
     if (inAdminLogs) {
-      const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
+      const adminCmd = resolveCommandAlias(rawCmd);
       const args = message.content.trim().split(/\s+/).slice(1);
 
       // Admin logs override commands
       if (
-        ["!clearstate", "!status", "!closeallthread", "!testbidding"].includes(
-          cmd
-        )
+        [
+          "!clearstate",
+          "!status",
+          "!closeallthread",
+          "!testbidding"
+        ].includes(adminCmd)
       ) {
         const now = Date.now();
         if (now - lastOverrideTime < TIMING.OVERRIDE_COOLDOWN) {
@@ -2021,15 +2067,15 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         lastOverrideTime = now;
-        console.log(`🔧 Override: ${cmd} used by ${member.user.username}`);
+        console.log(`🔧 Override (${rawCmd} -> ${adminCmd}): used by ${member.user.username}`);
 
-        if (cmd === "!clearstate")
+        if (adminCmd === "!clearstate")
           await commandHandlers.clearstate(message, member);
-        else if (cmd === "!status")
+        else if (adminCmd === "!status")
           await commandHandlers.status(message, member);
-        else if (cmd === "!closeallthread")
+        else if (adminCmd === "!closeallthread")
           await commandHandlers.closeallthread(message, member);
-        else if (cmd === "!testbidding")
+        else if (adminCmd === "!testbidding")
           await commandHandlers.testbidding(message, member);
         return;
       }
@@ -2045,16 +2091,16 @@ client.on(Events.MessageCreate, async (message) => {
           "!clearqueue",
           "!resetbids",
           "!forcesubmitresults",
-          "!bidstatus",
-        ].includes(cmd)
+          "!bidstatus"
+        ].includes(adminCmd)
       ) {
-        console.log(`🎯 Processing bidding command: ${cmd}`);
-        await bidding.handleCommand(cmd, message, args, client, config);
+        console.log(`🎯 Processing bidding command (${rawCmd} -> ${adminCmd})`);
+        await bidding.handleCommand(adminCmd, message, args, client, config);
         return;
       }
 
       // !addthread
-      if (cmd === "!addthread") {
+      if (adminCmd === "!addthread") {
         const fullText = message.content.substring("!addthread".length).trim();
 
         const timestampMatch = fullText.match(
@@ -2122,14 +2168,14 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     // Other bidding commands (admin only)
-    if (inBiddingChannel) {
-      const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
+if (inBiddingChannel) {
+      const biddingCmd = resolveCommandAlias(rawCmd);
       const args = message.content.trim().split(/\s+/).slice(1);
 
       // !bidstatus - also available to members
-      if (cmd === "!bidstatus") {
-        console.log(`🎯 Bidding status command: ${cmd}`);
-        await bidding.handleCommand(cmd, message, args, client, config);
+if (biddingCmd === "!bidstatus") {
+        console.log(`🎯 Bidding status command (${rawCmd} -> ${biddingCmd})`);
+        await bidding.handleCommand(biddingCmd, message, args, client, config);
         return;
       }
     }
