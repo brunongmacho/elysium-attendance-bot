@@ -510,16 +510,29 @@ async function finalize(cli, cfg) {
 
   // Get all members from cache for auto-populate
   const allMembers = Object.keys(st.cp || {});
-  const winners = {};
-  st.h.forEach(
-    (a) => (winners[a.winner] = (winners[a.winner] || 0) + a.amount)
-  );
 
-  // Auto-populate 0 for non-winners
-  const res = allMembers.map((m) => ({
-    member: m,
-    totalSpent: winners[m] || 0,
-  }));
+  // Build winners map with CASE-INSENSITIVE keys
+  const winners = {};
+  st.h.forEach((a) => {
+    const normalizedWinner = a.winner.toLowerCase().trim();
+    winners[normalizedWinner] = (winners[normalizedWinner] || 0) + a.amount;
+  });
+
+  // Auto-populate 0 for non-winners with case-insensitive matching
+  const res = allMembers.map((m) => {
+    const normalizedMember = m.toLowerCase().trim();
+    return {
+      member: m, // Keep original casing for sheet
+      totalSpent: winners[normalizedMember] || 0,
+    };
+  });
+
+  console.log("📊 FINALIZE DEBUG:");
+  console.log("Winners (normalized):", winners);
+  console.log(
+    "Non-zero results:",
+    res.filter((r) => r.totalSpent > 0)
+  );
 
   const sub = await submitRes(cfg.sheet_webhook_url, res, st.sd, st.dry);
 
@@ -1008,15 +1021,23 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         });
         if (fsCol.first().emoji.name === "✅") {
           if (!st.sd) st.sd = ts();
+
+          // Build winners map with CASE-INSENSITIVE keys
           const winners = {};
-          st.h.forEach(
-            (a) => (winners[a.winner] = (winners[a.winner] || 0) + a.amount)
-          );
+          st.h.forEach((a) => {
+            const normalizedWinner = a.winner.toLowerCase().trim();
+            winners[normalizedWinner] =
+              (winners[normalizedWinner] || 0) + a.amount;
+          });
+
           const allMembers = Object.keys(st.cp || {});
-          const res = allMembers.map((m) => ({
-            member: m,
-            totalSpent: winners[m] || 0,
-          }));
+          const res = allMembers.map((m) => {
+            const normalizedMember = m.toLowerCase().trim();
+            return {
+              member: m, // Keep original casing for sheet
+              totalSpent: winners[normalizedMember] || 0,
+            };
+          });
           const sub = await submitRes(
             cfg.sheet_webhook_url,
             res,
@@ -1236,7 +1257,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
 // MODULE EXPORTS
 module.exports = {
-  initializeBidding,  // ✅ Export the initialization function
+  initializeBidding, // ✅ Export the initialization function
   loadBiddingState: load,
   saveBiddingState: save,
   getBiddingState: () => st,
@@ -1247,21 +1268,21 @@ module.exports = {
   clearPointsCache: clearCache,
   handleCommand: handleCmd,
 
-confirmBid: async function (reaction, user, config) {
-  const p = st.pc[reaction.message.id];
-  if (!p) return;
+  confirmBid: async function (reaction, user, config) {
+    const p = st.pc[reaction.message.id];
+    if (!p) return;
 
-  const guild = reaction.message.guild,
-    member = await guild.members.fetch(user.id).catch(() => null);
-  if (!member) return;
+    const guild = reaction.message.guild,
+      member = await guild.members.fetch(user.id).catch(() => null);
+    if (!member) return;
 
-  const isOwner = p.userId === user.id,
-    isAdm = isAdmFunc(member, config);  // ✅ CHANGED: isAdmin() → isAdmFunc()
-  
-  if (!isOwner && !isAdm) {
-    await reaction.users.remove(user.id).catch(() => {});
-    return;
-  }
+    const isOwner = p.userId === user.id,
+      isAdm = isAdmFunc(member, config); // ✅ CHANGED: isAdmin() → isAdmFunc()
+
+    if (!isOwner && !isAdm) {
+      await reaction.users.remove(user.id).catch(() => {});
+      return;
+    }
 
     const a = st.a;
     if (!a || a.status !== "active") {
@@ -1416,20 +1437,20 @@ confirmBid: async function (reaction, user, config) {
   },
 
   cancelBid: async function (reaction, user, config) {
-  const p = st.pc[reaction.message.id];
-  if (!p) return;
+    const p = st.pc[reaction.message.id];
+    if (!p) return;
 
-  const guild = reaction.message.guild,
-    member = await guild.members.fetch(user.id).catch(() => null);
-  if (!member) return;
+    const guild = reaction.message.guild,
+      member = await guild.members.fetch(user.id).catch(() => null);
+    if (!member) return;
 
-  const isOwner = p.userId === user.id,
-    isAdm = isAdmFunc(member, config);  // ✅ CHANGED: isAdmin() → isAdmFunc()
-  
-  if (!isOwner && !isAdm) {
-    await reaction.users.remove(user.id).catch(() => {});
-    return;
-  }
+    const isOwner = p.userId === user.id,
+      isAdm = isAdmFunc(member, config); // ✅ CHANGED: isAdmin() → isAdmFunc()
+
+    if (!isOwner && !isAdm) {
+      await reaction.users.remove(user.id).catch(() => {});
+      return;
+    }
 
     await reaction.message.edit({
       embeds: [
