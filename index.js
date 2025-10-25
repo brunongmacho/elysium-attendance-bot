@@ -67,7 +67,6 @@ const client = new Client({
   partials: [Partials.Channel, Partials.Message, Partials.Reaction],
 });
 
-
 // ==========================================
 // HTTP HEALTH CHECK SERVER FOR KOYEB
 // ==========================================
@@ -2410,7 +2409,13 @@ async function handleCloseAllThreads(message, member) {
 
 client.on(Events.MessageCreate, async (message) => {
   try {
-    console.log(`[DEBUG] Message from channel: ${message.channel.id}, name: ${message.channel.name}, isThread=${message.channel.isThread()}, parentId=${message.channel.parentId}`);
+    console.log(
+      `[DEBUG] Message from channel: ${message.channel.id}, name: ${
+        message.channel.name
+      }, isThread=${message.channel.isThread()}, parentId=${
+        message.channel.parentId
+      }`
+    );
     // Timer server spawn detection
     if (message.guild && message.guild.id === config.timer_server_id) {
       if (
@@ -3291,6 +3296,17 @@ client.on(Events.MessageCreate, async (message) => {
       message.channel.id === config.bidding_channel_id ||
       (message.channel.isThread() &&
         message.channel.parentId === config.bidding_channel_id);
+
+    console.log("[DEBUG-CHECK] message.content:", message.content);
+    console.log("[DEBUG-CHECK] bidding_channel_id:", config.bidding_channel_id);
+    console.log(
+      "[DEBUG-CHECK] inBiddingChannel =",
+      message.channel.id === config.bidding_channel_id,
+      message.channel.isThread() &&
+        message.channel.parentId === config.bidding_channel_id,
+      "=>",
+      inBiddingChannel
+    );
 
     if (message.content.startsWith("!bid")) {
       console.log("🧩 DEBUG: Bidding Channel Check");
