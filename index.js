@@ -3287,20 +3287,17 @@ client.on(Events.MessageCreate, async (message) => {
 const inBiddingChannel = message.channel.id === config.bidding_channel_id || 
                         (message.channel.isThread() && message.channel.parentId === config.bidding_channel_id);
 
-// Diagnostic logging for bidding commands
-if (message.content.startsWith('!') && inBiddingChannel) {
-  console.log(`\n🎯 Bidding command detected`);
-  console.log(`   Command: ${message.content}`);
-  console.log(`   Channel ID: ${message.channel.id}`);
-  console.log(`   Is Thread: ${message.channel.isThread()}`);
-  if (message.channel.isThread()) {
-    console.log(`   Parent ID: ${message.channel.parentId}`);
-  }
-  console.log(`   Config Bidding ID: ${config.bidding_channel_id}`);
-  console.log(`   Match: ${inBiddingChannel ? '✅ YES' : '❌ NO'}`);
+if (message.content.startsWith('!bid')) {
+  console.log("🧩 DEBUG: Bidding Channel Check");
+  console.log("Channel ID:", message.channel.id);
+  console.log("Parent ID:", message.channel.parentId);
+  console.log("Config Bidding ID:", config.bidding_channel_id);
+  console.log("Is Thread:", message.channel.isThread());
+  console.log("Match:", inBiddingChannel ? "✅ YES" : "❌ NO");
 }
 
 if (inBiddingChannel) {
+
   const content = message.content.trim();
   const args = content.split(/\s+/).slice(1);
   const command = content.split(/\s+/)[0].toLowerCase();
