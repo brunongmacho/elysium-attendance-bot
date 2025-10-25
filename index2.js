@@ -1240,6 +1240,38 @@ client.on(Events.MessageCreate, async (message) => {
     const inAdminLogs = message.channel.id === config.admin_logs_channel_id || (message.channel.isThread() && message.channel.parentId === config.admin_logs_channel_id);
     const inBiddingChannel = message.channel.id === config.bidding_channel_id || (message.channel.isThread() && message.channel.parentId === config.bidding_channel_id);
 
+    // ✅ HANDLE !BID IMMEDIATELY - BEFORE ANY OTHER CHECKS
+    if (message.content.trim().toLowerCase().startsWith("!bid")) {
+      console.log(`🔍 !bid detected - Checking channel validity...`);
+      console.log(`   Channel: ${message.channel.name} (${message.channel.id})`);
+      console.log(`   Is Thread: ${message.channel.isThread()}`);
+      console.log(`   Parent ID: ${message.channel.parentId}`);
+      console.log(`   Expected Parent: ${config.bidding_channel_id}`);
+      console.log(`   inBiddingChannel: ${inBiddingChannel}`);
+
+      if (!inBiddingChannel) {
+        console.log(`❌ !bid blocked - not in bidding channel/thread`);
+        await message.reply("❌ You can only use `!bid` in the auction threads!");
+        return;
+      }
+
+      const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
+      const args = message.content.trim().split(/\s+/).slice(1);
+
+      console.log(`🎯 Bid command detected in ${message.channel.isThread() ? 'thread' : 'channel'}: ${message.channel.name}`);
+      await bidding.handleCommand(cmd, message, args, client, config);
+      return;
+    }
+
+    // ✅ HANDLE !BIDSTATUS IMMEDIATELY TOO
+    if (message.content.trim().toLowerCase().startsWith("!bidstatus") && inBiddingChannel) {
+      const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
+      const args = message.content.trim().split(/\s+/).slice(1);
+      console.log(`🎯 Bidding status command: ${cmd}`);
+      await bidding.handleCommand(cmd, message, args, client, config);
+      return;
+    }
+
     // Help command (anywhere except spawn threads)
     if (message.content.toLowerCase().match(/^(!help|!commands|!\?)/)) {
       if (message.channel.isThread() && message.channel.parentId === config.attendance_channel_id) {
@@ -1632,31 +1664,7 @@ client.on(Events.MessageCreate, async (message) => {
       }
     }
 
-    // BIDDING COMMANDS - Bidding channel and auction threads
-    // ✅ MOVED: Check for !bid BEFORE the inBiddingChannel check
-    if (message.content.trim().toLowerCase().startsWith("!bid")) {
-      console.log(`🔍 !bid detected - Checking channel validity...`);
-      console.log(`   Channel: ${message.channel.name} (${message.channel.id})`);
-      console.log(`   Is Thread: ${message.channel.isThread()}`);
-      console.log(`   Parent ID: ${message.channel.parentId}`);
-      console.log(`   Expected Parent: ${config.bidding_channel_id}`);
-      console.log(`   inBiddingChannel: ${inBiddingChannel}`);
-
-      if (!inBiddingChannel) {
-        console.log(`❌ !bid blocked - not in bidding channel/thread`);
-        await message.reply("❌ You can only use `!bid` in the auction threads!");
-        return;
-      }
-
-      const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
-      const args = message.content.trim().split(/\s+/).slice(1);
-
-      console.log(`🎯 Bid command detected in ${message.channel.isThread() ? 'thread' : 'channel'}: ${message.channel.name}`);
-      await bidding.handleCommand(cmd, message, args, client, config);
-      return;
-    }
-
-    // Other bidding commands (admin only)
+   // Other bidding commands (admin only)
     if (inBiddingChannel) {
       const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
       const args = message.content.trim().split(/\s+/).slice(1);
