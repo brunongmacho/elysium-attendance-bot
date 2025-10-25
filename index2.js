@@ -1546,21 +1546,26 @@ client.on(Events.MessageCreate, async (message) => {
       }
 
 // Bidding setup commands (admin logs)
-if (["!auction", "!queuelist", "!removeitem", "!startauction", "!dryrun", "!clearqueue", "!forcesync", "!setbidpoints", "!resetbids", "!forcesubmitresults"].includes(cmd)) {
-  console.log(`🎯 Processing bidding command: ${cmd}`);
+      if (["!auction", "!queuelist", "!removeitem", "!startauction", "!dryrun", "!clearqueue", "!resetbids", "!forcesubmitresults", "!testbidding", "!bidstatus"].includes(cmd)) {
+        console.log(`🎯 Processing bidding command: ${cmd}`);
+        await bidding.handleCommand(cmd, message, args, client, config);
+        return;
+      }
 
-  if (cmd === "!auction") await bidding.handleAuctionCommand(message, args, config);
-  else if (cmd === "!queuelist") await bidding.handleQueueListCommand(message);
-  else if (cmd === "!removeitem") await bidding.handleRemoveItemCommand(message, args);
-  else if (cmd === "!startauction") await bidding.handleStartAuctionCommand(message, client, config);
-  else if (cmd === "!dryrun") await bidding.handleDryRunCommand(message, args);
-  else if (cmd === "!clearqueue") await bidding.handleClearQueueCommand(message);
-  else if (cmd === "!forcesync") await bidding.handleForceSyncCommand(message, config);
-  else if (cmd === "!setbidpoints") await bidding.handleSetBidPointsCommand(message, args);
-  else if (cmd === "!resetbids") await bidding.handleResetBidsCommand(message);
-  else if (cmd === "!forcesubmitresults") await bidding.handleForceSubmitResultsCommand(message, client, config);
-  return;
-}
+      // Bidding commands in channel/threads
+      if (inBiddingChannel) {
+        if (cmd === "!bid") {
+          console.log(`🎯 Bidding channel command: ${cmd}`);
+          await bidding.handleCommand(cmd, message, args, client, config);
+          return;
+        }
+
+        if (cmd === "!bidstatus") {
+          console.log(`🎯 Bidding channel command: ${cmd}`);
+          await bidding.handleCommand(cmd, message, args, client, config);
+          return;
+        }
+      }
 
       // !addthread
       if (cmd === "!addthread") {
