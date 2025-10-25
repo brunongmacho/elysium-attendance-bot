@@ -2493,7 +2493,7 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     if (message.author.bot) return;
-
+   
     const guild = message.guild;
     if (!guild) return;
 
@@ -3279,171 +3279,159 @@ client.on(Events.MessageCreate, async (message) => {
 
       return;
     }
-    // ========== BIDDING COMMANDS (FIXED ROUTING) ==========
+// ==========================================
+// BIDDING COMMANDS (COMPLETE FIXED ROUTING)
+// ==========================================
 
-    // Check if in bidding channel (parent channel or its threads)
-    const inBiddingChannel =
-      message.channel.id === config.bidding_channel_id ||
-      (message.channel.isThread() &&
-        message.channel.parentId === config.bidding_channel_id);
+// Check if in bidding channel (parent channel OR its threads)
+const inBiddingChannel = message.channel.id === config.bidding_channel_id || 
+                        (message.channel.isThread() && message.channel.parentId === config.bidding_channel_id);
 
-    if (inBiddingChannel) {
-      const content = message.content.trim();
-      const args = content.split(/\s+/).slice(1);
-      const command = content.split(/\s+/)[0].toLowerCase();
+// Diagnostic logging for bidding commands
+if (message.content.startsWith('!') && inBiddingChannel) {
+  console.log(`\n🎯 Bidding command detected`);
+  console.log(`   Command: ${message.content}`);
+  console.log(`   Channel ID: ${message.channel.id}`);
+  console.log(`   Is Thread: ${message.channel.isThread()}`);
+  if (message.channel.isThread()) {
+    console.log(`   Parent ID: ${message.channel.parentId}`);
+  }
+  console.log(`   Config Bidding ID: ${config.bidding_channel_id}`);
+  console.log(`   Match: ${inBiddingChannel ? '✅ YES' : '❌ NO'}`);
+}
 
-      console.log(
-        `🎯 Bidding command detected: ${command} in channel ${message.channel.id}`
-      );
-
-      // MEMBER COMMANDS (work in bidding threads)
-      if (command === "!bid") {
-        console.log(`💰 Processing !bid command with args: ${args.join(" ")}`);
-        await bidding.handleBidCommand(message, args, config);
-        return;
-      }
-
-      if (command === "!bidstatus") {
-        console.log(`📊 Processing !bidstatus command`);
-        await bidding.handleBidStatusCommand(message, userIsAdmin);
-        return;
-      }
-
-      if (command === "!mybids") {
-        console.log(`💳 Processing !mybids command`);
-        await bidding.handleMyBidsCommand(message);
-        return;
-      }
-
-      // ADMIN COMMANDS (work in bidding threads)
-      if (userIsAdmin) {
-        if (command === "!endauction") {
-          console.log(`⏹️ Processing !endauction command`);
-          await bidding.handleEndAuctionCommand(message, client, config);
-          return;
-        }
-
-        if (command === "!extendtime") {
-          console.log(`⏱️ Processing !extendtime command`);
-          await bidding.handleExtendTimeCommand(message, args, client, config);
-          return;
-        }
-
-        if (command === "!forcewinner") {
-          console.log(`👑 Processing !forcewinner command`);
-          await bidding.handleForceWinnerCommand(message, args);
-          return;
-        }
-
-        if (command === "!cancelbid") {
-          console.log(`❌ Processing !cancelbid command`);
-          await bidding.handleCancelBidCommand(message, args);
-          return;
-        }
-
-        if (command === "!debugauction") {
-          console.log(`🔍 Processing !debugauction command`);
-          await bidding.handleDebugAuctionCommand(message);
-          return;
-        }
-
-        if (command === "!cancelauction") {
-          console.log(`🚫 Processing !cancelauction command`);
-          await bidding.handleCancelAuctionCommand(message, client, config);
-          return;
-        }
-      }
-
-      // If we got here and it's a bidding command, it means the command wasn't recognized
-      if (command.startsWith("!")) {
-        console.log(`⚠️ Unknown bidding command: ${command}`);
-      }
-
-      // Don't return here - let other handlers process non-command messages
-      // Only return if we actually handled a command
-      if (
-        [
-          "!bid",
-          "!bidstatus",
-          "!mybids",
-          "!endauction",
-          "!extendtime",
-          "!forcewinner",
-          "!cancelbid",
-          "!debugauction",
-          "!cancelauction",
-        ].includes(command)
-      ) {
-        return;
-      }
+if (inBiddingChannel) {
+  const content = message.content.trim();
+  const args = content.split(/\s+/).slice(1);
+  const command = content.split(/\s+/)[0].toLowerCase();
+  
+  console.log(`🎯 Processing bidding command: ${command}`);
+  
+  // MEMBER COMMANDS (work in bidding threads)
+  if (command === '!bid') {
+    console.log(`💰 Calling handleBidCommand with args: ${args.join(' ')}`);
+    await bidding.handleBidCommand(message, args, config);
+    return;
+  }
+  
+  if (command === '!bidstatus') {
+    console.log(`📊 Calling handleBidStatusCommand`);
+    await bidding.handleBidStatusCommand(message, userIsAdmin);
+    return;
+  }
+  
+  if (command === '!mybids') {
+    console.log(`💳 Calling handleMyBidsCommand`);
+    await bidding.handleMyBidsCommand(message);
+    return;
+  }
+  
+  // ADMIN COMMANDS (work in bidding threads)
+  if (userIsAdmin) {
+    if (command === '!endauction') {
+      console.log(`⏹️ Calling handleEndAuctionCommand`);
+      await bidding.handleEndAuctionCommand(message, client, config);
+      return;
     }
-
-    // Check if in admin logs (for admin-only bidding setup commands)
-    const inAdminLogsForBidding =
-      message.channel.id === config.admin_logs_channel_id ||
-      (message.channel.isThread() &&
-        message.channel.parentId === config.admin_logs_channel_id);
-
-    if (inAdminLogsForBidding && userIsAdmin) {
-      const content = message.content.trim();
-      const args = content.split(/\s+/).slice(1);
-      const command = content.split(/\s+/)[0].toLowerCase();
-
-      // ADMIN SETUP COMMANDS (in admin logs channel)
-      if (command === "!auction") {
-        console.log(`🏆 Processing !auction command`);
-        await bidding.handleAuctionCommand(message, args, config);
-        return;
-      }
-
-      if (command === "!queuelist") {
-        console.log(`📋 Processing !queuelist command`);
-        await bidding.handleQueueListCommand(message);
-        return;
-      }
-
-      if (command === "!removeitem") {
-        console.log(`🗑️ Processing !removeitem command`);
-        await bidding.handleRemoveItemCommand(message, args);
-        return;
-      }
-
-      if (command === "!startauction") {
-        console.log(`🚀 Processing !startauction command`);
-        await bidding.handleStartAuctionCommand(message, client, config);
-        return;
-      }
-
-      if (command === "!dryrun") {
-        console.log(`🧪 Processing !dryrun command`);
-        await bidding.handleDryRunCommand(message, args);
-        return;
-      }
-
-      if (command === "!clearqueue") {
-        console.log(`🗑️ Processing !clearqueue command`);
-        await bidding.handleClearQueueCommand(message);
-        return;
-      }
-
-      if (command === "!forcesync") {
-        console.log(`🔄 Processing !forcesync command`);
-        await bidding.handleForceSyncCommand(message, config);
-        return;
-      }
-
-      if (command === "!setbidpoints") {
-        console.log(`🔧 Processing !setbidpoints command`);
-        await bidding.handleSetBidPointsCommand(message, args);
-        return;
-      }
-
-      if (command === "!resetbids") {
-        console.log(`🔧 Processing !resetbids command`);
-        await bidding.handleResetBidsCommand(message);
-        return;
-      }
+    
+    if (command === '!extendtime') {
+      console.log(`⏱️ Calling handleExtendTimeCommand`);
+      await bidding.handleExtendTimeCommand(message, args, client, config);
+      return;
     }
+    
+    if (command === '!forcewinner') {
+      console.log(`👑 Calling handleForceWinnerCommand`);
+      await bidding.handleForceWinnerCommand(message, args);
+      return;
+    }
+    
+    if (command === '!cancelbid') {
+      console.log(`❌ Calling handleCancelBidCommand`);
+      await bidding.handleCancelBidCommand(message, args);
+      return;
+    }
+    
+    if (command === '!debugauction') {
+      console.log(`🔍 Calling handleDebugAuctionCommand`);
+      await bidding.handleDebugAuctionCommand(message);
+      return;
+    }
+    
+    if (command === '!cancelauction') {
+      console.log(`🚫 Calling handleCancelAuctionCommand`);
+      await bidding.handleCancelAuctionCommand(message, client, config);
+      return;
+    }
+  }
+  
+  // If we got here with a ! command that wasn't handled
+  if (command.startsWith('!')) {
+    console.log(`⚠️ Unknown bidding command: ${command}`);
+  }
+}
+
+
+if (inAdminLogs && userIsAdmin) {
+  const content = message.content.trim();
+  const args = content.split(/\s+/).slice(1);
+  const command = content.split(/\s+/)[0].toLowerCase();
+  
+  // ADMIN SETUP COMMANDS (in admin logs channel)
+  if (command === '!auction') {
+    console.log(`🏆 Calling handleAuctionCommand`);
+    await bidding.handleAuctionCommand(message, args, config);
+    return;
+  }
+  
+  if (command === '!queuelist') {
+    console.log(`📋 Calling handleQueueListCommand`);
+    await bidding.handleQueueListCommand(message);
+    return;
+  }
+  
+  if (command === '!removeitem') {
+    console.log(`🗑️ Calling handleRemoveItemCommand`);
+    await bidding.handleRemoveItemCommand(message, args);
+    return;
+  }
+  
+  if (command === '!startauction') {
+    console.log(`🚀 Calling handleStartAuctionCommand`);
+    await bidding.handleStartAuctionCommand(message, client, config);
+    return;
+  }
+  
+  if (command === '!dryrun') {
+    console.log(`🧪 Calling handleDryRunCommand`);
+    await bidding.handleDryRunCommand(message, args);
+    return;
+  }
+  
+  if (command === '!clearqueue') {
+    console.log(`🗑️ Calling handleClearQueueCommand`);
+    await bidding.handleClearQueueCommand(message);
+    return;
+  }
+  
+  if (command === '!forcesync') {
+    console.log(`🔄 Calling handleForceSyncCommand`);
+    await bidding.handleForceSyncCommand(message, config);
+    return;
+  }
+  
+  if (command === '!setbidpoints') {
+    console.log(`🔧 Calling handleSetBidPointsCommand`);
+    await bidding.handleSetBidPointsCommand(message, args);
+    return;
+  }
+  
+  if (command === '!resetbids') {
+    console.log(`🔧 Calling handleResetBidsCommand`);
+    await bidding.handleResetBidsCommand(message);
+    return;
+  }
+}
   } catch (err) {
     console.error("❌ Message handler error:", err);
   }
