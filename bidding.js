@@ -1572,6 +1572,132 @@ module.exports = {
   handleSetBidPointsCommand,
   handleResetBidsCommand,
 
+  handleForceSubmitResultsCommand: async function (message, client, config) {
+    if (biddingState.auctionHistory.length === 0) {
+      return await message.reply("❌ No auction history to submit. Run auctions first.");
+    }
+
+    if (!biddingState.sessionDate) {
+      return await message.reply("❌ No active session date. Start an auction first.");
+    }
+
+    const confirmEmbed = new EmbedBuilder()
+      .setColor(0xff6600)
+      .setTitle("⚠️ Force Submit Auction Results?")
+      .setDescription(
+        `**Session Timestamp:** ${biddingState.sessionDate}\n` +
+        `**Items in History:** ${biddingState.auctionHistory.length}\n` +
+        `**Winners:** ${biddingState.auctionHistory.map(a => a.winner).join(", ")}`
+      )
+      .addFields(
+        {
+          name: "📋 Items & Results",
+          value: biddingState.auctionHistory
+            .map(a => `• **${a.item}**: ${a.winner} - ${a.amount} points`)
+            .join("\n"),
+          inline: false,
+        }
+      )
+      .setFooter({ text: "React ✅ to force submit or ❌ to cancel" });
+
+    const confirmMsg = await message.reply({ embeds: [confirmEmbed] });
+    await confirmMsg.react("✅");
+    await confirmMsg.react("❌");
+
+    const filter = (reaction, user) => {
+      return (
+        ["✅", "❌"].includes(reaction.emoji.name) &&
+        user.id === message.author.id
+      );
+    };
+
+    try {
+      const collected = await confirmMsg.awaitReactions({
+        filter,
+        max: 1,
+        time: 30000,
+        errors: ["time"],
+      });
+      const reaction = collected.first();
+
+      if (reaction.emoji.name === "✅") {
+        await message.channel.send("📊 **Force submitting results to Google Sheets...**");
+
+        const memberTotals = {};
+        biddingState.auctionHistory.forEach(auction => {
+          memberTotals[auction.winner] = (memberTotals[auction.winner] || 0) + auction.amount;
+        });
+
+        const results = Object.entries(memberTotals).map(([member, total]) => ({
+          member,
+          totalSpent: total,
+        }));
+
+        const submission = await submitAuctionResults(
+          config.sheet_webhook_url,
+          results,
+          biddingState.sessionDate,
+          biddingState.isDryRun
+        );
+
+        if (submission.success) {
+          const successEmbed = new EmbedBuilder()
+            .setColor(0x00ff00)
+            .setTitle("✅ Force Submit Successful!")
+            .setDescription(`Results submitted to Google Sheets`)
+            .addFields(
+              { name: "🕐 Timestamp", value: biddingState.sessionDate, inline: true },
+              { name: "🏆 Items Sold", value: `${biddingState.auctionHistory.length}`, inline: true },
+              {
+                name: "💰 Total Points Spent",
+                value: `${results.reduce((sum, r) => sum + r.totalSpent, 0)}`,
+                inline: true,
+              }
+            )
+            .setFooter({
+              text: biddingState.isDryRun ? "🧪 DRY RUN - Test mode" : "Points have been deducted",
+            })
+            .setTimestamp();
+
+          const winnerList = biddingState.auctionHistory
+            .map(a => `• **${a.item}**: ${a.winner} - ${a.amount} points`)
+            .join("\n");
+
+          successEmbed.addFields({ name: "📋 Winners", value: winnerList || "None" });
+
+          await message.channel.send({ embeds: [successEmbed] });
+
+          console.log(`✅ Force submitted: ${biddingState.auctionHistory.length} items`);
+        } else {
+          const failureEmbed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle("❌ Force Submit Failed")
+            .setDescription(
+              `Failed to submit results.\n\n**Error:** ${submission.error}`
+            )
+            .addFields({
+              name: "📝 Manual Data",
+              value: `\`\`\`\n${results.map(r => `${r.member}: ${r.totalSpent} points`).join("\n")}\n\`\`\``,
+            })
+            .setFooter({ text: "Please manually enter the data in Google Sheets" })
+            .setTimestamp();
+
+          await message.channel.send({ embeds: [failureEmbed] });
+
+          console.log(`❌ Force submit failed: ${submission.error}`);
+        }
+
+        await confirmMsg.reactions.removeAll().catch(() => {});
+      } else {
+        await confirmMsg.reactions.removeAll().catch(() => {});
+        await message.reply("❌ Force submit canceled.");
+      }
+    } catch (err) {
+      await confirmMsg.reactions.removeAll().catch(() => {});
+      await message.reply("⏱️ Confirmation timed out. Force submit canceled.");
+    }
+  },
+
   confirmBid: async function (reaction, user, config) {
     const pending = biddingState.pendingConfirmations[reaction.message.id];
     if (!pending || pending.userId !== user.id) return;

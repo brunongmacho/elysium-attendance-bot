@@ -1545,21 +1545,22 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
 
-      // Bidding setup commands (admin logs)
-      if (["!auction", "!queuelist", "!removeitem", "!startauction", "!dryrun", "!clearqueue", "!forcesync", "!setbidpoints", "!resetbids"].includes(cmd)) {
-        console.log(`🎯 Processing bidding command: ${cmd}`);
+// Bidding setup commands (admin logs)
+if (["!auction", "!queuelist", "!removeitem", "!startauction", "!dryrun", "!clearqueue", "!forcesync", "!setbidpoints", "!resetbids", "!forcesubmitresults"].includes(cmd)) {
+  console.log(`🎯 Processing bidding command: ${cmd}`);
 
-        if (cmd === "!auction") await bidding.handleAuctionCommand(message, args, config);
-        else if (cmd === "!queuelist") await bidding.handleQueueListCommand(message);
-        else if (cmd === "!removeitem") await bidding.handleRemoveItemCommand(message, args);
-        else if (cmd === "!startauction") await bidding.handleStartAuctionCommand(message, client, config);
-        else if (cmd === "!dryrun") await bidding.handleDryRunCommand(message, args);
-        else if (cmd === "!clearqueue") await bidding.handleClearQueueCommand(message);
-        else if (cmd === "!forcesync") await bidding.handleForceSyncCommand(message, config);
-        else if (cmd === "!setbidpoints") await bidding.handleSetBidPointsCommand(message, args);
-        else if (cmd === "!resetbids") await bidding.handleResetBidsCommand(message);
-        return;
-      }
+  if (cmd === "!auction") await bidding.handleAuctionCommand(message, args, config);
+  else if (cmd === "!queuelist") await bidding.handleQueueListCommand(message);
+  else if (cmd === "!removeitem") await bidding.handleRemoveItemCommand(message, args);
+  else if (cmd === "!startauction") await bidding.handleStartAuctionCommand(message, client, config);
+  else if (cmd === "!dryrun") await bidding.handleDryRunCommand(message, args);
+  else if (cmd === "!clearqueue") await bidding.handleClearQueueCommand(message);
+  else if (cmd === "!forcesync") await bidding.handleForceSyncCommand(message, config);
+  else if (cmd === "!setbidpoints") await bidding.handleSetBidPointsCommand(message, args);
+  else if (cmd === "!resetbids") await bidding.handleResetBidsCommand(message);
+  else if (cmd === "!forcesubmitresults") await bidding.handleForceSubmitResultsCommand(message, client, config);
+  return;
+}
 
       // !addthread
       if (cmd === "!addthread") {
