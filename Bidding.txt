@@ -1,18 +1,15 @@
 /**
- * ELYSIUM Guild System - Attendance Tracker + Bidding System
- * Version 3.0 (MERGED FULLY OPTIMIZED)
+ * ELYSIUM Guild System - Google Apps Script v4.0
+ * Consolidated Attendance + Bidding System
  * 
  * FEATURES:
- * - Attendance submission with batch operations, case-insensitive member matching, checkbox validation
- * - Weekly sheet creation with previous week member copy
- * - Attendance logging
- * - Bidding system integration: get points, submit results, dry run, update Points Left
- * - Test functions included
+ * - Attendance tracking with weekly sheets
+ * - Bidding points management
+ * - Timestamped auction results (MM/DD/YYYY HH:MM for multiple auctions per day)
+ * - Automatic Points Left calculation
+ * - Dry run support
  */
 
-// ==========================================
-// CONFIGURATION
-// ==========================================
 const CONFIG = {
   SHEET_ID: '1dGLGjmRhvG0io1Yta5ikfN-b_U-SSJJfWIHznK18qYQ',
   SHEET_NAME_PREFIX: 'ELYSIUM_WEEK_',
@@ -20,36 +17,32 @@ const CONFIG = {
   BIDDING_SHEET: 'BiddingPoints',
   TEST_BIDDING_SHEET: 'TestBiddingPoints',
   TIMEZONE: 'Asia/Manila',
-  DATE_FORMAT: 'M/d/yy'
 };
 
-// Attendance column indices
 const COLUMNS = {
   MEMBERS: 1,
   POINTS_CONSUMED: 2,
   POINTS_LEFT: 3,
   ATTENDANCE_POINTS: 4,
-  FIRST_SPAWN: 5
+  FIRST_SPAWN: 5,
 };
 
 // ==========================================
 // MAIN WEBHOOK HANDLER
 // ==========================================
+
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents || '{}');
     const action = data.action || 'unknown';
     
-    Logger.log(`🔥 Action received: ${action}`);
-    Logger.log(`📦 Payload: ${JSON.stringify(data)}`);
+    Logger.log(`📥 Action received: ${action}`);
     
-    // Attendance actions
     if (['checkColumn', 'submitAttendance'].includes(action)) {
       if (action === 'checkColumn') return handleCheckColumn(data);
       if (action === 'submitAttendance') return handleSubmitAttendance(data);
     }
 
-    // Bidding actions
     if (['getBiddingPoints', 'submitBiddingResults'].includes(action)) {
       if (action === 'getBiddingPoints') return handleGetBiddingPoints(data);
       if (action === 'submitBiddingResults') return handleSubmitBiddingResults(data);
@@ -81,8 +74,8 @@ function handleCheckColumn(data) {
   if (lastCol < COLUMNS.FIRST_SPAWN) return createResponse('ok', 'No columns exist', {exists: false});
   
   const spawnData = sheet.getRange(1, COLUMNS.FIRST_SPAWN, 2, lastCol - COLUMNS.FIRST_SPAWN + 1).getValues();
-  const row1 = spawnData[0]; // timestamps
-  const row2 = spawnData[1]; // boss names
+  const row1 = spawnData[0];
+  const row2 = spawnData[1];
   
   for (let i = 0; i < row1.length; i++) {
     if ((row1[i] || '').toString().trim() === timestamp && (row2[i] || '').toString().trim().toUpperCase() === boss) {
@@ -98,7 +91,9 @@ function handleSubmitAttendance(data) {
   const timestamp = (data.timestamp || '').toString().trim();
   const members = (data.members || []).map(m => m.trim());
   
-  if (!boss || !timestamp || members.length === 0) return createResponse('error', 'Missing boss, timestamp, or members list');
+  if (!boss || !timestamp || members.length === 0) {
+    return createResponse('error', 'Missing boss, timestamp, or members list');
+  }
 
   const lock = LockService.getScriptLock();
   try { lock.waitLock(30000); } catch (e) { return createResponse('error', 'Could not acquire lock'); }
@@ -235,82 +230,128 @@ function handleGetBiddingPoints(data) {
   
   const dataRange = sheet.getRange(2,1,lastRow-1,2).getValues();
   const points = {};
-  dataRange.forEach(r => { const member = (r[0]||'').toString().trim(); if(member) points[member]=Number(r[1])||0; });
+  dataRange.forEach(r => { 
+    const member = (r[0]||'').toString().trim(); 
+    if(member) points[member]=Number(r[1])||0; 
+  });
   
   return createResponse('ok','Points fetched',{points});
 }
 
 function handleSubmitBiddingResults(data) {
   const results = data.results || [];
-  const date = data.date || '';
+  const timestamp = data.timestamp || '';
   const isDryRun = data.dryRun || false;
   const sheetName = isDryRun ? CONFIG.TEST_BIDDING_SHEET : CONFIG.BIDDING_SHEET;
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
   let sheet = ss.getSheetByName(sheetName);
   if (!sheet && isDryRun) sheet = createTestBiddingSheet(ss);
   if (!sheet) return createResponse('error', `Sheet not found: ${sheetName}`);
-  if (!date || results.length===0) return createResponse('error','Missing date or results');
+  if (!timestamp || results.length===0) return createResponse('error','Missing timestamp or results');
   
   const lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
-  let dateColumn=-1;
-  if(lastCol>=4){
-    const headers = sheet.getRange(1,4,1,lastCol-3).getValues()[0];
-    for(let i=0;i<headers.length;i++){if(headers[i].toString().trim()===date){dateColumn=i+4;break;}}
+  let timestampColumn = -1;
+  
+  if(lastCol >= 3) {
+    const headers = sheet.getRange(1, 3, 1, lastCol - 2).getValues()[0];
+    for(let i = 0; i < headers.length; i++) {
+      if(headers[i].toString().trim() === timestamp) {
+        timestampColumn = i + 3;
+        break;
+      }
+    }
   }
-  if(dateColumn===-1){dateColumn=lastCol+1;sheet.getRange(1,dateColumn).setValue(date).setFontWeight('bold').setBackground('#4A90E2').setFontColor('#FFFFFF').setHorizontalAlignment('center');}
+  
+  if(timestampColumn === -1) {
+    timestampColumn = lastCol + 1;
+    sheet.getRange(1, timestampColumn).setValue(timestamp)
+      .setFontWeight('bold')
+      .setBackground('#4A90E2')
+      .setFontColor('#FFFFFF')
+      .setHorizontalAlignment('center');
+  }
 
-  const memberNames = sheet.getRange(2,1,lastRow-1,1).getValues().flat();
+  const memberNames = sheet.getRange(2, 1, lastRow - 1, 1).getValues().flat();
   const updates = [];
-  results.forEach(r=>{
-    const member = r.member.trim(); const total = r.totalSpent||0;
-    let rowIndex = memberNames.findIndex(m => (m||'').toString().trim().toLowerCase()===member.toLowerCase());
-    if(rowIndex!==-1){updates.push({row:rowIndex+2,amount:total});}
+  results.forEach(r => {
+    const member = r.member.trim();
+    const total = r.totalSpent || 0;
+    let rowIndex = memberNames.findIndex(m => (m||'').toString().trim().toLowerCase() === member.toLowerCase());
+    if(rowIndex !== -1) {
+      updates.push({row: rowIndex + 2, amount: total});
+    }
   });
-  updates.forEach(u=>sheet.getRange(u.row,dateColumn).setValue(u.amount));
+  
+  updates.forEach(u => sheet.getRange(u.row, timestampColumn).setValue(u.amount));
   
   if(!isDryRun) updateBiddingPoints();
   
-  return createResponse('ok',`Results submitted: ${updates.length} members updated`,{dateColumn,membersUpdated:updates.length,date});
+  return createResponse('ok', `Results submitted: ${updates.length} members updated`, {
+    timestampColumn,
+    membersUpdated: updates.length,
+    timestamp
+  });
 }
 
-function createTestBiddingSheet(ss){
+function createTestBiddingSheet(ss) {
   const sheet = ss.insertSheet(CONFIG.TEST_BIDDING_SHEET);
-  sheet.getRange(1,1,1,3).setValues([['Member','Bidding Points Left','Consumed']])
-       .setFontWeight('bold').setBackground('#4A90E2').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+  sheet.getRange(1, 1, 1, 3).setValues([['Member', 'Bidding Points Left', 'Consumed']])
+    .setFontWeight('bold')
+    .setBackground('#4A90E2')
+    .setFontColor('#FFFFFF')
+    .setHorizontalAlignment('center');
+  
   const liveSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
-  if(liveSheet){
-    const lastRow=liveSheet.getLastRow();
-    if(lastRow>1){sheet.getRange(2,1,lastRow-1,3).setValues(liveSheet.getRange(2,1,lastRow-1,3).getValues());}
+  if(liveSheet) {
+    const lastRow = liveSheet.getLastRow();
+    if(lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, 3).setValues(liveSheet.getRange(2, 1, lastRow - 1, 3).getValues());
+    }
   } else {
-    sheet.getRange(2,1,5,3).setValues([['TestPlayer1',1000,0],['TestPlayer2',1000,0],['TestPlayer3',1000,0],['TestPlayer4',1000,0],['TestPlayer5',1000,0]]);
+    sheet.getRange(2, 1, 5, 3).setValues([
+      ['TestPlayer1', 1000, 0],
+      ['TestPlayer2', 1000, 0],
+      ['TestPlayer3', 1000, 0],
+      ['TestPlayer4', 1000, 0],
+      ['TestPlayer5', 1000, 0]
+    ]);
   }
-  sheet.setColumnWidths(1,3,150);
+  
+  sheet.setColumnWidths(1, 3, 150);
   sheet.getRange('A1').setNote('🧪 TEST SHEET - Dry run only');
   return sheet;
 }
 
-function updateBiddingPoints(){
+function updateBiddingPoints() {
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
   const bpSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
   if(!bpSheet) return;
+  
   const lastRow = bpSheet.getLastRow();
-  if(lastRow<2) return;
-  const existingData = bpSheet.getRange(2,1,lastRow-1,3).getValues();
-  let memberMap={};
-  existingData.forEach((r,i)=>{const m=(r[0]||'').toString().trim(); if(m) memberMap[m]={row:i+2,consumed:Number(r[2])||0};});
+  if(lastRow < 2) return;
+  
+  const existingData = bpSheet.getRange(2, 1, lastRow - 1, 3).getValues();
+  let memberMap = {};
+  existingData.forEach((r, i) => {
+    const m = (r[0] || '').toString().trim();
+    if(m) memberMap[m] = {row: i + 2, consumed: Number(r[2]) || 0};
+  });
   
   const sheets = ss.getSheets();
-  let totals={};
-  sheets.forEach(s=>{
-    if(s.getName().startsWith(CONFIG.SHEET_NAME_PREFIX)){
+  let totals = {};
+  sheets.forEach(s => {
+    if(s.getName().startsWith(CONFIG.SHEET_NAME_PREFIX)) {
       const data = s.getRange('A2:D').getValues();
-      data.forEach(r=>{const m=(r[0]||'').toString().trim(); if(m) totals[m]=(totals[m]||0)+Number(r[3]||0);});
+      data.forEach(r => {
+        const m = (r[0] || '').toString().trim();
+        if(m) totals[m] = (totals[m] || 0) + Number(r[3] || 0);
+      });
     }
   });
   
-  Object.keys(memberMap).forEach(m=>{
-    const left = (totals[m]||0)-memberMap[m].consumed;
-    bpSheet.getRange(memberMap[m].row,2).setValue(left);
+  Object.keys(memberMap).forEach(m => {
+    const left = (totals[m] || 0) - memberMap[m].consumed;
+    bpSheet.getRange(memberMap[m].row, 2).setValue(left);
   });
 }
 
@@ -318,8 +359,12 @@ function updateBiddingPoints(){
 // UTILITIES
 // ==========================================
 
-function createResponse(status,message,data){
-  const response={status,message,timestamp:new Date().toISOString()};
-  if(data) Object.assign(response,data);
+function createResponse(status, message, data) {
+  const response = {
+    status,
+    message,
+    timestamp: new Date().toISOString()
+  };
+  if(data) Object.assign(response, data);
   return ContentService.createTextOutput(JSON.stringify(response)).setMimeType(ContentService.MimeType.JSON);
 }
