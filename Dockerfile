@@ -28,4 +28,4 @@ EXPOSE 3000
 EXPOSE 8000
 
 # Start the bot
-CMD ["index2.js"]
+CMD ["index.js"]
