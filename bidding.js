@@ -1236,6 +1236,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
 // MODULE EXPORTS
 module.exports = {
+  initializeBidding,  // ✅ Export the initialization function
   loadBiddingState: load,
   saveBiddingState: save,
   getBiddingState: () => st,
