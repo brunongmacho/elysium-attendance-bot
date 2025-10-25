@@ -226,15 +226,26 @@ function clearQueue() {
 // ==========================================
 
 async function startAuctionSession(client, config) {
-  if (biddingState.auctionQueue.length === 0) return { success: false, message: "No items in queue" };
-  if (biddingState.activeAuction) return { success: false, message: "An auction is already in progress" };
+  if (biddingState.auctionQueue.length === 0) {
+    return { success: false, message: "No items in queue" };
+  }
+  if (biddingState.activeAuction) {
+    return { success: false, message: "An auction is already in progress" };
+  }
 
+  // ✅ FIXED: Set session date immediately when starting
   biddingState.sessionDate = getCurrentTimestamp();
+  console.log(`📅 Session started at: ${biddingState.sessionDate}`);
+
   const firstAuction = biddingState.auctionQueue[0];
   await startNextAuction(client, config);
   saveBiddingState();
 
-  return { success: true, totalItems: biddingState.auctionQueue.length, firstItem: firstAuction.item };
+  return { 
+    success: true, 
+    totalItems: biddingState.auctionQueue.length, 
+    firstItem: firstAuction.item 
+  };
 }
 
 async function startNextAuction(client, config) {
@@ -425,7 +436,11 @@ async function endAuction(client, config) {
         { name: "🏆 Winner", value: `<@${auction.currentWinnerId}>`, inline: true },
         { name: "💰 Winning Bid", value: `${auction.currentBid} points`, inline: true }
       )
-      .setFooter({ text: biddingState.isDryRun ? "🧪 DRY RUN - No points deducted" : "Points will be deducted after all auctions" })
+      .setFooter({ 
+        text: biddingState.isDryRun 
+          ? "🧪 DRY RUN - No points deducted" 
+          : "Points will be deducted after all auctions" 
+      })
       .setTimestamp();
 
     await thread.send({ embeds: [winnerEmbed] });
@@ -437,6 +452,8 @@ async function endAuction(client, config) {
       amount: auction.currentBid,
       timestamp: Date.now(),
     });
+
+    console.log(`🏆 Winner: ${auction.currentWinner} - ${auction.currentBid}pts for ${auction.item}`);
   } else {
     const noBidsEmbed = new EmbedBuilder()
       .setColor(0x808080)
@@ -445,6 +462,7 @@ async function endAuction(client, config) {
       .setFooter({ text: "Moving to next item..." });
 
     await thread.send({ embeds: [noBidsEmbed] });
+    console.log(`⚪ No bids: ${auction.item}`);
   }
 
   await thread.setArchived(true, "Auction ended").catch(() => {});
@@ -452,15 +470,29 @@ async function endAuction(client, config) {
   biddingState.activeAuction = null;
   saveBiddingState();
 
+  console.log(`📊 Queue status: ${biddingState.auctionQueue.length} items remaining`);
+
+  // ✅ Check if there are more items
   if (biddingState.auctionQueue.length > 0) {
+    const nextItem = biddingState.auctionQueue[0];
     await thread.parent.send(
       `⏳ Next auction starting in 20 seconds...\n` +
-      `📦 **${biddingState.auctionQueue[0].item}** - Starting bid: ${biddingState.auctionQueue[0].startPrice} points`
+      `📦 **${nextItem.item}** - Starting bid: ${nextItem.startPrice} points`
     );
+
+    console.log(`⏳ Scheduling next auction: ${nextItem.item}`);
 
     biddingState.timerHandles.nextAuction = setTimeout(async () => {
       await startNextAuction(client, config);
     }, 20000);
+  } else {
+    // ✅ FIXED: This is where auto-submit should happen
+    console.log("🎊 No more items in queue - triggering finalize...");
+    
+    // Give a brief delay to ensure thread is archived
+    setTimeout(async () => {
+      await finalizeAuctionSession(client, config);
+    }, 2000);
   }
 }
 
@@ -479,15 +511,41 @@ async function finalizeAuctionSession(client, config) {
     return;
   }
 
+  // ✅ FIXED: Ensure session date is set
+  if (!biddingState.sessionDate) {
+    console.warn("⚠️ Session date was null, using current timestamp");
+    biddingState.sessionDate = getCurrentTimestamp();
+  }
+
+  console.log(`📊 Preparing final submission - Session: ${biddingState.sessionDate}`);
+  console.log(`📦 Items sold: ${biddingState.auctionHistory.length}`);
+
   const memberTotals = {};
   biddingState.auctionHistory.forEach(auction => {
     memberTotals[auction.winner] = (memberTotals[auction.winner] || 0) + auction.amount;
   });
 
-  const results = Object.entries(memberTotals).map(([member, total]) => ({ member, totalSpent: total }));
-  const submission = await submitAuctionResults(config.sheet_webhook_url, results, biddingState.sessionDate, biddingState.isDryRun);
+  const results = Object.entries(memberTotals).map(([member, total]) => ({ 
+    member, 
+    totalSpent: total 
+  }));
+
+  console.log(`💰 Total winners: ${results.length}`);
+  console.log(`📋 Winners: ${results.map(r => `${r.member}:${r.totalSpent}`).join(', ')}`);
+
+  const submission = await submitAuctionResults(
+    config.sheet_webhook_url, 
+    results, 
+    biddingState.sessionDate, 
+    biddingState.isDryRun
+  );
 
   if (submission.success) {
+    const totalSpent = results.reduce((sum, r) => sum + r.totalSpent, 0);
+    const winnerList = biddingState.auctionHistory
+      .map(a => `• **${a.item}**: ${a.winner} - ${a.amount} points`)
+      .join("\n");
+
     const successEmbed = new EmbedBuilder()
       .setColor(0x00ff00)
       .setTitle("✅ Auction Session Complete!")
@@ -495,39 +553,48 @@ async function finalizeAuctionSession(client, config) {
       .addFields(
         { name: "🕐 Timestamp", value: biddingState.sessionDate, inline: true },
         { name: "🏆 Items Sold", value: `${biddingState.auctionHistory.length}`, inline: true },
-        { name: "💰 Total Points Spent", value: `${results.reduce((sum, r) => sum + r.totalSpent, 0)}`, inline: true }
+        { name: "💰 Total Points Spent", value: `${totalSpent}`, inline: true },
+        { name: "📋 Winners", value: winnerList || "None" }
       )
       .setFooter({ text: biddingState.isDryRun ? "🧪 DRY RUN - Test mode" : "Points have been deducted" })
       .setTimestamp();
 
-    const winnerList = biddingState.auctionHistory.map(a => `• **${a.item}**: ${a.winner} - ${a.amount} points`).join("\n");
-    successEmbed.addFields({ name: "📋 Winners", value: winnerList || "None" });
-
     await biddingChannel.send({ embeds: [successEmbed] });
     await adminLogs.send({ embeds: [successEmbed] });
+
+    console.log("✅ Session finalized successfully");
   } else {
+    console.error("❌ Session finalization failed:", submission.error);
+
+    const manualData = results.map(r => `${r.member}: ${r.totalSpent} points`).join("\n");
+
     const failureEmbed = new EmbedBuilder()
       .setColor(0xff0000)
       .setTitle("❌ Sheet Submission Failed")
-      .setDescription(`Failed to submit results after 3 attempts.\n\n**Error:** ${submission.error}`)
-      .addFields(
-        { name: "🕐 Timestamp", value: biddingState.sessionDate, inline: true },
-        { name: "🏆 Items Sold", value: `${biddingState.auctionHistory.length}`, inline: true }
+      .setDescription(
+        `Failed to submit results after 3 attempts.\n\n` +
+        `**Error:** ${submission.error}\n\n` +
+        `**Timestamp:** ${biddingState.sessionDate}\n` +
+        `**Items:** ${biddingState.auctionHistory.length}`
       )
-      .setFooter({ text: "Please manually enter the following data" })
+      .addFields({ 
+        name: "📝 Manual Entry Required", 
+        value: `\`\`\`\n${manualData}\n\`\`\`` 
+      })
+      .setFooter({ text: "Please manually enter the data in Google Sheets" })
       .setTimestamp();
-
-    const manualData = results.map(r => `${r.member}: ${r.totalSpent} points`).join("\n");
-    failureEmbed.addFields({ name: "📝 Manual Entry Required", value: `\`\`\`\n${manualData}\n\`\`\`` });
 
     await adminLogs.send({ embeds: [failureEmbed] });
     await biddingChannel.send("❌ Sheet submission failed. Admins have been notified.");
   }
 
+  // Clear state after submission attempt (success or failure)
   biddingState.auctionHistory = [];
   biddingState.sessionDate = null;
   biddingState.lockedPoints = {};
   saveBiddingState();
+
+  console.log("🧹 Session state cleared");
 }
 
 // ==========================================
