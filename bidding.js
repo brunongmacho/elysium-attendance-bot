@@ -1511,63 +1511,38 @@ async function handleResetBidsCommand(message) {
 // MODULE EXPORTS
 // ==========================================
 
+// ==========================================
+// MODULE EXPORTS (Replace from here to end of file)
+// ==========================================
+
 module.exports = {
   // State management
   loadBiddingState,
   saveBiddingState,
   getBiddingState: () => biddingState,
 
-  // Command handlers (member) - Admin Logs
+  // Command handlers - ALL must exist as functions above this line!
   handleAuctionCommand,
   handleQueueListCommand,
   handleRemoveItemCommand,
   handleStartAuctionCommand,
-
-  // Command handlers (member) - Bidding Threads
   handleBidCommand,
   handleMyBidsCommand,
   handleBidStatusCommand,
-
-  // Command handlers (admin) - Admin Logs
   handleDryRunCommand,
   handleCancelAuctionCommand,
   handleClearQueueCommand,
   handleForceSyncCommand,
-  handleSetBidPointsCommand,
-  handleResetBidsCommand,
-
-  // Command handlers (admin) - Bidding Threads
   handleEndAuctionCommand,
   handleExtendTimeCommand,
   handleForceWinnerCommand,
   handleCancelBidCommand,
   handleDebugAuctionCommand,
+  handleSetBidPointsCommand,
+  handleResetBidsCommand,
 
-  // Reaction handlers - REMOVED (causing error)
-  // confirmBid,
-  // cancelBid,
-
-  // Recovery
-  recoverBiddingState: async (client, config) => {
-    if (loadBiddingState()) {
-      console.log("📦 Bidding state recovered from disk");
-
-      // If there was an active auction, we need to reschedule timers
-      if (
-        biddingState.activeAuction &&
-        biddingState.activeAuction.status === "active"
-      ) {
-        console.log("🔄 Rescheduling auction timers...");
-        scheduleAuctionTimers(client, config);
-      }
-
-      return true;
-    }
-    return false;
-  },
-
-  // INLINE reaction handlers (fixes scope issue)
-  confirmBid: async (reaction, user, config) => {
+  // Reaction handlers - defined inline to fix scope issue
+  confirmBid: async function (reaction, user, config) {
     const pending = biddingState.pendingConfirmations[reaction.message.id];
     if (!pending || pending.userId !== user.id) return;
 
@@ -1579,7 +1554,6 @@ module.exports = {
       return;
     }
 
-    // Validate bid is still higher than current
     if (pending.amount <= auction.currentBid) {
       await reaction.message.reply(
         `❌ Bid no longer valid. Current bid is now ${auction.currentBid} points.`
@@ -1589,7 +1563,6 @@ module.exports = {
       return;
     }
 
-    // Check for duplicate amount (race condition)
     if (pending.amount === auction.currentBid) {
       await reaction.message.reply(
         "❌ **Duplicate bid!** Someone bid the same amount. Please bid higher."
@@ -1599,11 +1572,9 @@ module.exports = {
       return;
     }
 
-    // Unlock previous winner's points
     if (auction.currentWinner) {
       unlockPoints(auction.currentWinner, auction.currentBid);
 
-      // Notify previous winner
       const { EmbedBuilder } = require("discord.js");
       const outbidEmbed = new EmbedBuilder()
         .setColor(0xff6600)
@@ -1631,10 +1602,8 @@ module.exports = {
       });
     }
 
-    // Lock new winner's points
     lockPoints(pending.username, pending.amount);
 
-    // Update auction state
     const previousBid = auction.currentBid;
     auction.currentBid = pending.amount;
     auction.currentWinner = pending.username;
@@ -1646,26 +1615,21 @@ module.exports = {
       timestamp: Date.now(),
     });
 
-    // Check if bid was placed in last minute (extend timer)
     const timeLeft = auction.endTime - Date.now();
     if (timeLeft < 60000 && auction.extendedCount < 10) {
-      // Max 10 extensions
-      auction.endTime += 60000; // Add 1 minute
+      auction.endTime += 60000;
       auction.extendedCount++;
       auction.goingOnceAnnounced = false;
       auction.goingTwiceAnnounced = false;
 
-      // Reschedule timers
       scheduleAuctionTimers(config.client, config);
     }
 
-    // Clear confirmation timeout
     if (biddingState.timerHandles[`confirm_${reaction.message.id}`]) {
       clearTimeout(biddingState.timerHandles[`confirm_${reaction.message.id}`]);
       delete biddingState.timerHandles[`confirm_${reaction.message.id}`];
     }
 
-    // Update confirmation message
     const { EmbedBuilder: EB } = require("discord.js");
     const successEmbed = new EB()
       .setColor(0x00ff00)
@@ -1696,7 +1660,6 @@ module.exports = {
     await reaction.message.edit({ embeds: [successEmbed] });
     await reaction.message.reactions.removeAll().catch(() => {});
 
-    // Announce new high bid in thread
     const announceEmbed = new EB()
       .setColor(0xffd700)
       .setTitle("🔔 New High Bid!")
@@ -1720,7 +1683,7 @@ module.exports = {
     );
   },
 
-  cancelBid: async (reaction, user) => {
+  cancelBid: async function (reaction, user) {
     const pending = biddingState.pendingConfirmations[reaction.message.id];
     if (!pending || pending.userId !== user.id) return;
 
@@ -1734,7 +1697,6 @@ module.exports = {
     await reaction.message.edit({ embeds: [cancelEmbed] });
     await reaction.message.reactions.removeAll().catch(() => {});
 
-    // Clear timeout
     if (biddingState.timerHandles[`confirm_${reaction.message.id}`]) {
       clearTimeout(biddingState.timerHandles[`confirm_${reaction.message.id}`]);
       delete biddingState.timerHandles[`confirm_${reaction.message.id}`];
@@ -1743,4 +1705,758 @@ module.exports = {
     delete biddingState.pendingConfirmations[reaction.message.id];
     saveBiddingState();
   },
+
+  // Recovery
+  recoverBiddingState: async (client, config) => {
+    if (loadBiddingState()) {
+      console.log("📦 Bidding state recovered from disk");
+
+      if (
+        biddingState.activeAuction &&
+        biddingState.activeAuction.status === "active"
+      ) {
+        console.log("🔄 Rescheduling auction timers...");
+        scheduleAuctionTimers(client, config);
+      }
+
+      return true;
+    }
+    return false;
+  },
 };
+/*
+auction - Add item to queue
+ */
+async function handleAuctionCommand(message, args, config) {
+  // Parse: !auction ITEM NAME - DESCRIPTION 100 30
+  // Last two args are startPrice and duration
+  if (args.length < 3) {
+    return await message.reply(
+      "❌ **Invalid format**\n\n" +
+        "**Usage:** `!auction <item name> <starting price> <duration in minutes>`\n\n" +
+        "**Example:** `!auction GRAY DAWN LOAFERS - BARON 100 30`\n" +
+        "• Item: GRAY DAWN LOAFERS - BARON\n" +
+        "• Starting price: 100 points\n" +
+        "• Duration: 30 minutes"
+    );
+  }
+
+  const duration = parseInt(args[args.length - 1]);
+  const startPrice = parseInt(args[args.length - 2]);
+  const itemName = args.slice(0, -2).join(" ");
+
+  if (isNaN(startPrice) || startPrice <= 0) {
+    return await message.reply("❌ Starting price must be a positive number");
+  }
+
+  if (isNaN(duration) || duration <= 0) {
+    return await message.reply(
+      "❌ Duration must be a positive number (in minutes)"
+    );
+  }
+
+  if (itemName.trim().length === 0) {
+    return await message.reply("❌ Item name cannot be empty");
+  }
+
+  // Check for duplicates
+  const duplicate = biddingState.auctionQueue.find(
+    (a) => a.item.toLowerCase() === itemName.toLowerCase()
+  );
+
+  if (duplicate) {
+    return await message.reply(`❌ **${itemName}** is already in the queue`);
+  }
+
+  // Add to queue
+  const auction = addToQueue(itemName, startPrice, duration);
+
+  const embed = new EmbedBuilder()
+    .setColor(0x00ff00)
+    .setTitle("✅ Item Added to Queue")
+    .setDescription(`**${itemName}**`)
+    .addFields(
+      {
+        name: "💰 Starting Price",
+        value: `${startPrice} points`,
+        inline: true,
+      },
+      { name: "⏱️ Duration", value: formatDuration(duration), inline: true },
+      {
+        name: "📋 Position",
+        value: `#${biddingState.auctionQueue.length}`,
+        inline: true,
+      }
+    )
+    .setFooter({
+      text: `Use !queuelist to see all items • Use !startauction to begin`,
+    })
+    .setTimestamp();
+
+  await message.reply({ embeds: [embed] });
+
+  console.log(
+    `📦 Added to queue: ${itemName} (${startPrice}pts, ${duration}min) by ${message.author.username}`
+  );
+}
+
+/**
+ * !queuelist - Show all queued items
+ */
+async function handleQueueListCommand(message) {
+  if (biddingState.auctionQueue.length === 0) {
+    return await message.reply(
+      "📋 Queue is empty. Use `!auction` to add items."
+    );
+  }
+
+  const queueList = biddingState.auctionQueue
+    .map(
+      (a, i) =>
+        `**${i + 1}.** ${a.item} - ${a.startPrice}pts • ${formatDuration(
+          a.duration
+        )}`
+    )
+    .join("\n");
+
+  const embed = new EmbedBuilder()
+    .setColor(0x4a90e2)
+    .setTitle("📋 Auction Queue")
+    .setDescription(queueList)
+    .addFields(
+      {
+        name: "📊 Total Items",
+        value: `${biddingState.auctionQueue.length}`,
+        inline: true,
+      },
+      {
+        name: "🔄 Status",
+        value: biddingState.activeAuction
+          ? "🟢 Auction in progress"
+          : "⚪ Ready to start",
+        inline: true,
+      }
+    )
+    .setFooter({
+      text: "Use !removeitem <name> to remove • !startauction to begin",
+    })
+    .setTimestamp();
+
+  await message.reply({ embeds: [embed] });
+}
+
+/**
+ * !removeitem - Remove item from queue
+ */
+async function handleRemoveItemCommand(message, args) {
+  if (args.length === 0) {
+    return await message.reply(
+      "❌ **Invalid format**\n\n" +
+        "**Usage:** `!removeitem <item name>`\n" +
+        "**Example:** `!removeitem GRAY DAWN LOAFERS - BARON`"
+    );
+  }
+
+  const itemName = args.join(" ");
+  const removed = removeFromQueue(itemName);
+
+  if (!removed) {
+    return await message.reply(`❌ Item not found in queue: **${itemName}**`);
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(0xff6600)
+    .setTitle("🗑️ Item Removed from Queue")
+    .setDescription(`**${removed.item}**`)
+    .addFields({
+      name: "📋 Items Remaining",
+      value: `${biddingState.auctionQueue.length}`,
+      inline: true,
+    })
+    .setTimestamp();
+
+  await message.reply({ embeds: [embed] });
+
+  console.log(
+    `🗑️ Removed from queue: ${removed.item} by ${message.author.username}`
+  );
+}
+
+/**
+ * !startauction - Start auction session with confirmation
+ */
+async function handleStartAuctionCommand(message, client, config) {
+  if (biddingState.auctionQueue.length === 0) {
+    return await message.reply(
+      "❌ Queue is empty. Add items using `!auction` first."
+    );
+  }
+
+  if (biddingState.activeAuction) {
+    return await message.reply(
+      "❌ An auction is already in progress. Please wait for it to finish."
+    );
+  }
+
+  // Show confirmation
+  const queuePreview = biddingState.auctionQueue
+    .slice(0, 10)
+    .map(
+      (a, i) =>
+        `${i + 1}. **${a.item}** - ${a.startPrice}pts • ${formatDuration(
+          a.duration
+        )}`
+    )
+    .join("\n");
+
+  const moreItems =
+    biddingState.auctionQueue.length > 10
+      ? `\n\n*...and ${biddingState.auctionQueue.length - 10} more items*`
+      : "";
+
+  const confirmEmbed = new EmbedBuilder()
+    .setColor(0xffd700)
+    .setTitle("⚠️ Start Auction Session?")
+    .setDescription(
+      `**${biddingState.auctionQueue.length} item(s)** will be auctioned sequentially:\n\n` +
+        queuePreview +
+        moreItems
+    )
+    .addFields(
+      {
+        name: "⏱️ Estimated Time",
+        value: `~${Math.ceil(
+          biddingState.auctionQueue.reduce((sum, a) => sum + a.duration, 0) *
+            1.2
+        )} minutes`,
+        inline: true,
+      },
+      {
+        name: "🎯 Mode",
+        value: biddingState.isDryRun ? "🧪 **DRY RUN**" : "💰 **LIVE**",
+        inline: true,
+      }
+    )
+    .setFooter({ text: "React ✅ to start or ❌ to cancel" });
+
+  const confirmMsg = await message.reply({ embeds: [confirmEmbed] });
+  await confirmMsg.react("✅");
+  await confirmMsg.react("❌");
+
+  const filter = (reaction, user) => {
+    return (
+      ["✅", "❌"].includes(reaction.emoji.name) &&
+      user.id === message.author.id
+    );
+  };
+
+  try {
+    const collected = await confirmMsg.awaitReactions({
+      filter,
+      max: 1,
+      time: 30000,
+      errors: ["time"],
+    });
+    const reaction = collected.first();
+
+    if (reaction.emoji.name === "✅") {
+      await confirmMsg.reactions.removeAll().catch(() => {});
+      await confirmMsg.edit({
+        embeds: [
+          confirmEmbed
+            .setColor(0x00ff00)
+            .setFooter({ text: "🚀 Starting auction session..." }),
+        ],
+      });
+
+      const result = await startAuctionSession(client, config);
+
+      if (result.success) {
+        const startEmbed = new EmbedBuilder()
+          .setColor(0x00ff00)
+          .setTitle("🚀 Auction Session Started!")
+          .setDescription(
+            `**${result.totalItems} item(s)** will be auctioned one by one.\n\n` +
+              `First item: **${result.firstItem}**`
+          )
+          .setFooter({ text: "Check the auction threads to bid!" })
+          .setTimestamp();
+
+        await message.channel.send({ embeds: [startEmbed] });
+      } else {
+        await message.reply(`❌ ${result.message}`);
+      }
+    } else {
+      await confirmMsg.reactions.removeAll().catch(() => {});
+      await confirmMsg.edit({
+        embeds: [
+          confirmEmbed
+            .setColor(0x808080)
+            .setFooter({ text: "❌ Auction start canceled" }),
+        ],
+      });
+    }
+  } catch (err) {
+    await confirmMsg.reactions.removeAll().catch(() => {});
+    await confirmMsg.edit({
+      embeds: [
+        confirmEmbed
+          .setColor(0x808080)
+          .setFooter({ text: "⏱️ Confirmation timed out" }),
+      ],
+    });
+  }
+}
+
+/**
+ * !bid - Place bid
+ */
+async function handleBidCommand(message, args, config) {
+  if (args.length === 0) {
+    return await message.reply(
+      "❌ **Invalid format**\n\n" +
+        "**Usage:** `!bid <amount>`\n" +
+        "**Example:** `!bid 150`"
+    );
+  }
+
+  const amount = args[0];
+  const result = await processBid(message, amount, config);
+
+  if (!result.success) {
+    await message.reply(`❌ ${result.message}`);
+  }
+
+  // Success is handled by the confirmation flow
+}
+
+/**
+ * !mybids - Show user's active bids
+ */
+async function handleMyBidsCommand(message) {
+  const username = message.member.nickname || message.author.username;
+  const auction = biddingState.activeAuction;
+
+  if (!auction) {
+    return await message.reply("ℹ️ No active auction at the moment.");
+  }
+
+  const lockedAmount = biddingState.lockedPoints[username] || 0;
+  const isWinning = auction.currentWinner === username;
+
+  const embed = new EmbedBuilder()
+    .setColor(isWinning ? 0x00ff00 : 0x4a90e2)
+    .setTitle("📊 Your Bidding Status")
+    .addFields(
+      { name: "💰 Current Auction", value: auction.item, inline: true },
+      { name: "💳 Locked Points", value: `${lockedAmount}`, inline: true },
+      {
+        name: "🏆 Status",
+        value: isWinning ? "✅ **Winning!**" : "⚪ Not winning",
+        inline: true,
+      }
+    );
+
+  if (isWinning) {
+    embed.addFields(
+      {
+        name: "💵 Your Bid",
+        value: `${auction.currentBid} points`,
+        inline: true,
+      },
+      {
+        name: "⏱️ Time Left",
+        value: formatTimeRemaining(auction.endTime - Date.now()),
+        inline: true,
+      }
+    );
+  }
+
+  embed.setFooter({ text: "Use !bid <amount> to place a bid" });
+
+  await message.reply({ embeds: [embed] });
+}
+
+/**
+ * !bidstatus - Show all active auctions
+ */
+async function handleBidStatusCommand(message, isAdmin = false) {
+  const embed = new EmbedBuilder()
+    .setColor(0x4a90e2)
+    .setTitle("📊 Bidding System Status");
+
+  // Queue info
+  if (biddingState.auctionQueue.length > 0) {
+    const queueList = biddingState.auctionQueue
+      .slice(0, 5)
+      .map((a, i) => `${i + 1}. ${a.item} - ${a.startPrice}pts`)
+      .join("\n");
+
+    const more =
+      biddingState.auctionQueue.length > 5
+        ? `\n*...${biddingState.auctionQueue.length - 5} more*`
+        : "";
+
+    embed.addFields({ name: "📋 Queued Items", value: queueList + more });
+  } else {
+    embed.addFields({ name: "📋 Queue", value: "Empty" });
+  }
+
+  // Active auction info
+  if (biddingState.activeAuction) {
+    const auction = biddingState.activeAuction;
+    const timeLeft =
+      auction.status === "active"
+        ? formatTimeRemaining(auction.endTime - Date.now())
+        : auction.status;
+
+    embed.addFields(
+      { name: "🔴 Active Auction", value: auction.item, inline: false },
+      {
+        name: "💰 Current Bid",
+        value: auction.currentWinner
+          ? `${auction.currentBid}pts by ${auction.currentWinner}`
+          : `${auction.startPrice}pts (no bids)`,
+        inline: true,
+      },
+      { name: "⏱️ Time Left", value: timeLeft, inline: true },
+      { name: "📊 Total Bids", value: `${auction.bids.length}`, inline: true }
+    );
+  } else {
+    embed.addFields({ name: "🔴 Active Auction", value: "None" });
+  }
+
+  // Admin-only info
+  if (isAdmin) {
+    embed.addFields(
+      {
+        name: "🔒 Locked Points",
+        value: `${Object.keys(biddingState.lockedPoints).length} members`,
+        inline: true,
+      },
+      {
+        name: "🏆 Completed Today",
+        value: `${biddingState.auctionHistory.length}`,
+        inline: true,
+      },
+      {
+        name: "🎯 Mode",
+        value: biddingState.isDryRun ? "🧪 DRY RUN" : "💰 LIVE",
+        inline: true,
+      }
+    );
+  }
+
+  embed
+    .setFooter({
+      text: biddingState.isDryRun
+        ? "🧪 DRY RUN MODE ACTIVE"
+        : "Use !auction to add items",
+    })
+    .setTimestamp();
+
+  await message.reply({ embeds: [embed] });
+}
+
+// ==========================================
+// ADMIN OVERRIDE COMMANDS
+// ==========================================
+
+/**
+ * !dryrun - Toggle dry run mode
+ */
+async function handleDryRunCommand(message, args) {
+  if (biddingState.activeAuction) {
+    return await message.reply(
+      "❌ Cannot toggle dry run mode while auction is active"
+    );
+  }
+
+  if (args.length === 0) {
+    const status = biddingState.isDryRun ? "🧪 **ENABLED**" : "⚪ **DISABLED**";
+    return await message.reply(
+      `Dry run mode: ${status}\n\nUsage: \`!dryrun on\` or \`!dryrun off\``
+    );
+  }
+
+  const mode = args[0].toLowerCase();
+
+  if (mode === "on" || mode === "true" || mode === "enable") {
+    biddingState.isDryRun = true;
+    saveBiddingState();
+
+    await message.reply(
+      "🧪 **DRY RUN MODE ENABLED**\n\n" +
+        "• All auctions will use test data\n" +
+        "• No real points will be deducted\n" +
+        "• Results will be saved to test sheet\n\n" +
+        "⚠️ This is for testing only!"
+    );
+  } else if (mode === "off" || mode === "false" || mode === "disable") {
+    biddingState.isDryRun = false;
+    saveBiddingState();
+
+    await message.reply(
+      "💰 **DRY RUN MODE DISABLED**\n\n" +
+        "• Auctions will use real bidding points\n" +
+        "• Points will be deducted from winners\n" +
+        "• Results will be saved to live sheet\n\n" +
+        "✅ System is now LIVE"
+    );
+  } else {
+    await message.reply("❌ Invalid option. Use `on` or `off`");
+  }
+
+  console.log(
+    `🔧 Dry run mode: ${biddingState.isDryRun ? "ENABLED" : "DISABLED"} by ${
+      message.author.username
+    }`
+  );
+}
+
+/**
+ * !cancelauction - Cancel all active auctions
+ */
+async function handleCancelAuctionCommand(message, client, config) {
+  if (!biddingState.activeAuction && biddingState.auctionQueue.length === 0) {
+    return await message.reply("ℹ️ No active auctions to cancel");
+  }
+
+  const confirmEmbed = new EmbedBuilder()
+    .setColor(0xff0000)
+    .setTitle("⚠️ Cancel Auction Session?")
+    .setDescription(
+      `This will:\n` +
+        `• Cancel current auction${
+          biddingState.activeAuction
+            ? ` (**${biddingState.activeAuction.item}**)`
+            : ""
+        }\n` +
+        `• Clear ${biddingState.auctionQueue.length} queued item(s)\n` +
+        `• Return all locked points to members\n` +
+        `• **NOT** submit any results to Google Sheets`
+    )
+    .setFooter({ text: "React ✅ to confirm or ❌ to cancel" });
+
+  const confirmMsg = await message.reply({ embeds: [confirmEmbed] });
+  await confirmMsg.react("✅");
+  await confirmMsg.react("❌");
+
+  const filter = (reaction, user) => {
+    return (
+      ["✅", "❌"].includes(reaction.emoji.name) &&
+      user.id === message.author.id
+    );
+  };
+
+  try {
+    const collected = await confirmMsg.awaitReactions({
+      filter,
+      max: 1,
+      time: 30000,
+      errors: ["time"],
+    });
+    const reaction = collected.first();
+
+    if (reaction.emoji.name === "✅") {
+      // Clear all timers
+      clearAllTimers();
+
+      // Archive active thread if exists
+      if (biddingState.activeAuction) {
+        const guild = await client.guilds.fetch(config.main_guild_id);
+        const thread = await guild.channels
+          .fetch(biddingState.activeAuction.threadId)
+          .catch(() => null);
+        if (thread) {
+          await thread.send("❌ **Auction canceled by admin**");
+          await thread
+            .setArchived(true, "Admin canceled auction")
+            .catch(() => {});
+        }
+      }
+
+      // Clear state
+      const canceledItems =
+        biddingState.auctionQueue.length + (biddingState.activeAuction ? 1 : 0);
+      biddingState.activeAuction = null;
+      biddingState.auctionQueue = [];
+      biddingState.auctionHistory = [];
+      biddingState.lockedPoints = {};
+      biddingState.pendingConfirmations = {};
+      biddingState.sessionDate = null;
+      saveBiddingState();
+
+      await confirmMsg.edit({
+        embeds: [
+          confirmEmbed
+            .setColor(0x808080)
+            .setFooter({
+              text: `✅ Canceled ${canceledItems} auction(s) • All points returned`,
+            }),
+        ],
+      });
+      await confirmMsg.reactions.removeAll().catch(() => {});
+
+      console.log(`🔧 All auctions canceled by ${message.author.username}`);
+    } else {
+      await confirmMsg.reactions.removeAll().catch(() => {});
+      await confirmMsg.edit({
+        embeds: [
+          confirmEmbed
+            .setColor(0x4a90e2)
+            .setFooter({ text: "❌ Cancellation aborted" }),
+        ],
+      });
+    }
+  } catch (err) {
+    await confirmMsg.reactions.removeAll().catch(() => {});
+    await confirmMsg.edit({
+      embeds: [
+        confirmEmbed
+          .setColor(0x808080)
+          .setFooter({ text: "⏱️ Confirmation timed out" }),
+      ],
+    });
+  }
+}
+
+/**
+ * !clearqueue - Clear queue
+ */
+async function handleClearQueueCommand(message) {
+  if (biddingState.auctionQueue.length === 0) {
+    return await message.reply("ℹ️ Queue is already empty");
+  }
+
+  if (biddingState.activeAuction) {
+    return await message.reply(
+      "❌ Cannot clear queue while auction is active. Use `!cancelauction` instead."
+    );
+  }
+
+  const count = clearQueue();
+
+  await message.reply(`✅ Cleared ${count} item(s) from queue`);
+  console.log(
+    `🔧 Queue cleared by ${message.author.username} (${count} items)`
+  );
+}
+
+/**
+ * !forcesync - Force sync bidding points from sheet
+ */
+async function handleForceSyncCommand(message, config) {
+  await message.reply("⏳ Syncing bidding points from Google Sheets...");
+
+  const points = await fetchBiddingPoints(
+    config.sheet_webhook_url,
+    biddingState.isDryRun
+  );
+
+  if (points) {
+    const memberCount = Object.keys(points).length;
+    const totalPoints = Object.values(points).reduce((sum, p) => sum + p, 0);
+
+    await message.reply(
+      `✅ Sync complete!\n\n` +
+        `• ${memberCount} members\n` +
+        `• ${totalPoints} total points available\n` +
+        `• Mode: ${biddingState.isDryRun ? "🧪 DRY RUN" : "💰 LIVE"}`
+    );
+  } else {
+    await message.reply(
+      "❌ Failed to sync bidding points. Check Google Sheets connection."
+    );
+  }
+}
+
+/**
+ * !endauction - Force end current auction (in thread) with confirmation
+ */
+async function handleEndAuctionCommand(message, client, config) {
+  const auction = biddingState.activeAuction;
+
+  if (!auction) {
+    return await message.reply("❌ No active auction to end");
+  }
+
+  if (message.channel.id !== auction.threadId) {
+    return await message.reply(
+      "❌ This command must be used in the active auction thread"
+    );
+  }
+
+  // Show confirmation
+  const confirmEmbed = new EmbedBuilder()
+    .setColor(0xff6600)
+    .setTitle("⚠️ Force End Auction?")
+    .setDescription(
+      `**Item:** ${auction.item}\n` +
+        `**Current Bid:** ${auction.currentBid} points\n` +
+        `**Current Winner:** ${auction.currentWinner || "No bids yet"}\n` +
+        `**Time Left:** ${
+          auction.status === "active"
+            ? formatTimeRemaining(auction.endTime - Date.now())
+            : auction.status
+        }\n\n` +
+        `This will:\n` +
+        `• End the auction immediately\n` +
+        `• Declare current high bidder as winner\n` +
+        `• Move to next item in queue (if any)\n` +
+        `• Submit results at end of session`
+    )
+    .setFooter({ text: "React ✅ to confirm or ❌ to cancel" });
+
+  const confirmMsg = await message.reply({ embeds: [confirmEmbed] });
+  await confirmMsg.react("✅");
+  await confirmMsg.react("❌");
+
+  const filter = (reaction, user) => {
+    return (
+      ["✅", "❌"].includes(reaction.emoji.name) &&
+      user.id === message.author.id
+    );
+  };
+
+  try {
+    const collected = await confirmMsg.awaitReactions({
+      filter,
+      max: 1,
+      time: 30000,
+      errors: ["time"],
+    });
+    const reaction = collected.first();
+
+    if (reaction.emoji.name === "✅") {
+      await confirmMsg.reactions.removeAll().catch(() => {});
+      await message.channel.send("⚠️ **Force ending auction...**");
+
+      clearAllTimers();
+      await endAuction(client, config);
+
+      console.log(`🔧 Auction force-ended by ${message.author.username}`);
+    } else {
+      await confirmMsg.reactions.removeAll().catch(() => {});
+      await confirmMsg.edit({
+        embeds: [
+          confirmEmbed
+            .setColor(0x808080)
+            .setFooter({ text: "❌ Force end canceled" }),
+        ],
+      });
+    }
+  } catch (err) {
+    await confirmMsg.reactions.removeAll().catch(() => {});
+    await confirmMsg.edit({
+      embeds: [
+        confirmEmbed
+          .setColor(0x808080)
+          .setFooter({ text: "⏱️ Confirmation timed out" }),
+      ],
+    });
+  }
+}
+
+/**
+ */
