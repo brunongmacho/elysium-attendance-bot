@@ -1,6 +1,6 @@
 /**
- * ELYSIUM Guild Bidding System - Version 4.3 (OPTIMIZED WITH POINTS CACHE)
- * PERFORMANCE: 30-50x faster bidding with instant validation
+ * ELYSIUM Guild Bidding System - Version 5.0 (FULLY OPTIMIZED)
+ * NEW: Auto-populate 0pts, incremental bidding, pause on last 10s, rate limiting, !mypoints
  */
 
 const { EmbedBuilder } = require("discord.js");
@@ -8,27 +8,32 @@ const fetch = require("node-fetch");
 const fs = require("fs");
 
 // STATE
-let biddingState = {
-  auctionQueue: [],
-  activeAuction: null,
-  lockedPoints: {},
-  auctionHistory: [],
-  isDryRun: false,
-  timerHandles: {},
-  pendingConfirmations: {},
-  sessionDate: null,
-  cachedPoints: null,
-  cacheTimestamp: null, // ✅ CACHE
+let st = {
+  q: [], // queue
+  a: null, // active auction
+  lp: {}, // locked points
+  h: [], // history
+  dry: false, // dry run
+  th: {}, // timer handles
+  pc: {}, // pending confirmations
+  sd: null, // session date
+  cp: null, // cached points
+  ct: null, // cache timestamp
+  lb: {}, // last bid time (rate limit)
+  pause: false, // is paused
+  pauseTimer: null, // pause resume timer
 };
 
-const STATE_FILE = "./bidding-state.json";
+const SF = "./bidding-state.json";
+const CT = 10000; // confirm timeout (10s)
+const RL = 3000; // rate limit (3s)
+const ME = 15; // max extensions (15 mins = 900s/60s)
 
 // HELPERS
-const hasElysiumRole = (member) =>
-  member.roles.cache.some((r) => r.name === "ELYSIUM");
-const isAdmin = (member, config) =>
-  member.roles.cache.some((r) => config.admin_roles.includes(r.name));
-const getCurrentTimestamp = () => {
+const hasRole = (m) => m.roles.cache.some((r) => r.name === "ELYSIUM");
+const isAdm = (m, c) =>
+  m.roles.cache.some((r) => c.admin_roles.includes(r.name));
+const ts = () => {
   const d = new Date();
   return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(
     d.getDate()
@@ -37,722 +42,719 @@ const getCurrentTimestamp = () => {
     "0"
   )}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
-const formatDuration = (m) =>
+const fmtDur = (m) =>
   m < 60
     ? `${m}min`
     : m % 60 > 0
     ? `${Math.floor(m / 60)}h ${m % 60}min`
     : `${Math.floor(m / 60)}h`;
-const formatTimeRemaining = (ms) => {
+const fmtTime = (ms) => {
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s`;
   const m = Math.floor(s / 60),
-    secs = s % 60;
-  if (m < 60) return secs > 0 ? `${m}m ${secs}s` : `${m}m`;
+    sec = s % 60;
+  if (m < 60) return sec > 0 ? `${m}m ${sec}s` : `${m}m`;
   const h = Math.floor(m / 60);
   return m % 60 > 0 ? `${h}h ${m % 60}m` : `${h}h`;
 };
-const getAvailablePoints = (member, total) =>
-  Math.max(0, total - (biddingState.lockedPoints[member] || 0));
-const lockPoints = (member, amount) => {
-  biddingState.lockedPoints[member] =
-    (biddingState.lockedPoints[member] || 0) + amount;
-  saveBiddingState();
+const avail = (u, tot) => Math.max(0, tot - (st.lp[u] || 0));
+const lock = (u, amt) => {
+  st.lp[u] = (st.lp[u] || 0) + amt;
+  save();
 };
-const unlockPoints = (member, amount) => {
-  biddingState.lockedPoints[member] = Math.max(
-    0,
-    (biddingState.lockedPoints[member] || 0) - amount
-  );
-  if (biddingState.lockedPoints[member] === 0)
-    delete biddingState.lockedPoints[member];
-  saveBiddingState();
+const unlock = (u, amt) => {
+  st.lp[u] = Math.max(0, (st.lp[u] || 0) - amt);
+  if (st.lp[u] === 0) delete st.lp[u];
+  save();
 };
 
 // STATE PERSISTENCE
-function saveBiddingState() {
+function save() {
   try {
-    // Create a copy without timerHandles (they can't be serialized)
-    const { timerHandles, ...serializableState } = biddingState;
-    fs.writeFileSync(STATE_FILE, JSON.stringify(serializableState, null, 2));
+    const { th, pauseTimer, ...s } = st;
+    fs.writeFileSync(SF, JSON.stringify(s, null, 2));
   } catch (e) {
-    console.error("❌ Save failed:", e);
+    console.error("❌ Save:", e);
   }
 }
-function loadBiddingState() {
+
+function load() {
   try {
-    if (fs.existsSync(STATE_FILE)) {
-      const loaded = JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
-      biddingState = { ...biddingState, ...loaded, timerHandles: {} };
+    if (fs.existsSync(SF)) {
+      const d = JSON.parse(fs.readFileSync(SF, "utf8"));
+      st = { ...st, ...d, th: {}, lb: {}, pause: false, pauseTimer: null };
       return true;
     }
   } catch (e) {
-    console.error("❌ Load failed:", e);
+    console.error("❌ Load:", e);
   }
   return false;
 }
 
 // SHEETS API
-async function fetchBiddingPoints(webhookUrl, isDryRun = false) {
+async function fetchPts(url, dry = false) {
   try {
-    const res = await fetch(webhookUrl, {
+    const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "getBiddingPoints", dryRun: isDryRun }),
+      body: JSON.stringify({ action: "getBiddingPoints", dryRun: dry }),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return (await res.json()).points || {};
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return (await r.json()).points || {};
   } catch (e) {
-    console.error("❌ Fetch points failed:", e);
+    console.error("❌ Fetch pts:", e);
     return null;
   }
 }
 
-async function submitAuctionResults(
-  webhookUrl,
-  results,
-  timestamp,
-  isDryRun = false
-) {
-  if (!timestamp || !results || results.length === 0)
-    return { success: false, error: "Missing data" };
+async function submitRes(url, res, time, dry = false) {
+  if (!time || !res || res.length === 0)
+    return { ok: false, err: "Missing data" };
   for (let i = 1; i <= 3; i++) {
     try {
-      const res = await fetch(webhookUrl, {
+      const r = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "submitBiddingResults",
-          results,
-          timestamp,
-          dryRun: isDryRun,
+          results: res,
+          timestamp: time,
+          dryRun: dry,
         }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (data.status === "ok") {
-        console.log("✅ Results submitted");
-        return { success: true, data };
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      if (d.status === "ok") {
+        console.log("✅ Submitted");
+        return { ok: true, d };
       }
-      throw new Error(data.message || "Unknown error");
+      throw new Error(d.message || "Unknown");
     } catch (e) {
-      console.error(`❌ Submit attempt ${i} failed:`, e.message);
-      if (i < 3) await new Promise((r) => setTimeout(r, i * 2000));
-      else return { success: false, error: e.message, results };
+      console.error(`❌ Submit ${i}:`, e.message);
+      if (i < 3) await new Promise((x) => setTimeout(x, i * 2000));
+      else return { ok: false, err: e.message, res };
     }
   }
 }
 
-// ✅ CACHE MANAGEMENT (KEY OPTIMIZATION)
-async function loadPointsCache(webhookUrl, isDryRun = false) {
-  console.log("⚡ Loading points cache...");
-  const start = Date.now();
-  const points = await fetchBiddingPoints(webhookUrl, isDryRun);
-  if (!points) {
-    console.error("❌ Cache load failed");
+// CACHE
+async function loadCache(url, dry = false) {
+  console.log("⚡ Loading cache...");
+  const t0 = Date.now();
+  const p = await fetchPts(url, dry);
+  if (!p) {
+    console.error("❌ Cache fail");
     return false;
   }
-  biddingState.cachedPoints = points;
-  biddingState.cacheTimestamp = Date.now();
-  saveBiddingState();
+  st.cp = p;
+  st.ct = Date.now();
+  save();
   console.log(
-    `✅ Cache loaded in ${Date.now() - start}ms - ${
-      Object.keys(points).length
-    } members`
+    `✅ Cache: ${Date.now() - t0}ms - ${Object.keys(p).length} members`
   );
   return true;
 }
 
-function getCachedPoints(username) {
-  if (!biddingState.cachedPoints) return null;
-  let pts = biddingState.cachedPoints[username];
-  if (pts === undefined) {
-    const match = Object.keys(biddingState.cachedPoints).find(
-      (n) => n.toLowerCase() === username.toLowerCase()
+function getPts(u) {
+  if (!st.cp) return null;
+  let p = st.cp[u];
+  if (p === undefined) {
+    const m = Object.keys(st.cp).find(
+      (n) => n.toLowerCase() === u.toLowerCase()
     );
-    pts = match ? biddingState.cachedPoints[match] : 0;
+    p = m ? st.cp[m] : 0;
   }
-  return pts || 0;
+  return p || 0;
 }
 
-function clearPointsCache() {
-  console.log("🧹 Clearing cache");
-  biddingState.cachedPoints = null;
-  biddingState.cacheTimestamp = null;
-  saveBiddingState();
+function clearCache() {
+  console.log("🧹 Clear cache");
+  st.cp = null;
+  st.ct = null;
+  save();
 }
 
-// QUEUE MANAGEMENT
-const addToQueue = (item, startPrice, duration) => {
-  const auction = {
-    id: `auction_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    item: item.trim(),
-    startPrice: parseInt(startPrice),
-    duration: parseInt(duration),
+// QUEUE
+const addQ = (itm, pr, dur) => {
+  const a = {
+    id: `a_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    item: itm.trim(),
+    startPrice: parseInt(pr),
+    duration: parseInt(dur),
     addedAt: Date.now(),
   };
-  biddingState.auctionQueue.push(auction);
-  saveBiddingState();
-  return auction;
+  st.q.push(a);
+  save();
+  return a;
 };
-const removeFromQueue = (itemName) => {
-  const idx = biddingState.auctionQueue.findIndex(
-    (a) => a.item.toLowerCase() === itemName.toLowerCase()
-  );
-  if (idx === -1) return null;
-  const removed = biddingState.auctionQueue.splice(idx, 1)[0];
-  saveBiddingState();
-  return removed;
+const rmQ = (itm) => {
+  const i = st.q.findIndex((a) => a.item.toLowerCase() === itm.toLowerCase());
+  if (i === -1) return null;
+  const rm = st.q.splice(i, 1)[0];
+  save();
+  return rm;
 };
-const clearQueue = () => {
-  const cnt = biddingState.auctionQueue.length;
-  biddingState.auctionQueue = [];
-  saveBiddingState();
-  return cnt;
+const clrQ = () => {
+  const c = st.q.length;
+  st.q = [];
+  save();
+  return c;
 };
+
+// PAUSE/RESUME
+function pauseAuction() {
+  if (st.pause || !st.a || st.a.status !== "active") return false;
+  st.pause = true;
+  st.a.pausedAt = Date.now();
+  st.a.remainingTime = st.a.endTime - Date.now();
+
+  // Clear all timers
+  ["goingOnce", "goingTwice", "finalCall", "auctionEnd"].forEach((k) => {
+    if (st.th[k]) {
+      clearTimeout(st.th[k]);
+      delete st.th[k];
+    }
+  });
+
+  console.log(`⏸️ PAUSED: ${st.a.remainingTime}ms remaining`);
+  save();
+  return true;
+}
+
+function resumeAuction(cli, cfg) {
+  if (!st.pause || !st.a || st.a.status !== "active") return false;
+  st.pause = false;
+
+  // Check if we need to extend back to 60s
+  const wasUnder60 = st.a.remainingTime < 60000;
+  if (wasUnder60) {
+    st.a.endTime = Date.now() + 60000; // Reset to 60s
+    st.a.goingOnceAnnounced = false;
+    st.a.goingTwiceAnnounced = false;
+    console.log(
+      `▶️ RESUME: Extended to 60s (was ${Math.floor(
+        st.a.remainingTime / 1000
+      )}s)`
+    );
+  } else {
+    st.a.endTime = Date.now() + st.a.remainingTime;
+    console.log(`▶️ RESUME: ${st.a.remainingTime}ms remaining`);
+  }
+
+  delete st.a.pausedAt;
+  delete st.a.remainingTime;
+
+  schedTimers(cli, cfg);
+  save();
+  return true;
+}
 
 // AUCTION LIFECYCLE
-async function startAuctionSession(client, config) {
-  if (biddingState.auctionQueue.length === 0)
-    return { success: false, message: "No items in queue" };
-  if (biddingState.activeAuction)
-    return { success: false, message: "Auction already in progress" };
+async function startSess(cli, cfg) {
+  if (st.q.length === 0) return { ok: false, msg: "No items" };
+  if (st.a) return { ok: false, msg: "Already active" };
 
-  // ✅ LOAD CACHE FIRST
-  if (!(await loadPointsCache(config.sheet_webhook_url, biddingState.isDryRun)))
-    return { success: false, message: "❌ Failed to load points from Sheets" };
+  if (!(await loadCache(cfg.sheet_webhook_url, st.dry)))
+    return { ok: false, msg: "❌ Cache load failed" };
 
-  biddingState.sessionDate = getCurrentTimestamp();
-  const first = biddingState.auctionQueue[0];
-  await startNextAuction(client, config);
-  saveBiddingState();
+  st.sd = ts();
+  const f = st.q[0];
+  await startNext(cli, cfg);
+  save();
   return {
-    success: true,
-    totalItems: biddingState.auctionQueue.length,
-    firstItem: first.item,
-    cachedMembers: Object.keys(biddingState.cachedPoints).length,
+    ok: true,
+    tot: st.q.length,
+    first: f.item,
+    cached: Object.keys(st.cp).length,
   };
 }
 
-async function startNextAuction(client, config) {
-  if (biddingState.auctionQueue.length === 0) {
-    await finalizeAuctionSession(client, config);
+async function startNext(cli, cfg) {
+  if (st.q.length === 0) {
+    await finalize(cli, cfg);
     return;
   }
 
-  const data = biddingState.auctionQueue[0];
-  const guild = await client.guilds.fetch(config.main_guild_id);
-  const channel = await guild.channels.fetch(config.bidding_channel_id);
-  const thread = await channel.threads.create({
-    name: `${data.item} - ${getCurrentTimestamp()} | ${
-      data.startPrice
-    }pts | ${formatDuration(data.duration)}`,
+  const d = st.q[0];
+  const g = await cli.guilds.fetch(cfg.main_guild_id);
+  const ch = await g.channels.fetch(cfg.bidding_channel_id);
+  const th = await ch.threads.create({
+    name: `${d.item} - ${ts()} | ${d.startPrice}pts | ${fmtDur(d.duration)}`,
     autoArchiveDuration: 60,
-    reason: `Auction: ${data.item}`,
+    reason: `Auction: ${d.item}`,
   });
 
-  biddingState.activeAuction = {
-    ...data,
-    threadId: thread.id,
-    currentBid: data.startPrice,
-    currentWinner: null,
-    currentWinnerId: null,
+  st.a = {
+    ...d,
+    threadId: th.id,
+    curBid: d.startPrice,
+    curWin: null,
+    curWinId: null,
     bids: [],
     endTime: null,
-    extendedCount: 0,
+    extCnt: 0,
     status: "preview",
-    goingOnceAnnounced: false,
-    goingTwiceAnnounced: false,
+    go1: false,
+    go2: false,
   };
 
-  await thread.send({
+  await th.send({
     content: "@everyone",
     embeds: [
       new EmbedBuilder()
         .setColor(0xffd700)
         .setTitle("🏆 AUCTION STARTING")
-        .setDescription(`**${data.item}**`)
+        .setDescription(`**${d.item}**`)
         .addFields(
           {
             name: "💰 Starting Bid",
-            value: `${data.startPrice} points`,
+            value: `${d.startPrice} points`,
             inline: true,
           },
-          {
-            name: "⏱️ Duration",
-            value: formatDuration(data.duration),
-            inline: true,
-          },
-          {
-            name: "📋 Items Remaining",
-            value: `${biddingState.auctionQueue.length - 1} after this`,
-            inline: true,
-          }
+          { name: "⏱️ Duration", value: fmtDur(d.duration), inline: true },
+          { name: "📋 Items Left", value: `${st.q.length - 1}`, inline: true }
         )
-        .setFooter({
-          text: biddingState.isDryRun ? "🧪 DRY RUN" : "Bidding starts in 20s",
-        })
+        .setFooter({ text: st.dry ? "🧪 DRY RUN" : "Starts in 20s" })
         .setTimestamp(),
     ],
   });
 
-  biddingState.timerHandles.auctionStart = setTimeout(
-    async () => await activateAuction(client, config, thread),
-    20000
-  );
-  saveBiddingState();
+  st.th.aStart = setTimeout(async () => await activate(cli, cfg, th), 20000);
+  save();
 }
 
-async function activateAuction(client, config, thread) {
-  biddingState.activeAuction.status = "active";
-  biddingState.activeAuction.endTime =
-    Date.now() + biddingState.activeAuction.duration * 60000;
-  await thread.send({
+async function activate(cli, cfg, th) {
+  st.a.status = "active";
+  st.a.endTime = Date.now() + st.a.duration * 60000;
+  await th.send({
     embeds: [
       new EmbedBuilder()
         .setColor(0x00ff00)
-        .setTitle("🔔 BIDDING STARTS NOW!")
-        .setDescription("Type `!bid <amount>` to place your bid")
+        .setTitle("🔔 BIDDING NOW!")
+        .setDescription("Type `!bid <amount>` to bid")
         .addFields(
-          {
-            name: "💰 Current Bid",
-            value: `${biddingState.activeAuction.currentBid} points`,
-            inline: true,
-          },
-          {
-            name: "⏱️ Time Left",
-            value: formatDuration(biddingState.activeAuction.duration),
-            inline: true,
-          }
+          { name: "💰 Current", value: `${st.a.curBid} pts`, inline: true },
+          { name: "⏱️ Time", value: fmtDur(st.a.duration), inline: true }
         )
-        .setFooter({ text: "⚡ INSTANT validation!" }),
+        .setFooter({ text: "⚡ 10s confirm • 3s rate limit" }),
     ],
   });
-  scheduleAuctionTimers(client, config);
-  saveBiddingState();
+  schedTimers(cli, cfg);
+  save();
 }
 
-function scheduleAuctionTimers(client, config) {
-  const a = biddingState.activeAuction,
+function schedTimers(cli, cfg) {
+  const a = st.a,
     t = a.endTime - Date.now();
   ["goingOnce", "goingTwice", "finalCall", "auctionEnd"].forEach((k) => {
-    if (biddingState.timerHandles[k])
-      clearTimeout(biddingState.timerHandles[k]);
+    if (st.th[k]) clearTimeout(st.th[k]);
   });
-  if (t > 60000 && !a.goingOnceAnnounced)
-    biddingState.timerHandles.goingOnce = setTimeout(
-      async () => await announceGoingOnce(client, config),
-      t - 60000
-    );
-  if (t > 30000 && !a.goingTwiceAnnounced)
-    biddingState.timerHandles.goingTwice = setTimeout(
-      async () => await announceGoingTwice(client, config),
-      t - 30000
-    );
+  if (t > 60000 && !a.go1)
+    st.th.goingOnce = setTimeout(async () => await ann1(cli, cfg), t - 60000);
+  if (t > 30000 && !a.go2)
+    st.th.goingTwice = setTimeout(async () => await ann2(cli, cfg), t - 30000);
   if (t > 10000)
-    biddingState.timerHandles.finalCall = setTimeout(
-      async () => await announceFinalCall(client, config),
-      t - 10000
-    );
-  biddingState.timerHandles.auctionEnd = setTimeout(
-    async () => await endAuction(client, config),
-    t
-  );
+    st.th.finalCall = setTimeout(async () => await ann3(cli, cfg), t - 10000);
+  st.th.auctionEnd = setTimeout(async () => await endAuc(cli, cfg), t);
 }
 
-async function announceGoingOnce(client, config) {
-  const a = biddingState.activeAuction;
-  if (!a || a.status !== "active") return;
-  const guild = await client.guilds.fetch(config.main_guild_id),
-    thread = await guild.channels.fetch(a.threadId);
-  await thread.send({
+async function ann1(cli, cfg) {
+  const a = st.a;
+  if (!a || a.status !== "active" || st.pause) return;
+  const g = await cli.guilds.fetch(cfg.main_guild_id),
+    th = await g.channels.fetch(a.threadId);
+  await th.send({
     content: "@everyone",
     embeds: [
       new EmbedBuilder()
         .setColor(0xffa500)
         .setTitle("⚠️ GOING ONCE!")
-        .setDescription("1 minute remaining")
+        .setDescription("1 min left")
         .addFields({
-          name: "💰 Current Bid",
-          value: a.currentWinner
-            ? `${a.currentBid} points by ${a.currentWinner}`
-            : `${a.startPrice} points (no bids)`,
+          name: "💰 Current",
+          value: a.curWin
+            ? `${a.curBid}pts by ${a.curWin}`
+            : `${a.startPrice}pts (no bids)`,
           inline: false,
         }),
     ],
   });
-  a.goingOnceAnnounced = true;
-  saveBiddingState();
+  a.go1 = true;
+  save();
 }
 
-async function announceGoingTwice(client, config) {
-  const a = biddingState.activeAuction;
-  if (!a || a.status !== "active") return;
-  const guild = await client.guilds.fetch(config.main_guild_id),
-    thread = await guild.channels.fetch(a.threadId);
-  await thread.send({
+async function ann2(cli, cfg) {
+  const a = st.a;
+  if (!a || a.status !== "active" || st.pause) return;
+  const g = await cli.guilds.fetch(cfg.main_guild_id),
+    th = await g.channels.fetch(a.threadId);
+  await th.send({
     content: "@everyone",
     embeds: [
       new EmbedBuilder()
         .setColor(0xff6600)
         .setTitle("⚠️ GOING TWICE!")
-        .setDescription("30 seconds remaining")
+        .setDescription("30s left")
         .addFields({
-          name: "💰 Current Bid",
-          value: a.currentWinner
-            ? `${a.currentBid} points by ${a.currentWinner}`
-            : `${a.startPrice} points (no bids)`,
+          name: "💰 Current",
+          value: a.curWin
+            ? `${a.curBid}pts by ${a.curWin}`
+            : `${a.startPrice}pts (no bids)`,
           inline: false,
         }),
     ],
   });
-  a.goingTwiceAnnounced = true;
-  saveBiddingState();
+  a.go2 = true;
+  save();
 }
 
-async function announceFinalCall(client, config) {
-  const a = biddingState.activeAuction;
-  if (!a || a.status !== "active") return;
-  const guild = await client.guilds.fetch(config.main_guild_id),
-    thread = await guild.channels.fetch(a.threadId);
-  await thread.send({
+async function ann3(cli, cfg) {
+  const a = st.a;
+  if (!a || a.status !== "active" || st.pause) return;
+  const g = await cli.guilds.fetch(cfg.main_guild_id),
+    th = await g.channels.fetch(a.threadId);
+  await th.send({
     content: "@everyone",
     embeds: [
       new EmbedBuilder()
         .setColor(0xff0000)
         .setTitle("⚠️ FINAL CALL!")
-        .setDescription("10 seconds remaining")
+        .setDescription("10s left")
         .addFields({
-          name: "💰 Current Bid",
-          value: a.currentWinner
-            ? `${a.currentBid} points by ${a.currentWinner}`
-            : `${a.startPrice} points (no bids)`,
+          name: "💰 Current",
+          value: a.curWin
+            ? `${a.curBid}pts by ${a.curWin}`
+            : `${a.startPrice}pts (no bids)`,
           inline: false,
         }),
     ],
   });
-  saveBiddingState();
+  save();
 }
 
-async function endAuction(client, config) {
-  const a = biddingState.activeAuction;
+async function endAuc(cli, cfg) {
+  const a = st.a;
   if (!a) return;
   a.status = "ended";
-  const guild = await client.guilds.fetch(config.main_guild_id),
-    thread = await guild.channels.fetch(a.threadId);
+  const g = await cli.guilds.fetch(cfg.main_guild_id),
+    th = await g.channels.fetch(a.threadId);
 
-  if (a.currentWinner) {
-    await thread.send({
+  if (a.curWin) {
+    await th.send({
       embeds: [
         new EmbedBuilder()
           .setColor(0xffd700)
           .setTitle("🔨 SOLD!")
-          .setDescription(`**${a.item}** has been sold!`)
+          .setDescription(`**${a.item}** sold!`)
           .addFields(
-            {
-              name: "🏆 Winner",
-              value: `<@${a.currentWinnerId}>`,
-              inline: true,
-            },
-            {
-              name: "💰 Winning Bid",
-              value: `${a.currentBid} points`,
-              inline: true,
-            }
+            { name: "🏆 Winner", value: `<@${a.curWinId}>`, inline: true },
+            { name: "💰 Price", value: `${a.curBid}pts`, inline: true }
           )
-          .setFooter({
-            text: biddingState.isDryRun
-              ? "🧪 DRY RUN"
-              : "Points deducted after all auctions",
-          })
+          .setFooter({ text: st.dry ? "🧪 DRY RUN" : "Deducted after session" })
           .setTimestamp(),
       ],
     });
-    biddingState.auctionHistory.push({
+    st.h.push({
       item: a.item,
-      winner: a.currentWinner,
-      winnerId: a.currentWinnerId,
-      amount: a.currentBid,
+      winner: a.curWin,
+      winnerId: a.curWinId,
+      amount: a.curBid,
       timestamp: Date.now(),
     });
   } else {
-    await thread.send({
+    await th.send({
       embeds: [
         new EmbedBuilder()
           .setColor(0x808080)
           .setTitle("❌ NO BIDS")
-          .setDescription(`**${a.item}** received no bids`)
-          .setFooter({ text: "Moving to next item..." }),
+          .setDescription(`**${a.item}** - no bids`)
+          .setFooter({ text: "Next item..." }),
       ],
     });
   }
 
-  await thread.setArchived(true, "Auction ended").catch(() => {});
-  biddingState.auctionQueue.shift();
-  biddingState.activeAuction = null;
-  saveBiddingState();
+  await th.setArchived(true, "Ended").catch(() => {});
+  st.q.shift();
+  st.a = null;
+  save();
 
-  if (biddingState.auctionQueue.length > 0) {
-    const next = biddingState.auctionQueue[0];
-    await thread.parent.send(
-      `⏳ Next auction in 20s...\n📦 **${next.item}** - ${next.startPrice} points`
+  if (st.q.length > 0) {
+    const n = st.q[0];
+    await th.parent.send(
+      `⏳ Next in 20s...\n📦 **${n.item}** - ${n.startPrice}pts`
     );
-    biddingState.timerHandles.nextAuction = setTimeout(
-      async () => await startNextAuction(client, config),
-      20000
-    );
-  } else
-    setTimeout(async () => await finalizeAuctionSession(client, config), 2000);
+    st.th.next = setTimeout(async () => await startNext(cli, cfg), 20000);
+  } else setTimeout(async () => await finalize(cli, cfg), 2000);
 }
 
-async function finalizeAuctionSession(client, config) {
-  const guild = await client.guilds.fetch(config.main_guild_id);
-  const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id);
-  const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+async function finalize(cli, cfg) {
+  const g = await cli.guilds.fetch(cfg.main_guild_id);
+  const adm = await g.channels.fetch(cfg.admin_logs_channel_id);
+  const bch = await g.channels.fetch(cfg.bidding_channel_id);
 
-  if (biddingState.auctionHistory.length === 0) {
-    await biddingChannel.send(
-      "🎊 **Auction session complete!** No items sold."
-    );
-    clearPointsCache();
-    biddingState.sessionDate = null;
-    biddingState.lockedPoints = {};
-    saveBiddingState();
+  if (st.h.length === 0) {
+    await bch.send("🎊 **Session complete!** No sales.");
+    clearCache();
+    st.sd = null;
+    st.lp = {};
+    save();
     return;
   }
 
-  if (!biddingState.sessionDate)
-    biddingState.sessionDate = getCurrentTimestamp();
-  const totals = {};
-  biddingState.auctionHistory.forEach(
-    (a) => (totals[a.winner] = (totals[a.winner] || 0) + a.amount)
-  );
-  const results = Object.entries(totals).map(([member, total]) => ({
-    member,
-    totalSpent: total,
-  }));
-  const submission = await submitAuctionResults(
-    config.sheet_webhook_url,
-    results,
-    biddingState.sessionDate,
-    biddingState.isDryRun
+  if (!st.sd) st.sd = ts();
+
+  // Get all members from cache for auto-populate
+  const allMembers = Object.keys(st.cp || {});
+  const winners = {};
+  st.h.forEach(
+    (a) => (winners[a.winner] = (winners[a.winner] || 0) + a.amount)
   );
 
-  if (submission.success) {
-    const winnerList = biddingState.auctionHistory
+  // Auto-populate 0 for non-winners
+  const res = allMembers.map((m) => ({
+    member: m,
+    totalSpent: winners[m] || 0,
+  }));
+
+  const sub = await submitRes(cfg.sheet_webhook_url, res, st.sd, st.dry);
+
+  if (sub.ok) {
+    const wList = st.h
       .map((a) => `• **${a.item}**: ${a.winner} - ${a.amount}pts`)
       .join("\n");
-    const embed = new EmbedBuilder()
+    const e = new EmbedBuilder()
       .setColor(0x00ff00)
-      .setTitle("✅ Auction Session Complete!")
-      .setDescription("Results submitted to Sheets")
+      .setTitle("✅ Session Complete!")
+      .setDescription("Results submitted")
       .addFields(
-        { name: "🕐 Timestamp", value: biddingState.sessionDate, inline: true },
-        {
-          name: "🏆 Items Sold",
-          value: `${biddingState.auctionHistory.length}`,
-          inline: true,
-        },
+        { name: "🕐 Time", value: st.sd, inline: true },
+        { name: "🏆 Sold", value: `${st.h.length}`, inline: true },
         {
           name: "💰 Total",
-          value: `${results.reduce((s, r) => s + r.totalSpent, 0)}`,
+          value: `${res.reduce((s, r) => s + r.totalSpent, 0)}`,
           inline: true,
         },
-        { name: "📋 Winners", value: winnerList || "None" }
+        { name: "📋 Winners", value: wList || "None" },
+        {
+          name: "👥 Members Updated",
+          value: `${res.length} (auto-populated 0 for non-winners)`,
+          inline: false,
+        }
       )
-      .setFooter({
-        text: biddingState.isDryRun ? "🧪 DRY RUN" : "Points deducted",
-      })
+      .setFooter({ text: st.dry ? "🧪 DRY RUN" : "Points deducted" })
       .setTimestamp();
-    await biddingChannel.send({ embeds: [embed] });
-    await adminLogs.send({ embeds: [embed] });
+    await bch.send({ embeds: [e] });
+    await adm.send({ embeds: [e] });
   } else {
-    const data = results
+    const d = res
+      .filter((r) => r.totalSpent > 0)
       .map((r) => `${r.member}: ${r.totalSpent}pts`)
       .join("\n");
-    await adminLogs.send({
+    await adm.send({
       embeds: [
         new EmbedBuilder()
           .setColor(0xff0000)
-          .setTitle("❌ Sheet Submission Failed")
-          .setDescription(
-            `**Error:** ${submission.error}\n**Timestamp:** ${biddingState.sessionDate}`
-          )
-          .addFields({
-            name: "📝 Manual Entry Required",
-            value: `\`\`\`\n${data}\n\`\`\``,
-          })
+          .setTitle("❌ Submit Failed")
+          .setDescription(`**Error:** ${sub.err}\n**Time:** ${st.sd}`)
+          .addFields({ name: "📝 Manual Entry", value: `\`\`\`\n${d}\n\`\`\`` })
           .setTimestamp(),
       ],
     });
-    await biddingChannel.send("❌ Sheet submission failed. Admins notified.");
+    await bch.send("❌ Submit failed. Admins notified.");
   }
 
-  biddingState.auctionHistory = [];
-  biddingState.sessionDate = null;
-  biddingState.lockedPoints = {};
-  clearPointsCache();
-  saveBiddingState();
+  st.h = [];
+  st.sd = null;
+  st.lp = {};
+  clearCache();
+  save();
 }
 
-// ✅ OPTIMIZED BIDDING (USES CACHE - NO SHEETS CALLS!)
-async function processBid(message, amount, config) {
-  const a = biddingState.activeAuction;
-  if (!a) return { success: false, message: "No active auction" };
-  if (a.status !== "active")
-    return { success: false, message: "Auction not started yet" };
-  if (message.channel.id !== a.threadId)
-    return { success: false, message: "Wrong thread" };
+// BIDDING (OPTIMIZED)
+async function procBid(msg, amt, cfg) {
+  const a = st.a;
+  if (!a) return { ok: false, msg: "No auction" };
+  if (a.status !== "active") return { ok: false, msg: "Not started" };
+  if (msg.channel.id !== a.threadId) return { ok: false, msg: "Wrong thread" };
 
-  const member = message.member,
-    username = member.nickname || message.author.username;
-  if (!hasElysiumRole(member) && !isAdmin(member, config)) {
-    await message.reply("❌ **Access Denied** - Need ELYSIUM role");
-    return { success: false, message: "No ELYSIUM role" };
+  const m = msg.member,
+    u = m.nickname || msg.author.username,
+    uid = msg.author.id;
+  if (!hasRole(m) && !isAdm(m, cfg)) {
+    await msg.reply("❌ Need ELYSIUM role");
+    return { ok: false, msg: "No role" };
   }
 
-  const bidAmount = parseInt(amount);
-  if (isNaN(bidAmount) || bidAmount <= 0)
-    return { success: false, message: "Invalid bid" };
-  if (bidAmount <= a.currentBid) {
-    await message.reply(`❌ Bid must be > ${a.currentBid} points`);
-    return { success: false, message: "Bid too low" };
+  // Rate limit
+  const now = Date.now();
+  if (st.lb[uid] && now - st.lb[uid] < RL) {
+    const wait = Math.ceil((RL - (now - st.lb[uid])) / 1000);
+    await msg.reply(`⏳ Wait ${wait}s (rate limit)`);
+    return { ok: false, msg: "Rate limited" };
   }
 
-  // ✅ USE CACHE (INSTANT!)
-  if (!biddingState.cachedPoints) {
-    await message.reply("❌ **Cache not loaded!** Contact admin.");
-    return { success: false, message: "No cache" };
+  const bid = parseInt(amt);
+  if (isNaN(bid) || bid <= 0 || !Number.isInteger(bid)) {
+    await msg.reply("❌ Invalid bid (integers only)");
+    return { ok: false, msg: "Invalid" };
   }
-  const totalPoints = getCachedPoints(username),
-    availablePoints = getAvailablePoints(username, totalPoints);
 
-  if (totalPoints === 0) {
-    await message.reply("❌ No bidding points available");
-    return { success: false, message: "No points" };
+  if (bid <= a.curBid) {
+    await msg.reply(`❌ Must be > ${a.curBid}pts`);
+    return { ok: false, msg: "Too low" };
   }
-  if (bidAmount > availablePoints) {
-    await message.reply(
-      `❌ **Insufficient points!**\n💰 Total: ${totalPoints}\n💳 Locked: ${
-        biddingState.lockedPoints[username] || 0
-      }\n📊 Available: ${availablePoints}\nNeed: ${bidAmount}`
+
+  // Cache check
+  if (!st.cp) {
+    await msg.reply("❌ Cache not loaded!");
+    return { ok: false, msg: "No cache" };
+  }
+
+  const tot = getPts(u),
+    av = avail(u, tot);
+
+  if (tot === 0) {
+    await msg.reply("❌ No points");
+    return { ok: false, msg: "No pts" };
+  }
+
+  // Check if self-overbidding
+  const isSelf = a.curWin && a.curWin.toLowerCase() === u.toLowerCase();
+  const curLocked = st.lp[u] || 0;
+  const needed = isSelf ? Math.max(0, bid - curLocked) : bid;
+
+  if (needed > av) {
+    await msg.reply(
+      `❌ **Insufficient!**\n💰 Total: ${tot}\n🔒 Locked: ${curLocked}\n📊 Available: ${av}\n❗ Need: ${needed}`
     );
-    return { success: false, message: "Insufficient points" };
+    return { ok: false, msg: "Insufficient" };
   }
 
-  const confirmEmbed = new EmbedBuilder()
+  const confEmbed = new EmbedBuilder()
     .setColor(0xffd700)
-    .setTitle("⏳ Confirm Your Bid")
+    .setTitle("⏳ Confirm Bid")
     .setDescription(`**${a.item}**`)
     .addFields(
-      { name: "💰 Your Bid", value: `${bidAmount} points`, inline: true },
-      { name: "📊 Current", value: `${a.currentBid} points`, inline: true },
-      {
-        name: "💳 After",
-        value: `${availablePoints - bidAmount} points`,
-        inline: true,
-      }
-    )
-    .setFooter({
-      text: "React ✅ confirm / ❌ cancel • 30s timeout • ⚡ Instant!",
+      { name: "💰 Your Bid", value: `${bid}pts`, inline: true },
+      { name: "📊 Current", value: `${a.curBid}pts`, inline: true },
+      { name: "💳 After", value: `${av - needed}pts`, inline: true }
+    );
+
+  if (isSelf) {
+    confEmbed.addFields({
+      name: "🔄 Self-Overbid",
+      value: `Current: ${a.curBid}pts → New: ${bid}pts\n**+${needed}pts needed**`,
+      inline: false,
     });
+  }
 
-  const confirmMsg = await message.reply({ embeds: [confirmEmbed] });
-  await confirmMsg.react("✅");
-  await confirmMsg.react("❌");
+  confEmbed.setFooter({ text: "✅ confirm / ❌ cancel • 10s timeout" });
 
-  biddingState.pendingConfirmations[confirmMsg.id] = {
-    userId: message.author.id,
-    username,
+  const conf = await msg.reply({ embeds: [confEmbed] });
+  await conf.react("✅");
+  await conf.react("❌");
+
+  st.pc[conf.id] = {
+    userId: uid,
+    username: u,
     threadId: a.threadId,
-    amount: bidAmount,
-    timestamp: Date.now(),
-    originalMessageId: message.id,
+    amount: bid,
+    timestamp: now,
+    origMsgId: msg.id,
+    isSelf,
+    needed,
   };
-  saveBiddingState();
+  save();
 
-  biddingState.timerHandles[`confirm_${confirmMsg.id}`] = setTimeout(
-    async () => {
-      if (biddingState.pendingConfirmations[confirmMsg.id]) {
-        await confirmMsg.reactions.removeAll().catch(() => {});
-        await confirmMsg.edit({
-          embeds: [
-            confirmEmbed.setColor(0x808080).setFooter({ text: "⏰ Timed out" }),
-          ],
-        });
-        setTimeout(async () => await confirmMsg.delete().catch(() => {}), 3000);
-        delete biddingState.pendingConfirmations[confirmMsg.id];
-        saveBiddingState();
+  st.lb[uid] = now; // Rate limit stamp
+
+  // Check if bid in last 10 seconds - PAUSE
+  const timeLeft = a.endTime - Date.now();
+  if (timeLeft <= 10000 && timeLeft > 0) {
+    pauseAuction();
+    await msg.channel.send(
+      `⏸️ **PAUSED** - Bid in last 10s! Timer paused for confirmation...`
+    );
+  }
+
+  st.th[`c_${conf.id}`] = setTimeout(async () => {
+    if (st.pc[conf.id]) {
+      await conf.reactions.removeAll().catch(() => {});
+      await conf.edit({
+        embeds: [
+          confEmbed.setColor(0x808080).setFooter({ text: "⏰ Timed out" }),
+        ],
+      });
+      setTimeout(async () => await conf.delete().catch(() => {}), 3000);
+      delete st.pc[conf.id];
+      save();
+
+      // Resume if paused
+      if (st.pause) {
+        resumeAuction(conf.client, cfg);
+        await msg.channel.send(
+          `▶️ **RESUMED** - Bid timeout, auction continues...`
+        );
       }
-    },
-    30000
-  );
+    }
+  }, CT);
 
-  return { success: true, confirmationMessageId: confirmMsg.id };
+  return { ok: true, confId: conf.id };
 }
 
 // COMMAND HANDLERS
-async function handleCommand(cmd, message, args, client, config) {
+async function handleCmd(cmd, msg, args, cli, cfg) {
   switch (cmd) {
     case "!auction":
       if (args.length < 3)
-        return await message.reply(
+        return await msg.reply(
           "❌ Usage: `!auction <item> <price> <duration>`"
         );
       const dur = parseInt(args[args.length - 1]),
-        price = parseInt(args[args.length - 2]),
-        item = args.slice(0, -2).join(" ");
-      if (isNaN(price) || price <= 0 || isNaN(dur) || dur <= 0 || !item.trim())
-        return await message.reply("❌ Invalid parameters");
-      if (
-        biddingState.auctionQueue.find(
-          (a) => a.item.toLowerCase() === item.toLowerCase()
-        )
-      )
-        return await message.reply(`❌ **${item}** already in queue`);
-      addToQueue(item, price, dur);
-      await message.reply({
+        pr = parseInt(args[args.length - 2]),
+        itm = args.slice(0, -2).join(" ");
+      if (isNaN(pr) || pr <= 0 || isNaN(dur) || dur <= 0 || !itm.trim())
+        return await msg.reply("❌ Invalid params");
+      if (st.q.find((a) => a.item.toLowerCase() === itm.toLowerCase()))
+        return await msg.reply(`❌ **${itm}** already queued`);
+      addQ(itm, pr, dur);
+      await msg.reply({
         embeds: [
           new EmbedBuilder()
             .setColor(0x00ff00)
-            .setTitle("✅ Added to Queue")
-            .setDescription(`**${item}**`)
+            .setTitle("✅ Queued")
+            .setDescription(`**${itm}**`)
             .addFields(
-              { name: "💰 Price", value: `${price}pts`, inline: true },
-              { name: "⏱️ Duration", value: formatDuration(dur), inline: true },
-              {
-                name: "📋 Position",
-                value: `#${biddingState.auctionQueue.length}`,
-                inline: true,
-              }
+              { name: "💰 Price", value: `${pr}pts`, inline: true },
+              { name: "⏱️ Duration", value: fmtDur(dur), inline: true },
+              { name: "📋 Position", value: `#${st.q.length}`, inline: true }
             )
-            .setFooter({ text: "Use !startauction to begin" })
+            .setFooter({ text: "!startauction to begin" })
             .setTimestamp(),
         ],
       });
       break;
 
     case "!queuelist":
-      if (biddingState.auctionQueue.length === 0)
-        return await message.reply("📋 Queue empty");
-      await message.reply({
+      if (st.q.length === 0) return await msg.reply("📋 Empty");
+      await msg.reply({
         embeds: [
           new EmbedBuilder()
             .setColor(0x4a90e2)
-            .setTitle("📋 Auction Queue")
+            .setTitle("📋 Queue")
             .setDescription(
-              biddingState.auctionQueue
+              st.q
                 .map(
                   (a, i) =>
-                    `**${i + 1}.** ${a.item} - ${
-                      a.startPrice
-                    }pts • ${formatDuration(a.duration)}`
+                    `**${i + 1}.** ${a.item} - ${a.startPrice}pts • ${fmtDur(
+                      a.duration
+                    )}`
                 )
                 .join("\n")
             )
             .addFields({
               name: "📊 Total",
-              value: `${biddingState.auctionQueue.length}`,
+              value: `${st.q.length}`,
               inline: true,
             })
             .setTimestamp(),
@@ -762,18 +764,18 @@ async function handleCommand(cmd, message, args, client, config) {
 
     case "!removeitem":
       if (args.length === 0)
-        return await message.reply("❌ Usage: `!removeitem <name>`");
-      const removed = removeFromQueue(args.join(" "));
-      if (!removed) return await message.reply("❌ Not found");
-      await message.reply({
+        return await msg.reply("❌ Usage: `!removeitem <name>`");
+      const rm = rmQ(args.join(" "));
+      if (!rm) return await msg.reply("❌ Not found");
+      await msg.reply({
         embeds: [
           new EmbedBuilder()
             .setColor(0xff6600)
             .setTitle("🗑️ Removed")
-            .setDescription(`**${removed.item}**`)
+            .setDescription(`**${rm.item}**`)
             .addFields({
-              name: "📋 Remaining",
-              value: `${biddingState.auctionQueue.length}`,
+              name: "📋 Left",
+              value: `${st.q.length}`,
               inline: true,
             }),
         ],
@@ -781,232 +783,212 @@ async function handleCommand(cmd, message, args, client, config) {
       break;
 
     case "!startauction":
-      if (biddingState.auctionQueue.length === 0)
-        return await message.reply("❌ Queue empty. Use !auction first");
-      if (biddingState.activeAuction)
-        return await message.reply("❌ Auction already in progress");
-      const preview = biddingState.auctionQueue
+      if (st.q.length === 0) return await msg.reply("❌ Empty queue");
+      if (st.a) return await msg.reply("❌ Already active");
+      const prev = st.q
         .slice(0, 10)
         .map((a, i) => `${i + 1}. **${a.item}** - ${a.startPrice}pts`)
         .join("\n");
-      const confirmMsg = await message.reply({
+      const cMsg = await msg.reply({
         embeds: [
           new EmbedBuilder()
             .setColor(0xffd700)
-            .setTitle("⚠️ Start Auction?")
+            .setTitle("⚠️ Start?")
             .setDescription(
-              `**${biddingState.auctionQueue.length} item(s)**:\n\n${preview}${
-                biddingState.auctionQueue.length > 10
-                  ? `\n*...+${biddingState.auctionQueue.length - 10} more*`
-                  : ""
+              `**${st.q.length} item(s)**:\n\n${prev}${
+                st.q.length > 10 ? `\n*...+${st.q.length - 10} more*` : ""
               }`
             )
             .addFields({
               name: "🎯 Mode",
-              value: biddingState.isDryRun ? "🧪 DRY RUN" : "💰 LIVE",
+              value: st.dry ? "🧪 DRY" : "💰 LIVE",
               inline: true,
             })
-            .setFooter({
-              text: "React ✅ start / ❌ cancel • Points cached for INSTANT bidding!",
-            }),
+            .setFooter({ text: "✅ start / ❌ cancel" }),
         ],
       });
-      await confirmMsg.react("✅");
-      await confirmMsg.react("❌");
+      await cMsg.react("✅");
+      await cMsg.react("❌");
       try {
-        const collected = await confirmMsg.awaitReactions({
+        const col = await cMsg.awaitReactions({
           filter: (r, u) =>
-            ["✅", "❌"].includes(r.emoji.name) && u.id === message.author.id,
-          max: 1,
-          time: 30000,
-          errors: ["time"],
-        });
-        if (collected.first().emoji.name === "✅") {
-          await confirmMsg.reactions.removeAll().catch(() => {});
-          const loading = await message.channel.send(
-            "⚡ Loading points cache..."
-          );
-          const result = await startAuctionSession(client, config);
-          await loading.delete().catch(() => {});
-          if (result.success) {
-            await message.channel.send({
-              embeds: [
-                new EmbedBuilder()
-                  .setColor(0x00ff00)
-                  .setTitle("🚀 Started!")
-                  .setDescription(
-                    `**${result.totalItems} item(s)** • First: **${result.firstItem}**`
-                  )
-                  .addFields(
-                    {
-                      name: "⚡ Cached",
-                      value: `${result.cachedMembers} members`,
-                      inline: true,
-                    },
-                    {
-                      name: "🎯 Mode",
-                      value: biddingState.isDryRun ? "🧪 DRY RUN" : "💰 LIVE",
-                      inline: true,
-                    }
-                  )
-                  .setFooter({ text: "⚡ INSTANT bidding!" })
-                  .setTimestamp(),
-              ],
-            });
-          } else await message.channel.send(`❌ Failed: ${result.message}`);
-        } else await confirmMsg.reactions.removeAll().catch(() => {});
-      } catch (e) {
-        await confirmMsg.reactions.removeAll().catch(() => {});
-      }
-      break;
-
-    case "!bid":
-      if (args.length === 0)
-        return await message.reply("❌ Usage: `!bid <amount>`");
-      const res = await processBid(message, args[0], config);
-      if (!res.success) await message.reply(`❌ ${res.message}`);
-      break;
-
-    case "!dryrun":
-      if (biddingState.activeAuction)
-        return await message.reply("❌ Cannot toggle during auction");
-      if (args.length === 0)
-        return await message.reply(
-          `Dry run: ${biddingState.isDryRun ? "🧪 ENABLED" : "⚪ DISABLED"}`
-        );
-      const mode = args[0].toLowerCase();
-      if (["on", "true", "enable"].includes(mode)) {
-        biddingState.isDryRun = true;
-        await message.reply("🧪 DRY RUN ENABLED");
-      } else if (["off", "false", "disable"].includes(mode)) {
-        biddingState.isDryRun = false;
-        await message.reply("💰 DRY RUN DISABLED");
-      } else return await message.reply("❌ Use on/off");
-      saveBiddingState();
-      break;
-
-    case "!bidstatus":
-      const st = new EmbedBuilder().setColor(0x4a90e2).setTitle("📊 Status");
-      if (biddingState.cachedPoints) {
-        const age = Math.floor(
-          (Date.now() - biddingState.cacheTimestamp) / 60000
-        );
-        st.addFields({
-          name: "⚡ Cache",
-          value: `✅ Loaded (${
-            Object.keys(biddingState.cachedPoints).length
-          } members)\n⏱️ Age: ${age}m`,
-          inline: false,
-        });
-      } else
-        st.addFields({
-          name: "⚡ Cache",
-          value: "⚪ Not loaded (loads on !startauction)",
-          inline: false,
-        });
-      if (biddingState.auctionQueue.length > 0)
-        st.addFields({
-          name: "📋 Queue",
-          value:
-            biddingState.auctionQueue
-              .slice(0, 5)
-              .map((a, i) => `${i + 1}. ${a.item}`)
-              .join("\n") +
-            (biddingState.auctionQueue.length > 5
-              ? `\n*...+${biddingState.auctionQueue.length - 5} more*`
-              : ""),
-        });
-      if (biddingState.activeAuction)
-        st.addFields(
-          {
-            name: "🔴 Active",
-            value: biddingState.activeAuction.item,
-            inline: true,
-          },
-          {
-            name: "💰 Bid",
-            value: `${biddingState.activeAuction.currentBid}pts`,
-            inline: true,
-          }
-        );
-      st.setFooter({
-        text: biddingState.isDryRun ? "🧪 DRY RUN" : "Use !auction to add",
-      }).setTimestamp();
-      await message.reply({ embeds: [st] });
-      break;
-
-    case "!clearqueue":
-      if (biddingState.auctionQueue.length === 0)
-        return await message.reply("📋 Already empty");
-      if (biddingState.activeAuction)
-        return await message.reply("❌ Cannot clear during auction");
-      const cnt = clearQueue();
-      await message.reply(`✅ Cleared ${cnt} item(s)`);
-      break;
-
-    case "!resetbids":
-      const resetMsg = await message.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(0xff0000)
-            .setTitle("⚠️ RESET ALL?")
-            .setDescription(
-              "Clears:\n• Queue\n• Active auction\n• Locked points\n• History\n• **Points cache**"
-            )
-            .setFooter({ text: "React ✅ confirm / ❌ cancel" }),
-        ],
-      });
-      await resetMsg.react("✅");
-      await resetMsg.react("❌");
-      try {
-        const col = await resetMsg.awaitReactions({
-          filter: (r, u) =>
-            ["✅", "❌"].includes(r.emoji.name) && u.id === message.author.id,
+            ["✅", "❌"].includes(r.emoji.name) && u.id === msg.author.id,
           max: 1,
           time: 30000,
           errors: ["time"],
         });
         if (col.first().emoji.name === "✅") {
-          Object.values(biddingState.timerHandles).forEach((h) =>
-            clearTimeout(h)
-          );
-          biddingState = {
-            auctionQueue: [],
-            activeAuction: null,
-            lockedPoints: {},
-            auctionHistory: [],
-            isDryRun: biddingState.isDryRun,
-            timerHandles: {},
-            pendingConfirmations: {},
-            sessionDate: null,
-            cachedPoints: null,
-            cacheTimestamp: null,
+          await cMsg.reactions.removeAll().catch(() => {});
+          const load = await msg.channel.send("⚡ Loading cache...");
+          const r = await startSess(cli, cfg);
+          await load.delete().catch(() => {});
+          if (r.ok) {
+            await msg.channel.send({
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(0x00ff00)
+                  .setTitle("🚀 Started!")
+                  .setDescription(
+                    `**${r.tot} item(s)** • First: **${r.first}**`
+                  )
+                  .addFields(
+                    {
+                      name: "⚡ Cached",
+                      value: `${r.cached} members`,
+                      inline: true,
+                    },
+                    {
+                      name: "🎯 Mode",
+                      value: st.dry ? "🧪 DRY" : "💰 LIVE",
+                      inline: true,
+                    }
+                  )
+                  .setFooter({ text: "⚡ Instant bidding!" })
+                  .setTimestamp(),
+              ],
+            });
+          } else await msg.channel.send(`❌ Failed: ${r.msg}`);
+        } else await cMsg.reactions.removeAll().catch(() => {});
+      } catch (e) {
+        await cMsg.reactions.removeAll().catch(() => {});
+      }
+      break;
+
+    case "!bid":
+      if (args.length === 0)
+        return await msg.reply("❌ Usage: `!bid <amount>`");
+      const res = await procBid(msg, args[0], cfg);
+      if (!res.ok) await msg.reply(`❌ ${res.msg}`);
+      break;
+
+    case "!dryrun":
+      if (st.a) return await msg.reply("❌ Can't toggle during auction");
+      if (args.length === 0)
+        return await msg.reply(`Dry run: ${st.dry ? "🧪 ON" : "⚪ OFF"}`);
+      const mode = args[0].toLowerCase();
+      if (["on", "true", "enable"].includes(mode)) {
+        st.dry = true;
+        await msg.reply("🧪 DRY RUN ON");
+      } else if (["off", "false", "disable"].includes(mode)) {
+        st.dry = false;
+        await msg.reply("💰 DRY RUN OFF");
+      } else return await msg.reply("❌ Use on/off");
+      save();
+      break;
+
+    case "!bidstatus":
+      const statEmbed = new EmbedBuilder()
+        .setColor(0x4a90e2)
+        .setTitle("📊 Status");
+      if (st.cp) {
+        const age = Math.floor((Date.now() - st.ct) / 60000);
+        statEmbed.addFields({
+          name: "⚡ Cache",
+          value: `✅ Loaded (${
+            Object.keys(st.cp).length
+          } members)\n⏱️ Age: ${age}m`,
+          inline: false,
+        });
+      } else
+        statEmbed.addFields({
+          name: "⚡ Cache",
+          value: "⚪ Not loaded",
+          inline: false,
+        });
+      if (st.q.length > 0)
+        statEmbed.addFields({
+          name: "📋 Queue",
+          value:
+            st.q
+              .slice(0, 5)
+              .map((a, i) => `${i + 1}. ${a.item}`)
+              .join("\n") +
+            (st.q.length > 5 ? `\n*...+${st.q.length - 5} more*` : ""),
+        });
+      if (st.a) {
+        const tLeft = st.pause
+          ? `⏸️ PAUSED (${fmtTime(st.a.remainingTime)})`
+          : fmtTime(st.a.endTime - Date.now());
+        statEmbed.addFields(
+          { name: "🔴 Active", value: st.a.item, inline: true },
+          { name: "💰 Bid", value: `${st.a.curBid}pts`, inline: true },
+          { name: "⏱️ Time", value: tLeft, inline: true }
+        );
+      }
+      statEmbed
+        .setFooter({ text: st.dry ? "🧪 DRY RUN" : "Use !auction to add" })
+        .setTimestamp();
+      await msg.reply({ embeds: [statEmbed] });
+      break;
+
+    case "!clearqueue":
+      if (st.q.length === 0) return await msg.reply("📋 Empty");
+      if (st.a) return await msg.reply("❌ Can't clear during auction");
+      const cnt = clrQ();
+      await msg.reply(`✅ Cleared ${cnt} item(s)`);
+      break;
+
+    case "!resetbids":
+      const rstMsg = await msg.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle("⚠️ RESET ALL?")
+            .setDescription(
+              "Clears:\n• Queue\n• Active auction\n• Locked points\n• History\n• Cache"
+            )
+            .setFooter({ text: "✅ confirm / ❌ cancel" }),
+        ],
+      });
+      await rstMsg.react("✅");
+      await rstMsg.react("❌");
+      try {
+        const col = await rstMsg.awaitReactions({
+          filter: (r, u) =>
+            ["✅", "❌"].includes(r.emoji.name) && u.id === msg.author.id,
+          max: 1,
+          time: 30000,
+          errors: ["time"],
+        });
+        if (col.first().emoji.name === "✅") {
+          Object.values(st.th).forEach((h) => clearTimeout(h));
+          st = {
+            q: [],
+            a: null,
+            lp: {},
+            h: [],
+            dry: st.dry,
+            th: {},
+            pc: {},
+            sd: null,
+            cp: null,
+            ct: null,
+            lb: {},
+            pause: false,
+            pauseTimer: null,
           };
-          saveBiddingState();
-          await message.reply("✅ All data reset (including cache)");
+          save();
+          await msg.reply("✅ Reset (cache cleared)");
         }
       } catch (e) {}
       break;
 
     case "!forcesubmitresults":
-      if (!biddingState.sessionDate || biddingState.auctionHistory.length === 0)
-        return await message.reply("❌ No auction history");
-      const fsMsg = await message.reply({
+      if (!st.sd || st.h.length === 0) return await msg.reply("❌ No history");
+      const fsMsg = await msg.reply({
         embeds: [
           new EmbedBuilder()
             .setColor(0xff6600)
             .setTitle("⚠️ Force Submit?")
-            .setDescription(
-              `**Timestamp:** ${biddingState.sessionDate}\n**Items:** ${biddingState.auctionHistory.length}`
-            )
+            .setDescription(`**Time:** ${st.sd}\n**Items:** ${st.h.length}`)
             .addFields({
               name: "📋 Results",
-              value: biddingState.auctionHistory
+              value: st.h
                 .map((a) => `• **${a.item}**: ${a.winner} - ${a.amount}pts`)
                 .join("\n"),
               inline: false,
             })
-            .setFooter({ text: "React ✅ submit / ❌ cancel" }),
+            .setFooter({ text: "✅ submit / ❌ cancel" }),
         ],
       });
       await fsMsg.react("✅");
@@ -1014,79 +996,75 @@ async function handleCommand(cmd, message, args, client, config) {
       try {
         const fsCol = await fsMsg.awaitReactions({
           filter: (r, u) =>
-            ["✅", "❌"].includes(r.emoji.name) && u.id === message.author.id,
+            ["✅", "❌"].includes(r.emoji.name) && u.id === msg.author.id,
           max: 1,
           time: 30000,
           errors: ["time"],
         });
         if (fsCol.first().emoji.name === "✅") {
-          if (!biddingState.sessionDate)
-            biddingState.sessionDate = getCurrentTimestamp();
-          const totals = {};
-          biddingState.auctionHistory.forEach(
-            (a) => (totals[a.winner] = (totals[a.winner] || 0) + a.amount)
+          if (!st.sd) st.sd = ts();
+          const winners = {};
+          st.h.forEach(
+            (a) => (winners[a.winner] = (winners[a.winner] || 0) + a.amount)
           );
-          const results = Object.entries(totals).map(([m, t]) => ({
+          const allMembers = Object.keys(st.cp || {});
+          const res = allMembers.map((m) => ({
             member: m,
-            totalSpent: t,
+            totalSpent: winners[m] || 0,
           }));
-          const sub = await submitAuctionResults(
-            config.sheet_webhook_url,
-            results,
-            biddingState.sessionDate,
-            biddingState.isDryRun
+          const sub = await submitRes(
+            cfg.sheet_webhook_url,
+            res,
+            st.sd,
+            st.dry
           );
-          if (sub.success) {
-            const winners = biddingState.auctionHistory
+          if (sub.ok) {
+            const wList = st.h
               .map((a) => `• **${a.item}**: ${a.winner} - ${a.amount}pts`)
               .join("\n");
-            await message.channel.send({
+            await msg.channel.send({
               embeds: [
                 new EmbedBuilder()
                   .setColor(0x00ff00)
-                  .setTitle("✅ Force Submit Success!")
-                  .setDescription("Results submitted")
+                  .setTitle("✅ Force Submit OK!")
+                  .setDescription("Submitted")
                   .addFields(
-                    {
-                      name: "🕐 Timestamp",
-                      value: biddingState.sessionDate,
-                      inline: true,
-                    },
-                    {
-                      name: "🏆 Items",
-                      value: `${biddingState.auctionHistory.length}`,
-                      inline: true,
-                    },
+                    { name: "🕐 Time", value: st.sd, inline: true },
+                    { name: "🏆 Items", value: `${st.h.length}`, inline: true },
                     {
                       name: "💰 Total",
-                      value: `${results.reduce((s, r) => s + r.totalSpent, 0)}`,
+                      value: `${res.reduce((s, r) => s + r.totalSpent, 0)}`,
                       inline: true,
                     },
-                    { name: "📋 Winners", value: winners }
+                    { name: "📋 Winners", value: wList },
+                    {
+                      name: "👥 Updated",
+                      value: `${res.length} (0 auto-populated)`,
+                      inline: false,
+                    }
                   )
                   .setFooter({
-                    text: biddingState.isDryRun
-                      ? "🧪 DRY RUN"
-                      : "Points deducted • Cache cleared",
+                    text: st.dry ? "🧪 DRY" : "Deducted • Cache cleared",
                   })
                   .setTimestamp(),
               ],
             });
-            biddingState.auctionHistory = [];
-            biddingState.sessionDate = null;
-            biddingState.lockedPoints = {};
-            clearPointsCache();
-            saveBiddingState();
+            st.h = [];
+            st.sd = null;
+            st.lp = {};
+            clearCache();
+            save();
           } else {
-            await message.channel.send({
+            await msg.channel.send({
               embeds: [
                 new EmbedBuilder()
                   .setColor(0xff0000)
-                  .setTitle("❌ Submit Failed")
-                  .setDescription(`**Error:** ${sub.error}`)
+                  .setTitle("❌ Failed")
+                  .setDescription(`**Error:** ${sub.err}`)
                   .addFields({
                     name: "📝 Data",
-                    value: `\`\`\`\n${results
+                    value: `\`\`\`\n${res
+                      .filter((r) => r.totalSpent > 0)
                       .map((r) => `${r.member}: ${r.totalSpent}pts`)
                       .join("\n")}\n\`\`\``,
                   }),
@@ -1096,23 +1074,175 @@ async function handleCommand(cmd, message, args, client, config) {
         }
       } catch (e) {}
       break;
+
+    case "!cancelitem":
+      if (!st.a) return await msg.reply("❌ No active auction");
+      if (msg.channel.id !== st.a.threadId)
+        return await msg.reply("❌ Use in auction thread");
+      const canMsg = await msg.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0xff6600)
+            .setTitle("⚠️ Cancel Item?")
+            .setDescription(`**${st.a.item}**\n\nRefund all locked points?`)
+            .setFooter({ text: "✅ yes / ❌ no" }),
+        ],
+      });
+      await canMsg.react("✅");
+      await canMsg.react("❌");
+      try {
+        const canCol = await canMsg.awaitReactions({
+          filter: (r, u) =>
+            ["✅", "❌"].includes(r.emoji.name) && u.id === msg.author.id,
+          max: 1,
+          time: 30000,
+          errors: ["time"],
+        });
+        if (canCol.first().emoji.name === "✅") {
+          Object.values(st.th).forEach((h) => clearTimeout(h));
+          if (st.a.curWin) unlock(st.a.curWin, st.a.curBid);
+          await msg.channel.send(
+            `❌ **${st.a.item}** canceled. Points refunded.`
+          );
+          await msg.channel.setArchived(true, "Canceled").catch(() => {});
+          st.q.shift();
+          st.a = null;
+          save();
+          if (st.q.length > 0)
+            setTimeout(async () => await startNext(cli, cfg), 5000);
+          else await finalize(cli, cfg);
+        }
+      } catch (e) {}
+      break;
+
+    case "!skipitem":
+      if (!st.a) return await msg.reply("❌ No active auction");
+      if (msg.channel.id !== st.a.threadId)
+        return await msg.reply("❌ Use in auction thread");
+      const skpMsg = await msg.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0xff6600)
+            .setTitle("⚠️ Skip Item?")
+            .setDescription(
+              `**${st.a.item}**\n\nMark as no sale, move to next?`
+            )
+            .setFooter({ text: "✅ yes / ❌ no" }),
+        ],
+      });
+      await skpMsg.react("✅");
+      await skpMsg.react("❌");
+      try {
+        const skpCol = await skpMsg.awaitReactions({
+          filter: (r, u) =>
+            ["✅", "❌"].includes(r.emoji.name) && u.id === msg.author.id,
+          max: 1,
+          time: 30000,
+          errors: ["time"],
+        });
+        if (skpCol.first().emoji.name === "✅") {
+          Object.values(st.th).forEach((h) => clearTimeout(h));
+          if (st.a.curWin) unlock(st.a.curWin, st.a.curBid);
+          await msg.channel.send(`⏭️ **${st.a.item}** skipped (no sale).`);
+          await msg.channel.setArchived(true, "Skipped").catch(() => {});
+          st.q.shift();
+          st.a = null;
+          save();
+          if (st.q.length > 0)
+            setTimeout(async () => await startNext(cli, cfg), 5000);
+          else await finalize(cli, cfg);
+        }
+      } catch (e) {}
+      break;
+
+    case "!mypoints":
+      // Only in bidding channel (not thread)
+      if (msg.channel.isThread() || msg.channel.id !== cfg.bidding_channel_id) {
+        return await msg.reply(
+          "❌ Use `!mypoints` in bidding channel only (not threads)"
+        );
+      }
+
+      // Don't allow during active auction
+      if (st.a) {
+        return await msg.reply(
+          "⚠️ Can't check points during auction. Wait for session to end."
+        );
+      }
+
+      const u = msg.member.nickname || msg.author.username;
+
+      // Fetch fresh from sheets
+      const freshPts = await fetchPts(cfg.sheet_webhook_url, st.dry);
+      if (!freshPts) {
+        return await msg.reply("❌ Failed to fetch points from sheets.");
+      }
+
+      let userPts = freshPts[u];
+      if (userPts === undefined) {
+        const match = Object.keys(freshPts).find(
+          (n) => n.toLowerCase() === u.toLowerCase()
+        );
+        userPts = match ? freshPts[match] : null;
+      }
+
+      let ptsMsg;
+      if (userPts === null || userPts === undefined) {
+        ptsMsg = await msg.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0xff0000)
+              .setTitle("❌ Not Found")
+              .setDescription(
+                `**${u}**\n\nYou are not in the bidding system or not a current ELYSIUM member.`
+              )
+              .setFooter({ text: "Contact admin if this is wrong" })
+              .setTimestamp(),
+          ],
+        });
+      } else {
+        ptsMsg = await msg.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0x00ff00)
+              .setTitle("💰 Your Points")
+              .setDescription(`**${u}**`)
+              .addFields({
+                name: "📊 Available Points",
+                value: `${userPts} pts`,
+                inline: true,
+              })
+              .setFooter({
+                text: st.dry ? "🧪 DRY RUN MODE" : "Auto-deletes in 30s",
+              })
+              .setTimestamp(),
+          ],
+        });
+      }
+
+      // Delete after 30s
+      setTimeout(async () => {
+        await ptsMsg.delete().catch(() => {});
+        await msg.delete().catch(() => {});
+      }, 30000);
+      break;
   }
 }
 
 // MODULE EXPORTS
 module.exports = {
-  loadBiddingState,
-  saveBiddingState,
-  getBiddingState: () => biddingState,
-  hasElysiumRole,
-  isAdmin,
-  getCachedPoints,
-  loadPointsCache,
-  clearPointsCache,
-  handleCommand,
+  loadBiddingState: load,
+  saveBiddingState: save,
+  getBiddingState: () => st,
+  hasElysiumRole: hasRole,
+  isAdmin: isAdm,
+  getCachedPoints: getPts,
+  loadPointsCache: loadCache,
+  clearPointsCache: clearCache,
+  handleCommand: handleCmd,
 
   confirmBid: async function (reaction, user, config) {
-    const p = biddingState.pendingConfirmations[reaction.message.id];
+    const p = st.pc[reaction.message.id];
     if (!p) return;
 
     const guild = reaction.message.guild,
@@ -1126,33 +1256,50 @@ module.exports = {
       return;
     }
 
-    const a = biddingState.activeAuction;
+    const a = st.a;
     if (!a || a.status !== "active") {
       await reaction.message.channel.send(
         `❌ <@${user.id}> Auction no longer active`
       );
       await reaction.message.reactions.removeAll().catch(() => {});
       await reaction.message.delete().catch(() => {});
-      delete biddingState.pendingConfirmations[reaction.message.id];
-      saveBiddingState();
+      delete st.pc[reaction.message.id];
+      save();
+
+      // Resume if paused
+      if (st.pause) {
+        resumeAuction(reaction.client, config);
+        await reaction.message.channel.send(
+          `▶️ **RESUMED** - Auction continues...`
+        );
+      }
       return;
     }
 
-    if (p.amount <= a.currentBid) {
+    if (p.amount <= a.curBid) {
       await reaction.message.channel.send(
-        `❌ <@${user.id}> Bid no longer valid. Current: ${a.currentBid}pts`
+        `❌ <@${user.id}> Bid invalid. Current: ${a.curBid}pts`
       );
       await reaction.message.reactions.removeAll().catch(() => {});
       await reaction.message.delete().catch(() => {});
-      delete biddingState.pendingConfirmations[reaction.message.id];
-      saveBiddingState();
+      delete st.pc[reaction.message.id];
+      save();
+
+      // Resume if paused
+      if (st.pause) {
+        resumeAuction(reaction.client, config);
+        await reaction.message.channel.send(
+          `▶️ **RESUMED** - Auction continues...`
+        );
+      }
       return;
     }
 
-    if (a.currentWinner) {
-      unlockPoints(a.currentWinner, a.currentBid);
+    // Handle previous winner
+    if (a.curWin && !p.isSelf) {
+      unlock(a.curWin, a.curBid);
       await reaction.message.channel.send({
-        content: `<@${a.currentWinnerId}>`,
+        content: `<@${a.curWinId}>`,
         embeds: [
           new EmbedBuilder()
             .setColor(0xff6600)
@@ -1162,11 +1309,13 @@ module.exports = {
       });
     }
 
-    lockPoints(p.username, p.amount);
-    const prevBid = a.currentBid;
-    a.currentBid = p.amount;
-    a.currentWinner = p.username;
-    a.currentWinnerId = p.userId;
+    // Lock points (incremental if self-overbid)
+    lock(p.username, p.needed);
+
+    const prevBid = a.curBid;
+    a.curBid = p.amount;
+    a.curWin = p.username;
+    a.curWinId = p.userId;
     a.bids.push({
       user: p.username,
       userId: p.userId,
@@ -1174,17 +1323,22 @@ module.exports = {
       timestamp: Date.now(),
     });
 
-    const timeLeft = a.endTime - Date.now();
-    if (timeLeft < 60000 && a.extendedCount < 10) {
-      a.endTime += 60000;
-      a.extendedCount++;
-      a.goingOnceAnnounced = false;
-      a.goingTwiceAnnounced = false;
+    // Extension logic - max 15 extensions
+    const timeLeft = st.pause ? st.a.remainingTime : a.endTime - Date.now();
+    if (timeLeft < 60000 && a.extCnt < ME) {
+      if (!st.pause) {
+        a.endTime += 60000;
+      } else {
+        st.a.remainingTime += 60000;
+      }
+      a.extCnt++;
+      a.go1 = false;
+      a.go2 = false;
     }
 
-    if (biddingState.timerHandles[`confirm_${reaction.message.id}`]) {
-      clearTimeout(biddingState.timerHandles[`confirm_${reaction.message.id}`]);
-      delete biddingState.timerHandles[`confirm_${reaction.message.id}`];
+    if (st.th[`c_${reaction.message.id}`]) {
+      clearTimeout(st.th[`c_${reaction.message.id}`]);
+      delete st.th[`c_${reaction.message.id}`];
     }
 
     await reaction.message.edit({
@@ -1196,14 +1350,14 @@ module.exports = {
           .addFields(
             { name: "💰 Your Bid", value: `${p.amount}pts`, inline: true },
             { name: "📊 Previous", value: `${prevBid}pts`, inline: true },
-            {
-              name: "⏱️ Time Left",
-              value: formatTimeRemaining(a.endTime - Date.now()),
-              inline: true,
-            }
+            { name: "⏱️ Time Left", value: fmtTime(timeLeft), inline: true }
           )
           .setFooter({
-            text: timeLeft < 60000 ? "⏰ Timer extended!" : "Good luck!",
+            text: p.isSelf
+              ? `Self-overbid (+${p.needed}pts)`
+              : timeLeft < 60000 && a.extCnt < ME
+              ? "⏰ Extended!"
+              : "Good luck!",
           }),
       ],
     });
@@ -1225,24 +1379,37 @@ module.exports = {
       async () => await reaction.message.delete().catch(() => {}),
       5000
     );
-    if (p.originalMessageId) {
+    if (p.origMsgId) {
       const orig = await reaction.message.channel.messages
-        .fetch(p.originalMessageId)
+        .fetch(p.origMsgId)
         .catch(() => null);
       if (orig) await orig.delete().catch(() => {});
     }
 
-    delete biddingState.pendingConfirmations[reaction.message.id];
-    saveBiddingState();
+    delete st.pc[reaction.message.id];
+    save();
 
-    if (timeLeft < 60000) scheduleAuctionTimers(reaction.client, config);
+    // Resume if paused
+    if (st.pause) {
+      resumeAuction(reaction.client, config);
+      await reaction.message.channel.send(
+        `▶️ **RESUMED** - Timer continues with ${fmtTime(
+          a.endTime - Date.now()
+        )} remaining...`
+      );
+    } else if (timeLeft < 60000) {
+      schedTimers(reaction.client, config);
+    }
+
     console.log(
-      `✅ Bid confirmed: ${p.username} - ${p.amount}pts (⚡ instant validation!)`
+      `✅ Bid: ${p.username} - ${p.amount}pts${
+        p.isSelf ? ` (self +${p.needed}pts)` : ""
+      }`
     );
   },
 
   cancelBid: async function (reaction, user, config) {
-    const p = biddingState.pendingConfirmations[reaction.message.id];
+    const p = st.pc[reaction.message.id];
     if (!p) return;
 
     const guild = reaction.message.guild,
@@ -1261,7 +1428,7 @@ module.exports = {
         new EmbedBuilder()
           .setColor(0x808080)
           .setTitle("❌ Bid Canceled")
-          .setDescription("Bid not placed"),
+          .setDescription("Not placed"),
       ],
     });
     await reaction.message.reactions.removeAll().catch(() => {});
@@ -1270,50 +1437,48 @@ module.exports = {
       3000
     );
 
-    if (p.originalMessageId) {
+    if (p.origMsgId) {
       const orig = await reaction.message.channel.messages
-        .fetch(p.originalMessageId)
+        .fetch(p.origMsgId)
         .catch(() => null);
       if (orig) await orig.delete().catch(() => {});
     }
 
-    if (biddingState.timerHandles[`confirm_${reaction.message.id}`]) {
-      clearTimeout(biddingState.timerHandles[`confirm_${reaction.message.id}`]);
-      delete biddingState.timerHandles[`confirm_${reaction.message.id}`];
+    if (st.th[`c_${reaction.message.id}`]) {
+      clearTimeout(st.th[`c_${reaction.message.id}`]);
+      delete st.th[`c_${reaction.message.id}`];
     }
 
-    delete biddingState.pendingConfirmations[reaction.message.id];
-    saveBiddingState();
+    delete st.pc[reaction.message.id];
+    save();
+
+    // Resume if paused
+    if (st.pause) {
+      resumeAuction(reaction.client, config);
+      await reaction.message.channel.send(
+        `▶️ **RESUMED** - Bid canceled, auction continues...`
+      );
+    }
   },
 
   recoverBiddingState: async (client, config) => {
-    if (loadBiddingState()) {
+    if (load()) {
       console.log("📦 State recovered");
-      if (biddingState.cachedPoints) {
-        const age = Math.floor(
-          (Date.now() - biddingState.cacheTimestamp) / 60000
-        );
+      if (st.cp) {
+        const age = Math.floor((Date.now() - st.ct) / 60000);
         console.log(
-          `⚡ Cache recovered: ${
-            Object.keys(biddingState.cachedPoints).length
-          } members (${age}m old)`
+          `⚡ Cache: ${Object.keys(st.cp).length} members (${age}m old)`
         );
         if (age > 60) {
-          console.log("⚠️ Cache too old, clearing...");
-          clearPointsCache();
+          console.log("⚠️ Cache old, clearing...");
+          clearCache();
         }
-      } else console.log("⚪ No cache (loads on !startauction)");
+      } else console.log("⚪ No cache");
 
-      if (
-        biddingState.activeAuction &&
-        biddingState.activeAuction.status === "active"
-      ) {
+      if (st.a && st.a.status === "active") {
         console.log("🔄 Rescheduling timers...");
-        scheduleAuctionTimers(client, config);
-        if (!biddingState.cachedPoints)
-          console.warn(
-            "⚠️ WARNING: Active auction but no cache! Bidding will fail."
-          );
+        schedTimers(client, config);
+        if (!st.cp) console.warn("⚠️ Active auction but no cache!");
       }
       return true;
     }

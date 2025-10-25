@@ -16,6 +16,7 @@ const levenshtein = require("fast-levenshtein");
 const fs = require("fs");
 const http = require("http");
 const bidding = require("./bidding.js");
+const helpSystem = require("./help-system.js");
 
 // Load configuration
 const config = JSON.parse(fs.readFileSync("./config.json"));
@@ -628,70 +629,9 @@ async function recoverStateFromThreads() {
 const commandHandlers = {
   // Help command - Enhanced but concise
   help: async (message, member) => {
-    const userIsAdmin = isAdmin(member);
-
-    if (userIsAdmin) {
-      const embed = new EmbedBuilder()
-        .setColor(0x4a90e2)
-        .setTitle("🛡️ ELYSIUM Bot - Admin Commands")
-        .setDescription("**All commands require admin role**")
-        .addFields(
-          {
-            name: "📋 Attendance System",
-            value:
-              "**Monitoring:**\n`!status` - View bot status\n`!debugthread` - Debug current thread\n\n" +
-              "**Spawn Management:**\n`!addthread [Boss] will spawn in X min! (YYYY-MM-DD HH:MM)` - Manual spawn\n" +
-              "`close` - Close current spawn\n`!forceclose` - Force close without checks\n`!forcesubmit` - Submit without closing\n\n" +
-              "**Verification:**\n`!verify @member` - Manual verify\n`!verifyall` - Verify all pending\n`!resetpending` - Clear pending\n\n" +
-              "**Mass Operations:**\n`!closeallthread` - Close all spawns\n`!clearstate` - Reset bot memory",
-          },
-          {
-            name: "💰 Bidding System",
-            value:
-              "**Setup:**\n`!auction <item> <price> <duration>` - Add to queue\n`!queuelist` - View queue\n`!removeitem <name>` - Remove item\n`!clearqueue` - Clear all\n\n" +
-              "**Auction Control:**\n`!startauction` - Begin session\n`!endauction` - End current\n`!dryrun on/off` - Test mode\n\n" +
-              "**Status & Debug:**\n`!bidstatus` - System status\n`!testbidding` - Connection test\n`!forcesubmitresults` - Manual tally\n`!resetbids` - Clear all bids",
-          },
-          {
-            name: "ℹ️ Member Commands",
-            value:
-              "**Attendance:** `present` or `here` (with screenshot)\n**Bidding:** `!bid <amount>` in auction threads",
-          }
-        )
-        .setFooter({
-          text: `Version ${BOT_VERSION} • Use commands in appropriate channels`,
-        })
-        .setTimestamp();
-
-      await message.reply({ embeds: [embed] });
-    } else {
-      const embed = new EmbedBuilder()
-        .setColor(0xffd700)
-        .setTitle("📚 ELYSIUM Bot - Member Commands")
-        .addFields(
-          {
-            name: "📸 Attendance Check-In",
-            value:
-              "1. Type `present` or `here` in spawn threads\n2. Attach a screenshot showing boss\n3. Wait for admin verification (✅)",
-          },
-          {
-            name: "💰 Bidding Commands",
-            value:
-              "`!bid <amount>` - Place bid in auction thread\n`!bidstatus` - View auction status\n\n**Example:** `!bid 500`",
-          },
-          {
-            name: "💡 Tips",
-            value:
-              "• Screenshots required for attendance\n• Bids need confirmation (✅)\n• Check auction threads for active items",
-          }
-        )
-        .setFooter({ text: `Version ${BOT_VERSION}` })
-        .setTimestamp();
-
-      await message.reply({ embeds: [embed] });
-    }
+    const args = message.content.trim().split(/\s+/).slice(1);
+    await helpSystem.handleHelp(message, args, member);
   },
-
   status: async (message, member) => {
     const guild = message.guild;
     const uptime = formatUptime(Date.now() - BOT_START_TIME);
@@ -1461,7 +1401,7 @@ client.once(Events.ClientReady, () => {
   console.log(
     `⚙️ Timing: Sheet delay=${TIMING.MIN_SHEET_DELAY}ms, Retry attempts=${TIMING.REACTION_RETRY_ATTEMPTS}`
   );
-
+  helpSystem.initialize(config, isAdmin, BOT_VERSION);
   recoverStateFromThreads();
   bidding.recoverBiddingState(client, config);
 });
