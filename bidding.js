@@ -1247,20 +1247,21 @@ module.exports = {
   clearPointsCache: clearCache,
   handleCommand: handleCmd,
 
-  confirmBid: async function (reaction, user, config) {
-    const p = st.pc[reaction.message.id];
-    if (!p) return;
+confirmBid: async function (reaction, user, config) {
+  const p = st.pc[reaction.message.id];
+  if (!p) return;
 
-    const guild = reaction.message.guild,
-      member = await guild.members.fetch(user.id).catch(() => null);
-    if (!member) return;
+  const guild = reaction.message.guild,
+    member = await guild.members.fetch(user.id).catch(() => null);
+  if (!member) return;
 
-    const isOwner = p.userId === user.id,
-      isAdm = isAdmin(member, config);
-    if (!isOwner && !isAdm) {
-      await reaction.users.remove(user.id).catch(() => {});
-      return;
-    }
+  const isOwner = p.userId === user.id,
+    isAdm = isAdmFunc(member, config);  // ✅ CHANGED: isAdmin() → isAdmFunc()
+  
+  if (!isOwner && !isAdm) {
+    await reaction.users.remove(user.id).catch(() => {});
+    return;
+  }
 
     const a = st.a;
     if (!a || a.status !== "active") {
@@ -1415,19 +1416,20 @@ module.exports = {
   },
 
   cancelBid: async function (reaction, user, config) {
-    const p = st.pc[reaction.message.id];
-    if (!p) return;
+  const p = st.pc[reaction.message.id];
+  if (!p) return;
 
-    const guild = reaction.message.guild,
-      member = await guild.members.fetch(user.id).catch(() => null);
-    if (!member) return;
+  const guild = reaction.message.guild,
+    member = await guild.members.fetch(user.id).catch(() => null);
+  if (!member) return;
 
-    const isOwner = p.userId === user.id,
-      isAdm = isAdmin(member, config);
-    if (!isOwner && !isAdm) {
-      await reaction.users.remove(user.id).catch(() => {});
-      return;
-    }
+  const isOwner = p.userId === user.id,
+    isAdm = isAdmFunc(member, config);  // ✅ CHANGED: isAdmin() → isAdmFunc()
+  
+  if (!isOwner && !isAdm) {
+    await reaction.users.remove(user.id).catch(() => {});
+    return;
+  }
 
     await reaction.message.edit({
       embeds: [
