@@ -1545,27 +1545,34 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
 
-// Bidding setup commands (admin logs)
+// BIDDING COMMANDS - ALL CONSOLIDATED
+    if (inAdminLogs) {
+      const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
+      const args = message.content.trim().split(/\s+/).slice(1);
+
       if (["!auction", "!queuelist", "!removeitem", "!startauction", "!dryrun", "!clearqueue", "!resetbids", "!forcesubmitresults", "!testbidding", "!bidstatus"].includes(cmd)) {
         console.log(`🎯 Processing bidding command: ${cmd}`);
         await bidding.handleCommand(cmd, message, args, client, config);
         return;
       }
+    }
 
-      // Bidding commands in channel/threads
-      if (inBiddingChannel) {
-        if (cmd === "!bid") {
-          console.log(`🎯 Bidding channel command: ${cmd}`);
-          await bidding.handleCommand(cmd, message, args, client, config);
-          return;
-        }
+    if (inBiddingChannel) {
+      const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
+      const args = message.content.trim().split(/\s+/).slice(1);
 
-        if (cmd === "!bidstatus") {
-          console.log(`🎯 Bidding channel command: ${cmd}`);
-          await bidding.handleCommand(cmd, message, args, client, config);
-          return;
-        }
+      if (cmd === "!bid") {
+        console.log(`🎯 Bidding channel command: ${cmd}`);
+        await bidding.handleCommand(cmd, message, args, client, config);
+        return;
       }
+
+      if (cmd === "!bidstatus") {
+        console.log(`🎯 Bidding channel command: ${cmd}`);
+        await bidding.handleCommand(cmd, message, args, client, config);
+        return;
+      }
+    }
 
       // !addthread
       if (cmd === "!addthread") {
@@ -1616,72 +1623,6 @@ client.on(Events.MessageCreate, async (message) => {
         );
 
         return;
-      }
-    }
-
-    // Bidding commands (member + admin, in bidding channel/threads)
-    if (inBiddingChannel) {
-      const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
-      const args = message.content.trim().split(/\s+/).slice(1);
-
-      console.log(`🎯 Bidding channel command: ${cmd}`);
-
-      // Member commands
-      if (cmd === "!bid") {
-        console.log(`💰 Calling handleBidCommand with args: ${args.join(" ")}`);
-        await bidding.handleBidCommand(message, args, config);
-        return;
-      }
-
-      if (cmd === "!bidstatus") {
-        console.log(`📊 Calling handleBidStatusCommand`);
-        await bidding.handleBidStatusCommand(message, userIsAdmin);
-        return;
-      }
-
-      if (cmd === "!mybids") {
-        console.log(`💳 Calling handleMyBidsCommand`);
-        await bidding.handleMyBidsCommand(message);
-        return;
-      }
-
-      // Admin commands
-      if (userIsAdmin) {
-        if (cmd === "!endauction") {
-          console.log(`⏹️ Calling handleEndAuctionCommand`);
-          await bidding.handleEndAuctionCommand(message, client, config);
-          return;
-        }
-
-        if (cmd === "!extendtime") {
-          console.log(`⏱️ Calling handleExtendTimeCommand`);
-          await bidding.handleExtendTimeCommand(message, args, client, config);
-          return;
-        }
-
-        if (cmd === "!forcewinner") {
-          console.log(`👑 Calling handleForceWinnerCommand`);
-          await bidding.handleForceWinnerCommand(message, args);
-          return;
-        }
-
-        if (cmd === "!cancelbid") {
-          console.log(`❌ Calling handleCancelBidCommand`);
-          await bidding.handleCancelBidCommand(message, args);
-          return;
-        }
-
-        if (cmd === "!debugauction") {
-          console.log(`🔍 Calling handleDebugAuctionCommand`);
-          await bidding.handleDebugAuctionCommand(message);
-          return;
-        }
-
-        if (cmd === "!cancelauction") {
-          console.log(`🚫 Calling handleCancelAuctionCommand`);
-          await bidding.handleCancelAuctionCommand(message, client, config);
-          return;
-        }
       }
     }
   } catch (err) {
