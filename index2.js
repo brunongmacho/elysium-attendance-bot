@@ -1417,6 +1417,7 @@ client.once(Events.ClientReady, () => {
     `⚙️ Timing: Sheet delay=${TIMING.MIN_SHEET_DELAY}ms, Retry attempts=${TIMING.REACTION_RETRY_ATTEMPTS}`
   );
   helpSystem.initialize(config, isAdmin, BOT_VERSION);
+  bidding.initializeBidding(config, isAdmin);  // ✅ ADD THIS LINE
   recoverStateFromThreads();
   bidding.recoverBiddingState(client, config);
 });

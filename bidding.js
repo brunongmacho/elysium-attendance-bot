@@ -23,6 +23,7 @@ let st = {
   pause: false, // is paused
   pauseTimer: null, // pause resume timer
 };
+let isAdmFunc = null;
 
 const SF = "./bidding-state.json";
 const CT = 10000; // confirm timeout (10s)
@@ -89,6 +90,10 @@ function load() {
     console.error("❌ Load:", e);
   }
   return false;
+}
+
+function initializeBidding(config, isAdminFunc) {
+  isAdmFunc = isAdminFunc;
 }
 
 // SHEETS API
