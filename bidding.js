@@ -17,6 +17,9 @@ const { EmbedBuilder } = require("discord.js");
 const fetch = require("node-fetch");
 const fs = require("fs");
 
+let auctioneering = null;
+let cfg = null;
+
 // CONSTANTS
 const SF = "./bidding-state.json";
 const CT = 10000; // confirm timeout (10s)
@@ -156,8 +159,10 @@ function load() {
   return false;
 }
 
-function initializeBidding(config, isAdminFunc) {
+function initializeBidding(config, isAdminFunc, auctioneeringRef) {
   isAdmFunc = isAdminFunc;
+  cfg = config;
+  auctioneering = auctioneeringRef;
 }
 
 // SHEETS API
@@ -670,6 +675,100 @@ async function endAuc(cli, cfg) {
   }
 }
 
+async function loadPointsCacheForAuction(url) {
+  console.log(`⚡ Loading cache for auction...`);
+  const t0 = Date.now();
+  const p = await fetchPts(url, false);
+  if (!p) {
+    console.error(`❌ Cache fail`);
+    return false;
+  }
+  st.cp = p;
+  st.ct = Date.now();
+  save();
+  console.log(
+    `✅ Cache: ${Date.now() - t0}ms - ${Object.keys(p).length} members`
+  );
+  return true;
+}
+
+async function submitSessionTally(config, sessionItems) {
+  if (!st.cp || sessionItems.length === 0) {
+    console.log(`⚠️ No items to tally`);
+    return;
+  }
+
+  if (!st.sd) st.sd = ts();
+
+  const allMembers = Object.keys(st.cp);
+  const winners = {};
+
+  sessionItems.forEach((item) => {
+    const normalizedWinner = item.winner.toLowerCase().trim();
+    winners[normalizedWinner] = (winners[normalizedWinner] || 0) + item.amount;
+  });
+
+  const res = allMembers.map((m) => {
+    const normalizedMember = m.toLowerCase().trim();
+    return {
+      member: m,
+      totalSpent: winners[normalizedMember] || 0,
+    };
+  });
+
+  const sub = await submitRes(config.sheet_webhook_url, res, st.sd, false);
+
+  if (sub.ok) {
+    console.log(`✅ Session tally submitted`);
+    st.h = [];
+    st.sd = null;
+    st.lp = {};
+    clearCache();
+  } else {
+    console.error(`❌ Tally submission failed:`, sub.err);
+  }
+}
+
+async function saveBiddingStateToSheet() {
+  try {
+    const stateToSave = {
+      queue: st.q,
+      activeAuction: st.a,
+      lockedPoints: st.lp,
+      history: st.h,
+    };
+
+    await fetch(cfg.sheet_webhook_url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "saveBotState",
+        state: stateToSave,
+      }),
+    });
+
+    console.log(`✅ Bot state saved to sheet`);
+  } catch (e) {
+    console.error(`❌ Save state:`, e);
+  }
+}
+
+async function loadBiddingStateFromSheet(url) {
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "getBotState" }),
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    return data.state || null;
+  } catch (e) {
+    console.error(`❌ Load state:`, e);
+    return null;
+  }
+}
+
 async function finalize(cli, cfg) {
   const g = await cli.guilds.fetch(cfg.main_guild_id);
   const adm = await g.channels.fetch(cfg.admin_logs_channel_id);
@@ -766,8 +865,133 @@ async function finalize(cli, cfg) {
   save();
 }
 
+async function procBidAuctioneering(msg, amt, currentItem) {
+  const m = msg.member,
+    u = m.nickname || msg.author.username,
+    uid = msg.author.id;
+  
+  if (!hasRole(m) && !isAdm(m, cfg)) {
+    await msg.reply(`${EMOJI.ERROR} Need ELYSIUM role`);
+    return { ok: false, msg: "No role" };
+  }
+
+  const now = Date.now();
+  if (st.lb[uid] && now - st.lb[uid] < 3000) {
+    const wait = Math.ceil((3000 - (now - st.lb[uid])) / 1000);
+    await msg.reply(`${EMOJI.CLOCK} Wait ${wait}s (rate limit)`);
+    return { ok: false, msg: "Rate limited" };
+  }
+
+  const bid = parseInt(amt);
+  if (isNaN(bid) || bid <= 0 || !Number.isInteger(bid)) {
+    await msg.reply(`${EMOJI.ERROR} Invalid bid (integers only)`);
+    return { ok: false, msg: "Invalid" };
+  }
+
+  if (bid <= currentItem.curBid) {
+    await msg.reply(`${EMOJI.ERROR} Must be > ${currentItem.curBid}pts`);
+    return { ok: false, msg: "Too low" };
+  }
+
+  if (!st.cp) {
+    await msg.reply(`${EMOJI.ERROR} Cache not loaded!`);
+    return { ok: false, msg: "No cache" };
+  }
+
+  const tot = getPts(u),
+    av = avail(u, tot);
+
+  if (tot === 0) {
+    await msg.reply(`${EMOJI.ERROR} No points`);
+    return { ok: false, msg: "No pts" };
+  }
+
+  const isSelf = currentItem.curWin && currentItem.curWin.toLowerCase() === u.toLowerCase();
+  const curLocked = st.lp[u] || 0;
+  const needed = isSelf ? Math.max(0, bid - curLocked) : bid;
+
+  if (needed > av) {
+    await msg.reply(
+      `${EMOJI.ERROR} **Insufficient!**\n${EMOJI.BID} Total: ${tot}\n${EMOJI.LOCK} Locked: ${curLocked}\n${EMOJI.CHART} Available: ${av}\n${EMOJI.WARNING} Need: ${needed}`
+    );
+    return { ok: false, msg: "Insufficient" };
+  }
+
+  const confEmbed = new EmbedBuilder()
+    .setColor(COLORS.AUCTION)
+    .setTitle(`${EMOJI.CLOCK} Confirm Bid`)
+    .setDescription(`**${currentItem.item}**`)
+    .addFields(
+      { name: `${EMOJI.BID} Your Bid`, value: `${bid}pts`, inline: true },
+      { name: `${EMOJI.CHART} Current`, value: `${currentItem.curBid}pts`, inline: true },
+      { name: '💳 After', value: `${av - needed}pts`, inline: true }
+    )
+    .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 10s timeout` });
+
+  if (isSelf) {
+    confEmbed.addFields({
+      name: '🔄 Self-Overbid',
+      value: `Current: ${currentItem.curBid}pts → New: ${bid}pts\n**+${needed}pts needed**`,
+      inline: false,
+    });
+  }
+
+  const conf = await msg.reply({ embeds: [confEmbed] });
+  await conf.react(EMOJI.SUCCESS);
+  await conf.react(EMOJI.ERROR);
+
+  st.pc[conf.id] = {
+    userId: uid,
+    username: u,
+    threadId: null,
+    amount: bid,
+    timestamp: now,
+    origMsgId: msg.id,
+    isSelf,
+    needed,
+    isAuctioneering: true,
+  };
+  save();
+
+  st.lb[uid] = now;
+
+  let countdown = 10;
+  const countdownInterval = setInterval(async () => {
+    countdown--;
+    if (countdown > 0 && countdown <= 10 && st.pc[conf.id]) {
+      const updatedEmbed = EmbedBuilder.from(confEmbed)
+        .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • ${countdown}s remaining` });
+      await conf.edit({ embeds: [updatedEmbed] }).catch(() => {});
+    }
+  }, 1000);
+
+  st.th[`c_${conf.id}`] = setTimeout(async () => {
+    clearInterval(countdownInterval);
+    if (st.pc[conf.id]) {
+      await conf.reactions.removeAll().catch(() => {});
+      const timeoutEmbed = EmbedBuilder.from(confEmbed)
+        .setColor(COLORS.INFO)
+        .setFooter({ text: `${EMOJI.CLOCK} Timed out` });
+      await conf.edit({ embeds: [timeoutEmbed] });
+      setTimeout(async () => await conf.delete().catch(() => {}), 3000);
+      delete st.pc[conf.id];
+      save();
+    }
+  }, 10000);
+
+  return { ok: true, confId: conf.id };
+}
+
 // BIDDING (OPTIMIZED)
 async function procBid(msg, amt, cfg) {
+  // CRITICAL FIX: Check if auctioneering is active first
+  if (auctioneering) {
+    const auctState = auctioneering.getAuctionState();
+    if (auctState && auctState.active && auctState.currentItem) {
+      return await procBidAuctioneering(msg, amt, auctState.currentItem);
+    }
+  }
+
   const a = st.a;
   if (!a) return { ok: false, msg: "No auction" };
   if (a.status !== "active") return { ok: false, msg: "Not started" };
@@ -1585,6 +1809,10 @@ module.exports = {
   loadPointsCache: loadCache,
   clearPointsCache: clearCache,
   handleCommand: handleCmd,
+  loadPointsCacheForAuction: loadPointsCacheForAuction,
+  submitSessionTally: submitSessionTally,
+  loadBiddingStateFromSheet: loadBiddingStateFromSheet,
+  saveBiddingStateToSheet: saveBiddingStateToSheet,
 
   confirmBid: async function (reaction, user, config) {
     const p = st.pc[reaction.message.id];
@@ -1602,6 +1830,129 @@ module.exports = {
       return;
     }
 
+    // CRITICAL FIX: Handle auctioneering bids
+    if (p.isAuctioneering) {
+      const auctState = auctioneering.getAuctionState();
+      const a = auctState.currentItem;
+      
+      if (!auctState.active || !a) {
+        await reaction.message.channel.send(
+          `${EMOJI.ERROR} <@${user.id}> Auction no longer active`
+        );
+        await reaction.message.reactions.removeAll().catch(() => {});
+        await reaction.message.delete().catch(() => {});
+        delete st.pc[reaction.message.id];
+        save();
+        return;
+      }
+
+      if (p.amount <= a.curBid) {
+        await reaction.message.channel.send(
+          `${EMOJI.ERROR} <@${user.id}> Bid invalid. Current: ${a.curBid}pts`
+        );
+        await reaction.message.reactions.removeAll().catch(() => {});
+        await reaction.message.delete().catch(() => {});
+        delete st.pc[reaction.message.id];
+        save();
+        return;
+      }
+
+      if (a.curWin && !p.isSelf) {
+        unlock(a.curWin, a.curBid);
+        await reaction.message.channel.send({
+          content: `<@${a.curWinId}>`,
+          embeds: [
+            new EmbedBuilder()
+              .setColor(COLORS.WARNING)
+              .setTitle(`${EMOJI.WARNING} Outbid!`)
+              .setDescription(`Someone bid **${p.amount}pts** on **${a.item}**`),
+          ],
+        });
+      }
+
+      lock(p.username, p.needed);
+
+      const prevBid = a.curBid;
+      a.curBid = p.amount;
+      a.curWin = p.username;
+      a.curWinId = p.userId;
+      a.bids.push({
+        user: p.username,
+        userId: p.userId,
+        amount: p.amount,
+        timestamp: Date.now(),
+      });
+
+      const timeLeft = a.endTime - Date.now();
+      if (timeLeft < 60000 && a.extCnt < 15) {
+        a.endTime += 60000;
+        a.extCnt++;
+        a.go1 = false;
+        a.go2 = false;
+      }
+
+      if (st.th[`c_${reaction.message.id}`]) {
+        clearTimeout(st.th[`c_${reaction.message.id}`]);
+        delete st.th[`c_${reaction.message.id}`];
+      }
+
+      await reaction.message.edit({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLORS.SUCCESS)
+            .setTitle(`${EMOJI.SUCCESS} Bid Confirmed!`)
+            .setDescription(`Highest bidder on **${a.item}**`)
+            .addFields(
+              { name: `${EMOJI.BID} Your Bid`, value: `${p.amount}pts`, inline: true },
+              { name: `${EMOJI.CHART} Previous`, value: `${prevBid}pts`, inline: true },
+              { name: `${EMOJI.TIME} Time Left`, value: fmtTime(timeLeft), inline: true }
+            )
+            .setFooter({
+              text: p.isSelf
+                ? `Self-overbid (+${p.needed}pts)`
+                : timeLeft < 60000 && a.extCnt < 15
+                ? `${EMOJI.CLOCK} Extended!`
+                : "Good luck!",
+            }),
+        ],
+      });
+      await reaction.message.reactions.removeAll().catch(() => {});
+
+      await reaction.message.channel.send({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLORS.AUCTION)
+            .setTitle(`${EMOJI.FIRE} New High Bid!`)
+            .addFields(
+              { name: `${EMOJI.BID} Amount`, value: `${p.amount}pts`, inline: true },
+              { name: '🤔 Bidder', value: p.username, inline: true }
+            ),
+        ],
+      });
+
+      setTimeout(
+        async () => await reaction.message.delete().catch(() => {}),
+        5000
+      );
+      if (p.origMsgId) {
+        const orig = await reaction.message.channel.messages
+          .fetch(p.origMsgId)
+          .catch(() => null);
+        if (orig) await orig.delete().catch(() => {});
+      }
+
+      delete st.pc[reaction.message.id];
+      save();
+
+      console.log(
+        `${EMOJI.SUCCESS} Bid: ${p.username} - ${p.amount}pts${
+          p.isSelf ? ` (self +${p.needed}pts)` : ""
+        }`
+      );
+      return;
+    }
+
+    // Original bidding.js confirmBid logic continues
     const a = st.a;
     if (!a || a.status !== "active") {
       await reaction.message.channel.send(

@@ -17,6 +17,7 @@ const fs = require("fs");
 const http = require("http");
 const bidding = require("./bidding.js");
 const helpSystem = require("./help-system.js");
+const auctioneering = require("./auctioneering.js");
 
 const COMMAND_ALIASES = {
   // Help commands
@@ -53,8 +54,22 @@ const COMMAND_ALIASES = {
   '!bs': '!bidstatus',
   '!pts': '!mypoints',
   '!mypts': '!mypoints',
-  '!mp': '!mypoints',
+ '!mp': '!mypoints',
   
+  // Auctioneering commands
+  '!auc-start': '!startauction',
+  '!begin-auction': '!startauction',
+  '!auc-pause': '!pause',
+  '!hold': '!pause',
+  '!auc-resume': '!resume',
+  '!continue': '!resume',
+  '!auc-stop': '!stop',
+  '!end-item': '!stop',
+  '!auc-extend': '!extend',
+  '!ext': '!extend',
+  '!auc-now': '!startauctionnow',
+
+   
   // Auction control commands
   '!cancel': '!cancelitem',
   '!skip': '!skipitem',
@@ -102,6 +117,9 @@ let pendingClosures = {};
 let confirmationMessages = {};
 let lastSheetCall = 0;
 let lastOverrideTime = 0;
+let lastAuctionEndTime = 0;
+let isRecovering = false;
+const AUCTION_COOLDOWN = 10 * 60 * 1000; // 10 minutes
 
 // ==========================================
 // HTTP HEALTH CHECK SERVER
@@ -134,6 +152,101 @@ server.listen(PORT, () =>
 // ==========================================
 // UTILITY FUNCTIONS
 // ==========================================
+
+async function recoverBotStateOnStartup(client, config) {
+  console.log(`🔄 Checking for crashed state...`);
+  
+  const savedState = await bidding.loadBiddingStateFromSheet(config.sheet_webhook_url);
+  if (!savedState || !savedState.activeAuction) {
+    console.log(`✅ No crashed state found, starting fresh`);
+    return;
+  }
+
+  console.log(`⚠️ Found crashed auction state, recovering...`);
+  
+  const adminLogs = await client.guilds
+    .fetch(config.main_guild_id)
+    .then(g => g.channels.fetch(config.admin_logs_channel_id))
+    .catch(() => null);
+
+  if (adminLogs) {
+    await adminLogs.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0xffa500)
+          .setTitle(`🔄 Bot Recovery Started`)
+          .setDescription(`Recovering crashed auction state...`)
+          .setFooter({ text: `Please wait, this may take a moment...` })
+          .setTimestamp(),
+      ],
+    });
+  }
+
+  // Recover and finalize crashed auction
+  const auctState = savedState.activeAuction;
+  if (auctState && auctState.curWin) {
+    const sessionItems = [];
+    sessionItems.push({
+      item: auctState.item,
+      winner: auctState.curWin,
+      winnerId: auctState.curWinId,
+      amount: auctState.curBid,
+      source: auctState.source || 'Recovered',
+      timestamp: new Date().toISOString(),
+    });
+
+    // If there are unfinished queue items, move them to BiddingItems sheet
+    const unfinishedQueue = savedState.queue || [];
+    if (unfinishedQueue.length > 0) {
+      console.log(`📋 Moving ${unfinishedQueue.length} unfinished queue items to BiddingItems sheet`);
+      await moveQueueItemsToSheet(config, unfinishedQueue);
+    }
+
+    // Submit tally
+    console.log(`💾 Submitting recovered session tally...`);
+    await bidding.submitSessionTally(config, sessionItems);
+
+    if (adminLogs) {
+      await adminLogs.send({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0x00ff00)
+            .setTitle(`✅ Recovery Complete`)
+            .setDescription(`Finished item: **${auctState.item}**\nWinner: ${auctState.curWin}\nBid: ${auctState.curBid}pts`)
+            .addFields({
+              name: `📋 Unfinished Items`,
+              value: `${unfinishedQueue.length} item(s) moved to BiddingItems sheet`,
+              inline: false,
+            })
+            .setFooter({ text: `Ready for next !startauction` })
+            .setTimestamp(),
+        ],
+      });
+    }
+  }
+
+  lastAuctionEndTime = Date.now();
+  console.log(`✅ Recovery complete, cooldown started`);
+}
+
+async function moveQueueItemsToSheet(config, queueItems) {
+  try {
+    const payload = {
+      action: "moveQueueItemsToSheet",
+      items: queueItems,
+    };
+
+    await fetch(config.sheet_webhook_url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    console.log(`✅ Queue items moved to sheet`);
+  } catch (e) {
+    console.error(`❌ Move items error:`, e);
+  }
+}
 
 function resolveCommandAlias(cmd) {
   const lowerCmd = cmd.toLowerCase();
@@ -1448,23 +1561,114 @@ const commandHandlers = {
     console.log("Channel:", JSON.stringify(channelTest, null, 2));
     console.log("╚════════════════════════════════════════════");
   },
+
+  startauction: async (message, member) => {
+    if (isRecovering) {
+      return await message.reply(`⚠️ Bot is recovering from crash, please wait...`);
+    }
+
+    const auctState = auctioneering.getAuctionState();
+    if (auctState.active) {
+      return await message.reply(`❌ Auction session already running`);
+    }
+
+    const now = Date.now();
+    const timeSinceLast = now - lastAuctionEndTime;
+    const cooldownRemaining = AUCTION_COOLDOWN - timeSinceLast;
+
+    if (timeSinceLast < AUCTION_COOLDOWN) {
+      const mins = Math.ceil(cooldownRemaining / 60000);
+      return await message.reply(`⏱️ Cooldown active. Wait ${mins} more minute(s). Or use \`!startauctionnow\` to override.`);
+    }
+
+    await auctioneering.startAuctioneering(client, config, message.channel);
+    lastAuctionEndTime = Date.now();
+  },
+
+  startauctionnow: async (message, member) => {
+    if (isRecovering) {
+      return await message.reply(`⚠️ Bot is recovering from crash, please wait...`);
+    }
+
+    const auctState = auctioneering.getAuctionState();
+    if (auctState.active) {
+      return await message.reply(`❌ Auction session already running`);
+    }
+
+    await auctioneering.startAuctioneering(client, config, message.channel);
+    lastAuctionEndTime = Date.now();
+    await message.reply(`✅ Auction started immediately. Cooldown reset to 10 minutes.`);
+  },
+
+  pause: async (message, member) => {
+    const auctState = auctioneering.getAuctionState();
+    if (!auctState.active) {
+      return await message.reply(`❌ No active auction to pause`);
+    }
+    const success = auctioneering.pauseSession();
+    if (success) {
+      await message.reply(`⸸ Auction paused. Use \`!resume\` to continue.`);
+    }
+  },
+
+  resume: async (message, member) => {
+    const auctState = auctioneering.getAuctionState();
+    if (!auctState.active || !auctState.paused) {
+      return await message.reply(`❌ No paused auction to resume`);
+    }
+    const success = auctioneering.resumeSession(client, config, message.channel);
+    if (success) {
+      await message.reply(`▶️ Auction resumed.`);
+    }
+  },
+
+  stop: async (message, member) => {
+    const auctState = auctioneering.getAuctionState();
+    if (!auctState.active || !auctState.currentItem) {
+      return await message.reply(`❌ No active auction to stop`);
+    }
+    auctioneering.stopCurrentItem(client, config, message.channel);
+    await message.reply(`⏹️ Current item auction ended immediately.`);
+  },
+
+  extend: async (message, member, args) => {
+    if (args.length === 0) {
+      return await message.reply(`❌ Usage: \`!extend <minutes>\``);
+    }
+    const mins = parseInt(args[0]);
+    if (isNaN(mins) || mins <= 0) {
+      return await message.reply(`❌ Must be positive number`);
+    }
+    const auctState = auctioneering.getAuctionState();
+    if (!auctState.active || !auctState.currentItem) {
+      return await message.reply(`❌ No active auction to extend`);
+    }
+    const success = auctioneering.extendCurrentItem(mins);
+    if (success) {
+      await message.reply(`⏱️ Extended by ${mins} minute(s).`);
+    }
+  },
 };
 
 // ==========================================
 // BOT READY EVENT
 // ==========================================
 
-client.once(Events.ClientReady, () => {
+client.once(Events.ClientReady, async () => {
   console.log(`✅ Bot logged in as ${client.user.tag}`);
   console.log(`📊 Tracking ${Object.keys(bossPoints).length} bosses`);
-  console.log(`🏠 Main Guild: ${config.main_guild_id}`);
+  console.log(`🏢 Main Guild: ${config.main_guild_id}`);
   console.log(`⏰ Timer Server: ${config.timer_server_id}`);
   console.log(`🤖 Version: ${BOT_VERSION}`);
-  console.log(
-    `⚙️ Timing: Sheet delay=${TIMING.MIN_SHEET_DELAY}ms, Retry attempts=${TIMING.REACTION_RETRY_ATTEMPTS}`
-  );
+  console.log(`⚙️ Timing: Sheet delay=${TIMING.MIN_SHEET_DELAY}ms, Retry attempts=${TIMING.REACTION_RETRY_ATTEMPTS}`);
   helpSystem.initialize(config, isAdmin, BOT_VERSION);
-  bidding.initializeBidding(config, isAdmin);  // ✅ ADD THIS LINE
+  auctioneering.initialize(config, isAdmin, bidding);
+  bidding.initializeBidding(config, isAdmin, auctioneering);
+  
+  isRecovering = true;
+  await recoverBotStateOnStartup(client, config);
+  isRecovering = false;
+  
   recoverStateFromThreads();
   bidding.recoverBiddingState(client, config);
 });
@@ -2080,13 +2284,18 @@ const spawnCmd = resolveCommandAlias(rawCmd);
         return;
       }
 
-      // BIDDING COMMANDS - Admin logs only
+      // BIDDING & AUCTIONEERING COMMANDS - Admin logs only
       if (
         [
           "!auction",
           "!queuelist",
           "!removeitem",
           "!startauction",
+          "!startauctionnow",
+          "!pause",
+          "!resume",
+          "!stop",
+          "!extend",
           "!dryrun",
           "!clearqueue",
           "!resetbids",

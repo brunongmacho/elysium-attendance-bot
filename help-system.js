@@ -267,6 +267,103 @@ mypoints: {
       "Full diagnostic:\n• Tests webhook connection\n• Fetches sample points\n• Checks channel access\n• Verifies cache system\n• Shows configuration\n• Troubleshooting guide",
   },
 
+startauction: {
+    usage: "!startauction (or !start, !auc-start, !begin-auction)",
+    description: "Start auctioneering session with Google Sheet + queue items",
+    category: "Bidding",
+    adminOnly: true,
+    example: "!start",
+    aliases: ["!start", "!auc-start", "!begin-auction"],
+    details:
+      "Starts auctioneering session:\n" +
+      "• Reads items from BiddingItems sheet first\n" +
+      "• Then reads queued items from !auction commands\n" +
+      "• Auto-auctions one-by-one, 20sec gap between items\n" +
+      "• Same bidding rules as regular auctions\n" +
+      "• Results auto-logged to Google Sheet\n" +
+      "• Final tally submitted to BiddingPoints\n" +
+      "• 10-minute cooldown after session ends\n" +
+      "• Use !startauctionnow to override cooldown\n\n" +
+      "**Aliases:** !start, !auc-start, !begin-auction",
+  },
+
+  startauctionnow: {
+    usage: "!startauctionnow (or !auc-now)",
+    description: "Start auction immediately, overriding cooldown",
+    category: "Bidding",
+    adminOnly: true,
+    example: "!auc-now",
+    aliases: ["!auc-now"],
+    details:
+      "Same as !startauction but:\n" +
+      "• Overrides 10-minute cooldown\n" +
+      "• Resets cooldown timer to 10 minutes\n" +
+      "• Use if previous auction ended early\n" +
+      "• Cannot use during recovery period\n\n" +
+      "**Alias:** !auc-now",
+  },
+
+  pause: {
+    usage: "!pause (or !auc-pause, !hold)",
+    description: "Pause active auctioneering session",
+    category: "Bidding",
+    adminOnly: true,
+    example: "!pause",
+    aliases: ["!auc-pause", "!hold"],
+    details:
+      "Pauses current auction:\n" +
+      "• Freezes timer and bid acceptance\n" +
+      "• Use !resume to continue\n" +
+      "• Useful for announcements or issues\n\n" +
+      "**Aliases:** !auc-pause, !hold",
+  },
+
+  resume: {
+    usage: "!resume (or !auc-resume, !continue)",
+    description: "Resume paused auctioneering session",
+    category: "Bidding",
+    adminOnly: true,
+    example: "!resume",
+    aliases: ["!auc-resume", "!continue"],
+    details:
+      "Resumes paused auction:\n" +
+      "• Unfreezes timer from where it paused\n" +
+      "• Bids resume being accepted\n" +
+      "• Paused time is added back to auction\n\n" +
+      "**Aliases:** !auc-resume, !continue",
+  },
+
+  stop: {
+    usage: "!stop (or !auc-stop, !end-item)",
+    description: "End current item immediately and move to next",
+    category: "Bidding",
+    adminOnly: true,
+    example: "!stop",
+    aliases: ["!auc-stop", "!end-item"],
+    details:
+      "Stops current auction early:\n" +
+      "• Declares winner immediately\n" +
+      "• Logs result to Google Sheet\n" +
+      "• Waits 20 seconds, then starts next item\n" +
+      "• Use if item has clear winner or needs cancellation\n\n" +
+      "**Aliases:** !auc-stop, !end-item",
+  },
+
+  extend: {
+    usage: "!extend <minutes> (or !ext, !auc-extend)",
+    description: "Add time to current auction",
+    category: "Bidding",
+    adminOnly: true,
+    example: "!extend 5",
+    aliases: ["!ext", "!auc-extend"],
+    details:
+      "Extends current auction by X minutes:\n" +
+      "• `!extend 5` adds 5 more minutes\n" +
+      "• Useful if bidding is active at end\n" +
+      "• Timer extends from current point\n\n" +
+      "**Aliases:** !ext, !auc-extend",
+  },
+
   // === MEMBER COMMANDS ===
   present: {
     usage: 'present (or "here")',
@@ -359,7 +456,7 @@ async function handleHelp(message, args, member) {
       .setColor(0x4a90e2)
       .setTitle("🛡️ ELYSIUM Bot - Admin Commands")
       .setDescription(
-        "**Comprehensive command reference**\n\n💡 Use `!help <command>` for detailed info\n\n**New Features in v6.0:**\n✨ Cache auto-refresh every 30min\n✨ Extended 30s preview\n✨ Countdown timers on confirmations\n✨ Command aliases (!b, !ql, !bstatus, !pts, etc.)\n✨ Batch auctions (multiple items)\n✨ Concurrent start protection\n✨ Yellow embeds for dry run mode"
+        "**New Features in v7.0:**\n✨ Auctioneering system (Google Sheet items)\n✨ Hybrid auction queue (Sheet + manual queue)\n✨ Admin controls: pause, resume, stop, extend\n✨ Auto-logging to BiddingItems sheet\n✨ 20-second gaps between items\n✨ Single session at a time (no parallel auctions)\n✨ 10-minute cooldown with override\n✨ Auto-recovery on crash\n✨ State persistence to Google Sheet\n\n**Previous Features:**\n✨ Cache auto-refresh\n✨ Extended previews\n✨ Countdown timers\n✨ Command aliases\n✨ Batch auctions"
       )
       .addFields(
         {
