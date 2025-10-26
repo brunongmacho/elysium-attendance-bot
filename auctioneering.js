@@ -191,20 +191,25 @@ async function startAuctioneering(client, config, channel) {
     return;
   }
 
-  const biddingState = biddingModule.getBiddingState();
-  const queueItems = biddingState.q || [];
+const biddingState = biddingModule.getBiddingState();
+const queueItems = biddingState.q || [];
 
-  auctionState.itemQueue = [];
-  auctionState.sessionItems = [];
-  manualItemsAuctioned = [];
+auctionState.itemQueue = [];
+auctionState.sessionItems = [];
+manualItemsAuctioned = [];
 
-  // GET SESSION INFO
-  sessionStartDateTime = getCurrentTimestamp();
-  sessionTimestamp = `${sessionStartDateTime.date} ${sessionStartDateTime.time}`;
-  sessionStartTime = Date.now();
+// GET SESSION INFO
+sessionStartDateTime = getCurrentTimestamp();
+sessionTimestamp = `${sessionStartDateTime.date} ${sessionStartDateTime.time}`;
+sessionStartTime = Date.now();
 
-  // SHEET ITEMS FIRST (only those WITHOUT winners)
-  sheetItems.forEach((item, idx) => {
+// SHEET ITEMS FIRST (only those WITHOUT winners)
+if (!Array.isArray(sheetItems)) {
+  await channel.send(`${EMOJI.ERROR} Sheet items invalid. Got: ${typeof sheetItems}`);
+  return;
+}
+
+sheetItems.forEach((item, idx) => {
     auctionState.itemQueue.push({
       ...item,
       source: 'GoogleSheet',

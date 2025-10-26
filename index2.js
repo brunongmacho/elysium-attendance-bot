@@ -119,6 +119,7 @@ let lastSheetCall = 0;
 let lastOverrideTime = 0;
 let lastAuctionEndTime = 0;
 let isRecovering = false;
+let isBidProcessing = false;  // ← ADD THIS
 const AUCTION_COOLDOWN = 10 * 60 * 1000; // 10 minutes
 
 // ==========================================
@@ -1841,32 +1842,45 @@ client.on(Events.MessageCreate, async (message) => {
     const resolvedCmd = resolveCommandAlias(rawCmd);
 
     if (resolvedCmd === "!bid") {
-      console.log(`🔍 !bid or alias detected - Checking channel validity...`);
-      console.log(`   Raw command: ${rawCmd} -> Resolved: ${resolvedCmd}`);
-      console.log(`   Channel: ${message.channel.name} (${message.channel.id})`);
-      console.log(`   Is Thread: ${message.channel.isThread()}`);
-      console.log(`   Parent ID: ${message.channel.parentId}`);
-      console.log(`   Expected Parent: ${config.bidding_channel_id}`);
-      console.log(`   inBiddingChannel: ${inBiddingChannel}`);
+  // RACE CONDITION PROTECTION
+  if (isBidProcessing) {
+    console.log(`⚠️ Bid already processing, queueing this one...`);
+    await message.reply(`⏳ Processing previous bid, please wait 1 second...`);
+    return;
+  }
 
-      if (!inBiddingChannel) {
-        console.log(`❌ !bid blocked - not in bidding channel/thread`);
-        await message.reply(
-          `❌ You can only use \`${rawCmd}\` in the auction threads!`
-        );
-        return;
-      }
+  console.log(`🔍 !bid or alias detected - Checking channel validity...`);
+  console.log(`   Raw command: ${rawCmd} -> Resolved: ${resolvedCmd}`);
+  console.log(`   Channel: ${message.channel.name} (${message.channel.id})`);
+  console.log(`   Is Thread: ${message.channel.isThread()}`);
+  console.log(`   Parent ID: ${message.channel.parentId}`);
+  console.log(`   Expected Parent: ${config.bidding_channel_id}`);
+  console.log(`   inBiddingChannel: ${inBiddingChannel}`);
 
-      const args = message.content.trim().split(/\s+/).slice(1);
+  if (!inBiddingChannel) {
+    console.log(`❌ !bid blocked - not in bidding channel/thread`);
+    await message.reply(
+      `❌ You can only use \`${rawCmd}\` in the auction threads!`
+    );
+    return;
+  }
 
-      console.log(
-        `🎯 Bid command detected in ${
-          message.channel.isThread() ? "thread" : "channel"
-        }: ${message.channel.name}`
-      );
-      await bidding.handleCommand(resolvedCmd, message, args, client, config);
-      return;
-    }
+  const args = message.content.trim().split(/\s+/).slice(1);
+
+  console.log(
+    `ðŸŽ¯ Bid command detected in ${
+      message.channel.isThread() ? "thread" : "channel"
+    }: ${message.channel.name}`
+  );
+  
+  isBidProcessing = true;
+  try {
+    await bidding.handleCommand(resolvedCmd, message, args, client, config);
+  } finally {
+    isBidProcessing = false;
+  }
+  return;
+}
 
 // ✅ HANDLE !MYPOINTS AND ALIASES - BIDDING CHANNEL ONLY (NOT DURING AUCTION)
     if (

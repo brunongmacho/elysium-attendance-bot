@@ -685,6 +685,10 @@ async function loadPointsCacheForAuction(url) {
   console.log(
     `✅ Cache: ${Date.now() - t0}ms - ${Object.keys(p).length} members`
   );
+  
+  // START AUTO-REFRESH FOR AUCTIONEERING SESSIONS
+  startCacheAutoRefresh(url);
+  
   return true;
 }
 
@@ -985,7 +989,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 // BIDDING (OPTIMIZED)
 async function procBid(msg, amt, cfg) {
   // CRITICAL FIX: Check if auctioneering is active first
-  if (auctioneering) {
+  if (auctioneering && typeof auctioneering.getAuctionState === 'function') {
     const auctState = auctioneering.getAuctionState();
     if (auctState && auctState.active && auctState.currentItem) {
       return await procBidAuctioneering(msg, amt, auctState, auctioneering, cfg);
