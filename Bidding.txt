@@ -217,19 +217,115 @@ function getBiddingItems(data) {
   
   dataRange.forEach((row, idx) => {
     const itemName = (row[0] || '').toString().trim();
-    if (itemName) {
+    if (!itemName) return;
+    
+    const winner = (row[3] || '').toString().trim();
+    
+    // SKIP if item already has a winner (already auctioned)
+    if (winner) {
+      Logger.log(`⏭️ Skipping ${itemName} - Already has winner: ${winner}`);
+      return;
+    }
+    
+    const qty = parseInt(row[10]) || 1; // Column K (11) - Quantity
+    
+    // If quantity > 1, create separate items for each
+    if (qty > 1) {
+      for (let q = 0; q < qty; q++) {
+        items.push({
+          item: itemName,
+          startPrice: Number(row[1]) || 0,
+          duration: Number(row[2]) || 30,
+          quantity: 1,
+          source: 'GoogleSheet',
+          sheetIndex: idx + 2,
+          batchNumber: q + 1,
+          batchTotal: qty
+        });
+      }
+    } else {
       items.push({
         item: itemName,
         startPrice: Number(row[1]) || 0,
         duration: Number(row[2]) || 30,
         quantity: 1,
         source: 'GoogleSheet',
-        sheetIndex: idx,
+        sheetIndex: idx + 2
       });
     }
   });
   
+  Logger.log(`✅ Fetched ${items.length} items (skipped items with winners)`);
   return createResponse('ok', 'Items fetched', {items});
+}
+
+function getSessionNumber(timestamp) {
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const logSheet = ss.getSheetByName('AuctionLog');
+  if (!logSheet) return 1;
+  
+  const today = timestamp.split(' ')[0]; // MM/DD/YY
+  const data = logSheet.getRange('A:A').getValues().flat();
+  let count = 0;
+  for (let i = 1; i < data.length; i++) {
+    const cellDate = (data[i] || '').toString().split(' ')[0];
+    if (cellDate === today) count++;
+  }
+  return count + 1;
+}
+
+function getSessionTimestamp() {
+  const d = new Date();
+  const manilaTime = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  
+  const month = String(manilaTime.getMonth() + 1).padStart(2, "0");
+  const day = String(manilaTime.getDate()).padStart(2, "0");
+  const year = String(manilaTime.getFullYear()).slice(-2);
+  const hours = String(manilaTime.getHours()).padStart(2, "0");
+  const mins = String(manilaTime.getMinutes()).padStart(2, "0");
+  
+  const dateTime = `${month}/${day}/${year} ${hours}:${mins}`;
+  const sessionNum = getSessionNumber(dateTime);
+  
+  return {
+    dateTime,
+    sessionNum,
+    columnHeader: `${dateTime} #${sessionNum}`,
+    auctionStartTime: dateTime,
+    logDate: new Date().toISOString()
+  };
+}
+
+function logAuctionEvent(eventData) {
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  let logSheet = ss.getSheetByName('AuctionLog');
+  
+  if (!logSheet) {
+    logSheet = ss.insertSheet('AuctionLog');
+    logSheet.getRange(1, 1, 1, 10).setValues([[
+      'Session Date', 'Session Time', 'Session Number', 'Item', 'Source', 
+      'Winner', 'Amount', 'Auction Start', 'Auction End', 'Timestamp'
+    ]])
+    .setFontWeight('bold')
+    .setBackground('#4A90E2')
+    .setFontColor('#FFFFFF');
+    logSheet.hideSheet();
+  }
+  
+  const row = [
+    eventData.sessionDate,
+    eventData.sessionTime,
+    eventData.sessionNum,
+    eventData.item,
+    eventData.source,
+    eventData.winner || '',
+    eventData.amount || '',
+    eventData.auctionStart,
+    eventData.auctionEnd,
+    eventData.timestamp
+  ];
+  
+  logSheet.appendRow(row);
 }
 
 // BIDDING FUNCTIONS
@@ -255,44 +351,110 @@ function logAuctionResult(data) {
   const itemIndex = data.itemIndex || -1;
   const winner = data.winner || '';
   const winningBid = data.winningBid || 0;
-  const totalBids = data.totalBids || 0;
-  const bidCount = data.bidCount || 0;
   const itemSource = data.itemSource || 'Unknown';
   const timestamp = data.timestamp || new Date().toISOString();
+  const auctionStartTime = data.auctionStartTime || '';
+  const auctionEndTime = data.auctionEndTime || '';
+  
+  // SKIP if no winner (only for GoogleSheet items)
+  if (!winner && itemSource === 'GoogleSheet') {
+    Logger.log(`ℹ️ Skipping log for ${data.itemName || 'Unknown'} - No winner`);
+    return createResponse('ok', 'Skipped - no winner', {logged: false});
+  }
   
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
   const sheet = ss.getSheetByName('BiddingItems');
   if (!sheet) return createResponse('error', 'BiddingItems sheet not found');
   
-  if (itemIndex > 0) {
-    sheet.getRange(itemIndex, 4).setValue(winner);
-    sheet.getRange(itemIndex, 5).setValue(winningBid);
-    sheet.getRange(itemIndex, 6).setValue(timestamp);
-    sheet.getRange(itemIndex, 7).setValue(timestamp.split(' ')[1]);
-    sheet.getRange(itemIndex, 8).setValue(totalBids);
-    sheet.getRange(itemIndex, 9).setValue(bidCount);
-    sheet.getRange(itemIndex, 10).setValue(itemSource);
+  // Log to AuctionLog (event tracking)
+  const sessionTs = getSessionTimestamp();
+  const [dateOnly, timeOnly] = sessionTs.columnHeader.split(' #')[0].split(' ');
+  const sessionNum = parseInt(sessionTs.columnHeader.split('#')[1]);
+  
+  logAuctionEvent({
+    sessionDate: dateOnly,
+    sessionTime: timeOnly,
+    sessionNum: sessionNum,
+    item: data.itemName,
+    source: itemSource,
+    winner: winner,
+    amount: winningBid,
+    auctionStart: auctionStartTime,
+    auctionEnd: auctionEndTime,
+    timestamp: timestamp
+  });
+  
+  // Update BiddingItems sheet if GoogleSheet item
+  if (itemIndex > 0 && itemSource === 'GoogleSheet') {
+    sheet.getRange(itemIndex, 4).setValue(winner);      // Winner
+    sheet.getRange(itemIndex, 5).setValue(winningBid);  // Winning Bid
+    sheet.getRange(itemIndex, 6).setValue(auctionStartTime); // Auction Start
+    sheet.getRange(itemIndex, 7).setValue(auctionEndTime);   // Auction End
+    sheet.getRange(itemIndex, 8).setValue(new Date().toISOString()); // Timestamp
   }
   
-  return createResponse('ok', 'Auction result logged', {logged: true});
+  return createResponse('ok', 'Auction result logged', {logged: true, source: itemSource});
 }
 
 function handleSubmitBiddingResults(data) {
   const results = data.results || [];
-  const timestamp = data.timestamp || '';
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
-  let sheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
-  if (!sheet) return createResponse('error', `Sheet not found: ${CONFIG.BIDDING_SHEET}`);
-  if (!timestamp || results.length===0) return createResponse('error','Missing timestamp or results');
+  const manualItems = data.manualItems || [];
   
-  const lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
+  // Get session info
+  const sessionTs = getSessionTimestamp();
+  const columnHeader = sessionTs.columnHeader; // MM/DD/YY HH:MM #N
+  
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  let biddingSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
+  if (!biddingSheet) return createResponse('error', `Sheet not found: ${CONFIG.BIDDING_SHEET}`);
+  
+  let biddingItemsSheet = ss.getSheetByName('BiddingItems');
+  if (!biddingItemsSheet) {
+    biddingItemsSheet = ss.insertSheet('BiddingItems');
+    biddingItemsSheet.getRange(1, 1, 1, 11).setValues([[
+      'Item', 'Start Price', 'Duration', 'Winner', 'Winning Bid', 
+      'Auction Start', 'Auction End', 'Timestamp', 'Total Bids', 'Source', 'Quantity'
+    ]])
+    .setFontWeight('bold')
+    .setBackground('#4A90E2')
+    .setFontColor('#FFFFFF');
+  }
+  
+  // STEP 1: Add manual items to BiddingItems sheet (only if they were auctioned)
+  if (manualItems && manualItems.length > 0) {
+    const lastRow = biddingItemsSheet.getLastRow();
+    let insertRow = lastRow + 1;
+    
+    for (let item of manualItems) {
+      const winner = item.winner || '';
+      const bid = item.winningBid || '';
+      
+      biddingItemsSheet.getRange(insertRow, 1).setValue(item.item);
+      biddingItemsSheet.getRange(insertRow, 2).setValue(item.startPrice);
+      biddingItemsSheet.getRange(insertRow, 3).setValue(item.duration);
+      biddingItemsSheet.getRange(insertRow, 4).setValue(winner);
+      biddingItemsSheet.getRange(insertRow, 5).setValue(bid);
+      biddingItemsSheet.getRange(insertRow, 6).setValue(item.auctionStartTime || '');
+      biddingItemsSheet.getRange(insertRow, 7).setValue(item.auctionEndTime || '');
+      biddingItemsSheet.getRange(insertRow, 8).setValue(new Date().toISOString());
+      biddingItemsSheet.getRange(insertRow, 10).setValue('Manual');
+      biddingItemsSheet.getRange(insertRow, 11).setValue(1);  // Quantity = 1
+      
+      insertRow++;
+    }
+    
+    Logger.log(`✅ Added ${manualItems.length} manual items to BiddingItems sheet`);
+  }
+  
+  // STEP 2: Submit combined tally to BiddingPoints (all members, including 0s)
+  const lastRow = biddingSheet.getLastRow();
   let timestampColumn = -1;
   
-  // Check if timestamp column exists
-  if(lastCol >= 3) {
-    const headers = sheet.getRange(1, 3, 1, lastCol - 2).getValues()[0];
-    for(let i = 0; i < headers.length; i++) {
-      if(headers[i].toString().trim() === timestamp) {
+  // Check if column already exists
+  if (lastRow >= 1) {
+    const headers = biddingSheet.getRange(1, 3, 1, biddingSheet.getLastColumn() - 2).getValues()[0];
+    for (let i = 0; i < headers.length; i++) {
+      if (headers[i].toString().trim() === columnHeader) {
         timestampColumn = i + 3;
         break;
       }
@@ -300,39 +462,44 @@ function handleSubmitBiddingResults(data) {
   }
   
   // Create new column if doesn't exist
-  if(timestampColumn === -1) {
-    timestampColumn = lastCol + 1;
-    sheet.getRange(1, timestampColumn).setValue(timestamp)
+  if (timestampColumn === -1) {
+    timestampColumn = biddingSheet.getLastColumn() + 1;
+    biddingSheet.getRange(1, timestampColumn).setValue(columnHeader)
       .setFontWeight('bold')
       .setBackground('#4A90E2')
       .setFontColor('#FFFFFF')
       .setHorizontalAlignment('center');
   }
-
+  
   // Get all member names from sheet
-  const memberNames = sheet.getRange(2, 1, lastRow - 1, 1).getValues().flat();
+  const memberNames = biddingSheet.getRange(2, 1, lastRow - 1, 1).getValues().flat();
   
-  // Update ALL members (results already contains all with 0 for non-winners)
+  // Process results (includes all members with 0 for non-winners)
   const updates = [];
-  results.forEach(r => {
-    const member = r.member.trim();
-    const total = r.totalSpent || 0;
-    let rowIndex = memberNames.findIndex(m => (m||'').toString().trim().toLowerCase() === member.toLowerCase());
-    if(rowIndex !== -1) {
-      updates.push({row: rowIndex + 2, amount: total});
-    }
-  });
+  if (results && results.length > 0) {
+    results.forEach(r => {
+      const member = r.member.trim();
+      const total = r.totalSpent || 0;
+      let rowIndex = memberNames.findIndex(m => (m||'').toString().trim().toLowerCase() === member.toLowerCase());
+      if (rowIndex !== -1) {
+        updates.push({row: rowIndex + 2, amount: total});
+      }
+    });
+    
+    // Apply all updates
+    updates.forEach(u => biddingSheet.getRange(u.row, timestampColumn).setValue(u.amount));
+  }
   
-  // Apply all updates
-  updates.forEach(u => sheet.getRange(u.row, timestampColumn).setValue(u.amount));
-  
-// Update bidding points
+  // STEP 3: Update BiddingPoints (left side columns)
   updateBiddingPoints();
   
-  return createResponse('ok', `Submitted: ${updates.length} members (including 0s)`, {
+  Logger.log(`✅ Session tally submitted: ${columnHeader}`);
+  
+  return createResponse('ok', `Submitted: Session ${columnHeader} with ${updates.length} members`, {
     timestampColumn,
     membersUpdated: updates.length,
-    timestamp
+    sessionHeader: columnHeader,
+    manualItemsAdded: manualItems ? manualItems.length : 0
   });
 }
 

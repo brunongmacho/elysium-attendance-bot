@@ -1700,13 +1700,16 @@ const commandHandlers = {
 client.once(Events.ClientReady, async () => {
   console.log(`✅ Bot logged in as ${client.user.tag}`);
   console.log(`📊 Tracking ${Object.keys(bossPoints).length} bosses`);
-  console.log(`🏢 Main Guild: ${config.main_guild_id}`);
+  console.log(`🟢 Main Guild: ${config.main_guild_id}`);
   console.log(`⏰ Timer Server: ${config.timer_server_id}`);
   console.log(`🤖 Version: ${BOT_VERSION}`);
   console.log(`⚙️ Timing: Sheet delay=${TIMING.MIN_SHEET_DELAY}ms, Retry attempts=${TIMING.REACTION_RETRY_ATTEMPTS}`);
+  
+  // INITIALIZE ALL MODULES IN CORRECT ORDER
   helpSystem.initialize(config, isAdmin, BOT_VERSION);
   auctioneering.initialize(config, isAdmin, bidding);
   bidding.initializeBidding(config, isAdmin, auctioneering);
+  auctioneering.setPostToSheet(postToSheet);  // ← ADD THIS LINE
   
   isRecovering = true;
   await recoverBotStateOnStartup(client, config);
@@ -2753,6 +2756,12 @@ process.on("SIGINT", () => {
     process.exit(0);
   });
 });
+
+// ==========================================
+// EXPORT FUNCTIONS TO AUCTIONEERING MODULE
+// ==========================================
+
+global.postToSheet = postToSheet;
 
 // ==========================================
 // LOGIN

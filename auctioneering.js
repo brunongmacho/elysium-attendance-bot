@@ -7,6 +7,23 @@
 const { EmbedBuilder } = require("discord.js");
 const fetch = require("node-fetch");
 
+// ==========================================
+// POSTTOSHEET INITIALIZATION
+// ==========================================
+let postToSheetFunc = null;
+
+function setPostToSheet(fn) {
+  postToSheetFunc = fn;
+  console.log(`${EMOJI.SUCCESS} postToSheet function initialized`);
+}
+
+function getPostToSheet() {
+  if (!postToSheetFunc) {
+    throw new Error('❌ CRITICAL: postToSheet not initialized. Call setPostToSheet() first.');
+  }
+  return postToSheetFunc;
+}
+
 // STATE
 let auctionState = {
   active: false,
@@ -22,6 +39,11 @@ let auctionState = {
 let isAdmFunc = null;
 let cfg = null;
 let biddingModule = null;
+let sessionStartTime = null;
+let sessionNumber = 1;
+let sessionTimestamp = null;
+let sessionStartDateTime = null;
+let manualItemsAuctioned = [];
 
 // CONSTANTS
 const ITEM_WAIT = 20000;
@@ -174,21 +196,47 @@ async function startAuctioneering(client, config, channel) {
 
   auctionState.itemQueue = [];
   auctionState.sessionItems = [];
+  manualItemsAuctioned = [];
 
-  // SHEET ITEMS FIRST, THEN MANUAL QUEUE
+  // GET SESSION INFO
+  sessionStartDateTime = getCurrentTimestamp();
+  sessionTimestamp = `${sessionStartDateTime.date} ${sessionStartDateTime.time}`;
+  sessionStartTime = Date.now();
+
+  // SHEET ITEMS FIRST (only those WITHOUT winners)
   sheetItems.forEach((item, idx) => {
     auctionState.itemQueue.push({
       ...item,
       source: 'GoogleSheet',
       sheetIndex: idx,
+      auctionStartTime: sessionTimestamp,
     });
   });
 
+  // THEN MANUAL QUEUE - Handle batch items (qty > 1)
   queueItems.forEach((item) => {
-    auctionState.itemQueue.push({
-      ...item,
-      source: 'QueueList',
-    });
+    const qty = item.quantity || 1;
+    
+    if (qty > 1) {
+      // Create separate items for each (like Google Sheet batch items)
+      for (let q = 0; q < qty; q++) {
+        auctionState.itemQueue.push({
+          ...item,
+          quantity: 1,
+          batchNumber: q + 1,
+          batchTotal: qty,
+          source: 'QueueList',
+          auctionStartTime: sessionTimestamp,
+        });
+      }
+    } else {
+      // Single item (qty = 1)
+      auctionState.itemQueue.push({
+        ...item,
+        source: 'QueueList',
+        auctionStartTime: sessionTimestamp,
+      });
+    }
   });
 
   if (auctionState.itemQueue.length === 0) {
@@ -211,7 +259,8 @@ async function startAuctioneering(client, config, channel) {
         .setDescription(`**${auctionState.itemQueue.length} item(s)** queued`)
         .addFields(
           { name: `${EMOJI.LIST} From Google Sheet`, value: `${sheetCount}`, inline: true },
-          { name: `${EMOJI.LIST} From Queue`, value: `${queueCount}`, inline: true }
+          { name: `${EMOJI.LIST} From Queue`, value: `${queueCount}`, inline: true },
+          { name: `${EMOJI.CLOCK} Session Time`, value: sessionTimestamp, inline: true }
         )
         .setFooter({ text: `Starting first item in 20 seconds...` })
         .setTimestamp(),
@@ -221,6 +270,23 @@ async function startAuctioneering(client, config, channel) {
   auctionState.timers.sessionStart = setTimeout(async () => {
     await auctionNextItem(client, config, channel);
   }, 20000);
+}
+
+function getCurrentTimestamp() {
+  const d = new Date();
+  const manilaTime = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  
+  const month = String(manilaTime.getMonth() + 1).padStart(2, '0');
+  const day = String(manilaTime.getDate()).padStart(2, '0');
+  const year = String(manilaTime.getFullYear()).slice(-2);
+  const hours = String(manilaTime.getHours()).padStart(2, '0');
+  const mins = String(manilaTime.getMinutes()).padStart(2, '0');
+  
+  return {
+    date: `${month}/${day}/${year}`,
+    time: `${hours}:${mins}`,
+    full: `${month}/${day}/${year} ${hours}:${mins}`
+  };
 }
 
 async function auctionNextItem(client, config, channel) {
@@ -241,22 +307,31 @@ async function auctionNextItem(client, config, channel) {
     go2: false,
     extCnt: 0,
     status: 'active',
+    auctionEndTime: null,
   };
 
   const isBatch = item.quantity > 1;
+  
+  // Format item name for display
+  let displayName = item.item;
+  if (item.batchNumber && item.batchTotal) {
+    displayName += ` [${item.batchNumber}/${item.batchTotal}]`;
+  }
+  
   const embed = new EmbedBuilder()
     .setColor(COLORS.SUCCESS)
     .setTitle(`${EMOJI.FIRE} BIDDING NOW!`)
-    .setDescription(`**${item.item}**${isBatch ? ` x${item.quantity}` : ''}\n\nType \`!bid <amount>\` or \`!b <amount>\` to bid`)
+    .setDescription(`**${displayName}**${isBatch && !item.batchNumber ? ` x${item.quantity}` : ''}\n\nType \`!bid <amount>\` or \`!b <amount>\` to bid`)
     .addFields(
       { name: `${EMOJI.BID} Starting Bid`, value: `${item.startPrice}pts`, inline: true },
       { name: `${EMOJI.TIME} Duration`, value: `${item.duration}m`, inline: true },
-      { name: `${EMOJI.LIST} Item #`, value: `${auctionState.currentItemIndex + 1}/${auctionState.itemQueue.length}`, inline: true }
+      { name: `${EMOJI.LIST} Item #`, value: `${auctionState.currentItemIndex + 1}/${auctionState.itemQueue.length}`, inline: true },
+      { name: `${EMOJI.INFO} Source`, value: item.source === 'GoogleSheet' ? '📊 Google Sheet' : '📝 Manual Queue', inline: true }
     )
     .setFooter({ text: `${EMOJI.CLOCK} 10s confirm • ${EMOJI.BID} Fastest wins` })
     .setTimestamp();
 
-  if (isBatch) {
+  if (isBatch && !item.batchNumber) {
     embed.addFields({
       name: `${EMOJI.FIRE} Batch Auction`,
       value: `Top ${item.quantity} bidders will win!`,
@@ -264,7 +339,7 @@ async function auctionNextItem(client, config, channel) {
     });
   }
 
-await channel.send({ embeds: [embed] });
+  await channel.send({ embeds: [embed] });
   
   // 20 second preview before timer starts
   setTimeout(() => {
@@ -353,8 +428,14 @@ async function itemEnd(client, config, channel) {
   const timestamp = getTimestamp();
   const totalBids = item.bids.length;
   const bidCount = item.curWin ? item.bids.filter(b => b.user === item.curWin).length : 0;
+  
+  // Calculate auction end time
+  const auctionEndTime = getCurrentTimestamp();
+  const endTimeStr = `${auctionEndTime.date} ${auctionEndTime.time}`;
+  item.auctionEndTime = endTimeStr;
 
   if (item.curWin) {
+    // ITEM HAS WINNER
     await channel.send({
       embeds: [
         new EmbedBuilder()
@@ -363,13 +444,32 @@ async function itemEnd(client, config, channel) {
           .setDescription(`**${item.item}** sold!`)
           .addFields(
             { name: `${EMOJI.FIRE} Winner`, value: `<@${item.curWinId}>`, inline: true },
-            { name: `${EMOJI.BID} Price`, value: `${item.curBid}pts`, inline: true }
+            { name: `${EMOJI.BID} Price`, value: `${item.curBid}pts`, inline: true },
+            { name: `${EMOJI.INFO} Source`, value: item.source === 'GoogleSheet' ? '📊 Google Sheet' : '📝 Manual Queue', inline: true }
           )
           .setFooter({ text: `${timestamp}` })
           .setTimestamp(),
       ],
     });
 
+    // Log to Google Sheet
+    const logPayload = {
+      action: 'logAuctionResult',
+      itemIndex: item.source === 'GoogleSheet' ? item.sheetIndex + 2 : -1,
+      winner: item.curWin,
+      winningBid: item.curBid,
+      totalBids: totalBids,
+      bidCount: bidCount,
+      itemSource: item.source,
+      itemName: item.item,
+      timestamp: timestamp,
+      auctionStartTime: item.auctionStartTime,
+      auctionEndTime: endTimeStr,
+    };
+
+    await getPostToSheet()(logPayload);
+
+    // Add to session items (for final tally)
     auctionState.sessionItems.push({
       item: item.item,
       winner: item.curWin,
@@ -377,32 +477,51 @@ async function itemEnd(client, config, channel) {
       amount: item.curBid,
       source: item.source,
       timestamp,
+      auctionStartTime: item.auctionStartTime,
+      auctionEndTime: endTimeStr,
     });
 
-    await logAuctionResult(
-      config.sheet_webhook_url,
-      item.source === 'GoogleSheet' ? item.sheetIndex + 2 : -1,
-      item.curWin,
-      item.curBid,
-      totalBids,
-      bidCount,
-      item.source,
-      timestamp
-    );
+    // Track manual items for logging to BiddingItems
+    if (item.source === 'QueueList') {
+      manualItemsAuctioned.push({
+        item: item.item,
+        startPrice: item.startPrice,
+        duration: item.duration,
+        winner: item.curWin,
+        winningBid: item.curBid,
+        auctionStartTime: item.auctionStartTime,
+        auctionEndTime: endTimeStr,
+      });
+    }
+
   } else {
+    // NO WINNER
     await channel.send({
       embeds: [
         new EmbedBuilder()
           .setColor(COLORS.INFO)
           .setTitle(`${EMOJI.ERROR} NO BIDS`)
-          .setDescription(`**${item.item}** - no bids`),
+          .setDescription(`**${item.item}** - no bids\n*Will be re-auctioned next session*`)
+          .addFields({
+            name: `${EMOJI.INFO} Source`,
+            value: item.source === 'GoogleSheet' ? '📊 Google Sheet (stays in queue)' : '📝 Manual Queue (added to Google Sheet)',
+            inline: false,
+          }),
       ],
     });
-  }
 
-  // SUBMIT TALLY AFTER EACH ITEM (not continuous)
-  if (item.curWin) {
-    await biddingModule.submitSessionTally(config, auctionState.sessionItems);
+    // Track manual items with no winners (to be added to BiddingItems)
+    if (item.source === 'QueueList') {
+      manualItemsAuctioned.push({
+        item: item.item,
+        startPrice: item.startPrice,
+        duration: item.duration,
+        winner: '',  // Empty = no winner
+        winningBid: '',
+        auctionStartTime: item.auctionStartTime,
+        auctionEndTime: endTimeStr,
+      });
+    }
   }
 
   auctionState.currentItemIndex++;
@@ -423,29 +542,116 @@ async function finalizeSession(client, config, channel) {
   clearAllTimers();
 
   const summary = auctionState.sessionItems.map(
-    (s, i) => `${i + 1}. **${s.item}**: ${s.winner} - ${s.amount}pts`
+    (s, i) => `${i + 1}. **${s.item}** (${s.source === 'GoogleSheet' ? '📊' : '📝'}): ${s.winner} - ${s.amount}pts`
   ).join("\n");
 
-  await channel.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.SUCCESS)
-        .setTitle(`${EMOJI.SUCCESS} Auctioneering Session Complete!`)
-        .setDescription(`**${auctionState.sessionItems.length}** item(s) auctioned`)
-        .addFields({
-          name: `${EMOJI.LIST} Summary`,
-          value: summary || "No sales",
-        })
-        .setFooter({ text: "Submitting tally to BiddingPoints sheet..." })
-        .setTimestamp(),
-    ],
-  });
+  const mainEmbed = new EmbedBuilder()
+    .setColor(COLORS.SUCCESS)
+    .setTitle(`${EMOJI.SUCCESS} Auctioneering Session Complete!`)
+    .setDescription(`**${auctionState.sessionItems.length}** item(s) auctioned`)
+    .addFields(
+      {
+        name: `${EMOJI.LIST} Summary`,
+        value: summary || "No sales",
+        inline: false,
+      },
+      {
+        name: `${EMOJI.INFO} Session Info`,
+        value: `📊 Google Sheet Items Auctioned: ${auctionState.itemQueue.filter(i => i.source === 'GoogleSheet').length}\n📝 Manual Items Auctioned: ${manualItemsAuctioned.length}`,
+        inline: false,
+      }
+    )
+    .setFooter({ text: "Processing results and submitting to sheets..." })
+    .setTimestamp();
 
-  // Submit tally to bidding points
-  await biddingModule.submitSessionTally(config, auctionState.sessionItems);
+  await channel.send({ embeds: [mainEmbed] });
+
+  // STEP 1: Build combined results for tally
+  const combinedResults = await buildCombinedResults(config);
+
+  // STEP 2: Submit combined results with manual items
+  const submitPayload = {
+    action: 'submitBiddingResults',
+    results: combinedResults,
+    manualItems: manualItemsAuctioned,
+  };
+
+  await getPostToSheet()(submitPayload);
+
+  // STEP 3: Send detailed summary to admin logs
+  const mainGuild = await client.guilds.fetch(config.main_guild_id);
+  const adminLogs = await mainGuild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
+
+  if (adminLogs) {
+    const sheetItemsWithWinners = auctionState.sessionItems.filter(s => s.source === 'GoogleSheet').length;
+    const manualItemsWithWinners = auctionState.sessionItems.filter(s => s.source === 'QueueList').length;
+    const totalRevenue = auctionState.sessionItems.reduce((sum, s) => sum + s.amount, 0);
+    
+    const adminEmbed = new EmbedBuilder()
+      .setColor(COLORS.SUCCESS)
+      .setTitle(`${EMOJI.SUCCESS} Session Summary - ${sessionTimestamp}`)
+      .setDescription(`Auctioneering session completed successfully`)
+      .addFields(
+        {
+          name: `📊 Google Sheet Items`,
+          value: `**Auctioned:** ${auctionState.itemQueue.filter(i => i.source === 'GoogleSheet').length}\n**With Winners:** ${sheetItemsWithWinners}\n**No Bids:** ${auctionState.itemQueue.filter(i => i.source === 'GoogleSheet').length - sheetItemsWithWinners}`,
+          inline: true,
+        },
+        {
+          name: `📝 Manual Items`,
+          value: `**Auctioned:** ${manualItemsAuctioned.length}\n**With Winners:** ${manualItemsWithWinners}\n**No Bids:** ${manualItemsAuctioned.length - manualItemsWithWinners}`,
+          inline: true,
+        },
+        {
+          name: `💰 Revenue`,
+          value: `**Total:** ${totalRevenue}pts`,
+          inline: true,
+        },
+        {
+          name: `📋 Results`,
+          value: summary || "No sales recorded",
+          inline: false,
+        }
+      )
+      .setFooter({ text: `Session completed by !startauction` })
+      .setTimestamp();
+    
+    await adminLogs.send({ embeds: [adminEmbed] });
+  }
 
   auctionState.sessionItems = [];
   auctionState.itemQueue = [];
+  manualItemsAuctioned = [];
+}
+
+async function buildCombinedResults(config) {
+  // Fetch fresh points from sheet
+  const response = await fetch(config.sheet_webhook_url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "getBiddingPoints" }),
+  }).then(r => r.json()).catch(() => ({}));
+
+  const allPoints = response.points || {};
+  const allMembers = Object.keys(allPoints);
+
+  // Combine all winners from session
+  const winners = {};
+  auctionState.sessionItems.forEach(item => {
+    const normalizedWinner = item.winner.toLowerCase().trim();
+    winners[normalizedWinner] = (winners[normalizedWinner] || 0) + item.amount;
+  });
+
+  // Build results for ALL members (including 0s for clean logs)
+  const results = allMembers.map(m => {
+    const normalizedMember = m.toLowerCase().trim();
+    return {
+      member: m,
+      totalSpent: winners[normalizedMember] || 0,
+    };
+  });
+
+  return results;
 }
 
 function pauseSession() {
@@ -1013,4 +1219,5 @@ module.exports = {
   handleCancelItem,
   handleSkipItem,
   handleForceSubmitResults,
+  setPostToSheet,
 };
