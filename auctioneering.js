@@ -147,6 +147,7 @@ async function startAuctioneering(client, config, channel) {
     return;
   }
 
+  // LOAD POINTS ONCE AT START
   const pointsFetched = await biddingModule.loadPointsCacheForAuction(config.sheet_webhook_url);
   if (!pointsFetched) {
     await channel.send(`${EMOJI.ERROR} Failed to load points from sheet`);
@@ -165,6 +166,7 @@ async function startAuctioneering(client, config, channel) {
   auctionState.itemQueue = [];
   auctionState.sessionItems = [];
 
+  // SHEET ITEMS FIRST, THEN MANUAL QUEUE
   sheetItems.forEach((item, idx) => {
     auctionState.itemQueue.push({
       ...item,
@@ -202,14 +204,14 @@ async function startAuctioneering(client, config, channel) {
           { name: `${EMOJI.LIST} From Google Sheet`, value: `${sheetCount}`, inline: true },
           { name: `${EMOJI.LIST} From Queue`, value: `${queueCount}`, inline: true }
         )
-        .setFooter({ text: `Starting first item in 10 seconds...` })
+        .setFooter({ text: `Starting first item in 20 seconds...` })
         .setTimestamp(),
     ],
   });
 
   auctionState.timers.sessionStart = setTimeout(async () => {
     await auctionNextItem(client, config, channel);
-  }, 10000);
+  }, 20000);
 }
 
 async function auctionNextItem(client, config, channel) {
@@ -253,8 +255,12 @@ async function auctionNextItem(client, config, channel) {
     });
   }
 
-  await channel.send({ embeds: [embed] });
-  scheduleItemTimers(client, config, channel);
+await channel.send({ embeds: [embed] });
+  
+  // 20 second preview before timer starts
+  setTimeout(() => {
+    scheduleItemTimers(client, config, channel);
+  }, 20000);
 }
 
 function scheduleItemTimers(client, config, channel) {
@@ -385,8 +391,10 @@ async function itemEnd(client, config, channel) {
     });
   }
 
-  // CRITICAL FIX #1: Save state after each item
-  await saveAuctionState(config.sheet_webhook_url);
+  // SUBMIT TALLY AFTER EACH ITEM (not continuous)
+  if (item.curWin) {
+    await biddingModule.submitSessionTally(config, auctionState.sessionItems);
+  }
 
   auctionState.currentItemIndex++;
 
@@ -481,6 +489,420 @@ function getAuctionState() {
   return auctionState;
 }
 
+// ============================================
+// QUEUE MANAGEMENT FUNCTIONS
+// ============================================
+
+async function handleQueueList(message, biddingState) {
+  // Display both auctioneering queue and bidding queue
+  const auctQueue = auctionState.itemQueue || [];
+  const biddingQueue = biddingState.q || [];
+  
+  if (auctQueue.length === 0 && biddingQueue.length === 0) {
+    return await message.reply(`${EMOJI.LIST} Queue is empty`);
+  }
+
+  let queueText = '';
+  let position = 1;
+
+  // Auctioneering items first
+  if (auctQueue.length > 0) {
+    queueText += `**📋 FROM GOOGLE SHEET + MANUAL QUEUE:**\n`;
+    auctQueue.forEach((item, idx) => {
+      const qty = item.quantity > 1 ? ` x${item.quantity}` : '';
+      queueText += `**${position}.** ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m (${item.source})\n`;
+      position++;
+    });
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(0x4a90e2)
+    .setTitle(`${EMOJI.LIST} Auction Queue`)
+    .setDescription(queueText || 'No items queued')
+    .addFields({
+      name: `${EMOJI.CHART} Total`,
+      value: `${auctQueue.length + biddingQueue.length}`,
+      inline: true,
+    })
+    .setTimestamp();
+
+  await message.reply({ embeds: [embed] });
+}
+
+async function handleRemoveItem(message, args, biddingModule) {
+  if (args.length === 0) {
+    return await message.reply(`${EMOJI.ERROR} Usage: \`!removeitem <name>\``);
+  }
+
+  const itemName = args.join(" ");
+  
+  // Try to remove from auctioneering queue
+  const auctIdx = auctionState.itemQueue.findIndex(
+    (a) => a.item.toLowerCase() === itemName.toLowerCase()
+  );
+  
+  if (auctIdx !== -1) {
+    const removed = auctionState.itemQueue.splice(auctIdx, 1)[0];
+    return await message.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0xffa500)
+          .setTitle(`${EMOJI.SUCCESS} Removed`)
+          .setDescription(`**${removed.item}**${removed.quantity > 1 ? ` x${removed.quantity}` : ''}`)
+          .addFields({
+            name: `${EMOJI.LIST} Remaining in Queue`,
+            value: `${auctionState.itemQueue.length}`,
+            inline: true,
+          }),
+      ],
+    });
+  }
+
+  // Try to remove from bidding queue
+  const biddingState = biddingModule.getBiddingState();
+  const bidIdx = biddingState.q.findIndex(
+    (a) => a.item.toLowerCase() === itemName.toLowerCase()
+  );
+  
+  if (bidIdx !== -1) {
+    const removed = biddingState.q.splice(bidIdx, 1)[0];
+    biddingModule.saveBiddingState();
+    return await message.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0xffa500)
+          .setTitle(`${EMOJI.SUCCESS} Removed`)
+          .setDescription(`**${removed.item}**${removed.quantity > 1 ? ` x${removed.quantity}` : ''}`)
+          .addFields({
+            name: `${EMOJI.LIST} Remaining in Queue`,
+            value: `${biddingState.q.length}`,
+            inline: true,
+          }),
+      ],
+    });
+  }
+
+  await message.reply(`${EMOJI.ERROR} Item not found in queue`);
+}
+
+async function handleClearQueue(message, onConfirm, onCancel) {
+  if (auctionState.active) {
+    return await message.reply(`${EMOJI.ERROR} Cannot clear during active auction`);
+  }
+
+  const totalItems = auctionState.itemQueue.length;
+  if (totalItems === 0) {
+    return await message.reply(`${EMOJI.LIST} Queue is already empty`);
+  }
+
+  const clearMsg = await message.reply({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(0xffa500)
+        .setTitle(`${EMOJI.WARNING} Clear Queue?`)
+        .setDescription(`This will remove **${totalItems} item(s)** from the auction queue.`)
+        .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel` }),
+    ],
+  });
+
+  await clearMsg.react(EMOJI.SUCCESS);
+  await clearMsg.react(EMOJI.ERROR);
+
+  try {
+    const col = await clearMsg.awaitReactions({
+      filter: (r, u) =>
+        [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) && u.id === message.author.id,
+      max: 1,
+      time: 30000,
+      errors: ["time"],
+    });
+
+    if (col.first().emoji.name === EMOJI.SUCCESS) {
+      auctionState.itemQueue = [];
+      await clearMsg.reactions.removeAll().catch(() => {});
+      await message.reply(`${EMOJI.SUCCESS} Cleared ${totalItems} item(s)`);
+    } else {
+      await clearMsg.reactions.removeAll().catch(() => {});
+      await message.reply(`${EMOJI.ERROR} Clear canceled`);
+    }
+  } catch (e) {
+    await clearMsg.reactions.removeAll().catch(() => {});
+  }
+}
+
+async function handleMyPoints(message, biddingModule, config) {
+  // Only in bidding channel, not during active auction
+  if (auctionState.active) {
+    return await message.reply(
+      `${EMOJI.WARNING} Can't check points during active auction. Wait for session to end.`
+    );
+  }
+
+  const u = message.member.nickname || message.author.username;
+
+  // Fetch fresh from sheets
+  const freshPts = await fetch(config.sheet_webhook_url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "getBiddingPoints" }),
+  }).then(r => r.json()).then(d => d.points || {});
+
+  let userPts = freshPts[u];
+  if (userPts === undefined) {
+    const match = Object.keys(freshPts).find(
+      (n) => n.toLowerCase() === u.toLowerCase()
+    );
+    userPts = match ? freshPts[match] : null;
+  }
+
+  let ptsMsg;
+  if (userPts === null || userPts === undefined) {
+    ptsMsg = await message.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0xff0000)
+          .setTitle(`${EMOJI.ERROR} Not Found`)
+          .setDescription(
+            `**${u}**\n\nYou are not in the bidding system or not a current ELYSIUM member.`
+          )
+          .setFooter({ text: "Contact admin if this is wrong" })
+          .setTimestamp(),
+      ],
+    });
+  } else {
+    ptsMsg = await message.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x00ff00)
+          .setTitle(`${EMOJI.BID} Your Points`)
+          .setDescription(`**${u}**`)
+          .addFields({
+            name: `${EMOJI.CHART} Available Points`,
+            value: `${userPts} pts`,
+            inline: true,
+          })
+          .setFooter({ text: "Auto-deletes in 30s" })
+          .setTimestamp(),
+      ],
+    });
+  }
+
+  // Delete after 30s
+  setTimeout(async () => {
+    await ptsMsg.delete().catch(() => {});
+    await message.delete().catch(() => {});
+  }, 30000);
+}
+
+async function handleBidStatus(message, config) {
+  const statEmbed = new EmbedBuilder()
+    .setColor(0x4a90e2)
+    .setTitle(`${EMOJI.CHART} Auction Status`);
+
+  if (auctionState.active && auctionState.currentItem) {
+    const timeLeft = auctionState.paused
+      ? `${EMOJI.PAUSE} PAUSED (${fmtTime(auctionState.currentItem.endTime - Date.now())})`
+      : fmtTime(auctionState.currentItem.endTime - Date.now());
+
+    statEmbed.addFields(
+      { name: `${EMOJI.FIRE} Active`, value: `${auctionState.currentItem.item}`, inline: true },
+      { name: `${EMOJI.BID} Current Bid`, value: `${auctionState.currentItem.curBid}pts`, inline: true },
+      { name: `${EMOJI.TIME} Time Left`, value: timeLeft, inline: true }
+    );
+  } else {
+    statEmbed.addFields({
+      name: `${EMOJI.FIRE} Status`,
+      value: `${EMOJI.SUCCESS} Ready - No active auction`,
+      inline: false,
+    });
+  }
+
+  if (auctionState.itemQueue.length > 0) {
+    statEmbed.addFields({
+      name: `${EMOJI.LIST} Queue`,
+      value:
+        auctionState.itemQueue
+          .slice(0, 5)
+          .map((a, i) => `${i + 1}. ${a.item}${a.quantity > 1 ? ` x${a.quantity}` : ''}`)
+          .join("\n") +
+        (auctionState.itemQueue.length > 5 ? `\n*...+${auctionState.itemQueue.length - 5} more*` : ""),
+    });
+  }
+
+  statEmbed
+    .setFooter({ text: "Use !auction to add items" })
+    .setTimestamp();
+
+  await message.reply({ embeds: [statEmbed] });
+}
+
+async function handleCancelItem(message) {
+  if (!auctionState.active || !auctionState.currentItem) {
+    return await message.reply(`${EMOJI.ERROR} No active auction`);
+  }
+
+  const canMsg = await message.reply({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(0xffa500)
+        .setTitle(`${EMOJI.WARNING} Cancel Item?`)
+        .setDescription(`**${auctionState.currentItem.item}**\n\nRefund all locked points?`)
+        .setFooter({ text: `${EMOJI.SUCCESS} yes / ${EMOJI.ERROR} no` }),
+    ],
+  });
+
+  await canMsg.react(EMOJI.SUCCESS);
+  await canMsg.react(EMOJI.ERROR);
+
+  try {
+    const canCol = await canMsg.awaitReactions({
+      filter: (r, u) =>
+        [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) && u.id === message.author.id,
+      max: 1,
+      time: 30000,
+      errors: ["time"],
+    });
+
+    if (canCol.first().emoji.name === EMOJI.SUCCESS) {
+      await canMsg.reactions.removeAll().catch(() => {});
+      // Unlock points for current bidder
+      const biddingState = biddingModule.getBiddingState();
+      if (auctionState.currentItem.curWin) {
+        const amt = biddingState.lp[auctionState.currentItem.curWin] || 0;
+        biddingState.lp[auctionState.currentItem.curWin] = 0;
+        biddingModule.saveBiddingState();
+      }
+      
+      await message.channel.send(
+        `${EMOJI.ERROR} **${auctionState.currentItem.item}** canceled. Points refunded.`
+      );
+      
+      auctionState.currentItemIndex++;
+      if (auctionState.currentItemIndex < auctionState.itemQueue.length) {
+        auctionState.timers.nextItem = setTimeout(async () => {
+          await auctionNextItem(message.client, cfg, message.channel);
+        }, 20000);
+      } else {
+        await finalizeSession(message.client, cfg, message.channel);
+      }
+    } else {
+      await canMsg.reactions.removeAll().catch(() => {});
+    }
+  } catch (e) {
+    await canMsg.reactions.removeAll().catch(() => {});
+  }
+}
+
+async function handleSkipItem(message) {
+  if (!auctionState.active || !auctionState.currentItem) {
+    return await message.reply(`${EMOJI.ERROR} No active auction`);
+  }
+
+  const skpMsg = await message.reply({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(0xffa500)
+        .setTitle(`${EMOJI.WARNING} Skip Item?`)
+        .setDescription(`**${auctionState.currentItem.item}**\n\nMark as no sale, move to next?`)
+        .setFooter({ text: `${EMOJI.SUCCESS} yes / ${EMOJI.ERROR} no` }),
+    ],
+  });
+
+  await skpMsg.react(EMOJI.SUCCESS);
+  await skpMsg.react(EMOJI.ERROR);
+
+  try {
+    const skpCol = await skpMsg.awaitReactions({
+      filter: (r, u) =>
+        [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) && u.id === message.author.id,
+      max: 1,
+      time: 30000,
+      errors: ["time"],
+    });
+
+    if (skpCol.first().emoji.name === EMOJI.SUCCESS) {
+      await skpMsg.reactions.removeAll().catch(() => {});
+      // Unlock points for current bidder
+      const biddingState = biddingModule.getBiddingState();
+      if (auctionState.currentItem.curWin) {
+        const amt = biddingState.lp[auctionState.currentItem.curWin] || 0;
+        biddingState.lp[auctionState.currentItem.curWin] = 0;
+        biddingModule.saveBiddingState();
+      }
+
+      await message.channel.send(`⭐️ **${auctionState.currentItem.item}** skipped (no sale).`);
+      
+      auctionState.currentItemIndex++;
+      if (auctionState.currentItemIndex < auctionState.itemQueue.length) {
+        auctionState.timers.nextItem = setTimeout(async () => {
+          await auctionNextItem(message.client, cfg, message.channel);
+        }, 20000);
+      } else {
+        await finalizeSession(message.client, cfg, message.channel);
+      }
+    } else {
+      await skpMsg.reactions.removeAll().catch(() => {});
+    }
+  } catch (e) {
+    await skpMsg.reactions.removeAll().catch(() => {});
+  }
+}
+
+async function handleForceSubmitResults(message, config, biddingModule) {
+  if (auctionState.sessionItems.length === 0) {
+    return await message.reply(`${EMOJI.ERROR} No results to submit`);
+  }
+
+  const fsMsg = await message.reply({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(0xffa500)
+        .setTitle(`${EMOJI.WARNING} Force Submit?`)
+        .setDescription(`**Items:** ${auctionState.sessionItems.length}`)
+        .addFields({
+          name: `${EMOJI.LIST} Results`,
+          value: auctionState.sessionItems
+            .map((a) => `• **${a.item}**: ${a.winner} - ${a.amount}pts`)
+            .join("\n"),
+          inline: false,
+        })
+        .setFooter({ text: `${EMOJI.SUCCESS} submit / ${EMOJI.ERROR} cancel` }),
+    ],
+  });
+
+  await fsMsg.react(EMOJI.SUCCESS);
+  await fsMsg.react(EMOJI.ERROR);
+
+  try {
+    const fsCol = await fsMsg.awaitReactions({
+      filter: (r, u) =>
+        [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) && u.id === message.author.id,
+      max: 1,
+      time: 30000,
+      errors: ["time"],
+    });
+
+    if (fsCol.first().emoji.name === EMOJI.SUCCESS) {
+      await fsMsg.reactions.removeAll().catch(() => {});
+      await biddingModule.submitSessionTally(config, auctionState.sessionItems);
+      await message.reply(`${EMOJI.SUCCESS} Results submitted!`);
+      auctionState.sessionItems = [];
+    } else {
+      await fsMsg.reactions.removeAll().catch(() => {});
+    }
+  } catch (e) {
+    await fsMsg.reactions.removeAll().catch(() => {});
+  }
+};
+
+function updateCurrentItemState(updates) {
+  if (!auctionState.currentItem) return false;
+  
+  Object.assign(auctionState.currentItem, updates);
+  console.log(`${EMOJI.SUCCESS} Item state updated:`, Object.keys(updates));
+  return true;
+}
+
 module.exports = {
   initialize,
   startAuctioneering,
@@ -489,4 +911,13 @@ module.exports = {
   stopCurrentItem,
   extendCurrentItem,
   getAuctionState,
+  updateCurrentItemState,
+  handleQueueList,
+  handleRemoveItem,
+  handleClearQueue,
+  handleMyPoints,
+  handleBidStatus,
+  handleCancelItem,
+  handleSkipItem,
+  handleForceSubmitResults,
 };

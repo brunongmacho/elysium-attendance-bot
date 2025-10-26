@@ -193,7 +193,7 @@ const COMMAND_HELP = {
     example: "!bstatus",
     aliases: ["!bstatus", "!bs"],
     details:
-      "Shows:\n• Cache status and age\n• Auto-refresh status\n• Queue items (first 5)\n• Active auction item\n• Current bid and winner\n• Time remaining\n• Dry run mode indicator\n\n**Aliases:** !bstatus, !bs",
+      "Shows:\n• Cache status and age\n• Auto-refresh status\n• Queue items (first 5)\n• Active auction item\n• Current bid and winner\n• Time remaining\n•\n**Aliases:** !bstatus, !bs",
   },
 
 mypoints: {
@@ -205,16 +205,6 @@ mypoints: {
     aliases: ["!pts", "!mypts", "!mp"],
     details:
       'Personal points check:\n• Use ONLY in bidding channel (not threads)\n• Cannot use during active auction\n• Fetches fresh from Sheets\n• Auto-deletes after 30 seconds\n• Shows "Not found" if not in system\n\n**Aliases:** !pts, !mypts, !mp',
-  },
-
-  dryrun: {
-    usage: "Automatic - No command needed",
-    description: "Dry run mode shows yellow embeds automatically",
-    category: "Bidding",
-    adminOnly: true,
-    example: "N/A - Visual distinction only",
-    details:
-      "Dry run visual indicators:\n• Bright YELLOW embed borders (#FFFF00)\n• ⚠️ DRY RUN MODE in footers\n• Uses TestBiddingPoints sheet\n• No manual toggle needed\n• Automatic visual distinction",
   },
 
   cancelitem: {

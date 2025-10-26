@@ -1432,7 +1432,6 @@ const commandHandlers = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "getBiddingPoints",
-          dryRun: biddingState.dry,
         }),
       });
 
@@ -1458,7 +1457,6 @@ const commandHandlers = {
 
     const biddingState = bidding.getBiddingState();
     const stateInfo = {
-      isDryRun: biddingState.dry,
       queueLength: biddingState.q.length,
       hasActiveAuction: !!biddingState.a,
       activeAuctionItem: biddingState.a
@@ -1522,9 +1520,6 @@ const commandHandlers = {
         {
           name: "🎯 Bidding State",
           value:
-            `🧪 Dry Run: ${
-              stateInfo.isDryRun ? "✅ Enabled" : "⚪ Disabled"
-            }\n` +
             `📋 Queue: ${stateInfo.queueLength} item(s)\n` +
             `🔴 Active Auction: ${
               stateInfo.hasActiveAuction
@@ -1647,6 +1642,53 @@ const commandHandlers = {
     if (success) {
       await message.reply(`⏱️ Extended by ${mins} minute(s).`);
     }
+  },
+  queuelist: async (message, member) => {
+    await auctioneering.handleQueueList(message, bidding.getBiddingState());
+  },
+
+  removeitem: async (message, member, args) => {
+    await auctioneering.handleRemoveItem(message, args, bidding);
+  },
+
+  clearqueue: async (message, member) => {
+    // Wrap in confirmation
+    const totalItems = auctioneering.getAuctionState().itemQueue.length;
+    if (totalItems === 0) {
+      return await message.reply(`${EMOJI.LIST} Queue is already empty`);
+    }
+    await auctioneering.handleClearQueue(message, 
+      async (confirmMsg) => {
+        // On confirm
+        auctioneering.getAuctionState().itemQueue = [];
+        await confirmMsg.reactions.removeAll().catch(() => {});
+        await message.reply(`${EMOJI.SUCCESS} Cleared ${totalItems} item(s)`);
+      },
+      async (confirmMsg) => {
+        // On cancel
+        await confirmMsg.reactions.removeAll().catch(() => {});
+      }
+    );
+  },
+
+  mypoints: async (message, member) => {
+    await auctioneering.handleMyPoints(message, bidding, config);
+  },
+
+  bidstatus: async (message, member) => {
+    await auctioneering.handleBidStatus(message, config);
+  },
+
+  cancelitem: async (message, member) => {
+    await auctioneering.handleCancelItem(message);
+  },
+
+  skipitem: async (message, member) => {
+    await auctioneering.handleSkipItem(message);
+  },
+
+  forcesubmitresults: async (message, member) => {
+    await auctioneering.handleForceSubmitResults(message, config, bidding);
   },
 };
 
@@ -1822,7 +1864,7 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
-    // ✅ HANDLE !MYPOINTS AND ALIASES - BIDDING CHANNEL ONLY
+// ✅ HANDLE !MYPOINTS AND ALIASES - BIDDING CHANNEL ONLY (NOT DURING AUCTION)
     if (
       resolvedCmd === "!mypoints" &&
       inBiddingChannel &&
@@ -1830,7 +1872,7 @@ client.on(Events.MessageCreate, async (message) => {
     ) {
       const args = message.content.trim().split(/\s+/).slice(1);
       console.log(`🎯 My points command (${rawCmd}): ${resolvedCmd}`);
-      await bidding.handleCommand(resolvedCmd, message, args, client, config);
+      await commandHandlers.mypoints(message, member);
       return;
     }
 
@@ -1838,7 +1880,7 @@ client.on(Events.MessageCreate, async (message) => {
     if (resolvedCmd === "!bidstatus" && inBiddingChannel) {
       const args = message.content.trim().split(/\s+/).slice(1);
       console.log(`🎯 Bidding status command (${rawCmd}): ${resolvedCmd}`);
-      await bidding.handleCommand(resolvedCmd, message, args, client, config);
+      await commandHandlers.bidstatus(message, member);
       return;
     }
 
@@ -1940,8 +1982,6 @@ client.on(Events.MessageCreate, async (message) => {
       // Admin commands in spawn threads
       if (!userIsAdmin) return;
 
-      const cmd = message.content.trim().toLowerCase().split(/\s+/)[0];
-const spawnCmd = resolveCommandAlias(rawCmd);
       // !verifyall
       if (spawnCmd === "!verifyall") {
         const spawnInfo = activeSpawns[message.channel.id];
@@ -2290,21 +2330,27 @@ const spawnCmd = resolveCommandAlias(rawCmd);
           "!auction",
           "!queuelist",
           "!removeitem",
+          "!clearqueue",
           "!startauction",
           "!startauctionnow",
           "!pause",
           "!resume",
           "!stop",
           "!extend",
-          "!dryrun",
-          "!clearqueue",
           "!resetbids",
-          "!forcesubmitresults",
-          "!bidstatus"
+          "!forcesubmitresults"
         ].includes(adminCmd)
       ) {
-        console.log(`🎯 Processing bidding command (${rawCmd} -> ${adminCmd})`);
-        await bidding.handleCommand(adminCmd, message, args, client, config);
+        console.log(`🎯 Processing auction command (${rawCmd} -> ${adminCmd})`);
+        
+        // Route to appropriate handler
+        if (["!queuelist", "!removeitem", "!clearqueue"].includes(adminCmd)) {
+          await commandHandlers[adminCmd.slice(1)](message, member, args);
+        } else if (["!forcesubmitresults", "!cancelitem", "!skipitem"].includes(adminCmd)) {
+          await commandHandlers[adminCmd.slice(1)](message, member, args);
+        } else {
+          await bidding.handleCommand(adminCmd, message, args, client, config);
+        }
         return;
       }
 

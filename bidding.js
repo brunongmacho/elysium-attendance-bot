@@ -7,7 +7,6 @@
  * - Better confirmation messages with countdown timers
  * - Emoji consistency throughout
  * - Color-coded embeds (standardized)
- * - Dry run visual distinction (yellow borders)
  * - Command aliases (!b, !ql, etc.)
  * - Batch auctions (multiple identical items)
  * - Admin action confirmation for destructive commands
@@ -35,7 +34,6 @@ const COLORS = {
   ERROR: 0xff0000,
   INFO: 0x4a90e2,
   AUCTION: 0xffd700,
-  DRY_RUN: 0xffff00, // Bright yellow for dry run
 };
 
 // Emoji constants (consistent throughout)
@@ -76,7 +74,6 @@ let st = {
   a: null, // active auction
   lp: {}, // locked points
   h: [], // history
-  dry: false, // dry run
   th: {}, // timer handles
   pc: {}, // pending confirmations
   sd: null, // session date
@@ -131,11 +128,6 @@ const unlock = (u, amt) => {
   save();
 };
 
-// Get color based on dry run mode
-const getColor = (baseColor) => {
-  return st.dry ? COLORS.DRY_RUN : baseColor;
-};
-
 // STATE PERSISTENCE
 function save() {
   try {
@@ -166,22 +158,22 @@ function initializeBidding(config, isAdminFunc, auctioneeringRef) {
 }
 
 // SHEETS API
-async function fetchPts(url, dry = false) {
+async function fetchPts(url) {
   try {
     const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "getBiddingPoints", dryRun: dry }),
+      body: JSON.stringify({ action: "getBiddingPoints" }),
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return (await r.json()).points || {};
   } catch (e) {
-    console.error("❌ Fetch pts:", e);
+    console.error("âŒ Fetch pts:", e);
     return null;
   }
 }
 
-async function submitRes(url, res, time, dry = false) {
+async function submitRes(url, res, time) {
   if (!time || !res || res.length === 0)
     return { ok: false, err: "Missing data" };
   for (let i = 1; i <= 3; i++) {
@@ -193,18 +185,17 @@ async function submitRes(url, res, time, dry = false) {
           action: "submitBiddingResults",
           results: res,
           timestamp: time,
-          dryRun: dry,
         }),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const d = await r.json();
       if (d.status === "ok") {
-        console.log("✅ Submitted");
+        console.log("âœ… Submitted");
         return { ok: true, d };
       }
       throw new Error(d.message || "Unknown");
     } catch (e) {
-      console.error(`❌ Submit ${i}:`, e.message);
+      console.error(`âŒ Submit ${i}:`, e.message);
       if (i < 3) await new Promise((x) => setTimeout(x, i * 2000));
       else return { ok: false, err: e.message, res };
     }
@@ -212,30 +203,30 @@ async function submitRes(url, res, time, dry = false) {
 }
 
 // CACHE WITH AUTO-REFRESH
-async function loadCache(url, dry = false) {
-  console.log("⚡ Loading cache...");
+async function loadCache(url) {
+  console.log("âš¡ Loading cache...");
   const t0 = Date.now();
-  const p = await fetchPts(url, dry);
+  const p = await fetchPts(url);
   if (!p) {
-    console.error("❌ Cache fail");
+    console.error("âŒ Cache fail");
     return false;
   }
   st.cp = p;
   st.ct = Date.now();
   save();
   console.log(
-    `✅ Cache: ${Date.now() - t0}ms - ${Object.keys(p).length} members`
+    `âœ… Cache: ${Date.now() - t0}ms - ${Object.keys(p).length} members`
   );
   
   // Start auto-refresh timer if auction is active
   if (st.a && st.a.status === "active") {
-    startCacheAutoRefresh(url, dry);
+    startCacheAutoRefresh(url);
   }
   
   return true;
 }
 
-function startCacheAutoRefresh(url, dry) {
+function startCacheAutoRefresh(url) {
   // Clear existing timer
   if (st.cacheRefreshTimer) {
     clearInterval(st.cacheRefreshTimer);
@@ -245,13 +236,13 @@ function startCacheAutoRefresh(url, dry) {
   st.cacheRefreshTimer = setInterval(async () => {
     if (st.a && st.a.status === "active") {
       console.log("🔄 Auto-refreshing cache...");
-      await loadCache(url, dry);
+      await loadCache(url);
     } else {
       // Stop refreshing if no active auction
       stopCacheAutoRefresh();
     }
   }, CACHE_REFRESH_INTERVAL);
-  
+
   console.log("✅ Cache auto-refresh enabled (every 30 minutes)");
 }
 
@@ -370,7 +361,7 @@ async function startSess(cli, cfg) {
   st.auctionLock = true;
   
   try {
-    if (!(await loadCache(cfg.sheet_webhook_url, st.dry))) {
+    if (!(await loadCache(cfg.sheet_webhook_url))) {
       st.auctionLock = false;
       return { ok: false, msg: `${EMOJI.ERROR} Cache load failed` };
     }
@@ -443,7 +434,7 @@ async function startNext(cli, cfg) {
       { name: `${EMOJI.TIME} Duration`, value: fmtDur(d.duration), inline: true },
       { name: `${EMOJI.LIST} Items Left`, value: `${st.q.length - 1}`, inline: true }
     )
-    .setFooter({ text: st.dry ? `${EMOJI.WARNING} DRY RUN MODE - Starts in 30s` : "Starts in 30 seconds" })
+    .setFooter({ text: "Starts in 30 seconds" })
     .setTimestamp();
   
   if (isBatch) {
@@ -470,7 +461,7 @@ async function activate(cli, cfg, th) {
   const isBatch = st.a.quantity > 1;
   
   const activeEmbed = new EmbedBuilder()
-    .setColor(getColor(COLORS.SUCCESS))
+    .setColor(COLORS.SUCCESS)
     .setTitle(`${EMOJI.FIRE} BIDDING NOW!`)
     .setDescription(`Type \`!bid <amount>\` to bid${isBatch ? `\n\n**${st.a.quantity} items available** - Top ${st.a.quantity} bidders win!` : ''}`)
     .addFields(
@@ -508,7 +499,7 @@ async function ann1(cli, cfg) {
     content: "@everyone",
     embeds: [
       new EmbedBuilder()
-        .setColor(getColor(COLORS.WARNING))
+        .setColor(COLORS.WARNING)
         .setTitle(`${EMOJI.WARNING} GOING ONCE!`)
         .setDescription("1 min left")
         .addFields({
@@ -607,7 +598,7 @@ async function endAuc(cli, cfg) {
           .addFields(
             { name: `${EMOJI.TROPHY} Winners`, value: winnersList, inline: false },
           )
-          .setFooter({ text: st.dry ? `${EMOJI.WARNING} DRY RUN` : "Deducted after session" })
+          .setFooter({ text: "Deducted after session" })
           .setTimestamp(),
       ],
     });
@@ -635,7 +626,7 @@ async function endAuc(cli, cfg) {
             { name: `${EMOJI.TROPHY} Winner`, value: `<@${a.curWinId}>`, inline: true },
             { name: `${EMOJI.BID} Price`, value: `${a.curBid}pts`, inline: true }
           )
-          .setFooter({ text: st.dry ? `${EMOJI.WARNING} DRY RUN` : "Deducted after session" })
+          .setFooter({ text: "Deducted after session" })
           .setTimestamp(),
       ],
     });
@@ -651,7 +642,7 @@ async function endAuc(cli, cfg) {
     await th.send({
       embeds: [
         new EmbedBuilder()
-          .setColor(getColor(COLORS.INFO))
+          .setColor(COLORS.INFO)
           .setTitle(`${EMOJI.ERROR} NO BIDS`)
           .setDescription(`**${a.item}** - no bids`)
           .setFooter({ text: "Next item..." }),
@@ -716,7 +707,7 @@ async function submitSessionTally(config, sessionItems) {
     };
   });
 
-  const sub = await submitRes(config.sheet_webhook_url, res, st.sd, false);
+  const sub = await submitRes(config.sheet_webhook_url, res, st.sd);
 
   if (sub.ok) {
     console.log(`✅ Session tally submitted`);
@@ -811,7 +802,7 @@ async function finalize(cli, cfg) {
     res.filter((r) => r.totalSpent > 0)
   );
 
-  const sub = await submitRes(cfg.sheet_webhook_url, res, st.sd, st.dry);
+  const sub = await submitRes(cfg.sheet_webhook_url, res, st.sd);
 
   if (sub.ok) {
     const wList = st.h
@@ -836,7 +827,7 @@ async function finalize(cli, cfg) {
           inline: false,
         }
       )
-      .setFooter({ text: st.dry ? `${EMOJI.WARNING} DRY RUN` : "Points deducted" })
+      .setFooter({ text: "Points deducted" })
       .setTimestamp();
     await bch.send({ embeds: [e] });
     await adm.send({ embeds: [e] });
@@ -865,12 +856,14 @@ async function finalize(cli, cfg) {
   save();
 }
 
-async function procBidAuctioneering(msg, amt, currentItem) {
+async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
+  const currentItem = auctState.currentItem;
+  
   const m = msg.member,
     u = m.nickname || msg.author.username,
     uid = msg.author.id;
   
-  if (!hasRole(m) && !isAdm(m, cfg)) {
+  if (!hasRole(m) && !isAdm(m, config)) {
     await msg.reply(`${EMOJI.ERROR} Need ELYSIUM role`);
     return { ok: false, msg: "No role" };
   }
@@ -924,13 +917,13 @@ async function procBidAuctioneering(msg, amt, currentItem) {
     .addFields(
       { name: `${EMOJI.BID} Your Bid`, value: `${bid}pts`, inline: true },
       { name: `${EMOJI.CHART} Current`, value: `${currentItem.curBid}pts`, inline: true },
-      { name: '💳 After', value: `${av - needed}pts`, inline: true }
+      { name: `${EMOJI.CHART} After`, value: `${av - needed}pts`, inline: true }
     )
-    .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 10s timeout` });
+    .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel â€¢ 10s timeout` });
 
   if (isSelf) {
     confEmbed.addFields({
-      name: '🔄 Self-Overbid',
+      name: `${EMOJI.FIRE} Self-Overbid`,
       value: `Current: ${currentItem.curBid}pts → New: ${bid}pts\n**+${needed}pts needed**`,
       inline: false,
     });
@@ -950,6 +943,8 @@ async function procBidAuctioneering(msg, amt, currentItem) {
     isSelf,
     needed,
     isAuctioneering: true,
+    auctStateRef: auctState,
+    auctRef: auctRef,
   };
   save();
 
@@ -960,7 +955,7 @@ async function procBidAuctioneering(msg, amt, currentItem) {
     countdown--;
     if (countdown > 0 && countdown <= 10 && st.pc[conf.id]) {
       const updatedEmbed = EmbedBuilder.from(confEmbed)
-        .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • ${countdown}s remaining` });
+        .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel â€¢ ${countdown}s remaining` });
       await conf.edit({ embeds: [updatedEmbed] }).catch(() => {});
     }
   }, 1000);
@@ -988,7 +983,7 @@ async function procBid(msg, amt, cfg) {
   if (auctioneering) {
     const auctState = auctioneering.getAuctionState();
     if (auctState && auctState.active && auctState.currentItem) {
-      return await procBidAuctioneering(msg, amt, auctState.currentItem);
+      return await procBidAuctioneering(msg, amt, auctState, auctioneering, cfg);
     }
   }
 
@@ -1051,7 +1046,7 @@ async function procBid(msg, amt, cfg) {
   }
 
   const confEmbed = new EmbedBuilder()
-    .setColor(getColor(COLORS.AUCTION))
+    .setColor(COLORS.AUCTION)
     .setTitle(`${EMOJI.CLOCK} Confirm Bid`)
     .setDescription(`**${a.item}**${a.quantity > 1 ? ` (${a.quantity} available)` : ''}`)
     .addFields(
@@ -1224,7 +1219,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       await msg.reply({
         embeds: [
           new EmbedBuilder()
-            .setColor(getColor(COLORS.INFO))
+            .setColor(COLORS.INFO)
             .setTitle(`${EMOJI.LIST} Queue`)
             .setDescription(
               st.q
@@ -1277,19 +1272,14 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       
       const cMsg = await msg.reply({
         embeds: [
-          new EmbedBuilder()
-            .setColor(getColor(COLORS.AUCTION))
+new EmbedBuilder()
+            .setColor(COLORS.AUCTION)
             .setTitle(`${EMOJI.WARNING} Start?`)
             .setDescription(
               `**${st.q.length} item(s)**:\n\n${prev}${
                 st.q.length > 10 ? `\n*...+${st.q.length - 10} more*` : ""
               }`
             )
-            .addFields({
-              name: `${EMOJI.INFO} Mode`,
-              value: st.dry ? `${EMOJI.WARNING} DRY RUN` : `${EMOJI.BID} LIVE`,
-              inline: true,
-            })
             .setFooter({ text: `${EMOJI.SUCCESS} start / ${EMOJI.ERROR} cancel • 30s timeout` }),
         ],
       });
@@ -1310,11 +1300,6 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
                 st.q.length > 10 ? `\n*...+${st.q.length - 10} more*` : ""
               }`
             )
-            .addFields({
-              name: `${EMOJI.INFO} Mode`,
-              value: st.dry ? `${EMOJI.WARNING} DRY RUN` : `${EMOJI.BID} LIVE`,
-              inline: true,
-            })
             .setFooter({ text: `${EMOJI.SUCCESS} start / ${EMOJI.ERROR} cancel • ${confirmCountdown}s remaining` });
           await cMsg.edit({ embeds: [updatedEmbed] }).catch(() => {});
         }
@@ -1351,11 +1336,6 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
                       value: `${r.cached} members`,
                       inline: true,
                     },
-                    {
-                      name: `${EMOJI.INFO} Mode`,
-                      value: st.dry ? `${EMOJI.WARNING} DRY RUN` : `${EMOJI.BID} LIVE`,
-                      inline: true,
-                    }
                   )
                   .setFooter({ text: `${EMOJI.FIRE} Instant bidding!` })
                   .setTimestamp(),
@@ -1420,7 +1400,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         );
       }
       statEmbed
-        .setFooter({ text: st.dry ? `${EMOJI.WARNING} DRY RUN MODE` : "Use !auction to add" })
+        .setFooter({ text: "Use !auction to add" })
         .setTimestamp();
       await msg.reply({ embeds: [statEmbed] });
       break;
@@ -1469,7 +1449,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       const rstMsg = await msg.reply({
         embeds: [
           new EmbedBuilder()
-            .setColor(getColor(COLORS.ERROR))
+            .setColor(COLORS.ERROR)
             .setTitle(`${EMOJI.WARNING} RESET ALL?`)
             .setDescription(
               `Clears:\n` +
@@ -1500,7 +1480,6 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             a: null,
             lp: {},
             h: [],
-            dry: st.dry,
             th: {},
             pc: {},
             sd: null,
@@ -1571,8 +1550,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           const sub = await submitRes(
             cfg.sheet_webhook_url,
             res,
-            st.sd,
-            st.dry
+            st.sd
           );
           if (sub.ok) {
             const wList = st.h
@@ -1599,9 +1577,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
                       inline: false,
                     }
                   )
-                  .setFooter({
-                    text: st.dry ? `${EMOJI.WARNING} DRY RUN` : "Deducted • Cache cleared",
-                  })
+.setFooter({ text: "Deducted after session" })
                   .setTimestamp(),
               ],
             });
@@ -1741,7 +1717,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       const u = msg.member.nickname || msg.author.username;
 
       // Fetch fresh from sheets
-      const freshPts = await fetchPts(cfg.sheet_webhook_url, st.dry);
+      const freshPts = await fetchPts(cfg.sheet_webhook_url);
       if (!freshPts) {
         return await msg.reply(`${EMOJI.ERROR} Failed to fetch points from sheets.`);
       }
@@ -1780,9 +1756,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
                 value: `${userPts} pts`,
                 inline: true,
               })
-              .setFooter({
-                text: st.dry ? `${EMOJI.WARNING} DRY RUN MODE` : "Auto-deletes in 30s",
-              })
+.setFooter({ text: "Auto-deletes in 30s" })
               .setTimestamp(),
           ],
         });
@@ -1832,7 +1806,8 @@ module.exports = {
 
     // CRITICAL FIX: Handle auctioneering bids
     if (p.isAuctioneering) {
-      const auctState = auctioneering.getAuctionState();
+      const auctState = p.auctStateRef || auctioneering.getAuctionState();
+      const auctRef = p.auctRef || auctioneering;
       const a = auctState.currentItem;
       
       if (!auctState.active || !a) {
@@ -1873,23 +1848,33 @@ module.exports = {
       lock(p.username, p.needed);
 
       const prevBid = a.curBid;
-      a.curBid = p.amount;
-      a.curWin = p.username;
-      a.curWinId = p.userId;
-      a.bids.push({
+      const updatedBids = [...a.bids, {
         user: p.username,
         userId: p.userId,
         amount: p.amount,
         timestamp: Date.now(),
-      });
+      }];
 
       const timeLeft = a.endTime - Date.now();
+      let newEndTime = a.endTime;
+      let newExtCnt = a.extCnt;
+      
       if (timeLeft < 60000 && a.extCnt < 15) {
-        a.endTime += 60000;
-        a.extCnt++;
-        a.go1 = false;
-        a.go2 = false;
+        newEndTime = a.endTime + 60000;
+        newExtCnt = a.extCnt + 1;
       }
+
+      // PERSIST CHANGES TO AUCTION STATE
+      auctRef.updateCurrentItemState({
+        curBid: p.amount,
+        curWin: p.username,
+        curWinId: p.userId,
+        bids: updatedBids,
+        endTime: newEndTime,
+        extCnt: newExtCnt,
+        go1: timeLeft < 60000 && a.extCnt < 15 ? false : a.go1,
+        go2: timeLeft < 60000 && a.extCnt < 15 ? false : a.go2,
+      });
 
       if (st.th[`c_${reaction.message.id}`]) {
         clearTimeout(st.th[`c_${reaction.message.id}`]);
@@ -1925,7 +1910,7 @@ module.exports = {
             .setTitle(`${EMOJI.FIRE} New High Bid!`)
             .addFields(
               { name: `${EMOJI.BID} Amount`, value: `${p.amount}pts`, inline: true },
-              { name: '🤔 Bidder', value: p.username, inline: true }
+              { name: 'ðŸ¤" Bidder', value: p.username, inline: true }
             ),
         ],
       });
