@@ -38,34 +38,34 @@ const COLORS = {
 
 // Emoji constants (consistent throughout)
 const EMOJI = {
-  SUCCESS: '✅',
-  ERROR: '❌',
-  WARNING: '⚠️',
-  INFO: 'ℹ️',
-  AUCTION: '🔨',
-  BID: '💰',
-  TIME: '⏱️',
-  TROPHY: '🏆',
-  FIRE: '🔥',
-  LOCK: '🔒',
-  CHART: '📊',
-  PAUSE: '⏸️',
-  PLAY: '▶️',
-  CLOCK: '🕐',
-  LIST: '📋',
+  SUCCESS: "✅",
+  ERROR: "❌",
+  WARNING: "⚠️",
+  INFO: "ℹ️",
+  AUCTION: "🔨",
+  BID: "💰",
+  TIME: "⏱️",
+  TROPHY: "🏆",
+  FIRE: "🔥",
+  LOCK: "🔒",
+  CHART: "📊",
+  PAUSE: "⏸️",
+  PLAY: "▶️",
+  CLOCK: "🕐",
+  LIST: "📋",
 };
 
 // Command aliases
 const COMMAND_ALIASES = {
-  '!b': '!bid',
-  '!ql': '!queuelist',
-  '!queue': '!queuelist',
-  '!rm': '!removeitem',
-  '!start': '!startauction',
-  '!bstatus': '!bidstatus',
-  '!pts': '!mypoints',
-  '!mypts': '!mypoints',
-  '!mp': '!mypoints',
+  "!b": "!bid",
+  "!ql": "!queuelist",
+  "!queue": "!queuelist",
+  "!rm": "!removeitem",
+  "!start": "!startauction",
+  "!bstatus": "!bidstatus",
+  "!pts": "!mypoints",
+  "!mypts": "!mypoints",
+  "!mp": "!mypoints",
 };
 
 // STATE
@@ -93,14 +93,15 @@ const isAdm = (m, c) =>
   m.roles.cache.some((r) => c.admin_roles.includes(r.name));
 const ts = () => {
   const d = new Date();
-  const manilaTime = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-  
+  const manilaTime = new Date(
+    d.toLocaleString("en-US", { timeZone: "Asia/Manila" })
+  );
+
   return `${String(manilaTime.getMonth() + 1).padStart(2, "0")}/${String(
     manilaTime.getDate()
-  ).padStart(2, "0")}/${manilaTime.getFullYear()} ${String(manilaTime.getHours()).padStart(
-    2,
-    "0"
-  )}:${String(manilaTime.getMinutes()).padStart(2, "0")}`;
+  ).padStart(2, "0")}/${manilaTime.getFullYear()} ${String(
+    manilaTime.getHours()
+  ).padStart(2, "0")}:${String(manilaTime.getMinutes()).padStart(2, "0")}`;
 };
 const fmtDur = (m) =>
   m < 60
@@ -142,7 +143,16 @@ function load() {
   try {
     if (fs.existsSync(SF)) {
       const d = JSON.parse(fs.readFileSync(SF, "utf8"));
-      st = { ...st, ...d, th: {}, lb: {}, pause: false, pauseTimer: null, auctionLock: false, cacheRefreshTimer: null };
+      st = {
+        ...st,
+        ...d,
+        th: {},
+        lb: {},
+        pause: false,
+        pauseTimer: null,
+        auctionLock: false,
+        cacheRefreshTimer: null,
+      };
       return true;
     }
   } catch (e) {
@@ -222,12 +232,12 @@ async function loadCache(url) {
   console.log(
     `✅ Cache: ${Date.now() - t0}ms - ${Object.keys(p).length} members`
   );
-  
+
   // Start auto-refresh timer if auction is active
   if (st.a && st.a.status === "active") {
     startCacheAutoRefresh(url);
   }
-  
+
   return true;
 }
 
@@ -236,7 +246,7 @@ function startCacheAutoRefresh(url) {
   if (st.cacheRefreshTimer) {
     clearInterval(st.cacheRefreshTimer);
   }
-  
+
   // Set up auto-refresh every 30 minutes
   st.cacheRefreshTimer = setInterval(async () => {
     if (st.a && st.a.status === "active") {
@@ -357,14 +367,17 @@ function resumeAuction(cli, cfg) {
 async function startSess(cli, cfg) {
   if (st.q.length === 0) return { ok: false, msg: "No items" };
   if (st.a) return { ok: false, msg: "Already active" };
-  
+
   // Concurrent auction protection
   if (st.auctionLock) {
-    return { ok: false, msg: `${EMOJI.WARNING} Auction start already in progress, please wait...` };
+    return {
+      ok: false,
+      msg: `${EMOJI.WARNING} Auction start already in progress, please wait...`,
+    };
   }
-  
+
   st.auctionLock = true;
-  
+
   try {
     if (!(await loadCache(cfg.sheet_webhook_url))) {
       st.auctionLock = false;
@@ -375,9 +388,9 @@ async function startSess(cli, cfg) {
     const f = st.q[0];
     await startNext(cli, cfg);
     save();
-    
+
     st.auctionLock = false;
-    
+
     return {
       ok: true,
       tot: st.q.length,
@@ -399,12 +412,14 @@ async function startNext(cli, cfg) {
   const d = st.q[0];
   const g = await cli.guilds.fetch(cfg.main_guild_id);
   const ch = await g.channels.fetch(cfg.bidding_channel_id);
-  
+
   const isBatch = d.quantity > 1;
-  const threadName = isBatch 
-    ? `${d.item} x${d.quantity} - ${ts()} | ${d.startPrice}pts | ${fmtDur(d.duration)}`
+  const threadName = isBatch
+    ? `${d.item} x${d.quantity} - ${ts()} | ${d.startPrice}pts | ${fmtDur(
+        d.duration
+      )}`
     : `${d.item} - ${ts()} | ${d.startPrice}pts | ${fmtDur(d.duration)}`;
-  
+
   const th = await ch.threads.create({
     name: threadName,
     autoArchiveDuration: 60,
@@ -429,19 +444,27 @@ async function startNext(cli, cfg) {
   const previewEmbed = new EmbedBuilder()
     .setColor(getColor(COLORS.AUCTION))
     .setTitle(`${EMOJI.TROPHY} AUCTION STARTING`)
-    .setDescription(`**${d.item}**${isBatch ? ` x${d.quantity}` : ''}`)
+    .setDescription(`**${d.item}**${isBatch ? ` x${d.quantity}` : ""}`)
     .addFields(
       {
         name: `${EMOJI.BID} Starting Bid`,
         value: `${d.startPrice} points`,
         inline: true,
       },
-      { name: `${EMOJI.TIME} Duration`, value: fmtDur(d.duration), inline: true },
-      { name: `${EMOJI.LIST} Items Left`, value: `${st.q.length - 1}`, inline: true }
+      {
+        name: `${EMOJI.TIME} Duration`,
+        value: fmtDur(d.duration),
+        inline: true,
+      },
+      {
+        name: `${EMOJI.LIST} Items Left`,
+        value: `${st.q.length - 1}`,
+        inline: true,
+      }
     )
     .setFooter({ text: "Starts in 30 seconds" })
     .setTimestamp();
-  
+
   if (isBatch) {
     previewEmbed.addFields({
       name: `${EMOJI.FIRE} Batch Auction`,
@@ -455,25 +478,40 @@ async function startNext(cli, cfg) {
     embeds: [previewEmbed],
   });
 
-  st.th.aStart = setTimeout(async () => await activate(cli, cfg, th), PREVIEW_TIME);
+  st.th.aStart = setTimeout(
+    async () => await activate(cli, cfg, th),
+    PREVIEW_TIME
+  );
   save();
 }
 
 async function activate(cli, cfg, th) {
   st.a.status = "active";
   st.a.endTime = Date.now() + st.a.duration * 60000;
-  
+
   const isBatch = st.a.quantity > 1;
-  
+
   const activeEmbed = new EmbedBuilder()
     .setColor(COLORS.SUCCESS)
     .setTitle(`${EMOJI.FIRE} BIDDING NOW!`)
-    .setDescription(`Type \`!bid <amount>\` to bid${isBatch ? `\n\n**${st.a.quantity} items available** - Top ${st.a.quantity} bidders win!` : ''}`)
+    .setDescription(
+      `Type \`!bid <amount>\` to bid${
+        isBatch
+          ? `\n\n**${st.a.quantity} items available** - Top ${st.a.quantity} bidders win!`
+          : ""
+      }`
+    )
     .addFields(
-      { name: `${EMOJI.BID} Current`, value: `${st.a.curBid} pts`, inline: true },
+      {
+        name: `${EMOJI.BID} Current`,
+        value: `${st.a.curBid} pts`,
+        inline: true,
+      },
       { name: `${EMOJI.TIME} Time`, value: fmtDur(st.a.duration), inline: true }
     )
-    .setFooter({ text: `${EMOJI.CLOCK} 10s confirm • ${EMOJI.LOCK} 3s rate limit` });
+    .setFooter({
+      text: `${EMOJI.CLOCK} 10s confirm • ${EMOJI.LOCK} 3s rate limit`,
+    });
 
   await th.send({ embeds: [activeEmbed] });
   schedTimers(cli, cfg);
@@ -583,8 +621,8 @@ async function endAuc(cli, cfg) {
     const sortedBids = a.bids
       .sort((x, y) => y.amount - x.amount)
       .slice(0, a.quantity);
-    
-    a.winners = sortedBids.map(b => ({
+
+    a.winners = sortedBids.map((b) => ({
       username: b.user,
       userId: b.userId,
       amount: b.amount,
@@ -592,7 +630,7 @@ async function endAuc(cli, cfg) {
 
     const winnersList = a.winners
       .map((w, i) => `${i + 1}. <@${w.userId}> - ${w.amount}pts`)
-      .join('\n');
+      .join("\n");
 
     await th.send({
       embeds: [
@@ -600,16 +638,18 @@ async function endAuc(cli, cfg) {
           .setColor(getColor(COLORS.AUCTION))
           .setTitle(`${EMOJI.AUCTION} SOLD!`)
           .setDescription(`**${a.item}** x${a.quantity} sold!`)
-          .addFields(
-            { name: `${EMOJI.TROPHY} Winners`, value: winnersList, inline: false },
-          )
+          .addFields({
+            name: `${EMOJI.TROPHY} Winners`,
+            value: winnersList,
+            inline: false,
+          })
           .setFooter({ text: "Deducted after session" })
           .setTimestamp(),
       ],
     });
 
     // Add to history
-    a.winners.forEach(w => {
+    a.winners.forEach((w) => {
       st.h.push({
         item: a.item,
         winner: w.username,
@@ -618,7 +658,6 @@ async function endAuc(cli, cfg) {
         timestamp: Date.now(),
       });
     });
-
   } else if (a.curWin) {
     // Single item auction
     await th.send({
@@ -628,8 +667,16 @@ async function endAuc(cli, cfg) {
           .setTitle(`${EMOJI.AUCTION} SOLD!`)
           .setDescription(`**${a.item}** sold!`)
           .addFields(
-            { name: `${EMOJI.TROPHY} Winner`, value: `<@${a.curWinId}>`, inline: true },
-            { name: `${EMOJI.BID} Price`, value: `${a.curBid}pts`, inline: true }
+            {
+              name: `${EMOJI.TROPHY} Winner`,
+              value: `<@${a.curWinId}>`,
+              inline: true,
+            },
+            {
+              name: `${EMOJI.BID} Price`,
+              value: `${a.curBid}pts`,
+              inline: true,
+            }
           )
           .setFooter({ text: "Deducted after session" })
           .setTimestamp(),
@@ -685,10 +732,10 @@ async function loadPointsCacheForAuction(url) {
   console.log(
     `✅ Cache: ${Date.now() - t0}ms - ${Object.keys(p).length} members`
   );
-  
+
   // START AUTO-REFRESH FOR AUCTIONEERING SESSIONS
   startCacheAutoRefresh(url);
-  
+
   return true;
 }
 
@@ -831,7 +878,7 @@ async function finalize(cli, cfg) {
         },
         { name: `${EMOJI.LIST} Winners`, value: wList || "None" },
         {
-          name: '👥 Members Updated',
+          name: "👥 Members Updated",
           value: `${res.length} (auto-populated 0 for non-winners)`,
           inline: false,
         }
@@ -851,7 +898,10 @@ async function finalize(cli, cfg) {
           .setColor(getColor(COLORS.ERROR))
           .setTitle(`${EMOJI.ERROR} Submit Failed`)
           .setDescription(`**Error:** ${sub.err}\n**Time:** ${st.sd}`)
-          .addFields({ name: `${EMOJI.LIST} Manual Entry`, value: `\`\`\`\n${d}\n\`\`\`` })
+          .addFields({
+            name: `${EMOJI.LIST} Manual Entry`,
+            value: `\`\`\`\n${d}\n\`\`\``,
+          })
           .setTimestamp(),
       ],
     });
@@ -867,11 +917,11 @@ async function finalize(cli, cfg) {
 
 async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   const currentItem = auctState.currentItem;
-  
+
   const m = msg.member,
     u = m.nickname || msg.author.username,
     uid = msg.author.id;
-  
+
   if (!hasRole(m) && !isAdm(m, config)) {
     await msg.reply(`${EMOJI.ERROR} Need ELYSIUM role`);
     return { ok: false, msg: "No role" };
@@ -908,7 +958,8 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     return { ok: false, msg: "No pts" };
   }
 
-  const isSelf = currentItem.curWin && currentItem.curWin.toLowerCase() === u.toLowerCase();
+  const isSelf =
+    currentItem.curWin && currentItem.curWin.toLowerCase() === u.toLowerCase();
   const curLocked = st.lp[u] || 0;
   const needed = isSelf ? Math.max(0, bid - curLocked) : bid;
 
@@ -925,10 +976,16 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     .setDescription(`**${currentItem.item}**`)
     .addFields(
       { name: `${EMOJI.BID} Your Bid`, value: `${bid}pts`, inline: true },
-      { name: `${EMOJI.CHART} Current`, value: `${currentItem.curBid}pts`, inline: true },
+      {
+        name: `${EMOJI.CHART} Current`,
+        value: `${currentItem.curBid}pts`,
+        inline: true,
+      },
       { name: `${EMOJI.CHART} After`, value: `${av - needed}pts`, inline: true }
     )
-    .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 10s timeout` });
+    .setFooter({
+      text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 10s timeout`,
+    });
 
   if (isSelf) {
     confEmbed.addFields({
@@ -963,8 +1020,9 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   const countdownInterval = setInterval(async () => {
     countdown--;
     if (countdown > 0 && countdown <= 10 && st.pc[conf.id]) {
-      const updatedEmbed = EmbedBuilder.from(confEmbed)
-        .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • ${countdown}s remaining` });
+      const updatedEmbed = EmbedBuilder.from(confEmbed).setFooter({
+        text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • ${countdown}s remaining`,
+      });
       await conf.edit({ embeds: [updatedEmbed] }).catch(() => {});
     }
   }, 1000);
@@ -989,10 +1047,16 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 // BIDDING (OPTIMIZED)
 async function procBid(msg, amt, cfg) {
   // CRITICAL FIX: Check if auctioneering is active first
-  if (auctioneering && typeof auctioneering.getAuctionState === 'function') {
+  if (auctioneering && typeof auctioneering.getAuctionState === "function") {
     const auctState = auctioneering.getAuctionState();
     if (auctState && auctState.active && auctState.currentItem) {
-      return await procBidAuctioneering(msg, amt, auctState, auctioneering, cfg);
+      return await procBidAuctioneering(
+        msg,
+        amt,
+        auctState,
+        auctioneering,
+        cfg
+      );
     }
   }
 
@@ -1057,22 +1121,26 @@ async function procBid(msg, amt, cfg) {
   const confEmbed = new EmbedBuilder()
     .setColor(COLORS.AUCTION)
     .setTitle(`${EMOJI.CLOCK} Confirm Bid`)
-    .setDescription(`**${a.item}**${a.quantity > 1 ? ` (${a.quantity} available)` : ''}`)
+    .setDescription(
+      `**${a.item}**${a.quantity > 1 ? ` (${a.quantity} available)` : ""}`
+    )
     .addFields(
       { name: `${EMOJI.BID} Your Bid`, value: `${bid}pts`, inline: true },
       { name: `${EMOJI.CHART} Current`, value: `${a.curBid}pts`, inline: true },
-      { name: '💳 After', value: `${av - needed}pts`, inline: true }
+      { name: "💳 After", value: `${av - needed}pts`, inline: true }
     );
 
   if (isSelf) {
     confEmbed.addFields({
-      name: '🔄 Self-Overbid',
+      name: "🔄 Self-Overbid",
       value: `Current: ${a.curBid}pts → New: ${bid}pts\n**+${needed}pts needed**`,
       inline: false,
     });
   }
 
-  confEmbed.setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 10s timeout` });
+  confEmbed.setFooter({
+    text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 10s timeout`,
+  });
 
   const conf = await msg.reply({ embeds: [confEmbed] });
   await conf.react(EMOJI.SUCCESS);
@@ -1097,8 +1165,9 @@ async function procBid(msg, amt, cfg) {
   const countdownInterval = setInterval(async () => {
     countdown--;
     if (countdown > 0 && countdown <= 10 && st.pc[conf.id]) {
-      const updatedEmbed = EmbedBuilder.from(confEmbed)
-        .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • ${countdown}s remaining` });
+      const updatedEmbed = EmbedBuilder.from(confEmbed).setFooter({
+        text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • ${countdown}s remaining`,
+      });
       await conf.edit({ embeds: [updatedEmbed] }).catch(() => {});
     }
   }, 1000);
@@ -1141,38 +1210,48 @@ async function procBid(msg, amt, cfg) {
 async function handleCmd(cmd, msg, args, cli, cfg) {
   // Handle command aliases
   const actualCmd = COMMAND_ALIASES[cmd] || cmd;
-  
+
   switch (actualCmd) {
     case "!auction":
       if (args.length < 3)
         return await msg.reply(
           `${EMOJI.ERROR} Usage: \`!auction <item> <price> <duration> [quantity]\`\n\nExample: \`!auction Dragon Sword 500 30 3\` (for 3 items)`
         );
-      
+
       // Check if last arg is quantity (for batch auctions)
       let qty = 1;
       let lastArg = parseInt(args[args.length - 1]);
       let secondLastArg = parseInt(args[args.length - 2]);
-      
+
       // If last two args are both numbers, second-to-last is duration, last is quantity
       if (!isNaN(lastArg) && !isNaN(secondLastArg) && args.length >= 4) {
         qty = lastArg;
         const dur = secondLastArg;
         const pr = parseInt(args[args.length - 3]);
         const itm = args.slice(0, -3).join(" ");
-        
-        if (isNaN(pr) || pr <= 0 || isNaN(dur) || dur <= 0 || !itm.trim() || isNaN(qty) || qty <= 0) {
+
+        if (
+          isNaN(pr) ||
+          pr <= 0 ||
+          isNaN(dur) ||
+          dur <= 0 ||
+          !itm.trim() ||
+          isNaN(qty) ||
+          qty <= 0
+        ) {
           return await msg.reply(`${EMOJI.ERROR} Invalid params`);
         }
-        
+
         if (qty > 10) {
-          return await msg.reply(`${EMOJI.ERROR} Max quantity is 10 items per auction`);
+          return await msg.reply(
+            `${EMOJI.ERROR} Max quantity is 10 items per auction`
+          );
         }
-        
+
         if (st.q.find((a) => a.item.toLowerCase() === itm.toLowerCase())) {
           return await msg.reply(`${EMOJI.ERROR} **${itm}** already queued`);
         }
-        
+
         addQ(itm, pr, dur, qty);
         await msg.reply({
           embeds: [
@@ -1181,10 +1260,26 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
               .setTitle(`${EMOJI.SUCCESS} Queued (Batch Auction)`)
               .setDescription(`**${itm}** x${qty}`)
               .addFields(
-                { name: `${EMOJI.BID} Starting Price`, value: `${pr}pts`, inline: true },
-                { name: `${EMOJI.TIME} Duration`, value: fmtDur(dur), inline: true },
-                { name: `${EMOJI.LIST} Position`, value: `#${st.q.length}`, inline: true },
-                { name: `${EMOJI.FIRE} Batch Auction`, value: `Top ${qty} bidders will win!`, inline: false }
+                {
+                  name: `${EMOJI.BID} Starting Price`,
+                  value: `${pr}pts`,
+                  inline: true,
+                },
+                {
+                  name: `${EMOJI.TIME} Duration`,
+                  value: fmtDur(dur),
+                  inline: true,
+                },
+                {
+                  name: `${EMOJI.LIST} Position`,
+                  value: `#${st.q.length}`,
+                  inline: true,
+                },
+                {
+                  name: `${EMOJI.FIRE} Batch Auction`,
+                  value: `Top ${qty} bidders will win!`,
+                  inline: false,
+                }
               )
               .setFooter({ text: "!startauction to begin" })
               .setTimestamp(),
@@ -1195,15 +1290,15 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         const dur = parseInt(args[args.length - 1]),
           pr = parseInt(args[args.length - 2]),
           itm = args.slice(0, -2).join(" ");
-        
+
         if (isNaN(pr) || pr <= 0 || isNaN(dur) || dur <= 0 || !itm.trim()) {
           return await msg.reply(`${EMOJI.ERROR} Invalid params`);
         }
-        
+
         if (st.q.find((a) => a.item.toLowerCase() === itm.toLowerCase())) {
           return await msg.reply(`${EMOJI.ERROR} **${itm}** already queued`);
         }
-        
+
         addQ(itm, pr, dur, 1);
         await msg.reply({
           embeds: [
@@ -1213,8 +1308,16 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
               .setDescription(`**${itm}**`)
               .addFields(
                 { name: `${EMOJI.BID} Price`, value: `${pr}pts`, inline: true },
-                { name: `${EMOJI.TIME} Duration`, value: fmtDur(dur), inline: true },
-                { name: `${EMOJI.LIST} Position`, value: `#${st.q.length}`, inline: true }
+                {
+                  name: `${EMOJI.TIME} Duration`,
+                  value: fmtDur(dur),
+                  inline: true,
+                },
+                {
+                  name: `${EMOJI.LIST} Position`,
+                  value: `#${st.q.length}`,
+                  inline: true,
+                }
               )
               .setFooter({ text: "!startauction to begin" })
               .setTimestamp(),
@@ -1234,9 +1337,9 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
               st.q
                 .map(
                   (a, i) =>
-                    `**${i + 1}.** ${a.item}${a.quantity > 1 ? ` x${a.quantity}` : ''} - ${a.startPrice}pts • ${fmtDur(
-                      a.duration
-                    )}`
+                    `**${i + 1}.** ${a.item}${
+                      a.quantity > 1 ? ` x${a.quantity}` : ""
+                    } - ${a.startPrice}pts • ${fmtDur(a.duration)}`
                 )
                 .join("\n")
             )
@@ -1260,7 +1363,9 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           new EmbedBuilder()
             .setColor(getColor(COLORS.WARNING))
             .setTitle(`${EMOJI.SUCCESS} Removed`)
-            .setDescription(`**${rm.item}**${rm.quantity > 1 ? ` x${rm.quantity}` : ''}`)
+            .setDescription(
+              `**${rm.item}**${rm.quantity > 1 ? ` x${rm.quantity}` : ""}`
+            )
             .addFields({
               name: `${EMOJI.LIST} Left`,
               value: `${st.q.length}`,
@@ -1271,17 +1376,23 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       break;
 
     case "!startauction":
-      if (st.q.length === 0) return await msg.reply(`${EMOJI.ERROR} Empty queue`);
+      if (st.q.length === 0)
+        return await msg.reply(`${EMOJI.ERROR} Empty queue`);
       if (st.a) return await msg.reply(`${EMOJI.ERROR} Already active`);
-      
+
       const prev = st.q
         .slice(0, 10)
-        .map((a, i) => `${i + 1}. **${a.item}**${a.quantity > 1 ? ` x${a.quantity}` : ''} - ${a.startPrice}pts`)
+        .map(
+          (a, i) =>
+            `${i + 1}. **${a.item}**${
+              a.quantity > 1 ? ` x${a.quantity}` : ""
+            } - ${a.startPrice}pts`
+        )
         .join("\n");
-      
+
       const cMsg = await msg.reply({
         embeds: [
-new EmbedBuilder()
+          new EmbedBuilder()
             .setColor(COLORS.AUCTION)
             .setTitle(`${EMOJI.WARNING} Start?`)
             .setDescription(
@@ -1289,13 +1400,15 @@ new EmbedBuilder()
                 st.q.length > 10 ? `\n*...+${st.q.length - 10} more*` : ""
               }`
             )
-            .setFooter({ text: `${EMOJI.SUCCESS} start / ${EMOJI.ERROR} cancel • 30s timeout` }),
+            .setFooter({
+              text: `${EMOJI.SUCCESS} start / ${EMOJI.ERROR} cancel • 30s timeout`,
+            }),
         ],
       });
-      
+
       await cMsg.react(EMOJI.SUCCESS);
       await cMsg.react(EMOJI.ERROR);
-      
+
       // Countdown timer for confirmation
       let confirmCountdown = 30;
       const confirmInterval = setInterval(async () => {
@@ -1309,25 +1422,30 @@ new EmbedBuilder()
                 st.q.length > 10 ? `\n*...+${st.q.length - 10} more*` : ""
               }`
             )
-            .setFooter({ text: `${EMOJI.SUCCESS} start / ${EMOJI.ERROR} cancel • ${confirmCountdown}s remaining` });
+            .setFooter({
+              text: `${EMOJI.SUCCESS} start / ${EMOJI.ERROR} cancel • ${confirmCountdown}s remaining`,
+            });
           await cMsg.edit({ embeds: [updatedEmbed] }).catch(() => {});
         }
       }, 5000);
-      
+
       try {
         const col = await cMsg.awaitReactions({
           filter: (r, u) =>
-            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) && u.id === msg.author.id,
+            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
+            u.id === msg.author.id,
           max: 1,
           time: 30000,
           errors: ["time"],
         });
-        
+
         clearInterval(confirmInterval);
-        
+
         if (col.first().emoji.name === EMOJI.SUCCESS) {
           await cMsg.reactions.removeAll().catch(() => {});
-          const load = await msg.channel.send(`${EMOJI.CLOCK} Loading cache...`);
+          const load = await msg.channel.send(
+            `${EMOJI.CLOCK} Loading cache...`
+          );
           const r = await startSess(cli, cfg);
           await load.delete().catch(() => {});
           if (r.ok) {
@@ -1339,13 +1457,11 @@ new EmbedBuilder()
                   .setDescription(
                     `**${r.tot} item(s)** • First: **${r.first}**`
                   )
-                  .addFields(
-                    {
-                      name: `${EMOJI.CHART} Cached`,
-                      value: `${r.cached} members`,
-                      inline: true,
-                    },
-                  )
+                  .addFields({
+                    name: `${EMOJI.CHART} Cached`,
+                    value: `${r.cached} members`,
+                    inline: true,
+                  })
                   .setFooter({ text: `${EMOJI.FIRE} Instant bidding!` })
                   .setTimestamp(),
               ],
@@ -1374,7 +1490,9 @@ new EmbedBuilder()
         .setTitle(`${EMOJI.CHART} Status`);
       if (st.cp) {
         const age = Math.floor((Date.now() - st.ct) / 60000);
-        const autoRefreshStatus = st.cacheRefreshTimer ? `${EMOJI.SUCCESS} Auto-refresh ON` : `${EMOJI.WARNING} Auto-refresh OFF`;
+        const autoRefreshStatus = st.cacheRefreshTimer
+          ? `${EMOJI.SUCCESS} Auto-refresh ON`
+          : `${EMOJI.WARNING} Auto-refresh OFF`;
         statEmbed.addFields({
           name: `${EMOJI.CHART} Cache`,
           value: `${EMOJI.SUCCESS} Loaded (${
@@ -1394,7 +1512,12 @@ new EmbedBuilder()
           value:
             st.q
               .slice(0, 5)
-              .map((a, i) => `${i + 1}. ${a.item}${a.quantity > 1 ? ` x${a.quantity}` : ''}`)
+              .map(
+                (a, i) =>
+                  `${i + 1}. ${a.item}${
+                    a.quantity > 1 ? ` x${a.quantity}` : ""
+                  }`
+              )
               .join("\n") +
             (st.q.length > 5 ? `\n*...+${st.q.length - 5} more*` : ""),
         });
@@ -1403,44 +1526,58 @@ new EmbedBuilder()
           ? `${EMOJI.PAUSE} PAUSED (${fmtTime(st.a.remainingTime)})`
           : fmtTime(st.a.endTime - Date.now());
         statEmbed.addFields(
-          { name: `${EMOJI.FIRE} Active`, value: `${st.a.item}${st.a.quantity > 1 ? ` x${st.a.quantity}` : ''}`, inline: true },
-          { name: `${EMOJI.BID} Bid`, value: `${st.a.curBid}pts`, inline: true },
+          {
+            name: `${EMOJI.FIRE} Active`,
+            value: `${st.a.item}${
+              st.a.quantity > 1 ? ` x${st.a.quantity}` : ""
+            }`,
+            inline: true,
+          },
+          {
+            name: `${EMOJI.BID} Bid`,
+            value: `${st.a.curBid}pts`,
+            inline: true,
+          },
           { name: `${EMOJI.TIME} Time`, value: tLeft, inline: true }
         );
       }
-      statEmbed
-        .setFooter({ text: "Use !auction to add" })
-        .setTimestamp();
+      statEmbed.setFooter({ text: "Use !auction to add" }).setTimestamp();
       await msg.reply({ embeds: [statEmbed] });
       break;
 
     case "!clearqueue":
       if (st.q.length === 0) return await msg.reply(`${EMOJI.LIST} Empty`);
-      if (st.a) return await msg.reply(`${EMOJI.ERROR} Can't clear during auction`);
-      
+      if (st.a)
+        return await msg.reply(`${EMOJI.ERROR} Can't clear during auction`);
+
       // Admin confirmation required
       const clearMsg = await msg.reply({
         embeds: [
           new EmbedBuilder()
             .setColor(getColor(COLORS.WARNING))
             .setTitle(`${EMOJI.WARNING} Clear Queue?`)
-            .setDescription(`This will remove **${st.q.length} item(s)** from the queue.`)
-            .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel` }),
+            .setDescription(
+              `This will remove **${st.q.length} item(s)** from the queue.`
+            )
+            .setFooter({
+              text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel`,
+            }),
         ],
       });
-      
+
       await clearMsg.react(EMOJI.SUCCESS);
       await clearMsg.react(EMOJI.ERROR);
-      
+
       try {
         const clearCol = await clearMsg.awaitReactions({
           filter: (r, u) =>
-            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) && u.id === msg.author.id,
+            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
+            u.id === msg.author.id,
           max: 1,
           time: 30000,
           errors: ["time"],
         });
-        
+
         if (clearCol.first().emoji.name === EMOJI.SUCCESS) {
           const cnt = clrQ();
           await clearMsg.reactions.removeAll().catch(() => {});
@@ -1462,13 +1599,15 @@ new EmbedBuilder()
             .setTitle(`${EMOJI.WARNING} RESET ALL?`)
             .setDescription(
               `Clears:\n` +
-              `• Queue (${st.q.length} items)\n` +
-              `• Active auction\n` +
-              `• Locked points (${Object.keys(st.lp).length} members)\n` +
-              `• History (${st.h.length} records)\n` +
-              `• Cache`
+                `• Queue (${st.q.length} items)\n` +
+                `• Active auction\n` +
+                `• Locked points (${Object.keys(st.lp).length} members)\n` +
+                `• History (${st.h.length} records)\n` +
+                `• Cache`
             )
-            .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel` }),
+            .setFooter({
+              text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel`,
+            }),
         ],
       });
       await rstMsg.react(EMOJI.SUCCESS);
@@ -1476,7 +1615,8 @@ new EmbedBuilder()
       try {
         const col = await rstMsg.awaitReactions({
           filter: (r, u) =>
-            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) && u.id === msg.author.id,
+            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
+            u.id === msg.author.id,
           max: 1,
           time: 30000,
           errors: ["time"],
@@ -1511,7 +1651,8 @@ new EmbedBuilder()
       break;
 
     case "!forcesubmitresults":
-      if (!st.sd || st.h.length === 0) return await msg.reply(`${EMOJI.ERROR} No history`);
+      if (!st.sd || st.h.length === 0)
+        return await msg.reply(`${EMOJI.ERROR} No history`);
       const fsMsg = await msg.reply({
         embeds: [
           new EmbedBuilder()
@@ -1525,7 +1666,9 @@ new EmbedBuilder()
                 .join("\n"),
               inline: false,
             })
-            .setFooter({ text: `${EMOJI.SUCCESS} submit / ${EMOJI.ERROR} cancel` }),
+            .setFooter({
+              text: `${EMOJI.SUCCESS} submit / ${EMOJI.ERROR} cancel`,
+            }),
         ],
       });
       await fsMsg.react(EMOJI.SUCCESS);
@@ -1533,7 +1676,8 @@ new EmbedBuilder()
       try {
         const fsCol = await fsMsg.awaitReactions({
           filter: (r, u) =>
-            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) && u.id === msg.author.id,
+            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
+            u.id === msg.author.id,
           max: 1,
           time: 30000,
           errors: ["time"],
@@ -1556,11 +1700,7 @@ new EmbedBuilder()
               totalSpent: winners[normalizedMember] || 0,
             };
           });
-          const sub = await submitRes(
-            cfg.sheet_webhook_url,
-            res,
-            st.sd
-          );
+          const sub = await submitRes(cfg.sheet_webhook_url, res, st.sd);
           if (sub.ok) {
             const wList = st.h
               .map((a) => `• **${a.item}**: ${a.winner} - ${a.amount}pts`)
@@ -1573,7 +1713,11 @@ new EmbedBuilder()
                   .setDescription("Submitted")
                   .addFields(
                     { name: `${EMOJI.CLOCK} Time`, value: st.sd, inline: true },
-                    { name: `${EMOJI.TROPHY} Items`, value: `${st.h.length}`, inline: true },
+                    {
+                      name: `${EMOJI.TROPHY} Items`,
+                      value: `${st.h.length}`,
+                      inline: true,
+                    },
                     {
                       name: `${EMOJI.BID} Total`,
                       value: `${res.reduce((s, r) => s + r.totalSpent, 0)}`,
@@ -1581,12 +1725,12 @@ new EmbedBuilder()
                     },
                     { name: `${EMOJI.LIST} Winners`, value: wList },
                     {
-                      name: '👥 Updated',
+                      name: "👥 Updated",
                       value: `${res.length} (0 auto-populated)`,
                       inline: false,
                     }
                   )
-.setFooter({ text: "Deducted after session" })
+                  .setFooter({ text: "Deducted after session" })
                   .setTimestamp(),
               ],
             });
@@ -1629,7 +1773,11 @@ new EmbedBuilder()
           new EmbedBuilder()
             .setColor(getColor(COLORS.WARNING))
             .setTitle(`${EMOJI.WARNING} Cancel Item?`)
-            .setDescription(`**${st.a.item}**${st.a.quantity > 1 ? ` x${st.a.quantity}` : ''}\n\nRefund all locked points?`)
+            .setDescription(
+              `**${st.a.item}**${
+                st.a.quantity > 1 ? ` x${st.a.quantity}` : ""
+              }\n\nRefund all locked points?`
+            )
             .setFooter({ text: `${EMOJI.SUCCESS} yes / ${EMOJI.ERROR} no` }),
         ],
       });
@@ -1638,7 +1786,8 @@ new EmbedBuilder()
       try {
         const canCol = await canMsg.awaitReactions({
           filter: (r, u) =>
-            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) && u.id === msg.author.id,
+            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
+            u.id === msg.author.id,
           max: 1,
           time: 30000,
           errors: ["time"],
@@ -1674,7 +1823,9 @@ new EmbedBuilder()
             .setColor(getColor(COLORS.WARNING))
             .setTitle(`${EMOJI.WARNING} Skip Item?`)
             .setDescription(
-              `**${st.a.item}**${st.a.quantity > 1 ? ` x${st.a.quantity}` : ''}\n\nMark as no sale, move to next?`
+              `**${st.a.item}**${
+                st.a.quantity > 1 ? ` x${st.a.quantity}` : ""
+              }\n\nMark as no sale, move to next?`
             )
             .setFooter({ text: `${EMOJI.SUCCESS} yes / ${EMOJI.ERROR} no` }),
         ],
@@ -1684,7 +1835,8 @@ new EmbedBuilder()
       try {
         const skpCol = await skpMsg.awaitReactions({
           filter: (r, u) =>
-            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) && u.id === msg.author.id,
+            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
+            u.id === msg.author.id,
           max: 1,
           time: 30000,
           errors: ["time"],
@@ -1728,7 +1880,9 @@ new EmbedBuilder()
       // Fetch fresh from sheets
       const freshPts = await fetchPts(cfg.sheet_webhook_url);
       if (!freshPts) {
-        return await msg.reply(`${EMOJI.ERROR} Failed to fetch points from sheets.`);
+        return await msg.reply(
+          `${EMOJI.ERROR} Failed to fetch points from sheets.`
+        );
       }
 
       let userPts = freshPts[u];
@@ -1765,16 +1919,24 @@ new EmbedBuilder()
                 value: `${userPts} pts`,
                 inline: true,
               })
-.setFooter({ text: "Auto-deletes in 30s" })
+              .setFooter({ text: "Auto-deletes in 30s" })
               .setTimestamp(),
           ],
         });
       }
 
-      // Delete after 30s
+      // DELETE USER MESSAGE IMMEDIATELY + DELETE REPLY AFTER 30s
+      try {
+        await msg.delete().catch(() => {});
+      } catch (e) {
+        console.warn(
+          `${EMOJI.WARNING} Could not delete user message: ${e.message}`
+        );
+      }
+
+      // Delete reply embed after 30s
       setTimeout(async () => {
         await ptsMsg.delete().catch(() => {});
-        await msg.delete().catch(() => {});
       }, 30000);
       break;
   }
@@ -1818,7 +1980,7 @@ module.exports = {
       const auctState = p.auctStateRef || auctioneering.getAuctionState();
       const auctRef = p.auctRef || auctioneering;
       const a = auctState.currentItem;
-      
+
       if (!auctState.active || !a) {
         await reaction.message.channel.send(
           `${EMOJI.ERROR} <@${user.id}> Auction no longer active`
@@ -1845,7 +2007,7 @@ module.exports = {
       if (a.curWin) {
         const prevWinner = a.curWin;
         const prevAmount = a.curBid;
-        
+
         // Only unlock if NOT self-overbid
         if (!p.isSelf) {
           unlock(prevWinner, prevAmount);
@@ -1855,7 +2017,9 @@ module.exports = {
               new EmbedBuilder()
                 .setColor(COLORS.WARNING)
                 .setTitle(`${EMOJI.WARNING} Outbid!`)
-                .setDescription(`Someone bid **${p.amount}pts** on **${a.item}**`),
+                .setDescription(
+                  `Someone bid **${p.amount}pts** on **${a.item}**`
+                ),
             ],
           });
         }
@@ -1864,17 +2028,20 @@ module.exports = {
       lock(p.username, p.needed);
 
       const prevBid = a.curBid;
-      const updatedBids = [...a.bids, {
-        user: p.username,
-        userId: p.userId,
-        amount: p.amount,
-        timestamp: Date.now(),
-      }];
+      const updatedBids = [
+        ...a.bids,
+        {
+          user: p.username,
+          userId: p.userId,
+          amount: p.amount,
+          timestamp: Date.now(),
+        },
+      ];
 
       const timeLeft = a.endTime - Date.now();
       let newEndTime = a.endTime;
       let newExtCnt = a.extCnt;
-      
+
       if (timeLeft < 60000 && a.extCnt < 15) {
         newEndTime = a.endTime + 60000;
         newExtCnt = a.extCnt + 1;
@@ -1904,9 +2071,21 @@ module.exports = {
             .setTitle(`${EMOJI.SUCCESS} Bid Confirmed!`)
             .setDescription(`Highest bidder on **${a.item}**`)
             .addFields(
-              { name: `${EMOJI.BID} Your Bid`, value: `${p.amount}pts`, inline: true },
-              { name: `${EMOJI.CHART} Previous`, value: `${prevBid}pts`, inline: true },
-              { name: `${EMOJI.TIME} Time Left`, value: fmtTime(timeLeft), inline: true }
+              {
+                name: `${EMOJI.BID} Your Bid`,
+                value: `${p.amount}pts`,
+                inline: true,
+              },
+              {
+                name: `${EMOJI.CHART} Previous`,
+                value: `${prevBid}pts`,
+                inline: true,
+              },
+              {
+                name: `${EMOJI.TIME} Time Left`,
+                value: fmtTime(timeLeft),
+                inline: true,
+              }
             )
             .setFooter({
               text: p.isSelf
@@ -1925,7 +2104,11 @@ module.exports = {
             .setColor(COLORS.AUCTION)
             .setTitle(`${EMOJI.FIRE} New High Bid!`)
             .addFields(
-              { name: `${EMOJI.BID} Amount`, value: `${p.amount}pts`, inline: true },
+              {
+                name: `${EMOJI.BID} Amount`,
+                value: `${p.amount}pts`,
+                inline: true,
+              },
               { name: 'ðŸ¤" Bidder', value: p.username, inline: true }
             ),
         ],
@@ -2046,9 +2229,21 @@ module.exports = {
           .setTitle(`${EMOJI.SUCCESS} Bid Confirmed!`)
           .setDescription(`Highest bidder on **${a.item}**`)
           .addFields(
-            { name: `${EMOJI.BID} Your Bid`, value: `${p.amount}pts`, inline: true },
-            { name: `${EMOJI.CHART} Previous`, value: `${prevBid}pts`, inline: true },
-            { name: `${EMOJI.TIME} Time Left`, value: fmtTime(timeLeft), inline: true }
+            {
+              name: `${EMOJI.BID} Your Bid`,
+              value: `${p.amount}pts`,
+              inline: true,
+            },
+            {
+              name: `${EMOJI.CHART} Previous`,
+              value: `${prevBid}pts`,
+              inline: true,
+            },
+            {
+              name: `${EMOJI.TIME} Time Left`,
+              value: fmtTime(timeLeft),
+              inline: true,
+            }
           )
           .setFooter({
             text: p.isSelf
@@ -2067,8 +2262,12 @@ module.exports = {
           .setColor(getColor(COLORS.AUCTION))
           .setTitle(`${EMOJI.FIRE} New High Bid!`)
           .addFields(
-            { name: `${EMOJI.BID} Amount`, value: `${p.amount}pts`, inline: true },
-            { name: '👤 Bidder', value: p.username, inline: true }
+            {
+              name: `${EMOJI.BID} Amount`,
+              value: `${p.amount}pts`,
+              inline: true,
+            },
+            { name: "👤 Bidder", value: p.username, inline: true }
           ),
       ],
     });
@@ -2166,7 +2365,9 @@ module.exports = {
       if (st.cp) {
         const age = Math.floor((Date.now() - st.ct) / 60000);
         console.log(
-          `${EMOJI.CHART} Cache: ${Object.keys(st.cp).length} members (${age}m old)`
+          `${EMOJI.CHART} Cache: ${
+            Object.keys(st.cp).length
+          } members (${age}m old)`
         );
         if (age > 60) {
           console.log(`${EMOJI.WARNING} Cache old, clearing...`);
@@ -2177,7 +2378,8 @@ module.exports = {
       if (st.a && st.a.status === "active") {
         console.log(`${EMOJI.FIRE} Rescheduling timers...`);
         schedTimers(client, config);
-        if (!st.cp) console.warn(`${EMOJI.WARNING} Active auction but no cache!`);
+        if (!st.cp)
+          console.warn(`${EMOJI.WARNING} Active auction but no cache!`);
       }
       return true;
     }

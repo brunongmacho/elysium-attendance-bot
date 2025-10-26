@@ -7,18 +7,18 @@ const { EmbedBuilder } = require("discord.js");
 
 // Add EMOJI constant
 const EMOJI = {
-  SUCCESS: '✅',
-  ERROR: '❌',
-  WARNING: '⚠️',
-  INFO: 'ℹ️',
-  FIRE: '🔥',
-  LOCK: '🔒',
-  CHART: '📊',
-  BID: '💰',
-  TIME: '⏱️',
-  LIST: '📋',
-  CLOCK: '🕐',
-  TROPHY: '🏆',
+  SUCCESS: "✅",
+  ERROR: "❌",
+  WARNING: "⚠️",
+  INFO: "ℹ️",
+  FIRE: "🔥",
+  LOCK: "🔒",
+  CHART: "📊",
+  BID: "💰",
+  TIME: "⏱️",
+  LIST: "📋",
+  CLOCK: "🕐",
+  TROPHY: "🏆",
 };
 
 // Module-level variables (initialized later)
@@ -212,7 +212,7 @@ const COMMAND_HELP = {
       "Shows:\n• Cache status and age\n• Auto-refresh status\n• Queue items (first 5)\n• Active auction item\n• Current bid and winner\n• Time remaining\n•\n**Aliases:** !bstatus, !bs",
   },
 
-mypoints: {
+  mypoints: {
     usage: "!mypoints (or !pts, !mypts, !mp)",
     description: "Check your available bidding points",
     category: "Bidding",
@@ -255,7 +255,8 @@ mypoints: {
 
   forcesubmitresults: {
     usage: "!forcesubmitresults",
-    description: "Manually submit auction results to Sheets (requires confirmation)",
+    description:
+      "Manually submit auction results to Sheets (requires confirmation)",
     category: "Bidding",
     adminOnly: true,
     example: "!forcesubmitresults",
@@ -273,7 +274,7 @@ mypoints: {
       "Full diagnostic:\n• Tests webhook connection\n• Fetches sample points\n• Checks channel access\n• Verifies cache system\n• Shows configuration\n• Troubleshooting guide",
   },
 
-startauction: {
+  startauction: {
     usage: "!startauction (or !start, !auc-start, !begin-auction)",
     description: "Start auctioneering session with Google Sheet + queue items",
     category: "Bidding",

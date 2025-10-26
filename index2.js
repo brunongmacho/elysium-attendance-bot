@@ -21,58 +21,57 @@ const auctioneering = require("./auctioneering.js");
 
 const COMMAND_ALIASES = {
   // Help commands
-  '!?': '!help',
-  '!commands': '!help',
-  '!cmds': '!help',
-  
-  // Attendance commands (admin)
-  '!st': '!status',
-  '!addth': '!addthread',
-  '!v': '!verify',
-  '!vall': '!verifyall',
-  '!resetpend': '!resetpending',
-  '!fs': '!forcesubmit',
-  '!fc': '!forceclose',
-  '!debug': '!debugthread',
-  '!closeall': '!closeallthread',
-  '!clear': '!clearstate',
-  
-  // Bidding commands (admin)
-  '!auc': '!auction',
-  '!ql': '!queuelist',
-  '!queue': '!queuelist',
-  '!rm': '!removeitem',
-  '!start': '!startauction',
-  '!clearq': '!clearqueue',
-  '!resetb': '!resetbids',
-  '!forcesubmit': '!forcesubmitresults',
-  '!testbid': '!testbidding',
-  
-  // Bidding commands (member)
-  '!b': '!bid',
-  '!bstatus': '!bidstatus',
-  '!bs': '!bidstatus',
-  '!pts': '!mypoints',
-  '!mypts': '!mypoints',
- '!mp': '!mypoints',
-  
-  // Auctioneering commands
-  '!auc-start': '!startauction',
-  '!begin-auction': '!startauction',
-  '!auc-pause': '!pause',
-  '!hold': '!pause',
-  '!auc-resume': '!resume',
-  '!continue': '!resume',
-  '!auc-stop': '!stop',
-  '!end-item': '!stop',
-  '!auc-extend': '!extend',
-  '!ext': '!extend',
-  '!auc-now': '!startauctionnow',
+  "!?": "!help",
+  "!commands": "!help",
+  "!cmds": "!help",
 
-   
+  // Attendance commands (admin)
+  "!st": "!status",
+  "!addth": "!addthread",
+  "!v": "!verify",
+  "!vall": "!verifyall",
+  "!resetpend": "!resetpending",
+  "!fs": "!forcesubmit",
+  "!fc": "!forceclose",
+  "!debug": "!debugthread",
+  "!closeall": "!closeallthread",
+  "!clear": "!clearstate",
+
+  // Bidding commands (admin)
+  "!auc": "!auction",
+  "!ql": "!queuelist",
+  "!queue": "!queuelist",
+  "!rm": "!removeitem",
+  "!start": "!startauction",
+  "!clearq": "!clearqueue",
+  "!resetb": "!resetbids",
+  "!forcesubmit": "!forcesubmitresults",
+  "!testbid": "!testbidding",
+
+  // Bidding commands (member)
+  "!b": "!bid",
+  "!bstatus": "!bidstatus",
+  "!bs": "!bidstatus",
+  "!pts": "!mypoints",
+  "!mypts": "!mypoints",
+  "!mp": "!mypoints",
+
+  // Auctioneering commands
+  "!auc-start": "!startauction",
+  "!begin-auction": "!startauction",
+  "!auc-pause": "!pause",
+  "!hold": "!pause",
+  "!auc-resume": "!resume",
+  "!continue": "!resume",
+  "!auc-stop": "!stop",
+  "!end-item": "!stop",
+  "!auc-extend": "!extend",
+  "!ext": "!extend",
+  "!auc-now": "!startauctionnow",
+
   // Auction control commands
-  '!cancel': '!cancelitem',
-  '!skip': '!skipitem',
+  "!cancel": "!cancelitem",
+  "!skip": "!skipitem",
 };
 
 // Load configuration
@@ -119,8 +118,10 @@ let lastSheetCall = 0;
 let lastOverrideTime = 0;
 let lastAuctionEndTime = 0;
 let isRecovering = false;
-let isBidProcessing = false;  // ← ADD THIS
+let isBidProcessing = false;
+let biddingChannelCleanupTimer = null; // ← ADD THIS
 const AUCTION_COOLDOWN = 10 * 60 * 1000; // 10 minutes
+const BIDDING_CHANNEL_CLEANUP_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours
 
 // ==========================================
 // HTTP HEALTH CHECK SERVER
@@ -156,18 +157,20 @@ server.listen(PORT, () =>
 
 async function recoverBotStateOnStartup(client, config) {
   console.log(`🔄 Checking for crashed state...`);
-  
-  const savedState = await bidding.loadBiddingStateFromSheet(config.sheet_webhook_url);
+
+  const savedState = await bidding.loadBiddingStateFromSheet(
+    config.sheet_webhook_url
+  );
   if (!savedState || !savedState.activeAuction) {
     console.log(`✅ No crashed state found, starting fresh`);
     return;
   }
 
   console.log(`⚠️ Found crashed auction state, recovering...`);
-  
+
   const adminLogs = await client.guilds
     .fetch(config.main_guild_id)
-    .then(g => g.channels.fetch(config.admin_logs_channel_id))
+    .then((g) => g.channels.fetch(config.admin_logs_channel_id))
     .catch(() => null);
 
   if (adminLogs) {
@@ -192,14 +195,16 @@ async function recoverBotStateOnStartup(client, config) {
       winner: auctState.curWin,
       winnerId: auctState.curWinId,
       amount: auctState.curBid,
-      source: auctState.source || 'Recovered',
+      source: auctState.source || "Recovered",
       timestamp: new Date().toISOString(),
     });
 
     // If there are unfinished queue items, move them to BiddingItems sheet
     const unfinishedQueue = savedState.queue || [];
     if (unfinishedQueue.length > 0) {
-      console.log(`📋 Moving ${unfinishedQueue.length} unfinished queue items to BiddingItems sheet`);
+      console.log(
+        `📋 Moving ${unfinishedQueue.length} unfinished queue items to BiddingItems sheet`
+      );
       await moveQueueItemsToSheet(config, unfinishedQueue);
     }
 
@@ -213,7 +218,9 @@ async function recoverBotStateOnStartup(client, config) {
           new EmbedBuilder()
             .setColor(0x00ff00)
             .setTitle(`✅ Recovery Complete`)
-            .setDescription(`Finished item: **${auctState.item}**\nWinner: ${auctState.curWin}\nBid: ${auctState.curBid}pts`)
+            .setDescription(
+              `Finished item: **${auctState.item}**\nWinner: ${auctState.curWin}\nBid: ${auctState.curBid}pts`
+            )
             .addFields({
               name: `📋 Unfinished Items`,
               value: `${unfinishedQueue.length} item(s) moved to BiddingItems sheet`,
@@ -256,18 +263,20 @@ function resolveCommandAlias(cmd) {
 
 function getCurrentTimestamp() {
   const date = new Date();
-  const manilaDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
-  
-  const month = String(manilaDate.getMonth() + 1).padStart(2, '0');
-  const day = String(manilaDate.getDate()).padStart(2, '0');
+  const manilaDate = new Date(
+    date.toLocaleString("en-US", { timeZone: "Asia/Manila" })
+  );
+
+  const month = String(manilaDate.getMonth() + 1).padStart(2, "0");
+  const day = String(manilaDate.getDate()).padStart(2, "0");
   const year = String(manilaDate.getFullYear()).slice(-2);
-  
-  const hours = String(manilaDate.getHours()).padStart(2, '0');
-  const minutes = String(manilaDate.getMinutes()).padStart(2, '0');
-  
+
+  const hours = String(manilaDate.getHours()).padStart(2, "0");
+  const minutes = String(manilaDate.getMinutes()).padStart(2, "0");
+
   const dateStr = `${month}/${day}/${year}`;
   const timeStr = `${hours}:${minutes}`;
-  
+
   return { date: dateStr, time: timeStr, full: `${dateStr} ${timeStr}` };
 }
 
@@ -377,6 +386,135 @@ function parseThreadName(name) {
     timestamp: `${match[1]} ${match[2]}`,
     boss: match[3],
   };
+}
+
+// ==========================================
+// BIDDING CHANNEL CLEANUP
+// ==========================================
+
+async function cleanupBiddingChannel() {
+  try {
+    console.log(`🧹 Starting bidding channel cleanup...`);
+
+    const guild = await client.guilds
+      .fetch(config.main_guild_id)
+      .catch(() => null);
+    if (!guild) {
+      console.error(`❌ Could not fetch guild for cleanup`);
+      return;
+    }
+
+    const biddingChannel = await guild.channels
+      .fetch(config.bidding_channel_id)
+      .catch(() => null);
+    if (!biddingChannel) {
+      console.error(`❌ Could not fetch bidding channel for cleanup`);
+      return;
+    }
+
+    console.log(`📊 Fetching bidding channel history...`);
+    let messagesDeleted = 0;
+    let messagesFetched = 0;
+    let batchSize = 0;
+
+    // Fetch messages in batches
+    let lastMessageId = null;
+    let shouldContinue = true;
+
+    while (shouldContinue) {
+      try {
+        const options = { limit: 100 };
+        if (lastMessageId) {
+          options.before = lastMessageId;
+        }
+
+        const messages = await biddingChannel.messages
+          .fetch(options)
+          .catch(() => null);
+        if (!messages || messages.size === 0) {
+          console.log(`📊 Reached end of message history`);
+          shouldContinue = false;
+          break;
+        }
+
+        messagesFetched += messages.size;
+        batchSize++;
+
+        for (const [msgId, message] of messages) {
+          // SKIP: Bot messages
+          if (message.author.bot) {
+            continue;
+          }
+
+          // SKIP: Admin messages
+          if (message.guild) {
+            const msgAuthor = await message.guild.members
+              .fetch(message.author.id)
+              .catch(() => null);
+            if (msgAuthor && isAdmin(msgAuthor)) {
+              continue;
+            }
+          }
+
+          // DELETE: Non-admin, non-bot messages
+          try {
+            await message.delete().catch(() => {});
+            messagesDeleted++;
+
+            // Rate limit: 1 delete per 500ms to avoid Discord API issues
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          } catch (e) {
+            console.warn(`⚠️ Could not delete message ${msgId}: ${e.message}`);
+          }
+        }
+
+        // Get the last message ID for pagination
+        if (messages.size > 0) {
+          const lastMsg = messages.last();
+          lastMessageId = lastMsg.id;
+        }
+
+        // Safety: Stop after fetching 50 batches (5000 messages)
+        if (batchSize >= 50) {
+          console.log(
+            `⚠️ Safety limit reached (50 batches, 5000 messages). Stopping cleanup.`
+          );
+          shouldContinue = false;
+        }
+      } catch (e) {
+        console.error(`❌ Error in cleanup batch ${batchSize}: ${e.message}`);
+        shouldContinue = false;
+      }
+    }
+
+    console.log(`✅ Bidding channel cleanup complete!`);
+    console.log(
+      `📊 Fetched: ${messagesFetched} messages | Deleted: ${messagesDeleted} non-admin messages`
+    );
+  } catch (e) {
+    console.error(`❌ Bidding channel cleanup error:`, e);
+  }
+}
+
+function startBiddingChannelCleanupSchedule() {
+  console.log(`⏰ Starting bidding channel cleanup schedule (every 12 hours)`);
+
+  // Run cleanup immediately on startup
+  cleanupBiddingChannel().catch(console.error);
+
+  // Then schedule every 12 hours
+  biddingChannelCleanupTimer = setInterval(async () => {
+    console.log(`⏰ Running scheduled bidding channel cleanup...`);
+    await cleanupBiddingChannel().catch(console.error);
+  }, BIDDING_CHANNEL_CLEANUP_INTERVAL);
+}
+
+function stopBiddingChannelCleanupSchedule() {
+  if (biddingChannelCleanupTimer) {
+    clearInterval(biddingChannelCleanupTimer);
+    biddingChannelCleanupTimer = null;
+    console.log(`⏹️ Bidding channel cleanup schedule stopped`);
+  }
 }
 
 async function postToSheet(payload) {
@@ -1225,7 +1363,11 @@ const commandHandlers = {
               `📊 Total: ${openSpawns.length}`
           )
           .addFields(
-            { name: "📋 Detailed Results", value: results.join("\n"), inline: false },
+            {
+              name: "📋 Detailed Results",
+              value: results.join("\n"),
+              inline: false,
+            },
             {
               name: "🧹 Cleanup Statistics",
               value: `✅ Reactions removed: ${totalReactionsRemoved}\n❌ Failed cleanups: ${totalReactionsFailed}`,
@@ -1460,9 +1602,7 @@ const commandHandlers = {
     const stateInfo = {
       queueLength: biddingState.q.length,
       hasActiveAuction: !!biddingState.a,
-      activeAuctionItem: biddingState.a
-        ? biddingState.a.item
-        : "None",
+      activeAuctionItem: biddingState.a ? biddingState.a.item : "None",
       lockedPointsCount: Object.keys(biddingState.lp).length,
     };
 
@@ -1560,7 +1700,9 @@ const commandHandlers = {
 
   startauction: async (message, member) => {
     if (isRecovering) {
-      return await message.reply(`⚠️ Bot is recovering from crash, please wait...`);
+      return await message.reply(
+        `⚠️ Bot is recovering from crash, please wait...`
+      );
     }
 
     const auctState = auctioneering.getAuctionState();
@@ -1574,7 +1716,9 @@ const commandHandlers = {
 
     if (timeSinceLast < AUCTION_COOLDOWN) {
       const mins = Math.ceil(cooldownRemaining / 60000);
-      return await message.reply(`⏱️ Cooldown active. Wait ${mins} more minute(s). Or use \`!startauctionnow\` to override.`);
+      return await message.reply(
+        `⏱️ Cooldown active. Wait ${mins} more minute(s). Or use \`!startauctionnow\` to override.`
+      );
     }
 
     await auctioneering.startAuctioneering(client, config, message.channel);
@@ -1583,7 +1727,9 @@ const commandHandlers = {
 
   startauctionnow: async (message, member) => {
     if (isRecovering) {
-      return await message.reply(`⚠️ Bot is recovering from crash, please wait...`);
+      return await message.reply(
+        `⚠️ Bot is recovering from crash, please wait...`
+      );
     }
 
     const auctState = auctioneering.getAuctionState();
@@ -1593,7 +1739,9 @@ const commandHandlers = {
 
     await auctioneering.startAuctioneering(client, config, message.channel);
     lastAuctionEndTime = Date.now();
-    await message.reply(`✅ Auction started immediately. Cooldown reset to 10 minutes.`);
+    await message.reply(
+      `✅ Auction started immediately. Cooldown reset to 10 minutes.`
+    );
   },
 
   pause: async (message, member) => {
@@ -1612,7 +1760,11 @@ const commandHandlers = {
     if (!auctState.active || !auctState.paused) {
       return await message.reply(`❌ No paused auction to resume`);
     }
-    const success = auctioneering.resumeSession(client, config, message.channel);
+    const success = auctioneering.resumeSession(
+      client,
+      config,
+      message.channel
+    );
     if (success) {
       await message.reply(`▶️ Auction resumed.`);
     }
@@ -1659,7 +1811,8 @@ const commandHandlers = {
     if (totalItems === 0) {
       return await message.reply(`📋 Queue is already empty`);
     }
-    await auctioneering.handleClearQueue(message, 
+    await auctioneering.handleClearQueue(
+      message,
       async (confirmMsg) => {
         // On confirm
         auctioneering.getAuctionState().itemQueue = [];
@@ -1704,20 +1857,25 @@ client.once(Events.ClientReady, async () => {
   console.log(`🟢 Main Guild: ${config.main_guild_id}`);
   console.log(`⏰ Timer Server: ${config.timer_server_id}`);
   console.log(`🤖 Version: ${BOT_VERSION}`);
-  console.log(`⚙️ Timing: Sheet delay=${TIMING.MIN_SHEET_DELAY}ms, Retry attempts=${TIMING.REACTION_RETRY_ATTEMPTS}`);
-  
+  console.log(
+    `⚙️ Timing: Sheet delay=${TIMING.MIN_SHEET_DELAY}ms, Retry attempts=${TIMING.REACTION_RETRY_ATTEMPTS}`
+  );
+
   // INITIALIZE ALL MODULES IN CORRECT ORDER
   helpSystem.initialize(config, isAdmin, BOT_VERSION);
   auctioneering.initialize(config, isAdmin, bidding);
   bidding.initializeBidding(config, isAdmin, auctioneering);
-  auctioneering.setPostToSheet(postToSheet);  // ← ADD THIS LINE
-  
+  auctioneering.setPostToSheet(postToSheet);
+
   isRecovering = true;
   await recoverBotStateOnStartup(client, config);
   isRecovering = false;
-  
+
   recoverStateFromThreads();
   bidding.recoverBiddingState(client, config);
+
+  // START BIDDING CHANNEL CLEANUP SCHEDULE
+  startBiddingChannelCleanupSchedule();
 });
 
 // ==========================================
@@ -1726,13 +1884,45 @@ client.once(Events.ClientReady, async () => {
 
 client.on(Events.MessageCreate, async (message) => {
   try {
+    // 🧹 BIDDING CHANNEL PROTECTION: Delete non-admin messages immediately
+    if (
+      message.guild &&
+      message.channel.id === config.bidding_channel_id &&
+      !message.author.bot
+    ) {
+      const member = await message.guild.members
+        .fetch(message.author.id)
+        .catch(() => null);
+
+      // If not an admin, delete message immediately
+      if (member && !isAdmin(member)) {
+        try {
+          await message.delete().catch(() => {});
+          console.log(
+            `🧹 Deleted non-admin message from ${message.author.username} in bidding channel`
+          );
+        } catch (e) {
+          console.warn(
+            `⚠️ Could not delete message from ${message.author.username}: ${e.message}`
+          );
+        }
+        return; // Stop processing
+      }
+    }
     // Debug for !bid detection
-    if (message.content.startsWith("!bid") || message.content.startsWith("!b")) {
+    if (
+      message.content.startsWith("!bid") ||
+      message.content.startsWith("!b")
+    ) {
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.log("🔔 BID COMMAND DETECTED");
-      console.log(`👤 Author: ${message.author.username} (${message.author.id})`);
+      console.log(
+        `👤 Author: ${message.author.username} (${message.author.id})`
+      );
       console.log(`📝 Content: ${message.content}`);
-      console.log(`📍 Channel: ${message.channel.name} (${message.channel.id})`);
+      console.log(
+        `📍 Channel: ${message.channel.name} (${message.channel.id})`
+      );
       console.log(`🤖 Is Bot: ${message.author.bot}`);
       console.log(`🏰 Guild: ${message.guild?.name}`);
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -1842,47 +2032,51 @@ client.on(Events.MessageCreate, async (message) => {
     const resolvedCmd = resolveCommandAlias(rawCmd);
 
     if (resolvedCmd === "!bid") {
-  // RACE CONDITION PROTECTION
-  if (isBidProcessing) {
-    console.log(`⚠️ Bid already processing, queueing this one...`);
-    await message.reply(`⏳ Processing previous bid, please wait 1 second...`);
-    return;
-  }
+      // RACE CONDITION PROTECTION
+      if (isBidProcessing) {
+        console.log(`⚠️ Bid already processing, queueing this one...`);
+        await message.reply(
+          `⏳ Processing previous bid, please wait 1 second...`
+        );
+        return;
+      }
 
-  console.log(`🔍 !bid or alias detected - Checking channel validity...`);
-  console.log(`   Raw command: ${rawCmd} -> Resolved: ${resolvedCmd}`);
-  console.log(`   Channel: ${message.channel.name} (${message.channel.id})`);
-  console.log(`   Is Thread: ${message.channel.isThread()}`);
-  console.log(`   Parent ID: ${message.channel.parentId}`);
-  console.log(`   Expected Parent: ${config.bidding_channel_id}`);
-  console.log(`   inBiddingChannel: ${inBiddingChannel}`);
+      console.log(`🔍 !bid or alias detected - Checking channel validity...`);
+      console.log(`   Raw command: ${rawCmd} -> Resolved: ${resolvedCmd}`);
+      console.log(
+        `   Channel: ${message.channel.name} (${message.channel.id})`
+      );
+      console.log(`   Is Thread: ${message.channel.isThread()}`);
+      console.log(`   Parent ID: ${message.channel.parentId}`);
+      console.log(`   Expected Parent: ${config.bidding_channel_id}`);
+      console.log(`   inBiddingChannel: ${inBiddingChannel}`);
 
-  if (!inBiddingChannel) {
-    console.log(`❌ !bid blocked - not in bidding channel/thread`);
-    await message.reply(
-      `❌ You can only use \`${rawCmd}\` in the auction threads!`
-    );
-    return;
-  }
+      if (!inBiddingChannel) {
+        console.log(`❌ !bid blocked - not in bidding channel/thread`);
+        await message.reply(
+          `❌ You can only use \`${rawCmd}\` in the auction threads!`
+        );
+        return;
+      }
 
-  const args = message.content.trim().split(/\s+/).slice(1);
+      const args = message.content.trim().split(/\s+/).slice(1);
 
-  console.log(
-    `ðŸŽ¯ Bid command detected in ${
-      message.channel.isThread() ? "thread" : "channel"
-    }: ${message.channel.name}`
-  );
-  
-  isBidProcessing = true;
-  try {
-    await bidding.handleCommand(resolvedCmd, message, args, client, config);
-  } finally {
-    isBidProcessing = false;
-  }
-  return;
-}
+      console.log(
+        `ðŸŽ¯ Bid command detected in ${
+          message.channel.isThread() ? "thread" : "channel"
+        }: ${message.channel.name}`
+      );
 
-// ✅ HANDLE !MYPOINTS AND ALIASES - BIDDING CHANNEL ONLY (NOT DURING AUCTION)
+      isBidProcessing = true;
+      try {
+        await bidding.handleCommand(resolvedCmd, message, args, client, config);
+      } finally {
+        isBidProcessing = false;
+      }
+      return;
+    }
+
+    // ✅ HANDLE !MYPOINTS AND ALIASES - BIDDING CHANNEL ONLY (NOT DURING AUCTION)
     if (
       resolvedCmd === "!mypoints" &&
       inBiddingChannel &&
@@ -1928,8 +2122,6 @@ client.on(Events.MessageCreate, async (message) => {
       if (
         ["present", "here", "join", "checkin", "check-in"].includes(keyword)
       ) {
-
-
         const spawnInfo = activeSpawns[message.channel.id];
 
         if (!spawnInfo || spawnInfo.closed) {
@@ -2002,7 +2194,7 @@ client.on(Events.MessageCreate, async (message) => {
       // Admin commands in spawn threads
       if (!userIsAdmin) return;
 
-// ADD THIS LINE:
+      // ADD THIS LINE:
       const spawnCmd = resolveCommandAlias(content.split(/\s+/)[0]);
 
       // !verifyall
@@ -2273,11 +2465,9 @@ client.on(Events.MessageCreate, async (message) => {
       }
 
       // Thread-specific override commands
-            if ([
-        "!forcesubmit",
-        "!debugthread",
-        "!resetpending"
-      ].includes(spawnCmd)) {
+      if (
+        ["!forcesubmit", "!debugthread", "!resetpending"].includes(spawnCmd)
+      ) {
         const now = Date.now();
         if (now - lastOverrideTime < TIMING.OVERRIDE_COOLDOWN) {
           const remaining = Math.ceil(
@@ -2315,12 +2505,9 @@ client.on(Events.MessageCreate, async (message) => {
 
       // Admin logs override commands
       if (
-        [
-          "!clearstate",
-          "!status",
-          "!closeallthread",
-          "!testbidding"
-        ].includes(adminCmd)
+        ["!clearstate", "!status", "!closeallthread", "!testbidding"].includes(
+          adminCmd
+        )
       ) {
         const now = Date.now();
         if (now - lastOverrideTime < TIMING.OVERRIDE_COOLDOWN) {
@@ -2334,7 +2521,9 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         lastOverrideTime = now;
-        console.log(`🔧 Override (${rawCmd} -> ${adminCmd}): used by ${member.user.username}`);
+        console.log(
+          `🔧 Override (${rawCmd} -> ${adminCmd}): used by ${member.user.username}`
+        );
 
         if (adminCmd === "!clearstate")
           await commandHandlers.clearstate(message, member);
@@ -2361,25 +2550,46 @@ client.on(Events.MessageCreate, async (message) => {
           "!stop",
           "!extend",
           "!resetbids",
-          "!forcesubmitresults"
+          "!forcesubmitresults",
         ].includes(adminCmd)
       ) {
-console.log(`🎯 Processing auction command (${rawCmd} -> ${adminCmd})`);
-        
+        console.log(`🎯 Processing auction command (${rawCmd} -> ${adminCmd})`);
+
         // Route to appropriate handler
         // These are handled by commandHandlers
-        if (["!startauction", "!startauctionnow", "!pause", "!resume", "!stop", "!extend"].includes(adminCmd)) {
+        if (
+          [
+            "!startauction",
+            "!startauctionnow",
+            "!pause",
+            "!resume",
+            "!stop",
+            "!extend",
+          ].includes(adminCmd)
+        ) {
           const handlerName = adminCmd.slice(1); // Remove the "!"
           if (commandHandlers[handlerName]) {
             await commandHandlers[handlerName](message, member, args);
           }
-        } 
+        }
         // These are handled by auctioneering module
-        else if (["!queuelist", "!removeitem", "!clearqueue", "!forcesubmitresults", "!cancelitem", "!skipitem"].includes(adminCmd)) {
+        else if (
+          [
+            "!queuelist",
+            "!removeitem",
+            "!clearqueue",
+            "!forcesubmitresults",
+            "!cancelitem",
+            "!skipitem",
+          ].includes(adminCmd)
+        ) {
           const handler = adminCmd.slice(1); // Remove the "!"
-          
+
           if (handler === "queuelist") {
-            await auctioneering.handleQueueList(message, bidding.getBiddingState());
+            await auctioneering.handleQueueList(
+              message,
+              bidding.getBiddingState()
+            );
           } else if (handler === "removeitem") {
             await auctioneering.handleRemoveItem(message, args, bidding);
           } else if (handler === "clearqueue") {
@@ -2387,7 +2597,8 @@ console.log(`🎯 Processing auction command (${rawCmd} -> ${adminCmd})`);
             if (totalItems === 0) {
               return await message.reply(`📋 Queue is already empty`);
             }
-            await auctioneering.handleClearQueue(message, 
+            await auctioneering.handleClearQueue(
+              message,
               async (confirmMsg) => {
                 auctioneering.getAuctionState().itemQueue = [];
                 await confirmMsg.reactions.removeAll().catch(() => {});
@@ -2399,7 +2610,11 @@ console.log(`🎯 Processing auction command (${rawCmd} -> ${adminCmd})`);
               }
             );
           } else if (handler === "forcesubmitresults") {
-            await auctioneering.handleForceSubmitResults(message, config, bidding);
+            await auctioneering.handleForceSubmitResults(
+              message,
+              config,
+              bidding
+            );
           } else if (handler === "cancelitem") {
             await auctioneering.handleCancelItem(message);
           } else if (handler === "skipitem") {
@@ -2482,12 +2697,12 @@ console.log(`🎯 Processing auction command (${rawCmd} -> ${adminCmd})`);
     }
 
     // Other bidding commands (admin only)
-if (inBiddingChannel) {
+    if (inBiddingChannel) {
       const biddingCmd = resolveCommandAlias(rawCmd);
       const args = message.content.trim().split(/\s+/).slice(1);
 
       // !bidstatus - also available to members
-if (biddingCmd === "!bidstatus") {
+      if (biddingCmd === "!bidstatus") {
         console.log(`🎯 Bidding status command (${rawCmd} -> ${biddingCmd})`);
         await bidding.handleCommand(biddingCmd, message, args, client, config);
         return;
@@ -2722,7 +2937,8 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     // Bidding bid confirmations
     const biddingState = bidding.getBiddingState();
 
-    if (biddingState.pc[msg.id]) {  // ✅ FIXED: Changed from pendingConfirmations to pc
+    if (biddingState.pc[msg.id]) {
+      // ✅ FIXED: Changed from pendingConfirmations to pc
       console.log(
         `🎯 Bidding confirmation reaction detected: ${reaction.emoji.name} by ${user.username}`
       );
@@ -2755,6 +2971,7 @@ process.on("unhandledRejection", (error) =>
 
 process.on("SIGTERM", () => {
   console.log("🛑 SIGTERM received, shutting down gracefully...");
+  stopBiddingChannelCleanupSchedule(); // ← ADD THIS
   server.close(() => {
     console.log("🌐 HTTP server closed");
     client.destroy();
@@ -2764,6 +2981,7 @@ process.on("SIGTERM", () => {
 
 process.on("SIGINT", () => {
   console.log("🛑 SIGINT received, shutting down gracefully...");
+  stopBiddingChannelCleanupSchedule(); // ← ADD THIS
   server.close(() => {
     console.log("🌐 HTTP server closed");
     client.destroy();
