@@ -1,27 +1,17 @@
-# Node
+# Node / build
 node_modules/
-package-lock.json
+dist/
+build/
 
-# Clasp / Google Script
-appsscript-token.json
-script-id.txt
+# Local clasp auth
+.clasprc.json
 .clasp.json
 .claspignore
 
-# Environment / system
+# env / logs
 *.env
 *.log
+
+# system / editor
 .DS_Store
 .vscode/
-
-# Build or dev files
-dist/
-build/
-Dockerfile
-.dockerignore
-
-# Trained data files
-*.traineddata
-
-# GitHub and project configs
-.github/

@@ -1,6 +1,3 @@
-# Ignore everything
 **/*
-
-# Only allow the main script and manifest
-!Code.js
 !appsscript.json
+!Code.js
