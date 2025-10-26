@@ -1,22 +1,27 @@
 # Node
 node_modules/
-# Logs
-logs/
+package-lock.json
+
+# Clasp / Google Script
+appsscript-token.json
+script-id.txt
+.clasp.json
+.claspignore
+
+# Environment / system
+*.env
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-# Env files
-.env
-Code.gs
-# OS/editor
 .DS_Store
-Thumbs.db
 .vscode/
-.idea/
-# Build/test artifacts
-coverage/
+
+# Build or dev files
 dist/
-.github/appscript-token.json
-.github/appscript-refresh-token.txt
-.env.local
+build/
+Dockerfile
+.dockerignore
+
+# Trained data files
+*.traineddata
+
+# GitHub and project configs
+.github/
