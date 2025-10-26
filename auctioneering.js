@@ -43,10 +43,13 @@ const EMOJI = {
   TIME: '⏱️',
   CLOCK: '🕐',
   LIST: '📋',
-  PAUSE: '⸸',
+  PAUSE: '⏸️',
   PLAY: '▶️',
   FIRE: '🔥',
   STOP: '⏹️',
+  TROPHY: '🏆',
+  CHART: '📊',
+  LOCK: '🔒',
 };
 
 function initialize(config, isAdminFunc, biddingModuleRef) {
@@ -126,7 +129,7 @@ async function saveAuctionState(url) {
       timestamp: getTimestamp(),
     };
 
-    await fetch(url, {
+    const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -135,9 +138,15 @@ async function saveAuctionState(url) {
       }),
     });
 
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
     console.log(`${EMOJI.SUCCESS} Auction state saved`);
+    return true;
   } catch (e) {
     console.error(`${EMOJI.ERROR} Save auction state:`, e);
+    return false;
   }
 }
 
@@ -446,6 +455,12 @@ function pauseSession() {
 
   Object.values(auctionState.timers).forEach(t => clearTimeout(t));
   console.log(`${EMOJI.PAUSE} Session paused`);
+  
+  // ADD THIS LINE:
+  if (cfg && cfg.sheet_webhook_url) {
+    saveAuctionState(cfg.sheet_webhook_url).catch(console.error);
+  }
+  
   return true;
 }
 
@@ -463,6 +478,10 @@ function resumeSession(client, config, channel) {
 
 function stopCurrentItem(client, config, channel) {
   if (!auctionState.active || !auctionState.currentItem) return false;
+  // ADD THIS LINE:
+  if (cfg && cfg.sheet_webhook_url) {
+    saveAuctionState(cfg.sheet_webhook_url).catch(console.error);
+  }
 
   clearTimeout(auctionState.timers.itemEnd);
   clearTimeout(auctionState.timers.go1);
@@ -475,6 +494,11 @@ function stopCurrentItem(client, config, channel) {
 
 function extendCurrentItem(minutes) {
   if (!auctionState.active || !auctionState.currentItem) return false;
+    // ADD THIS LINE:
+  if (cfg && cfg.sheet_webhook_url) {
+    saveAuctionState(cfg.sheet_webhook_url).catch(console.error);
+  }
+  
   auctionState.currentItem.endTime += minutes * 60000;
   console.log(`${EMOJI.TIME} Extended by ${minutes}m`);
   return true;

@@ -5,6 +5,22 @@
 
 const { EmbedBuilder } = require("discord.js");
 
+// Add EMOJI constant
+const EMOJI = {
+  SUCCESS: '✅',
+  ERROR: '❌',
+  WARNING: '⚠️',
+  INFO: 'ℹ️',
+  FIRE: '🔥',
+  LOCK: '🔒',
+  CHART: '📊',
+  BID: '💰',
+  TIME: '⏱️',
+  LIST: '📋',
+  CLOCK: '🕐',
+  TROPHY: '🏆',
+};
+
 // Module-level variables (initialized later)
 let config = null;
 let isAdminFunc = null;

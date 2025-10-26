@@ -255,18 +255,18 @@ function resolveCommandAlias(cmd) {
 
 function getCurrentTimestamp() {
   const date = new Date();
-  const dateStr = date.toLocaleDateString("en-US", {
-    timeZone: "Asia/Manila",  // ✅ Already correct!
-    year: "2-digit",
-    month: "numeric",
-    day: "numeric",
-  });
-  const timeStr = date.toLocaleTimeString("en-US", {
-    timeZone: "Asia/Manila",  // ✅ Already correct!
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const manilaDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+  
+  const month = String(manilaDate.getMonth() + 1).padStart(2, '0');
+  const day = String(manilaDate.getDate()).padStart(2, '0');
+  const year = String(manilaDate.getFullYear()).slice(-2);
+  
+  const hours = String(manilaDate.getHours()).padStart(2, '0');
+  const minutes = String(manilaDate.getMinutes()).padStart(2, '0');
+  
+  const dateStr = `${month}/${day}/${year}`;
+  const timeStr = `${hours}:${minutes}`;
+  
   return { date: dateStr, time: timeStr, full: `${dateStr} ${timeStr}` };
 }
 
@@ -1643,6 +1643,7 @@ const commandHandlers = {
       await message.reply(`⏱️ Extended by ${mins} minute(s).`);
     }
   },
+
   queuelist: async (message, member) => {
     await auctioneering.handleQueueList(message, bidding.getBiddingState());
   },
@@ -1655,14 +1656,14 @@ const commandHandlers = {
     // Wrap in confirmation
     const totalItems = auctioneering.getAuctionState().itemQueue.length;
     if (totalItems === 0) {
-      return await message.reply(`${EMOJI.LIST} Queue is already empty`);
+      return await message.reply(`📋 Queue is already empty`);
     }
     await auctioneering.handleClearQueue(message, 
       async (confirmMsg) => {
         // On confirm
         auctioneering.getAuctionState().itemQueue = [];
         await confirmMsg.reactions.removeAll().catch(() => {});
-        await message.reply(`${EMOJI.SUCCESS} Cleared ${totalItems} item(s)`);
+        await message.reply(`✅ Cleared ${totalItems} item(s)`);
       },
       async (confirmMsg) => {
         // On cancel
@@ -1910,6 +1911,8 @@ client.on(Events.MessageCreate, async (message) => {
       if (
         ["present", "here", "join", "checkin", "check-in"].includes(keyword)
       ) {
+
+
         const spawnInfo = activeSpawns[message.channel.id];
 
         if (!spawnInfo || spawnInfo.closed) {
@@ -1981,6 +1984,9 @@ client.on(Events.MessageCreate, async (message) => {
 
       // Admin commands in spawn threads
       if (!userIsAdmin) return;
+
+// ADD THIS LINE:
+      const spawnCmd = resolveCommandAlias(content.split(/\s+/)[0]);
 
       // !verifyall
       if (spawnCmd === "!verifyall") {
@@ -2341,14 +2347,50 @@ client.on(Events.MessageCreate, async (message) => {
           "!forcesubmitresults"
         ].includes(adminCmd)
       ) {
-        console.log(`🎯 Processing auction command (${rawCmd} -> ${adminCmd})`);
+console.log(`🎯 Processing auction command (${rawCmd} -> ${adminCmd})`);
         
         // Route to appropriate handler
-        if (["!queuelist", "!removeitem", "!clearqueue"].includes(adminCmd)) {
-          await commandHandlers[adminCmd.slice(1)](message, member, args);
-        } else if (["!forcesubmitresults", "!cancelitem", "!skipitem"].includes(adminCmd)) {
-          await commandHandlers[adminCmd.slice(1)](message, member, args);
-        } else {
+        // These are handled by commandHandlers
+        if (["!startauction", "!startauctionnow", "!pause", "!resume", "!stop", "!extend"].includes(adminCmd)) {
+          const handlerName = adminCmd.slice(1); // Remove the "!"
+          if (commandHandlers[handlerName]) {
+            await commandHandlers[handlerName](message, member, args);
+          }
+        } 
+        // These are handled by auctioneering module
+        else if (["!queuelist", "!removeitem", "!clearqueue", "!forcesubmitresults", "!cancelitem", "!skipitem"].includes(adminCmd)) {
+          const handler = adminCmd.slice(1); // Remove the "!"
+          
+          if (handler === "queuelist") {
+            await auctioneering.handleQueueList(message, bidding.getBiddingState());
+          } else if (handler === "removeitem") {
+            await auctioneering.handleRemoveItem(message, args, bidding);
+          } else if (handler === "clearqueue") {
+            const totalItems = auctioneering.getAuctionState().itemQueue.length;
+            if (totalItems === 0) {
+              return await message.reply(`📋 Queue is already empty`);
+            }
+            await auctioneering.handleClearQueue(message, 
+              async (confirmMsg) => {
+                auctioneering.getAuctionState().itemQueue = [];
+                await confirmMsg.reactions.removeAll().catch(() => {});
+                await message.reply(`✅ Cleared ${totalItems} item(s)`);
+              },
+              async (confirmMsg) => {
+                await confirmMsg.reactions.removeAll().catch(() => {});
+                await message.reply(`❌ Clear canceled`);
+              }
+            );
+          } else if (handler === "forcesubmitresults") {
+            await auctioneering.handleForceSubmitResults(message, config, bidding);
+          } else if (handler === "cancelitem") {
+            await auctioneering.handleCancelItem(message);
+          } else if (handler === "skipitem") {
+            await auctioneering.handleSkipItem(message);
+          }
+        }
+        // Everything else (!auction, !resetbids) goes to bidding.handleCommand
+        else {
           await bidding.handleCommand(adminCmd, message, args, client, config);
         }
         return;

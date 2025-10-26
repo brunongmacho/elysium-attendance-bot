@@ -157,6 +157,11 @@ function initializeBidding(config, isAdminFunc, auctioneeringRef) {
   auctioneering = auctioneeringRef;
 }
 
+// Add after COLORS constant definition (around line 30)
+function getColor(color) {
+  return color;
+}
+
 // SHEETS API
 async function fetchPts(url) {
   try {
@@ -168,7 +173,7 @@ async function fetchPts(url) {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return (await r.json()).points || {};
   } catch (e) {
-    console.error("âŒ Fetch pts:", e);
+    console.error("❌ Fetch pts:", e);
     return null;
   }
 }
@@ -190,12 +195,12 @@ async function submitRes(url, res, time) {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const d = await r.json();
       if (d.status === "ok") {
-        console.log("âœ… Submitted");
+        console.log("✅ Submitted");
         return { ok: true, d };
       }
       throw new Error(d.message || "Unknown");
     } catch (e) {
-      console.error(`âŒ Submit ${i}:`, e.message);
+      console.error(`❌ Submit ${i}:`, e.message);
       if (i < 3) await new Promise((x) => setTimeout(x, i * 2000));
       else return { ok: false, err: e.message, res };
     }
@@ -204,18 +209,18 @@ async function submitRes(url, res, time) {
 
 // CACHE WITH AUTO-REFRESH
 async function loadCache(url) {
-  console.log("âš¡ Loading cache...");
+  console.log("🔄 Loading cache...");
   const t0 = Date.now();
   const p = await fetchPts(url);
   if (!p) {
-    console.error("âŒ Cache fail");
+    console.error("❌ Cache fail");
     return false;
   }
   st.cp = p;
   st.ct = Date.now();
   save();
   console.log(
-    `âœ… Cache: ${Date.now() - t0}ms - ${Object.keys(p).length} members`
+    `✅ Cache: ${Date.now() - t0}ms - ${Object.keys(p).length} members`
   );
   
   // Start auto-refresh timer if auction is active
@@ -919,7 +924,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
       { name: `${EMOJI.CHART} Current`, value: `${currentItem.curBid}pts`, inline: true },
       { name: `${EMOJI.CHART} After`, value: `${av - needed}pts`, inline: true }
     )
-    .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel â€¢ 10s timeout` });
+    .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 10s timeout` });
 
   if (isSelf) {
     confEmbed.addFields({
@@ -955,7 +960,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     countdown--;
     if (countdown > 0 && countdown <= 10 && st.pc[conf.id]) {
       const updatedEmbed = EmbedBuilder.from(confEmbed)
-        .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel â€¢ ${countdown}s remaining` });
+        .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • ${countdown}s remaining` });
       await conf.edit({ embeds: [updatedEmbed] }).catch(() => {});
     }
   }, 1000);
@@ -1832,17 +1837,24 @@ module.exports = {
         return;
       }
 
-      if (a.curWin && !p.isSelf) {
-        unlock(a.curWin, a.curBid);
-        await reaction.message.channel.send({
-          content: `<@${a.curWinId}>`,
-          embeds: [
-            new EmbedBuilder()
-              .setColor(COLORS.WARNING)
-              .setTitle(`${EMOJI.WARNING} Outbid!`)
-              .setDescription(`Someone bid **${p.amount}pts** on **${a.item}**`),
-          ],
-        });
+      // FIX: Properly handle previous winner
+      if (a.curWin) {
+        const prevWinner = a.curWin;
+        const prevAmount = a.curBid;
+        
+        // Only unlock if NOT self-overbid
+        if (!p.isSelf) {
+          unlock(prevWinner, prevAmount);
+          await reaction.message.channel.send({
+            content: `<@${a.curWinId}>`,
+            embeds: [
+              new EmbedBuilder()
+                .setColor(COLORS.WARNING)
+                .setTitle(`${EMOJI.WARNING} Outbid!`)
+                .setDescription(`Someone bid **${p.amount}pts** on **${a.item}**`),
+            ],
+          });
+        }
       }
 
       lock(p.username, p.needed);
