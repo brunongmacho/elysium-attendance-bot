@@ -17,3 +17,6 @@ Thumbs.db
 # Build/test artifacts
 coverage/
 dist/
+.github/appscript-token.json
+.github/appscript-refresh-token.txt
+.env.local

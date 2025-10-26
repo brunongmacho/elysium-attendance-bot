@@ -1,0 +1,9 @@
+# Ignore everything by default
+**/*
+
+# Allow only these:
+!appsscript.json
+!Code.js
+!Utilities.js
+!Main.js
+!src/**
