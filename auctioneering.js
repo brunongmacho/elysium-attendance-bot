@@ -518,36 +518,105 @@ function getAuctionState() {
 // ============================================
 
 async function handleQueueList(message, biddingState) {
-  // Display both auctioneering queue and bidding queue
   const auctQueue = auctionState.itemQueue || [];
   const biddingQueue = biddingState.q || [];
   
-  if (auctQueue.length === 0 && biddingQueue.length === 0) {
-    return await message.reply(`${EMOJI.LIST} Queue is empty`);
+  // Check if auction is active - if so, show only auctionState.itemQueue
+  if (auctionState.active) {
+    if (auctQueue.length === 0) {
+      return await message.reply(`${EMOJI.LIST} Queue is empty`);
+    }
+
+    let queueText = '';
+    auctQueue.forEach((item, idx) => {
+      const qty = item.quantity > 1 ? ` x${item.quantity}` : '';
+      queueText += `**${idx + 1}.** ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m (${item.source})\n`;
+    });
+
+    const embed = new EmbedBuilder()
+      .setColor(0x4a90e2)
+      .setTitle(`${EMOJI.LIST} Auction Queue (Active Session)`)
+      .setDescription(queueText)
+      .addFields({
+        name: `${EMOJI.CHART} Total`,
+        value: `${auctQueue.length}`,
+        inline: true,
+      })
+      .setTimestamp();
+
+    return await message.reply({ embeds: [embed] });
+  }
+
+  // NO ACTIVE AUCTION - Fetch from Google Sheet and show preview
+  const loadingMsg = await message.reply(`${EMOJI.CLOCK} Loading items from Google Sheet...`);
+
+  // Fetch items from BiddingItems sheet
+  const sheetItems = await fetchSheetItems(cfg.sheet_webhook_url);
+  
+  if (sheetItems === null) {
+    await loadingMsg.edit(`${EMOJI.ERROR} Failed to fetch items from Google Sheet. Check webhook configuration.`);
+    return;
+  }
+
+  await loadingMsg.delete().catch(() => {});
+
+  if (sheetItems.length === 0 && biddingQueue.length === 0) {
+    return await message.reply(
+      `${EMOJI.LIST} Queue is empty.\n\n` +
+      `Add items with:\n` +
+      `• \`!auction <item> <price> <duration>\` - Manual queue\n` +
+      `• Add to **BiddingItems** sheet in Google Sheets`
+    );
   }
 
   let queueText = '';
   let position = 1;
 
-  // Auctioneering items first
-  if (auctQueue.length > 0) {
-    queueText += `**📋 FROM GOOGLE SHEET + MANUAL QUEUE:**\n`;
-    auctQueue.forEach((item, idx) => {
+  // Google Sheet items first
+  if (sheetItems.length > 0) {
+    queueText += `**📊 FROM GOOGLE SHEET (BiddingItems):**\n`;
+    sheetItems.forEach((item, idx) => {
       const qty = item.quantity > 1 ? ` x${item.quantity}` : '';
-      queueText += `**${position}.** ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m (${item.source})\n`;
+      queueText += `**${position}.** ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
       position++;
     });
   }
 
+  // Then manual queue items
+  if (biddingQueue.length > 0) {
+    if (sheetItems.length > 0) queueText += `\n`;
+    queueText += `**📋 MANUAL QUEUE (from !auction):**\n`;
+    biddingQueue.forEach((item, idx) => {
+      const qty = item.quantity > 1 ? ` x${item.quantity}` : '';
+      queueText += `**${position}.** ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
+      position++;
+    });
+  }
+
+  queueText += `\n**ℹ️ Note:** This is the order items will auction when you run \`!startauction\``;
+
   const embed = new EmbedBuilder()
     .setColor(0x4a90e2)
-    .setTitle(`${EMOJI.LIST} Auction Queue`)
-    .setDescription(queueText || 'No items queued')
-    .addFields({
-      name: `${EMOJI.CHART} Total`,
-      value: `${auctQueue.length + biddingQueue.length}`,
-      inline: true,
-    })
+    .setTitle(`${EMOJI.LIST} Auction Queue (Preview)`)
+    .setDescription(queueText)
+    .addFields(
+      { 
+        name: `${EMOJI.CHART} Google Sheet`, 
+        value: `${sheetItems.length}`, 
+        inline: true 
+      },
+      { 
+        name: `${EMOJI.LIST} Manual Queue`, 
+        value: `${biddingQueue.length}`, 
+        inline: true 
+      },
+      { 
+        name: `${EMOJI.FIRE} Total`, 
+        value: `${sheetItems.length + biddingQueue.length}`, 
+        inline: true 
+      }
+    )
+    .setFooter({ text: 'Use !startauction to begin • Sheet items auction first' })
     .setTimestamp();
 
   await message.reply({ embeds: [embed] });
