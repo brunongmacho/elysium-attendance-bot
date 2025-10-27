@@ -2062,7 +2062,7 @@ client.on(Events.MessageCreate, async (message) => {
       const args = message.content.trim().split(/\s+/).slice(1);
 
       console.log(
-        `ðŸŽ¯ Bid command detected in ${
+        `🎯 Bid command detected in ${
           message.channel.isThread() ? "thread" : "channel"
         }: ${message.channel.name}`
       );
