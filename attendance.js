@@ -118,7 +118,9 @@ function parseThreadName(name) {
   };
 }
 
-async function postToSheet(payload) {
+async function postToSheet(payload, retryCount = 0) {
+  const MAX_RETRIES = 3;
+
   try {
     const now = Date.now();
     const timeSinceLastCall = now - lastSheetCall;
@@ -137,8 +139,14 @@ async function postToSheet(payload) {
 
     const text = await res.text();
     if (res.status === 429) {
-      await new Promise((resolve) => setTimeout(resolve, TIMING.RETRY_DELAY));
-      return postToSheet(payload);
+      if (retryCount < MAX_RETRIES) {
+        console.log(`⚠️ Rate limit hit, retry ${retryCount + 1}/${MAX_RETRIES}`);
+        await new Promise((resolve) => setTimeout(resolve, TIMING.RETRY_DELAY));
+        return postToSheet(payload, retryCount + 1);
+      } else {
+        console.error(`❌ Rate limit: Max retries (${MAX_RETRIES}) exceeded`);
+        return { ok: false, status: 429, text: "Max retries exceeded" };
+      }
     }
 
     return { ok: res.ok, status: res.status, text };
@@ -449,6 +457,106 @@ async function loadAttendanceForBoss(weekSheet, bossKey) {
   }
 }
 
+// STATE MANAGEMENT FOR KOYEB (Memory optimization)
+let lastAttendanceStateSyncTime = 0;
+const ATTENDANCE_STATE_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+async function saveAttendanceStateToSheet(forceSync = false) {
+  if (!config || !config.sheet_webhook_url) {
+    console.warn("⚠️ Config not initialized, skipping attendance state sync");
+    return false;
+  }
+
+  const now = Date.now();
+  const shouldSync = forceSync || (now - lastAttendanceStateSyncTime > ATTENDANCE_STATE_SYNC_INTERVAL);
+
+  if (!shouldSync) {
+    return false;
+  }
+
+  try {
+    const stateToSave = {
+      activeSpawns,
+      activeColumns,
+      pendingVerifications,
+      pendingClosures,
+      confirmationMessages,
+    };
+
+    const response = await fetch(config.sheet_webhook_url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "saveAttendanceState",
+        state: stateToSave,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    lastAttendanceStateSyncTime = now;
+    if (forceSync) {
+      console.log("📊 Forced attendance state sync to Google Sheets");
+    } else {
+      console.log("✅ Attendance state synced to Google Sheets");
+    }
+    return true;
+  } catch (err) {
+    console.error("❌ Failed to save attendance state:", err.message);
+    return false;
+  }
+}
+
+async function loadAttendanceStateFromSheet() {
+  if (!config || !config.sheet_webhook_url) {
+    console.warn("⚠️ Config not initialized, cannot load attendance state");
+    return false;
+  }
+
+  try {
+    const response = await fetch(config.sheet_webhook_url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "getAttendanceState" }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data.state) {
+      console.log("ℹ️ No saved attendance state found");
+      return false;
+    }
+
+    // Restore state
+    activeSpawns = data.state.activeSpawns || {};
+    activeColumns = data.state.activeColumns || {};
+    pendingVerifications = data.state.pendingVerifications || {};
+    pendingClosures = data.state.pendingClosures || {};
+    confirmationMessages = data.state.confirmationMessages || {};
+
+    console.log("✅ Attendance state loaded from Google Sheets");
+    console.log(`   - Active spawns: ${Object.keys(activeSpawns).length}`);
+    console.log(`   - Active columns: ${Object.keys(activeColumns).length}`);
+    console.log(`   - Pending verifications: ${Object.keys(pendingVerifications).length}`);
+    return true;
+  } catch (err) {
+    console.error("❌ Failed to load attendance state:", err.message);
+    return false;
+  }
+}
+
+// Periodic state sync (call this periodically from main bot)
+function schedulePeriodicStateSync() {
+  setInterval(async () => {
+    await saveAttendanceStateToSheet(false);
+  }, ATTENDANCE_STATE_SYNC_INTERVAL);
+}
+
 // Export functions and state
 module.exports = {
   initialize,
@@ -464,6 +572,9 @@ module.exports = {
   createSpawnThreads,
   recoverStateFromThreads,
   loadAttendanceForBoss,
+  saveAttendanceStateToSheet,
+  loadAttendanceStateFromSheet,
+  schedulePeriodicStateSync,
   getActiveSpawns: () => activeSpawns,
   getActiveColumns: () => activeColumns,
   getPendingVerifications: () => pendingVerifications,

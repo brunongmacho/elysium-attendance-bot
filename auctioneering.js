@@ -197,6 +197,12 @@ async function saveAuctionState(url) {
 }
 
 async function startAuctioneering(client, config, channel) {
+  // Validate parameters
+  if (!client || !config || !channel) {
+    console.error(`${EMOJI.ERROR} Invalid parameters to startAuctioneering`);
+    return;
+  }
+
   if (auctionState.active) {
     await channel.send(`❌ Auction already running`);
     return;
@@ -406,8 +412,14 @@ function getCurrentTimestamp() {
 }
 
 async function auctionNextItem(client, config, channel) {
+  // Validate parameters
+  if (!client || !config || !channel) {
+    console.error(`${EMOJI.ERROR} Invalid parameters to auctionNextItem`);
+    return;
+  }
+
   const currentSession = auctionState.sessions[auctionState.currentSessionIndex];
-  
+
   if (!currentSession || auctionState.currentItemIndex >= currentSession.items.length) {
     // Move to next session
     auctionState.currentSessionIndex++;
@@ -514,6 +526,12 @@ async function auctionNextItem(client, config, channel) {
 }
 
 function scheduleItemTimers(client, config, channel) {
+  // Validate parameters
+  if (!client || !config || !channel || !auctionState.currentItem) {
+    console.error(`${EMOJI.ERROR} Invalid parameters to scheduleItemTimers`);
+    return;
+  }
+
   const item = auctionState.currentItem;
   const t = item.endTime - Date.now();
 
@@ -614,6 +632,12 @@ async function itemGo3(client, config, channel) {
 }
 
 async function itemEnd(client, config, channel) {
+  // Validate parameters
+  if (!client || !config || !channel) {
+    console.error(`${EMOJI.ERROR} Invalid parameters to itemEnd`);
+    return;
+  }
+
   if (!auctionState.active || !auctionState.currentItem) return;
 
   const item = auctionState.currentItem;
@@ -751,6 +775,12 @@ async function itemEnd(client, config, channel) {
 }
 
 async function finalizeSession(client, config, channel) {
+  // Validate parameters
+  if (!client || !config || !channel) {
+    console.error(`${EMOJI.ERROR} Invalid parameters to finalizeSession`);
+    return;
+  }
+
   if (!auctionState.active) return;
 
   auctionState.active = false;
@@ -868,14 +898,19 @@ console.log("🧹 Clearing session caches...");
   auctionState.sessionItems = [];
   auctionState.itemQueue = [];
   manualItemsAuctioned = [];
-  
+
   // Clear bidding module cache
   const biddingModule = require("./bidding.js");
   biddingModule.clearPointsCache();
-  
+
   console.log("✅ All session data cleared");
-  
-  save();
+
+  // Save state if config is available
+  if (cfg && cfg.sheet_webhook_url) {
+    await saveAuctionState(cfg.sheet_webhook_url).catch((err) => {
+      console.error(`${EMOJI.ERROR} Failed to save state:`, err);
+    });
+  }
 }
 
 async function buildCombinedResults(config) {

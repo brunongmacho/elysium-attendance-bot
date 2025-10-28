@@ -130,17 +130,42 @@ const unlock = (u, amt) => {
 };
 
 // STATE PERSISTENCE
-function save() {
+let lastSheetSyncTime = 0;
+const SHEET_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+function save(forceSync = false) {
   try {
     const { th, pauseTimer, cacheRefreshTimer, ...s } = st;
-    fs.writeFileSync(SF, JSON.stringify(s, null, 2));
+
+    // Always save to local file for quick access (works even on ephemeral Koyeb FS)
+    try {
+      fs.writeFileSync(SF, JSON.stringify(s, null, 2));
+    } catch (fileErr) {
+      // On Koyeb, file system might be read-only or restricted
+      console.warn("⚠️ Local file save failed (expected on Koyeb):", fileErr.message);
+    }
+
+    // Sync to Google Sheets for persistence across Koyeb restarts
+    const now = Date.now();
+    const shouldSync = forceSync || (now - lastSheetSyncTime > SHEET_SYNC_INTERVAL);
+
+    if (cfg && cfg.sheet_webhook_url && shouldSync) {
+      lastSheetSyncTime = now;
+      saveBiddingStateToSheet().catch(err => {
+        console.error("❌ Background sheet sync failed:", err.message);
+      });
+      if (forceSync) {
+        console.log("📊 Forced state sync to Google Sheets");
+      }
+    }
   } catch (e) {
     console.error("❌ Save:", e);
   }
 }
 
-function load() {
+async function load() {
   try {
+    // Try local file first (fast)
     if (fs.existsSync(SF)) {
       const d = JSON.parse(fs.readFileSync(SF, "utf8"));
       st = {
@@ -153,11 +178,41 @@ function load() {
         auctionLock: false,
         cacheRefreshTimer: null,
       };
+      console.log("✅ Loaded state from local file");
       return true;
     }
   } catch (e) {
-    console.error("❌ Load:", e);
+    console.warn("⚠️ Local file load failed:", e.message);
   }
+
+  // Fallback to Google Sheets (for Koyeb restarts)
+  if (cfg && cfg.sheet_webhook_url) {
+    console.log("📊 Local file not found, loading from Google Sheets...");
+    try {
+      const sheetState = await loadBiddingStateFromSheet(cfg.sheet_webhook_url);
+      if (sheetState) {
+        st = {
+          ...st,
+          q: sheetState.queue || [],
+          a: sheetState.activeAuction || null,
+          lp: sheetState.lockedPoints || {},
+          h: sheetState.history || [],
+          th: {},
+          lb: {},
+          pause: false,
+          pauseTimer: null,
+          auctionLock: false,
+          cacheRefreshTimer: null,
+        };
+        console.log("✅ Loaded state from Google Sheets");
+        return true;
+      }
+    } catch (err) {
+      console.error("❌ Sheet load failed:", err.message);
+    }
+  }
+
+  console.log("ℹ️ Starting with fresh state");
   return false;
 }
 
@@ -219,6 +274,12 @@ async function submitRes(url, res, time) {
 
 // CACHE WITH AUTO-REFRESH
 async function loadCache(url) {
+  // Validate URL parameter
+  if (!url || typeof url !== 'string') {
+    console.error("❌ Invalid URL provided to loadCache");
+    return false;
+  }
+
   console.log("🔄 Loading cache...");
   const t0 = Date.now();
   const p = await fetchPts(url);
@@ -2137,7 +2198,7 @@ module.exports = {
                 value: `${p.amount}pts`,
                 inline: true,
               },
-              { name: 'ðŸ¤" Bidder', value: p.username, inline: true }
+              { name: '👤 Bidder', value: p.username, inline: true }
             ),
         ],
       });
@@ -2388,7 +2449,7 @@ module.exports = {
   },
 
   recoverBiddingState: async (client, config) => {
-    if (load()) {
+    if (await load()) {
       console.log(`${EMOJI.SUCCESS} State recovered`);
       if (st.cp) {
         const age = Math.floor((Date.now() - st.ct) / 60000);

@@ -17,7 +17,7 @@ const getNearestRarity = c => Object.entries(rarityColors).reduce((a, [k, b]) =>
 let bossNames = [];
 try {
   const bossData = JSON.parse(fs.readFileSync(path.join(__dirname, 'boss_points.json'), 'utf8'));
-  bossNames = Object.values(bossData).flatMap(boss => boss.aliases);
+  bossNames = Object.values(bossData).flatMap(boss => boss.aliases || []);
 } catch (e) {
   console.log("Warning: Could not load boss_points.json, using hardcoded boss list");
   bossNames = [
@@ -47,19 +47,29 @@ const isBlacklisted = item => {
 
 const processImage = async img => {
   const p = `./tmp_${Date.now()}.png`;
-  await sharp(img)
-    .resize(3000, 3000, { fit: 'inside', withoutEnlargement: true })
-    .normalize()
-    .sharpen()
-    .gamma(1.2)
-    .toFile(p);
-  const buf = fs.readFileSync(p);
-  const res = await Tesseract.recognize(buf, "eng", {
-    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ',
-    tessedit_pageseg_mode: Tesseract.PSM.AUTO
-  });
-  fs.unlinkSync(p);
-  return res.data.text;
+  try {
+    await sharp(img)
+      .resize(3000, 3000, { fit: 'inside', withoutEnlargement: true })
+      .normalize()
+      .sharpen()
+      .gamma(1.2)
+      .toFile(p);
+    const buf = fs.readFileSync(p);
+    const res = await Tesseract.recognize(buf, "eng", {
+      tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ',
+      tessedit_pageseg_mode: Tesseract.PSM.AUTO
+    });
+    return res.data.text;
+  } finally {
+    // Always clean up temp file, even if error occurs
+    try {
+      if (fs.existsSync(p)) {
+        fs.unlinkSync(p);
+      }
+    } catch (e) {
+      console.warn(`⚠️ Failed to delete temp file ${p}: ${e.message}`);
+    }
+  }
 };
 
 const parseLoots = text => {
