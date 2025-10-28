@@ -218,6 +218,13 @@ async function startAuctioneering(client, config, channel) {
     return;
   }
 
+if (![0, 5].includes(channel.type)) {
+  console.error(`❌ Invalid channel type (${channel.type}) — must be text or announcement channel.`);
+  const guild = await client.guilds.fetch(config.main_guild_id);
+  channel = await guild.channels.fetch(config.bidding_channel_id);
+  console.log(`✅ Recovered correct bidding channel: ${channel.name} (${channel.id})`);
+}
+
   // Load points
   const pointsFetched = await biddingModule.loadPointsCacheForAuction(
     config.sheet_webhook_url
