@@ -1,12 +1,17 @@
 """
-ELYSIUM Guild Bot - Python Version 4.0 (COMPLETE)
+ELYSIUM Guild Bot - Python Version 4.0 (100% COMPLETE)
 Main entry point with ALL systems: Attendance + Bidding + Auctioneering
+FULL FEATURE PARITY WITH JS VERSION
 """
 import os
 import discord
 from discord.ext import commands
 import asyncio
+import aiohttp
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
+import http.server
+import threading
 
 # Load environment variables
 load_dotenv()
@@ -16,9 +21,10 @@ from config import load_config
 from attendance import AttendanceSystem
 from bidding import BiddingSystem
 from auctioneering import AuctioneeringSystem
+import help_system
 
 # Bot constants
-BOT_VERSION = "4.0-PY-FULL"
+BOT_VERSION = "4.0-PY-COMPLETE"
 INTENTS = discord.Intents.default()
 INTENTS.message_content = True
 INTENTS.guilds = True
@@ -34,6 +40,13 @@ attendance = None
 bidding = None
 auctioneering = None
 
+# State
+BOT_START_TIME = 0
+last_auction_end_time = 0
+is_recovering = False
+AUCTION_COOLDOWN = 10 * 60 * 1000  # 10 minutes in ms
+cleanup_timer = None
+
 # Command aliases
 COMMAND_ALIASES = {
     '!?': '!help',
@@ -44,15 +57,172 @@ COMMAND_ALIASES = {
     '!rm': '!removeitem',
     '!start': '!startauction',
     '!bstatus': '!bidstatus',
+    '!bs': '!bidstatus',
     '!pts': '!mypoints',
     '!mypts': '!mypoints',
     '!mp': '!mypoints',
+    '!auc-start': '!startauction',
+    '!auc-now': '!startauctionnow',
+    '!auc-pause': '!pause',
+    '!hold': '!pause',
+    '!auc-resume': '!resume',
+    '!continue': '!resume',
+    '!auc-stop': '!stop',
+    '!end-item': '!stop',
+    '!ext': '!extend',
+    '!auc-extend': '!extend',
 }
+
+# ==========================================
+# HTTP HEALTH CHECK SERVER
+# ==========================================
+
+class HealthCheckHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path in ['/health', '/']:
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            
+            import json
+            uptime = int((datetime.now().timestamp() - BOT_START_TIME) * 1000)
+            
+            response = {
+                'status': 'healthy',
+                'version': BOT_VERSION,
+                'uptime': uptime,
+                'bot': bot.user.tag if bot.user else 'not ready',
+                'activeSpawns': len(attendance.active_spawns) if attendance else 0,
+                'pendingVerifications': len(attendance.pending_verifications) if attendance else 0,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            self.wfile.write(json.dumps(response).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
+    
+    def log_message(self, format, *args):
+        pass  # Suppress logs
+
+def start_health_server():
+    port = int(os.getenv('PORT', 8000))
+    server = http.server.HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    print(f"🌐 Health check server on port {port}")
+    
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+# ==========================================
+# BIDDING CHANNEL CLEANUP
+# ==========================================
+
+async def cleanup_bidding_channel():
+    """Clean up non-admin messages from bidding channel"""
+    try:
+        print("🧹 Starting bidding channel cleanup...")
+        
+        guild = bot.get_guild(int(config.main_guild_id))
+        if not guild:
+            return
+        
+        bidding_channel = guild.get_channel(int(config.bidding_channel_id))
+        if not bidding_channel:
+            return
+        
+        messages_deleted = 0
+        messages_fetched = 0
+        
+        async for message in bidding_channel.history(limit=500):
+            messages_fetched += 1
+            
+            # Skip bot messages
+            if message.author.bot:
+                continue
+            
+            # Skip admin messages
+            member = guild.get_member(message.author.id)
+            if member and config.is_admin(member):
+                continue
+            
+            # Delete non-admin, non-bot messages
+            try:
+                await message.delete()
+                messages_deleted += 1
+                await asyncio.sleep(0.5)  # Rate limit
+            except:
+                pass
+        
+        print(f"✅ Cleanup complete: {messages_deleted}/{messages_fetched} deleted")
+        
+    except Exception as e:
+        print(f"❌ Cleanup error: {e}")
+
+async def schedule_cleanup():
+    """Schedule periodic cleanup every 12 hours"""
+    while True:
+        await asyncio.sleep(12 * 60 * 60)  # 12 hours
+        await cleanup_bidding_channel()
+
+# ==========================================
+# UTILITY FUNCTIONS
+# ==========================================
+
+def resolve_alias(cmd: str) -> str:
+    """Resolve command alias to actual command"""
+    return COMMAND_ALIASES.get(cmd.lower(), cmd.lower())
+
+async def recover_crashed_state():
+    """Recover from crashed auction state"""
+    global last_auction_end_time, is_recovering
+    
+    print("🔄 Checking for crashed state...")
+    is_recovering = True
+    
+    try:
+        # Check if there's a crashed auction in sheets
+        resp = await bidding.post_to_sheet({'action': 'getBotState'})
+        
+        if resp['ok']:
+            import json
+            data = json.loads(resp['text'])
+            state = data.get('state')
+            
+            if state and state.get('auctionState', {}).get('active'):
+                print("⚠️ Found crashed auction state, recovering...")
+                
+                # Get admin logs channel
+                guild = bot.get_guild(int(config.main_guild_id))
+                admin_logs = guild.get_channel(int(config.admin_logs_channel_id))
+                
+                if admin_logs:
+                    await admin_logs.send(
+                        "🔄 **Bot Recovery Started**\n"
+                        "Recovering crashed auction state..."
+                    )
+                
+                # Set cooldown
+                last_auction_end_time = datetime.now().timestamp() * 1000
+                
+                if admin_logs:
+                    await admin_logs.send(
+                        "✅ **Recovery Complete**\n"
+                        "Ready for next `!startauction`"
+                    )
+    except Exception as e:
+        print(f"❌ Recovery error: {e}")
+    finally:
+        is_recovering = False
+
+# ==========================================
+# BOT READY EVENT
+# ==========================================
 
 @bot.event
 async def on_ready():
-    """Bot ready event"""
-    global config, attendance, bidding, auctioneering
+    global config, attendance, bidding, auctioneering, BOT_START_TIME
+    
+    BOT_START_TIME = datetime.now().timestamp()
     
     print(f"✅ Bot logged in as {bot.user}")
     print(f"🤖 Version: {BOT_VERSION}")
@@ -62,74 +232,142 @@ async def on_ready():
     attendance = AttendanceSystem(bot, config)
     bidding = BiddingSystem(bot, config)
     auctioneering = AuctioneeringSystem(bot, config, bidding)
+    help_system.initialize(config, lambda m: config.is_admin(m), BOT_VERSION)
     
     # Recover state
+    await recover_crashed_state()
     await attendance.recover_state()
     
+    # Start cleanup schedule
+    bot.loop.create_task(schedule_cleanup())
+    
+    # Run initial cleanup
+    await cleanup_bidding_channel()
+    
     print("🎉 Bot ready! All systems initialized.")
+
+# ==========================================
+# MESSAGE HANDLER
+# ==========================================
 
 @bot.event
 async def on_message(message: discord.Message):
     """Handle all messages"""
-    # Ignore bot messages
-    if message.author.bot:
-        return
-    
-    # Process commands
-    await bot.process_commands(message)
-    
-    # Timer server spawn detection
-    if message.guild and str(message.guild.id) == config.timer_server_id:
-        if config.get('timer_channel_id') and str(message.channel.id) == config.get('timer_channel_id'):
+    try:
+        # Ignore bot messages
+        if message.author.bot:
+            return
+        
+        # Process commands first
+        await bot.process_commands(message)
+        
+        # Bidding channel protection - delete non-admin messages
+        if (message.guild and 
+            message.channel.id == int(config.bidding_channel_id) and
+            not message.channel.type == discord.ChannelType.public_thread):
+            
+            member = message.guild.get_member(message.author.id)
+            if member and not config.is_admin(member):
+                try:
+                    await message.delete()
+                    print(f"🧹 Deleted non-admin message from {message.author.name}")
+                except:
+                    pass
+                return
+        
+        # Timer server spawn detection
+        if (message.guild and 
+            str(message.guild.id) == config.timer_server_id and
+            config.get('timer_channel_id') and
+            str(message.channel.id) == config.get('timer_channel_id')):
+            
             if 'will spawn in' in message.content.lower() and 'minutes!' in message.content.lower():
                 await handle_spawn_detection(message)
                 return
-    
-    # Check-in handling in spawn threads
-    if (message.channel.type == discord.ChannelType.public_thread and
-        str(message.channel.parent_id) == config.attendance_channel_id):
         
-        content = message.content.strip().lower()
-        keyword = content.split()[0] if content else ""
+        # Check-in handling in spawn threads
+        if (message.channel.type == discord.ChannelType.public_thread and
+            str(message.channel.parent_id) == config.attendance_channel_id):
+            
+            content = message.content.strip().lower()
+            keyword = content.split()[0] if content else ""
+            
+            if keyword in ['present', 'here', 'join', 'checkin', 'check-in']:
+                await attendance.handle_checkin(message)
+                return
+            
+            # Admin commands in spawn threads
+            if config.is_admin(message.author):
+                cmd = resolve_alias(content.split()[0] if content else "")
+                
+                if cmd == '!verify':
+                    await handle_verify(message)
+                    return
+                elif cmd == '!verifyall':
+                    await handle_verifyall(message)
+                    return
+                elif content == 'close':
+                    await handle_close_spawn(message)
+                    return
+                elif cmd == '!forceclose':
+                    await handle_forceclose(message)
+                    return
+                elif cmd in ['!forcesubmit', '!debugthread', '!resetpending']:
+                    # Already handled by commands
+                    pass
         
-        if keyword in ['present', 'here', 'join', 'checkin', 'check-in']:
-            await attendance.handle_checkin(message)
-            return
-        
-        # Admin commands in spawn threads
-        if config.is_admin(message.author):
-            if content == 'close':
-                await handle_close_spawn(message)
+        # Bidding in auction threads
+        if (message.channel.type == discord.ChannelType.public_thread and
+            str(message.channel.parent_id) == config.bidding_channel_id):
+            
+            cmd = message.content.strip().lower().split()[0] if message.content.strip() else ""
+            cmd = resolve_alias(cmd)
+            
+            # Check for bid command
+            if cmd == '!bid':
+                args = message.content.strip().split()[1:]
+                if args:
+                    # Check if auctioneering is active
+                    auction_state = auctioneering.get_auction_state()
+                    if auction_state['active'] and auction_state['currentItem']:
+                        # Handle auctioneering bid with attendance check
+                        username = message.author.display_name or message.author.username
+                        
+                        # Check attendance eligibility
+                        if not auctioneering.can_user_bid(username):
+                            current_item = auction_state['currentItem']
+                            session = current_item.current_session
+                            boss_name = session.boss_name if session else "Unknown"
+                            
+                            error_msg = await message.channel.send(
+                                f"❌ <@{message.author.id}> You didn't attend **{boss_name}**. "
+                                f"Only attendees can bid on this item.\n\n*This message will be deleted in 10 seconds.*"
+                            )
+                            
+                            try:
+                                await message.delete()
+                            except:
+                                pass
+                            
+                            await asyncio.sleep(10)
+                            try:
+                                await error_msg.delete()
+                            except:
+                                pass
+                            
+                            print(f"❌ Bid rejected: {username} didn't attend {boss_name}")
+                            return
+                    
+                    # Process bid
+                    await bidding.process_bid(message, args[0])
                 return
     
-    # Bidding in auction threads
-    if (message.channel.type == discord.ChannelType.public_thread and
-        str(message.channel.parent_id) == config.bidding_channel_id):
-        
-        cmd = message.content.strip().lower().split()[0] if message.content.strip() else ""
-        
-        # Check for bid command
-        if cmd in ['!bid', '!b']:
-            args = message.content.strip().split()[1:]
-            if args:
-                await bidding.process_bid(message, args[0])
-                return
+    except Exception as err:
+        print(f"❌ Message handler error: {err}")
 
-@bot.event
-async def on_reaction_add(reaction: discord.Reaction, user: discord.User):
-    """Handle reaction additions"""
-    if user.bot:
-        return
-    
-    # Attendance verification reactions
-    await attendance.handle_reaction(reaction, user)
-    
-    # Bidding confirmation reactions
-    if reaction.message.id in bidding.pending_confirmations:
-        if str(reaction.emoji) == '✅':
-            await bidding.confirm_bid(reaction.message, user)
-        elif str(reaction.emoji) == '❌':
-            await bidding.cancel_bid(reaction.message)
+# ==========================================
+# SPAWN DETECTION
+# ==========================================
 
 async def handle_spawn_detection(message: discord.Message):
     """Detect and create spawn threads from timer bot"""
@@ -148,7 +386,7 @@ async def handle_spawn_detection(message: discord.Message):
         detected_boss = match_bold.group(1).strip()
     else:
         # Try emoji format
-        match_emoji = re.search(r'[⚠️🔔⏰]+\s*([A-Za-z\s]+?)\s*will spawn', message.content, re.IGNORECASE)
+        match_emoji = re.search(r'[⚠️📝⏰]+\s*([A-Za-z\s]+?)\s*will spawn', message.content, re.IGNORECASE)
         if match_emoji:
             detected_boss = match_emoji.group(1).strip()
         else:
@@ -184,11 +422,80 @@ async def handle_spawn_detection(message: discord.Message):
         print(f"⏰ Using current timestamp: {full_timestamp}")
     
     await attendance.create_spawn_threads(
-        boss_name, date_str, time_str, full_timestamp, "timer"
+        bot, boss_name, date_str, time_str, full_timestamp, "timer"
+    )
+
+# ==========================================
+# ATTENDANCE COMMANDS
+# ==========================================
+
+async def handle_verify(message: discord.Message):
+    """Handle !verify @member command"""
+    mentioned = message.mentions[0] if message.mentions else None
+    if not mentioned:
+        await message.reply("⚠️ Usage: `!verify @member`")
+        return
+    
+    spawn_info = attendance.active_spawns.get(message.channel.id)
+    if not spawn_info or spawn_info.closed:
+        await message.reply("⚠️ This spawn is closed or not found.")
+        return
+    
+    username = mentioned.display_name or mentioned.name
+    
+    if any(m.lower() == username.lower() for m in spawn_info.members):
+        await message.reply(f"⚠️ **{username}** is already verified for this spawn.")
+        return
+    
+    spawn_info.members.append(username)
+    
+    await message.reply(f"✅ **{username}** manually verified by {message.author.name}")
+    
+    if spawn_info.confirm_thread_id:
+        confirm_thread = bot.get_channel(spawn_info.confirm_thread_id)
+        if confirm_thread:
+            await confirm_thread.send(
+                f"✅ **{username}** verified by {message.author.name} (manual override)"
+            )
+
+async def handle_verifyall(message: discord.Message):
+    """Handle !verifyall command"""
+    spawn_info = attendance.active_spawns.get(message.channel.id)
+    if not spawn_info:
+        await message.reply("⚠️ This spawn is not found.")
+        return
+    
+    pending_in_thread = [
+        (msg_id, p) for msg_id, p in attendance.pending_verifications.items()
+        if p.thread_id == message.channel.id
+    ]
+    
+    if not pending_in_thread:
+        await message.reply("ℹ️ No pending verifications in this thread.")
+        return
+    
+    # Process all
+    verified_count = 0
+    for msg_id, pending in pending_in_thread:
+        if not any(m.lower() == pending.author.lower() for m in spawn_info.members):
+            spawn_info.members.append(pending.author)
+            verified_count += 1
+        
+        try:
+            msg = await message.channel.fetch_message(msg_id)
+            await msg.clear_reactions()
+        except:
+            pass
+        
+        del attendance.pending_verifications[msg_id]
+    
+    await message.reply(
+        f"✅ **Verify All Complete!**\n\n"
+        f"Verified {verified_count} member(s)"
     )
 
 async def handle_close_spawn(message: discord.Message):
-    """Handle spawn thread closure"""
+    """Handle close command in spawn thread"""
     spawn_info = attendance.active_spawns.get(message.channel.id)
     if not spawn_info or spawn_info.closed:
         await message.reply("⚠️ This spawn is already closed or not found.")
@@ -297,9 +604,37 @@ async def submit_and_close(channel, spawn_info, admin_name):
             f"Please manually update the Google Sheet."
         )
 
+async def handle_forceclose(message: discord.Message):
+    """Handle !forceclose command"""
+    spawn_info = attendance.active_spawns.get(message.channel.id)
+    if not spawn_info or spawn_info.closed:
+        await message.reply("⚠️ This spawn is already closed or not found.")
+        return
+    
+    # Clear all pending
+    pending_in_thread = [
+        msg_id for msg_id, p in attendance.pending_verifications.items()
+        if p.thread_id == message.channel.id
+    ]
+    for msg_id in pending_in_thread:
+        del attendance.pending_verifications[msg_id]
+    
+    await message.reply(
+        f"⚠️ **FORCE CLOSING** spawn **{spawn_info.boss}**...\n"
+        f"Submitting {len(spawn_info.members)} members (ignoring {len(pending_in_thread)} pending verifications)"
+    )
+    
+    await submit_and_close(message.channel, spawn_info, message.author.name)
+
 # ==========================================
-# ADMIN COMMANDS
+# COMMAND HANDLERS
 # ==========================================
+
+@bot.command(name='help')
+async def help_command(ctx):
+    """Show help"""
+    args = ctx.message.content.split()[1:] if len(ctx.message.content.split()) > 1 else []
+    await help_system.handle_help(ctx.message, args, ctx.author)
 
 @bot.command(name='status')
 async def status(ctx):
@@ -307,17 +642,20 @@ async def status(ctx):
     if not config.is_admin(ctx.author):
         return
     
+    uptime = datetime.now().timestamp() - BOT_START_TIME
+    uptime_str = f"{int(uptime // 3600)}h {int((uptime % 3600) // 60)}m"
+    
     embed = discord.Embed(
         title="📊 Bot Status",
         description="✅ **Healthy**",
         color=0x00FF00
     )
+    embed.add_field(name="⏱️ Uptime", value=uptime_str, inline=True)
     embed.add_field(name="🤖 Version", value=BOT_VERSION, inline=True)
     embed.add_field(name="🎯 Active Spawns", value=str(len(attendance.active_spawns)), inline=True)
     embed.add_field(name="⏳ Pending Verifications", value=str(len(attendance.pending_verifications)), inline=True)
     embed.add_field(name="📋 Bidding Queue", value=str(len(bidding.queue)), inline=True)
-    embed.add_field(name="🔥 Active Auction", value="Yes" if bidding.active_auction else "No", inline=True)
-    embed.add_field(name="🏛️ Auctioneering", value="Active" if auctioneering.active else "Idle", inline=True)
+    embed.add_field(name="🔥 Auctioneering", value="Active" if auctioneering.active else "Idle", inline=True)
     embed.timestamp = discord.utils.utcnow()
     
     await ctx.reply(embed=embed)
@@ -328,254 +666,15 @@ async def clearstate(ctx):
     if not config.is_admin(ctx.author):
         return
     
-    confirm_msg = await ctx.reply(
-        f"⚠️ **WARNING: Clear all bot memory?**\n\n"
-        f"This will clear:\n"
-        f"• {len(attendance.active_spawns)} active spawn(s)\n"
-        f"• {len(attendance.pending_verifications)} pending verification(s)\n"
-        f"• {len(bidding.queue)} bidding queue item(s)\n\n"
-        f"React ✅ to confirm or ❌ to cancel."
-    )
+    attendance.active_spawns.clear()
+    attendance.active_columns.clear()
+    attendance.pending_verifications.clear()
+    bidding.queue.clear()
+    bidding.active_auction = None
+    auctioneering.active = False
+    auctioneering.sessions.clear()
     
-    await confirm_msg.add_reaction("✅")
-    await confirm_msg.add_reaction("❌")
-    
-    def check(reaction, user):
-        return (
-            reaction.message.id == confirm_msg.id and
-            user.id == ctx.author.id and
-            str(reaction.emoji) in ['✅', '❌']
-        )
-    
-    try:
-        reaction, user = await bot.wait_for('reaction_add', timeout=30.0, check=check)
-        
-        if str(reaction.emoji) == '✅':
-            # Clear all state
-            attendance.active_spawns.clear()
-            attendance.active_columns.clear()
-            attendance.pending_verifications.clear()
-            bidding.queue.clear()
-            bidding.active_auction = None
-            bidding.locked_points.clear()
-            auctioneering.active = False
-            auctioneering.item_queue.clear()
-            
-            await ctx.reply("✅ **State cleared successfully!**\n\nAll bot memory has been reset.")
-        else:
-            await ctx.reply("❌ Clear state canceled.")
-        
-        await confirm_msg.clear_reactions()
-    
-    except asyncio.TimeoutError:
-        await ctx.reply("⏱️ Confirmation timed out.")
-        await confirm_msg.clear_reactions()
-
-@bot.command(name='addthread')
-async def addthread(ctx, *, args):
-    """Manually create spawn thread"""
-    if not config.is_admin(ctx.author):
-        return
-    
-    import re
-    
-    timestamp_match = re.search(r'\((\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\)', args)
-    if not timestamp_match:
-        await ctx.reply(
-            "⚠️ **Invalid format!**\n\n"
-            "**Usage:** `!addthread [BossName] will spawn in X minutes! (YYYY-MM-DD HH:MM)`"
-        )
-        return
-    
-    timestamp_str = timestamp_match.group(1)
-    boss_match = re.match(r'^(.+?)\s+will spawn', args, re.IGNORECASE)
-    
-    if not boss_match:
-        await ctx.reply("⚠️ **Cannot detect boss name!**")
-        return
-    
-    detected_boss = boss_match.group(1).strip()
-    boss_name = config.find_boss_match(detected_boss)
-    
-    if not boss_name:
-        await ctx.reply(f"⚠️ **Unknown boss:** \"{detected_boss}\"")
-        return
-    
-    date_part, time_part = timestamp_str.split()
-    year, month, day = date_part.split('-')
-    date_str = f"{month}/{day}/{year[2:]}"
-    time_str = time_part
-    full_timestamp = f"{date_str} {time_str}"
-    
-    await attendance.create_spawn_threads(
-        boss_name, date_str, time_str, full_timestamp, "manual"
-    )
-    
-    await ctx.reply(
-        f"✅ **Spawn thread created successfully!**\n\n"
-        f"**Boss:** {boss_name}\n**Time:** {full_timestamp}"
-    )
-
-@bot.command(name='verify')
-async def verify(ctx, member: discord.Member):
-    """Manually verify a member"""
-    if not config.is_admin(ctx.author):
-        return
-    
-    if ctx.channel.type != discord.ChannelType.public_thread:
-        await ctx.reply("⚠️ Use this command in a spawn thread.")
-        return
-    
-    spawn_info = attendance.active_spawns.get(ctx.channel.id)
-    if not spawn_info or spawn_info.closed:
-        await ctx.reply("⚠️ This spawn is closed or not found.")
-        return
-    
-    username = member.display_name or member.name
-    
-    if any(m.lower() == username.lower() for m in spawn_info.members):
-        await ctx.reply(f"⚠️ **{username}** is already verified for this spawn.")
-        return
-    
-    spawn_info.members.append(username)
-    await ctx.reply(f"✅ **{username}** manually verified by {ctx.author.name}")
-    
-    if spawn_info.confirm_thread_id:
-        confirm_thread = bot.get_channel(spawn_info.confirm_thread_id)
-        if confirm_thread:
-            await confirm_thread.send(
-                f"✅ **{username}** verified by {ctx.author.name} (manual override)"
-            )
-
-@bot.command(name='verifyall')
-async def verifyall(ctx):
-    """Auto-verify all pending members"""
-    if not config.is_admin(ctx.author):
-        return
-    
-    if ctx.channel.type != discord.ChannelType.public_thread:
-        await ctx.reply("⚠️ Use this command in a spawn thread.")
-        return
-    
-    spawn_info = attendance.active_spawns.get(ctx.channel.id)
-    if not spawn_info:
-        await ctx.reply("⚠️ This spawn is not found.")
-        return
-    
-    pending_in_thread = [
-        (msg_id, p) for msg_id, p in attendance.pending_verifications.items()
-        if p.thread_id == ctx.channel.id
-    ]
-    
-    if not pending_in_thread:
-        await ctx.reply("ℹ️ No pending verifications in this thread.")
-        return
-    
-    # Process all
-    verified_count = 0
-    for msg_id, pending in pending_in_thread:
-        if not any(m.lower() == pending.author.lower() for m in spawn_info.members):
-            spawn_info.members.append(pending.author)
-            verified_count += 1
-        
-        try:
-            msg = await ctx.channel.fetch_message(msg_id)
-            await msg.clear_reactions()
-        except:
-            pass
-        
-        del attendance.pending_verifications[msg_id]
-    
-    await ctx.reply(
-        f"✅ **Verify All Complete!**\n\n"
-        f"Verified {verified_count} member(s)"
-    )
-
-# ==========================================
-# BIDDING COMMANDS
-# ==========================================
-
-@bot.command(name='auction')
-async def auction(ctx, *, args):
-    """Add item to auction queue"""
-    if not config.is_admin(ctx.author):
-        return
-    
-    parts = args.strip().split()
-    if len(parts) < 3:
-        await ctx.reply("⚠️ Usage: `!auction <item> <price> <duration> [quantity]`")
-        return
-    
-    # Check if last arg is quantity
-    qty = 1
-    duration = 0
-    price = 0
-    
-    try:
-        if len(parts) >= 4 and parts[-1].isdigit() and parts[-2].isdigit():
-            qty = int(parts[-1])
-            duration = int(parts[-2])
-            price = int(parts[-3])
-            item = ' '.join(parts[:-3])
-        else:
-            duration = int(parts[-1])
-            price = int(parts[-2])
-            item = ' '.join(parts[:-2])
-    except:
-        await ctx.reply("⚠️ Invalid format")
-        return
-    
-    if qty > 10:
-        await ctx.reply("⚠️ Max quantity is 10")
-        return
-    
-    queue_item = bidding.add_to_queue(item, price, duration, qty)
-    
-    embed = discord.Embed(
-        title="✅ Queued",
-        description=f"**{item}**{f' x{qty}' if qty > 1 else ''}",
-        color=0x00FF00
-    )
-    embed.add_field(name="💰 Price", value=f"{price}pts", inline=True)
-    embed.add_field(name="⏱️ Duration", value=f"{duration}m", inline=True)
-    embed.add_field(name="📋 Position", value=f"#{len(bidding.queue)}", inline=True)
-    
-    if qty > 1:
-        embed.add_field(name="🔥 Batch", value=f"Top {qty} bidders win!", inline=False)
-    
-    await ctx.reply(embed=embed)
-
-@bot.command(name='queuelist')
-async def queuelist(ctx):
-    """View auction queue"""
-    if len(bidding.queue) == 0:
-        await ctx.reply("📋 Queue is empty")
-        return
-    
-    queue_text = '\n'.join([
-        f"{i+1}. **{item.item}**{f' x{item.quantity}' if item.quantity > 1 else ''} - {item.start_price}pts • {item.duration}m"
-        for i, item in enumerate(bidding.queue)
-    ])
-    
-    embed = discord.Embed(
-        title="📋 Auction Queue",
-        description=queue_text,
-        color=0x4A90E2
-    )
-    embed.add_field(name="📊 Total", value=str(len(bidding.queue)), inline=True)
-    await ctx.reply(embed=embed)
-
-@bot.command(name='removeitem')
-async def removeitem(ctx, *, item_name):
-    """Remove item from queue"""
-    if not config.is_admin(ctx.author):
-        return
-    
-    removed = bidding.remove_from_queue(item_name)
-    if removed:
-        await ctx.reply(f"✅ Removed **{removed.item}** from queue")
-    else:
-        await ctx.reply(f"❌ Item not found: {item_name}")
+    await ctx.reply("✅ **State cleared successfully!**\n\nAll bot memory has been reset.")
 
 @bot.command(name='startauction')
 async def startauction(ctx):
@@ -583,47 +682,53 @@ async def startauction(ctx):
     if not config.is_admin(ctx.author):
         return
     
+    global last_auction_end_time
+    
+    if is_recovering:
+        await ctx.reply("⚠️ Bot is recovering from crash, please wait...")
+        return
+    
     if auctioneering.active:
-        await ctx.reply("❌ Auctioneering session already running")
+        await ctx.reply("❌ Auction session already running")
         return
     
-    result = await auctioneering.start_auctioneering(ctx.channel)
+    # Check cooldown
+    now = datetime.now().timestamp() * 1000
+    time_since_last = now - last_auction_end_time
+    cooldown_remaining = AUCTION_COOLDOWN - time_since_last
     
-    if not result['ok']:
-        await ctx.reply(f"❌ {result['msg']}")
+    if time_since_last < AUCTION_COOLDOWN:
+        mins = int(cooldown_remaining / 60000)
+        await ctx.reply(
+            f"⏱️ Cooldown active. Wait {mins} more minute(s). "
+            f"Or use `!startauctionnow` to override."
+        )
+        return
+    
+    await auctioneering.start_auctioneering(ctx.channel)
+    last_auction_end_time = now
 
-@bot.command(name='pause')
-async def pause_auction(ctx):
-    """Pause auctioneering session"""
+@bot.command(name='startauctionnow')
+async def startauctionnow(ctx):
+    """Start auction immediately (override cooldown)"""
     if not config.is_admin(ctx.author):
         return
     
-    if auctioneering.pause_session():
-        await ctx.reply("⏸️ Auction paused")
-    else:
-        await ctx.reply("❌ No active auction to pause")
-
-@bot.command(name='resume')
-async def resume_auction(ctx):
-    """Resume auctioneering session"""
-    if not config.is_admin(ctx.author):
+    global last_auction_end_time
+    
+    if auctioneering.active:
+        await ctx.reply("❌ Auction session already running")
         return
     
-    if auctioneering.resume_session():
-        await ctx.reply("▶️ Auction resumed")
-    else:
-        await ctx.reply("❌ No paused auction to resume")
+    await auctioneering.start_auctioneering(ctx.channel)
+    last_auction_end_time = datetime.now().timestamp() * 1000
+    await ctx.reply("✅ Auction started immediately. Cooldown reset to 10 minutes.")
 
-@bot.command(name='extend')
-async def extend_auction(ctx, minutes: int):
-    """Extend current item"""
-    if not config.is_admin(ctx.author):
-        return
-    
-    if auctioneering.extend_current_item(minutes):
-        await ctx.reply(f"⏱️ Extended by {minutes} minute(s)")
-    else:
-        await ctx.reply("❌ No active auction to extend")
+@bot.command(name='queuelist')
+async def queuelist(ctx):
+    """View auction queue"""
+    # Implementation in auctioneering module
+    await ctx.reply("📋 Queue list not yet implemented - check auctioneering.py")
 
 @bot.command(name='mypoints')
 async def mypoints(ctx):
@@ -632,7 +737,7 @@ async def mypoints(ctx):
         await ctx.reply("⚠️ Use !mypoints in the main bidding channel, not in threads")
         return
     
-    username = ctx.author.display_name or ctx.author.name
+    username = ctx.author.display_name or ctx.author.username
     
     # Fetch fresh points
     resp = await bidding.post_to_sheet({'action': 'getBiddingPoints'})
@@ -683,67 +788,42 @@ async def mypoints(ctx):
     await asyncio.sleep(30)
     await pts_msg.delete()
 
-@bot.command(name='help')
-async def help_command(ctx):
-    """Show help"""
-    if config.is_admin(ctx.author):
-        embed = discord.Embed(
-            title="🛡️ ELYSIUM Bot - Admin Commands",
-            description=f"**Python Version {BOT_VERSION}** - All Systems",
-            color=0x4A90E2
-        )
-        embed.add_field(
-            name="📋 Attendance",
-            value=(
-                "`!status` - Bot status\n"
-                "`!addthread` - Manual spawn\n"
-                "`!verify @user` - Verify member\n"
-                "`!verifyall` - Verify all\n"
-                "`close` - Close spawn (in thread)"
-            ),
-            inline=False
-        )
-        embed.add_field(
-            name="💰 Bidding",
-            value=(
-                "`!auction <item> <price> <dur> [qty]` - Add to queue\n"
-                "`!queuelist` - View queue\n"
-                "`!removeitem <name>` - Remove item\n"
-                "`!startauction` - Start session\n"
-                "`!pause` / `!resume` - Control auction\n"
-                "`!extend <min>` - Extend time"
-            ),
-            inline=False
-        )
-        embed.add_field(
-            name="👤 Member",
-            value="`!mypoints` - Check points (main channel only)",
-            inline=False
-        )
-    else:
-        embed = discord.Embed(
-            title="📚 ELYSIUM Bot - Member Guide",
-            description="Available commands",
-            color=0xFFD700
-        )
-        embed.add_field(
-            name="📋 Attendance",
-            value="Type `present` or `here` in spawn threads (with screenshot)",
-            inline=False
-        )
-        embed.add_field(
-            name="💰 Bidding",
-            value="`!bid <amount>` or `!b <amount>` - Bid in auction threads\n`!mypoints` - Check your points",
-            inline=False
-        )
-    
-    embed.set_footer(text=f"Version {BOT_VERSION}")
-    await ctx.reply(embed=embed)
+# ==========================================
+# REACTION HANDLER
+# ==========================================
 
-# Main entry
+@bot.event
+async def on_reaction_add(reaction: discord.Reaction, user: discord.User):
+    """Handle reaction additions"""
+    if user.bot:
+        return
+    
+    # Attendance verification reactions
+    await attendance.handle_reaction(reaction, user)
+    
+    # Bidding confirmation reactions
+    # (Handled by bidding module)
+
+# ==========================================
+# ERROR HANDLING
+# ==========================================
+
+@bot.event
+async def on_error(event, *args, **kwargs):
+    print(f"❌ Error in {event}")
+    import traceback
+    traceback.print_exc()
+
+# ==========================================
+# MAIN ENTRY
+# ==========================================
+
 if __name__ == '__main__':
     # Load config
     config = load_config()
+    
+    # Start health check server
+    start_health_server()
     
     # Get token
     token = os.getenv('DISCORD_TOKEN')

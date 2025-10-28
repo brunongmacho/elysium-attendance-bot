@@ -1,6 +1,6 @@
 """
-ELYSIUM Bot - Auctioneering System
-Manages automated auction sessions from Google Sheets + manual queue
+ELYSIUM Bot - Auctioneering System v2.1 - PYTHON PORT
+Session-based auction with attendance filtering
 """
 import discord
 import asyncio
@@ -11,16 +11,11 @@ from typing import Dict, Optional, List
 from dataclasses import dataclass, field
 
 @dataclass
-class AuctionItem:
-    item: str
-    start_price: int
-    duration: int
-    quantity: int
-    source: str  # "GoogleSheet" or "QueueList"
-    sheet_index: Optional[int] = None
-    batch_number: Optional[int] = None
-    batch_total: Optional[int] = None
-    auction_start_time: Optional[str] = None
+class AuctionSession:
+    boss_key: str
+    boss_name: str
+    items: List[Dict]
+    attendees: List[str]
 
 @dataclass
 class CurrentItem:
@@ -41,6 +36,9 @@ class CurrentItem:
     auction_start_time: Optional[str] = None
     auction_end_time: Optional[str] = None
     sheet_index: Optional[int] = None
+    batch_number: Optional[int] = None
+    batch_total: Optional[int] = None
+    current_session: Optional[AuctionSession] = None
 
 class AuctioneeringSystem:
     def __init__(self, bot, config, bidding_system):
@@ -50,21 +48,22 @@ class AuctioneeringSystem:
         
         # State
         self.active = False
-        self.current_item: Optional[CurrentItem] = None
-        self.item_queue: List[AuctionItem] = []
-        self.session_items: List[Dict] = []
+        self.sessions: List[AuctionSession] = []
+        self.current_session_index = 0
         self.current_item_index = 0
-        self.paused = False
-        self.paused_time: Optional[float] = None
-        
-        # Tracking
-        self.session_start_time: Optional[float] = None
-        self.session_timestamp: Optional[str] = None
+        self.current_item: Optional[CurrentItem] = None
+        self.session_items: List[Dict] = []
         self.manual_items_auctioned: List[Dict] = []
+        self.session_timestamp: Optional[str] = None
+        self.attendance_cache: Dict[str, List[str]] = {}
+        self.current_session_boss: Optional[str] = None
+        
+        # Timers
+        self.timers: Dict[str, asyncio.Task] = {}
         
         # Constants
-        self.ITEM_WAIT = 20.0  # seconds between items
-        self.PREVIEW_TIME = 20.0  # seconds preview before bidding starts
+        self.ITEM_WAIT = 20.0
+        self.PREVIEW_TIME = 20.0
         self.MAX_EXTENSIONS = 15
     
     async def post_to_sheet(self, payload: dict) -> dict:
@@ -114,6 +113,17 @@ class AuctioneeringSystem:
             'full': f"{month}/{day}/{year} {hours}:{mins}"
         }
     
+    def can_user_bid(self, username: str) -> bool:
+        """Check if user can bid on current item based on attendance"""
+        if not self.current_item or not self.current_item.current_session:
+            return True  # Open session
+        
+        if not self.current_item.current_session.boss_key:
+            return True  # Open session
+        
+        attendees = self.current_item.current_session.attendees or []
+        return any(m.lower() == username.lower() for m in attendees)
+    
     async def start_auctioneering(self, channel: discord.TextChannel) -> dict:
         """Start auctioneering session"""
         if self.active:
@@ -131,162 +141,218 @@ class AuctioneeringSystem:
         # Get queue items from bidding system
         queue_items = self.bidding.queue.copy()
         
-        # Clear queues
-        self.item_queue.clear()
+        # Clear state
+        self.sessions.clear()
         self.session_items.clear()
         self.manual_items_auctioned.clear()
+        self.attendance_cache.clear()
         
         # Get session info
         session_ts = self.get_manila_timestamp()
         self.session_timestamp = f"{session_ts['date']} {session_ts['time']}"
-        self.session_start_time = datetime.now().timestamp()
         
-        # Add sheet items first (only those without winners)
+        # Calculate week sheet name
+        sunday_date = self.get_sunday_of_week()
+        week_sheet_name = f"ELYSIUM_WEEK_{sunday_date}"
+        
+        # Group items by boss
+        boss_groups = {}
+        manual_items = []
+        
+        # Manual queue items first (open to all)
+        for item in queue_items:
+            qty = item.get('quantity', 1)
+            for q in range(qty):
+                manual_items.append({
+                    **item,
+                    'quantity': 1,
+                    'batchNumber': q + 1 if qty > 1 else None,
+                    'batchTotal': qty if qty > 1 else None,
+                    'source': 'QueueList',
+                    'skipAttendance': True,
+                })
+        
+        if manual_items:
+            self.sessions.append(AuctionSession(
+                boss_key=None,
+                boss_name="OPEN",
+                items=manual_items,
+                attendees=[]
+            ))
+        
+        # Group sheet items by boss
         for idx, item in enumerate(sheet_items):
-            item_name = item.get('item', '').strip()
-            if not item_name:
+            boss_data = (item.get('boss', '') or '').strip()
+            if not boss_data:
+                print(f"⚠️ Item {item.get('item')} has no boss data, skipping")
                 continue
             
-            winner = item.get('winner', '').strip()
-            if winner:
-                continue  # Skip items with winners
+            # Parse boss: "EGO 10/27/25 17:57"
+            import re
+            match = re.match(r'^(.+?)\s+(\d{1,2})/(\d{1,2})/(\d{2})\s+(\d{1,2}):(\d{2})$', boss_data)
+            if not match:
+                print(f"⚠️ Invalid boss format: {boss_data}")
+                continue
             
-            qty = item.get('quantity', 1)
+            boss = match.group(1).strip().upper()
+            month = match.group(2).zfill(2)
+            day = match.group(3).zfill(2)
+            year = match.group(4)
+            hour = match.group(5).zfill(2)
+            minute = match.group(6).zfill(2)
             
-            if qty > 1:
-                # Batch items - create separate entries
-                for q in range(qty):
-                    self.item_queue.append(AuctionItem(
-                        item=item_name,
-                        start_price=item.get('startPrice', 0),
-                        duration=item.get('duration', 30),
-                        quantity=1,
-                        source='GoogleSheet',
-                        sheet_index=idx,
-                        batch_number=q + 1,
-                        batch_total=qty,
-                        auction_start_time=self.session_timestamp
-                    ))
-            else:
-                self.item_queue.append(AuctionItem(
-                    item=item_name,
-                    start_price=item.get('startPrice', 0),
-                    duration=item.get('duration', 30),
-                    quantity=1,
-                    source='GoogleSheet',
-                    sheet_index=idx,
-                    auction_start_time=self.session_timestamp
-                ))
+            boss_key = f"{boss} {month}/{day}/{year} {hour}:{minute}"
+            
+            if boss_key not in boss_groups:
+                boss_groups[boss_key] = []
+            
+            qty = int(item.get('quantity', 1))
+            for q in range(qty):
+                boss_groups[boss_key].append({
+                    **item,
+                    'quantity': 1,
+                    'batchNumber': q + 1 if qty > 1 else None,
+                    'batchTotal': qty if qty > 1 else None,
+                    'source': 'GoogleSheet',
+                    'sheetIndex': idx,
+                    'bossName': boss,
+                    'bossKey': boss_key,
+                    'skipAttendance': False,
+                })
         
-        # Add manual queue items
-        for queue_item in queue_items:
-            qty = queue_item.quantity
-            
-            if qty > 1:
-                for q in range(qty):
-                    self.item_queue.append(AuctionItem(
-                        item=queue_item.item,
-                        start_price=queue_item.start_price,
-                        duration=queue_item.duration,
-                        quantity=1,
-                        source='QueueList',
-                        batch_number=q + 1,
-                        batch_total=qty,
-                        auction_start_time=self.session_timestamp
-                    ))
-            else:
-                self.item_queue.append(AuctionItem(
-                    item=queue_item.item,
-                    start_price=queue_item.start_price,
-                    duration=queue_item.duration,
-                    quantity=1,
-                    source='QueueList',
-                    auction_start_time=self.session_timestamp
-                ))
+        # Convert boss groups to sessions
+        for boss_key, items in boss_groups.items():
+            self.sessions.append(AuctionSession(
+                boss_key=boss_key,
+                boss_name=items[0]['bossName'],
+                items=items,
+                attendees=[]
+            ))
         
-        if len(self.item_queue) == 0:
+        if not self.sessions:
             return {'ok': False, 'msg': 'No items to auction'}
         
+        # Load attendance for each boss session
+        for session in self.sessions:
+            if not session.boss_key:
+                continue  # Skip OPEN session
+            
+            payload = {
+                'action': 'getAttendanceForBoss',
+                'weekSheet': week_sheet_name,
+                'bossKey': session.boss_key,
+            }
+            
+            resp = await self.post_to_sheet(payload)
+            if not resp['ok']:
+                await channel.send(
+                    f"❌ Failed to load attendance for {session.boss_key}\n"
+                    f"Sheet: {week_sheet_name}\n"
+                    f"Error: HTTP {resp['status']}"
+                )
+                return {'ok': False, 'msg': f'Failed to load attendance for {session.boss_key}'}
+            
+            data = json.loads(resp['text'])
+            session.attendees = data.get('attendees', [])
+            self.attendance_cache[session.boss_key] = session.attendees
+        
         self.active = True
+        self.current_session_index = 0
         self.current_item_index = 0
         
-        # Announce start
-        sheet_count = sum(1 for i in self.item_queue if i.source == 'GoogleSheet')
-        queue_count = sum(1 for i in self.item_queue if i.source == 'QueueList')
+        # Show preview
+        preview = []
+        for i, s in enumerate(self.sessions):
+            session_type = s.boss_name if s.boss_key else "OPEN (No Boss)"
+            attendee_info = f" - {len(s.attendees)} attendees" if s.boss_key else " - Open to all"
+            preview.append(f"{i + 1}. **{session_type}**: {len(s.items)} item(s){attendee_info}")
         
         embed = discord.Embed(
-            title="🔥 Auctioneering Session Started!",
-            description=f"**{len(self.item_queue)} item(s)** queued",
+            title="🔥 Auctioneering Started!",
+            description=f"**{len(self.sessions)} session(s)** queued\n\n" + "\n".join(preview),
             color=0xFFD700
         )
-        embed.add_field(name="📋 From Google Sheet", value=str(sheet_count), inline=True)
-        embed.add_field(name="📋 From Queue", value=str(queue_count), inline=True)
-        embed.add_field(name="🕐 Session Time", value=self.session_timestamp, inline=True)
-        embed.set_footer(text="Starting first item in 20 seconds...")
+        embed.set_footer(text="Starting first session in 20s...")
         embed.timestamp = datetime.now(timezone.utc)
         
         await channel.send(embed=embed)
-        
-        # Start first item after delay
-        await asyncio.sleep(self.ITEM_WAIT)
+        await asyncio.sleep(20)
         await self.auction_next_item(channel)
         
         return {'ok': True}
     
+    def get_sunday_of_week(self) -> str:
+        """Get Sunday of current week in YYYYMMDD format"""
+        manila_tz = timezone(timedelta(hours=8))
+        now = datetime.now(manila_tz)
+        sunday = now - timedelta(days=now.weekday() + 1 if now.weekday() != 6 else 0)
+        return sunday.strftime("%Y%m%d")
+    
     async def auction_next_item(self, channel: discord.TextChannel):
         """Start next item in queue"""
-        if not self.active or self.current_item_index >= len(self.item_queue):
-            await self.finalize_session(channel)
+        current_session = self.sessions[self.current_session_index] if self.current_session_index < len(self.sessions) else None
+        
+        if not current_session or self.current_item_index >= len(current_session.items):
+            # Move to next session
+            self.current_session_index += 1
+            self.current_item_index = 0
+            
+            if self.current_session_index >= len(self.sessions):
+                await self.finalize_session(channel)
+                return
+            
+            # Clear attendance cache for previous session
+            if self.current_session_index > 0:
+                prev_session = self.sessions[self.current_session_index - 1]
+                if prev_session.boss_key:
+                    self.attendance_cache.pop(prev_session.boss_key, None)
+                    print(f"🧹 Cleared attendance cache for {prev_session.boss_key}")
+            
+            self.current_session_boss = self.sessions[self.current_session_index].boss_key
+            
+            await asyncio.sleep(10)
+            await self.auction_next_item(channel)
             return
         
-        item = self.item_queue[self.current_item_index]
+        item = current_session.items[self.current_item_index]
+        self.current_session_boss = current_session.boss_key
         
-        # Create current item
         self.current_item = CurrentItem(
-            item=item.item,
-            start_price=item.start_price,
-            duration=item.duration,
-            quantity=item.quantity,
-            source=item.source,
-            cur_bid=item.start_price,
+            item=item['item'],
+            start_price=item['startPrice'],
+            duration=item['duration'],
+            quantity=item['quantity'],
+            source=item['source'],
+            cur_bid=item['startPrice'],
             status='active',
-            auction_start_time=item.auction_start_time,
-            sheet_index=item.sheet_index
+            auction_start_time=self.session_timestamp,
+            sheet_index=item.get('sheetIndex'),
+            batch_number=item.get('batchNumber'),
+            batch_total=item.get('batchTotal'),
+            current_session=current_session,
         )
         
         # Format display name
-        display_name = item.item
-        if item.batch_number and item.batch_total:
-            display_name += f" [{item.batch_number}/{item.batch_total}]"
+        display_name = item['item']
+        if item.get('batchNumber') and item.get('batchTotal'):
+            display_name += f" [{item['batchNumber']}/{item['batchTotal']}]"
         
-        # Create embed
         embed = discord.Embed(
             title="🔥 BIDDING NOW!",
             description=f"**{display_name}**\n\nType `!bid <amount>` or `!b <amount>` to bid",
             color=0x00FF00
         )
-        embed.add_field(name="💰 Starting Bid", value=f"{item.start_price}pts", inline=True)
-        embed.add_field(name="⏱️ Duration", value=f"{item.duration}m", inline=True)
-        embed.add_field(
-            name="📋 Item #",
-            value=f"{self.current_item_index + 1}/{len(self.item_queue)}",
-            inline=True
-        )
-        embed.add_field(
-            name="ℹ️ Source",
-            value="📊 Google Sheet" if item.source == 'GoogleSheet' else "📝 Manual Queue",
-            inline=True
-        )
+        embed.add_field(name="💰 Starting Bid", value=f"{item['startPrice']}pts", inline=True)
+        embed.add_field(name="⏱️ Duration", value=f"{item['duration']}m", inline=True)
+        embed.add_field(name="📋 Item #", value=f"{self.current_item_index + 1}/{len(current_session.items)}", inline=True)
+        embed.add_field(name="ℹ️ Source", value="📊 Google Sheet" if item['source'] == 'GoogleSheet' else "📝 Manual Queue", inline=True)
         embed.set_footer(text="🕐 10s confirm • 💰 Fastest wins")
         embed.timestamp = datetime.now(timezone.utc)
         
         await channel.send(embed=embed)
-        
-        # Wait for preview
         await asyncio.sleep(self.PREVIEW_TIME)
         
-        # Set end time and schedule timers
-        self.current_item.end_time = datetime.now().timestamp() + (item.duration * 60)
+        self.current_item.end_time = datetime.now().timestamp() + (item['duration'] * 60)
         self.schedule_item_timers(channel)
     
     def schedule_item_timers(self, channel: discord.TextChannel):
@@ -297,22 +363,20 @@ class AuctioneeringSystem:
         time_left = self.current_item.end_time - datetime.now().timestamp()
         
         if time_left > 60 and not self.current_item.going_once:
-            asyncio.create_task(self.item_going_once(channel, time_left - 60))
+            self.timers['go1'] = asyncio.create_task(self.item_going_once(channel, time_left - 60))
         if time_left > 30 and not self.current_item.going_twice:
-            asyncio.create_task(self.item_going_twice(channel, time_left - 30))
+            self.timers['go2'] = asyncio.create_task(self.item_going_twice(channel, time_left - 30))
         if time_left > 10:
-            asyncio.create_task(self.item_final_call(channel, time_left - 10))
+            self.timers['go3'] = asyncio.create_task(self.item_final_call(channel, time_left - 10))
         
-        asyncio.create_task(self.item_end(channel, time_left))
+        self.timers['end'] = asyncio.create_task(self.item_end(channel, time_left))
     
     async def item_going_once(self, channel: discord.TextChannel, delay: float):
-        """Going once announcement"""
         await asyncio.sleep(delay)
         if not self.active or not self.current_item or self.current_item.status != 'active':
             return
         
         self.current_item.going_once = True
-        
         embed = discord.Embed(
             title="⚠️ GOING ONCE!",
             description="1 minute left",
@@ -320,17 +384,14 @@ class AuctioneeringSystem:
         )
         current = f"{self.current_item.cur_winner} - {self.current_item.cur_bid}pts" if self.current_item.cur_winner else f"{self.current_item.start_price}pts (no bids)"
         embed.add_field(name="💰 Current", value=current)
-        
         await channel.send(embed=embed)
     
     async def item_going_twice(self, channel: discord.TextChannel, delay: float):
-        """Going twice announcement"""
         await asyncio.sleep(delay)
         if not self.active or not self.current_item or self.current_item.status != 'active':
             return
         
         self.current_item.going_twice = True
-        
         embed = discord.Embed(
             title="⚠️ GOING TWICE!",
             description="30 seconds left",
@@ -338,13 +399,11 @@ class AuctioneeringSystem:
         )
         current = f"{self.current_item.cur_winner} - {self.current_item.cur_bid}pts" if self.current_item.cur_winner else f"{self.current_item.start_price}pts (no bids)"
         embed.add_field(name="💰 Current", value=current)
-        
         await channel.send(embed=embed)
     
     async def item_final_call(self, channel: discord.TextChannel, delay: float):
-        """Final call announcement"""
         await asyncio.sleep(delay)
-        if not self.active or not self.current_item or self.current_item.status != 'active':
+        if not self.active or not self.current_item:
             return
         
         embed = discord.Embed(
@@ -354,17 +413,14 @@ class AuctioneeringSystem:
         )
         current = f"{self.current_item.cur_winner} - {self.current_item.cur_bid}pts" if self.current_item.cur_winner else f"{self.current_item.start_price}pts (no bids)"
         embed.add_field(name="💰 Current", value=current)
-        
         await channel.send(embed=embed)
     
     async def item_end(self, channel: discord.TextChannel, delay: float):
-        """End current item"""
         await asyncio.sleep(delay)
         if not self.active or not self.current_item:
             return
         
         self.current_item.status = 'ended'
-        
         timestamp = self.get_manila_timestamp()
         end_time_str = f"{timestamp['date']} {timestamp['time']}"
         self.current_item.auction_end_time = end_time_str
@@ -378,11 +434,7 @@ class AuctioneeringSystem:
             )
             embed.add_field(name="🔥 Winner", value=f"<@{self.current_item.cur_winner_id}>", inline=True)
             embed.add_field(name="💰 Price", value=f"{self.current_item.cur_bid}pts", inline=True)
-            embed.add_field(
-                name="ℹ️ Source",
-                value="📊 Google Sheet" if self.current_item.source == 'GoogleSheet' else "📝 Manual Queue",
-                inline=True
-            )
+            embed.add_field(name="ℹ️ Source", value="📊 Google Sheet" if self.current_item.source == 'GoogleSheet' else "📝 Manual Queue", inline=True)
             embed.set_footer(text=timestamp['full'])
             embed.timestamp = datetime.now(timezone.utc)
             
@@ -435,11 +487,7 @@ class AuctioneeringSystem:
                 description=f"**{self.current_item.item}** - no bids\n*Will be re-auctioned next session*",
                 color=0x4A90E2
             )
-            embed.add_field(
-                name="ℹ️ Source",
-                value="📊 Google Sheet (stays in queue)" if self.current_item.source == 'GoogleSheet' else "📝 Manual Queue (added to Google Sheet)",
-                inline=False
-            )
+            embed.add_field(name="ℹ️ Source", value="📊 Google Sheet (stays in queue)" if self.current_item.source == 'GoogleSheet' else "📝 Manual Queue (added to Google Sheet)", inline=False)
             
             await channel.send(embed=embed)
             
@@ -458,13 +506,14 @@ class AuctioneeringSystem:
         # Move to next item
         self.current_item_index += 1
         
-        if self.current_item_index < len(self.item_queue):
-            next_item = self.item_queue[self.current_item_index]
-            await channel.send(f"🕐 Next in 20s...\n📋 **{next_item.item}** - {next_item.start_price}pts")
+        current_session = self.sessions[self.current_session_index]
+        if self.current_item_index < len(current_session.items):
+            next_item = current_session.items[self.current_item_index]
+            await channel.send(f"🕐 Next in 20s...\n📋 **{next_item['item']}** - {next_item['startPrice']}pts")
             await asyncio.sleep(self.ITEM_WAIT)
             await self.auction_next_item(channel)
         else:
-            await self.finalize_session(channel)
+            await self.auction_next_item(channel)
     
     async def finalize_session(self, channel: discord.TextChannel):
         """Finalize auctioneering session"""
@@ -472,29 +521,25 @@ class AuctioneeringSystem:
             return
         
         self.active = False
+        self.clear_all_timers()
         
-        # Build summary
-        summary_lines = []
+        summary = []
         for i, item in enumerate(self.session_items):
             source_emoji = "📊" if item['source'] == 'GoogleSheet' else "📝"
-            summary_lines.append(
-                f"{i+1}. **{item['item']}** ({source_emoji}): {item['winner']} - {item['amount']}pts"
-            )
+            summary.append(f"{i+1}. **{item['item']}** ({source_emoji}): {item['winner']} - {item['amount']}pts")
         
-        summary = '\n'.join(summary_lines) if summary_lines else "No sales"
+        summary_text = '\n'.join(summary) if summary else "No sales"
         
         embed = discord.Embed(
             title="✅ Auctioneering Session Complete!",
             description=f"**{len(self.session_items)}** item(s) auctioned",
             color=0x00FF00
         )
-        embed.add_field(name="📋 Summary", value=summary, inline=False)
+        embed.add_field(name="📋 Summary", value=summary_text, inline=False)
         embed.add_field(
             name="ℹ️ Session Info",
-            value=(
-                f"📊 Google Sheet Items Auctioned: {sum(1 for i in self.item_queue if i.source == 'GoogleSheet')}\n"
-                f"📝 Manual Items Auctioned: {len(self.manual_items_auctioned)}"
-            ),
+            value=f"📊 Google Sheet Items: {sum(1 for s in self.session_items if s['source'] == 'GoogleSheet')}\n"
+                  f"📝 Manual Items: {len(self.manual_items_auctioned)}",
             inline=False
         )
         embed.set_footer(text="Processing results and submitting to sheets...")
@@ -514,53 +559,18 @@ class AuctioneeringSystem:
         
         await self.post_to_sheet(submit_payload)
         
-        # Send detailed summary to admin logs
-        guild = channel.guild
-        admin_logs = guild.get_channel(int(self.config.admin_logs_channel_id))
-        
-        if admin_logs:
-            sheet_with_winners = sum(1 for s in self.session_items if s['source'] == 'GoogleSheet')
-            manual_with_winners = sum(1 for s in self.session_items if s['source'] == 'QueueList')
-            total_revenue = sum(s['amount'] for s in self.session_items)
-            
-            admin_embed = discord.Embed(
-                title=f"✅ Session Summary - {self.session_timestamp}",
-                description="Auctioneering session completed successfully",
-                color=0x00FF00
-            )
-            admin_embed.add_field(
-                name="📊 Google Sheet Items",
-                value=f"**Auctioned:** {sum(1 for i in self.item_queue if i.source == 'GoogleSheet')}\n**With Winners:** {sheet_with_winners}\n**No Bids:** {sum(1 for i in self.item_queue if i.source == 'GoogleSheet') - sheet_with_winners}",
-                inline=True
-            )
-            admin_embed.add_field(
-                name="📝 Manual Items",
-                value=f"**Auctioned:** {len(self.manual_items_auctioned)}\n**With Winners:** {manual_with_winners}\n**No Bids:** {len(self.manual_items_auctioned) - manual_with_winners}",
-                inline=True
-            )
-            admin_embed.add_field(
-                name="💰 Revenue",
-                value=f"**Total:** {total_revenue}pts",
-                inline=True
-            )
-            admin_embed.add_field(
-                name="📋 Results",
-                value=summary or "No sales recorded",
-                inline=False
-            )
-            admin_embed.set_footer(text="Session completed by !startauction")
-            admin_embed.timestamp = datetime.now(timezone.utc)
-            
-            await admin_logs.send(embed=admin_embed)
-        
         # Clear state
         self.session_items.clear()
-        self.item_queue.clear()
+        self.sessions.clear()
         self.manual_items_auctioned.clear()
+        self.attendance_cache.clear()
+        self.current_session_boss = None
+        self.bidding.clear_points_cache()
+        
+        print("✅ All session data cleared")
     
     async def build_combined_results(self) -> List[Dict]:
         """Build combined results for all members"""
-        # Fetch fresh points
         resp = await self.post_to_sheet({'action': 'getBiddingPoints'})
         
         all_points = {}
@@ -590,44 +600,29 @@ class AuctioneeringSystem:
         
         return results
     
-    def pause_session(self) -> bool:
-        """Pause auctioneering session"""
-        if not self.active or self.paused:
+    def clear_all_timers(self):
+        """Clear all running timers"""
+        for task in self.timers.values():
+            if not task.done():
+                task.cancel()
+        self.timers.clear()
+    
+    def update_current_item_state(self, updates: dict) -> bool:
+        """Update current item state"""
+        if not self.current_item:
             return False
         
-        self.paused = True
-        self.paused_time = datetime.now().timestamp()
-        print("⏸️ Session paused")
+        for key, value in updates.items():
+            setattr(self.current_item, key, value)
+        
         return True
     
-    def resume_session(self) -> bool:
-        """Resume auctioneering session"""
-        if not self.active or not self.paused or not self.current_item:
-            return False
-        
-        self.paused = False
-        
-        # Add paused duration to end time
-        if self.paused_time:
-            paused_duration = datetime.now().timestamp() - self.paused_time
-            self.current_item.end_time += paused_duration
-        
-        print("▶️ Session resumed")
-        return True
-    
-    def stop_current_item(self) -> bool:
-        """Stop current item immediately"""
-        if not self.active or not self.current_item:
-            return False
-        
-        # This will be handled by calling item_end directly
-        return True
-    
-    def extend_current_item(self, minutes: int) -> bool:
-        """Extend current item by minutes"""
-        if not self.active or not self.current_item:
-            return False
-        
-        self.current_item.end_time += minutes * 60
-        print(f"⏱️ Extended by {minutes}m")
-        return True
+    def get_auction_state(self) -> dict:
+        """Get current auction state"""
+        return {
+            'active': self.active,
+            'currentItem': self.current_item,
+            'sessions': self.sessions,
+            'currentSessionIndex': self.current_session_index,
+            'currentItemIndex': self.current_item_index,
+        }

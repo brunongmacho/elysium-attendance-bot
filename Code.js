@@ -20,6 +20,7 @@ const COLUMNS = {
 };
 
 // MAIN WEBHOOK HANDLER
+// MAIN WEBHOOK HANDLER - COMPLETE VERSION
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents || '{}');
@@ -42,6 +43,11 @@ function doPost(e) {
     if (action === 'getBotState') return getBotState(data);
     if (action === 'saveBotState') return saveBotState(data);
     if (action === 'moveQueueItemsToSheet') return moveQueueItemsToSheet(data);
+
+    // ⭐ LOOT LOGGER ACTIONS - ADD THESE THREE LINES! ⭐
+    if (action === 'submitLootEntries') return handleSubmitLootEntries(data);
+    if (action === 'getLootState') return getLootState(data);
+    if (action === 'saveLootState') return saveLootState(data);
 
     Logger.log(`❌ Unknown: ${action}`);
     return createResponse('error', 'Unknown action: ' + action);
@@ -76,6 +82,193 @@ function handleCheckColumn(data) {
   }
   
   return createResponse('ok', 'Does not exist', {exists: false});
+}
+
+function handleSubmitLootEntries(data) {
+  const entries = data.entries || [];
+  
+  if (!entries || entries.length === 0) {
+    Logger.log('❌ No loot entries provided');
+    return createResponse('error', 'No loot entries provided', {submitted: 0});
+  }
+
+  Logger.log(`📦 Received ${entries.length} loot entries`);
+  
+  try {
+    const lock = LockService.getScriptLock();
+    try { 
+      lock.waitLock(30000); 
+    } catch (e) { 
+      Logger.log('❌ Lock timeout');
+      return createResponse('error', 'Lock timeout'); 
+    }
+
+    try {
+      const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+      let biddingItemsSheet = ss.getSheetByName('BiddingItems');
+
+      // Create sheet if doesn't exist
+      if (!biddingItemsSheet) {
+        Logger.log('📋 Creating BiddingItems sheet...');
+        biddingItemsSheet = ss.insertSheet('BiddingItems');
+        
+        // Set headers (12 columns total: A-L)
+        biddingItemsSheet.getRange(1, 1, 1, 12).setValues([[
+          'Item', 'Start Price', 'Duration', 'Winner', 'Winning Bid', 
+          'Auction Start', 'Auction End', 'Timestamp', 'Total Bids', 'Source', 'Quantity', 'Boss'
+        ]])
+        .setFontWeight('bold')
+        .setBackground('#4A90E2')
+        .setFontColor('#FFFFFF');
+        
+        // Set column widths
+        biddingItemsSheet.setColumnWidth(1, 200);  // Item
+        biddingItemsSheet.setColumnWidth(10, 100); // Source
+        biddingItemsSheet.setColumnWidth(11, 80);  // Quantity
+        biddingItemsSheet.setColumnWidth(12, 200); // Boss
+        
+        Logger.log('✅ BiddingItems sheet created');
+      }
+
+      // STEP 1: Save pending entries to _LootState (for recovery)
+      const pendingState = {
+        pendingEntries: entries,
+        timestamp: new Date().toISOString(),
+        status: 'processing'
+      };
+      
+      saveLootState({state: pendingState});
+      Logger.log('💾 Saved loot state for recovery');
+
+      // Find last row (skip header)
+      const lastRow = Math.max(biddingItemsSheet.getLastRow(), 1);
+      let insertRow = lastRow + 1;
+      
+      Logger.log(`📊 Last row: ${lastRow}, inserting at row: ${insertRow}`);
+
+      let successCount = 0;
+      let failCount = 0;
+      const submittedItems = [];
+
+      // STEP 2: Add each loot entry
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        
+        try {
+          const item = (entry.item || '').toString().trim();
+          const rawSource = (entry.source || 'LOOT').toString().trim();
+          const quantity = parseInt(entry.quantity) || 1;
+          const rawBoss = (entry.boss || '').toString().trim();
+
+          // Validate item
+          if (!item || item.length < 3) {
+            Logger.log(`⚠️ Skipping invalid item: "${item}"`);
+            failCount++;
+            continue;
+          }
+
+          // FIX 1: Format Source - proper case (not all caps)
+          let source;
+          if (rawSource.toUpperCase() === 'LOOT') {
+            source = 'Loot';
+          } else if (rawSource.toUpperCase() === 'GUILD BOSS') {
+            source = 'Guild Boss';
+          } else {
+            source = rawSource; // Keep as-is if unknown
+          }
+
+          // FIX 2: Format Boss - all uppercase
+          const boss = rawBoss.toUpperCase();
+
+          Logger.log(`📝 Adding item ${i + 1}: ${item} (qty: ${quantity}, source: ${source}, boss: ${boss})`);
+
+          // FIX 3: Build row data WITHOUT Column H (Timestamp)
+          // We'll leave Column H empty so it doesn't interfere with auction tallies
+          const rowData = [
+            item,                           // A: Item
+            '',                            // B: Start Price (empty)
+            '',                            // C: Duration (empty)
+            '',                            // D: Winner (empty)
+            '',                            // E: Winning Bid (empty)
+            '',                            // F: Auction Start (empty)
+            '',                            // G: Auction End (empty)
+            '',                            // H: Timestamp (EMPTY - don't include)
+            '',                            // I: Total Bids (empty)
+            source,                        // J: Source (proper case)
+            quantity,                      // K: Quantity
+            boss                           // L: Boss (all caps)
+          ];
+
+          // Insert entire row at once
+          biddingItemsSheet.getRange(insertRow, 1, 1, 12).setValues([rowData]);
+          
+          Logger.log(`✅ Added item at row ${insertRow}: ${item}`);
+          
+          submittedItems.push({
+            item: item,
+            row: insertRow,
+            boss: boss
+          });
+          
+          insertRow++;
+          successCount++;
+          
+        } catch (itemError) {
+          Logger.log(`❌ Error adding item ${i + 1}: ${itemError.toString()}`);
+          failCount++;
+        }
+      }
+
+      // STEP 3: Update state to 'completed' (clear pending entries)
+      const completedState = {
+        pendingEntries: [],
+        lastSubmitted: submittedItems,
+        lastSubmissionTime: new Date().toISOString(),
+        status: 'completed'
+      };
+      
+      saveLootState({state: completedState});
+      Logger.log('✅ Updated loot state to completed');
+
+      const summary = `Submitted ${successCount}/${entries.length} loot entries (${failCount} failed)`;
+      Logger.log(`✅ ${summary}`);
+      
+      return createResponse('ok', summary, {
+        submitted: successCount,
+        failed: failCount,
+        total: entries.length,
+        sheet: 'BiddingItems',
+        lastRow: insertRow - 1,
+        submittedItems: submittedItems
+      });
+
+    } finally { 
+      lock.releaseLock(); 
+    }
+
+  } catch (err) {
+    Logger.log('❌ Loot submission error: ' + err.toString());
+    Logger.log('Stack trace: ' + err.stack);
+    
+    // Save error state
+    try {
+      const errorState = {
+        pendingEntries: entries,
+        error: err.toString(),
+        errorStack: err.stack,
+        timestamp: new Date().toISOString(),
+        status: 'error'
+      };
+      saveLootState({state: errorState});
+    } catch (saveErr) {
+      Logger.log('❌ Could not save error state: ' + saveErr.toString());
+    }
+    
+    return createResponse('error', err.toString(), {
+      submitted: 0,
+      errorDetails: err.stack
+    });
+  }
 }
 
 function handleSubmitAttendance(data) {
@@ -696,6 +889,47 @@ function updateBiddingPoints() {
   });
 }
 
+// ===========================================================
+// LOOT STATE MANAGEMENT (for recovery + debugging)
+// ===========================================================
+function saveLootState(data) {
+  const state = data.state || {};
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  let stateSheet = ss.getSheetByName('_LootState');
+
+  if (!stateSheet) {
+    stateSheet = ss.insertSheet('_LootState');
+    stateSheet.getRange(1, 1, 1, 2).setValues([['Key', 'Value']])
+      .setFontWeight('bold')
+      .setBackground('#4A90E2')
+      .setFontColor('#FFFFFF');
+  }
+
+  // Clear old state and save new one
+  stateSheet.clearContents();
+  stateSheet.getRange(1, 1, 1, 2).setValues([['Key', 'Value']]);
+  stateSheet.getRange(2, 1, 1, 2).setValues([
+    ['state', JSON.stringify(state)],
+  ]);
+
+  Logger.log('💾 Loot state saved successfully');
+  return createResponse('ok', 'Loot state saved');
+}
+
+function getLootState() {
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const stateSheet = ss.getSheetByName('_LootState');
+
+  if (!stateSheet) {
+    return createResponse('ok', 'No loot state found', { state: {} });
+  }
+
+  const data = stateSheet.getRange(2, 2).getValue();
+  const parsed = data ? JSON.parse(data) : {};
+
+  return createResponse('ok', 'Loot state retrieved', { state: parsed });
+}
+
 // ATTENDANCE STATE MANAGEMENT (Memory optimization for Koyeb)
 function getAttendanceState(data) {
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
@@ -770,4 +1004,4 @@ function createResponse(status, message, data) {
   return ContentService.createTextOutput(JSON.stringify(response)).setMimeType(ContentService.MimeType.JSON);
 }
 
-//test v2
+//test v4

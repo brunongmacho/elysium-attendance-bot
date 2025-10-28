@@ -19,6 +19,7 @@ const bidding = require("./bidding.js");
 const helpSystem = require("./help-system.js");
 const auctioneering = require("./auctioneering.js");
 const attendance = require("./attendance.js");
+const lootSystem = require("./loot-system.js");
 
 const COMMAND_ALIASES = {
   // Help commands
@@ -448,6 +449,10 @@ async function awaitConfirmation(
 
 const commandHandlers = {
   // Help command
+  loot: async (message, member, args) => {
+    await lootSystem.handleLootCommand(message, args, client);
+  },
+  
   help: async (message, member) => {
     const args = message.content.trim().split(/\s+/).slice(1);
     await helpSystem.handleHelp(message, args, member);
@@ -1394,6 +1399,7 @@ client.once(Events.ClientReady, async () => {
   auctioneering.initialize(config, isAdmin, bidding);
   bidding.initializeBidding(config, isAdmin, auctioneering);
   auctioneering.setPostToSheet(attendance.postToSheet); // Use attendance module's postToSheet
+  lootSystem.initialize(config, bossPoints, isAdmin);
 
   isRecovering = true;
   await recoverBotStateOnStartup(client, config);
@@ -2048,6 +2054,15 @@ attendance.setPendingVerifications(pendingVerifications);
     if (inAdminLogs) {
       const adminCmd = resolveCommandAlias(rawCmd);
       const args = message.content.trim().split(/\s+/).slice(1);
+
+      // LOOT COMMAND - Admin logs threads only
+      const lootCmd = resolveCommandAlias(rawCmd);
+      if (lootCmd === "!loot") {
+        console.log(`🎯 Loot command detected`);
+        client.config = config; // Store config for loot system
+        await lootSystem.handleLootCommand(message, message.content.trim().split(/\s+/).slice(1), client);
+        return;
+      }
 
       // Admin logs override commands
       if (
