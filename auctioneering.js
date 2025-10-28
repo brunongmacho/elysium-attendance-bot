@@ -118,18 +118,25 @@ async function fetchSheetItems(url, retries = 3) {
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json();
-      console.log(`${EMOJI.SUCCESS} Fetched ${(data.items || []).length} items from sheet`);
+      console.log(
+        `${EMOJI.SUCCESS} Fetched ${(data.items || []).length} items from sheet`
+      );
       return data.items || [];
     } catch (e) {
-      console.error(`${EMOJI.ERROR} Fetch items attempt ${attempt}/${retries}:`, e.message);
+      console.error(
+        `${EMOJI.ERROR} Fetch items attempt ${attempt}/${retries}:`,
+        e.message
+      );
       if (attempt < retries) {
         const backoff = 2000 * attempt; // Exponential backoff: 2s, 4s, 6s
-        console.log(`${EMOJI.WARNING} Retrying in ${backoff/1000}s...`);
-        await new Promise(resolve => setTimeout(resolve, backoff));
+        console.log(`${EMOJI.WARNING} Retrying in ${backoff / 1000}s...`);
+        await new Promise((resolve) => setTimeout(resolve, backoff));
       }
     }
   }
-  console.error(`${EMOJI.ERROR} Failed to fetch items after ${retries} attempts`);
+  console.error(
+    `${EMOJI.ERROR} Failed to fetch items after ${retries} attempts`
+  );
   return null;
 }
 
@@ -218,12 +225,16 @@ async function startAuctioneering(client, config, channel) {
     return;
   }
 
-if (![0, 5].includes(channel.type)) {
-  console.error(`❌ Invalid channel type (${channel.type}) — must be text or announcement channel.`);
-  const guild = await client.guilds.fetch(config.main_guild_id);
-  channel = await guild.channels.fetch(config.bidding_channel_id);
-  console.log(`✅ Recovered correct bidding channel: ${channel.name} (${channel.id})`);
-}
+  if (![0, 5].includes(channel.type)) {
+    console.error(
+      `❌ Invalid channel type (${channel.type}) — must be text or announcement channel.`
+    );
+    const guild = await client.guilds.fetch(config.main_guild_id);
+    channel = await guild.channels.fetch(config.bidding_channel_id);
+    console.log(
+      `✅ Recovered correct bidding channel: ${channel.name} (${channel.id})`
+    );
+  }
 
   // Load points
   const pointsFetched = await biddingModule.loadPointsCacheForAuction(
@@ -287,7 +298,9 @@ if (![0, 5].includes(channel.type)) {
     }
 
     // Parse boss: "EGO 10/27/2025 5:57:00"
-    const match = bossData.match(/^(.+?)\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
+    const match = bossData.match(
+      /^(.+?)\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/
+    );
     if (!match) {
       console.warn(`⚠️ Invalid boss format: ${bossData}`);
       return;
@@ -338,11 +351,12 @@ if (![0, 5].includes(channel.type)) {
   }
 
   // Load attendance for each boss session
-for (const session of sessions) {
-  session.attendees = []; // Open session, anyone can bid
-}
-console.log("⚙️ Attendance check disabled — all sessions open to all members.");
-
+  for (const session of sessions) {
+    session.attendees = []; // Open session, anyone can bid
+  }
+  console.log(
+    "⚙️ Attendance check disabled — all sessions open to all members."
+  );
 
   auctionState.active = true;
   auctionState.sessions = sessions;
@@ -351,11 +365,17 @@ console.log("⚙️ Attendance check disabled — all sessions open to all membe
   auctionState.sessionItems = [];
 
   // Show preview
-  const preview = sessions.map((s, i) => {
-    const sessionType = s.bossKey ? `${s.bossName}` : "OPEN (No Boss)";
-    const attendeeInfo = s.bossKey ? ` - ${s.attendees.length} attendees` : " - Open to all";
-    return `${i + 1}. **${sessionType}**: ${s.items.length} item(s)${attendeeInfo}`;
-  }).join("\n");
+  const preview = sessions
+    .map((s, i) => {
+      const sessionType = s.bossKey ? `${s.bossName}` : "OPEN (No Boss)";
+      const attendeeInfo = s.bossKey
+        ? ` - ${s.attendees.length} attendees`
+        : " - Open to all";
+      return `${i + 1}. **${sessionType}**: ${
+        s.items.length
+      } item(s)${attendeeInfo}`;
+    })
+    .join("\n");
 
   await channel.send({
     embeds: [
@@ -371,17 +391,21 @@ console.log("⚙️ Attendance check disabled — all sessions open to all membe
   });
 
   auctionState.timers.sessionStart = setTimeout(async () => {
-  try {
-    // Always use the configured bidding channel, not the command channel
-    const guild = await client.guilds.fetch(config.main_guild_id);
-    const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+    try {
+      // Always use the configured bidding channel, not the command channel
+      const guild = await client.guilds.fetch(config.main_guild_id);
+      const biddingChannel = await guild.channels.fetch(
+        config.bidding_channel_id
+      );
 
-    console.log(`✅ Using bidding channel: ${biddingChannel.name} (${biddingChannel.id})`);
-    await auctionNextItem(client, config, biddingChannel);
-  } catch (err) {
-    console.error("❌ Failed to fetch bidding channel:", err);
-  }
-}, 20000);
+      console.log(
+        `✅ Using bidding channel: ${biddingChannel.name} (${biddingChannel.id})`
+      );
+      await auctionNextItem(client, config, biddingChannel);
+    } catch (err) {
+      console.error("❌ Failed to fetch bidding channel:", err);
+    }
+  }, 20000);
 }
 
 function canUserBid(username, currentSession) {
@@ -408,10 +432,8 @@ function getCurrentTimestamp() {
 }
 
 // =======================================================
-// AUCTION NEXT ITEM (thread per item)
-// =======================================================
-// =======================================================
-// AUCTION NEXT ITEM (thread per item)
+// AUCTION NEXT ITEM (thread per item) — FIXED VERSION
+// Prevents overlap, ensures currentItem is set before bids
 // =======================================================
 async function auctionNextItem(client, config, channel) {
   // ✅ Ensure channel reference is valid
@@ -439,10 +461,12 @@ async function auctionNextItem(client, config, channel) {
       !!(channel && channel.threads && typeof channel.threads.create === "function"),
   });
 
+  // ✅ Pull current sessions from state
   const sessions = auctionState.sessions;
   if (!sessions || sessions.length === 0) {
     await channel.send(`✅ All sessions completed`);
     auctionState.active = false;
+    await finalizeSession(client, config, channel);
     return;
   }
 
@@ -452,12 +476,17 @@ async function auctionNextItem(client, config, channel) {
     return auctionNextItem(client, config, channel);
   }
 
-  const item = session.items[auctionState.currentItemIndex];
-  if (!item) {
-    auctionState.currentSessionIndex++;
-    auctionState.currentItemIndex = 0;
-    return auctionNextItem(client, config, channel);
-  }
+const item = session.items[auctionState.currentItemIndex];
+if (!item) {
+  auctionState.currentSessionIndex++;
+  auctionState.currentItemIndex = 0;
+  return auctionNextItem(client, config, channel);
+}
+
+auctionState.currentItem = item;
+auctionState.currentItem.status = "active";
+auctionState.currentItem.bids = [];
+
 
   const threadName = `${item.item} | ${item.startPrice || 0}pts | ${
     session.bossName || "OPEN"
@@ -554,31 +583,23 @@ async function auctionNextItem(client, config, channel) {
     return; // stop here for this item
   }
 
+  // ✅ Set currentItem properly BEFORE starting the auction
+  auctionState.currentItem = item;
+  item.status = "active";
+  item.auctionStartTime = getTimestamp();
+
   // ✅ Start bidding in this thread
-  await biddingModule.startItemAuction(client, config, auctionThread, item, session);
-
-  // ✅ Prepare next item in sequence
-  auctionState.currentItemIndex++;
-
-  if (auctionState.currentItemIndex >= session.items.length) {
-    auctionState.currentSessionIndex++;
-    auctionState.currentItemIndex = 0;
+  try {
+    await biddingModule.startItemAuction(client, config, auctionThread, item, session);
+  } catch (err) {
+    console.error("❌ Error starting item auction:", err);
+    await channel.send(`❌ Failed to start auction for ${item.item}`);
+    return;
   }
 
-  // ✅ Auto-start next item after short delay
-  auctionState.timers.nextItem = setTimeout(async () => {
-    try {
-      const guild = await client.guilds.fetch(config.main_guild_id);
-      const biddingChannel = await guild.channels.fetch(
-        config.bidding_channel_id
-      );
-      await auctionNextItem(client, config, biddingChannel);
-    } catch (err) {
-      console.error("❌ auctionNextItem recursion error:", err);
-    }
-  }, ITEM_WAIT);
+  // ✅ DO NOT auto-queue next item immediately
+  console.log(`🕐 Auction started for: ${item.item}. Waiting for bids to finish...`);
 }
-
 
 
 function scheduleItemTimers(client, config, channel) {
@@ -687,8 +708,11 @@ async function itemGo3(client, config, channel) {
   });
 }
 
+// =======================================================
+// ITEM END — FIXED VERSION
+// Ensures next item only starts after completion
+// =======================================================
 async function itemEnd(client, config, channel) {
-  // Validate parameters
   if (!client || !config || !channel) {
     console.error(`${EMOJI.ERROR} Invalid parameters to itemEnd`);
     return;
@@ -699,19 +723,25 @@ async function itemEnd(client, config, channel) {
   const item = auctionState.currentItem;
   item.status = "ended";
 
+  // 🧹 Clear timers to avoid duplicates
+  clearTimeout(auctionState.timers.itemEnd);
+  clearTimeout(auctionState.timers.go1);
+  clearTimeout(auctionState.timers.go2);
+  clearTimeout(auctionState.timers.go3);
+
   const timestamp = getTimestamp();
-  const totalBids = item.bids.length;
+  const totalBids = item.bids ? item.bids.length : 0;
   const bidCount = item.curWin
     ? item.bids.filter((b) => b.user === item.curWin).length
     : 0;
 
-  // Calculate auction end time
+  // 🕐 Record end time
   const auctionEndTime = getCurrentTimestamp();
   const endTimeStr = `${auctionEndTime.date} ${auctionEndTime.time}`;
   item.auctionEndTime = endTimeStr;
 
   if (item.curWin) {
-    // ITEM HAS WINNER
+    // ✅ ITEM SOLD
     await channel.send({
       embeds: [
         new EmbedBuilder()
@@ -726,7 +756,7 @@ async function itemEnd(client, config, channel) {
             },
             {
               name: `${EMOJI.BID} Price`,
-              value: `${item.curBid}pts`,
+              value: `${item.curBid} pts`,
               inline: true,
             },
             {
@@ -743,34 +773,30 @@ async function itemEnd(client, config, channel) {
       ],
     });
 
-    // Log to Google Sheet
-    const logPayload = {
-      action: "logAuctionResult",
-      itemIndex: item.source === "GoogleSheet" ? item.sheetIndex + 2 : -1, // +2 because sheet has 1 header row, forEach index is 0-based
-      winner: item.curWin,
-      winningBid: item.curBid,
-      totalBids: totalBids,
-      bidCount: bidCount,
-      itemSource: item.source,
-      itemName: item.item,
-      timestamp: timestamp,
-      auctionStartTime: item.auctionStartTime,
-      auctionEndTime: endTimeStr,
-    };
-
+    // 🧾 Log result to sheet
     try {
       if (!postToSheetFunc) {
-        console.error(`${EMOJI.ERROR} postToSheet not initialized - cannot log result for ${item.item}`);
-        // Store in sessionItems anyway for recovery
+        console.error(`${EMOJI.ERROR} postToSheet not initialized.`);
       } else {
-        await getPostToSheet()(logPayload);
+        await getPostToSheet()({
+          action: "logAuctionResult",
+          itemIndex: item.source === "GoogleSheet" ? item.sheetIndex + 2 : -1,
+          winner: item.curWin,
+          winningBid: item.curBid,
+          totalBids,
+          bidCount,
+          itemSource: item.source,
+          itemName: item.item,
+          timestamp,
+          auctionStartTime: item.auctionStartTime,
+          auctionEndTime: endTimeStr,
+        });
       }
     } catch (err) {
-      console.error(`${EMOJI.ERROR} Failed to log auction result for ${item.item}:`, err);
-      // Continue auction but log error for manual recovery
+      console.error(`${EMOJI.ERROR} Failed to log auction result:`, err);
     }
 
-    // Add to session items (for final tally)
+    // 🧩 Add to session log
     auctionState.sessionItems.push({
       item: item.item,
       winner: item.curWin,
@@ -781,67 +807,52 @@ async function itemEnd(client, config, channel) {
       auctionStartTime: item.auctionStartTime,
       auctionEndTime: endTimeStr,
     });
-
-    // Track manual items for logging to BiddingItems
-    if (item.source === "QueueList") {
-      manualItemsAuctioned.push({
-        item: item.item,
-        startPrice: item.startPrice,
-        duration: item.duration,
-        winner: item.curWin,
-        winningBid: item.curBid,
-        auctionStartTime: item.auctionStartTime,
-        auctionEndTime: endTimeStr,
-      });
-    }
   } else {
-    // NO WINNER
+    // ⚠️ NO WINNER
     await channel.send({
       embeds: [
         new EmbedBuilder()
           .setColor(COLORS.INFO)
           .setTitle(`${EMOJI.ERROR} NO BIDS`)
-          .setDescription(
-            `**${item.item}** - no bids\n*Will be re-auctioned next session*`
-          )
+          .setDescription(`**${item.item}** had no bids and will be requeued.`)
           .addFields({
             name: `${EMOJI.INFO} Source`,
             value:
               item.source === "GoogleSheet"
                 ? "📊 Google Sheet (stays in queue)"
-                : "📝 Manual Queue (added to Google Sheet)",
+                : "📝 Manual Queue (added to sheet)",
             inline: false,
           }),
       ],
     });
-
-    // Track manual items with no winners (to be added to BiddingItems)
-    if (item.source === "QueueList") {
-      manualItemsAuctioned.push({
-        item: item.item,
-        startPrice: item.startPrice,
-        duration: item.duration,
-        winner: "", // Empty = no winner
-        winningBid: "",
-        auctionStartTime: item.auctionStartTime,
-        auctionEndTime: endTimeStr,
-      });
-    }
   }
 
+  // ✅ Move to next item or session
+  const session = auctionState.sessions[auctionState.currentSessionIndex];
   auctionState.currentItemIndex++;
 
-  // Check if more items in current session
-  const currentSession = auctionState.sessions[auctionState.currentSessionIndex];
-  if (currentSession && auctionState.currentItemIndex < currentSession.items.length) {
-    auctionState.timers.nextItem = setTimeout(async () => {
-      await auctionNextItem(client, config, channel);
-    }, ITEM_WAIT);
-  } else {
-    // Move to next session or finalize
+  if (session && auctionState.currentItemIndex < session.items.length) {
+    // ➡️ Next item in same session
+    auctionState.currentItem = null;
+    console.log(`⏭️ Moving to next item in current session...`);
     await auctionNextItem(client, config, channel);
+  } else {
+    // ✅ End of session
+    auctionState.currentSessionIndex++;
+    auctionState.currentItemIndex = 0;
+    auctionState.currentItem = null;
+
+    if (auctionState.currentSessionIndex < auctionState.sessions.length) {
+      console.log(`🔥 Moving to next boss session...`);
+      await auctionNextItem(client, config, channel);
+    } else {
+      // ✅ ALL DONE
+      console.log(`🏁 All items completed. Finalizing session.`);
+      await finalizeSession(client, config, channel);
+    }
   }
 }
+
 
 async function finalizeSession(client, config, channel) {
   // Validate parameters
@@ -868,13 +879,11 @@ async function finalizeSession(client, config, channel) {
     .setColor(COLORS.SUCCESS)
     .setTitle(`${EMOJI.SUCCESS} Auctioneering Session Complete!`)
     .setDescription(`**${auctionState.sessionItems.length}** item(s) auctioned`)
-    .addFields(
-      {
-        name: `${EMOJI.LIST} Summary`,
-        value: summary || "No sales",
-        inline: false,
-      }
-    )
+    .addFields({
+      name: `${EMOJI.LIST} Summary`,
+      value: summary || "No sales",
+      inline: false,
+    })
     .setFooter({ text: "Processing results and submitting to sheets..." })
     .setTimestamp();
 
@@ -892,8 +901,13 @@ async function finalizeSession(client, config, channel) {
 
   try {
     if (!postToSheetFunc) {
-      console.error(`${EMOJI.ERROR} postToSheet not initialized - cannot submit session results`);
-      console.log(`${EMOJI.WARNING} Session results (for manual recovery):`, JSON.stringify(submitPayload, null, 2));
+      console.error(
+        `${EMOJI.ERROR} postToSheet not initialized - cannot submit session results`
+      );
+      console.log(
+        `${EMOJI.WARNING} Session results (for manual recovery):`,
+        JSON.stringify(submitPayload, null, 2)
+      );
     } else {
       const response = await fetch(config.sheet_webhook_url, {
         method: "POST",
@@ -906,15 +920,18 @@ async function finalizeSession(client, config, channel) {
       }
 
       const data = await response.json();
-      if (data.status !== 'ok') {
-        throw new Error(data.message || 'Unknown error from sheets');
+      if (data.status !== "ok") {
+        throw new Error(data.message || "Unknown error from sheets");
       }
 
       console.log(`${EMOJI.SUCCESS} Session results submitted successfully`);
     }
   } catch (err) {
     console.error(`${EMOJI.ERROR} Failed to submit bidding results:`, err);
-    console.log(`${EMOJI.WARNING} Session results (for manual recovery):`, JSON.stringify(submitPayload, null, 2));
+    console.log(
+      `${EMOJI.WARNING} Session results (for manual recovery):`,
+      JSON.stringify(submitPayload, null, 2)
+    );
   }
 
   // STEP 3: Send detailed summary to admin logs
@@ -978,7 +995,7 @@ async function finalizeSession(client, config, channel) {
   // Clear bidding module cache AND locked points
   const biddingModule = require("./bidding.js");
   biddingModule.clearPointsCache();
-  
+
   // CRITICAL: Clear all locked points after session
   const biddingState = biddingModule.getBiddingState();
   biddingState.lp = {};
@@ -1003,7 +1020,9 @@ async function buildCombinedResults(config) {
   });
 
   if (!response.ok) {
-    console.error(`${EMOJI.ERROR} Failed to fetch bidding points: HTTP ${response.status}`);
+    console.error(
+      `${EMOJI.ERROR} Failed to fetch bidding points: HTTP ${response.status}`
+    );
     return [];
   }
 
@@ -1027,7 +1046,11 @@ async function buildCombinedResults(config) {
     };
   });
 
-  console.log(`${EMOJI.CHART} Built results: ${results.filter(r => r.totalSpent > 0).length} winners out of ${results.length} members`);
+  console.log(
+    `${EMOJI.CHART} Built results: ${
+      results.filter((r) => r.totalSpent > 0).length
+    } winners out of ${results.length} members`
+  );
 
   return results;
 }
@@ -1115,22 +1138,25 @@ async function handleQueueList(message, biddingState) {
     let itemNumber = 1;
 
     auctQueue.forEach((session, sessionIdx) => {
-      const sessionTitle = session.bossKey 
-        ? `🔥 SESSION ${sessionIdx + 1} - ${session.bossName} (${session.bossKey.split(' ').slice(1).join(' ')})`
+      const sessionTitle = session.bossKey
+        ? `🔥 SESSION ${sessionIdx + 1} - ${session.bossName} (${session.bossKey
+            .split(" ")
+            .slice(1)
+            .join(" ")})`
         : `📋 SESSION ${sessionIdx + 1} - OPEN (No Boss)`;
-      
-      const attendeeInfo = session.bossKey 
+
+      const attendeeInfo = session.bossKey
         ? `👥 Attendees: ${session.attendees.length} members`
         : `👥 Open to all`;
-      
+
       queueText += `\n**${sessionTitle}**\n`;
-      
+
       session.items.forEach((item) => {
         const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
         queueText += `${itemNumber}. ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
         itemNumber++;
       });
-      
+
       queueText += `${attendeeInfo}\n`;
     });
 
@@ -1185,7 +1211,7 @@ async function handleQueueList(message, biddingState) {
       noBossItems.push(item);
       return;
     }
-    
+
     if (!bossGroups[boss]) {
       bossGroups[boss] = [];
     }
@@ -1230,7 +1256,8 @@ async function handleQueueList(message, biddingState) {
 
   queueText += `\n**ℹ️ Note:** Order shown is how items will auction when you run \`!startauction\``;
 
-  const totalSessions = Object.keys(bossGroups).length + (biddingQueue.length > 0 ? 1 : 0);
+  const totalSessions =
+    Object.keys(bossGroups).length + (biddingQueue.length > 0 ? 1 : 0);
   const totalItems = sheetItems.length + biddingQueue.length;
 
   const embed = new EmbedBuilder()
@@ -1433,14 +1460,15 @@ async function handleMyPoints(message, biddingModule, config) {
   try {
     await message.delete().catch(() => {});
   } catch (e) {
-    console.warn(`${EMOJI.WARNING} Could not delete user message: ${e.message}`);
+    console.warn(
+      `${EMOJI.WARNING} Could not delete user message: ${e.message}`
+    );
   }
 
   setTimeout(async () => {
     await ptsMsg.delete().catch(() => {});
   }, 30000);
 }
-
 
 async function handleBidStatus(message, config) {
   const statEmbed = new EmbedBuilder()
@@ -1476,14 +1504,33 @@ async function handleBidStatus(message, config) {
   }
 
   // Show remaining items in active sessions
-  if (auctionState.active && auctionState.sessions && auctionState.sessions.length > 0) {
+  if (
+    auctionState.active &&
+    auctionState.sessions &&
+    auctionState.sessions.length > 0
+  ) {
     const remainingItems = [];
-    for (let i = auctionState.currentSessionIndex; i < auctionState.sessions.length; i++) {
+    for (
+      let i = auctionState.currentSessionIndex;
+      i < auctionState.sessions.length;
+      i++
+    ) {
       const session = auctionState.sessions[i];
-      const startIdx = (i === auctionState.currentSessionIndex) ? auctionState.currentItemIndex + 1 : 0;
-      for (let j = startIdx; j < session.items.length && remainingItems.length < 5; j++) {
+      const startIdx =
+        i === auctionState.currentSessionIndex
+          ? auctionState.currentItemIndex + 1
+          : 0;
+      for (
+        let j = startIdx;
+        j < session.items.length && remainingItems.length < 5;
+        j++
+      ) {
         const item = session.items[j];
-        remainingItems.push(`${remainingItems.length + 1}. ${item.item}${item.quantity > 1 ? ` x${item.quantity}` : ""}`);
+        remainingItems.push(
+          `${remainingItems.length + 1}. ${item.item}${
+            item.quantity > 1 ? ` x${item.quantity}` : ""
+          }`
+        );
       }
       if (remainingItems.length >= 5) break;
     }
@@ -1492,13 +1539,14 @@ async function handleBidStatus(message, config) {
       const totalRemaining = auctionState.sessions
         .slice(auctionState.currentSessionIndex)
         .reduce((sum, s, idx) => {
-          const startIdx = (idx === 0) ? auctionState.currentItemIndex + 1 : 0;
+          const startIdx = idx === 0 ? auctionState.currentItemIndex + 1 : 0;
           return sum + (s.items.length - startIdx);
         }, 0);
 
       statEmbed.addFields({
         name: `${EMOJI.LIST} Remaining Items`,
-        value: remainingItems.join("\n") +
+        value:
+          remainingItems.join("\n") +
           (totalRemaining > 5 ? `\n*...+${totalRemaining - 5} more*` : ""),
       });
     }
@@ -1688,7 +1736,7 @@ function updateCurrentItemState(updates) {
 module.exports = {
   initialize,
   startAuctioneering,
-  auctionNextItem,        // ✅ add this
+  auctionNextItem, // ✅ add this
   getAuctionState: () => auctionState,
   canUserBid,
   setPostToSheet,

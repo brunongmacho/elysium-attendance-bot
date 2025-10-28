@@ -2029,34 +2029,101 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
   }
 }
 
-// ===========================================
-// startItemAuction wrapper for auctioneering.js
-// ===========================================
 async function startItemAuction(client, config, thread, item, session) {
-  try {
-    // If you already have a main auction starter, call it here:
-    if (typeof startAuction === "function") {
-      return await startAuction(client, config, thread, item, session);
-    }
+  const { EmbedBuilder } = require("discord.js");
+  const auctioneering = require("./auctioneering.js");
 
-    // Otherwise, perform a basic message setup so auctions don't crash
+  console.log(`🔨 Starting item auction: ${item.item}`);
+
+  // Initialize the auction item state
+  item.curBid = item.startPrice || 0;
+  item.curWin = null;
+  item.curWinId = null;
+  item.bids = [];
+  item.status = "active";
+
+  const duration = (item.duration || 2) * 60 * 1000;
+  item.endTime = Date.now() + duration;
+
+  // Announce the start of the auction
+  await thread.send({
+    content: `@everyone`,
+    embeds: [
+      new EmbedBuilder()
+        .setColor(0xffd700)
+        .setTitle(`🔨 Auction Started: ${item.item}`)
+        .setDescription(
+          `**Boss:** ${session.bossName || "OPEN"}\n` +
+          `**Starting Price:** ${item.startPrice || 0} pts\n` +
+          `**Duration:** ${item.duration || 2} min\n\n` +
+          `Use \`!bid <amount>\` to place your bids.`
+        )
+        .setFooter({ text: "Auction open — place your bids now!" })
+        .setTimestamp()
+    ]
+  });
+
+  // Schedule end timer
+  item.timers = {};
+
+  item.timers.go1 = setTimeout(async () => {
+    if (item.status !== "active") return;
     await thread.send({
       embeds: [
-        {
-          title: "🔨 Auction Started",
-          description: `**Item:** ${item.item}\n**Starting Price:** ${item.startPrice || 0} pts\n**Duration:** ${item.duration || 2} min`,
-          color: 0xffd700,
-          footer: { text: "Auction launched via startItemAuction()" },
-          timestamp: new Date(),
-        },
-      ],
+        new EmbedBuilder()
+          .setColor(0xffa500)
+          .setTitle("⚠️ Going Once!")
+          .setDescription("1 minute remaining.")
+      ]
     });
-    console.log(`✅ startItemAuction: Auction thread started for ${item.item}`);
-  } catch (err) {
-    console.error("❌ startItemAuction failed:", err);
-  }
-}
+  }, duration - 60000);
 
+  item.timers.go2 = setTimeout(async () => {
+    if (item.status !== "active") return;
+    await thread.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0xffa500)
+          .setTitle("⚠️ Going Twice!")
+          .setDescription("30 seconds remaining.")
+      ]
+    });
+  }, duration - 30000);
+
+  item.timers.final = setTimeout(async () => {
+    if (item.status !== "active") return;
+    await thread.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0xff0000)
+          .setTitle("🚨 Final Call!")
+          .setDescription("10 seconds left to bid!")
+      ]
+    });
+  }, duration - 10000);
+
+  // End auction
+  item.timers.end = setTimeout(async () => {
+    if (item.status !== "active") return;
+
+    item.status = "ended";
+    await thread.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x00ff00)
+          .setTitle(`🏁 Auction Ended: ${item.item}`)
+          .setDescription(
+            item.curWin
+              ? `**Winner:** <@${item.curWinId}> (${item.curBid} pts)`
+              : `No bids were placed.`
+          )
+      ]
+    });
+
+    // Notify auctioneering to finalize and move to the next item
+    await auctioneering.itemEnd(client, config, thread);
+  }, duration);
+}
 
 // MODULE EXPORTS
 module.exports = {
