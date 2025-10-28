@@ -2162,8 +2162,141 @@ module.exports = {
 
   // CRITICAL: Check if this is an auctioneering bid
   if (p.isAuctioneering) {
-    console.log(`🎯 Routing auctioneering bid confirmation to auctioneering module`);
-    // Let auctioneering module handle this
+    console.log(`🎯 Processing auctioneering bid confirmation`);
+
+    const auctState = p.auctStateRef;
+    const currentItem = auctState.currentItem;
+
+    if (!currentItem || currentItem.status !== "active") {
+      await reaction.message.channel.send(
+        `❌ <@${user.id}> Auction no longer active`
+      );
+      await reaction.message.reactions.removeAll().catch(() => {});
+      await reaction.message.delete().catch(() => {});
+      delete st.pc[reaction.message.id];
+      save();
+      return;
+    }
+
+    if (p.amount <= currentItem.curBid) {
+      await reaction.message.channel.send(
+        `❌ <@${user.id}> Bid invalid. Current: ${currentItem.curBid}pts`
+      );
+      await reaction.message.reactions.removeAll().catch(() => {});
+      await reaction.message.delete().catch(() => {});
+      delete st.pc[reaction.message.id];
+      save();
+      return;
+    }
+
+    // Handle previous winner
+    if (currentItem.curWin && !p.isSelf) {
+      unlock(currentItem.curWin, currentItem.curBid);
+      await reaction.message.channel.send({
+        content: `<@${currentItem.curWinId}>`,
+        embeds: [
+          new EmbedBuilder()
+            .setColor(getColor(COLORS.WARNING))
+            .setTitle(`${EMOJI.WARNING} Outbid!`)
+            .setDescription(`Someone bid **${p.amount}pts** on **${currentItem.item}**`),
+        ],
+      });
+    }
+
+    // Lock the new bid
+    lock(p.username, p.needed);
+
+    // Update current item
+    const prevBid = currentItem.curBid;
+    currentItem.curBid = p.amount;
+    currentItem.curWin = p.username;
+    currentItem.curWinId = p.userId;
+
+    if (!currentItem.bids) currentItem.bids = [];
+    currentItem.bids.push({
+      user: p.username,
+      userId: p.userId,
+      amount: p.amount,
+      timestamp: Date.now(),
+    });
+
+    // Update via auctioneering module
+    if (p.auctRef && typeof p.auctRef.updateCurrentItemState === 'function') {
+      p.auctRef.updateCurrentItemState({
+        curBid: p.amount,
+        curWin: p.username,
+        curWinId: p.userId,
+        bids: currentItem.bids,
+      });
+    }
+
+    // Clear timeout
+    if (st.th[`c_${reaction.message.id}`]) {
+      clearTimeout(st.th[`c_${reaction.message.id}`]);
+      delete st.th[`c_${reaction.message.id}`];
+    }
+
+    // Send confirmation
+    await reaction.message.edit({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(getColor(COLORS.SUCCESS))
+          .setTitle(`${EMOJI.SUCCESS} Bid Confirmed!`)
+          .setDescription(`Highest bidder on **${currentItem.item}**`)
+          .addFields(
+            {
+              name: `${EMOJI.BID} Your Bid`,
+              value: `${p.amount}pts`,
+              inline: true,
+            },
+            {
+              name: `${EMOJI.CHART} Previous`,
+              value: `${prevBid}pts`,
+              inline: true,
+            }
+          )
+          .setFooter({
+            text: p.isSelf ? `Self-overbid (+${p.needed}pts)` : "Good luck!",
+          }),
+      ],
+    });
+    await reaction.message.reactions.removeAll().catch(() => {});
+
+    await reaction.message.channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(getColor(COLORS.AUCTION))
+          .setTitle(`${EMOJI.FIRE} New High Bid!`)
+          .addFields(
+            {
+              name: `${EMOJI.BID} Amount`,
+              value: `${p.amount}pts`,
+              inline: true,
+            },
+            { name: '👤 Bidder', value: p.username, inline: true }
+          ),
+      ],
+    });
+
+    setTimeout(
+      async () => await reaction.message.delete().catch(() => {}),
+      5000
+    );
+    if (p.origMsgId) {
+      const orig = await reaction.message.channel.messages
+        .fetch(p.origMsgId)
+        .catch(() => null);
+      if (orig) await orig.delete().catch(() => {});
+    }
+
+    delete st.pc[reaction.message.id];
+    save();
+
+    console.log(
+      `${EMOJI.SUCCESS} Auctioneering bid: ${p.username} - ${p.amount}pts${
+        p.isSelf ? ` (self +${p.needed}pts)` : ""
+      }`
+    );
     return;
   }
 
@@ -2376,8 +2509,8 @@ module.exports = {
     delete st.pc[reaction.message.id];
     save();
 
-    // Resume if paused
-    if (st.pause) {
+    // Resume if paused (only for regular bidding.js auctions, not auctioneering)
+    if (!p.isAuctioneering && st.pause) {
       resumeAuction(reaction.client, config);
       await reaction.message.channel.send(
         `${EMOJI.PLAY} **RESUMED** - Bid canceled, auction continues...`

@@ -185,8 +185,10 @@ async function saveAuctionState(url) {
     const safeStringify = (obj) => {
       const seen = new WeakSet();
       return JSON.stringify(obj, (key, value) => {
+        // Skip timers and circular references
+        if (key === 'timers' || key === 'currentSession') return undefined;
         if (typeof value === "object" && value !== null) {
-          if (seen.has(value)) return;
+          if (seen.has(value)) return undefined;
           seen.add(value);
         }
         return value;
@@ -194,22 +196,26 @@ async function saveAuctionState(url) {
     };
 
     // 🧩 Clean item (avoid timers and circular data)
-    const cleanItem =
-      auctionState.currentItem && typeof auctionState.currentItem === "object"
-        ? Object.fromEntries(
-            Object.entries(auctionState.currentItem).filter(
-              ([k, v]) =>
-                typeof v !== "object" ||
-                (v && v.constructor && v.constructor.name !== "Timeout")
-            )
-          )
-        : auctionState.currentItem;
+    const cleanItem = auctionState.currentItem && typeof auctionState.currentItem === "object"
+      ? {
+          item: auctionState.currentItem.item,
+          startPrice: auctionState.currentItem.startPrice,
+          duration: auctionState.currentItem.duration,
+          curBid: auctionState.currentItem.curBid,
+          curWin: auctionState.currentItem.curWin,
+          curWinId: auctionState.currentItem.curWinId,
+          status: auctionState.currentItem.status,
+          source: auctionState.currentItem.source,
+          sheetIndex: auctionState.currentItem.sheetIndex,
+          bossName: auctionState.currentItem.bossName,
+        }
+      : null;
 
     const stateToSave = {
       auctionState: {
         active: auctionState.active,
-        currentItem: cleanItem ? { ...cleanItem, timers: undefined } : null,
-        itemQueue: auctionState.itemQueue,
+        currentItem: cleanItem,
+        itemQueue: [],
         sessionItems: auctionState.sessionItems,
         currentItemIndex: auctionState.currentItemIndex,
         paused: auctionState.paused,
@@ -353,7 +359,7 @@ async function startAuctioneering(client, config, channel) {
         sheetIndex: idx,
         bossName: boss,
         bossKey: bossKey,
-        skipAttendance: false,
+        skipAttendance: true,
       });
     }
   });
