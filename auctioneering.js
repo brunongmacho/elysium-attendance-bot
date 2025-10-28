@@ -180,10 +180,20 @@ async function logAuctionResult(
 
 async function saveAuctionState(url) {
   try {
+    // 🧩 Strip circular references (timers, etc.)
+    const cleanItem =
+      auctionState.currentItem && typeof auctionState.currentItem === "object"
+        ? Object.fromEntries(
+            Object.entries(auctionState.currentItem).filter(
+              ([k, v]) => typeof v !== "object" || !(v instanceof Timeout)
+            )
+          )
+        : auctionState.currentItem;
+
     const stateToSave = {
       auctionState: {
         active: auctionState.active,
-        currentItem: auctionState.currentItem,
+        currentItem: cleanItem ? { ...cleanItem, timers: undefined } : null,
         itemQueue: auctionState.itemQueue,
         sessionItems: auctionState.sessionItems,
         currentItemIndex: auctionState.currentItemIndex,
@@ -436,6 +446,23 @@ function getCurrentTimestamp() {
 // Prevents overlap, ensures currentItem is set before bids
 // =======================================================
 async function auctionNextItem(client, config, channel) {
+  // ✅ Ensure we’re using a proper guild text channel
+  if (![0, 5].includes(channel.type)) {
+    console.warn(
+      `⚠️ Channel type ${channel.type} invalid — refetching bidding channel...`
+    );
+    try {
+      const guild = await client.guilds.fetch(config.main_guild_id);
+      channel = await guild.channels.fetch(config.bidding_channel_id);
+      console.log(
+        `✅ Corrected to bidding channel: ${channel.name} (${channel.id})`
+      );
+    } catch (err) {
+      console.error("❌ Could not refetch bidding channel:", err);
+      return;
+    }
+  }
+
   // ✅ Ensure channel reference is valid
   if (!channel) {
     console.warn("⚠️ Channel is undefined, attempting to refetch...");
@@ -457,8 +484,11 @@ async function auctionNextItem(client, config, channel) {
     id: channel?.id,
     name: channel?.name,
     type: channel?.type,
-    threadsAvailable:
-      !!(channel && channel.threads && typeof channel.threads.create === "function"),
+    threadsAvailable: !!(
+      channel &&
+      channel.threads &&
+      typeof channel.threads.create === "function"
+    ),
   });
 
   // ✅ Pull current sessions from state
@@ -476,17 +506,16 @@ async function auctionNextItem(client, config, channel) {
     return auctionNextItem(client, config, channel);
   }
 
-const item = session.items[auctionState.currentItemIndex];
-if (!item) {
-  auctionState.currentSessionIndex++;
-  auctionState.currentItemIndex = 0;
-  return auctionNextItem(client, config, channel);
-}
+  const item = session.items[auctionState.currentItemIndex];
+  if (!item) {
+    auctionState.currentSessionIndex++;
+    auctionState.currentItemIndex = 0;
+    return auctionNextItem(client, config, channel);
+  }
 
-auctionState.currentItem = item;
-auctionState.currentItem.status = "active";
-auctionState.currentItem.bids = [];
-
+  auctionState.currentItem = item;
+  auctionState.currentItem.status = "active";
+  auctionState.currentItem.bids = [];
 
   const threadName = `${item.item} | ${item.startPrice || 0}pts | ${
     session.bossName || "OPEN"
@@ -590,7 +619,13 @@ auctionState.currentItem.bids = [];
 
   // ✅ Start bidding in this thread
   try {
-    await biddingModule.startItemAuction(client, config, auctionThread, item, session);
+    await biddingModule.startItemAuction(
+      client,
+      config,
+      auctionThread,
+      item,
+      session
+    );
   } catch (err) {
     console.error("❌ Error starting item auction:", err);
     await channel.send(`❌ Failed to start auction for ${item.item}`);
@@ -598,9 +633,10 @@ auctionState.currentItem.bids = [];
   }
 
   // ✅ DO NOT auto-queue next item immediately
-  console.log(`🕐 Auction started for: ${item.item}. Waiting for bids to finish...`);
+  console.log(
+    `🕐 Auction started for: ${item.item}. Waiting for bids to finish...`
+  );
 }
-
 
 function scheduleItemTimers(client, config, channel) {
   // Validate parameters
@@ -852,7 +888,6 @@ async function itemEnd(client, config, channel) {
     }
   }
 }
-
 
 async function finalizeSession(client, config, channel) {
   // Validate parameters
