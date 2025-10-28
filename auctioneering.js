@@ -364,8 +364,17 @@ console.log("⚙️ Attendance check disabled — all sessions open to all membe
   });
 
   auctionState.timers.sessionStart = setTimeout(async () => {
-    await auctionNextItem(client, config, channel);
-  }, 20000);
+  try {
+    // Always use the configured bidding channel, not the command channel
+    const guild = await client.guilds.fetch(config.main_guild_id);
+    const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+
+    console.log(`✅ Using bidding channel: ${biddingChannel.name} (${biddingChannel.id})`);
+    await auctionNextItem(client, config, biddingChannel);
+  } catch (err) {
+    console.error("❌ Failed to fetch bidding channel:", err);
+  }
+}, 20000);
 }
 
 function canUserBid(username, currentSession) {
