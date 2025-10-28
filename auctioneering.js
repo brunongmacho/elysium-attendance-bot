@@ -332,9 +332,6 @@ async function startAuctioneering(client, config, channel) {
 
   // Load attendance for each boss session
   for (const session of sessions) {
-    if (!session.bossKey) continue; // Skip OPEN session
-
-    for (const session of sessions) {
   session.attendees = []; // Open session, anyone can bid
 }
 console.log("⚙️ Attendance check disabled — all sessions open to all members.");
