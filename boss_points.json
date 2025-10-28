@@ -30,5 +30,6 @@
   "Asta": {"points":3, "aliases":["asta"]},
   "Supore": {"points":3, "aliases":["supore"]},
   "Chaiflock": {"points":3, "aliases":["chaiflock"]},
-  "Benji": {"points":3, "aliases":["benji"]}
+  "Benji": {"points":3, "aliases":["benji"]},
+  "Guild Boss": {"points": 0, "aliases": ["guild boss", "guildboss", "gb"]}
 }
