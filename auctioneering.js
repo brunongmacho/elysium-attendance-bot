@@ -421,119 +421,71 @@ function getCurrentTimestamp() {
   };
 }
 
+// =======================================================
+// AUCTION NEXT ITEM (thread per item)
+// =======================================================
 async function auctionNextItem(client, config, channel) {
-  // Validate parameters
-  if (!client || !config || !channel) {
-    console.error(`${EMOJI.ERROR} Invalid parameters to auctionNextItem`);
+  const sessions = auctionState.sessions;
+  if (!sessions || sessions.length === 0) {
+    await channel.send(`✅ All sessions completed`);
+    auctionState.active = false;
     return;
   }
 
-  const currentSession = auctionState.sessions[auctionState.currentSessionIndex];
+  const session = sessions[auctionState.currentSessionIndex];
+  if (!session || session.items.length === 0) {
+    auctionState.currentSessionIndex++;
+    return auctionNextItem(client, config, channel);
+  }
 
-  if (!currentSession || auctionState.currentItemIndex >= currentSession.items.length) {
-    // Move to next session
+  const item = session.items[auctionState.currentItemIndex];
+  if (!item) {
     auctionState.currentSessionIndex++;
     auctionState.currentItemIndex = 0;
+    return auctionNextItem(client, config, channel);
+  }
 
-    if (auctionState.currentSessionIndex >= auctionState.sessions.length) {
-      await finalizeSession(client, config, channel);
-      return;
-    }
+  const threadName = `${item.item} | ${item.startPrice || 0}pts | ${session.bossName || "OPEN"}`;
+  const auctionThread = await channel.threads.create({
+    name: threadName,
+    autoArchiveDuration: config.auto_archive_minutes || 60,
+    reason: `Auction for ${item.item}`,
+  });
 
-    // Clear attendance cache for previous session
-    const prevSession = auctionState.sessions[auctionState.currentSessionIndex - 1];
-    if (prevSession && prevSession.bossKey) {
-      delete attendanceCache[prevSession.bossKey];
-      console.log(`🧹 Cleared attendance cache for ${prevSession.bossKey}`);
-    }
+  await auctionThread.send({
+    content: `@everyone`,
+    embeds: [
+      new EmbedBuilder()
+        .setColor(COLORS.AUCTION)
+        .setTitle(`${EMOJI.AUCTION} New Auction Started`)
+        .setDescription(
+          `**Item:** ${item.item}\n**Boss:** ${
+            session.bossName || "OPEN"
+          }\n**Start Price:** ${item.startPrice || 0} pts\n**Duration:** ${
+            item.duration || 2
+          } min`
+        )
+        .setFooter({ text: `Thread created per item • ${getTimestamp()}` }),
+    ],
+  });
 
-    currentSessionBoss = auctionState.sessions[auctionState.currentSessionIndex].bossKey;
+  // Start bidding for this item (handled in bidding.js)
+  await biddingModule.startItemAuction(client, config, auctionThread, item, session);
 
-    // 10 second delay between sessions
-    await new Promise((resolve) => setTimeout(resolve, 10000));
+  // Prepare next item in sequence
+  auctionState.currentItemIndex++;
+
+  if (auctionState.currentItemIndex >= session.items.length) {
+    auctionState.currentSessionIndex++;
+    auctionState.currentItemIndex = 0;
+  }
+
+  // Auto-start next item after short delay (optional)
+  auctionState.timers.nextItem = setTimeout(async () => {
     await auctionNextItem(client, config, channel);
-    return;
-  }
-
-  const item = currentSession.items[auctionState.currentItemIndex];
-  currentSessionBoss = currentSession.bossKey;
-
-  auctionState.currentItem = {
-    ...item,
-    currentSession: currentSession,
-    bids: [],
-    curBid: item.startPrice,
-    curWin: null,
-    curWinId: null,
-    endTime: Date.now() + item.duration * 60000,
-    go1: false,
-    go2: false,
-    extCnt: 0,
-    status: "active",
-    auctionEndTime: null,
-  };
-
-  const isBatch = item.quantity > 1;
-
-  // Format item name for display
-  let displayName = item.item;
-  if (item.batchNumber && item.batchTotal) {
-    displayName += ` [${item.batchNumber}/${item.batchTotal}]`;
-  }
-
-  const embed = new EmbedBuilder()
-    .setColor(COLORS.SUCCESS)
-    .setTitle(`${EMOJI.FIRE} BIDDING NOW!`)
-    .setDescription(
-      `**${displayName}**${
-        isBatch && !item.batchNumber ? ` x${item.quantity}` : ""
-      }\n\nType \`!bid <amount>\` or \`!b <amount>\` to bid`
-    )
-    .addFields(
-      {
-        name: `${EMOJI.BID} Starting Bid`,
-        value: `${item.startPrice}pts`,
-        inline: true,
-      },
-      {
-        name: `${EMOJI.TIME} Duration`,
-        value: `${item.duration}m`,
-        inline: true,
-      },
-      {
-        name: `${EMOJI.LIST} Item #`,
-        value: `${auctionState.currentItemIndex + 1}/${
-          currentSession.items.length
-        }`,
-        inline: true,
-      },
-      {
-        name: `${EMOJI.INFO} Source`,
-        value:
-          item.source === "GoogleSheet" ? "📊 Google Sheet" : "📝 Manual Queue",
-        inline: true,
-      }
-    )
-    .setFooter({
-      text: `${EMOJI.CLOCK} 10s confirm • ${EMOJI.BID} Fastest wins`,
-    })
-    .setTimestamp();
-
-  if (isBatch && !item.batchNumber) {
-    embed.addFields({
-      name: `${EMOJI.FIRE} Batch Auction`,
-      value: `Top ${item.quantity} bidders will win!`,
-      inline: false,
-    });
-  }
-
-  await channel.send({ embeds: [embed] });
-
-  // 20 second preview before timer starts
-  setTimeout(() => {
-    scheduleItemTimers(client, config, channel);
-  }, 20000);
+  }, ITEM_WAIT);
 }
+
 
 function scheduleItemTimers(client, config, channel) {
   // Validate parameters
@@ -1642,6 +1594,11 @@ function updateCurrentItemState(updates) {
 module.exports = {
   initialize,
   startAuctioneering,
+  auctionNextItem,        // ✅ add this
+  getAuctionState: () => auctionState,
+  canUserBid,
+  setPostToSheet,
+  getPostToSheet,
   pauseSession,
   resumeSession,
   stopCurrentItem,
