@@ -412,11 +412,31 @@ function getBiddingItems(data) {
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
   let sheet = ss.getSheetByName('BiddingItems');
   if (!sheet) return createResponse('error', 'BiddingItems sheet not found', {items: []});
-  
+
+  // Validate sheet structure
+  const expectedHeaders = ['Item', 'Start Price', 'Duration', 'Winner', 'Winning Bid',
+                           'Auction Start', 'Auction End', 'Timestamp', 'Total Bids',
+                           'Source', 'Quantity', 'Boss'];
+  const headers = sheet.getRange(1, 1, 1, 12).getValues()[0];
+
+  for (let i = 0; i < expectedHeaders.length; i++) {
+    const expected = expectedHeaders[i];
+    const actual = (headers[i] || '').toString().trim();
+    if (actual !== expected) {
+      Logger.log(`⚠️ Header mismatch at column ${String.fromCharCode(65+i)}: expected "${expected}", got "${actual}"`);
+      // Continue but warn - don't fail completely
+    }
+  }
+
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return createResponse('ok', 'No items', {items: []});
-  
-  const dataRange = sheet.getRange(2, 1, lastRow - 1, 12).getValues(); // Changed from 10 to 12 (include L column)
+
+  const lastCol = sheet.getLastColumn();
+  if (lastCol < 12) {
+    Logger.log(`⚠️ Sheet only has ${lastCol} columns, expected 12. Some data may be missing.`);
+  }
+
+  const dataRange = sheet.getRange(2, 1, lastRow - 1, Math.min(lastCol, 12)).getValues();
   const items = [];
   
   dataRange.forEach((row, idx) => {

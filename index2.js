@@ -2302,7 +2302,9 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
               `⚠️ <@${user.id}>, this spawn is closed. Reaction removed.`
             )
             .then((m) => setTimeout(() => m.delete().catch(() => {}), 5000));
-        } catch (err) {}
+        } catch (err) {
+          console.error(`❌ Failed to send/delete closed spawn message:`, err.message);
+        }
         return;
       }
     }
@@ -2311,7 +2313,9 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     if (!adminMember || !isAdmin(adminMember)) {
       try {
         await reaction.users.remove(user.id);
-      } catch (e) {}
+      } catch (e) {
+        console.error(`❌ Failed to remove non-admin reaction from ${user.tag}:`, e.message);
+      }
       return;
     }
 
