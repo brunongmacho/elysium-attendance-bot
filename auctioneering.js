@@ -107,20 +107,30 @@ function fmtTime(ms) {
   return m % 60 > 0 ? `${h}h ${m % 60}m` : `${h}h`;
 }
 
-async function fetchSheetItems(url) {
-  try {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "getBiddingItems" }),
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const data = await r.json();
-    return data.items || [];
-  } catch (e) {
-    console.error(`${EMOJI.ERROR} Fetch items:`, e);
-    return null;
+async function fetchSheetItems(url, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getBiddingItems" }),
+        timeout: 10000, // 10 second timeout
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      console.log(`${EMOJI.SUCCESS} Fetched ${(data.items || []).length} items from sheet`);
+      return data.items || [];
+    } catch (e) {
+      console.error(`${EMOJI.ERROR} Fetch items attempt ${attempt}/${retries}:`, e.message);
+      if (attempt < retries) {
+        const backoff = 2000 * attempt; // Exponential backoff: 2s, 4s, 6s
+        console.log(`${EMOJI.WARNING} Retrying in ${backoff/1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, backoff));
+      }
+    }
   }
+  console.error(`${EMOJI.ERROR} Failed to fetch items after ${retries} attempts`);
+  return null;
 }
 
 async function logAuctionResult(
@@ -493,7 +503,7 @@ async function auctionNextItem(client, config, channel) {
       {
         name: `${EMOJI.LIST} Item #`,
         value: `${auctionState.currentItemIndex + 1}/${
-          auctionState.itemQueue.length
+          currentSession.items.length
         }`,
         inline: true,
       },
@@ -690,7 +700,7 @@ async function itemEnd(client, config, channel) {
     // Log to Google Sheet
     const logPayload = {
       action: "logAuctionResult",
-      itemIndex: item.source === "GoogleSheet" ? item.sheetIndex + 2 : -1,
+      itemIndex: item.source === "GoogleSheet" ? item.sheetIndex + 2 : -1, // +2 because sheet has 1 header row, forEach index is 0-based
       winner: item.curWin,
       winningBid: item.curBid,
       totalBids: totalBids,
@@ -702,7 +712,17 @@ async function itemEnd(client, config, channel) {
       auctionEndTime: endTimeStr,
     };
 
-    await getPostToSheet()(logPayload);
+    try {
+      if (!postToSheetFunc) {
+        console.error(`${EMOJI.ERROR} postToSheet not initialized - cannot log result for ${item.item}`);
+        // Store in sessionItems anyway for recovery
+      } else {
+        await getPostToSheet()(logPayload);
+      }
+    } catch (err) {
+      console.error(`${EMOJI.ERROR} Failed to log auction result for ${item.item}:`, err);
+      // Continue auction but log error for manual recovery
+    }
 
     // Add to session items (for final tally)
     auctionState.sessionItems.push({
@@ -765,12 +785,15 @@ async function itemEnd(client, config, channel) {
 
   auctionState.currentItemIndex++;
 
-  if (auctionState.currentItemIndex < auctionState.itemQueue.length) {
+  // Check if more items in current session
+  const currentSession = auctionState.sessions[auctionState.currentSessionIndex];
+  if (currentSession && auctionState.currentItemIndex < currentSession.items.length) {
     auctionState.timers.nextItem = setTimeout(async () => {
       await auctionNextItem(client, config, channel);
     }, ITEM_WAIT);
   } else {
-    await finalizeSession(client, config, channel);
+    // Move to next session or finalize
+    await auctionNextItem(client, config, channel);
   }
 }
 
@@ -829,7 +852,17 @@ async function finalizeSession(client, config, channel) {
     manualItems: manualItemsAuctioned,
   };
 
-  await getPostToSheet()(submitPayload);
+  try {
+    if (!postToSheetFunc) {
+      console.error(`${EMOJI.ERROR} postToSheet not initialized - cannot submit session results`);
+      console.log(`${EMOJI.WARNING} Session results (for manual recovery):`, JSON.stringify(submitPayload, null, 2));
+    } else {
+      await getPostToSheet()(submitPayload);
+    }
+  } catch (err) {
+    console.error(`${EMOJI.ERROR} Failed to submit bidding results:`, err);
+    console.log(`${EMOJI.WARNING} Session results (for manual recovery):`, JSON.stringify(submitPayload, null, 2));
+  }
 
   // STEP 3: Send detailed summary to admin logs
   const mainGuild = await client.guilds.fetch(config.main_guild_id);
@@ -1388,21 +1421,33 @@ async function handleBidStatus(message, config) {
     });
   }
 
-  if (auctionState.itemQueue.length > 0) {
-    statEmbed.addFields({
-      name: `${EMOJI.LIST} Queue`,
-      value:
-        auctionState.itemQueue
-          .slice(0, 5)
-          .map(
-            (a, i) =>
-              `${i + 1}. ${a.item}${a.quantity > 1 ? ` x${a.quantity}` : ""}`
-          )
-          .join("\n") +
-        (auctionState.itemQueue.length > 5
-          ? `\n*...+${auctionState.itemQueue.length - 5} more*`
-          : ""),
-    });
+  // Show remaining items in active sessions
+  if (auctionState.active && auctionState.sessions && auctionState.sessions.length > 0) {
+    const remainingItems = [];
+    for (let i = auctionState.currentSessionIndex; i < auctionState.sessions.length; i++) {
+      const session = auctionState.sessions[i];
+      const startIdx = (i === auctionState.currentSessionIndex) ? auctionState.currentItemIndex + 1 : 0;
+      for (let j = startIdx; j < session.items.length && remainingItems.length < 5; j++) {
+        const item = session.items[j];
+        remainingItems.push(`${remainingItems.length + 1}. ${item.item}${item.quantity > 1 ? ` x${item.quantity}` : ""}`);
+      }
+      if (remainingItems.length >= 5) break;
+    }
+
+    if (remainingItems.length > 0) {
+      const totalRemaining = auctionState.sessions
+        .slice(auctionState.currentSessionIndex)
+        .reduce((sum, s, idx) => {
+          const startIdx = (idx === 0) ? auctionState.currentItemIndex + 1 : 0;
+          return sum + (s.items.length - startIdx);
+        }, 0);
+
+      statEmbed.addFields({
+        name: `${EMOJI.LIST} Remaining Items`,
+        value: remainingItems.join("\n") +
+          (totalRemaining > 5 ? `\n*...+${totalRemaining - 5} more*` : ""),
+      });
+    }
   }
 
   statEmbed.setFooter({ text: "Use !auction to add items" }).setTimestamp();
