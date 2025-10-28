@@ -1401,12 +1401,168 @@ client.once(Events.ClientReady, async () => {
   auctioneering.setPostToSheet(attendance.postToSheet); // Use attendance module's postToSheet
   lootSystem.initialize(config, bossPoints, isAdmin);
 
+  console.log("\n╔═══════════════════════════════════════════════════════╗");
+  console.log("║         🔄 BOT STATE RECOVERY (3-SWEEP SYSTEM)        ║");
+  console.log("╚═══════════════════════════════════════════════════════╝\n");
+
   isRecovering = true;
+
+  // Recover bidding state first
   await recoverBotStateOnStartup(client, config);
+
+  // ═══════════════════════════════════════════════════════
+  // SWEEP 1: Enhanced Thread Recovery (PRIORITY)
+  // ═══════════════════════════════════════════════════════
+  const sweep1 = await attendance.recoverStateFromThreads(client);
+
+  // ═══════════════════════════════════════════════════════
+  // SWEEP 2: Google Sheets Fallback (Fill Gaps)
+  // ═══════════════════════════════════════════════════════
+  console.log("\n═══════════════════════════════════════════════════════");
+  console.log("💾 SWEEP 2: GOOGLE SHEETS STATE RECOVERY");
+  console.log("═══════════════════════════════════════════════════════");
+
+  let sweep2LoadedState = false;
+  if (!sweep1.success || sweep1.recovered === 0) {
+    console.log("⚠️ Sweep 1 found no threads, attempting Sheets recovery...");
+    sweep2LoadedState = await attendance.loadAttendanceStateFromSheet();
+    
+    if (sweep2LoadedState) {
+      console.log("✅ SWEEP 2: State loaded from Google Sheets");
+    } else {
+      console.log("⚠️ SWEEP 2: No saved state found in Sheets");
+    }
+  } else {
+    console.log("✅ SWEEP 2: Skipped (Sweep 1 found active threads)");
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // SWEEP 3: Cross-Reference Validation
+  // ═══════════════════════════════════════════════════════
+  const sweep3 = await attendance.validateStateConsistency(client);
+
   isRecovering = false;
 
-  // Use attendance module's recovery function (from threads)
-  const threadsRecovered = await attendance.recoverStateFromThreads(client);
+  // ═══════════════════════════════════════════════════════
+  // SEND RECOVERY SUMMARY TO ADMIN LOGS
+  // ═══════════════════════════════════════════════════════
+  const adminLogs = await client.guilds
+    .fetch(config.main_guild_id)
+    .then((g) => g.channels.fetch(config.admin_logs_channel_id))
+    .catch(() => null);
+
+  if (adminLogs) {
+    const embed = new EmbedBuilder()
+      .setColor(sweep1.success ? 0x00ff00 : 0xffa500)
+      .setTitle("🔄 Bot State Recovery Complete")
+      .setDescription("3-Sweep recovery system executed")
+      .addFields(
+        {
+          name: "📋 Sweep 1: Thread Recovery",
+          value: sweep1.success
+            ? `✅ **Success**\n` +
+              `├─ Spawns: ${sweep1.recovered}\n` +
+              `├─ Pending verifications: ${sweep1.pending}\n` +
+              `├─ Pending closures: ${sweep1.confirmations}\n` +
+              `└─ Reactions re-added: ${sweep1.reactionsAdded || 0}`
+            : `❌ **Failed:** ${sweep1.error || "Unknown error"}`,
+          inline: false,
+        },
+        {
+          name: "💾 Sweep 2: Sheets Recovery",
+          value: sweep2LoadedState
+            ? "✅ Loaded from Google Sheets"
+            : sweep1.success
+            ? "⏭️ Skipped (threads found)"
+            : "⚠️ No saved state",
+          inline: false,
+        },
+        {
+          name: "🔍 Sweep 3: Validation",
+          value: sweep3
+            ? `${
+                sweep3.threadsWithoutColumns.length +
+                  sweep3.columnsWithoutThreads.length +
+                  sweep3.duplicateColumns.length ===
+                0
+                  ? "✅"
+                  : "⚠️"
+              } **Discrepancies Found:**\n` +
+              `├─ Threads without columns: ${sweep3.threadsWithoutColumns.length}\n` +
+              `├─ Columns without threads: ${sweep3.columnsWithoutThreads.length}\n` +
+              `└─ Duplicate columns: ${sweep3.duplicateColumns.length}`
+            : "❌ Validation failed",
+          inline: false,
+        }
+      )
+      .setFooter({ text: "Bot is now ready for operations" })
+      .setTimestamp();
+
+    // Add discrepancy details if found
+    if (sweep3) {
+      if (sweep3.threadsWithoutColumns.length > 0) {
+        const list = sweep3.threadsWithoutColumns
+          .slice(0, 5)
+          .map(
+            (t) =>
+              `• **${t.boss}** (${t.timestamp}) - ${t.members} members - <#${t.threadId}>`
+          )
+          .join("\n");
+        embed.addFields({
+          name: "⚠️ Threads Without Columns",
+          value:
+            list +
+            (sweep3.threadsWithoutColumns.length > 5
+              ? `\n*+${sweep3.threadsWithoutColumns.length - 5} more...*`
+              : ""),
+          inline: false,
+        });
+      }
+
+      if (sweep3.columnsWithoutThreads.length > 0) {
+        const list = sweep3.columnsWithoutThreads
+          .slice(0, 5)
+          .map((c) => `• **${c.boss}** (${c.timestamp}) - Column ${c.column}`)
+          .join("\n");
+        embed.addFields({
+          name: "⚠️ Columns Without Threads",
+          value:
+            list +
+            (sweep3.columnsWithoutThreads.length > 5
+              ? `\n*+${sweep3.columnsWithoutThreads.length - 5} more...*`
+              : "") +
+            "\n\n*These may be closed threads. Manually verify if needed.*",
+          inline: false,
+        });
+      }
+
+      if (sweep3.duplicateColumns.length > 0) {
+        const list = sweep3.duplicateColumns
+          .slice(0, 3)
+          .map(
+            (d) =>
+              `• **${d.boss}** (${d.timestamp}) - Columns: ${d.columns.join(", ")}`
+          )
+          .join("\n");
+        embed.addFields({
+          name: "⚠️ Duplicate Columns Detected",
+          value:
+            list +
+            (sweep3.duplicateColumns.length > 3
+              ? `\n*+${sweep3.duplicateColumns.length - 3} more...*`
+              : "") +
+            "\n\n*Manually delete duplicate columns from Google Sheets.*",
+          inline: false,
+        });
+      }
+    }
+
+    await adminLogs.send({ embeds: [embed] });
+  }
+
+  console.log("\n╔═══════════════════════════════════════════════════════╗");
+  console.log("║              ✅ RECOVERY COMPLETE                      ║");
+  console.log("╚═══════════════════════════════════════════════════════╝\n");
 
   // If thread recovery didn't find much, try Google Sheets
   if (!threadsRecovered || Object.keys(attendance.getActiveSpawns()).length === 0) {

@@ -33,7 +33,8 @@ function doPost(e) {
     if (action === 'submitAttendance') return handleSubmitAttendance(data);
     if (action === 'getAttendanceState') return getAttendanceState(data);
     if (action === 'saveAttendanceState') return saveAttendanceState(data);
-
+    if (action === 'getAllSpawnColumns') return getAllSpawnColumns(data);
+    
     // Bidding actions
     if (action === 'getBiddingPoints') return handleGetBiddingPoints(data);
     if (action === 'submitBiddingResults') return handleSubmitBiddingResults(data);
@@ -81,6 +82,50 @@ function handleCheckColumn(data) {
   }
   
   return createResponse('ok', 'Does not exist', {exists: false});
+}
+
+function getAllSpawnColumns(data) {
+  const weekSheet = data.weekSheet || '';
+  
+  if (!weekSheet) {
+    return createResponse('error', 'Missing weekSheet parameter', {columns: []});
+  }
+  
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const sheet = ss.getSheetByName(weekSheet);
+  
+  if (!sheet) {
+    Logger.log(`⚠️ Sheet not found: ${weekSheet}`);
+    return createResponse('ok', 'Sheet not found', {columns: []});
+  }
+  
+  const lastCol = sheet.getLastColumn();
+  
+  if (lastCol < COLUMNS.FIRST_SPAWN) {
+    return createResponse('ok', 'No spawn columns', {columns: []});
+  }
+  
+  const spawnData = sheet.getRange(1, COLUMNS.FIRST_SPAWN, 2, lastCol - COLUMNS.FIRST_SPAWN + 1).getValues();
+  const row1 = spawnData[0]; // Timestamps
+  const row2 = spawnData[1]; // Boss names
+  
+  const columns = [];
+  
+  for (let i = 0; i < row1.length; i++) {
+    const timestamp = (row1[i] || '').toString().trim();
+    const boss = (row2[i] || '').toString().trim().toUpperCase();
+    
+    if (timestamp && boss) {
+      columns.push({
+        timestamp: timestamp,
+        boss: boss,
+        column: i + COLUMNS.FIRST_SPAWN
+      });
+    }
+  }
+  
+  Logger.log(`✅ Found ${columns.length} spawn columns in ${weekSheet}`);
+  return createResponse('ok', 'Columns fetched', {columns: columns});
 }
 
 function handleSubmitLootEntries(data) {

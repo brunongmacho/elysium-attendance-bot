@@ -585,7 +585,7 @@ async function handleHelp(message, args, member) {
   // ========================================
   if (args.length > 0) {
     const cmdName = args[0].toLowerCase().replace("!", "");
-    const cmdInfo = COMMAND_HELP[cmdName];
+    let cmdInfo = COMMAND_HELP[cmdName];
 
     if (!cmdInfo) {
       // Try to find by alias

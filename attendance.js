@@ -303,129 +303,355 @@ async function createSpawnThreads(
 }
 
 // State recovery
+// ==========================================
+// ENHANCED SWEEP 1: THREAD-BASED RECOVERY
+// ==========================================
+
+async function scanThreadForPendingReactions(thread, client, bossName, parsed) {
+  const messages = await thread.messages.fetch({ limit: 100 }).catch(() => null);
+  if (!messages) return { members: [], pending: [], confirmations: [] };
+
+  const members = [];
+  const pending = [];
+  const confirmations = [];
+
+  for (const [msgId, msg] of messages) {
+    // Skip bot messages except specific ones
+    if (msg.author.id === client.user.id) {
+      // Check for already-verified members
+      if (msg.content.includes("verified by")) {
+        const match = msg.content.match(/\*\*(.+?)\*\* verified by/);
+        if (match) members.push(match[1]);
+      }
+
+      // Check for pending closure confirmations
+      if (msg.content.includes("React ✅ to confirm") && msg.content.includes("Close spawn")) {
+        const hasReactions = msg.reactions.cache.has("✅") && msg.reactions.cache.has("❌");
+        if (hasReactions) {
+          confirmations.push({
+            messageId: msgId,
+            timestamp: msg.createdTimestamp
+          });
+        }
+      }
+      continue;
+    }
+
+    // Check for member check-ins with missing or existing reactions
+    const content = msg.content.trim().toLowerCase();
+    const keyword = content.split(/\s+/)[0];
+
+    if (["present", "here", "join", "checkin", "check-in"].includes(keyword)) {
+      const hasCheckmark = msg.reactions.cache.has("✅");
+      const hasX = msg.reactions.cache.has("❌");
+
+      // Get member info
+      const author = await thread.guild.members.fetch(msg.author.id).catch(() => null);
+      const username = author ? (author.nickname || msg.author.username) : msg.author.username;
+
+      // If has both reactions, it's pending verification
+      if (hasCheckmark && hasX) {
+        // Check if already verified (bot reply exists)
+        const hasVerificationReply = messages.some(
+          (m) =>
+            m.reference?.messageId === msgId &&
+            m.author.id === client.user.id &&
+            m.content.includes("verified")
+        );
+
+        if (!hasVerificationReply) {
+          pending.push({
+            messageId: msgId,
+            author: username,
+            authorId: msg.author.id,
+            timestamp: msg.createdTimestamp
+          });
+        }
+      } 
+      // If missing reactions, add them
+      else if (!hasCheckmark || !hasX) {
+        try {
+          if (!hasCheckmark) await msg.react("✅");
+          if (!hasX) await msg.react("❌");
+          
+          pending.push({
+            messageId: msgId,
+            author: username,
+            authorId: msg.author.id,
+            timestamp: msg.createdTimestamp
+          });
+
+          console.log(`  ├─ ✅ Re-added reactions to ${username}'s check-in`);
+        } catch (err) {
+          console.warn(`  ├─ ⚠️ Could not add reactions to message ${msgId}: ${err.message}`);
+        }
+      }
+    }
+  }
+
+  return { members, pending, confirmations };
+}
+
 async function recoverStateFromThreads(client) {
+  console.log("═══════════════════════════════════════════════════════");
+  console.log("🔄 SWEEP 1: ENHANCED THREAD RECOVERY");
+  console.log("═══════════════════════════════════════════════════════");
+
   try {
-    const mainGuild = await client.guilds
-      .fetch(config.main_guild_id)
-      .catch(() => null);
-    if (!mainGuild) return;
+    const mainGuild = await client.guilds.fetch(config.main_guild_id).catch(() => null);
+    if (!mainGuild) {
+      console.log("❌ Could not fetch main guild");
+      return { success: false, recovered: 0, pending: 0 };
+    }
 
-    const attChannel = await mainGuild.channels
-      .fetch(config.attendance_channel_id)
-      .catch(() => null);
-    const adminLogs = await mainGuild.channels
-      .fetch(config.admin_logs_channel_id)
-      .catch(() => null);
+    const attChannel = await mainGuild.channels.fetch(config.attendance_channel_id).catch(() => null);
+    const adminLogs = await mainGuild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
 
-    if (!attChannel || !adminLogs) return;
+    if (!attChannel || !adminLogs) {
+      console.log("❌ Could not fetch required channels");
+      return { success: false, recovered: 0, pending: 0 };
+    }
+
+    const attThreads = await attChannel.threads.fetchActive().catch(() => null);
+    if (!attThreads) {
+      console.log("❌ Could not fetch active threads");
+      return { success: false, recovered: 0, pending: 0 };
+    }
+
+    const adminThreads = await adminLogs.threads.fetchActive().catch(() => null);
 
     let recoveredCount = 0;
     let pendingCount = 0;
+    let reactionsAddedCount = 0;
+    let confirmationsCount = 0;
 
-    const attThreads = await attChannel.threads.fetchActive().catch(() => null);
-    if (!attThreads) return;
-
-    const adminThreads = await adminLogs.threads
-      .fetchActive()
-      .catch(() => null);
+    const threadProcessingPromises = [];
 
     for (const [threadId, thread] of attThreads.threads) {
-      const parsed = parseThreadName(thread.name);
-      if (!parsed) continue;
+      // Process threads in parallel as requested
+      const promise = (async () => {
+        const parsed = parseThreadName(thread.name);
+        if (!parsed) {
+          console.log(`⚠️ Could not parse thread name: ${thread.name}`);
+          return;
+        }
 
-      const bossName = findBossMatch(parsed.boss);
-      if (!bossName || thread.archived) continue;
+        const bossName = findBossMatch(parsed.boss);
+        if (!bossName || thread.archived) {
+          console.log(`⚠️ Unknown boss or archived: ${parsed.boss}`);
+          return;
+        }
 
-      let confirmThreadId = null;
-      if (adminThreads) {
-        for (const [id, adminThread] of adminThreads.threads) {
-          if (adminThread.name === `✅ ${thread.name}`) {
-            confirmThreadId = id;
-            break;
+        console.log(`\n📋 Processing: ${thread.name} (ID: ${threadId})`);
+
+        // Find corresponding confirmation thread
+        let confirmThreadId = null;
+        if (adminThreads) {
+          for (const [id, adminThread] of adminThreads.threads) {
+            if (adminThread.name === `✅ ${thread.name}`) {
+              confirmThreadId = id;
+              console.log(`  ├─ 🔗 Found confirmation thread: ${id}`);
+              break;
+            }
           }
         }
-      }
 
-      const messages = await thread.messages
-        .fetch({ limit: 100 })
-        .catch(() => null);
-      if (!messages) continue;
+        // Deep scan thread for all pending items
+        const scanResult = await scanThreadForPendingReactions(thread, client, bossName, parsed);
 
-      const members = [];
+        console.log(`  ├─ 👥 Verified members: ${scanResult.members.length}`);
+        console.log(`  ├─ ⏳ Pending verifications: ${scanResult.pending.length}`);
+        console.log(`  ├─ 🔒 Pending closures: ${scanResult.confirmations.length}`);
 
-      for (const [msgId, msg] of messages) {
-        if (
-          msg.author.id === client.user.id &&
-          msg.content.includes("verified by")
-        ) {
-          const match = msg.content.match(/\*\*(.+?)\*\* verified by/);
-          if (match) members.push(match[1]);
-        }
+        // Store spawn info
+        activeSpawns[threadId] = {
+          boss: bossName,
+          date: parsed.date,
+          time: parsed.time,
+          timestamp: parsed.timestamp,
+          members: scanResult.members,
+          confirmThreadId: confirmThreadId,
+          closed: false,
+        };
 
-        if (msg.reactions.cache.has("✅") && msg.reactions.cache.has("❌")) {
-          const hasVerificationReply = messages.some(
-            (m) =>
-              m.reference?.messageId === msgId &&
-              m.author.id === client.user.id &&
-              m.content.includes("verified")
-          );
+        activeColumns[`${bossName}|${parsed.timestamp}`] = threadId;
 
-          if (!hasVerificationReply) {
-            const author = await mainGuild.members
-              .fetch(msg.author.id)
-              .catch(() => null);
-            const username = author
-              ? author.nickname || msg.author.username
-              : msg.author.username;
+        // Store pending verifications
+        scanResult.pending.forEach(p => {
+          pendingVerifications[p.messageId] = {
+            author: p.author,
+            authorId: p.authorId,
+            threadId: thread.id,
+            timestamp: p.timestamp,
+          };
+          pendingCount++;
+        });
 
-            pendingVerifications[msgId] = {
-              author: username,
-              authorId: msg.author.id,
-              threadId: thread.id,
-              timestamp: msg.createdTimestamp,
-            };
-            pendingCount++;
-          }
-        }
-      }
+        // Store pending closures
+        scanResult.confirmations.forEach(c => {
+          pendingClosures[c.messageId] = {
+            threadId: thread.id,
+            timestamp: c.timestamp,
+            type: "close",
+          };
+          confirmationsCount++;
+        });
 
-      activeSpawns[thread.id] = {
-        boss: bossName,
-        date: parsed.date,
-        time: parsed.time,
-        timestamp: parsed.timestamp,
-        members: members,
-        confirmThreadId: confirmThreadId,
-        closed: false,
-      };
+        recoveredCount++;
+      })();
 
-      activeColumns[`${bossName}|${parsed.timestamp}`] = thread.id;
-      recoveredCount++;
+      threadProcessingPromises.push(promise);
     }
 
-    if (recoveredCount > 0 && adminLogs) {
-      const embed = new EmbedBuilder()
-        .setColor(0x00ff00)
-        .setTitle("🔄 Bot State Recovered")
-        .setDescription(`Recovered ${recoveredCount} spawn(s)`)
-        .addFields(
-          {
-            name: "Spawns Recovered",
-            value: `${recoveredCount}`,
-            inline: true,
-          },
-          {
-            name: "Pending Verifications",
-            value: `${pendingCount}`,
-            inline: true,
-          }
-        )
-        .setTimestamp();
+    // Wait for all threads to be processed in parallel
+    await Promise.all(threadProcessingPromises);
 
-      await adminLogs.send({ embeds: [embed] });
-    }
+    console.log("\n✅ SWEEP 1 COMPLETE");
+    console.log(`   ├─ Spawns recovered: ${recoveredCount}`);
+    console.log(`   ├─ Pending verifications: ${pendingCount}`);
+    console.log(`   ├─ Pending closures: ${confirmationsCount}`);
+    console.log(`   └─ Reactions added: ${reactionsAddedCount}`);
+
+    return {
+      success: true,
+      recovered: recoveredCount,
+      pending: pendingCount,
+      confirmations: confirmationsCount,
+      reactionsAdded: reactionsAddedCount
+    };
+
   } catch (err) {
-    console.error("❌ State recovery error:", err);
+    console.error("❌ SWEEP 1 ERROR:", err);
+    return { success: false, recovered: 0, pending: 0, error: err.message };
+  }
+}
+
+// ==========================================
+// SWEEP 3: CROSS-REFERENCE VALIDATION
+// ==========================================
+
+async function validateStateConsistency(client) {
+  console.log("\n═══════════════════════════════════════════════════════");
+  console.log("🔍 SWEEP 3: CROSS-REFERENCE VALIDATION");
+  console.log("═══════════════════════════════════════════════════════");
+
+  try {
+    const discrepancies = {
+      threadsWithoutColumns: [],
+      columnsWithoutThreads: [],
+      duplicateColumns: []
+    };
+
+    // Get current week sheet
+    const weekSheet = getSundayOfWeek();
+    const sheetName = `ELYSIUM_WEEK_${weekSheet}`;
+
+    console.log(`📊 Checking consistency with sheet: ${sheetName}`);
+
+    // Fetch sheet columns
+    const payload = {
+      action: "getAllSpawnColumns",
+      weekSheet: sheetName
+    };
+
+    const resp = await fetch(config.sheet_webhook_url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    let sheetColumns = [];
+    if (resp.ok) {
+      try {
+        const data = await resp.json();
+        sheetColumns = data.columns || [];
+      } catch (e) {
+        console.log("⚠️ Could not parse sheet columns");
+      }
+    }
+
+    console.log(`📋 Found ${sheetColumns.length} columns in sheet`);
+    console.log(`📋 Found ${Object.keys(activeSpawns).length} active spawns in memory`);
+
+    // Check 1: Threads without sheet columns
+    for (const [threadId, spawn] of Object.entries(activeSpawns)) {
+      const key = `${spawn.boss}|${spawn.timestamp}`;
+      const hasColumn = sheetColumns.some(col => 
+        col.boss.toUpperCase() === spawn.boss.toUpperCase() && 
+        col.timestamp === spawn.timestamp
+      );
+
+      if (!hasColumn) {
+        discrepancies.threadsWithoutColumns.push({
+          threadId,
+          boss: spawn.boss,
+          timestamp: spawn.timestamp,
+          members: spawn.members.length
+        });
+      }
+    }
+
+    // Check 2: Sheet columns without threads
+    for (const col of sheetColumns) {
+      const key = `${col.boss}|${col.timestamp}`;
+      const hasThread = activeColumns[key];
+
+      if (!hasThread) {
+        discrepancies.columnsWithoutThreads.push({
+          boss: col.boss,
+          timestamp: col.timestamp,
+          column: col.column
+        });
+      }
+    }
+
+    // Check 3: Duplicate columns (same boss+timestamp)
+    const columnKeys = {};
+    for (const col of sheetColumns) {
+      const key = `${col.boss}|${col.timestamp}`;
+      if (columnKeys[key]) {
+        discrepancies.duplicateColumns.push({
+          boss: col.boss,
+          timestamp: col.timestamp,
+          columns: [columnKeys[key], col.column]
+        });
+      } else {
+        columnKeys[key] = col.column;
+      }
+    }
+
+    // Log results
+    console.log("\n📊 VALIDATION RESULTS:");
+    console.log(`   ├─ Threads without columns: ${discrepancies.threadsWithoutColumns.length}`);
+    console.log(`   ├─ Columns without threads: ${discrepancies.columnsWithoutThreads.length}`);
+    console.log(`   └─ Duplicate columns: ${discrepancies.duplicateColumns.length}`);
+
+    if (discrepancies.threadsWithoutColumns.length > 0) {
+      console.log("\n⚠️ THREADS WITHOUT COLUMNS:");
+      discrepancies.threadsWithoutColumns.forEach(t => {
+        console.log(`   ├─ ${t.boss} (${t.timestamp}) - ${t.members} members - Thread: ${t.threadId}`);
+      });
+    }
+
+    if (discrepancies.columnsWithoutThreads.length > 0) {
+      console.log("\n⚠️ COLUMNS WITHOUT THREADS:");
+      discrepancies.columnsWithoutThreads.forEach(c => {
+        console.log(`   ├─ ${c.boss} (${c.timestamp}) - Column ${c.column}`);
+      });
+    }
+
+    if (discrepancies.duplicateColumns.length > 0) {
+      console.log("\n⚠️ DUPLICATE COLUMNS:");
+      discrepancies.duplicateColumns.forEach(d => {
+        console.log(`   ├─ ${d.boss} (${d.timestamp}) - Columns: ${d.columns.join(', ')}`);
+      });
+    }
+
+    return discrepancies;
+
+  } catch (err) {
+    console.error("❌ SWEEP 3 ERROR:", err);
+    return null;
   }
 }
 
@@ -566,6 +792,7 @@ module.exports = {
   cleanupAllThreadReactions,
   createSpawnThreads,
   recoverStateFromThreads,
+  validateStateConsistency,
   loadAttendanceForBoss,
   saveAttendanceStateToSheet,
   loadAttendanceStateFromSheet,
