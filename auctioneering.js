@@ -1843,6 +1843,7 @@ function updateCurrentItemState(updates) {
 
 module.exports = {
   initialize,
+  itemEnd,
   startAuctioneering,
   auctionNextItem, // ✅ add this
   getAuctionState: () => auctionState,
