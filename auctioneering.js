@@ -331,28 +331,11 @@ async function startAuctioneering(client, config, channel) {
   }
 
   // Load attendance for each boss session
-  for (const session of sessions) {
+for (const session of sessions) {
   session.attendees = []; // Open session, anyone can bid
 }
 console.log("⚙️ Attendance check disabled — all sessions open to all members.");
 
-    if (!resp.ok) {
-      await channel.send(
-        `❌ Failed to load attendance for ${session.bossKey}\n` +
-        `Sheet: ${weekSheetName}\n` +
-        `Error: HTTP ${resp.status}`
-      );
-      return;
-    }
-
-    const data = await resp.json();
-    if (!data.attendees || data.attendees.length === 0) {
-      console.warn(`⚠️ No attendees found for ${session.bossKey}`);
-    }
-
-    session.attendees = data.attendees || [];
-    attendanceCache[session.bossKey] = session.attendees;
-  }
 
   auctionState.active = true;
   auctionState.sessions = sessions;
