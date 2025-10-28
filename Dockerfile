@@ -1,31 +1,29 @@
 # Stage 1: Install dependencies
-FROM mirror.gcr.io/library/node:18-alpine AS deps
+FROM node:18-slim AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --production --no-audit --progress=false
+RUN apt-get update && apt-get install -y python3 make g++ \
+    && npm ci --production --no-audit --progress=false \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Stage 2: Copy source and build (if applicable)
-FROM mirror.gcr.io/library/node:18-alpine AS builder
+FROM node:18-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Uncomment the next line if you have a build step (e.g., React, TypeScript)
+# Uncomment if you have a build step (TypeScript/React)
 # RUN npm run build
 
-# Stage 3: Use Distroless for production (no DockerHub dependency)
+# Stage 3: Use Distroless for production
 FROM gcr.io/distroless/nodejs18
 WORKDIR /app
 
-# Copy built app and dependencies
-COPY --from=builder /app .
+COPY --from=builder /app ./
 
-# Optional: set environment variables
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Expose port if your app listens on one
 EXPOSE 3000
 EXPOSE 8000
 
-# Start the bot
 CMD ["index2.js"]
