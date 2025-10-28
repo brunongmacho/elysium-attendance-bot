@@ -1399,9 +1399,20 @@ client.once(Events.ClientReady, async () => {
   await recoverBotStateOnStartup(client, config);
   isRecovering = false;
 
-  // Use attendance module's recovery function
-  await attendance.recoverStateFromThreads(client);
-  bidding.recoverBiddingState(client, config);
+  // Use attendance module's recovery function (from threads)
+  const threadsRecovered = await attendance.recoverStateFromThreads(client);
+
+  // If thread recovery didn't find much, try Google Sheets
+  if (!threadsRecovered || Object.keys(attendance.getActiveSpawns()).length === 0) {
+    console.log("📊 Attempting to load attendance state from Google Sheets...");
+    await attendance.loadAttendanceStateFromSheet();
+  }
+
+  await bidding.recoverBiddingState(client, config);
+
+  // Start periodic state syncing to Google Sheets (memory optimization for Koyeb)
+  console.log("🔄 Starting periodic state sync to Google Sheets...");
+  attendance.schedulePeriodicStateSync();
 
   // Sync state references
   activeSpawns = attendance.getActiveSpawns();

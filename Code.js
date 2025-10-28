@@ -24,29 +24,28 @@ function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents || '{}');
     const action = data.action || 'unknown';
-    
+
     Logger.log(`🔥 Action: ${action}`);
-    
-if (action === 'getAttendanceForBoss') return getAttendanceForBoss(data);
 
-    if (['checkColumn', 'submitAttendance'].includes(action)) {
-      if (action === 'checkColumn') return handleCheckColumn(data);
-      if (action === 'submitAttendance') return handleSubmitAttendance(data);
-    }
+    // Attendance actions
+    if (action === 'getAttendanceForBoss') return getAttendanceForBoss(data);
+    if (action === 'checkColumn') return handleCheckColumn(data);
+    if (action === 'submitAttendance') return handleSubmitAttendance(data);
+    if (action === 'getAttendanceState') return getAttendanceState(data);
+    if (action === 'saveAttendanceState') return saveAttendanceState(data);
 
-if (['getBiddingPoints', 'submitBiddingResults', 'getBiddingItems', 'logAuctionResult', 'getBotState', 'saveBotState', 'moveQueueItemsToSheet'].includes(action)) {
-  if (action === 'getBiddingPoints') return handleGetBiddingPoints(data);
-  if (action === 'submitBiddingResults') return handleSubmitBiddingResults(data);
-  if (action === 'getBiddingItems') return getBiddingItems(data);
-  if (action === 'logAuctionResult') return logAuctionResult(data);
-  if (action === 'getBotState') return getBotState(data);
-  if (action === 'saveBotState') return saveBotState(data);
-  if (action === 'moveQueueItemsToSheet') return moveQueueItemsToSheet(data);
-}
-    
+    // Bidding actions
+    if (action === 'getBiddingPoints') return handleGetBiddingPoints(data);
+    if (action === 'submitBiddingResults') return handleSubmitBiddingResults(data);
+    if (action === 'getBiddingItems') return getBiddingItems(data);
+    if (action === 'logAuctionResult') return logAuctionResult(data);
+    if (action === 'getBotState') return getBotState(data);
+    if (action === 'saveBotState') return saveBotState(data);
+    if (action === 'moveQueueItemsToSheet') return moveQueueItemsToSheet(data);
+
     Logger.log(`❌ Unknown: ${action}`);
     return createResponse('error', 'Unknown action: ' + action);
-    
+
   } catch (err) {
     Logger.log('❌ Error: ' + err.toString());
     Logger.log(err.stack);
@@ -668,17 +667,17 @@ function updateBiddingPoints() {
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
   const bpSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
   if(!bpSheet) return;
-  
+
   const lastRow = bpSheet.getLastRow();
   if(lastRow < 2) return;
-  
+
   const existingData = bpSheet.getRange(2, 1, lastRow - 1, 3).getValues();
   let memberMap = {};
   existingData.forEach((r, i) => {
     const m = (r[0] || '').toString().trim();
     if(m) memberMap[m] = {row: i + 2, consumed: Number(r[2]) || 0};
   });
-  
+
   const sheets = ss.getSheets();
   let totals = {};
   sheets.forEach(s => {
@@ -690,11 +689,74 @@ function updateBiddingPoints() {
       });
     }
   });
-  
+
   Object.keys(memberMap).forEach(m => {
     const left = (totals[m] || 0) - memberMap[m].consumed;
     bpSheet.getRange(memberMap[m].row, 2).setValue(left);
   });
+}
+
+// ATTENDANCE STATE MANAGEMENT (Memory optimization for Koyeb)
+function getAttendanceState(data) {
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  let sheet = ss.getSheetByName('_AttendanceState');
+
+  if (!sheet) {
+    return createResponse('ok', 'No state found', {state: null});
+  }
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return createResponse('ok', 'No state found', {state: null});
+
+  const stateData = {};
+  const dataRange = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+
+  dataRange.forEach(row => {
+    const key = (row[0] || '').toString().trim();
+    const value = (row[1] || '').toString().trim();
+    if (key && value) {
+      try {
+        stateData[key] = JSON.parse(value);
+      } catch (e) {
+        stateData[key] = value;
+      }
+    }
+  });
+
+  return createResponse('ok', 'Attendance state retrieved', {state: stateData});
+}
+
+function saveAttendanceState(data) {
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  let sheet = ss.getSheetByName('_AttendanceState');
+
+  if (!sheet) {
+    sheet = ss.insertSheet('_AttendanceState');
+    sheet.getRange(1, 1, 1, 3).setValues([['Key', 'Value', 'LastUpdated']])
+      .setFontWeight('bold')
+      .setBackground('#4A90E2')
+      .setFontColor('#FFFFFF');
+    sheet.hideSheet();
+  }
+
+  const stateObj = data.state || {};
+  const timestamp = new Date().toISOString();
+
+  sheet.clearContents();
+  sheet.getRange(1, 1, 1, 3).setValues([['Key', 'Value', 'LastUpdated']])
+    .setFontWeight('bold')
+    .setBackground('#4A90E2')
+    .setFontColor('#FFFFFF');
+
+  let row = 2;
+  for (const [key, value] of Object.entries(stateObj)) {
+    sheet.getRange(row, 1).setValue(key);
+    sheet.getRange(row, 2).setValue(JSON.stringify(value));
+    sheet.getRange(row, 3).setValue(timestamp);
+    row++;
+  }
+
+  return createResponse('ok', 'Attendance state saved', {saved: true, timestamp: timestamp});
 }
 
 // UTILITIES
