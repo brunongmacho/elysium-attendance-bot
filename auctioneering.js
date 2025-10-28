@@ -6,6 +6,7 @@
 
 const { EmbedBuilder } = require("discord.js");
 const fetch = require("node-fetch");
+const { Timeout } = require("timers");
 
 // ==========================================
 // POSTTOSHEET INITIALIZATION
