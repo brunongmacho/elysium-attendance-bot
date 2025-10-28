@@ -353,7 +353,7 @@ async function startAuctioneering(client, config, channel) {
         sheetIndex: idx,
         bossName: boss,
         bossKey: bossKey,
-        skipAttendance: false,
+        skipAttendance: true,
       });
     }
   });
