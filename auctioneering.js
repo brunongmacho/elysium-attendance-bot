@@ -478,8 +478,20 @@ async function auctionNextItem(client, config, channel) {
 
   // Auto-start next item after short delay (optional)
   auctionState.timers.nextItem = setTimeout(async () => {
-    await auctionNextItem(client, config, channel);
-  }, ITEM_WAIT);
+  try {
+    if (!channel) {
+      console.warn("⚠️ Missing channel reference, refetching bidding channel...");
+      const guild = await client.guilds.fetch(config.main_guild_id);
+      const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+      await auctionNextItem(client, config, biddingChannel);
+    } else {
+      await auctionNextItem(client, config, channel);
+    }
+  } catch (err) {
+    console.error("❌ auctionNextItem recursion error:", err);
+  }
+}, ITEM_WAIT);
+
 }
 
 
