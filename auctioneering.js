@@ -394,6 +394,9 @@ function getCurrentTimestamp() {
 // =======================================================
 // AUCTION NEXT ITEM (thread per item)
 // =======================================================
+// =======================================================
+// AUCTION NEXT ITEM (thread per item)
+// =======================================================
 async function auctionNextItem(client, config, channel) {
   // ✅ Ensure channel reference is valid
   if (!channel) {
@@ -410,6 +413,15 @@ async function auctionNextItem(client, config, channel) {
       return;
     }
   }
+
+  // ✅ Log what channel we’re using for clarity
+  console.log("🔍 auctionNextItem channel info:", {
+    id: channel?.id,
+    name: channel?.name,
+    type: channel?.type,
+    threadsAvailable:
+      !!(channel && channel.threads && typeof channel.threads.create === "function"),
+  });
 
   const sessions = auctionState.sessions;
   if (!sessions || sessions.length === 0) {
@@ -431,34 +443,105 @@ async function auctionNextItem(client, config, channel) {
     return auctionNextItem(client, config, channel);
   }
 
-  const threadName = `${item.item} | ${item.startPrice || 0}pts | ${session.bossName || "OPEN"}`;
-  const auctionThread = await channel.threads.create({
-    name: threadName,
-    autoArchiveDuration: config.auto_archive_minutes || 60,
-    reason: `Auction for ${item.item}`,
-  });
+  const threadName = `${item.item} | ${item.startPrice || 0}pts | ${
+    session.bossName || "OPEN"
+  }`;
 
-  await auctionThread.send({
-    content: `@everyone`,
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.AUCTION)
-        .setTitle(`${EMOJI.AUCTION} New Auction Started`)
-        .setDescription(
-          `**Item:** ${item.item}\n**Boss:** ${
-            session.bossName || "OPEN"
-          }\n**Start Price:** ${item.startPrice || 0} pts\n**Duration:** ${
-            item.duration || 2
-          } min`
-        )
-        .setFooter({ text: `Thread created per item • ${getTimestamp()}` }),
-    ],
-  });
+  let auctionThread = null;
 
-  // Start bidding for this item (handled in bidding.js)
+  try {
+    // ✅ Try normal thread creation first
+    if (channel.threads && typeof channel.threads.create === "function") {
+      auctionThread = await channel.threads.create({
+        name: threadName,
+        autoArchiveDuration: config.auto_archive_minutes || 60,
+        reason: `Auction for ${item.item}`,
+      });
+    } else {
+      // ✅ Fallback: send starter message and create thread from it
+      console.warn(
+        "⚠️ channel.threads.create not available — using message.startThread() fallback"
+      );
+      const starterMsg = await channel.send({
+        content: `@everyone`,
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLORS.AUCTION)
+            .setTitle(`${EMOJI.AUCTION} New Auction Started`)
+            .setDescription(
+              `**Item:** ${item.item}\n**Boss:** ${
+                session.bossName || "OPEN"
+              }\n**Start Price:** ${item.startPrice || 0} pts\n**Duration:** ${
+                item.duration || 2
+              } min`
+            )
+            .setFooter({
+              text: `Thread created per item • ${getTimestamp()}`,
+            }),
+        ],
+      });
+
+      if (starterMsg && typeof starterMsg.startThread === "function") {
+        auctionThread = await starterMsg.startThread({
+          name: threadName,
+          autoArchiveDuration: config.auto_archive_minutes || 60,
+          reason: `Auction for ${item.item}`,
+        });
+      } else {
+        throw new Error(
+          "Neither channel.threads.create nor message.startThread are available."
+        );
+      }
+    }
+
+    if (!auctionThread) {
+      throw new Error("Failed to create auction thread (unknown reason).");
+    }
+
+    // ✅ Send embed inside the thread (only if we used threads.create)
+    if (channel.threads && typeof channel.threads.create === "function") {
+      await auctionThread.send({
+        content: `@everyone`,
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLORS.AUCTION)
+            .setTitle(`${EMOJI.AUCTION} New Auction Started`)
+            .setDescription(
+              `**Item:** ${item.item}\n**Boss:** ${
+                session.bossName || "OPEN"
+              }\n**Start Price:** ${item.startPrice || 0} pts\n**Duration:** ${
+                item.duration || 2
+              } min`
+            )
+            .setFooter({
+              text: `Thread created per item • ${getTimestamp()}`,
+            }),
+        ],
+      });
+    }
+  } catch (err) {
+    console.error("❌ Failed to create auction thread:", err);
+    console.error(
+      "→ Check: Bot needs 'Create Public Threads' & 'Send Messages in Threads' in the bidding channel."
+    );
+    console.error(
+      "→ Also confirm config.bidding_channel_id points to a normal text channel."
+    );
+
+    try {
+      await channel.send(
+        `❌ Unable to create thread for **${item.item}**. See logs for details.`
+      );
+    } catch (e) {
+      console.error("❌ Also failed to send fallback message:", e);
+    }
+    return; // stop here for this item
+  }
+
+  // ✅ Start bidding in this thread
   await biddingModule.startItemAuction(client, config, auctionThread, item, session);
 
-  // Prepare next item in sequence
+  // ✅ Prepare next item in sequence
   auctionState.currentItemIndex++;
 
   if (auctionState.currentItemIndex >= session.items.length) {
@@ -466,23 +549,20 @@ async function auctionNextItem(client, config, channel) {
     auctionState.currentItemIndex = 0;
   }
 
-  // Auto-start next item after short delay (optional)
+  // ✅ Auto-start next item after short delay
   auctionState.timers.nextItem = setTimeout(async () => {
-  try {
-    if (!channel) {
-      console.warn("⚠️ Missing channel reference, refetching bidding channel...");
+    try {
       const guild = await client.guilds.fetch(config.main_guild_id);
-      const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+      const biddingChannel = await guild.channels.fetch(
+        config.bidding_channel_id
+      );
       await auctionNextItem(client, config, biddingChannel);
-    } else {
-      await auctionNextItem(client, config, channel);
+    } catch (err) {
+      console.error("❌ auctionNextItem recursion error:", err);
     }
-  } catch (err) {
-    console.error("❌ auctionNextItem recursion error:", err);
-  }
-}, ITEM_WAIT);
-
+  }, ITEM_WAIT);
 }
+
 
 
 function scheduleItemTimers(client, config, channel) {
