@@ -15,3 +15,5 @@ build/
 # system / editor
 .DS_Store
 .vscode/
+
+PYTHON/

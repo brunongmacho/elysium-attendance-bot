@@ -917,6 +917,7 @@ async function finalize(cli, cfg) {
 
 async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   const currentItem = auctState.currentItem;
+  const currentSession = currentItem.currentSession;
 
   const m = msg.member,
     u = m.nickname || msg.author.username,
@@ -925,6 +926,32 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   if (!hasRole(m) && !isAdm(m, config)) {
     await msg.reply(`${EMOJI.ERROR} Need ELYSIUM role`);
     return { ok: false, msg: "No role" };
+  }
+
+  // NEW: Attendance check (skip for manual queue items)
+  if (!currentItem.skipAttendance && currentSession && currentSession.bossKey) {
+    const canBid = auctRef.canUserBid(u, currentSession);
+    if (!canBid) {
+      const bossName = currentSession.bossName;
+      const errorMsg = await msg.channel.send(
+        `❌ <@${uid}> You didn't attend **${bossName}**. Only attendees can bid on this item.\n\n*This message will be deleted in 10 seconds.*`
+      );
+      
+      // Delete user's bid message
+      try {
+        await msg.delete().catch(() => {});
+      } catch (e) {
+        console.warn(`⚠️ Could not delete bid message: ${e.message}`);
+      }
+
+      // Delete error message after 10s
+      setTimeout(async () => {
+        await errorMsg.delete().catch(() => {});
+      }, 10000);
+
+      console.log(`❌ Bid rejected: ${u} didn't attend ${bossName}`);
+      return { ok: false, msg: "No attendance" };
+    }
   }
 
   const now = Date.now();
@@ -1958,6 +1985,7 @@ module.exports = {
   submitSessionTally: submitSessionTally,
   loadBiddingStateFromSheet: loadBiddingStateFromSheet,
   saveBiddingStateToSheet: saveBiddingStateToSheet,
+  clearPointsCache: clearCache,
 
   confirmBid: async function (reaction, user, config) {
     const p = st.pc[reaction.message.id];

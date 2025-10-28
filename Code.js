@@ -27,6 +27,8 @@ function doPost(e) {
     
     Logger.log(`🔥 Action: ${action}`);
     
+if (action === 'getAttendanceForBoss') return getAttendanceForBoss(data);
+
     if (['checkColumn', 'submitAttendance'].includes(action)) {
       if (action === 'checkColumn') return handleCheckColumn(data);
       if (action === 'submitAttendance') return handleSubmitAttendance(data);
@@ -212,7 +214,7 @@ function getBiddingItems(data) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return createResponse('ok', 'No items', {items: []});
   
-  const dataRange = sheet.getRange(2, 1, lastRow - 1, 10).getValues();
+  const dataRange = sheet.getRange(2, 1, lastRow - 1, 12).getValues(); // Changed from 10 to 12 (include L column)
   const items = [];
   
   dataRange.forEach((row, idx) => {
@@ -220,43 +222,118 @@ function getBiddingItems(data) {
     if (!itemName) return;
     
     const winner = (row[3] || '').toString().trim();
+    if (winner) return; // Skip items with winners
     
-    // SKIP if item already has a winner (already auctioned)
-    if (winner) {
-      Logger.log(`⏭️ Skipping ${itemName} - Already has winner: ${winner}`);
-      return;
-    }
+    const qty = parseInt(row[10]) || 1;
+    const boss = (row[11] || '').toString().trim(); // Column L (index 11)
     
-    const qty = parseInt(row[10]) || 1; // Column K (11) - Quantity
-    
-    // If quantity > 1, create separate items for each
-    if (qty > 1) {
-      for (let q = 0; q < qty; q++) {
-        items.push({
-          item: itemName,
-          startPrice: Number(row[1]) || 0,
-          duration: Number(row[2]) || 30,
-          quantity: 1,
-          source: 'GoogleSheet',
-          sheetIndex: idx + 2,
-          batchNumber: q + 1,
-          batchTotal: qty
-        });
-      }
-    } else {
-      items.push({
-        item: itemName,
-        startPrice: Number(row[1]) || 0,
-        duration: Number(row[2]) || 30,
-        quantity: 1,
-        source: 'GoogleSheet',
-        sheetIndex: idx + 2
-      });
-    }
+    items.push({
+      item: itemName,
+      startPrice: Number(row[1]) || 0,
+      duration: Number(row[2]) || 30,
+      quantity: qty,
+      boss: boss, // NEW
+      source: 'GoogleSheet',
+      sheetIndex: idx + 2,
+    });
   });
   
-  Logger.log(`✅ Fetched ${items.length} items (skipped items with winners)`);
+  Logger.log(`✅ Fetched ${items.length} items`);
   return createResponse('ok', 'Items fetched', {items});
+}
+
+function getAttendanceForBoss(data) {
+  const weekSheet = data.weekSheet || '';
+  const bossKey = data.bossKey || '';
+  
+  if (!weekSheet || !bossKey) {
+    return createResponse('error', 'Missing weekSheet or bossKey', {attendees: []});
+  }
+  
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  let sheet = ss.getSheetByName(weekSheet);
+  
+  if (!sheet) {
+    return createResponse('error', `Sheet not found: ${weekSheet}`, {attendees: []});
+  }
+  
+  // Parse bossKey: "EGO 10/27/25 17:57"
+  const match = bossKey.match(/^(.+?)\s+(\d{1,2})\/(\d{1,2})\/(\d{2})\s+(\d{1,2}):(\d{2})$/);
+  if (!match) {
+    return createResponse('error', `Invalid bossKey format: ${bossKey}`, {attendees: []});
+  }
+  
+  const bossName = match[1].trim().toUpperCase();
+  const month = match[2].padStart(2, '0');
+  const day = match[3].padStart(2, '0');
+  const year = match[4];
+  const hour = match[5].padStart(2, '0');
+  const minute = match[6].padStart(2, '0');
+  
+  const targetTimestamp = `${month}/${day}/${year} ${hour}:${minute}`;
+  
+  Logger.log(`🔍 Looking for: ${targetTimestamp} + ${bossName}`);
+  
+  const lastCol = sheet.getLastColumn();
+  const lastRow = sheet.getLastRow();
+  
+  if (lastCol < 5 || lastRow < 3) {
+    return createResponse('error', 'Sheet has insufficient data', {attendees: []});
+  }
+  
+  // Search for matching column
+  const row1 = sheet.getRange(1, 5, 1, lastCol - 4).getValues()[0]; // Timestamps
+  const row2 = sheet.getRange(2, 5, 1, lastCol - 4).getValues()[0]; // Boss names
+  
+  let targetColumn = -1;
+  
+  for (let i = 0; i < row1.length; i++) {
+    const cellTimestamp = (row1[i] || '').toString().trim();
+    const cellBoss = (row2[i] || '').toString().trim().toUpperCase();
+    
+    // Try exact match first
+    if (cellTimestamp === targetTimestamp && cellBoss === bossName) {
+      targetColumn = i + 5; // +5 because we started from column E (5)
+      break;
+    }
+    
+    // Try fuzzy match (allow slight variations)
+    const timestampMatch = cellTimestamp.replace(/\s+/g, ' ') === targetTimestamp.replace(/\s+/g, ' ');
+    const bossMatch = cellBoss === bossName;
+    
+    if (timestampMatch && bossMatch) {
+      targetColumn = i + 5;
+      break;
+    }
+  }
+  
+  if (targetColumn === -1) {
+    Logger.log(`⚠️ Column not found for ${bossKey}`);
+    return createResponse('ok', 'Boss spawn not found in attendance sheet', {attendees: []});
+  }
+  
+  Logger.log(`✅ Found column ${targetColumn}`);
+  
+  // Get attendees (rows 3+, where checkbox = true)
+  const memberNames = sheet.getRange(3, 1, lastRow - 2, 1).getValues().flat();
+  const attendance = sheet.getRange(3, targetColumn, lastRow - 2, 1).getValues().flat();
+  
+  const attendees = [];
+  for (let i = 0; i < memberNames.length; i++) {
+    if (attendance[i] === true) {
+      const member = (memberNames[i] || '').toString().trim();
+      if (member) attendees.push(member);
+    }
+  }
+  
+  Logger.log(`✅ Found ${attendees.length} attendees: ${attendees.join(', ')}`);
+  
+  return createResponse('ok', `Attendance loaded for ${bossKey}`, {
+    attendees: attendees,
+    bossKey: bossKey,
+    weekSheet: weekSheet,
+    column: targetColumn
+  });
 }
 
 function getSessionNumber(timestamp) {

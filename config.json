@@ -8,7 +8,7 @@
   "admin_logs_channel_id": "1429074047529914439",
   "admin_roles": ["GUILD LEADER", "ELITE", "Admin", "Martin Romualdez", "BOT"],
   "week_start": "Sunday",
-  "sheet_webhook_url": "https://script.google.com/macros/s/AKfycbw2l2U5lhUpI2BcvUm9z1gXulXAiMa9T4oaeJmiZnkTUXqQJtyycuqu-1ELwZ3_N5s/exec",
+  "sheet_webhook_url": "https://script.google.com/macros/s/AKfycbyUzmDjlSOP31bVUJHS9EetV5jT_aYwf6vC7m1F0Ik1fC8mmfofh8gKYZYLZ5qWIkbI/exec",
   "timezone": "Asia/Manila",
   "auto_archive_minutes": 60
 }

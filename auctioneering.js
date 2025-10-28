@@ -11,6 +11,8 @@ const fetch = require("node-fetch");
 // POSTTOSHEET INITIALIZATION
 // ==========================================
 let postToSheetFunc = null;
+let attendanceCache = {}; // { "BOSS DATE TIME": ["member1", "member2"] }
+let currentSessionBoss = null;
 
 function setPostToSheet(fn) {
   postToSheetFunc = fn;
@@ -196,118 +198,178 @@ async function saveAuctionState(url) {
 
 async function startAuctioneering(client, config, channel) {
   if (auctionState.active) {
-    await channel.send(`${EMOJI.ERROR} Auction already running`);
+    await channel.send(`❌ Auction already running`);
     return;
   }
 
-  // LOAD POINTS ONCE AT START
+  // Load points
   const pointsFetched = await biddingModule.loadPointsCacheForAuction(
     config.sheet_webhook_url
   );
   if (!pointsFetched) {
-    await channel.send(`${EMOJI.ERROR} Failed to load points from sheet`);
+    await channel.send(`❌ Failed to load points`);
     return;
   }
 
+  // Fetch sheet items
   const sheetItems = await fetchSheetItems(config.sheet_webhook_url);
   if (!sheetItems) {
-    await channel.send(`${EMOJI.ERROR} Failed to load items from sheet`);
+    await channel.send(`❌ Failed to load items`);
     return;
   }
 
   const biddingState = biddingModule.getBiddingState();
   const queueItems = biddingState.q || [];
 
-  auctionState.itemQueue = [];
-  auctionState.sessionItems = [];
-  manualItemsAuctioned = [];
+  // Calculate week sheet name
+  const attendance = require("./attendance.js");
+  const sundayDate = attendance.getSundayOfWeek();
+  const weekSheetName = `ELYSIUM_WEEK_${sundayDate}`;
 
-  // GET SESSION INFO
-  sessionStartDateTime = getCurrentTimestamp();
-  sessionTimestamp = `${sessionStartDateTime.date} ${sessionStartDateTime.time}`;
-  sessionStartTime = Date.now();
+  // Group items by boss
+  const sessions = [];
+  const bossGroups = {};
+  const manualItems = [];
 
-  // SHEET ITEMS FIRST (only those WITHOUT winners)
-  if (!Array.isArray(sheetItems)) {
-    await channel.send(
-      `${EMOJI.ERROR} Sheet items invalid. Got: ${typeof sheetItems}`
-    );
-    return;
-  }
-
-  sheetItems.forEach((item, idx) => {
-    auctionState.itemQueue.push({
-      ...item,
-      source: "GoogleSheet",
-      sheetIndex: idx,
-      auctionStartTime: sessionTimestamp,
-    });
-  });
-
-  // THEN MANUAL QUEUE - Handle batch items (qty > 1)
+  // Manual queue items first (open to all)
   queueItems.forEach((item) => {
     const qty = item.quantity || 1;
-
-    if (qty > 1) {
-      // Create separate items for each (like Google Sheet batch items)
-      for (let q = 0; q < qty; q++) {
-        auctionState.itemQueue.push({
-          ...item,
-          quantity: 1,
-          batchNumber: q + 1,
-          batchTotal: qty,
-          source: "QueueList",
-          auctionStartTime: sessionTimestamp,
-        });
-      }
-    } else {
-      // Single item (qty = 1)
-      auctionState.itemQueue.push({
+    for (let q = 0; q < qty; q++) {
+      manualItems.push({
         ...item,
+        quantity: 1,
+        batchNumber: qty > 1 ? q + 1 : null,
+        batchTotal: qty > 1 ? qty : null,
         source: "QueueList",
-        auctionStartTime: sessionTimestamp,
+        skipAttendance: true,
       });
     }
   });
 
-  if (auctionState.itemQueue.length === 0) {
-    await channel.send(
-      `${EMOJI.ERROR} No items to auction. Add via \`!auction\` or Google Sheet.\n\n**Usage:**\n\`!auction <item> <price> <duration>\``
-    );
+  if (manualItems.length > 0) {
+    sessions.push({
+      bossName: "OPEN",
+      bossKey: null,
+      items: manualItems,
+      attendees: [],
+    });
+  }
+
+  // Group sheet items by boss
+  sheetItems.forEach((item, idx) => {
+    const bossData = (item.boss || "").trim();
+    if (!bossData) {
+      console.warn(`⚠️ Item ${item.item} has no boss data, skipping`);
+      return;
+    }
+
+    // Parse boss: "EGO 10/27/2025 5:57:00"
+    const match = bossData.match(/^(.+?)\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
+    if (!match) {
+      console.warn(`⚠️ Invalid boss format: ${bossData}`);
+      return;
+    }
+
+    const boss = match[1].trim().toUpperCase();
+    const month = match[2].padStart(2, "0");
+    const day = match[3].padStart(2, "0");
+    const year = match[4].slice(-2);
+    const hour = match[5].padStart(2, "0");
+    const minute = match[6].padStart(2, "0");
+
+    const bossKey = `${boss} ${month}/${day}/${year} ${hour}:${minute}`;
+
+    if (!bossGroups[bossKey]) {
+      bossGroups[bossKey] = [];
+    }
+
+    const qty = parseInt(item.quantity) || 1;
+    for (let q = 0; q < qty; q++) {
+      bossGroups[bossKey].push({
+        ...item,
+        quantity: 1,
+        batchNumber: qty > 1 ? q + 1 : null,
+        batchTotal: qty > 1 ? qty : null,
+        source: "GoogleSheet",
+        sheetIndex: idx,
+        bossName: boss,
+        bossKey: bossKey,
+        skipAttendance: false,
+      });
+    }
+  });
+
+  // Convert boss groups to sessions
+  for (const [bossKey, items] of Object.entries(bossGroups)) {
+    sessions.push({
+      bossName: items[0].bossName,
+      bossKey: bossKey,
+      items: items,
+      attendees: [],
+    });
+  }
+
+  if (sessions.length === 0) {
+    await channel.send(`❌ No items to auction`);
     return;
   }
 
+  // Load attendance for each boss session
+  for (const session of sessions) {
+    if (!session.bossKey) continue; // Skip OPEN session
+
+    const payload = {
+      action: "getAttendanceForBoss",
+      weekSheet: weekSheetName,
+      bossKey: session.bossKey,
+    };
+
+    const resp = await fetch(config.sheet_webhook_url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      await channel.send(
+        `❌ Failed to load attendance for ${session.bossKey}\n` +
+        `Sheet: ${weekSheetName}\n` +
+        `Error: HTTP ${resp.status}`
+      );
+      return;
+    }
+
+    const data = await resp.json();
+    if (!data.attendees || data.attendees.length === 0) {
+      console.warn(`⚠️ No attendees found for ${session.bossKey}`);
+    }
+
+    session.attendees = data.attendees || [];
+    attendanceCache[session.bossKey] = session.attendees;
+  }
+
   auctionState.active = true;
+  auctionState.sessions = sessions;
+  auctionState.currentSessionIndex = 0;
   auctionState.currentItemIndex = 0;
   auctionState.sessionItems = [];
 
-  const sheetCount = sheetItems.length;
-  const queueCount = queueItems.length;
+  // Show preview
+  const preview = sessions.map((s, i) => {
+    const sessionType = s.bossKey ? `${s.bossName}` : "OPEN (No Boss)";
+    const attendeeInfo = s.bossKey ? ` - ${s.attendees.length} attendees` : " - Open to all";
+    return `${i + 1}. **${sessionType}**: ${s.items.length} item(s)${attendeeInfo}`;
+  }).join("\n");
 
   await channel.send({
     embeds: [
       new EmbedBuilder()
         .setColor(COLORS.AUCTION)
-        .setTitle(`${EMOJI.FIRE} Auctioneering Session Started!`)
-        .setDescription(`**${auctionState.itemQueue.length} item(s)** queued`)
-        .addFields(
-          {
-            name: `${EMOJI.LIST} From Google Sheet`,
-            value: `${sheetCount}`,
-            inline: true,
-          },
-          {
-            name: `${EMOJI.LIST} From Queue`,
-            value: `${queueCount}`,
-            inline: true,
-          },
-          {
-            name: `${EMOJI.CLOCK} Session Time`,
-            value: sessionTimestamp,
-            inline: true,
-          }
+        .setTitle(`${EMOJI.FIRE} Auctioneering Started!`)
+        .setDescription(
+          `**${sessions.length} session(s)** queued\n\n${preview}`
         )
-        .setFooter({ text: `Starting first item in 20 seconds...` })
+        .setFooter({ text: "Starting first session in 20s..." })
         .setTimestamp(),
     ],
   });
@@ -315,6 +377,13 @@ async function startAuctioneering(client, config, channel) {
   auctionState.timers.sessionStart = setTimeout(async () => {
     await auctionNextItem(client, config, channel);
   }, 20000);
+}
+
+function canUserBid(username, currentSession) {
+  if (!currentSession || !currentSession.bossKey) return true; // Open session
+
+  const attendees = currentSession.attendees || [];
+  return attendees.some((m) => m.toLowerCase() === username.toLowerCase());
 }
 
 function getCurrentTimestamp() {
@@ -337,17 +406,39 @@ function getCurrentTimestamp() {
 }
 
 async function auctionNextItem(client, config, channel) {
-  if (
-    !auctionState.active ||
-    auctionState.currentItemIndex >= auctionState.itemQueue.length
-  ) {
-    await finalizeSession(client, config, channel);
+  const currentSession = auctionState.sessions[auctionState.currentSessionIndex];
+  
+  if (!currentSession || auctionState.currentItemIndex >= currentSession.items.length) {
+    // Move to next session
+    auctionState.currentSessionIndex++;
+    auctionState.currentItemIndex = 0;
+
+    if (auctionState.currentSessionIndex >= auctionState.sessions.length) {
+      await finalizeSession(client, config, channel);
+      return;
+    }
+
+    // Clear attendance cache for previous session
+    const prevSession = auctionState.sessions[auctionState.currentSessionIndex - 1];
+    if (prevSession && prevSession.bossKey) {
+      delete attendanceCache[prevSession.bossKey];
+      console.log(`🧹 Cleared attendance cache for ${prevSession.bossKey}`);
+    }
+
+    currentSessionBoss = auctionState.sessions[auctionState.currentSessionIndex].bossKey;
+
+    // 10 second delay between sessions
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+    await auctionNextItem(client, config, channel);
     return;
   }
 
-  const item = auctionState.itemQueue[auctionState.currentItemIndex];
+  const item = currentSession.items[auctionState.currentItemIndex];
+  currentSessionBoss = currentSession.bossKey;
+
   auctionState.currentItem = {
     ...item,
+    currentSession: currentSession,
     bids: [],
     curBid: item.startPrice,
     curWin: null,
@@ -770,9 +861,21 @@ async function finalizeSession(client, config, channel) {
     await adminLogs.send({ embeds: [adminEmbed] });
   }
 
+console.log("🧹 Clearing session caches...");
+  attendanceCache = {}; // Clear all attendance data
+  currentSessionBoss = null;
+  auctionState.sessions = [];
   auctionState.sessionItems = [];
   auctionState.itemQueue = [];
   manualItemsAuctioned = [];
+  
+  // Clear bidding module cache
+  const biddingModule = require("./bidding.js");
+  biddingModule.clearPointsCache();
+  
+  console.log("✅ All session data cleared");
+  
+  save();
 }
 
 async function buildCombinedResults(config) {
@@ -877,30 +980,47 @@ function getAuctionState() {
 // ============================================
 
 async function handleQueueList(message, biddingState) {
-  const auctQueue = auctionState.itemQueue || [];
+  const auctQueue = auctionState.sessions || [];
   const biddingQueue = biddingState.q || [];
 
-  // Check if auction is active - if so, show only auctionState.itemQueue
+  // Active auction - show sessions
   if (auctionState.active) {
     if (auctQueue.length === 0) {
-      return await message.reply(`${EMOJI.LIST} Queue is empty`);
+      return await message.reply(`${EMOJI.LIST} No sessions active`);
     }
 
     let queueText = "";
-    auctQueue.forEach((item, idx) => {
-      const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
-      queueText += `**${idx + 1}.** ${item.item}${qty} - ${
-        item.startPrice
-      }pts • ${item.duration}m (${item.source})\n`;
+    let itemNumber = 1;
+
+    auctQueue.forEach((session, sessionIdx) => {
+      const sessionTitle = session.bossKey 
+        ? `🔥 SESSION ${sessionIdx + 1} - ${session.bossName} (${session.bossKey.split(' ').slice(1).join(' ')})`
+        : `📋 SESSION ${sessionIdx + 1} - OPEN (No Boss)`;
+      
+      const attendeeInfo = session.bossKey 
+        ? `👥 Attendees: ${session.attendees.length} members`
+        : `👥 Open to all`;
+      
+      queueText += `\n**${sessionTitle}**\n`;
+      
+      session.items.forEach((item) => {
+        const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
+        queueText += `${itemNumber}. ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
+        itemNumber++;
+      });
+      
+      queueText += `${attendeeInfo}\n`;
     });
+
+    const totalItems = auctQueue.reduce((sum, s) => sum + s.items.length, 0);
 
     const embed = new EmbedBuilder()
       .setColor(0x4a90e2)
-      .setTitle(`${EMOJI.LIST} Auction Queue (Active Session)`)
+      .setTitle(`${EMOJI.LIST} Auction Sessions (Active)`)
       .setDescription(queueText)
       .addFields({
         name: `${EMOJI.CHART} Total`,
-        value: `${auctQueue.length}`,
+        value: `${auctQueue.length} session(s), ${totalItems} item(s)`,
         inline: true,
       })
       .setTimestamp();
@@ -908,17 +1028,16 @@ async function handleQueueList(message, biddingState) {
     return await message.reply({ embeds: [embed] });
   }
 
-  // NO ACTIVE AUCTION - Fetch from Google Sheet and show preview
+  // Preview mode
   const loadingMsg = await message.reply(
     `${EMOJI.CLOCK} Loading items from Google Sheet...`
   );
 
-  // Fetch items from BiddingItems sheet
   const sheetItems = await fetchSheetItems(cfg.sheet_webhook_url);
 
   if (sheetItems === null) {
     await loadingMsg.edit(
-      `${EMOJI.ERROR} Failed to fetch items from Google Sheet. Check webhook configuration.`
+      `${EMOJI.ERROR} Failed to fetch items from Google Sheet.`
     );
     return;
   }
@@ -934,31 +1053,63 @@ async function handleQueueList(message, biddingState) {
     );
   }
 
+  // Group sheet items by boss for preview
+  const bossGroups = {};
+  const noBossItems = [];
+
+  sheetItems.forEach((item) => {
+    const boss = item.boss || "";
+    if (!boss) {
+      noBossItems.push(item);
+      return;
+    }
+    
+    if (!bossGroups[boss]) {
+      bossGroups[boss] = [];
+    }
+    bossGroups[boss].push(item);
+  });
+
   let queueText = "";
   let position = 1;
+  let sessionNum = 1;
 
-  // Google Sheet items first
-  if (sheetItems.length > 0) {
-    queueText += `**📊 FROM GOOGLE SHEET (BiddingItems):**\n`;
-    sheetItems.forEach((item, idx) => {
-      const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
-      queueText += `**${position}.** ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
-      position++;
-    });
-  }
-
-  // Then manual queue items
+  // Manual queue first
   if (biddingQueue.length > 0) {
-    if (sheetItems.length > 0) queueText += `\n`;
-    queueText += `**📋 MANUAL QUEUE (from !auction):**\n`;
-    biddingQueue.forEach((item, idx) => {
+    queueText += `**📋 SESSION ${sessionNum} - OPEN (No Boss)**\n`;
+    biddingQueue.forEach((item) => {
       const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
-      queueText += `**${position}.** ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
+      queueText += `${position}. ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
       position++;
+    });
+    queueText += `👥 Open to all\n\n`;
+    sessionNum++;
+  }
+
+  // Boss sessions
+  for (const [boss, items] of Object.entries(bossGroups)) {
+    queueText += `**🔥 SESSION ${sessionNum} - ${boss}**\n`;
+    items.forEach((item) => {
+      const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
+      queueText += `${position}. ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
+      position++;
+    });
+    queueText += `👥 Attendance required\n\n`;
+    sessionNum++;
+  }
+
+  // Items without boss
+  if (noBossItems.length > 0) {
+    queueText += `**⚠️ ITEMS WITHOUT BOSS (Will be skipped)**\n`;
+    noBossItems.forEach((item) => {
+      queueText += `• ${item.item} - Missing boss data\n`;
     });
   }
 
-  queueText += `\n**ℹ️ Note:** This is the order items will auction when you run \`!startauction\``;
+  queueText += `\n**ℹ️ Note:** Order shown is how items will auction when you run \`!startauction\``;
+
+  const totalSessions = Object.keys(bossGroups).length + (biddingQueue.length > 0 ? 1 : 0);
+  const totalItems = sheetItems.length + biddingQueue.length;
 
   const embed = new EmbedBuilder()
     .setColor(0x4a90e2)
@@ -966,23 +1117,18 @@ async function handleQueueList(message, biddingState) {
     .setDescription(queueText)
     .addFields(
       {
-        name: `${EMOJI.CHART} Google Sheet`,
-        value: `${sheetItems.length}`,
+        name: `${EMOJI.FIRE} Sessions`,
+        value: `${totalSessions}`,
         inline: true,
       },
       {
-        name: `${EMOJI.LIST} Manual Queue`,
-        value: `${biddingQueue.length}`,
-        inline: true,
-      },
-      {
-        name: `${EMOJI.FIRE} Total`,
-        value: `${sheetItems.length + biddingQueue.length}`,
+        name: `${EMOJI.LIST} Total Items`,
+        value: `${totalItems}`,
         inline: true,
       }
     )
     .setFooter({
-      text: "Use !startauction to begin • Sheet items auction first",
+      text: "Use !startauction to begin • Manual items first, then by boss",
     })
     .setTimestamp();
 
@@ -1106,16 +1252,14 @@ async function handleClearQueue(message, onConfirm, onCancel) {
 }
 
 async function handleMyPoints(message, biddingModule, config) {
-  // Only in bidding channel, not during active auction
   if (auctionState.active) {
-    return await message.reply(
+    return await message.channel.send(
       `${EMOJI.WARNING} Can't check points during active auction. Wait for session to end.`
     );
   }
 
   const u = message.member.nickname || message.author.username;
 
-  // Fetch fresh from sheets
   const freshPts = await fetch(config.sheet_webhook_url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1134,7 +1278,7 @@ async function handleMyPoints(message, biddingModule, config) {
 
   let ptsMsg;
   if (userPts === null || userPts === undefined) {
-    ptsMsg = await message.reply({
+    ptsMsg = await message.channel.send({
       embeds: [
         new EmbedBuilder()
           .setColor(0xff0000)
@@ -1147,7 +1291,7 @@ async function handleMyPoints(message, biddingModule, config) {
       ],
     });
   } else {
-    ptsMsg = await message.reply({
+    ptsMsg = await message.channel.send({
       embeds: [
         new EmbedBuilder()
           .setColor(0x00ff00)
@@ -1164,20 +1308,17 @@ async function handleMyPoints(message, biddingModule, config) {
     });
   }
 
-  // DELETE USER MESSAGE IMMEDIATELY + DELETE REPLY AFTER 30s
   try {
     await message.delete().catch(() => {});
   } catch (e) {
-    console.warn(
-      `${EMOJI.WARNING} Could not delete user message: ${e.message}`
-    );
+    console.warn(`${EMOJI.WARNING} Could not delete user message: ${e.message}`);
   }
 
-  // Delete reply embed after 30s
   setTimeout(async () => {
     await ptsMsg.delete().catch(() => {});
   }, 30000);
 }
+
 
 async function handleBidStatus(message, config) {
   const statEmbed = new EmbedBuilder()
@@ -1428,4 +1569,6 @@ module.exports = {
   handleSkipItem,
   handleForceSubmitResults,
   setPostToSheet,
+  canUserBid,
+  getCurrentSessionBoss: () => currentSessionBoss,
 };

@@ -18,6 +18,7 @@ const http = require("http");
 const bidding = require("./bidding.js");
 const helpSystem = require("./help-system.js");
 const auctioneering = require("./auctioneering.js");
+const attendance = require("./attendance.js");
 
 const COMMAND_ALIASES = {
   // Help commands
@@ -109,6 +110,7 @@ const TIMING = {
   REACTION_RETRY_DELAY: 1000,
 };
 
+// Import state from attendance module
 let activeSpawns = {};
 let activeColumns = {};
 let pendingVerifications = {};
@@ -119,7 +121,7 @@ let lastOverrideTime = 0;
 let lastAuctionEndTime = 0;
 let isRecovering = false;
 let isBidProcessing = false;
-let biddingChannelCleanupTimer = null; // ← ADD THIS
+let biddingChannelCleanupTimer = null;
 const AUCTION_COOLDOWN = 10 * 60 * 1000; // 10 minutes
 const BIDDING_CHANNEL_CLEANUP_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours
 
@@ -261,131 +263,8 @@ function resolveCommandAlias(cmd) {
   return COMMAND_ALIASES[lowerCmd] || lowerCmd;
 }
 
-function getCurrentTimestamp() {
-  const date = new Date();
-  const manilaDate = new Date(
-    date.toLocaleString("en-US", { timeZone: "Asia/Manila" })
-  );
-
-  const month = String(manilaDate.getMonth() + 1).padStart(2, "0");
-  const day = String(manilaDate.getDate()).padStart(2, "0");
-  const year = String(manilaDate.getFullYear()).slice(-2);
-
-  const hours = String(manilaDate.getHours()).padStart(2, "0");
-  const minutes = String(manilaDate.getMinutes()).padStart(2, "0");
-
-  const dateStr = `${month}/${day}/${year}`;
-  const timeStr = `${hours}:${minutes}`;
-
-  return { date: dateStr, time: timeStr, full: `${dateStr} ${timeStr}` };
-}
-
-function formatUptime(ms) {
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-  if (days > 0) return `${days}d ${hours % 24}h ${minutes % 60}m`;
-  if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-  return `${seconds}s`;
-}
-
-async function removeAllReactionsWithRetry(
-  message,
-  attempts = TIMING.REACTION_RETRY_ATTEMPTS
-) {
-  for (let i = 0; i < attempts; i++) {
-    try {
-      await message.reactions.removeAll();
-      console.log(
-        `✅ Reactions removed from message ${message.id} (attempt ${i + 1})`
-      );
-      return true;
-    } catch (err) {
-      console.warn(
-        `⚠️ Failed to remove reactions from ${message.id} (attempt ${
-          i + 1
-        }/${attempts}): ${err.message}`
-      );
-      if (i < attempts - 1)
-        await new Promise((resolve) =>
-          setTimeout(resolve, TIMING.REACTION_RETRY_DELAY)
-        );
-    }
-  }
-  console.error(
-    `❌ Failed to remove reactions from ${message.id} after ${attempts} attempts`
-  );
-  return false;
-}
-
-async function cleanupAllThreadReactions(thread) {
-  try {
-    console.log(`🧹 Cleaning up all reactions in thread: ${thread.name}`);
-    const messages = await thread.messages
-      .fetch({ limit: 100 })
-      .catch(() => null);
-    if (!messages) return { success: 0, failed: 0 };
-
-    let successCount = 0,
-      failCount = 0;
-    for (const [msgId, msg] of messages) {
-      if (msg.reactions.cache.size === 0) continue;
-      const success = await removeAllReactionsWithRetry(msg);
-      success ? successCount++ : failCount++;
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    }
-
-    console.log(
-      `✅ Thread cleanup complete: ${successCount} success, ${failCount} failed`
-    );
-    return { success: successCount, failed: failCount };
-  } catch (err) {
-    console.error(`❌ Error cleaning thread reactions: ${err.message}`);
-    return { success: 0, failed: 0 };
-  }
-}
-
-function findBossMatch(input) {
-  const q = input.toLowerCase().trim();
-
-  // Exact match first
-  for (const name of Object.keys(bossPoints)) {
-    if (name.toLowerCase() === q) return name;
-    const meta = bossPoints[name];
-    for (const alias of meta.aliases || []) {
-      if (alias.toLowerCase() === q) return name;
-    }
-  }
-
-  // Fuzzy match with levenshtein distance
-  let best = { name: null, dist: 999 };
-  for (const name of Object.keys(bossPoints)) {
-    const dist = levenshtein.get(q, name.toLowerCase());
-    if (dist < best.dist) best = { name, dist };
-    for (const alias of bossPoints[name].aliases || []) {
-      const d2 = levenshtein.get(q, alias.toLowerCase());
-      if (d2 < best.dist) best = { name, dist: d2 };
-    }
-  }
-
-  return best.dist <= 2 ? best.name : null;
-}
-
 function isAdmin(member) {
   return member.roles.cache.some((r) => config.admin_roles.includes(r.name));
-}
-
-function parseThreadName(name) {
-  const match = name.match(/^\[(.*?)\s+(.*?)\]\s+(.+)$/);
-  if (!match) return null;
-  return {
-    date: match[1],
-    time: match[2],
-    timestamp: `${match[1]} ${match[2]}`,
-    boss: match[3],
-  };
 }
 
 // ==========================================
@@ -517,62 +396,6 @@ function stopBiddingChannelCleanupSchedule() {
   }
 }
 
-async function postToSheet(payload) {
-  try {
-    const now = Date.now();
-    const timeSinceLastCall = now - lastSheetCall;
-    if (timeSinceLastCall < TIMING.MIN_SHEET_DELAY) {
-      const waitTime = TIMING.MIN_SHEET_DELAY - timeSinceLastCall;
-      console.log(`⏳ Rate limiting: waiting ${waitTime}ms...`);
-      await new Promise((resolve) => setTimeout(resolve, waitTime));
-    }
-
-    lastSheetCall = Date.now();
-
-    const res = await fetch(config.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const text = await res.text();
-    console.log(`📊 Sheet response: ${res.status} - ${text.substring(0, 200)}`);
-
-    if (res.status === 429) {
-      console.error("❌ Rate limit hit! Waiting 5 seconds...");
-      await new Promise((resolve) => setTimeout(resolve, TIMING.RETRY_DELAY));
-      return postToSheet(payload);
-    }
-
-    return { ok: res.ok, status: res.status, text };
-  } catch (err) {
-    console.error("❌ Webhook error:", err);
-    return { ok: false, err: err.toString() };
-  }
-}
-
-async function checkColumnExists(boss, timestamp) {
-  const key = `${boss}|${timestamp}`;
-  if (activeColumns[key]) {
-    console.log(`✅ Column exists in memory: ${key}`);
-    return true;
-  }
-
-  console.log(`🔍 Checking sheet for column: ${key}`);
-  const resp = await postToSheet({ action: "checkColumn", boss, timestamp });
-
-  if (resp.ok) {
-    try {
-      const data = JSON.parse(resp.text);
-      return data.exists === true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  return false;
-}
-
 // ==========================================
 // CONSOLIDATED CONFIRMATION UTILITY
 // ==========================================
@@ -610,314 +433,10 @@ async function awaitConfirmation(
       await onCancel(confirmMsg);
     }
 
-    await removeAllReactionsWithRetry(confirmMsg);
+    await attendance.removeAllReactionsWithRetry(confirmMsg);
   } catch (err) {
     await message.reply("⏱️ Confirmation timed out.");
-    await removeAllReactionsWithRetry(confirmMsg);
-  }
-}
-
-// ==========================================
-// SPAWN THREAD CREATION
-// ==========================================
-
-async function createSpawnThreads(
-  bossName,
-  dateStr,
-  timeStr,
-  fullTimestamp,
-  triggerSource
-) {
-  const mainGuild = await client.guilds
-    .fetch(config.main_guild_id)
-    .catch(() => null);
-  if (!mainGuild) return;
-
-  const attChannel = await mainGuild.channels
-    .fetch(config.attendance_channel_id)
-    .catch(() => null);
-  const adminLogs = await mainGuild.channels
-    .fetch(config.admin_logs_channel_id)
-    .catch(() => null);
-
-  if (!attChannel || !adminLogs) {
-    console.error("❌ Could not find channels");
-    return;
-  }
-
-  const columnExists = await checkColumnExists(bossName, fullTimestamp);
-  if (columnExists) {
-    console.log(
-      `⚠️ Column already exists for ${bossName} at ${fullTimestamp}. Blocking spawn.`
-    );
-    await adminLogs.send(
-      `⚠️ **BLOCKED SPAWN:** ${bossName} at ${fullTimestamp}\nA column for this boss at this timestamp already exists. Close the existing thread first.`
-    );
-    return;
-  }
-
-  const threadTitle = `[${dateStr} ${timeStr}] ${bossName}`;
-
-  const [attThread, confirmThread] = await Promise.all([
-    attChannel.threads
-      .create({
-        name: threadTitle,
-        autoArchiveDuration: config.auto_archive_minutes,
-        reason: `Boss spawn: ${bossName}`,
-      })
-      .catch((err) => {
-        console.error("❌ Failed to create attendance thread:", err);
-        return null;
-      }),
-    adminLogs.threads
-      .create({
-        name: `✅ ${threadTitle}`,
-        autoArchiveDuration: config.auto_archive_minutes,
-        reason: `Confirmation thread: ${bossName}`,
-      })
-      .catch((err) => {
-        console.error("❌ Failed to create confirmation thread:", err);
-        return null;
-      }),
-  ]);
-
-  if (!attThread) return;
-
-  activeSpawns[attThread.id] = {
-    boss: bossName,
-    date: dateStr,
-    time: timeStr,
-    timestamp: fullTimestamp,
-    members: [],
-    confirmThreadId: confirmThread ? confirmThread.id : null,
-    closed: false,
-  };
-
-  activeColumns[`${bossName}|${fullTimestamp}`] = attThread.id;
-
-  const embed = new EmbedBuilder()
-    .setColor(0xffd700)
-    .setTitle(`🎯 ${bossName}`)
-    .setDescription(`Boss detected! Please check in below.`)
-    .addFields(
-      {
-        name: "📸 How to Check In",
-        value:
-          "1. Post `present` or `here`\n2. Attach a screenshot (admins exempt)\n3. Wait for admin ✅",
-      },
-      {
-        name: "📊 Points",
-        value: `${bossPoints[bossName].points} points`,
-        inline: true,
-      },
-      { name: "🕐 Time", value: timeStr, inline: true },
-      { name: "📅 Date", value: dateStr, inline: true }
-    )
-    .setFooter({
-      text: 'Admins: type "close" to finalize and submit attendance',
-    })
-    .setTimestamp();
-
-  await attThread.send({ content: "@everyone", embeds: [embed] });
-
-  if (confirmThread) {
-    await confirmThread.send(
-      `🟨 **${bossName}** spawn detected (${fullTimestamp}). Verifications will appear here.`
-    );
-  }
-
-  console.log(
-    `✅ Created threads for ${bossName} at ${fullTimestamp} (${triggerSource})`
-  );
-}
-
-// ==========================================
-// STATE RECOVERY ON STARTUP
-// ==========================================
-
-async function recoverStateFromThreads() {
-  try {
-    console.log("🔄 Scanning for existing threads...");
-
-    const mainGuild = await client.guilds
-      .fetch(config.main_guild_id)
-      .catch(() => null);
-    if (!mainGuild) {
-      console.log("❌ Could not fetch main guild for state recovery");
-      return;
-    }
-
-    const attChannel = await mainGuild.channels
-      .fetch(config.attendance_channel_id)
-      .catch(() => null);
-    const adminLogs = await mainGuild.channels
-      .fetch(config.admin_logs_channel_id)
-      .catch(() => null);
-
-    if (!attChannel || !adminLogs) {
-      console.log("❌ Could not fetch channels for state recovery");
-      return;
-    }
-
-    let recoveredCount = 0;
-    let pendingCount = 0;
-
-    const attThreads = await attChannel.threads.fetchActive().catch(() => null);
-    if (!attThreads) {
-      console.log("🔭 No active threads found to recover");
-      return;
-    }
-
-    const threadDataPromises = [];
-
-    for (const [threadId, thread] of attThreads.threads) {
-      const parsed = parseThreadName(thread.name);
-      if (!parsed) continue;
-
-      const bossName = findBossMatch(parsed.boss);
-      if (!bossName) continue;
-
-      threadDataPromises.push({
-        thread,
-        parsed,
-        bossName,
-        messagesPromise: thread.messages
-          .fetch({ limit: 100 })
-          .catch(() => null),
-      });
-    }
-
-    const threadDataResults = await Promise.all(
-      threadDataPromises.map(async (data) => ({
-        ...data,
-        messages: await data.messagesPromise,
-      }))
-    );
-
-    const adminThreads = await adminLogs.threads
-      .fetchActive()
-      .catch(() => null);
-
-    for (const { thread, parsed, bossName, messages } of threadDataResults) {
-      if (!messages) continue;
-
-      if (thread.archived) {
-        console.log(
-          `⏸️ Skipping archived thread: ${bossName} at ${parsed.timestamp}`
-        );
-        continue;
-      }
-
-      let confirmThreadId = null;
-      if (adminThreads) {
-        for (const [id, adminThread] of adminThreads.threads) {
-          if (adminThread.name === `✅ ${thread.name}`) {
-            confirmThreadId = id;
-            break;
-          }
-        }
-      }
-
-      const members = [];
-
-      for (const [msgId, msg] of messages) {
-        if (
-          msg.author.id === client.user.id &&
-          msg.content.includes("verified by")
-        ) {
-          const match = msg.content.match(/\*\*(.+?)\*\* verified by/);
-          if (match) members.push(match[1]);
-        }
-
-        if (msg.reactions.cache.has("✅") && msg.reactions.cache.has("❌")) {
-          const isConfirmation =
-            msg.content.includes("Close spawn") ||
-            msg.content.includes("close spawn") ||
-            msg.content.includes("React ✅ to confirm") ||
-            msg.content.includes("Clear all bot memory") ||
-            msg.content.includes("Force submit attendance") ||
-            msg.content.includes("MASS CLOSE ALL THREADS");
-
-          if (isConfirmation) {
-            console.log(`⭕ Skipping confirmation message: ${msgId}`);
-            continue;
-          }
-
-          const hasVerificationReply = messages.some(
-            (m) =>
-              m.reference?.messageId === msgId &&
-              m.author.id === client.user.id &&
-              m.content.includes("verified")
-          );
-
-          if (!hasVerificationReply) {
-            const author = await mainGuild.members
-              .fetch(msg.author.id)
-              .catch(() => null);
-            const username = author
-              ? author.nickname || msg.author.username
-              : msg.author.username;
-
-            pendingVerifications[msgId] = {
-              author: username,
-              authorId: msg.author.id,
-              threadId: thread.id,
-              timestamp: msg.createdTimestamp,
-            };
-            pendingCount++;
-          }
-        }
-      }
-
-      activeSpawns[thread.id] = {
-        boss: bossName,
-        date: parsed.date,
-        time: parsed.time,
-        timestamp: parsed.timestamp,
-        members: members,
-        confirmThreadId: confirmThreadId,
-        closed: false,
-      };
-
-      activeColumns[`${bossName}|${parsed.timestamp}`] = thread.id;
-
-      recoveredCount++;
-      console.log(
-        `✅ Recovered: ${bossName} at ${parsed.timestamp} - ${members.length} verified, ${pendingCount} pending`
-      );
-    }
-
-    if (recoveredCount > 0) {
-      console.log(
-        `🎉 State recovery complete! Recovered ${recoveredCount} spawn(s), ${pendingCount} pending verification(s)`
-      );
-
-      if (adminLogs) {
-        const embed = new EmbedBuilder()
-          .setColor(0x00ff00)
-          .setTitle("🔄 Bot State Recovered")
-          .setDescription(`Bot restarted and recovered existing threads`)
-          .addFields(
-            {
-              name: "Spawns Recovered",
-              value: `${recoveredCount}`,
-              inline: true,
-            },
-            {
-              name: "Pending Verifications",
-              value: `${pendingCount}`,
-              inline: true,
-            }
-          )
-          .setTimestamp();
-
-        await adminLogs.send({ embeds: [embed] });
-      }
-    } else {
-      console.log("🔭 No active threads found to recover");
-    }
-  } catch (err) {
-    console.error("❌ Error during state recovery:", err);
+    await attendance.removeAllReactionsWithRetry(confirmMsg);
   }
 }
 
@@ -936,11 +455,15 @@ const commandHandlers = {
 
   status: async (message, member) => {
     const guild = message.guild;
-    const uptime = formatUptime(Date.now() - BOT_START_TIME);
+    const uptime = attendance.formatUptime(Date.now() - BOT_START_TIME);
     const timeSinceSheet =
       lastSheetCall > 0
         ? `${Math.floor((Date.now() - lastSheetCall) / 1000)} seconds ago`
         : "Never";
+
+        activeSpawns = attendance.getActiveSpawns();
+    pendingVerifications = attendance.getPendingVerifications();
+
     const totalSpawns = Object.keys(activeSpawns).length;
 
     const activeSpawnEntries = Object.entries(activeSpawns);
@@ -1199,7 +722,7 @@ const commandHandlers = {
               members: spawnInfo.members,
             };
 
-            const resp = await postToSheet(payload);
+            const resp = await attendance.postToSheet(payload);
 
             if (resp.ok) {
               await thread
@@ -1229,7 +752,7 @@ const commandHandlers = {
               await message.channel.send(
                 `   ├─ 🧹 Cleaning up reactions from thread...`
               );
-              const cleanupStats = await cleanupAllThreadReactions(thread);
+              const cleanupStats = await attendance.cleanupAllThreadReactions(thread);
               totalReactionsRemoved += cleanupStats.success;
               totalReactionsFailed += cleanupStats.failed;
 
@@ -1270,7 +793,7 @@ const commandHandlers = {
                 setTimeout(resolve, TIMING.RETRY_DELAY)
               );
 
-              const retryResp = await postToSheet(payload);
+              const retryResp = await attendance.postToSheet(payload);
 
               if (retryResp.ok) {
                 if (spawnInfo.confirmThreadId) {
@@ -1421,7 +944,7 @@ const commandHandlers = {
           members: spawnInfo.members,
         };
 
-        const resp = await postToSheet(payload);
+        const resp = await attendance.postToSheet(payload);
 
         if (resp.ok) {
           await message.channel.send(
@@ -1857,22 +1380,28 @@ client.once(Events.ClientReady, async () => {
   console.log(`🟢 Main Guild: ${config.main_guild_id}`);
   console.log(`⏰ Timer Server: ${config.timer_server_id}`);
   console.log(`🤖 Version: ${BOT_VERSION}`);
-  console.log(
-    `⚙️ Timing: Sheet delay=${TIMING.MIN_SHEET_DELAY}ms, Retry attempts=${TIMING.REACTION_RETRY_ATTEMPTS}`
-  );
 
   // INITIALIZE ALL MODULES IN CORRECT ORDER
+  attendance.initialize(config, bossPoints, isAdmin); // NEW
   helpSystem.initialize(config, isAdmin, BOT_VERSION);
   auctioneering.initialize(config, isAdmin, bidding);
   bidding.initializeBidding(config, isAdmin, auctioneering);
-  auctioneering.setPostToSheet(postToSheet);
+  auctioneering.setPostToSheet(attendance.postToSheet); // Use attendance module's postToSheet
 
   isRecovering = true;
   await recoverBotStateOnStartup(client, config);
   isRecovering = false;
 
-  recoverStateFromThreads();
+  // Use attendance module's recovery function
+  await attendance.recoverStateFromThreads(client);
   bidding.recoverBiddingState(client, config);
+
+  // Sync state references
+  activeSpawns = attendance.getActiveSpawns();
+  activeColumns = attendance.getActiveColumns();
+  pendingVerifications = attendance.getPendingVerifications();
+  pendingClosures = attendance.getPendingClosures();
+  confirmationMessages = attendance.getConfirmationMessages();
 
   // START BIDDING CHANNEL CLEANUP SCHEDULE
   startBiddingChannelCleanupSchedule();
@@ -1968,7 +1497,7 @@ client.on(Events.MessageCreate, async (message) => {
             return;
           }
 
-          const bossName = findBossMatch(detectedBoss);
+          const bossName = attendance.findBossMatch(detectedBoss);
           if (!bossName) {
             console.log(`⚠️ Unknown boss: ${detectedBoss}`);
             return;
@@ -1988,20 +1517,14 @@ client.on(Events.MessageCreate, async (message) => {
             fullTimestamp = `${dateStr} ${timeStr}`;
             console.log(`⏰ Using timestamp from timer: ${fullTimestamp}`);
           } else {
-            const ts = getCurrentTimestamp();
+            const ts = attendance.getCurrentTimestamp();
             dateStr = ts.date;
             timeStr = ts.time;
             fullTimestamp = ts.full;
             console.log(`⏰ Using current timestamp: ${fullTimestamp}`);
           }
 
-          await createSpawnThreads(
-            bossName,
-            dateStr,
-            timeStr,
-            fullTimestamp,
-            "timer"
-          );
+          await attendance.createSpawnThreads(client, bossName, dateStr, timeStr, fullTimestamp, "timer");
         }
         return;
       }
@@ -2116,6 +1639,10 @@ client.on(Events.MessageCreate, async (message) => {
       message.channel.isThread() &&
       message.channel.parentId === config.attendance_channel_id
     ) {
+      // Sync state
+  activeSpawns = attendance.getActiveSpawns();
+  pendingVerifications = attendance.getPendingVerifications();
+
       const content = message.content.trim().toLowerCase();
       const keyword = content.split(/\s+/)[0];
 
@@ -2159,6 +1686,7 @@ client.on(Events.MessageCreate, async (message) => {
           threadId: message.channel.id,
           timestamp: Date.now(),
         };
+attendance.setPendingVerifications(pendingVerifications);
 
         const statusText = userIsAdmin
           ? `⏩ **${username}** (Admin) registered for **${spawnInfo.boss}**\n\nFast-track verification (no screenshot required)...`
@@ -2244,7 +1772,7 @@ client.on(Events.MessageCreate, async (message) => {
               const originalMsg = await message.channel.messages
                 .fetch(msgId)
                 .catch(() => null);
-              if (originalMsg) await removeAllReactionsWithRetry(originalMsg);
+              if (originalMsg) await attendance.removeAllReactionsWithRetry(originalMsg);
 
               delete pendingVerifications[msgId];
             }
@@ -2421,7 +1949,7 @@ client.on(Events.MessageCreate, async (message) => {
           members: spawnInfo.members,
         };
 
-        const resp = await postToSheet(payload);
+        const resp = await attendance.postToSheet(payload);
 
         if (resp.ok) {
           await message.channel.send(
@@ -2655,7 +2183,7 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         const detectedBoss = bossMatch[1].trim();
-        const bossName = findBossMatch(detectedBoss);
+        const bossName = attendance.findBossMatch(detectedBoss);
 
         if (!bossName) {
           await message.reply(
@@ -2677,13 +2205,7 @@ client.on(Events.MessageCreate, async (message) => {
           `🔧 Manual spawn creation: ${bossName} at ${fullTimestamp} by ${message.author.username}`
         );
 
-        await createSpawnThreads(
-          bossName,
-          dateStr,
-          timeStr,
-          fullTimestamp,
-          "manual"
-        );
+        await attendance.createSpawnThreads(client, bossName, dateStr, timeStr, fullTimestamp, "timer");
 
         await message.reply(
           `✅ **Spawn thread created successfully!**\n\n` +
@@ -2727,7 +2249,12 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     const msg = reaction.message;
     const guild = msg.guild;
 
-    // Guard against reactions on closed threads
+    // Sync state from attendance module
+    activeSpawns = attendance.getActiveSpawns();
+    pendingVerifications = attendance.getPendingVerifications();
+    pendingClosures = attendance.getPendingClosures();
+
+    // Guard against closed threads
     if (
       msg.channel.isThread() &&
       msg.channel.parentId === config.attendance_channel_id
@@ -2739,111 +2266,19 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
           await reaction.users.remove(user.id);
           await msg.channel
             .send(
-              `⚠️ <@${user.id}>, this spawn is closed. Your reaction was removed to prevent confusion.\n` +
-                `(Closed threads should not have reactions to avoid restart detection issues)`
+              `⚠️ <@${user.id}>, this spawn is closed. Reaction removed.`
             )
             .then((m) => setTimeout(() => m.delete().catch(() => {}), 5000));
-        } catch (err) {
-          console.warn(
-            `⚠️ Could not remove reaction from closed thread ${msg.channel.id}: ${err.message}`
-          );
-        }
+        } catch (err) {}
         return;
       }
     }
 
     const adminMember = await guild.members.fetch(user.id).catch(() => null);
-
-    // Only admins can use reactions
     if (!adminMember || !isAdmin(adminMember)) {
       try {
         await reaction.users.remove(user.id);
       } catch (e) {}
-      return;
-    }
-
-    // Close confirmation
-    const closePending = pendingClosures[msg.id];
-
-    if (closePending) {
-      const spawnInfo = activeSpawns[closePending.threadId];
-
-      if (reaction.emoji.name === "✅") {
-        if (!spawnInfo || spawnInfo.closed) {
-          await msg.channel.send("⚠️ Spawn already closed or not found.");
-          delete pendingClosures[msg.id];
-          await removeAllReactionsWithRetry(msg);
-          return;
-        }
-
-        spawnInfo.closed = true;
-
-        await msg.channel.send(
-          `🔒 Closing spawn **${spawnInfo.boss}**... Submitting ${spawnInfo.members.length} members to Google Sheets...`
-        );
-
-        const payload = {
-          action: "submitAttendance",
-          boss: spawnInfo.boss,
-          date: spawnInfo.date,
-          time: spawnInfo.time,
-          timestamp: spawnInfo.timestamp,
-          members: spawnInfo.members,
-        };
-
-        const resp = await postToSheet(payload);
-
-        if (resp.ok) {
-          await msg.channel.send(
-            `✅ Attendance submitted successfully! Archiving thread...`
-          );
-
-          await removeAllReactionsWithRetry(msg);
-
-          if (spawnInfo.confirmThreadId) {
-            const confirmThread = await guild.channels
-              .fetch(spawnInfo.confirmThreadId)
-              .catch(() => null);
-            if (confirmThread) {
-              await confirmThread.send(
-                `✅ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - ${spawnInfo.members.length} members recorded`
-              );
-              await confirmThread.delete().catch(console.error);
-              console.log(
-                `🗑️ Deleted confirmation thread for ${spawnInfo.boss}`
-              );
-            }
-          }
-
-          await msg.channel
-            .setArchived(true, `Closed by ${user.username}`)
-            .catch(console.error);
-
-          delete activeSpawns[closePending.threadId];
-          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
-          delete pendingClosures[msg.id];
-          delete confirmationMessages[closePending.threadId];
-
-          console.log(
-            `🔒 Spawn closed: ${spawnInfo.boss} at ${spawnInfo.timestamp} (${spawnInfo.members.length} members)`
-          );
-        } else {
-          await msg.channel.send(
-            `⚠️ **Failed to submit attendance!**\n\n` +
-              `Error: ${resp.text || resp.err}\n\n` +
-              `**Members list (for manual entry):**\n${spawnInfo.members.join(
-                ", "
-              )}\n\n` +
-              `Please manually update the Google Sheet.`
-          );
-          await removeAllReactionsWithRetry(msg);
-        }
-      } else if (reaction.emoji.name === "❌") {
-        await msg.channel.send("❌ Spawn close canceled.");
-        await removeAllReactionsWithRetry(msg);
-        delete pendingClosures[msg.id];
-      }
-
       return;
     }
 
@@ -2854,8 +2289,9 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
       const spawnInfo = activeSpawns[pending.threadId];
 
       if (!spawnInfo || spawnInfo.closed) {
-        await msg.reply("⚠️ This spawn is already closed.");
+        await msg.reply("⚠️ This spawn is closed.");
         delete pendingVerifications[msg.id];
+        attendance.setPendingVerifications(pendingVerifications); // Sync
         return;
       }
 
@@ -2865,26 +2301,18 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         );
 
         if (isDuplicate) {
-          await msg.reply(
-            `⚠️ **${pending.author}** is already verified. Ignoring duplicate.`
-          );
-          await removeAllReactionsWithRetry(msg);
+          await msg.reply(`⚠️ **${pending.author}** already verified.`);
+          await attendance.removeAllReactionsWithRetry(msg); // CHANGED
           delete pendingVerifications[msg.id];
+          attendance.setPendingVerifications(pendingVerifications); // Sync
           return;
         }
 
         spawnInfo.members.push(pending.author);
+        attendance.setActiveSpawns(activeSpawns); // Sync
 
-        const cleanupSuccess = await removeAllReactionsWithRetry(msg);
-        if (!cleanupSuccess) {
-          console.warn(
-            `⚠️ Could not clean reactions for ${msg.id}, but continuing...`
-          );
-        }
-
-        await msg.reply(
-          `✅ **${pending.author}** verified by ${user.username}!`
-        );
+        await attendance.removeAllReactionsWithRetry(msg); // CHANGED
+        await msg.reply(`✅ **${pending.author}** verified by ${user.username}!`);
 
         if (spawnInfo.confirmThreadId) {
           const confirmThread = await guild.channels
@@ -2917,9 +2345,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         }
 
         delete pendingVerifications[msg.id];
-        console.log(
-          `✅ Verified: ${pending.author} for ${spawnInfo.boss} by ${user.username}`
-        );
+        attendance.setPendingVerifications(pendingVerifications); // Sync
       } else if (reaction.emoji.name === "❌") {
         await msg.delete().catch(() => {});
         await msg.channel.send(
@@ -2928,26 +2354,98 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         );
 
         delete pendingVerifications[msg.id];
-        console.log(
-          `❌ Denied: ${pending.author} for ${spawnInfo.boss} by ${user.username}`
-        );
+        attendance.setPendingVerifications(pendingVerifications); // Sync
       }
     }
 
-    // Bidding bid confirmations
+    // Close confirmation
+    const closePending = pendingClosures[msg.id];
+
+    if (closePending) {
+      const spawnInfo = activeSpawns[closePending.threadId];
+
+      if (reaction.emoji.name === "✅") {
+        if (!spawnInfo || spawnInfo.closed) {
+          await msg.channel.send("⚠️ Spawn already closed.");
+          delete pendingClosures[msg.id];
+          attendance.setPendingClosures(pendingClosures); // Sync
+          await attendance.removeAllReactionsWithRetry(msg); // CHANGED
+          return;
+        }
+
+        spawnInfo.closed = true;
+        attendance.setActiveSpawns(activeSpawns); // Sync
+
+        await msg.channel.send(
+          `🔒 Closing spawn **${spawnInfo.boss}**... Submitting ${spawnInfo.members.length} members...`
+        );
+
+        const payload = {
+          action: "submitAttendance",
+          boss: spawnInfo.boss,
+          date: spawnInfo.date,
+          time: spawnInfo.time,
+          timestamp: spawnInfo.timestamp,
+          members: spawnInfo.members,
+        };
+
+        const resp = await attendance.postToSheet(payload); // CHANGED
+
+        if (resp.ok) {
+          await msg.channel.send(`✅ Attendance submitted! Archiving...`);
+
+          await attendance.removeAllReactionsWithRetry(msg); // CHANGED
+
+          if (spawnInfo.confirmThreadId) {
+            const confirmThread = await guild.channels
+              .fetch(spawnInfo.confirmThreadId)
+              .catch(() => null);
+            if (confirmThread) {
+              await confirmThread.send(
+                `✅ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - ${spawnInfo.members.length} members`
+              );
+              await confirmThread.delete().catch(() => {});
+            }
+          }
+
+          await msg.channel
+            .setArchived(true, `Closed by ${user.username}`)
+            .catch(() => {});
+
+          delete activeSpawns[closePending.threadId];
+          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+          delete pendingClosures[msg.id];
+          delete confirmationMessages[closePending.threadId];
+          
+          // Sync all changes
+          attendance.setActiveSpawns(activeSpawns);
+          attendance.setActiveColumns(activeColumns);
+          attendance.setPendingClosures(pendingClosures);
+          attendance.setConfirmationMessages(confirmationMessages);
+        } else {
+          await msg.channel.send(
+            `⚠️ **Failed!**\n\nError: ${resp.text || resp.err}\n\n` +
+              `**Members:** ${spawnInfo.members.join(", ")}`
+          );
+          await attendance.removeAllReactionsWithRetry(msg); // CHANGED
+        }
+      } else if (reaction.emoji.name === "❌") {
+        await msg.channel.send("❌ Close canceled.");
+        await attendance.removeAllReactionsWithRetry(msg); // CHANGED
+        delete pendingClosures[msg.id];
+        attendance.setPendingClosures(pendingClosures); // Sync
+      }
+
+      return;
+    }
+
+    // Bidding confirmations (keep as is)
     const biddingState = bidding.getBiddingState();
 
     if (biddingState.pc[msg.id]) {
-      // ✅ FIXED: Changed from pendingConfirmations to pc
-      console.log(
-        `🎯 Bidding confirmation reaction detected: ${reaction.emoji.name} by ${user.username}`
-      );
-
       if (reaction.emoji.name === "✅") {
-        console.log(`✅ Confirming bid...`);
         await bidding.confirmBid(reaction, user, config);
       } else if (reaction.emoji.name === "❌") {
-        console.log(`❌ Canceling bid...`);
         await bidding.cancelBid(reaction, user, config);
       }
       return;
@@ -2993,7 +2491,7 @@ process.on("SIGINT", () => {
 // EXPORT FUNCTIONS TO AUCTIONEERING MODULE
 // ==========================================
 
-global.postToSheet = postToSheet;
+global.postToSheet = attendance.postToSheet;
 
 // ==========================================
 // LOGIN
