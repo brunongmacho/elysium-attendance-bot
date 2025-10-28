@@ -863,6 +863,11 @@ async function itemEnd(client, config, channel) {
     });
   }
 
+if (item.status === "ended") {
+  console.warn("⚠️ itemEnd() called on already-ended item — skipping duplicate finalization.");
+  return;
+}
+
   // ✅ Move to next item or session
   const session = auctionState.sessions[auctionState.currentSessionIndex];
   auctionState.currentItemIndex++;
@@ -887,6 +892,7 @@ async function itemEnd(client, config, channel) {
       await finalizeSession(client, config, channel);
     }
   }
+  
 }
 
 async function finalizeSession(client, config, channel) {
@@ -1118,21 +1124,73 @@ function resumeSession(client, config, channel) {
   return true;
 }
 
-function stopCurrentItem(client, config, channel) {
-  if (!auctionState.active || !auctionState.currentItem) return false;
-  // ADD THIS LINE:
-  if (cfg && cfg.sheet_webhook_url) {
-    saveAuctionState(cfg.sheet_webhook_url).catch(console.error);
+async function stopCurrentItem(client, config, channel) {
+  if (!auctionState.active || !auctionState.currentItem) {
+    console.warn("⚠️ No active item to stop.");
+    return false;
   }
 
+  // ✅ Always save current state before stopping
+  if (cfg && cfg.sheet_webhook_url) {
+    await saveAuctionState(cfg.sheet_webhook_url).catch(console.error);
+  }
+
+  // 🧹 Clear timers for this item
   clearTimeout(auctionState.timers.itemEnd);
   clearTimeout(auctionState.timers.go1);
   clearTimeout(auctionState.timers.go2);
   clearTimeout(auctionState.timers.go3);
 
-  itemEnd(client, config, channel);
+  const item = auctionState.currentItem;
+  console.log(`🛑 Forced stop for: ${item.item}`);
+
+  // ✅ Announce forced stop in the override channel
+  try {
+    const guild = await client.guilds.fetch(config.main_guild_id);
+    const adminLogs = await guild.channels
+      .fetch(config.admin_logs_channel_id)
+      .catch(() => null);
+
+    if (adminLogs) {
+      await adminLogs.send({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLORS.WARNING)
+            .setTitle(`${EMOJI.STOP} Auction Force-Stopped`)
+            .setDescription(`**${item.item}** was manually ended by admin.`)
+            .addFields(
+              {
+                name: `${EMOJI.BID} Highest Bid`,
+                value: item.curBid
+                  ? `${item.curBid} pts by ${item.curWin || "No bids"}`
+                  : "No bids placed",
+                inline: true,
+              },
+              {
+                name: `${EMOJI.TIME} Status`,
+                value: "✅ Finalized early via admin override",
+                inline: true,
+              }
+            )
+            .setFooter({ text: "Proceeding to next item automatically..." })
+            .setTimestamp(),
+        ],
+      });
+    }
+  } catch (err) {
+    console.error("❌ Failed to announce force-stop:", err);
+  }
+
+  // ✅ Mark item as ended and finalize normally (shows winner, logs, then next item)
+  try {
+    await itemEnd(client, config, channel);
+  } catch (err) {
+    console.error("❌ Error finalizing forced stop:", err);
+  }
+
   return true;
 }
+
 
 function extendCurrentItem(minutes) {
   if (!auctionState.active || !auctionState.currentItem) return false;
