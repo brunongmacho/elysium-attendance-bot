@@ -1565,10 +1565,10 @@ client.once(Events.ClientReady, async () => {
   console.log("╚═══════════════════════════════════════════════════════╝\n");
 
   // If thread recovery didn't find much, try Google Sheets
-  if (!threadsRecovered || Object.keys(attendance.getActiveSpawns()).length === 0) {
-    console.log("📊 Attempting to load attendance state from Google Sheets...");
-    await attendance.loadAttendanceStateFromSheet();
-  }
+  if (!sweep1.success || Object.keys(attendance.getActiveSpawns()).length === 0) {
+  console.log("📊 Attempting to load attendance state from Google Sheets...");
+  await attendance.loadAttendanceStateFromSheet();
+}
 
   await bidding.recoverBiddingState(client, config);
 
