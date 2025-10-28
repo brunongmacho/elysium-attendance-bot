@@ -180,12 +180,26 @@ async function logAuctionResult(
 
 async function saveAuctionState(url) {
   try {
-    // 🧩 Strip circular references (timers, etc.)
+    // 🔒 Prevent circular reference errors
+    const safeStringify = (obj) => {
+      const seen = new WeakSet();
+      return JSON.stringify(obj, (key, value) => {
+        if (typeof value === "object" && value !== null) {
+          if (seen.has(value)) return;
+          seen.add(value);
+        }
+        return value;
+      });
+    };
+
+    // 🧩 Clean item (avoid timers and circular data)
     const cleanItem =
       auctionState.currentItem && typeof auctionState.currentItem === "object"
         ? Object.fromEntries(
             Object.entries(auctionState.currentItem).filter(
-              ([k, v]) => typeof v !== "object" || !(v instanceof Timeout)
+              ([k, v]) =>
+                typeof v !== "object" ||
+                (v && v.constructor && v.constructor.name !== "Timeout")
             )
           )
         : auctionState.currentItem;
@@ -205,16 +219,13 @@ async function saveAuctionState(url) {
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body: safeStringify({
         action: "saveBotState",
         state: stateToSave,
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     console.log(`${EMOJI.SUCCESS} Auction state saved`);
     return true;
   } catch (e) {
@@ -222,6 +233,7 @@ async function saveAuctionState(url) {
     return false;
   }
 }
+
 
 async function startAuctioneering(client, config, channel) {
   // Validate parameters
@@ -1130,21 +1142,22 @@ async function stopCurrentItem(client, config, channel) {
     return false;
   }
 
-  // ✅ Always save current state before stopping
-  if (cfg && cfg.sheet_webhook_url) {
-    await saveAuctionState(cfg.sheet_webhook_url).catch(console.error);
-  }
-
-  // 🧹 Clear timers for this item
+  // 🧹 Clear timers safely
   clearTimeout(auctionState.timers.itemEnd);
   clearTimeout(auctionState.timers.go1);
   clearTimeout(auctionState.timers.go2);
   clearTimeout(auctionState.timers.go3);
 
   const item = auctionState.currentItem;
+
+  if (item.status === "ended") {
+    console.warn("⚠️ Item already ended — skipping force stop.");
+    return false;
+  }
+
   console.log(`🛑 Forced stop for: ${item.item}`);
 
-  // ✅ Announce forced stop in the override channel
+  // ✅ Announce forced stop in admin logs
   try {
     const guild = await client.guilds.fetch(config.main_guild_id);
     const adminLogs = await guild.channels
@@ -1157,7 +1170,7 @@ async function stopCurrentItem(client, config, channel) {
           new EmbedBuilder()
             .setColor(COLORS.WARNING)
             .setTitle(`${EMOJI.STOP} Auction Force-Stopped`)
-            .setDescription(`**${item.item}** was manually ended by admin.`)
+            .setDescription(`**${item.item}** manually finalized by admin.`)
             .addFields(
               {
                 name: `${EMOJI.BID} Highest Bid`,
@@ -1168,7 +1181,7 @@ async function stopCurrentItem(client, config, channel) {
               },
               {
                 name: `${EMOJI.TIME} Status`,
-                value: "✅ Finalized early via admin override",
+                value: "✅ Finalized early (manual override)",
                 inline: true,
               }
             )
@@ -1181,8 +1194,9 @@ async function stopCurrentItem(client, config, channel) {
     console.error("❌ Failed to announce force-stop:", err);
   }
 
-  // ✅ Mark item as ended and finalize normally (shows winner, logs, then next item)
+  // ✅ Mark as ended and finalize normally
   try {
+    item.status = "ended";
     await itemEnd(client, config, channel);
   } catch (err) {
     console.error("❌ Error finalizing forced stop:", err);
@@ -1190,7 +1204,6 @@ async function stopCurrentItem(client, config, channel) {
 
   return true;
 }
-
 
 function extendCurrentItem(minutes) {
   if (!auctionState.active || !auctionState.currentItem) return false;
