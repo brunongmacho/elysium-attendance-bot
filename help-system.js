@@ -1,11 +1,10 @@
 /**
- * Enhanced Help System for ELYSIUM Bot v6.0
- * Updated with all new features and command aliases
+ * Enhanced Help System for ELYSIUM Bot v7.0
+ * Updated with all current features and attendance-based auctions
  */
 
 const { EmbedBuilder } = require("discord.js");
 
-// Add EMOJI constant
 const EMOJI = {
   SUCCESS: "✅",
   ERROR: "❌",
@@ -21,19 +20,16 @@ const EMOJI = {
   TROPHY: "🏆",
 };
 
-// Module-level variables (initialized later)
 let config = null;
 let isAdminFunc = null;
 let BOT_VERSION = null;
 
-// Initialize function (called from index2.js)
 function initialize(cfg, adminFunc, version) {
   config = cfg;
   isAdminFunc = adminFunc;
   BOT_VERSION = version;
 }
 
-// Detailed command descriptions
 const COMMAND_HELP = {
   // === ATTENDANCE COMMANDS ===
   status: {
@@ -42,8 +38,6 @@ const COMMAND_HELP = {
     category: "Attendance",
     adminOnly: true,
     example: "!status",
-    details:
-      "Shows:\n• Bot uptime and version\n• Active spawn threads (sorted oldest first)\n• Pending verifications\n• Memory usage\n• Last sheet sync time\n• Bidding system status",
   },
 
   addthread: {
@@ -52,8 +46,6 @@ const COMMAND_HELP = {
     category: "Attendance",
     adminOnly: true,
     example: "!addthread Clemantis will spawn in 5 minutes! (2025-10-22 14:30)",
-    details:
-      "Creates spawn thread even if timer bot is down.\n• Boss name must match database\n• Timestamp must be in format (YYYY-MM-DD HH:MM)\n• Auto-creates verification thread",
   },
 
   verify: {
@@ -62,8 +54,6 @@ const COMMAND_HELP = {
     category: "Attendance",
     adminOnly: true,
     example: "!verify @Username",
-    details:
-      "Use when:\n• Member's screenshot was valid but bot failed\n• Admin override needed\n• Member had technical issues",
   },
 
   verifyall: {
@@ -72,8 +62,6 @@ const COMMAND_HELP = {
     category: "Attendance",
     adminOnly: true,
     example: "!verifyall",
-    details:
-      "Bulk verification tool:\n• Shows confirmation with member list\n• Skips duplicates automatically\n• Updates confirmation thread\n• Use when mass approval needed",
   },
 
   resetpending: {
@@ -82,8 +70,6 @@ const COMMAND_HELP = {
     category: "Attendance",
     adminOnly: true,
     example: "!resetpending",
-    details:
-      "Emergency cleanup:\n• Removes ALL pending check-ins\n• Does NOT add them to verified list\n• Allows thread closure\n• Use when verifications stuck",
   },
 
   forcesubmit: {
@@ -92,8 +78,6 @@ const COMMAND_HELP = {
     category: "Attendance",
     adminOnly: true,
     example: "!forcesubmit",
-    details:
-      "Submits current verified members:\n• Thread stays open\n• Can add more members after\n• Use for early submission\n• Does NOT archive thread",
   },
 
   forceclose: {
@@ -102,8 +86,6 @@ const COMMAND_HELP = {
     category: "Attendance",
     adminOnly: true,
     example: "!forceclose",
-    details:
-      "Emergency closure:\n• Submits verified members only\n• Ignores ALL pending verifications\n• Deletes confirmation thread\n• Archives spawn thread\n• Use when stuck",
   },
 
   debugthread: {
@@ -112,8 +94,6 @@ const COMMAND_HELP = {
     category: "Attendance",
     adminOnly: true,
     example: "!debugthread",
-    details:
-      "Displays:\n• Boss name and timestamp\n• Verified member count and list\n• Pending verification count\n• Thread status (open/closed)\n• Confirmation thread link",
   },
 
   closeallthread: {
@@ -122,8 +102,6 @@ const COMMAND_HELP = {
     category: "Attendance",
     adminOnly: true,
     example: "!closeallthread",
-    details:
-      "Bulk closure tool:\n• Auto-verifies all pending in ALL threads\n• Processes one at a time (3s delay)\n• Shows progress bar\n• Submits each to Sheets\n• Archives all threads\n• Use at end of session",
   },
 
   clearstate: {
@@ -132,41 +110,88 @@ const COMMAND_HELP = {
     category: "Attendance",
     adminOnly: true,
     example: "!clearstate",
-    details:
-      "DANGER - Full reset:\n• Clears active spawns\n• Removes pending verifications\n• Deletes column cache\n• Fresh start\n• Does NOT affect Sheets\n• Use only if bot corrupted",
   },
 
-  // === BIDDING COMMANDS ===
+  // === AUCTIONEERING COMMANDS ===
+  startauction: {
+    usage: "!startauction",
+    description: "Start auction session (Sheet items + queue, attendance-filtered)",
+    category: "Auctioneering",
+    adminOnly: true,
+    example: "!startauction",
+    aliases: ["!start", "!auc-start", "!begin-auction"],
+  },
+
+  startauctionnow: {
+    usage: "!startauctionnow",
+    description: "Start auction immediately, overriding cooldown",
+    category: "Auctioneering",
+    adminOnly: true,
+    example: "!startauctionnow",
+    aliases: ["!auc-now"],
+  },
+
+  pause: {
+    usage: "!pause",
+    description: "Pause active auctioneering session",
+    category: "Auctioneering",
+    adminOnly: true,
+    example: "!pause",
+    aliases: ["!auc-pause", "!hold"],
+  },
+
+  resume: {
+    usage: "!resume",
+    description: "Resume paused auctioneering session",
+    category: "Auctioneering",
+    adminOnly: true,
+    example: "!resume",
+    aliases: ["!auc-resume", "!continue"],
+  },
+
+  stop: {
+    usage: "!stop",
+    description: "End current item immediately and move to next",
+    category: "Auctioneering",
+    adminOnly: true,
+    example: "!stop",
+    aliases: ["!auc-stop", "!end-item"],
+  },
+
+  extend: {
+    usage: "!extend <minutes>",
+    description: "Add time to current auction",
+    category: "Auctioneering",
+    adminOnly: true,
+    example: "!extend 5",
+    aliases: ["!ext", "!auc-extend"],
+  },
+
+  // === BIDDING COMMANDS (Admin) ===
   auction: {
     usage: "!auction <item> <startPrice> <duration> [quantity]",
-    description: "Add item to auction queue (supports batch auctions)",
+    description: "Add item to manual queue (will be auctioned OPEN to all)",
     category: "Bidding",
     adminOnly: true,
-    example: "!auction Dragon Sword 500 30 3",
-    details:
-      "Queue management:\n• Item name (spaces allowed)\n• Start price (integer only)\n• Duration in minutes\n• Quantity (optional, default 1)\n• Batch auctions: Top N bidders win\n• Items auction sequentially\n• Max 15-minute extensions\n• Max 10 items per batch",
+    example: "!auction Dragon Sword 500 30",
   },
 
   queuelist: {
-    usage: "!queuelist (or !ql, !queue)",
-    description: "View all items in auction queue",
+    usage: "!queuelist",
+    description: "View auction queue preview (shows sessions)",
     category: "Bidding",
     adminOnly: true,
-    example: "!ql",
+    example: "!queuelist",
     aliases: ["!ql", "!queue"],
-    details:
-      "Shows:\n• Item names\n• Start prices\n• Durations\n• Quantities (for batch auctions)\n• Queue position\n• Total count\n\n**Aliases:** !ql, !queue",
   },
 
   removeitem: {
-    usage: "!removeitem <itemName> (or !rm)",
+    usage: "!removeitem <itemName>",
     description: "Remove item from queue",
     category: "Bidding",
     adminOnly: true,
-    example: "!rm Dragon Sword",
+    example: "!removeitem Dragon Sword",
     aliases: ["!rm"],
-    details:
-      "Removes before auction starts:\n• Cannot remove during active auction\n• Full item name required\n• Updates queue positions\n\n**Alias:** !rm",
   },
 
   clearqueue: {
@@ -175,72 +200,6 @@ const COMMAND_HELP = {
     category: "Bidding",
     adminOnly: true,
     example: "!clearqueue",
-    details:
-      "Emergency clear:\n• Cannot clear during auction\n• Requires ✅ confirmation\n• Clears entire queue\n• Does NOT refund points",
-  },
-
-  startauction: {
-    usage: "!startauction (or !start)",
-    description: "Begin auction session with queued items",
-    category: "Bidding",
-    adminOnly: true,
-    example: "!start",
-    aliases: ["!start"],
-    details:
-      "Starts session:\n• Loads points cache (instant bidding)\n• Auto-refreshes cache every 30min\n• Shows preview of items\n• 30-second item preview\n• Processes items one-by-one\n• Auto-submits at end\n• Concurrent start protection\n\n**Alias:** !start",
-  },
-
-  bid: {
-    usage: "!bid <amount> (or !b)",
-    description: "Place bid on current auction item",
-    category: "Bidding",
-    adminOnly: false,
-    example: "!b 750",
-    aliases: ["!b"],
-    details:
-      "Bidding rules:\n• Integers only (no decimals)\n• Must exceed current bid\n• 10-second confirmation with countdown\n• 3-second rate limit\n• Self-overbid = incremental locking\n• Last 10s bids pause timer\n• Max 15 extensions\n• Batch auctions: Top N bidders win\n\n**Aliases:** !b",
-  },
-
-  bidstatus: {
-    usage: "!bidstatus (or !bstatus, !bs)",
-    description: "View bidding system status",
-    category: "Bidding",
-    adminOnly: false,
-    example: "!bstatus",
-    aliases: ["!bstatus", "!bs"],
-    details:
-      "Shows:\n• Cache status and age\n• Auto-refresh status\n• Queue items (first 5)\n• Active auction item\n• Current bid and winner\n• Time remaining\n•\n**Aliases:** !bstatus, !bs",
-  },
-
-  mypoints: {
-    usage: "!mypoints (or !pts, !mypts, !mp)",
-    description: "Check your available bidding points",
-    category: "Bidding",
-    adminOnly: false,
-    example: "!pts",
-    aliases: ["!pts", "!mypts", "!mp"],
-    details:
-      'Personal points check:\n• Use ONLY in bidding channel (not threads)\n• Cannot use during active auction\n• Fetches fresh from Sheets\n• Auto-deletes after 30 seconds\n• Shows "Not found" if not in system\n\n**Aliases:** !pts, !mypts, !mp',
-  },
-
-  cancelitem: {
-    usage: "!cancelitem",
-    description: "Cancel current auction item and refund bids",
-    category: "Bidding",
-    adminOnly: true,
-    example: "!cancelitem",
-    details:
-      "Cancels auction:\n• Use in auction thread only\n• Refunds ALL locked points\n• Archives thread\n• Moves to next item\n• Use if item unavailable",
-  },
-
-  skipitem: {
-    usage: "!skipitem",
-    description: 'Skip current item marking as "no sale"',
-    category: "Bidding",
-    adminOnly: true,
-    example: "!skipitem",
-    details:
-      "Skips to next:\n• Use in auction thread only\n• Refunds locked points\n• Does NOT record in history\n• Archives thread\n• Use if no bids received",
   },
 
   resetbids: {
@@ -249,19 +208,30 @@ const COMMAND_HELP = {
     category: "Bidding",
     adminOnly: true,
     example: "!resetbids",
-    details:
-      "DANGER - Full reset:\n• Requires ✅ confirmation\n• Clears queue\n• Stops active auction\n• Unlocks all points\n• Clears history\n• Deletes cache\n• Stops auto-refresh\n• Does NOT submit to Sheets",
   },
 
   forcesubmitresults: {
     usage: "!forcesubmitresults",
-    description:
-      "Manually submit auction results to Sheets (requires confirmation)",
+    description: "Manually submit auction results to Sheets",
     category: "Bidding",
     adminOnly: true,
     example: "!forcesubmitresults",
-    details:
-      "Manual submission:\n• Shows current results\n• Requires ✅ confirmation\n• Auto-populates 0 for non-winners\n• Updates ALL members in sheet\n• Clears cache after\n• Stops auto-refresh\n• Use if auto-submit failed",
+  },
+
+  cancelitem: {
+    usage: "!cancelitem",
+    description: "Cancel current auction item and refund bids",
+    category: "Bidding",
+    adminOnly: true,
+    example: "!cancelitem",
+  },
+
+  skipitem: {
+    usage: "!skipitem",
+    description: 'Skip current item marking as "no sale"',
+    category: "Bidding",
+    adminOnly: true,
+    example: "!skipitem",
   },
 
   testbidding: {
@@ -270,105 +240,34 @@ const COMMAND_HELP = {
     category: "Bidding",
     adminOnly: true,
     example: "!testbidding",
-    details:
-      "Full diagnostic:\n• Tests webhook connection\n• Fetches sample points\n• Checks channel access\n• Verifies cache system\n• Shows configuration\n• Troubleshooting guide",
   },
 
-  startauction: {
-    usage: "!startauction (or !start, !auc-start, !begin-auction)",
-    description: "Start auctioneering session with Google Sheet + queue items",
-    category: "Bidding",
-    adminOnly: true,
-    example: "!start",
-    aliases: ["!start", "!auc-start", "!begin-auction"],
-    details:
-      "Starts auctioneering session:\n" +
-      "• Reads items from BiddingItems sheet first\n" +
-      "• Then reads queued items from !auction commands\n" +
-      "• Auto-auctions one-by-one, 20sec gap between items\n" +
-      "• Same bidding rules as regular auctions\n" +
-      "• Results auto-logged to Google Sheet\n" +
-      "• Final tally submitted to BiddingPoints\n" +
-      "• 10-minute cooldown after session ends\n" +
-      "• Use !startauctionnow to override cooldown\n\n" +
-      "**Aliases:** !start, !auc-start, !begin-auction",
+  // === BIDDING COMMANDS (Member) ===
+  bid: {
+    usage: "!bid <amount>",
+    description: "Place bid on current auction item (attendance-checked for boss items)",
+    category: "Member",
+    adminOnly: false,
+    example: "!bid 750",
+    aliases: ["!b"],
   },
 
-  startauctionnow: {
-    usage: "!startauctionnow (or !auc-now)",
-    description: "Start auction immediately, overriding cooldown",
-    category: "Bidding",
-    adminOnly: true,
-    example: "!auc-now",
-    aliases: ["!auc-now"],
-    details:
-      "Same as !startauction but:\n" +
-      "• Overrides 10-minute cooldown\n" +
-      "• Resets cooldown timer to 10 minutes\n" +
-      "• Use if previous auction ended early\n" +
-      "• Cannot use during recovery period\n\n" +
-      "**Alias:** !auc-now",
+  bidstatus: {
+    usage: "!bidstatus",
+    description: "View bidding system status",
+    category: "Member",
+    adminOnly: false,
+    example: "!bidstatus",
+    aliases: ["!bstatus", "!bs"],
   },
 
-  pause: {
-    usage: "!pause (or !auc-pause, !hold)",
-    description: "Pause active auctioneering session",
-    category: "Bidding",
-    adminOnly: true,
-    example: "!pause",
-    aliases: ["!auc-pause", "!hold"],
-    details:
-      "Pauses current auction:\n" +
-      "• Freezes timer and bid acceptance\n" +
-      "• Use !resume to continue\n" +
-      "• Useful for announcements or issues\n\n" +
-      "**Aliases:** !auc-pause, !hold",
-  },
-
-  resume: {
-    usage: "!resume (or !auc-resume, !continue)",
-    description: "Resume paused auctioneering session",
-    category: "Bidding",
-    adminOnly: true,
-    example: "!resume",
-    aliases: ["!auc-resume", "!continue"],
-    details:
-      "Resumes paused auction:\n" +
-      "• Unfreezes timer from where it paused\n" +
-      "• Bids resume being accepted\n" +
-      "• Paused time is added back to auction\n\n" +
-      "**Aliases:** !auc-resume, !continue",
-  },
-
-  stop: {
-    usage: "!stop (or !auc-stop, !end-item)",
-    description: "End current item immediately and move to next",
-    category: "Bidding",
-    adminOnly: true,
-    example: "!stop",
-    aliases: ["!auc-stop", "!end-item"],
-    details:
-      "Stops current auction early:\n" +
-      "• Declares winner immediately\n" +
-      "• Logs result to Google Sheet\n" +
-      "• Waits 20 seconds, then starts next item\n" +
-      "• Use if item has clear winner or needs cancellation\n\n" +
-      "**Aliases:** !auc-stop, !end-item",
-  },
-
-  extend: {
-    usage: "!extend <minutes> (or !ext, !auc-extend)",
-    description: "Add time to current auction",
-    category: "Bidding",
-    adminOnly: true,
-    example: "!extend 5",
-    aliases: ["!ext", "!auc-extend"],
-    details:
-      "Extends current auction by X minutes:\n" +
-      "• `!extend 5` adds 5 more minutes\n" +
-      "• Useful if bidding is active at end\n" +
-      "• Timer extends from current point\n\n" +
-      "**Aliases:** !ext, !auc-extend",
+  mypoints: {
+    usage: "!mypoints",
+    description: "Check your available bidding points",
+    category: "Member",
+    adminOnly: false,
+    example: "!mypoints",
+    aliases: ["!pts", "!mypts", "!mp"],
   },
 
   // === MEMBER COMMANDS ===
@@ -378,29 +277,25 @@ const COMMAND_HELP = {
     category: "Member",
     adminOnly: false,
     example: "present",
-    details:
-      "Check-in process:\n• Must attach screenshot (admins exempt)\n• Shows boss name and points\n• Creates pending verification\n• Wait for admin ✅ reaction\n• Cannot check in twice for same spawn",
   },
 };
 
 const CATEGORIES = {
   Attendance: "📋 Attendance System",
+  Auctioneering: "🔥 Auctioneering System",
   Bidding: "💰 Bidding System",
   Member: "👤 Member Commands",
 };
 
-// Main help command handler
 async function handleHelp(message, args, member) {
   if (!config || !isAdminFunc) {
-    console.error(
-      "❌ Help system not initialized! Call helpSystem.initialize() first."
-    );
+    console.error("❌ Help system not initialized!");
     return await message.reply("❌ Help system error. Contact admin.");
   }
 
   const isAdmin = isAdminFunc(member, config);
 
-  // Specific command help: !help <command>
+  // Specific command help
   if (args.length > 0) {
     const cmdName = args[0].toLowerCase().replace("!", "");
     const cmdInfo = COMMAND_HELP[cmdName];
@@ -424,7 +319,6 @@ async function handleHelp(message, args, member) {
       .addFields(
         { name: "📝 Usage", value: `\`${cmdInfo.usage}\``, inline: false },
         { name: "💡 Example", value: `\`${cmdInfo.example}\``, inline: false },
-        { name: "📚 Details", value: cmdInfo.details, inline: false },
         {
           name: "🎯 Category",
           value: CATEGORIES[cmdInfo.category],
@@ -435,9 +329,18 @@ async function handleHelp(message, args, member) {
           value: cmdInfo.adminOnly ? "👑 Admin Only" : "👥 All Members",
           inline: true,
         }
-      )
-      .setFooter({ text: "Use !help to see all commands" })
-      .setTimestamp();
+      );
+
+    if (cmdInfo.aliases) {
+      embed.addFields({
+        name: "🔀 Aliases",
+        value: cmdInfo.aliases.join(", "),
+        inline: false,
+      });
+    }
+
+    embed.setFooter({ text: "Use !help to see all commands" });
+    embed.setTimestamp();
 
     return await message.reply({ embeds: [embed] });
   }
@@ -446,6 +349,11 @@ async function handleHelp(message, args, member) {
   if (isAdmin) {
     const attendanceCmds = Object.entries(COMMAND_HELP)
       .filter(([k, v]) => v.category === "Attendance" && v.adminOnly)
+      .map(([k, v]) => `\`!${k}\` - ${v.description}`)
+      .join("\n");
+
+    const auctioneeringCmds = Object.entries(COMMAND_HELP)
+      .filter(([k, v]) => v.category === "Auctioneering" && v.adminOnly)
       .map(([k, v]) => `\`!${k}\` - ${v.description}`)
       .join("\n");
 
@@ -463,12 +371,25 @@ async function handleHelp(message, args, member) {
       .setColor(0x4a90e2)
       .setTitle("🛡️ ELYSIUM Bot - Admin Commands")
       .setDescription(
-        "**New Features in v7.0:**\n✨ Auctioneering system (Google Sheet items)\n✨ Hybrid auction queue (Sheet + manual queue)\n✨ Admin controls: pause, resume, stop, extend\n✨ Auto-logging to BiddingItems sheet\n✨ 20-second gaps between items\n✨ Single session at a time (no parallel auctions)\n✨ 10-minute cooldown with override\n✨ Auto-recovery on crash\n✨ State persistence to Google Sheet\n\n**Previous Features:**\n✨ Cache auto-refresh\n✨ Extended previews\n✨ Countdown timers\n✨ Command aliases\n✨ Batch auctions"
+        "**New in v7.0:**\n" +
+        "✨ Attendance-based auction filtering\n" +
+        "✨ Session-based auctions (grouped by boss)\n" +
+        "✨ Manual items = OPEN (no attendance required)\n" +
+        "✨ Sheet items = ATTENDANCE REQUIRED\n" +
+        "✨ Automatic attendance loading per boss\n" +
+        "✨ 10-minute cooldown with override\n" +
+        "✨ State persistence to Google Sheets\n\n" +
+        "**Key Feature:** Only attendees can bid on boss-specific items!"
       )
       .addFields(
         {
           name: "📋 Attendance Management",
           value: attendanceCmds || "None",
+          inline: false,
+        },
+        {
+          name: "🔥 Auctioneering (Session-Based)",
+          value: auctioneeringCmds || "None",
           inline: false,
         },
         {
@@ -479,12 +400,6 @@ async function handleHelp(message, args, member) {
         {
           name: "👤 Member Commands",
           value: memberCmds || "None",
-          inline: false,
-        },
-        {
-          name: "📖 Quick Tips",
-          value:
-            "• Type `present` in spawn threads to check in\n• Use `!bid <amount>` or `!b <amount>` in auction threads\n• Commands are case-insensitive\n• Admin commands work in admin logs only\n• Many commands now have shortcuts!",
           inline: false,
         }
       )
@@ -500,7 +415,8 @@ async function handleHelp(message, args, member) {
     const memberCmds = Object.entries(COMMAND_HELP)
       .filter(([k, v]) => !v.adminOnly)
       .map(
-        ([k, v]) => `**!${k}** - ${v.description}\n*Example:* \`${v.example}\``
+        ([k, v]) =>
+          `**!${k}** - ${v.description}\n*Example:* \`${v.example}\``
       )
       .join("\n\n");
 
@@ -508,7 +424,11 @@ async function handleHelp(message, args, member) {
       .setColor(0xffd700)
       .setTitle("📚 ELYSIUM Bot - Member Guide")
       .setDescription(
-        "**Available commands for all members**\n\n💡 Use `!help <command>` for detailed info\n\n**New Shortcuts:**\n• !b = !bid\n• !bstatus = !bidstatus\n• !pts = !mypoints"
+        "**Available commands for all members**\n\n" +
+        "💡 Use `!help <command>` for detailed info\n\n" +
+        "**Important:** Boss-specific auction items require attendance!\n" +
+        "Only members who attended that boss can bid on its items.\n" +
+        "Manual queue items are OPEN to everyone."
       )
       .addFields(
         {
@@ -519,19 +439,29 @@ async function handleHelp(message, args, member) {
         {
           name: "📋 Attendance Check-In",
           value:
-            "1. Type `present` or `here` in spawn threads\n2. Attach screenshot (shows boss + timestamp)\n3. Wait for admin ✅ verification\n4. Points auto-added to your account",
+            "1. Type `present` or `here` in spawn threads\n" +
+            "2. Attach screenshot (shows boss + timestamp)\n" +
+            "3. Wait for admin ✅ verification\n" +
+            "4. Points auto-added + auction eligibility granted",
           inline: false,
         },
         {
           name: "💰 Bidding Process",
           value:
-            "1. Wait for auction thread to open\n2. Type `!bid <amount>` or `!b <amount>`\n3. React ✅ to confirm within 10 seconds (countdown shown)\n4. Winner announced at end\n5. Batch auctions: Top N bidders win!",
+            "1. Wait for auction thread to open\n" +
+            "2. Type `!bid <amount>` or `!b <amount>`\n" +
+            "3. React ✅ to confirm within 10 seconds\n" +
+            "4. **NOTE:** If item is from a boss spawn, only attendees can bid!\n" +
+            "5. Winner announced at end",
           inline: false,
         },
         {
-          name: "⚠️ Important Rules",
+          name: "⚠️ Attendance-Based Bidding",
           value:
-            "• Screenshot required for attendance\n• Bids must be integers (no decimals)\n• 3-second cooldown between bids\n• Can overbid yourself (pays difference)\n• Last 10s bids pause timer\n• Confirmations have countdown timers",
+            "• **Boss Items:** Only attendees can bid\n" +
+            "• **Manual Items:** Open to everyone\n" +
+            "• Check auction message for restrictions\n" +
+            "• Attend boss spawns to unlock more bidding!",
           inline: false,
         }
       )
@@ -542,7 +472,6 @@ async function handleHelp(message, args, member) {
   }
 }
 
-// Export for use in index2.js
 module.exports = {
   initialize,
   handleHelp,
