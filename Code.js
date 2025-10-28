@@ -19,7 +19,6 @@ const COLUMNS = {
   FIRST_SPAWN: 5,
 };
 
-// MAIN WEBHOOK HANDLER
 // MAIN WEBHOOK HANDLER - COMPLETE VERSION
 function doPost(e) {
   try {
@@ -375,15 +374,26 @@ function getCurrentWeekSheet() {
 }
 
 function copyMembersFromPreviousWeek(spreadsheet, newSheet) {
-  const weekSheets = spreadsheet.getSheets().filter(s => s.getName().startsWith(CONFIG.SHEET_NAME_PREFIX))
-                          .sort((a, b) => b.getName().localeCompare(a.getName()));
+  const weekSheets = spreadsheet.getSheets()
+      .filter(s => s.getName().startsWith(CONFIG.SHEET_NAME_PREFIX))
+      .sort((a, b) => b.getName().localeCompare(a.getName()));
+
   if (weekSheets.length > 1) {
     const prevSheet = weekSheets[1];
     const lastRow = prevSheet.getLastRow();
+
     if (lastRow >= 3) {
-      const members = prevSheet.getRange(3, COLUMNS.MEMBERS, lastRow - 2, 1).getValues()
+      // Copy column A (members) as values
+      const members = prevSheet.getRange(3, COLUMNS.MEMBERS, lastRow - 2, 1)
+                              .getValues()
                               .filter(m => m[0] && m[0].toString().trim() !== '');
-      if (members.length > 0) newSheet.getRange(3, COLUMNS.MEMBERS, members.length, 1).setValues(members);
+      if (members.length > 0) {
+        newSheet.getRange(3, COLUMNS.MEMBERS, members.length, 1).setValues(members);
+
+        // Copy columns B, C, D (formulas)
+        const formulas = prevSheet.getRange(3, 2, members.length, 3).getFormulas();
+        newSheet.getRange(3, 2, members.length, 3).setFormulas(formulas);
+      }
     }
   }
 }
@@ -859,30 +869,44 @@ function moveQueueItemsToSheet(data) {
 function updateBiddingPoints() {
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
   const bpSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
-  if(!bpSheet) return;
+  if (!bpSheet) return;
 
   const lastRow = bpSheet.getLastRow();
-  if(lastRow < 2) return;
+  const existingData = lastRow > 1 ? bpSheet.getRange(2, 1, lastRow - 1, 3).getValues() : [];
+  const memberMap = {};
 
-  const existingData = bpSheet.getRange(2, 1, lastRow - 1, 3).getValues();
-  let memberMap = {};
+  // --- Step 1: Map existing members in bidding sheet ---
   existingData.forEach((r, i) => {
     const m = (r[0] || '').toString().trim();
-    if(m) memberMap[m] = {row: i + 2, consumed: Number(r[2]) || 0};
+    if (m) memberMap[m] = { row: i + 2, consumed: Number(r[2]) || 0 };
   });
 
-  const sheets = ss.getSheets();
-  let totals = {};
+  // --- Step 2: Collect totals from all weekly sheets ---
+  const sheets = ss.getSheets().filter(s => s.getName().startsWith(CONFIG.SHEET_NAME_PREFIX));
+  const totals = {};
+
   sheets.forEach(s => {
-    if(s.getName().startsWith(CONFIG.SHEET_NAME_PREFIX)) {
-      const data = s.getRange('A2:D').getValues();
-      data.forEach(r => {
-        const m = (r[0] || '').toString().trim();
-        if(m) totals[m] = (totals[m] || 0) + Number(r[3] || 0);
-      });
-    }
+    const data = s.getRange('A2:D').getValues();
+    data.forEach(r => {
+      const m = (r[0] || '').toString().trim();
+      if (m) totals[m] = (totals[m] || 0) + Number(r[3] || 0);
+    });
   });
 
+  // --- Step 3: Add new members if not already in the bidding sheet ---
+  const newMembers = Object.keys(totals).filter(m => !memberMap[m]);
+  if (newMembers.length > 0) {
+    const insertStart = bpSheet.getLastRow() + 1;
+    const newRows = newMembers.map(m => [m, totals[m], 0]); // Member | Left | Consumed
+    bpSheet.getRange(insertStart, 1, newRows.length, 3).setValues(newRows);
+
+    // Also update memberMap so they’re included below
+    newMembers.forEach((m, i) => {
+      memberMap[m] = { row: insertStart + i, consumed: 0 };
+    });
+  }
+
+  // --- Step 4: Update points for all members ---
   Object.keys(memberMap).forEach(m => {
     const left = (totals[m] || 0) - memberMap[m].consumed;
     bpSheet.getRange(memberMap[m].row, 2).setValue(left);
@@ -993,6 +1017,44 @@ function saveAttendanceState(data) {
   return createResponse('ok', 'Attendance state saved', {saved: true, timestamp: timestamp});
 }
 
+function updateTotalAttendanceAndMembers() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheets = ss.getSheets().filter(s => s.getName().startsWith("ELYSIUM_WEEK_"));
+  const totalSheetName = "TOTAL ATTENDANCE";
+  const totalSheet = ss.getSheetByName(totalSheetName);
+  const memberTotals = {};
+
+  // --- Step 1: Gather all members + count TRUE checkboxes ---
+  sheets.forEach(sheet => {
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      const name = data[i][0];
+      if (!name) continue;
+      const attendance = data[i].slice(4).filter(v => v === true).length;
+      memberTotals[name] = (memberTotals[name] || 0) + attendance;
+    }
+  });
+
+  // --- Step 2: Update TOTAL ATTENDANCE sheet ---
+  const result = [["Member", "Total Attendance (Days)"]];
+  Object.keys(memberTotals)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach(name => result.push([name, memberTotals[name]]));
+
+  totalSheet.clearContents();
+  totalSheet.getRange(1, 1, result.length, 2).setValues(result);
+
+  // --- Step 3: Sync new members into all weekly sheets ---
+  const allMembers = Object.keys(memberTotals);
+  sheets.forEach(sheet => {
+    const existing = sheet.getRange("A2:A").getValues().flat().filter(String);
+    const missing = allMembers.filter(m => !existing.includes(m));
+    if (missing.length > 0) {
+      const insertStart = existing.length + 2;
+      sheet.getRange(insertStart, 1, missing.length, 1).setValues(missing.map(m => [m]));
+    }
+  });
+}
 // UTILITIES
 function createResponse(status, message, data) {
   const response = {

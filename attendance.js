@@ -497,11 +497,6 @@ async function saveAttendanceStateToSheet(forceSync = false) {
     }
 
     lastAttendanceStateSyncTime = now;
-    if (forceSync) {
-      console.log("📊 Forced attendance state sync to Google Sheets");
-    } else {
-      console.log("✅ Attendance state synced to Google Sheets");
-    }
     return true;
   } catch (err) {
     console.error("❌ Failed to save attendance state:", err.message);
