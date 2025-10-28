@@ -339,12 +339,6 @@ async function startAuctioneering(client, config, channel) {
 }
 console.log("⚙️ Attendance check disabled — all sessions open to all members.");
 
-    const resp = await fetch(config.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
     if (!resp.ok) {
       await channel.send(
         `❌ Failed to load attendance for ${session.bossKey}\n` +
