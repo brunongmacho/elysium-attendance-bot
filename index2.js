@@ -1402,7 +1402,7 @@ client.once(Events.ClientReady, async () => {
   lootSystem.initialize(config, bossPoints, isAdmin);
 
   console.log("\n╔═══════════════════════════════════════════════════════╗");
-  console.log("║         🔄 BOT STATE RECOVERY (3-SWEEP SYSTEM)        ║");
+  console.log("║         🔄 BOT STATE RECOVERY (3-SWEEP SYSTEM)   ║");
   console.log("╚═══════════════════════════════════════════════════════╝\n");
 
   isRecovering = true;
@@ -1561,7 +1561,7 @@ client.once(Events.ClientReady, async () => {
   }
 
   console.log("\n╔═══════════════════════════════════════════════════════╗");
-  console.log("║              ✅ RECOVERY COMPLETE                      ║");
+  console.log("║              ✅ RECOVERY COMPLETE                ║");
   console.log("╚═══════════════════════════════════════════════════════╝\n");
 
   // If thread recovery didn't find much, try Google Sheets
