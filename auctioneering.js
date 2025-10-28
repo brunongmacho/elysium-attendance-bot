@@ -395,6 +395,22 @@ function getCurrentTimestamp() {
 // AUCTION NEXT ITEM (thread per item)
 // =======================================================
 async function auctionNextItem(client, config, channel) {
+  // ✅ Ensure channel reference is valid
+  if (!channel) {
+    console.warn("⚠️ Channel is undefined, attempting to refetch...");
+    try {
+      const guild = await client.guilds.fetch(config.main_guild_id);
+      channel = await guild.channels.fetch(config.bidding_channel_id);
+      if (!channel) {
+        console.error("❌ Failed to refetch bidding channel.");
+        return;
+      }
+    } catch (err) {
+      console.error("❌ Error refetching bidding channel:", err);
+      return;
+    }
+  }
+
   const sessions = auctionState.sessions;
   if (!sessions || sessions.length === 0) {
     await channel.send(`✅ All sessions completed`);
