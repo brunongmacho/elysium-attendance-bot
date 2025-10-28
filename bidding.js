@@ -2152,13 +2152,10 @@ module.exports = {
     member = await guild.members.fetch(user.id).catch(() => null);
   if (!member) return;
 
-  const isOwner = p.userId === user.id,
-    isAdm = isAdmFunc(member, config);
-
-  if (!isOwner && !isAdm) {
-    await reaction.users.remove(user.id).catch(() => {});
-    return;
-  }
+  if (p.userId !== user.id) {
+  await reaction.users.remove(user.id).catch(() => {});
+  return;
+}
 
   // CRITICAL: Check if this is an auctioneering bid
   if (p.isAuctioneering) {
