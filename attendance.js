@@ -118,7 +118,9 @@ function parseThreadName(name) {
   };
 }
 
-async function postToSheet(payload) {
+async function postToSheet(payload, retryCount = 0) {
+  const MAX_RETRIES = 3;
+
   try {
     const now = Date.now();
     const timeSinceLastCall = now - lastSheetCall;
@@ -137,8 +139,14 @@ async function postToSheet(payload) {
 
     const text = await res.text();
     if (res.status === 429) {
-      await new Promise((resolve) => setTimeout(resolve, TIMING.RETRY_DELAY));
-      return postToSheet(payload);
+      if (retryCount < MAX_RETRIES) {
+        console.log(`⚠️ Rate limit hit, retry ${retryCount + 1}/${MAX_RETRIES}`);
+        await new Promise((resolve) => setTimeout(resolve, TIMING.RETRY_DELAY));
+        return postToSheet(payload, retryCount + 1);
+      } else {
+        console.error(`❌ Rate limit: Max retries (${MAX_RETRIES}) exceeded`);
+        return { ok: false, status: 429, text: "Max retries exceeded" };
+      }
     }
 
     return { ok: res.ok, status: res.status, text };

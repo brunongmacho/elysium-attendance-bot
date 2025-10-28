@@ -561,6 +561,13 @@ const commandHandlers = {
         pendingClosures = {};
         confirmationMessages = {};
 
+        // Sync state back to attendance module
+        attendance.setActiveSpawns(activeSpawns);
+        attendance.setActiveColumns(activeColumns);
+        attendance.setPendingVerifications(pendingVerifications);
+        attendance.setPendingClosures(pendingClosures);
+        attendance.setConfirmationMessages(confirmationMessages);
+
         await message.reply(
           `✅ **State cleared successfully!**\n\nAll bot memory has been reset. Fresh start.`
         );

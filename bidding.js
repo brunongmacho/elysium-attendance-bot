@@ -219,6 +219,12 @@ async function submitRes(url, res, time) {
 
 // CACHE WITH AUTO-REFRESH
 async function loadCache(url) {
+  // Validate URL parameter
+  if (!url || typeof url !== 'string') {
+    console.error("❌ Invalid URL provided to loadCache");
+    return false;
+  }
+
   console.log("🔄 Loading cache...");
   const t0 = Date.now();
   const p = await fetchPts(url);
@@ -2137,7 +2143,7 @@ module.exports = {
                 value: `${p.amount}pts`,
                 inline: true,
               },
-              { name: 'ðŸ¤" Bidder', value: p.username, inline: true }
+              { name: '👤 Bidder', value: p.username, inline: true }
             ),
         ],
       });
