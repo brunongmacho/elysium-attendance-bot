@@ -624,7 +624,7 @@ function getSessionTimestamp() {
   
   const month = String(manilaTime.getMonth() + 1).padStart(2, "0");
   const day = String(manilaTime.getDate()).padStart(2, "0");
-  const year = String(manilaTime.getFullYear()).slice(-2);
+  const year = String(manilaTime.getFullYear());
   const hours = String(manilaTime.getHours()).padStart(2, "0");
   const mins = String(manilaTime.getMinutes()).padStart(2, "0");
   

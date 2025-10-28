@@ -827,14 +827,6 @@ async function finalizeSession(client, config, channel) {
         name: `${EMOJI.LIST} Summary`,
         value: summary || "No sales",
         inline: false,
-      },
-      {
-        name: `${EMOJI.INFO} Session Info`,
-        value: `📊 Google Sheet Items Auctioned: ${
-          auctionState.itemQueue.filter((i) => i.source === "GoogleSheet")
-            .length
-        }\n📝 Manual Items Auctioned: ${manualItemsAuctioned.length}`,
-        inline: false,
       }
     )
     .setFooter({ text: "Processing results and submitting to sheets..." })
@@ -857,7 +849,22 @@ async function finalizeSession(client, config, channel) {
       console.error(`${EMOJI.ERROR} postToSheet not initialized - cannot submit session results`);
       console.log(`${EMOJI.WARNING} Session results (for manual recovery):`, JSON.stringify(submitPayload, null, 2));
     } else {
-      await getPostToSheet()(submitPayload);
+      const response = await fetch(config.sheet_webhook_url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(submitPayload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.status !== 'ok') {
+        throw new Error(data.message || 'Unknown error from sheets');
+      }
+
+      console.log(`${EMOJI.SUCCESS} Session results submitted successfully`);
     }
   } catch (err) {
     console.error(`${EMOJI.ERROR} Failed to submit bidding results:`, err);
@@ -884,27 +891,17 @@ async function finalizeSession(client, config, channel) {
 
     const adminEmbed = new EmbedBuilder()
       .setColor(COLORS.SUCCESS)
-      .setTitle(`${EMOJI.SUCCESS} Session Summary - ${sessionTimestamp}`)
+      .setTitle(`${EMOJI.SUCCESS} Session Summary`)
       .setDescription(`Auctioneering session completed successfully`)
       .addFields(
         {
           name: `📊 Google Sheet Items`,
-          value: `**Auctioned:** ${
-            auctionState.itemQueue.filter((i) => i.source === "GoogleSheet")
-              .length
-          }\n**With Winners:** ${sheetItemsWithWinners}\n**No Bids:** ${
-            auctionState.itemQueue.filter((i) => i.source === "GoogleSheet")
-              .length - sheetItemsWithWinners
-          }`,
+          value: `**With Winners:** ${sheetItemsWithWinners}`,
           inline: true,
         },
         {
           name: `📝 Manual Items`,
-          value: `**Auctioned:** ${
-            manualItemsAuctioned.length
-          }\n**With Winners:** ${manualItemsWithWinners}\n**No Bids:** ${
-            manualItemsAuctioned.length - manualItemsWithWinners
-          }`,
+          value: `**Auctioned:** ${manualItemsAuctioned.length}\n**With Winners:** ${manualItemsWithWinners}`,
           inline: true,
         },
         {
@@ -924,7 +921,7 @@ async function finalizeSession(client, config, channel) {
     await adminLogs.send({ embeds: [adminEmbed] });
   }
 
-console.log("🧹 Clearing session caches...");
+  console.log("🧹 Clearing session caches...");
   attendanceCache = {}; // Clear all attendance data
   currentSessionBoss = null;
   auctionState.sessions = [];
@@ -932,11 +929,16 @@ console.log("🧹 Clearing session caches...");
   auctionState.itemQueue = [];
   manualItemsAuctioned = [];
 
-  // Clear bidding module cache
+  // Clear bidding module cache AND locked points
   const biddingModule = require("./bidding.js");
   biddingModule.clearPointsCache();
+  
+  // CRITICAL: Clear all locked points after session
+  const biddingState = biddingModule.getBiddingState();
+  biddingState.lp = {};
+  biddingModule.saveBiddingState();
 
-  console.log("✅ All session data cleared");
+  console.log("✅ All session data cleared, locked points released");
 
   // Save state if config is available
   if (cfg && cfg.sheet_webhook_url) {
@@ -952,11 +954,15 @@ async function buildCombinedResults(config) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "getBiddingPoints" }),
-  })
-    .then((r) => r.json())
-    .catch(() => ({}));
+  });
 
-  const allPoints = response.points || {};
+  if (!response.ok) {
+    console.error(`${EMOJI.ERROR} Failed to fetch bidding points: HTTP ${response.status}`);
+    return [];
+  }
+
+  const data = await response.json();
+  const allPoints = data.points || {};
   const allMembers = Object.keys(allPoints);
 
   // Combine all winners from session
@@ -974,6 +980,8 @@ async function buildCombinedResults(config) {
       totalSpent: winners[normalizedMember] || 0,
     };
   });
+
+  console.log(`${EMOJI.CHART} Built results: ${results.filter(r => r.totalSpent > 0).length} winners out of ${results.length} members`);
 
   return results;
 }

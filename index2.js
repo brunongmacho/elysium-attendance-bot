@@ -508,6 +508,196 @@ const commandHandlers = {
           } more spawns (sorted oldest first - close old ones first!)*`
         : "";
 
+const auctState = auctioneering.getAuctionState();
+if (auctState.active && auctState.currentItem) {
+  const biddingState = bidding.getBiddingState();
+  const pendingBid = biddingState.pc[msg.id];
+  
+  if (pendingBid && pendingBid.isAuctioneering) {
+    if (reaction.emoji.name === "✅") {
+      // Handle auctioneering bid confirmation
+      const currentItem = auctState.currentItem;
+      
+      if (!currentItem || currentItem.status === "ended") {
+        await msg.channel.send(`❌ <@${user.id}> Auction item no longer active`);
+        await msg.reactions.removeAll().catch(() => {});
+        await msg.delete().catch(() => {});
+        delete biddingState.pc[msg.id];
+        bidding.saveBiddingState();
+        return;
+      }
+
+      if (pendingBid.amount <= currentItem.curBid) {
+        await msg.channel.send(`❌ <@${user.id}> Bid invalid. Current: ${currentItem.curBid}pts`);
+        await msg.reactions.removeAll().catch(() => {});
+        await msg.delete().catch(() => {});
+        delete biddingState.pc[msg.id];
+        bidding.saveBiddingState();
+        return;
+      }
+
+      // Handle previous winner
+      if (currentItem.curWin && !pendingBid.isSelf) {
+        const prevWinner = currentItem.curWin;
+        const prevAmount = currentItem.curBid;
+        
+        // Unlock previous winner's points
+        const biddingStateMod = bidding.getBiddingState();
+        biddingStateMod.lp[prevWinner] = Math.max(0, (biddingStateMod.lp[prevWinner] || 0) - prevAmount);
+        bidding.saveBiddingState();
+
+        await msg.channel.send({
+          content: `<@${currentItem.curWinId}>`,
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0xffa500)
+              .setTitle(`⚠️ Outbid!`)
+              .setDescription(`Someone bid **${pendingBid.amount}pts** on **${currentItem.item}**`),
+          ],
+        });
+      }
+
+      // Lock new bidder's points
+      const biddingStateMod = bidding.getBiddingState();
+      biddingStateMod.lp[pendingBid.username] = (biddingStateMod.lp[pendingBid.username] || 0) + pendingBid.needed;
+      bidding.saveBiddingState();
+
+      const prevBid = currentItem.curBid;
+      const updatedBids = [
+        ...currentItem.bids,
+        {
+          user: pendingBid.username,
+          userId: pendingBid.userId,
+          amount: pendingBid.amount,
+          timestamp: Date.now(),
+        },
+      ];
+
+      const timeLeft = currentItem.endTime - Date.now();
+      let newEndTime = currentItem.endTime;
+      let newExtCnt = currentItem.extCnt;
+
+      if (timeLeft < 60000 && currentItem.extCnt < 15) {
+        newEndTime = currentItem.endTime + 60000;
+        newExtCnt = currentItem.extCnt + 1;
+      }
+
+      // Update auctioneering state
+      auctioneering.updateCurrentItemState({
+        curBid: pendingBid.amount,
+        curWin: pendingBid.username,
+        curWinId: pendingBid.userId,
+        bids: updatedBids,
+        endTime: newEndTime,
+        extCnt: newExtCnt,
+        go1: timeLeft < 60000 && currentItem.extCnt < 15 ? false : currentItem.go1,
+        go2: timeLeft < 60000 && currentItem.extCnt < 15 ? false : currentItem.go2,
+      });
+
+      if (biddingState.th[`c_${msg.id}`]) {
+        clearTimeout(biddingState.th[`c_${msg.id}`]);
+        delete biddingState.th[`c_${msg.id}`];
+      }
+
+      await msg.edit({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0x00ff00)
+            .setTitle(`✅ Bid Confirmed!`)
+            .setDescription(`Highest bidder on **${currentItem.item}**`)
+            .addFields(
+              {
+                name: `💰 Your Bid`,
+                value: `${pendingBid.amount}pts`,
+                inline: true,
+              },
+              {
+                name: `📊 Previous`,
+                value: `${prevBid}pts`,
+                inline: true,
+              },
+              {
+                name: `⏱️ Time Left`,
+                value: `${Math.floor(timeLeft / 60000)}m ${Math.floor((timeLeft % 60000) / 1000)}s`,
+                inline: true,
+              }
+            )
+            .setFooter({
+              text: pendingBid.isSelf
+                ? `Self-overbid (+${pendingBid.needed}pts)`
+                : timeLeft < 60000 && currentItem.extCnt < 15
+                ? `🕐 Extended!`
+                : "Good luck!",
+            }),
+        ],
+      });
+      await msg.reactions.removeAll().catch(() => {});
+
+      await msg.channel.send({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0xffd700)
+            .setTitle(`🔥 New High Bid!`)
+            .addFields(
+              {
+                name: `💰 Amount`,
+                value: `${pendingBid.amount}pts`,
+                inline: true,
+              },
+              { name: '👤 Bidder', value: pendingBid.username, inline: true }
+            ),
+        ],
+      });
+
+      setTimeout(async () => await msg.delete().catch(() => {}), 5000);
+      if (pendingBid.origMsgId) {
+        const orig = await msg.channel.messages
+          .fetch(pendingBid.origMsgId)
+          .catch(() => null);
+        if (orig) await orig.delete().catch(() => {});
+      }
+
+      delete biddingState.pc[msg.id];
+      bidding.saveBiddingState();
+
+      console.log(
+        `✅ Auctioneering bid: ${pendingBid.username} - ${pendingBid.amount}pts${
+          pendingBid.isSelf ? ` (self +${pendingBid.needed}pts)` : ""
+        }`
+      );
+      return;
+    } else if (reaction.emoji.name === "❌") {
+      // Cancel auctioneering bid
+      await msg.edit({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0x4a90e2)
+            .setTitle(`❌ Bid Canceled`)
+            .setDescription("Not placed"),
+        ],
+      });
+      await msg.reactions.removeAll().catch(() => {});
+      setTimeout(async () => await msg.delete().catch(() => {}), 3000);
+
+      if (pendingBid.origMsgId) {
+        const orig = await msg.channel.messages
+          .fetch(pendingBid.origMsgId)
+          .catch(() => null);
+        if (orig) await orig.delete().catch(() => {});
+      }
+
+      if (biddingState.th[`c_${msg.id}`]) {
+        clearTimeout(biddingState.th[`c_${msg.id}`]);
+        delete biddingState.th[`c_${msg.id}`];
+      }
+
+      delete biddingState.pc[msg.id];
+      bidding.saveBiddingState();
+      return;
+    }
+  }
+}
+
     const biddingState = bidding.getBiddingState();
     const biddingStatus = biddingState.a
       ? `🔴 Active: **${biddingState.a.item}** (${biddingState.a.curBid}pts)`
