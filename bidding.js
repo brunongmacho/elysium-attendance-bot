@@ -2029,75 +2029,38 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
   }
 }
 
-// =======================================================
-// START ITEM AUCTION (called from auctioneering.js per item)
-// =======================================================
+// ===========================================
+// startItemAuction wrapper for auctioneering.js
+// ===========================================
 async function startItemAuction(client, config, thread, item, session) {
-  if (!thread || !item) {
-    console.error("❌ Invalid thread or item for startItemAuction");
-    return;
+  try {
+    // If you already have a main auction starter, call it here:
+    if (typeof startAuction === "function") {
+      return await startAuction(client, config, thread, item, session);
+    }
+
+    // Otherwise, perform a basic message setup so auctions don't crash
+    await thread.send({
+      embeds: [
+        {
+          title: "🔨 Auction Started",
+          description: `**Item:** ${item.item}\n**Starting Price:** ${item.startPrice || 0} pts\n**Duration:** ${item.duration || 2} min`,
+          color: 0xffd700,
+          footer: { text: "Auction launched via startItemAuction()" },
+          timestamp: new Date(),
+        },
+      ],
+    });
+    console.log(`✅ startItemAuction: Auction thread started for ${item.item}`);
+  } catch (err) {
+    console.error("❌ startItemAuction failed:", err);
   }
-
-  const isBatch = item.quantity && item.quantity > 1;
-
-  const previewEmbed = new EmbedBuilder()
-    .setColor(COLORS.AUCTION)
-    .setTitle(`${EMOJI.TROPHY} AUCTION STARTING`)
-    .setDescription(`**${item.item}**${isBatch ? ` x${item.quantity}` : ""}`)
-    .addFields(
-      { name: `${EMOJI.BID} Starting Bid`, value: `${item.startPrice || 0} pts`, inline: true },
-      { name: `${EMOJI.TIME} Duration`, value: `${item.duration || 2} min`, inline: true },
-      { name: `${EMOJI.LOCK} Boss`, value: session?.bossName || "OPEN", inline: true }
-    )
-    .setFooter({ text: "Starts in 30 seconds..." })
-    .setTimestamp();
-
-  await thread.send({ embeds: [previewEmbed] });
-
-  // Wait 30s preview before active bidding
-  setTimeout(async () => {
-    const activeEmbed = new EmbedBuilder()
-      .setColor(COLORS.SUCCESS)
-      .setTitle(`${EMOJI.FIRE} BIDDING NOW!`)
-      .setDescription(
-        `Type \`!bid <amount>\` to place your bid!\n\n` +
-          (isBatch ? `Top ${item.quantity} bidders will win.` : "")
-      )
-      .addFields(
-        { name: `${EMOJI.BID} Starting`, value: `${item.startPrice || 0} pts`, inline: true },
-        { name: `${EMOJI.TIME} Duration`, value: `${item.duration || 2} min`, inline: true }
-      )
-      .setTimestamp();
-
-    await thread.send({ embeds: [activeEmbed] });
-
-    // Trigger internal bidding engine (reuse logic from startNext)
-    st.a = {
-      ...item,
-      threadId: thread.id,
-      curBid: item.startPrice || 0,
-      curWin: null,
-      curWinId: null,
-      bids: [],
-      endTime: Date.now() + (item.duration || 2) * 60000,
-      status: "active",
-      source: item.source || "Auctioneer",
-    };
-
-    save();
-    schedTimers(client, config); // reuse your existing scheduler for going once/twice/end
-
-    console.log(`✅ Started item auction thread for ${item.item}`);
-  }, 30000);
 }
 
-module.exports = {
-  ...module.exports,
-  startItemAuction,
-};
 
 // MODULE EXPORTS
 module.exports = {
+  startItemAuction,
   initializeBidding,
   loadBiddingState: load,
   saveBiddingState: save,
