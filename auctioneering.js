@@ -882,11 +882,6 @@ async function itemEnd(client, config, channel) {
     });
   }
 
-if (item.status === "ended") {
-  console.warn("⚠️ itemEnd() called on already-ended item — skipping duplicate finalization.");
-  return;
-}
-
   // ✅ Move to next item or session
   const session = auctionState.sessions[auctionState.currentSessionIndex];
   auctionState.currentItemIndex++;
