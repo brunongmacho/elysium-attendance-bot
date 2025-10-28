@@ -1,20 +1,21 @@
-# Stage 1: Install dependencies
+# Stage 1: Dependencies
 FROM node:18-slim AS deps
 WORKDIR /app
+
 COPY package*.json ./
+
+# Install build tools for sharp
 RUN apt-get update && apt-get install -y python3 make g++ \
-    && npm ci --production --no-audit --progress=false \
+    && npm ci --production --no-audit --progress=false --include=optional \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Stage 2: Copy source and build (if applicable)
+# Stage 2: Build + copy app
 FROM node:18-slim AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Uncomment if you have a build step (TypeScript/React)
-# RUN npm run build
+COPY --from=deps /app/node_modules ./node_modules
 
-# Stage 3: Use Distroless for production
+# Stage 3: Lightweight runtime image
 FROM gcr.io/distroless/nodejs18
 WORKDIR /app
 
@@ -26,4 +27,5 @@ ENV PORT=3000
 EXPOSE 3000
 EXPOSE 8000
 
-CMD ["index2.js"]
+# ✅ Use index.js (matches your package.json)
+CMD ["index.js"]
