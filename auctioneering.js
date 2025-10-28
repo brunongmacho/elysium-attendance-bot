@@ -334,11 +334,10 @@ async function startAuctioneering(client, config, channel) {
   for (const session of sessions) {
     if (!session.bossKey) continue; // Skip OPEN session
 
-    const payload = {
-      action: "getAttendanceForBoss",
-      weekSheet: weekSheetName,
-      bossKey: session.bossKey,
-    };
+    for (const session of sessions) {
+  session.attendees = []; // Open session, anyone can bid
+}
+console.log("⚙️ Attendance check disabled — all sessions open to all members.");
 
     const resp = await fetch(config.sheet_webhook_url, {
       method: "POST",
@@ -396,10 +395,7 @@ async function startAuctioneering(client, config, channel) {
 }
 
 function canUserBid(username, currentSession) {
-  if (!currentSession || !currentSession.bossKey) return true; // Open session
-
-  const attendees = currentSession.attendees || [];
-  return attendees.some((m) => m.toLowerCase() === username.toLowerCase());
+  return true;
 }
 
 function getCurrentTimestamp() {
