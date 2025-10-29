@@ -1631,10 +1631,23 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       break;
 
     case "!bid":
-      if (args.length === 0)
-        return await msg.reply(`${EMOJI.ERROR} Usage: \`!bid <amount>\``);
+      if (args.length === 0) {
+        try {
+          return await msg.reply(`${EMOJI.ERROR} Usage: \`!bid <amount>\``);
+        } catch (err) {
+          // If reply fails (message deleted), send regular message
+          return await msg.channel.send(`${EMOJI.ERROR} Usage: \`!bid <amount>\``);
+        }
+      }
       const res = await procBid(msg, args[0], cfg);
-      if (!res.ok) await msg.reply(`${EMOJI.ERROR} ${res.msg}`);
+      if (!res.ok) {
+        try {
+          await msg.reply(`${EMOJI.ERROR} ${res.msg}`);
+        } catch (err) {
+          // If reply fails (message deleted), send regular message
+          await msg.channel.send(`${EMOJI.ERROR} <@${msg.author.id}> ${res.msg}`);
+        }
+      }
       break;
 
     case "!bidstatus":

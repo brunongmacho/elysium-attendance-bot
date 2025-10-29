@@ -535,7 +535,8 @@ async function validateStateConsistency(client) {
       }
     }
 
-    // Check 2: Sheet columns without threads
+    // Check 2: Sheet columns without threads (only recent ones - older than 3 hours are expected to be closed)
+    const threeHoursAgo = Date.now() - (3 * 60 * 60 * 1000);
     for (const col of sheetColumns) {
       const normalizedColTimestamp = normalizeTimestamp(col.timestamp);
 
@@ -548,11 +549,21 @@ async function validateStateConsistency(client) {
       });
 
       if (!hasThread) {
-        discrepancies.columnsWithoutThreads.push({
-          boss: col.boss,
-          timestamp: col.timestamp,
-          column: col.column
-        });
+        // Only report as discrepancy if the spawn is recent (within 3 hours)
+        // Old spawns are expected to have closed threads
+        try {
+          const colTime = new Date(col.timestamp).getTime();
+          if (colTime > threeHoursAgo) {
+            discrepancies.columnsWithoutThreads.push({
+              boss: col.boss,
+              timestamp: col.timestamp,
+              column: col.column
+            });
+          }
+        } catch (err) {
+          // If we can't parse the timestamp, don't report it
+          // This avoids false positives for old or malformed timestamps
+        }
       }
     }
 

@@ -871,15 +871,35 @@ async function itemEnd(client, config, channel) {
     });
   }
 
+  // 🔒 Archive the thread after the auction ends
+  try {
+    // Check if channel is a thread (type 11 or 12 = public/private thread)
+    if (channel && (channel.type === 11 || channel.type === 12) && typeof channel.setArchived === 'function') {
+      await channel.setArchived(true, "Auction ended").catch(err => {
+        console.warn(`⚠️ Failed to archive thread ${channel.id}:`, err.message);
+      });
+      console.log(`🔒 Archived thread for ${item.item}`);
+    }
+  } catch (err) {
+    console.warn(`⚠️ Error archiving thread:`, err.message);
+  }
+
   // ✅ Move to next item or session
   const session = auctionState.sessions[auctionState.currentSessionIndex];
   auctionState.currentItemIndex++;
+
+  // Get the parent bidding channel for next auction (not the thread)
+  let biddingChannel = channel;
+  if (channel && (channel.type === 11 || channel.type === 12) && channel.parent) {
+    // If current channel is a thread, use its parent
+    biddingChannel = channel.parent;
+  }
 
   if (session && auctionState.currentItemIndex < session.items.length) {
     // ➡️ Next item in same session
     auctionState.currentItem = null;
     console.log(`⏭️ Moving to next item in current session...`);
-    await auctionNextItem(client, config, channel);
+    await auctionNextItem(client, config, biddingChannel);
   } else {
     // ✅ End of session
     auctionState.currentSessionIndex++;
@@ -888,14 +908,14 @@ async function itemEnd(client, config, channel) {
 
     if (auctionState.currentSessionIndex < auctionState.sessions.length) {
       console.log(`🔥 Moving to next boss session...`);
-      await auctionNextItem(client, config, channel);
+      await auctionNextItem(client, config, biddingChannel);
     } else {
       // ✅ ALL DONE
       console.log(`🏁 All items completed. Finalizing session.`);
-      await finalizeSession(client, config, channel);
+      await finalizeSession(client, config, biddingChannel);
     }
   }
-  
+
 }
 
 async function finalizeSession(client, config, channel) {
@@ -966,6 +986,24 @@ async function finalizeSession(client, config, channel) {
       }
 
       console.log(`${EMOJI.SUCCESS} Session results submitted successfully`);
+
+      // Display tally summary in bidding channel
+      const winnersWithSpending = combinedResults.filter(r => r.totalSpent > 0);
+      if (winnersWithSpending.length > 0) {
+        const tallyEmbed = new EmbedBuilder()
+          .setColor(COLORS.SUCCESS)
+          .setTitle(`${EMOJI.CHART} Bidding Points Tally`)
+          .setDescription(`**Points spent this session:**\n\n${
+            winnersWithSpending
+              .sort((a, b) => b.totalSpent - a.totalSpent)
+              .map((r, i) => `${i + 1}. **${r.member}** - ${r.totalSpent} pts`)
+              .join('\n')
+          }`)
+          .setFooter({ text: `Total: ${winnersWithSpending.reduce((sum, r) => sum + r.totalSpent, 0)} pts spent` })
+          .setTimestamp();
+
+        await channel.send({ embeds: [tallyEmbed] });
+      }
     }
   } catch (err) {
     console.error(`${EMOJI.ERROR} Failed to submit bidding results:`, err);
@@ -988,11 +1026,25 @@ async function finalizeSession(client, config, channel) {
       0
     );
 
+    // Ensure summary is properly formatted and within Discord's limits
+    let summaryValue = summary || "No sales recorded";
+    // Discord embed field values have a 1024 character limit
+    if (summaryValue.length > 1024) {
+      summaryValue = summaryValue.substring(0, 1020) + "...";
+    }
+    // Ensure it's not empty
+    if (!summaryValue || summaryValue.trim().length === 0) {
+      summaryValue = "No sales recorded";
+    }
+
     const adminEmbed = new EmbedBuilder()
       .setColor(COLORS.SUCCESS)
       .setTitle(`${EMOJI.SUCCESS} Session Summary`)
-      .setDescription(`Auctioneering session completed successfully`)
-      .addFields(
+      .setDescription(`Auctioneering session completed successfully`);
+
+    // Add fields one by one with validation
+    try {
+      adminEmbed.addFields(
         {
           name: `📊 Items Sold`,
           value: `**With Winners:** ${itemsWithWinners}`,
@@ -1005,10 +1057,21 @@ async function finalizeSession(client, config, channel) {
         },
         {
           name: `📋 Results`,
-          value: summary || "No sales recorded",
+          value: summaryValue,
           inline: false,
         }
-      )
+      );
+    } catch (err) {
+      console.error(`${EMOJI.ERROR} Error adding fields to embed:`, err);
+      // Fallback: try adding fields individually
+      adminEmbed.addFields({
+        name: `📊 Summary`,
+        value: `Items: ${itemsWithWinners} | Revenue: ${totalRevenue}pts`,
+        inline: false,
+      });
+    }
+
+    adminEmbed
       .setFooter({ text: `Session completed by !startauction` })
       .setTimestamp();
 
@@ -1719,11 +1782,56 @@ function updateCurrentItemState(updates) {
   return true;
 }
 
+async function endAuctionSession(client, config, channel) {
+  console.log(`🛑 Ending auction session (forced by admin)...`);
+
+  if (!auctionState.active) {
+    console.log(`${EMOJI.WARNING} No active auction to end`);
+    return;
+  }
+
+  // Clear all timers
+  clearAllTimers();
+
+  // If there's a current item, mark it as cancelled
+  if (auctionState.currentItem && auctionState.currentItem.status === "active") {
+    auctionState.currentItem.status = "cancelled";
+
+    // Try to notify in the current item thread if possible
+    try {
+      const currentThread = auctionState.currentItem.thread;
+      if (currentThread && typeof currentThread.send === 'function') {
+        await currentThread.send({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(COLORS.ERROR)
+              .setTitle(`${EMOJI.ERROR} Auction Cancelled`)
+              .setDescription(`This auction was ended by an administrator.`)
+          ]
+        });
+
+        // Archive the thread
+        if (typeof currentThread.setArchived === 'function') {
+          await currentThread.setArchived(true, "Session ended by admin").catch(() => {});
+        }
+      }
+    } catch (err) {
+      console.warn(`⚠️ Could not notify current item thread:`, err.message);
+    }
+  }
+
+  // Finalize the session (submit completed items, clear state)
+  await finalizeSession(client, config, channel);
+
+  console.log(`✅ Auction session ended successfully`);
+}
+
 module.exports = {
   initialize,
   itemEnd,
   startAuctioneering,
-  auctionNextItem, // ✅ add this
+  auctionNextItem,
+  endAuctionSession,
   getAuctionState: () => auctionState,
   canUserBid,
   setPostToSheet,
@@ -1732,7 +1840,6 @@ module.exports = {
   resumeSession,
   stopCurrentItem,
   extendCurrentItem,
-  getAuctionState,
   updateCurrentItemState,
   handleQueueList,
   handleRemoveItem,
@@ -1742,7 +1849,5 @@ module.exports = {
   handleCancelItem,
   handleSkipItem,
   handleForceSubmitResults,
-  setPostToSheet,
-  canUserBid,
   getCurrentSessionBoss: () => currentSessionBoss,
 };

@@ -38,6 +38,7 @@ const COMMAND_ALIASES = {
   "!debug": "!debugthread",
   "!closeall": "!closeallthread",
   "!clear": "!clearstate",
+  "!maint": "!maintenance",
 
   // Bidding commands (admin)
   "!auc": "!auction",
@@ -1559,20 +1560,19 @@ if (auctState.active && auctState.currentItem) {
       if (collected.first().emoji.name === '✅') {
         await confirmMsg.reactions.removeAll().catch(() => {});
 
-        // Stop current item timer if exists
-        if (auctState.currentItem) {
-          auctioneering.stopCurrentItem(client, config, message.channel);
-        }
+        await message.reply(`🛑 Ending auction session immediately...`);
 
         // Get bidding channel for finalization
         const guild = await client.guilds.fetch(config.main_guild_id);
         const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
 
-        await message.reply(`🛑 Ending auction session...`);
-
-        // Call the finalizeSession function from auctioneering
-        // This will submit all completed items and clear the session
-        await auctioneering.handleForceSubmitResults(message, config);
+        // Call endAuctionSession which properly ends the entire session
+        // This will:
+        // 1. Stop all timers
+        // 2. Close the current item if active
+        // 3. Submit all completed items
+        // 4. Clear the session state
+        await auctioneering.endAuctionSession(client, config, biddingChannel);
 
         await message.reply(`✅ Auction session ended and results submitted.`);
       } else {
@@ -1616,6 +1616,137 @@ if (auctState.active && auctState.currentItem) {
 
   forcesubmitresults: async (message, member) => {
     await auctioneering.handleForceSubmitResults(message, config, bidding);
+  },
+
+  maintenance: async (message, member) => {
+    // Define all maintenance bosses that spawn during maintenance
+    const maintenanceBosses = [
+      "Venatus",
+      "Viorent",
+      "Ego",
+      "Livera",
+      "Araneo",
+      "Undomiel",
+      "Lady Dalia",
+      "General Aquleus",
+      "Amentis",
+      "Baron Braudmore",
+      "Wannitas",
+      "Metus",
+      "Duplican",
+      "Shuliar",
+      "Gareth",
+      "Titore",
+      "Larba",
+      "Catena",
+      "Secreta",
+      "Ordo",
+      "Asta",
+      "Supore"
+    ];
+
+    // Show confirmation message
+    await awaitConfirmation(
+      message,
+      member,
+      `⚠️ **Spawn Maintenance Threads?**\n\n` +
+        `This will create spawn threads for **${maintenanceBosses.length} bosses** that spawn during maintenance:\n\n` +
+        `${maintenanceBosses.map((b, i) => `${i + 1}. ${b}`).join('\n')}\n\n` +
+        `**Spawn time:** 5 minutes from now\n\n` +
+        `React ✅ to confirm or ❌ to cancel.`,
+      async (confirmMsg) => {
+        // Get current time + 5 minutes
+        const spawnDate = new Date(Date.now() + 5 * 60 * 1000);
+        const year = spawnDate.getFullYear();
+        const month = String(spawnDate.getMonth() + 1).padStart(2, '0');
+        const day = String(spawnDate.getDate()).padStart(2, '0');
+        const hours = String(spawnDate.getHours()).padStart(2, '0');
+        const minutes = String(spawnDate.getMinutes()).padStart(2, '0');
+        const formattedTimestamp = `${year}-${month}-${day} ${hours}:${minutes}`;
+
+        await message.reply(
+          `🔄 **Creating maintenance spawn threads...**\n\n` +
+          `Spawning ${maintenanceBosses.length} boss threads...\n` +
+          `Please wait...`
+        );
+
+        let successCount = 0;
+        let failCount = 0;
+        const results = [];
+
+        for (const bossName of maintenanceBosses) {
+          try {
+            // Create the thread using attendance module
+            const result = await attendance.createSpawnThreads(
+              client,
+              bossName,
+              `${month}/${day}/${year.toString().slice(-2)}`,
+              `${hours}:${minutes}`,
+              formattedTimestamp,
+              "manual"
+            );
+
+            if (result && result.success) {
+              successCount++;
+              results.push(`✅ ${bossName}`);
+            } else {
+              // Try direct thread creation if attendance module fails
+              const guild = await client.guilds.fetch(config.main_guild_id);
+              const attChannel = await guild.channels.fetch(config.attendance_channel_id);
+              const spawnMessage = `⚠️ ${bossName} will spawn in 5 minutes! (${formattedTimestamp}) @everyone`;
+
+              const thread = await attChannel.threads.create({
+                name: `[${month}/${day}/${year.toString().slice(-2)} ${hours}:${minutes}] ${bossName}`,
+                autoArchiveDuration: config.auto_archive_minutes || 60,
+                message: {
+                  content: spawnMessage
+                },
+                reason: `Maintenance spawn by ${member.user.username}`
+              });
+
+              if (thread) {
+                successCount++;
+                results.push(`✅ ${bossName}`);
+              } else {
+                failCount++;
+                results.push(`❌ ${bossName} - Failed to create thread`);
+              }
+            }
+
+            // Small delay to avoid rate limits
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } catch (err) {
+            failCount++;
+            results.push(`❌ ${bossName} - ${err.message}`);
+          }
+        }
+
+        // Send summary
+        const summary = new EmbedBuilder()
+          .setColor(successCount > 0 ? 0x00ff00 : 0xff0000)
+          .setTitle(`✅ Maintenance Threads Created`)
+          .setDescription(
+            `**Success:** ${successCount}/${maintenanceBosses.length}\n` +
+            `**Failed:** ${failCount}/${maintenanceBosses.length}`
+          )
+          .addFields({
+            name: '📋 Results',
+            value: results.join('\n'),
+            inline: false
+          })
+          .setFooter({ text: `Executed by ${member.user.username}` })
+          .setTimestamp();
+
+        await message.reply({ embeds: [summary] });
+
+        console.log(
+          `🔧 Maintenance threads created: ${successCount}/${maintenanceBosses.length} successful by ${member.user.username}`
+        );
+      },
+      async (confirmMsg) => {
+        await message.reply("❌ Maintenance spawn canceled.");
+      }
+    );
   },
 };
 
@@ -2490,7 +2621,7 @@ attendance.setPendingVerifications(pendingVerifications);
 
       // Admin logs override commands
       if (
-        ["!clearstate", "!status", "!closeallthread", "!testbidding"].includes(
+        ["!clearstate", "!status", "!closeallthread", "!testbidding", "!maintenance"].includes(
           adminCmd
         )
       ) {
@@ -2518,6 +2649,8 @@ attendance.setPendingVerifications(pendingVerifications);
           await commandHandlers.closeallthread(message, member);
         else if (adminCmd === "!testbidding")
           await commandHandlers.testbidding(message, member);
+        else if (adminCmd === "!maintenance")
+          await commandHandlers.maintenance(message, member);
         return;
       }
 

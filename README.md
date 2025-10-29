@@ -44,6 +44,7 @@ A comprehensive Discord bot for managing guild boss spawn attendance tracking an
 | `!startauction` | Start auction session with confirmation |
 | `!startauctionnow` | Start auction immediately (bypasses cooldown) |
 | `!endauction` | End auction session immediately and submit results |
+| `!maintenance` or `!maint` | Create spawn threads for all 22 maintenance bosses at once |
 | `!queuelist` | Show auction queue preview |
 | `!forcesubmitresults` | Force submit auction results to sheets |
 | `!addthread <boss> (timestamp)` | Create attendance thread manually |
@@ -313,7 +314,18 @@ Format:
 
 ## 📊 Recent Updates
 
-### v5.0 - Comprehensive Overhaul (Current)
+### v5.1 - Maintenance & Bug Fixes (Latest)
+- ✅ Added !maintenance command to spawn all 22 maintenance bosses at once
+- ✅ Fixed bidding threads not closing after auctions end
+- ✅ Fixed ArrayValidator error in session finalization
+- ✅ Fixed message reference error when replying to deleted messages
+- ✅ Fixed !endauction to properly end entire session (not just current item)
+- ✅ Fixed false positive "columns without threads" validation warnings
+- ✅ Fixed missing bidding points tally summary after session ends
+- ✅ Improved thread archiving logic with proper parent channel detection
+- ✅ Enhanced error handling in embed field validation
+
+### v5.0 - Comprehensive Overhaul
 - ✅ Abolished manual queue feature - all items require attendance
 - ✅ Fixed critical timestamp normalization bug (false negatives)
 - ✅ Restricted commands to proper channels (thread-only vs admin-only)
