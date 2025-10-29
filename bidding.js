@@ -1069,10 +1069,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
         inline: true,
       },
       { name: `${EMOJI.CHART} After`, value: `${av - needed}pts`, inline: true }
-    )
-    .setFooter({
-      text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 10s timeout`,
-    });
+    );
 
   if (isSelf) {
     confEmbed.addFields({
@@ -1082,7 +1079,20 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     });
   }
 
-  const conf = await msg.reply({ embeds: [confEmbed] });
+  confEmbed.addFields({
+    name: `⚠️ ATTENDANCE WARNING`,
+    value: `**IF YOU DID NOT ATTEND THIS WILL INVALIDATE IF YOU WIN AND STILL DEDUCT YOUR POINTS**`,
+    inline: false,
+  });
+
+  confEmbed.setFooter({
+    text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 10s timeout`,
+  });
+
+  const conf = await msg.reply({
+    content: `<@${uid}> **PLS REACT HERE TO CONFIRM**`,
+    embeds: [confEmbed]
+  });
   await conf.react(EMOJI.SUCCESS);
   await conf.react(EMOJI.ERROR);
 
@@ -1225,11 +1235,20 @@ async function procBid(msg, amt, cfg) {
     });
   }
 
+  confEmbed.addFields({
+    name: `⚠️ ATTENDANCE WARNING`,
+    value: `**IF YOU DID NOT ATTEND THIS WILL INVALIDATE IF YOU WIN AND STILL DEDUCT YOUR POINTS**`,
+    inline: false,
+  });
+
   confEmbed.setFooter({
     text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 10s timeout`,
   });
 
-  const conf = await msg.reply({ embeds: [confEmbed] });
+  const conf = await msg.reply({
+    content: `<@${uid}> **PLS REACT HERE TO CONFIRM**`,
+    embeds: [confEmbed]
+  });
   await conf.react(EMOJI.SUCCESS);
   await conf.react(EMOJI.ERROR);
 
