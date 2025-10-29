@@ -989,28 +989,26 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     return { ok: false, msg: "No role" };
   }
 
-  // Attendance check (skip for manual queue items)
-  if (!currentItem.skipAttendance && currentSession && currentSession.bossKey) {
-    const canBid = auctRef.canUserBid(u, currentSession);
-    if (!canBid) {
-      const bossName = currentSession.bossName;
-      const errorMsg = await msg.channel.send(
-        `❌ <@${uid}> You didn't attend **${bossName}**. Only attendees can bid on this item.\n\n*This message will be deleted in 10 seconds.*`
-      );
-      
-      try {
-        await msg.delete().catch(() => {});
-      } catch (e) {
-        console.warn(`⚠️ Could not delete bid message: ${e.message}`);
-      }
+  // Attendance check (all items require attendance now)
+  const canBid = auctRef.canUserBid(u, currentSession);
+  if (!canBid) {
+    const bossName = currentSession?.bossName || "this boss";
+    const errorMsg = await msg.channel.send(
+      `❌ <@${uid}> You didn't attend **${bossName}**. Only attendees can bid on this item.\n\n*This message will be deleted in 10 seconds.*`
+    );
 
-      setTimeout(async () => {
-        await errorMsg.delete().catch(() => {});
-      }, 10000);
-
-      console.log(`❌ Bid rejected: ${u} didn't attend ${bossName}`);
-      return { ok: false, msg: "No attendance" };
+    try {
+      await msg.delete().catch(() => {});
+    } catch (e) {
+      console.warn(`⚠️ Could not delete bid message: ${e.message}`);
     }
+
+    setTimeout(async () => {
+      await errorMsg.delete().catch(() => {});
+    }, 10000);
+
+    console.log(`❌ Bid rejected: ${u} didn't attend ${bossName}`);
+    return { ok: false, msg: "No attendance" };
   }
 
   const now = Date.now();

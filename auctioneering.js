@@ -35,7 +35,6 @@ function getPostToSheet() {
 let auctionState = {
   active: false,
   currentItem: null,
-  itemQueue: [],
   sessionItems: [],
   currentItemIndex: 0,
   timers: {},
@@ -50,7 +49,6 @@ let sessionStartTime = null;
 let sessionNumber = 1;
 let sessionTimestamp = null;
 let sessionStartDateTime = null;
-let manualItemsAuctioned = [];
 
 // CONSTANTS
 const ITEM_WAIT = 20000;
@@ -217,7 +215,6 @@ async function saveAuctionState(url) {
       auctionState: {
         active: auctionState.active,
         currentItem: cleanItem,
-        itemQueue: [],
         sessionItems: auctionState.sessionItems,
         currentItemIndex: auctionState.currentItemIndex,
         paused: auctionState.paused,
@@ -283,9 +280,6 @@ async function startAuctioneering(client, config, channel) {
     return;
   }
 
-  const biddingState = biddingModule.getBiddingState();
-  const queueItems = biddingState.q || [];
-
   // Calculate week sheet name
   const attendance = require("./attendance.js");
   const sundayDate = attendance.getSundayOfWeek();
@@ -294,33 +288,8 @@ async function startAuctioneering(client, config, channel) {
   // Group items by boss
   const sessions = [];
   const bossGroups = {};
-  const manualItems = [];
 
-  // Manual queue items first (open to all)
-  queueItems.forEach((item) => {
-    const qty = item.quantity || 1;
-    for (let q = 0; q < qty; q++) {
-      manualItems.push({
-        ...item,
-        quantity: 1,
-        batchNumber: qty > 1 ? q + 1 : null,
-        batchTotal: qty > 1 ? qty : null,
-        source: "QueueList",
-        skipAttendance: true,
-      });
-    }
-  });
-
-  if (manualItems.length > 0) {
-    sessions.push({
-      bossName: "OPEN",
-      bossKey: null,
-      items: manualItems,
-      attendees: [],
-    });
-  }
-
-  // Group sheet items by boss
+  // All items must come from Google Sheets with proper boss data
   sheetItems.forEach((item, idx) => {
     const bossData = (item.boss || "").trim();
     if (!bossData) {
@@ -361,7 +330,6 @@ async function startAuctioneering(client, config, channel) {
         sheetIndex: idx,
         bossName: boss,
         bossKey: bossKey,
-        skipAttendance: false, // Enable attendance checking
       });
     }
   });
@@ -381,19 +349,12 @@ async function startAuctioneering(client, config, channel) {
     return;
   }
 
-  // Load attendance for each boss session
+  // Load attendance for each boss session (all items require attendance now)
   console.log(`📊 Loading attendance for ${sessions.length} boss sessions...`);
   const weekSheet = getSundayOfWeek();
   const sheetName = `ELYSIUM_WEEK_${weekSheet}`;
 
   for (const session of sessions) {
-    if (!session.bossKey) {
-      // Manual queue - no boss, everyone can bid
-      session.attendees = [];
-      console.log(`📝 Session "${session.bossName}" - Manual queue (no attendance check)`);
-      continue;
-    }
-
     try {
       const attendees = await attendance.loadAttendanceForBoss(sheetName, session.bossKey);
       session.attendees = attendees || [];
@@ -415,13 +376,7 @@ async function startAuctioneering(client, config, channel) {
   // Show preview
   const preview = sessions
     .map((s, i) => {
-      const sessionType = s.bossKey ? `${s.bossName}` : "OPEN (No Boss)";
-      const attendeeInfo = s.bossKey
-        ? ` - ${s.attendees.length} attendees`
-        : " - Open to all";
-      return `${i + 1}. **${sessionType}**: ${
-        s.items.length
-      } item(s)${attendeeInfo}`;
+      return `${i + 1}. **${s.bossName}**: ${s.items.length} item(s) - ${s.attendees.length} attendees`;
     })
     .join("\n");
 
@@ -457,9 +412,10 @@ async function startAuctioneering(client, config, channel) {
 }
 
 function canUserBid(username, currentSession) {
-  // Manual queue items or missing data - no attendance required
-  if (!currentSession || !currentSession.bossKey || !currentSession.attendees) {
-    return true;
+  // All items now require attendance - no exceptions
+  if (!currentSession || !currentSession.attendees) {
+    console.warn(`⚠️ Missing session data for attendance check`);
+    return false;
   }
 
   // Check if username is in attendees (case-insensitive)
@@ -549,9 +505,7 @@ async function auctionNextItem(client, config, channel) {
   auctionState.currentItem.bids = [];
   auctionState.currentItem.currentSession = session; // Attach session for attendance check
 
-  const threadName = `${item.item} | ${item.startPrice || 0}pts | ${
-    session.bossName || "OPEN"
-  }`;
+  const threadName = `${item.item} | ${item.startPrice || 0}pts | ${session.bossName}`;
 
   let auctionThread = null;
 
@@ -575,9 +529,7 @@ async function auctionNextItem(client, config, channel) {
             .setColor(COLORS.AUCTION)
             .setTitle(`${EMOJI.AUCTION} New Auction Started`)
             .setDescription(
-              `**Item:** ${item.item}\n**Boss:** ${
-                session.bossName || "OPEN"
-              }\n**Start Price:** ${item.startPrice || 0} pts\n**Duration:** ${
+              `**Item:** ${item.item}\n**Boss:** ${session.bossName}\n**Start Price:** ${item.startPrice || 0} pts\n**Duration:** ${
                 item.duration || 2
               } min`
             )
@@ -613,9 +565,7 @@ async function auctionNextItem(client, config, channel) {
             .setColor(COLORS.AUCTION)
             .setTitle(`${EMOJI.AUCTION} New Auction Started`)
             .setDescription(
-              `**Item:** ${item.item}\n**Boss:** ${
-                session.bossName || "OPEN"
-              }\n**Start Price:** ${item.startPrice || 0} pts\n**Duration:** ${
+              `**Item:** ${item.item}\n**Boss:** ${session.bossName}\n**Start Price:** ${item.startPrice || 0} pts\n**Duration:** ${
                 item.duration || 2
               } min`
             )
@@ -961,11 +911,10 @@ async function finalizeSession(client, config, channel) {
   // STEP 1: Build combined results for tally
   const combinedResults = await buildCombinedResults(config);
 
-  // STEP 2: Submit combined results with manual items
+  // STEP 2: Submit combined results
   const submitPayload = {
     action: "submitBiddingResults",
     results: combinedResults,
-    manualItems: manualItemsAuctioned,
   };
 
   try {
@@ -1010,11 +959,8 @@ async function finalizeSession(client, config, channel) {
     .catch(() => null);
 
   if (adminLogs) {
-    const sheetItemsWithWinners = auctionState.sessionItems.filter(
+    const itemsWithWinners = auctionState.sessionItems.filter(
       (s) => s.source === "GoogleSheet"
-    ).length;
-    const manualItemsWithWinners = auctionState.sessionItems.filter(
-      (s) => s.source === "QueueList"
     ).length;
     const totalRevenue = auctionState.sessionItems.reduce(
       (sum, s) => sum + s.amount,
@@ -1027,13 +973,8 @@ async function finalizeSession(client, config, channel) {
       .setDescription(`Auctioneering session completed successfully`)
       .addFields(
         {
-          name: `📊 Google Sheet Items`,
-          value: `**With Winners:** ${sheetItemsWithWinners}`,
-          inline: true,
-        },
-        {
-          name: `📝 Manual Items`,
-          value: `**Auctioned:** ${manualItemsAuctioned.length}\n**With Winners:** ${manualItemsWithWinners}`,
+          name: `📊 Items Sold`,
+          value: `**With Winners:** ${itemsWithWinners}`,
           inline: true,
         },
         {
@@ -1058,8 +999,6 @@ async function finalizeSession(client, config, channel) {
   currentSessionBoss = null;
   auctionState.sessions = [];
   auctionState.sessionItems = [];
-  auctionState.itemQueue = [];
-  manualItemsAuctioned = [];
 
   // Clear bidding module cache AND locked points
   const biddingModule = require("./bidding.js");
@@ -1260,16 +1199,12 @@ async function handleQueueList(message, biddingState) {
     let itemNumber = 1;
 
     auctQueue.forEach((session, sessionIdx) => {
-      const sessionTitle = session.bossKey
-        ? `🔥 SESSION ${sessionIdx + 1} - ${session.bossName} (${session.bossKey
-            .split(" ")
-            .slice(1)
-            .join(" ")})`
-        : `📋 SESSION ${sessionIdx + 1} - OPEN (No Boss)`;
+      const sessionTitle = `🔥 SESSION ${sessionIdx + 1} - ${session.bossName} (${session.bossKey
+        .split(" ")
+        .slice(1)
+        .join(" ")})`;
 
-      const attendeeInfo = session.bossKey
-        ? `👥 Attendees: ${session.attendees.length} members`
-        : `👥 Open to all`;
+      const attendeeInfo = `👥 Attendees: ${session.attendees.length} members`;
 
       queueText += `\n**${sessionTitle}**\n`;
 
@@ -1314,12 +1249,10 @@ async function handleQueueList(message, biddingState) {
 
   await loadingMsg.delete().catch(() => {});
 
-  if (sheetItems.length === 0 && biddingQueue.length === 0) {
+  if (sheetItems.length === 0) {
     return await message.reply(
-      `${EMOJI.LIST} Queue is empty.\n\n` +
-        `Add items with:\n` +
-        `• \`!auction <item> <price> <duration>\` - Manual queue\n` +
-        `• Add to **BiddingItems** sheet in Google Sheets`
+      `${EMOJI.LIST} No items in auction queue.\n\n` +
+        `Add items to the **BiddingItems** sheet in Google Sheets with proper boss data.`
     );
   }
 
@@ -1344,19 +1277,7 @@ async function handleQueueList(message, biddingState) {
   let position = 1;
   let sessionNum = 1;
 
-  // Manual queue first
-  if (biddingQueue.length > 0) {
-    queueText += `**📋 SESSION ${sessionNum} - OPEN (No Boss)**\n`;
-    biddingQueue.forEach((item) => {
-      const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
-      queueText += `${position}. ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
-      position++;
-    });
-    queueText += `👥 Open to all\n\n`;
-    sessionNum++;
-  }
-
-  // Boss sessions
+  // All items must have boss data now
   for (const [boss, items] of Object.entries(bossGroups)) {
     queueText += `**🔥 SESSION ${sessionNum} - ${boss}**\n`;
     items.forEach((item) => {
@@ -1376,11 +1297,10 @@ async function handleQueueList(message, biddingState) {
     });
   }
 
-  queueText += `\n**ℹ️ Note:** Order shown is how items will auction when you run \`!startauction\``;
+  queueText += `\n**ℹ️ Note:** Order shown is how items will auction when you run \`!startauction\`\n**⚠️ All items require attendance at the corresponding boss spawn.**`;
 
-  const totalSessions =
-    Object.keys(bossGroups).length + (biddingQueue.length > 0 ? 1 : 0);
-  const totalItems = sheetItems.length + biddingQueue.length;
+  const totalSessions = Object.keys(bossGroups).length;
+  const totalItems = sheetItems.length;
 
   const embed = new EmbedBuilder()
     .setColor(0x4a90e2)
@@ -1399,7 +1319,7 @@ async function handleQueueList(message, biddingState) {
       }
     )
     .setFooter({
-      text: "Use !startauction to begin • Manual items first, then by boss",
+      text: "Use !startauction to begin • All items require attendance",
     })
     .setTimestamp();
 
@@ -1413,33 +1333,8 @@ async function handleRemoveItem(message, args, biddingModule) {
 
   const itemName = args.join(" ");
 
-  // Try to remove from auctioneering queue
-  const auctIdx = auctionState.itemQueue.findIndex(
-    (a) => a.item.toLowerCase() === itemName.toLowerCase()
-  );
-
-  if (auctIdx !== -1) {
-    const removed = auctionState.itemQueue.splice(auctIdx, 1)[0];
-    return await message.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(0xffa500)
-          .setTitle(`${EMOJI.SUCCESS} Removed`)
-          .setDescription(
-            `**${removed.item}**${
-              removed.quantity > 1 ? ` x${removed.quantity}` : ""
-            }`
-          )
-          .addFields({
-            name: `${EMOJI.LIST} Remaining in Queue`,
-            value: `${auctionState.itemQueue.length}`,
-            inline: true,
-          }),
-      ],
-    });
-  }
-
-  // Try to remove from bidding queue
+  // No manual queue anymore - all items come from sheet
+  // This command is now deprecated but kept for compatibility
   const biddingState = biddingModule.getBiddingState();
   const bidIdx = biddingState.q.findIndex(
     (a) => a.item.toLowerCase() === itemName.toLowerCase()
@@ -1471,55 +1366,10 @@ async function handleRemoveItem(message, args, biddingModule) {
 }
 
 async function handleClearQueue(message, onConfirm, onCancel) {
-  if (auctionState.active) {
-    return await message.reply(
-      `${EMOJI.ERROR} Cannot clear during active auction`
-    );
-  }
-
-  const totalItems = auctionState.itemQueue.length;
-  if (totalItems === 0) {
-    return await message.reply(`${EMOJI.LIST} Queue is already empty`);
-  }
-
-  const clearMsg = await message.reply({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(0xffa500)
-        .setTitle(`${EMOJI.WARNING} Clear Queue?`)
-        .setDescription(
-          `This will remove **${totalItems} item(s)** from the auction queue.`
-        )
-        .setFooter({
-          text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel`,
-        }),
-    ],
-  });
-
-  await clearMsg.react(EMOJI.SUCCESS);
-  await clearMsg.react(EMOJI.ERROR);
-
-  try {
-    const col = await clearMsg.awaitReactions({
-      filter: (r, u) =>
-        [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
-        u.id === message.author.id,
-      max: 1,
-      time: 30000,
-      errors: ["time"],
-    });
-
-    if (col.first().emoji.name === EMOJI.SUCCESS) {
-      auctionState.itemQueue = [];
-      await clearMsg.reactions.removeAll().catch(() => {});
-      await message.reply(`${EMOJI.SUCCESS} Cleared ${totalItems} item(s)`);
-    } else {
-      await clearMsg.reactions.removeAll().catch(() => {});
-      await message.reply(`${EMOJI.ERROR} Clear canceled`);
-    }
-  } catch (e) {
-    await clearMsg.reactions.removeAll().catch(() => {});
-  }
+  // No manual queue anymore - this command is deprecated
+  return await message.reply(
+    `${EMOJI.ERROR} Manual queue has been removed. All items must be added to the BiddingItems Google Sheet with proper boss data.`
+  );
 }
 
 async function handleMyPoints(message, biddingModule, config) {
@@ -1723,14 +1573,12 @@ async function handleCancelItem(message) {
         `${EMOJI.ERROR} **${auctionState.currentItem.item}** canceled. Points refunded.`
       );
 
+      // Move to next item in sessions
+      auctionState.currentItem = null;
       auctionState.currentItemIndex++;
-      if (auctionState.currentItemIndex < auctionState.itemQueue.length) {
-        auctionState.timers.nextItem = setTimeout(async () => {
-          await auctionNextItem(message.client, cfg, message.channel);
-        }, 20000);
-      } else {
-        await finalizeSession(message.client, cfg, message.channel);
-      }
+      auctionState.timers.nextItem = setTimeout(async () => {
+        await auctionNextItem(message.client, cfg, message.channel);
+      }, 20000);
     } else {
       await canMsg.reactions.removeAll().catch(() => {});
     }
@@ -1783,14 +1631,12 @@ async function handleSkipItem(message) {
         `⭐️ **${auctionState.currentItem.item}** skipped (no sale).`
       );
 
+      // Move to next item in sessions
+      auctionState.currentItem = null;
       auctionState.currentItemIndex++;
-      if (auctionState.currentItemIndex < auctionState.itemQueue.length) {
-        auctionState.timers.nextItem = setTimeout(async () => {
-          await auctionNextItem(message.client, cfg, message.channel);
-        }, 20000);
-      } else {
-        await finalizeSession(message.client, cfg, message.channel);
-      }
+      auctionState.timers.nextItem = setTimeout(async () => {
+        await auctionNextItem(message.client, cfg, message.channel);
+      }, 20000);
     } else {
       await skpMsg.reactions.removeAll().catch(() => {});
     }
