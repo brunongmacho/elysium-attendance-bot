@@ -554,6 +554,29 @@ const COMMAND_HELP = {
       "Requires ✅ confirmation"
     ]
   },
+
+  // ========================================
+  // EMERGENCY COMMANDS
+  // ========================================
+  emergency: {
+    usage: "!emergency <subcommand>",
+    description: "🚨 Emergency recovery commands for stuck states (REQUIRES CONFIRMATION)",
+    category: "Emergency",
+    adminOnly: true,
+    example: "!emergency diag\n!emergency closeall\n!emergency endauction",
+    aliases: ["!emerg"],
+    features: [
+      "Force close all attendance threads",
+      "Force close specific thread by ID",
+      "Force end stuck auctions",
+      "Unlock all locked points",
+      "Clear pending bid confirmations",
+      "State diagnostics",
+      "Force sync to Google Sheets",
+      "All commands require confirmation",
+      "Use when normal commands fail"
+    ]
+  },
 };
 
 const CATEGORIES = {
@@ -562,6 +585,7 @@ const CATEGORIES = {
   Bidding: `${EMOJI.BID} Bidding System`,
   Loot: `${EMOJI.LOOT} Loot Recognition`,
   Member: `${EMOJI.MEMBER} Member Commands`,
+  Emergency: `🚨 Emergency Recovery`,
 };
 
 const CATEGORY_DESCRIPTIONS = {
@@ -570,6 +594,7 @@ const CATEGORY_DESCRIPTIONS = {
   Bidding: "Point-based auction management with queue and item tracking",
   Loot: "OCR-powered loot screenshot processing and automatic logging",
   Member: "Commands available to all ELYSIUM members",
+  Emergency: "⚠️ ADMIN ONLY: Force recovery from stuck states (requires confirmation)",
 };
 
 async function handleHelp(message, args, member) {

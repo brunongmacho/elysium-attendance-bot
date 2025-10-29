@@ -20,6 +20,7 @@ const helpSystem = require("./help-system.js");
 const auctioneering = require("./auctioneering.js");
 const attendance = require("./attendance.js");
 const lootSystem = require("./loot-system.js");
+const emergencyCommands = require("./emergency-commands.js");
 
 const COMMAND_ALIASES = {
   // Help commands
@@ -50,6 +51,9 @@ const COMMAND_ALIASES = {
   "!resetb": "!resetbids",
   "!forcesubmit": "!forcesubmitresults",
   "!testbid": "!testbidding",
+
+  // Emergency commands (admin)
+  "!emerg": "!emergency",
 
   // Bidding commands (member)
   "!b": "!bid",
@@ -1768,6 +1772,7 @@ client.once(Events.ClientReady, async () => {
   bidding.initializeBidding(config, isAdmin, auctioneering);
   auctioneering.setPostToSheet(attendance.postToSheet); // Use attendance module's postToSheet
   lootSystem.initialize(config, bossPoints, isAdmin);
+  emergencyCommands.initialize(config, attendance, bidding, auctioneering, isAdmin);
 
   console.log("\n╔═══════════════════════════════════════════════════════╗");
   console.log("║         🔄 BOT STATE RECOVERY (3-SWEEP SYSTEM)   ║");
@@ -2621,7 +2626,7 @@ attendance.setPendingVerifications(pendingVerifications);
 
       // Admin logs override commands
       if (
-        ["!clearstate", "!status", "!closeallthread", "!testbidding", "!maintenance"].includes(
+        ["!clearstate", "!status", "!closeallthread", "!testbidding", "!emergency", "!maintenance"].includes(
           adminCmd
         )
       ) {
@@ -2649,6 +2654,8 @@ attendance.setPendingVerifications(pendingVerifications);
           await commandHandlers.closeallthread(message, member);
         else if (adminCmd === "!testbidding")
           await commandHandlers.testbidding(message, member);
+        else if (adminCmd === "!emergency")
+          await emergencyCommands.handleEmergencyCommand(message, args);
         else if (adminCmd === "!maintenance")
           await commandHandlers.maintenance(message, member);
         return;

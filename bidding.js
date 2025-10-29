@@ -2735,4 +2735,31 @@ module.exports = {
     }
     return false;
   },
+
+  // EMERGENCY FUNCTIONS
+  forceEndAuction: async (client, config) => {
+    if (!st.a) {
+      console.log(`${EMOJI.WARNING} No active auction to end`);
+      return;
+    }
+
+    console.log(`${EMOJI.EMERGENCY} Force ending auction: ${st.a.item}`);
+
+    // Clear all timers
+    ["goingOnce", "goingTwice", "finalCall", "auctionEnd", "next", "aStart"].forEach((k) => {
+      if (st.th[k]) {
+        clearTimeout(st.th[k]);
+        delete st.th[k];
+      }
+    });
+
+    // Force finalize current session
+    await finalize(client, config);
+
+    console.log(`${EMOJI.SUCCESS} Auction force-ended`);
+  },
+
+  forceSaveState: async () => {
+    return await saveBiddingStateToSheet();
+  },
 };
