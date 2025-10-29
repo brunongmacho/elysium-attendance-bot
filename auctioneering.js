@@ -7,7 +7,8 @@
 const { EmbedBuilder } = require("discord.js");
 const fetch = require("node-fetch");
 const { Timeout } = require("timers");
-const { getCurrentTimestamp, sleep } = require("./utils/common");
+const { getCurrentTimestamp, getSundayOfWeek, sleep } = require("./utils/common");
+const attendance = require("./attendance");
 
 // ==========================================
 // POSTTOSHEET INITIALIZATION
@@ -360,7 +361,7 @@ async function startAuctioneering(client, config, channel) {
         sheetIndex: idx,
         bossName: boss,
         bossKey: bossKey,
-        skipAttendance: true,
+        skipAttendance: false, // Enable attendance checking
       });
     }
   });
@@ -381,12 +382,29 @@ async function startAuctioneering(client, config, channel) {
   }
 
   // Load attendance for each boss session
+  console.log(`📊 Loading attendance for ${sessions.length} boss sessions...`);
+  const weekSheet = getSundayOfWeek();
+  const sheetName = `ELYSIUM_WEEK_${weekSheet}`;
+
   for (const session of sessions) {
-    session.attendees = []; // Open session, anyone can bid
+    if (!session.bossKey) {
+      // Manual queue - no boss, everyone can bid
+      session.attendees = [];
+      console.log(`📝 Session "${session.bossName}" - Manual queue (no attendance check)`);
+      continue;
+    }
+
+    try {
+      const attendees = await attendance.loadAttendanceForBoss(sheetName, session.bossKey);
+      session.attendees = attendees || [];
+      attendanceCache[session.bossKey] = session.attendees;
+      console.log(`✅ Loaded ${session.attendees.length} attendees for ${session.bossKey}`);
+    } catch (err) {
+      console.error(`❌ Failed to load attendance for ${session.bossKey}:`, err);
+      session.attendees = [];
+    }
   }
-  console.log(
-    "⚙️ Attendance check disabled — all sessions open to all members."
-  );
+  console.log(`✅ Attendance loading complete. Cache has ${Object.keys(attendanceCache).length} boss spawns.`);
 
   auctionState.active = true;
   auctionState.sessions = sessions;
@@ -439,7 +457,19 @@ async function startAuctioneering(client, config, channel) {
 }
 
 function canUserBid(username, currentSession) {
-  return true;
+  // Manual queue items or missing data - no attendance required
+  if (!currentSession || !currentSession.bossKey || !currentSession.attendees) {
+    return true;
+  }
+
+  // Check if username is in attendees (case-insensitive)
+  const normalizedUsername = username.toLowerCase().trim();
+  const attended = currentSession.attendees.some(attendee =>
+    attendee.toLowerCase().trim() === normalizedUsername
+  );
+
+  console.log(`🔍 Attendance check: ${username} for ${currentSession.bossKey} - ${attended ? '✅ PASS' : '❌ FAIL'}`);
+  return attended;
 }
 
 // =======================================================
