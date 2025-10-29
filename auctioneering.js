@@ -547,6 +547,7 @@ async function auctionNextItem(client, config, channel) {
   auctionState.currentItem = item;
   auctionState.currentItem.status = "active";
   auctionState.currentItem.bids = [];
+  auctionState.currentItem.currentSession = session; // Attach session for attendance check
 
   const threadName = `${item.item} | ${item.startPrice || 0}pts | ${
     session.bossName || "OPEN"
@@ -645,6 +646,7 @@ async function auctionNextItem(client, config, channel) {
 
   // ✅ Set currentItem properly BEFORE starting the auction
   auctionState.currentItem = item;
+  auctionState.currentItem.currentSession = session; // Attach session for attendance check
   item.status = "active";
   item.auctionStartTime = getTimestamp();
 
