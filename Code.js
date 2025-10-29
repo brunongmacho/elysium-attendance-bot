@@ -690,19 +690,19 @@ function getSessionTimestamp() {
 function logAuctionEvent(eventData) {
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
   let logSheet = ss.getSheetByName('AuctionLog');
-  
+
   if (!logSheet) {
     logSheet = ss.insertSheet('AuctionLog');
-    logSheet.getRange(1, 1, 1, 10).setValues([[
-      'Session Date', 'Session Time', 'Session Number', 'Item', 'Source', 
-      'Winner', 'Amount', 'Auction Start', 'Auction End', 'Timestamp'
+    logSheet.getRange(1, 1, 1, 12).setValues([[
+      'Session Date', 'Session Time', 'Session Number', 'Item', 'Source',
+      'Winner', 'Amount', 'Total Bids', 'Winner Bid Count', 'Auction Start', 'Auction End', 'Timestamp'
     ]])
     .setFontWeight('bold')
     .setBackground('#4A90E2')
     .setFontColor('#FFFFFF');
     logSheet.hideSheet();
   }
-  
+
   const row = [
     eventData.sessionDate,
     eventData.sessionTime,
@@ -711,11 +711,13 @@ function logAuctionEvent(eventData) {
     eventData.source,
     eventData.winner || '',
     eventData.amount || '',
+    eventData.totalBids || 0,
+    eventData.bidCount || 0,
     eventData.auctionStart,
     eventData.auctionEnd,
     eventData.timestamp
   ];
-  
+
   logSheet.appendRow(row);
 }
 
@@ -742,26 +744,28 @@ function logAuctionResult(data) {
   const itemIndex = data.itemIndex || -1;
   const winner = data.winner || '';
   const winningBid = data.winningBid || 0;
+  const totalBids = data.totalBids || 0;
+  const bidCount = data.bidCount || 0;
   const itemSource = data.itemSource || 'Unknown';
   const timestamp = data.timestamp || new Date().toISOString();
   const auctionStartTime = data.auctionStartTime || '';
   const auctionEndTime = data.auctionEndTime || '';
-  
+
   // SKIP if no winner (only for GoogleSheet items)
   if (!winner && itemSource === 'GoogleSheet') {
     Logger.log(`ℹ️ Skipping log for ${data.itemName || 'Unknown'} - No winner`);
     return createResponse('ok', 'Skipped - no winner', {logged: false});
   }
-  
+
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
   const sheet = ss.getSheetByName('BiddingItems');
   if (!sheet) return createResponse('error', 'BiddingItems sheet not found');
-  
+
   // Log to AuctionLog (event tracking)
   const sessionTs = getSessionTimestamp();
   const [dateOnly, timeOnly] = sessionTs.columnHeader.split(' #')[0].split(' ');
   const sessionNum = parseInt(sessionTs.columnHeader.split('#')[1]);
-  
+
   logAuctionEvent({
     sessionDate: dateOnly,
     sessionTime: timeOnly,
@@ -770,6 +774,8 @@ function logAuctionResult(data) {
     source: itemSource,
     winner: winner,
     amount: winningBid,
+    totalBids: totalBids,
+    bidCount: bidCount,
     auctionStart: auctionStartTime,
     auctionEnd: auctionEndTime,
     timestamp: timestamp
