@@ -1522,6 +1522,69 @@ if (auctState.active && auctState.currentItem) {
     }
   },
 
+  endauction: async (message, member) => {
+    const auctState = auctioneering.getAuctionState();
+    if (!auctState.active) {
+      return await message.reply(`❌ No active auction to end`);
+    }
+
+    // Ask for confirmation
+    const confirmMsg = await message.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0xffa500)
+          .setTitle(`⚠️ End Auction Session?`)
+          .setDescription(
+            `This will immediately end the current auction session and submit all completed items.\n\n` +
+            `**Current Item:** ${auctState.currentItem?.item || 'None'}\n` +
+            `**Completed Items:** ${auctState.sessionItems.length}\n\n` +
+            `React with ✅ to confirm or ❌ to cancel.`
+          )
+          .setFooter({ text: `30 seconds to respond` }),
+      ],
+    });
+
+    await confirmMsg.react('✅');
+    await confirmMsg.react('❌');
+
+    try {
+      const collected = await confirmMsg.awaitReactions({
+        filter: (r, u) =>
+          ['✅', '❌'].includes(r.emoji.name) && u.id === message.author.id,
+        max: 1,
+        time: 30000,
+        errors: ['time'],
+      });
+
+      if (collected.first().emoji.name === '✅') {
+        await confirmMsg.reactions.removeAll().catch(() => {});
+
+        // Stop current item timer if exists
+        if (auctState.currentItem) {
+          auctioneering.stopCurrentItem(client, config, message.channel);
+        }
+
+        // Get bidding channel for finalization
+        const guild = await client.guilds.fetch(config.main_guild_id);
+        const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+
+        await message.reply(`🛑 Ending auction session...`);
+
+        // Call the finalizeSession function from auctioneering
+        // This will submit all completed items and clear the session
+        await auctioneering.handleForceSubmitResults(message, config);
+
+        await message.reply(`✅ Auction session ended and results submitted.`);
+      } else {
+        await confirmMsg.reactions.removeAll().catch(() => {});
+        await message.reply(`❌ End auction canceled`);
+      }
+    } catch (e) {
+      await confirmMsg.reactions.removeAll().catch(() => {});
+      await message.reply(`⏱️ Confirmation timeout - auction continues`);
+    }
+  },
+
   queuelist: async (message, member) => {
     await auctioneering.handleQueueList(message, bidding.getBiddingState());
   },
@@ -1944,10 +2007,11 @@ client.on(Events.MessageCreate, async (message) => {
       console.log(`   Expected Parent: ${config.bidding_channel_id}`);
       console.log(`   inBiddingChannel: ${inBiddingChannel}`);
 
-      if (!inBiddingChannel) {
-        console.log(`❌ !bid blocked - not in bidding channel/thread`);
+      // Bid commands must be in threads only, not main bidding channel
+      if (!message.channel.isThread() || message.channel.parentId !== config.bidding_channel_id) {
+        console.log(`❌ !bid blocked - not in auction thread`);
         await message.reply(
-          `❌ You can only use \`${rawCmd}\` in the auction threads!`
+          `❌ You can only use \`${rawCmd}\` in auction threads (inside <#${config.bidding_channel_id}>)!`
         );
         return;
       }
@@ -1986,6 +2050,36 @@ client.on(Events.MessageCreate, async (message) => {
       const args = message.content.trim().split(/\s+/).slice(1);
       console.log(`🎯 Bidding status command (${rawCmd}): ${resolvedCmd}`);
       await commandHandlers.bidstatus(message, member);
+      return;
+    }
+
+    // ✅ HANDLE AUCTION THREAD-ONLY COMMANDS (!pause, !resume, !stop, !extend)
+    // These commands must be used in auction threads (bidding channel threads) only
+    if (
+      ["!pause", "!resume", "!stop", "!extend"].includes(resolvedCmd) &&
+      message.channel.isThread() &&
+      message.channel.parentId === config.bidding_channel_id
+    ) {
+      if (!userIsAdmin) {
+        await message.reply(`❌ Admin only`);
+        return;
+      }
+
+      const args = message.content.trim().split(/\s+/).slice(1);
+      const handlerName = resolvedCmd.slice(1); // Remove the "!"
+      console.log(`🎯 Thread auction command (${rawCmd}): ${resolvedCmd}`);
+
+      if (commandHandlers[handlerName]) {
+        await commandHandlers[handlerName](message, member, args);
+      }
+      return;
+    }
+
+    // Block !pause, !resume, !stop, !extend if not in auction thread
+    if (["!pause", "!resume", "!stop", "!extend"].includes(resolvedCmd)) {
+      await message.reply(
+        `❌ This command can only be used in auction threads (in <#${config.bidding_channel_id}>)`
+      );
       return;
     }
 
@@ -2444,6 +2538,7 @@ attendance.setPendingVerifications(pendingVerifications);
       }
 
       // BIDDING & AUCTIONEERING COMMANDS - Admin logs only
+      // NOTE: !pause, !resume, !stop, !extend are thread-only commands now
       if (
         [
           "!auction",
@@ -2452,12 +2547,9 @@ attendance.setPendingVerifications(pendingVerifications);
           "!clearqueue",
           "!startauction",
           "!startauctionnow",
-          "!pause",
-          "!resume",
-          "!stop",
-          "!extend",
           "!resetbids",
           "!forcesubmitresults",
+          "!endauction",
         ].includes(adminCmd)
       ) {
         console.log(`🎯 Processing auction command (${rawCmd} -> ${adminCmd})`);
@@ -2468,10 +2560,7 @@ attendance.setPendingVerifications(pendingVerifications);
           [
             "!startauction",
             "!startauctionnow",
-            "!pause",
-            "!resume",
-            "!stop",
-            "!extend",
+            "!endauction",
           ].includes(adminCmd)
         ) {
           const handlerName = adminCmd.slice(1); // Remove the "!"
