@@ -1594,24 +1594,8 @@ if (auctState.active && auctState.currentItem) {
   },
 
   clearqueue: async (message, member) => {
-    // Wrap in confirmation
-    const totalItems = auctioneering.getAuctionState().itemQueue.length;
-    if (totalItems === 0) {
-      return await message.reply(`📋 Queue is already empty`);
-    }
-    await auctioneering.handleClearQueue(
-      message,
-      async (confirmMsg) => {
-        // On confirm
-        auctioneering.getAuctionState().itemQueue = [];
-        await confirmMsg.reactions.removeAll().catch(() => {});
-        await message.reply(`✅ Cleared ${totalItems} item(s)`);
-      },
-      async (confirmMsg) => {
-        // On cancel
-        await confirmMsg.reactions.removeAll().catch(() => {});
-      }
-    );
+    // Manual queue deprecated - just show deprecation message
+    await auctioneering.handleClearQueue(message);
   },
 
   mypoints: async (message, member) => {
@@ -2589,22 +2573,8 @@ attendance.setPendingVerifications(pendingVerifications);
           } else if (handler === "removeitem") {
             await auctioneering.handleRemoveItem(message, args, bidding);
           } else if (handler === "clearqueue") {
-            const totalItems = auctioneering.getAuctionState().itemQueue.length;
-            if (totalItems === 0) {
-              return await message.reply(`📋 Queue is already empty`);
-            }
-            await auctioneering.handleClearQueue(
-              message,
-              async (confirmMsg) => {
-                auctioneering.getAuctionState().itemQueue = [];
-                await confirmMsg.reactions.removeAll().catch(() => {});
-                await message.reply(`✅ Cleared ${totalItems} item(s)`);
-              },
-              async (confirmMsg) => {
-                await confirmMsg.reactions.removeAll().catch(() => {});
-                await message.reply(`❌ Clear canceled`);
-              }
-            );
+            // Manual queue deprecated - just show deprecation message
+            await auctioneering.handleClearQueue(message);
           } else if (handler === "forcesubmitresults") {
             await auctioneering.handleForceSubmitResults(
               message,

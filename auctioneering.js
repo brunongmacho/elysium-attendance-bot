@@ -888,9 +888,7 @@ async function finalizeSession(client, config, channel) {
   const summary = auctionState.sessionItems
     .map(
       (s, i) =>
-        `${i + 1}. **${s.item}** (${
-          s.source === "GoogleSheet" ? "📊" : "📝"
-        }): ${s.winner} - ${s.amount}pts`
+        `${i + 1}. **${s.item}** 📊: ${s.winner} - ${s.amount}pts`
     )
     .join("\n");
 
@@ -959,9 +957,7 @@ async function finalizeSession(client, config, channel) {
     .catch(() => null);
 
   if (adminLogs) {
-    const itemsWithWinners = auctionState.sessionItems.filter(
-      (s) => s.source === "GoogleSheet"
-    ).length;
+    const itemsWithWinners = auctionState.sessionItems.length;
     const totalRevenue = auctionState.sessionItems.reduce(
       (sum, s) => sum + s.amount,
       0
