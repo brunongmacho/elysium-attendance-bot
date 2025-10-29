@@ -1026,8 +1026,8 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     return { ok: false, msg: "Invalid" };
   }
 
-  if (bid <= currentItem.curBid) {
-    await msg.reply(`${EMOJI.ERROR} Must be > ${currentItem.curBid}pts`);
+  if (bid < currentItem.curBid) {
+    await msg.reply(`${EMOJI.ERROR} Must be >= ${currentItem.curBid}pts`);
     return { ok: false, msg: "Too low" };
   }
 
@@ -1174,8 +1174,8 @@ async function procBid(msg, amt, cfg) {
     return { ok: false, msg: "Invalid" };
   }
 
-  if (bid <= a.curBid) {
-    await msg.reply(`${EMOJI.ERROR} Must be > ${a.curBid}pts`);
+  if (bid < a.curBid) {
+    await msg.reply(`${EMOJI.ERROR} Must be >= ${a.curBid}pts`);
     return { ok: false, msg: "Too low" };
   }
 
@@ -2041,6 +2041,7 @@ async function startItemAuction(client, config, thread, item, session) {
   item.curWinId = null;
   item.bids = [];
   item.status = "active";
+  item.extCnt = 0; // Extension counter for time extensions
 
   const duration = (item.duration || 2) * 60 * 1000;
   item.endTime = Date.now() + duration;
@@ -2217,6 +2218,31 @@ module.exports = {
       timestamp: Date.now(),
     });
 
+    // Check if bid is in last minute - extend time by 1 minute
+    const timeLeft = currentItem.endTime - Date.now();
+    if (!currentItem.extCnt) currentItem.extCnt = 0; // Initialize if not exists
+    if (timeLeft < 60000 && timeLeft > 0 && currentItem.extCnt < ME) {
+      const extensionTime = 60000; // 1 minute
+      currentItem.endTime += extensionTime;
+      currentItem.extCnt++;
+
+      await reaction.message.channel.send({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0xffa500)
+            .setTitle(`⏰ Time Extended!`)
+            .setDescription(`Bid placed in final minute - adding 1 more minute to the auction!`)
+            .addFields({
+              name: '⏱️ New Time Remaining',
+              value: `${Math.ceil((currentItem.endTime - Date.now()) / 1000)}s`,
+              inline: true
+            })
+        ],
+      });
+
+      console.log(`⏰ Time extended for ${currentItem.item} by 1 minute (bid in final minute, ext #${currentItem.extCnt})`);
+    }
+
     // Update via auctioneering module
     if (p.auctRef && typeof p.auctRef.updateCurrentItemState === 'function') {
       p.auctRef.updateCurrentItemState({
@@ -2317,7 +2343,7 @@ module.exports = {
     return;
   }
 
-  if (p.amount <= a.curBid) {
+  if (p.amount < a.curBid) {
     await reaction.message.channel.send(
       `❌ <@${user.id}> Bid invalid. Current: ${a.curBid}pts`
     );
@@ -2372,6 +2398,22 @@ module.exports = {
     a.extCnt++;
     a.go1 = false;
     a.go2 = false;
+
+    await reaction.message.channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0xffa500)
+          .setTitle(`⏰ Time Extended!`)
+          .setDescription(`Bid placed in final minute - adding 1 more minute to the auction!`)
+          .addFields({
+            name: '⏱️ New Time Remaining',
+            value: `${Math.ceil((st.pause ? st.a.remainingTime : (a.endTime - Date.now())) / 1000)}s`,
+            inline: true
+          })
+      ],
+    });
+
+    console.log(`⏰ Time extended for ${a.item} by 1 minute (bid in final minute)`);
   }
 
   if (st.th[`c_${reaction.message.id}`]) {
