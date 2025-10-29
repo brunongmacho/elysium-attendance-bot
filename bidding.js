@@ -137,9 +137,20 @@ function save(forceSync = false) {
   try {
     const { th, pauseTimer, cacheRefreshTimer, ...s } = st;
 
+    // Clean up circular references from pending confirmations
+    const cleanState = {
+      ...s,
+      pc: Object.fromEntries(
+        Object.entries(s.pc).map(([key, val]) => {
+          const { auctStateRef, auctRef, ...cleanVal } = val;
+          return [key, cleanVal];
+        })
+      ),
+    };
+
     // Always save to local file for quick access (works even on ephemeral Koyeb FS)
     try {
-      fs.writeFileSync(SF, JSON.stringify(s, null, 2));
+      fs.writeFileSync(SF, JSON.stringify(cleanState, null, 2));
     } catch (fileErr) {
       // On Koyeb, file system might be read-only or restricted
       console.warn("⚠️ Local file save failed (expected on Koyeb):", fileErr.message);
