@@ -922,17 +922,28 @@ async function itemEnd(client, config, channel) {
     });
   }
 
-  // 🔒 Archive the thread after the auction ends
+  // 🔒 Lock and archive the thread after the auction ends
   try {
     // Check if channel is a thread (type 11 or 12 = public/private thread)
-    if (channel && (channel.type === 11 || channel.type === 12) && typeof channel.setArchived === 'function') {
-      await channel.setArchived(true, "Auction ended").catch(err => {
-        console.warn(`⚠️ Failed to archive thread ${channel.id}:`, err.message);
-      });
-      console.log(`🔒 Archived thread for ${item.item}`);
+    if (channel && (channel.type === 11 || channel.type === 12)) {
+      // Lock the thread first to prevent new messages
+      if (typeof channel.setLocked === 'function') {
+        await channel.setLocked(true, "Auction ended").catch(err => {
+          console.warn(`⚠️ Failed to lock thread ${channel.id}:`, err.message);
+        });
+        console.log(`🔒 Locked thread for ${item.item}`);
+      }
+
+      // Then archive it to hide from active list
+      if (typeof channel.setArchived === 'function') {
+        await channel.setArchived(true, "Auction ended").catch(err => {
+          console.warn(`⚠️ Failed to archive thread ${channel.id}:`, err.message);
+        });
+        console.log(`📦 Archived thread for ${item.item}`);
+      }
     }
   } catch (err) {
-    console.warn(`⚠️ Error archiving thread:`, err.message);
+    console.warn(`⚠️ Error locking/archiving thread:`, err.message);
   }
 
   // ✅ Move to next item or session
@@ -1705,11 +1716,33 @@ async function handleCancelItem(message) {
         `${EMOJI.ERROR} **${auctionState.currentItem.item}** canceled. Points refunded.`
       );
 
-      // Move to next item in sessions
+      // Lock and archive the cancelled item's thread
+      const thread = message.channel;
+      if (thread && (thread.type === 11 || thread.type === 12)) {
+        try {
+          if (typeof thread.setLocked === 'function') {
+            await thread.setLocked(true, "Item cancelled").catch(err => {
+              console.warn(`⚠️ Failed to lock cancelled thread:`, err.message);
+            });
+            console.log(`🔒 Locked cancelled thread`);
+          }
+          if (typeof thread.setArchived === 'function') {
+            await thread.setArchived(true, "Item cancelled").catch(err => {
+              console.warn(`⚠️ Failed to archive cancelled thread:`, err.message);
+            });
+            console.log(`📦 Archived cancelled thread`);
+          }
+        } catch (err) {
+          console.warn(`⚠️ Error closing cancelled thread:`, err.message);
+        }
+      }
+
+      // Move to next item in sessions (use parent channel for next item)
+      const parentChannel = thread.parent || message.channel;
       auctionState.currentItem = null;
       auctionState.currentItemIndex++;
       auctionState.timers.nextItem = setTimeout(async () => {
-        await auctionNextItem(message.client, cfg, message.channel);
+        await auctionNextItem(message.client, cfg, parentChannel);
       }, 20000);
     } else {
       await canMsg.reactions.removeAll().catch(() => {});
@@ -1763,11 +1796,33 @@ async function handleSkipItem(message) {
         `⭐️ **${auctionState.currentItem.item}** skipped (no sale).`
       );
 
-      // Move to next item in sessions
+      // Lock and archive the skipped item's thread
+      const thread = message.channel;
+      if (thread && (thread.type === 11 || thread.type === 12)) {
+        try {
+          if (typeof thread.setLocked === 'function') {
+            await thread.setLocked(true, "Item skipped").catch(err => {
+              console.warn(`⚠️ Failed to lock skipped thread:`, err.message);
+            });
+            console.log(`🔒 Locked skipped thread`);
+          }
+          if (typeof thread.setArchived === 'function') {
+            await thread.setArchived(true, "Item skipped").catch(err => {
+              console.warn(`⚠️ Failed to archive skipped thread:`, err.message);
+            });
+            console.log(`📦 Archived skipped thread`);
+          }
+        } catch (err) {
+          console.warn(`⚠️ Error closing skipped thread:`, err.message);
+        }
+      }
+
+      // Move to next item in sessions (use parent channel for next item)
+      const parentChannel = thread.parent || message.channel;
       auctionState.currentItem = null;
       auctionState.currentItemIndex++;
       auctionState.timers.nextItem = setTimeout(async () => {
-        await auctionNextItem(message.client, cfg, message.channel);
+        await auctionNextItem(message.client, cfg, parentChannel);
       }, 20000);
     } else {
       await skpMsg.reactions.removeAll().catch(() => {});
