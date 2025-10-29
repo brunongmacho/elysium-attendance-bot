@@ -2255,7 +2255,7 @@ module.exports = {
       return;
     }
 
-    if (p.amount <= currentItem.curBid) {
+    if (p.amount < currentItem.curBid) {
       await reaction.message.channel.send(
         `❌ <@${user.id}> Bid invalid. Current: ${currentItem.curBid}pts`
       );
