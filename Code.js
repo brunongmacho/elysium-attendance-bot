@@ -226,7 +226,7 @@ function handleSubmitLootEntries(data) {
       // STEP 2: Add each loot entry
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i];
-        
+
         try {
           const item = (entry.item || '').toString().trim();
           const rawSource = (entry.source || 'LOOT').toString().trim();
@@ -253,14 +253,32 @@ function handleSubmitLootEntries(data) {
           // FIX 2: Format Boss - all uppercase
           const boss = rawBoss.toUpperCase();
 
-          Logger.log(`📝 Adding item ${i + 1}: ${item} (qty: ${quantity}, source: ${source}, boss: ${boss})`);
+          // NEW: Check if item exists in sheet and get start price
+          let startPrice = '';
+          const defaultDuration = 5; // Default duration: 5 minutes
 
-          // FIX 3: Build row data WITHOUT Column H (Timestamp)
-          // We'll leave Column H empty so it doesn't interfere with auction tallies
+          if (lastRow > 1) {
+            const existingData = biddingItemsSheet.getRange(2, 1, lastRow - 1, 2).getValues();
+            for (let row = 0; row < existingData.length; row++) {
+              const existingItem = (existingData[row][0] || '').toString().trim();
+              const existingPrice = existingData[row][1];
+
+              // Case-insensitive match
+              if (existingItem.toLowerCase() === item.toLowerCase()) {
+                startPrice = existingPrice || '';
+                Logger.log(`💡 Found existing item "${item}" with start price: ${startPrice}`);
+                break;
+              }
+            }
+          }
+
+          Logger.log(`📝 Adding item ${i + 1}: ${item} (qty: ${quantity}, source: ${source}, boss: ${boss}, startPrice: ${startPrice || 'none'})`);
+
+          // FIX 3: Build row data with start price lookup and default duration
           const rowData = [
             item,                           // A: Item
-            '',                            // B: Start Price (empty)
-            '',                            // C: Duration (empty)
+            startPrice,                     // B: Start Price (from existing item or empty)
+            defaultDuration,                // C: Duration (5 minutes default)
             '',                            // D: Winner (empty)
             '',                            // E: Winning Bid (empty)
             '',                            // F: Auction Start (empty)
