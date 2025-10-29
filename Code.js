@@ -984,45 +984,63 @@ function updateBiddingPoints() {
   if (!bpSheet) return;
 
   const lastRow = bpSheet.getLastRow();
-  const existingData = lastRow > 1 ? bpSheet.getRange(2, 1, lastRow - 1, 3).getValues() : [];
+  const lastCol = bpSheet.getLastColumn();
+
+  // Get all data including session columns (columns 4+)
+  const allData = lastRow > 1 ? bpSheet.getRange(2, 1, lastRow - 1, lastCol).getValues() : [];
   const memberMap = {};
 
-  // --- Step 1: Map existing members in bidding sheet ---
-  existingData.forEach((r, i) => {
+  // --- Step 1: Map existing members and calculate consumed from session columns ---
+  allData.forEach((r, i) => {
     const m = (r[0] || '').toString().trim();
-    if (m) memberMap[m] = { row: i + 2, consumed: Number(r[2]) || 0 };
+    if (!m) return;
+
+    // Sum all session columns (columns 4+ = indices 3+)
+    let totalConsumed = 0;
+    for (let col = 3; col < r.length; col++) {
+      const val = Number(r[col]) || 0;
+      totalConsumed += val;
+    }
+
+    memberMap[m] = { row: i + 2, consumed: totalConsumed };
   });
 
-  // --- Step 2: Collect totals from all weekly sheets ---
+  // --- Step 2: Collect attendance points from all weekly sheets ---
   const sheets = ss.getSheets().filter(s => s.getName().startsWith(CONFIG.SHEET_NAME_PREFIX));
-  const totals = {};
+  const attendancePoints = {};
 
   sheets.forEach(s => {
     const data = s.getRange('A2:D').getValues();
     data.forEach(r => {
       const m = (r[0] || '').toString().trim();
-      if (m) totals[m] = (totals[m] || 0) + Number(r[3] || 0);
+      if (m) attendancePoints[m] = (attendancePoints[m] || 0) + Number(r[3] || 0);
     });
   });
 
   // --- Step 3: Add new members if not already in the bidding sheet ---
-  const newMembers = Object.keys(totals).filter(m => !memberMap[m]);
+  const newMembers = Object.keys(attendancePoints).filter(m => !memberMap[m]);
   if (newMembers.length > 0) {
     const insertStart = bpSheet.getLastRow() + 1;
-    const newRows = newMembers.map(m => [m, totals[m], 0]); // Member | Left | Consumed
+    const newRows = newMembers.map(m => [m, attendancePoints[m], 0]); // Member | Left | Consumed
     bpSheet.getRange(insertStart, 1, newRows.length, 3).setValues(newRows);
 
-    // Also update memberMap so they’re included below
+    // Also update memberMap so they're included below
     newMembers.forEach((m, i) => {
       memberMap[m] = { row: insertStart + i, consumed: 0 };
     });
   }
 
-  // --- Step 4: Update points for all members ---
+  // --- Step 4: Update Column 3 (Points Consumed) and Column 2 (Points Left) for all members ---
   Object.keys(memberMap).forEach(m => {
-    const left = (totals[m] || 0) - memberMap[m].consumed;
-    bpSheet.getRange(memberMap[m].row, 2).setValue(left);
+    const consumed = memberMap[m].consumed;
+    const left = (attendancePoints[m] || 0) - consumed;
+
+    // Update both columns
+    bpSheet.getRange(memberMap[m].row, 2).setValue(left);      // Column 2 = Points Left
+    bpSheet.getRange(memberMap[m].row, 3).setValue(consumed);  // Column 3 = Points Consumed
   });
+
+  Logger.log(`✅ Updated bidding points for ${Object.keys(memberMap).length} members`);
 }
 
 // ===========================================================
