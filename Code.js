@@ -693,9 +693,9 @@ function logAuctionEvent(eventData) {
 
   if (!logSheet) {
     logSheet = ss.insertSheet('AuctionLog');
-    logSheet.getRange(1, 1, 1, 12).setValues([[
+    logSheet.getRange(1, 1, 1, 11).setValues([[
       'Session Date', 'Session Time', 'Session Number', 'Item', 'Source',
-      'Winner', 'Amount', 'Total Bids', 'Winner Bid Count', 'Auction Start', 'Auction End', 'Timestamp'
+      'Winner', 'Amount', 'Total Bids', 'Auction Start', 'Auction End', 'Timestamp'
     ]])
     .setFontWeight('bold')
     .setBackground('#4A90E2')
@@ -712,7 +712,6 @@ function logAuctionEvent(eventData) {
     eventData.winner || '',
     eventData.amount || '',
     eventData.totalBids || 0,
-    eventData.bidCount || 0,
     eventData.auctionStart,
     eventData.auctionEnd,
     eventData.timestamp
@@ -745,7 +744,6 @@ function logAuctionResult(data) {
   const winner = data.winner || '';
   const winningBid = data.winningBid || 0;
   const totalBids = data.totalBids || 0;
-  const bidCount = data.bidCount || 0;
   const itemSource = data.itemSource || 'Unknown';
   const timestamp = data.timestamp || new Date().toISOString();
   const auctionStartTime = data.auctionStartTime || '';
@@ -775,7 +773,6 @@ function logAuctionResult(data) {
     winner: winner,
     amount: winningBid,
     totalBids: totalBids,
-    bidCount: bidCount,
     auctionStart: auctionStartTime,
     auctionEnd: auctionEndTime,
     timestamp: timestamp
