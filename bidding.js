@@ -1068,38 +1068,39 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 
   const confEmbed = new EmbedBuilder()
     .setColor(COLORS.AUCTION)
-    .setTitle(`${EMOJI.CLOCK} Confirm Bid`)
-    .setDescription(`**${currentItem.item}**`)
+    .setTitle(`${EMOJI.CLOCK} Confirm Your Bid`)
+    .setDescription(
+      `**Item:** ${currentItem.item}\n` +
+      `**Action:** ${isSelf ? 'Increase your bid' : 'Place bid and lock points'}\n\n` +
+      `⚠️ **By confirming, you agree to:**\n` +
+      `• Lock ${needed}pts from your available points\n` +
+      `• ${isSelf ? 'Increase' : 'Place'} your bid to ${bid}pts\n` +
+      `• Lose points if you win but didn't attend`
+    )
     .addFields(
       { name: `${EMOJI.BID} Your Bid`, value: `${bid}pts`, inline: true },
       {
-        name: `${EMOJI.CHART} Current`,
+        name: `${EMOJI.CHART} Current High`,
         value: `${currentItem.curBid}pts`,
         inline: true,
       },
-      { name: `${EMOJI.CHART} After`, value: `${av - needed}pts`, inline: true }
+      { name: `💳 Points After`, value: `${av - needed}pts left`, inline: true }
     );
 
   if (isSelf) {
     confEmbed.addFields({
-      name: `${EMOJI.FIRE} Self-Overbid`,
-      value: `Current: ${currentItem.curBid}pts → New: ${bid}pts\n**+${needed}pts needed**`,
+      name: `${EMOJI.FIRE} Self-Overbid Details`,
+      value: `Your current bid: ${currentItem.curBid}pts\nNew bid: ${bid}pts\n**Additional points needed: +${needed}pts**`,
       inline: false,
     });
   }
 
-  confEmbed.addFields({
-    name: `⚠️ ATTENDANCE WARNING`,
-    value: `**IF YOU DID NOT ATTEND THIS WILL INVALIDATE IF YOU WIN AND STILL DEDUCT YOUR POINTS**`,
-    inline: false,
-  });
-
   confEmbed.setFooter({
-    text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 10s timeout`,
+    text: `${EMOJI.SUCCESS} YES, PLACE BID / ${EMOJI.ERROR} NO, CANCEL • ${isSelf ? 'Overbidding yourself' : 'Outbidding current leader'} • 10s timeout`,
   });
 
   const conf = await msg.reply({
-    content: `<@${uid}> **PLS REACT HERE TO CONFIRM**`,
+    content: `<@${uid}> **CONFIRM YOUR BID - React below within 10 seconds**`,
     embeds: [confEmbed]
   });
   await conf.react(EMOJI.SUCCESS);
@@ -1226,36 +1227,35 @@ async function procBid(msg, amt, cfg) {
 
   const confEmbed = new EmbedBuilder()
     .setColor(COLORS.AUCTION)
-    .setTitle(`${EMOJI.CLOCK} Confirm Bid`)
+    .setTitle(`${EMOJI.CLOCK} Confirm Your Bid`)
     .setDescription(
-      `**${a.item}**${a.quantity > 1 ? ` (${a.quantity} available)` : ""}`
+      `**Item:** ${a.item}${a.quantity > 1 ? ` (${a.quantity} available)` : ""}\n` +
+      `**Action:** ${isSelf ? 'Increase your bid' : 'Place bid and lock points'}\n\n` +
+      `⚠️ **By confirming, you agree to:**\n` +
+      `• Lock ${needed}pts from your available points\n` +
+      `• ${isSelf ? 'Increase' : 'Place'} your bid to ${bid}pts\n` +
+      `• Lose points if you win but didn't attend`
     )
     .addFields(
       { name: `${EMOJI.BID} Your Bid`, value: `${bid}pts`, inline: true },
-      { name: `${EMOJI.CHART} Current`, value: `${a.curBid}pts`, inline: true },
-      { name: "💳 After", value: `${av - needed}pts`, inline: true }
+      { name: `${EMOJI.CHART} Current High`, value: `${a.curBid}pts`, inline: true },
+      { name: "💳 Points After", value: `${av - needed}pts left`, inline: true }
     );
 
   if (isSelf) {
     confEmbed.addFields({
-      name: "🔄 Self-Overbid",
-      value: `Current: ${a.curBid}pts → New: ${bid}pts\n**+${needed}pts needed**`,
+      name: "🔄 Self-Overbid Details",
+      value: `Your current bid: ${a.curBid}pts\nNew bid: ${bid}pts\n**Additional points needed: +${needed}pts**`,
       inline: false,
     });
   }
 
-  confEmbed.addFields({
-    name: `⚠️ ATTENDANCE WARNING`,
-    value: `**IF YOU DID NOT ATTEND THIS WILL INVALIDATE IF YOU WIN AND STILL DEDUCT YOUR POINTS**`,
-    inline: false,
-  });
-
   confEmbed.setFooter({
-    text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 10s timeout`,
+    text: `${EMOJI.SUCCESS} YES, PLACE BID / ${EMOJI.ERROR} NO, CANCEL • ${isSelf ? 'Overbidding yourself' : 'Outbidding current leader'} • 10s timeout`,
   });
 
   const conf = await msg.reply({
-    content: `<@${uid}> **PLS REACT HERE TO CONFIRM**`,
+    content: `<@${uid}> **CONFIRM YOUR BID - React below within 10 seconds**`,
     embeds: [confEmbed]
   });
   await conf.react(EMOJI.SUCCESS);
@@ -2215,6 +2215,39 @@ module.exports = {
       return;
     }
 
+    // Check for higher pending bids from other users
+    const higherPendingBids = Object.entries(st.pc)
+      .filter(([msgId, pending]) => {
+        return msgId !== reaction.message.id && // Not this confirmation
+               pending.isAuctioneering && // Is auctioneering bid
+               pending.amount > p.amount && // Higher amount
+               pending.userId !== p.userId; // Different user
+      })
+      .sort((a, b) => b[1].amount - a[1].amount); // Sort by amount desc
+
+    if (higherPendingBids.length > 0) {
+      const highestPending = higherPendingBids[0][1];
+      await reaction.message.channel.send({
+        content: `<@${user.id}>`,
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0xffa500)
+            .setTitle(`⚠️ Higher Bid Pending!`)
+            .setDescription(
+              `Your bid: **${p.amount}pts**\n` +
+              `Higher pending bid: **${highestPending.amount}pts** (waiting for confirmation)\n\n` +
+              `Someone else has a higher bid pending. If they confirm first, your bid will be rejected.\n` +
+              `**Your confirmation has been CANCELLED.**`
+            )
+        ],
+      });
+      await reaction.message.reactions.removeAll().catch(() => {});
+      await reaction.message.delete().catch(() => {});
+      delete st.pc[reaction.message.id];
+      save();
+      return;
+    }
+
     // Handle previous winner
     if (currentItem.curWin && !p.isSelf) {
       unlock(currentItem.curWin, currentItem.curBid);
@@ -2375,6 +2408,46 @@ module.exports = {
     await reaction.message.channel.send(
       `❌ <@${user.id}> Bid invalid. Current: ${a.curBid}pts`
     );
+    await reaction.message.reactions.removeAll().catch(() => {});
+    await reaction.message.delete().catch(() => {});
+    delete st.pc[reaction.message.id];
+    save();
+
+    if (st.pause) {
+      resumeAuction(reaction.client, config);
+      await reaction.message.channel.send(
+        `▶️ **RESUMED** - Auction continues...`
+      );
+    }
+    return;
+  }
+
+  // Check for higher pending bids from other users
+  const higherPendingBids = Object.entries(st.pc)
+    .filter(([msgId, pending]) => {
+      return msgId !== reaction.message.id && // Not this confirmation
+             !pending.isAuctioneering && // Regular bidding.js auction
+             pending.amount > p.amount && // Higher amount
+             pending.userId !== p.userId; // Different user
+    })
+    .sort((a, b) => b[1].amount - a[1].amount); // Sort by amount desc
+
+  if (higherPendingBids.length > 0) {
+    const highestPending = higherPendingBids[0][1];
+    await reaction.message.channel.send({
+      content: `<@${user.id}>`,
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0xffa500)
+          .setTitle(`⚠️ Higher Bid Pending!`)
+          .setDescription(
+            `Your bid: **${p.amount}pts**\n` +
+            `Higher pending bid: **${highestPending.amount}pts** (waiting for confirmation)\n\n` +
+            `Someone else has a higher bid pending. If they confirm first, your bid will be rejected.\n` +
+            `**Your confirmation has been CANCELLED.**`
+          )
+      ],
+    });
     await reaction.message.reactions.removeAll().catch(() => {});
     await reaction.message.delete().catch(() => {});
     delete st.pc[reaction.message.id];
