@@ -7,6 +7,7 @@
 const { EmbedBuilder } = require("discord.js");
 const fetch = require("node-fetch");
 const { Timeout } = require("timers");
+const { getCurrentTimestamp, sleep } = require("./utils/common");
 
 // ==========================================
 // POSTTOSHEET INITIALIZATION
@@ -439,25 +440,6 @@ async function startAuctioneering(client, config, channel) {
 
 function canUserBid(username, currentSession) {
   return true;
-}
-
-function getCurrentTimestamp() {
-  const d = new Date();
-  const manilaTime = new Date(
-    d.toLocaleString("en-US", { timeZone: "Asia/Manila" })
-  );
-
-  const month = String(manilaTime.getMonth() + 1).padStart(2, "0");
-  const day = String(manilaTime.getDate()).padStart(2, "0");
-  const year = String(manilaTime.getFullYear()).slice(-2);
-  const hours = String(manilaTime.getHours()).padStart(2, "0");
-  const mins = String(manilaTime.getMinutes()).padStart(2, "0");
-
-  return {
-    date: `${month}/${day}/${year}`,
-    time: `${hours}:${mins}`,
-    full: `${month}/${day}/${year} ${hours}:${mins}`,
-  };
 }
 
 // =======================================================
