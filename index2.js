@@ -20,6 +20,7 @@ const helpSystem = require("./help-system.js");
 const auctioneering = require("./auctioneering.js");
 const attendance = require("./attendance.js");
 const lootSystem = require("./loot-system.js");
+const emergencyCommands = require("./emergency-commands.js");
 
 const COMMAND_ALIASES = {
   // Help commands
@@ -49,7 +50,9 @@ const COMMAND_ALIASES = {
   "!clearq": "!clearqueue",
   "!resetb": "!resetbids",
   "!forcesubmit": "!forcesubmitresults",
-  "!testbid": "!testbidding",
+
+  // Emergency commands (admin)
+  "!emerg": "!emergency",
 
   // Bidding commands (member)
   "!b": "!bid",
@@ -1273,157 +1276,6 @@ if (auctState.active && auctState.currentItem) {
     );
   },
 
-  testbidding: async (message, member) => {
-    await message.reply("🔍 **Testing Bidding System...**\n\nPlease wait...");
-
-    const configCheck = {
-      hasWebhook: !!config.sheet_webhook_url,
-      webhookUrl: config.sheet_webhook_url
-        ? config.sheet_webhook_url.substring(0, 50) + "..."
-        : "MISSING",
-      hasBiddingChannel: !!config.bidding_channel_id,
-      biddingChannel: config.bidding_channel_id || "MISSING",
-    };
-
-    let pointsTest = {
-      success: false,
-      memberCount: 0,
-      error: null,
-      sampleMembers: [],
-    };
-
-    try {
-      console.log("🔬 Attempting to fetch bidding points...");
-      const biddingState = bidding.getBiddingState();
-
-      const response = await fetch(config.sheet_webhook_url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "getBiddingPoints",
-        }),
-      });
-
-      console.log(`📊 Sheet response: ${response.status}`);
-
-      if (response.ok) {
-        const text = await response.text();
-        const data = JSON.parse(text);
-
-        if (data.points) {
-          pointsTest.success = true;
-          pointsTest.memberCount = Object.keys(data.points).length;
-          pointsTest.sampleMembers = Object.entries(data.points)
-            .slice(0, 5)
-            .map(([member, points]) => `${member}: ${points}pts`);
-        }
-      } else {
-        pointsTest.error = `HTTP ${response.status}: ${await response.text()}`;
-      }
-    } catch (err) {
-      pointsTest.error = err.message;
-    }
-
-    const biddingState = bidding.getBiddingState();
-    const stateInfo = {
-      queueLength: biddingState.q.length,
-      hasActiveAuction: !!biddingState.a,
-      activeAuctionItem: biddingState.a ? biddingState.a.item : "None",
-      lockedPointsCount: Object.keys(biddingState.lp).length,
-    };
-
-    let channelTest = {
-      canAccessChannel: false,
-      channelName: "Unknown",
-      isThread: false,
-    };
-
-    try {
-      const biddingChannel = await client.channels.fetch(
-        config.bidding_channel_id
-      );
-      if (biddingChannel) {
-        channelTest.canAccessChannel = true;
-        channelTest.channelName = biddingChannel.name;
-        channelTest.isThread = biddingChannel.isThread();
-      }
-    } catch (err) {
-      channelTest.error = err.message;
-    }
-
-    const embed = new EmbedBuilder()
-      .setColor(pointsTest.success ? 0x00ff00 : 0xff0000)
-      .setTitle("🔍 Bidding System Diagnostics")
-      .setDescription("Complete system health check")
-      .addFields(
-        {
-          name: "⚙️ Configuration",
-          value:
-            `✅ Webhook URL: ${
-              configCheck.hasWebhook ? "Configured" : "❌ MISSING"
-            }\n` +
-            `✅ Bidding Channel: ${
-              configCheck.hasBiddingChannel ? "Configured" : "❌ MISSING"
-            }\n` +
-            `🔗 Webhook: \`${configCheck.webhookUrl}\`\n` +
-            `🔗 Channel ID: \`${configCheck.biddingChannel}\``,
-          inline: false,
-        },
-        {
-          name: "📊 Google Sheets Connection",
-          value: pointsTest.success
-            ? `✅ **Connected Successfully**\n` +
-              `👥 Members: ${pointsTest.memberCount}\n` +
-              `📋 Sample:\n${pointsTest.sampleMembers.join("\n")}`
-            : `❌ **Connection Failed**\n` +
-              `Error: ${pointsTest.error || "Unknown error"}\n\n` +
-              `**Troubleshooting:**\n` +
-              `1. Check webhook URL in config.json\n` +
-              `2. Verify Apps Script is deployed\n` +
-              `3. Check BiddingPoints sheet exists\n` +
-              `4. Verify sheet has data`,
-          inline: false,
-        },
-        {
-          name: "🎯 Bidding State",
-          value:
-            `📋 Queue: ${stateInfo.queueLength} item(s)\n` +
-            `🔴 Active Auction: ${
-              stateInfo.hasActiveAuction
-                ? `✅ ${stateInfo.activeAuctionItem}`
-                : `⚪ None`
-            }\n` +
-            `🔒 Locked Points: ${stateInfo.lockedPointsCount} member(s)`,
-          inline: false,
-        },
-        {
-          name: "📡 Channel Access",
-          value: channelTest.canAccessChannel
-            ? `✅ **Can access channel**\n` +
-              `📌 Name: ${channelTest.channelName}\n` +
-              `📝 Type: ${channelTest.isThread ? "Thread" : "Channel"}`
-            : `❌ **Cannot access channel**\n` +
-              `Error: ${channelTest.error || "Unknown error"}`,
-          inline: false,
-        }
-      )
-      .setFooter({
-        text: "If any tests failed, check the troubleshooting steps above",
-      })
-      .setTimestamp();
-
-    await message.reply({ embeds: [embed] });
-
-    console.log("╔════════════════════════════════════════════");
-    console.log("🔍 BIDDING SYSTEM DIAGNOSTICS");
-    console.log("╚════════════════════════════════════════════");
-    console.log("Config:", JSON.stringify(configCheck, null, 2));
-    console.log("Points Test:", JSON.stringify(pointsTest, null, 2));
-    console.log("State:", JSON.stringify(stateInfo, null, 2));
-    console.log("Channel:", JSON.stringify(channelTest, null, 2));
-    console.log("╚════════════════════════════════════════════");
-  },
-
   startauction: async (message, member) => {
     if (isRecovering) {
       return await message.reply(
@@ -1768,6 +1620,7 @@ client.once(Events.ClientReady, async () => {
   bidding.initializeBidding(config, isAdmin, auctioneering);
   auctioneering.setPostToSheet(attendance.postToSheet); // Use attendance module's postToSheet
   lootSystem.initialize(config, bossPoints, isAdmin);
+  emergencyCommands.initialize(config, attendance, bidding, auctioneering, isAdmin);
 
   console.log("\n╔═══════════════════════════════════════════════════════╗");
   console.log("║         🔄 BOT STATE RECOVERY (3-SWEEP SYSTEM)   ║");
@@ -2621,7 +2474,7 @@ attendance.setPendingVerifications(pendingVerifications);
 
       // Admin logs override commands
       if (
-        ["!clearstate", "!status", "!closeallthread", "!testbidding", "!maintenance"].includes(
+        ["!clearstate", "!status", "!closeallthread", "!emergency", "!maintenance"].includes(
           adminCmd
         )
       ) {
@@ -2647,8 +2500,8 @@ attendance.setPendingVerifications(pendingVerifications);
           await commandHandlers.status(message, member);
         else if (adminCmd === "!closeallthread")
           await commandHandlers.closeallthread(message, member);
-        else if (adminCmd === "!testbidding")
-          await commandHandlers.testbidding(message, member);
+        else if (adminCmd === "!emergency")
+          await emergencyCommands.handleEmergencyCommand(message, args);
         else if (adminCmd === "!maintenance")
           await commandHandlers.maintenance(message, member);
         return;
