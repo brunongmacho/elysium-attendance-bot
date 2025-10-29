@@ -2655,6 +2655,19 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
       }
     }
 
+    // Bidding confirmations (allow non-admin users who made the bid)
+    const biddingState = bidding.getBiddingState();
+
+    if (biddingState.pc[msg.id]) {
+      if (reaction.emoji.name === "✅") {
+        await bidding.confirmBid(reaction, user, config);
+      } else if (reaction.emoji.name === "❌") {
+        await bidding.cancelBid(reaction, user, config);
+      }
+      return;
+    }
+
+    // Admin check for attendance-related reactions
     const adminMember = await guild.members.fetch(user.id).catch(() => null);
     if (!adminMember || !isAdmin(adminMember)) {
       try {
@@ -2819,18 +2832,6 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         attendance.setPendingClosures(pendingClosures); // Sync
       }
 
-      return;
-    }
-
-    // Bidding confirmations (keep as is)
-    const biddingState = bidding.getBiddingState();
-
-    if (biddingState.pc[msg.id]) {
-      if (reaction.emoji.name === "✅") {
-        await bidding.confirmBid(reaction, user, config);
-      } else if (reaction.emoji.name === "❌") {
-        await bidding.cancelBid(reaction, user, config);
-      }
       return;
     }
   } catch (err) {
