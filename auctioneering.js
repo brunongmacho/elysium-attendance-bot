@@ -418,6 +418,17 @@ async function startAuctioneering(client, config, channel) {
       await auctionNextItem(client, config, biddingChannel);
     } catch (err) {
       console.error("❌ Failed to fetch bidding channel:", err);
+
+      // Cleanup on error
+      auctionState.active = false;
+      clearAllTimers();
+      if (biddingModule && typeof biddingModule.stopCacheAutoRefresh === 'function') {
+        biddingModule.stopCacheAutoRefresh();
+      }
+
+      await channel.send(
+        `❌ Failed to start auction session. Please try again or contact an admin.`
+      ).catch(() => {});
     }
   }, 20000);
 }
@@ -991,6 +1002,11 @@ async function finalizeSession(client, config, channel) {
 
   auctionState.active = false;
   clearAllTimers();
+
+  // Stop cache auto-refresh timer from bidding module
+  if (biddingModule && typeof biddingModule.stopCacheAutoRefresh === 'function') {
+    biddingModule.stopCacheAutoRefresh();
+  }
 
   const summary = auctionState.sessionItems
     .map(
@@ -1706,14 +1722,15 @@ async function handleCancelItem(message) {
       await canMsg.reactions.removeAll().catch(() => {});
       // Unlock points for current bidder
       const biddingState = biddingModule.getBiddingState();
-      if (auctionState.currentItem.curWin) {
+      if (auctionState.currentItem && auctionState.currentItem.curWin) {
         const amt = biddingState.lp[auctionState.currentItem.curWin] || 0;
         biddingState.lp[auctionState.currentItem.curWin] = 0;
         biddingModule.saveBiddingState();
       }
 
+      const itemName = auctionState.currentItem ? auctionState.currentItem.item : 'Unknown Item';
       await message.channel.send(
-        `${EMOJI.ERROR} **${auctionState.currentItem.item}** canceled. Points refunded.`
+        `${EMOJI.ERROR} **${itemName}** canceled. Points refunded.`
       );
 
       // Lock and archive the cancelled item's thread
@@ -1786,14 +1803,15 @@ async function handleSkipItem(message) {
       await skpMsg.reactions.removeAll().catch(() => {});
       // Unlock points for current bidder
       const biddingState = biddingModule.getBiddingState();
-      if (auctionState.currentItem.curWin) {
+      if (auctionState.currentItem && auctionState.currentItem.curWin) {
         const amt = biddingState.lp[auctionState.currentItem.curWin] || 0;
         biddingState.lp[auctionState.currentItem.curWin] = 0;
         biddingModule.saveBiddingState();
       }
 
+      const itemName = auctionState.currentItem ? auctionState.currentItem.item : 'Unknown Item';
       await message.channel.send(
-        `⭐️ **${auctionState.currentItem.item}** skipped (no sale).`
+        `⭐️ **${itemName}** skipped (no sale).`
       );
 
       // Lock and archive the skipped item's thread

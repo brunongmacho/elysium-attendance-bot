@@ -249,6 +249,9 @@ function initializeBidding(config, isAdminFunc, auctioneeringRef) {
   isAdmFunc = isAdminFunc;
   cfg = config;
   auctioneering = auctioneeringRef;
+
+  // Start cleanup schedule for pending confirmations
+  startCleanupSchedule();
 }
 
 // Add after COLORS constant definition (around line 30)
@@ -2205,6 +2208,58 @@ async function startItemAuction(client, config, thread, item, session) {
   }, duration);
 }
 
+// CLEANUP FUNCTION FOR PENDING CONFIRMATIONS
+function cleanupPendingConfirmations() {
+  const now = Date.now();
+  const CONFIRMATION_TIMEOUT = 60000; // 1 minute - stale confirmations
+
+  let cleaned = 0;
+  Object.keys(st.pc).forEach(msgId => {
+    const pending = st.pc[msgId];
+
+    // Check if confirmation is older than timeout
+    if (pending.timestamp && (now - pending.timestamp > CONFIRMATION_TIMEOUT)) {
+      // Clear associated timer if exists
+      if (st.th[`c_${msgId}`]) {
+        clearTimeout(st.th[`c_${msgId}`]);
+        delete st.th[`c_${msgId}`];
+      }
+
+      // Clear countdown interval if exists
+      if (st.th[`countdown_${msgId}`]) {
+        clearInterval(st.th[`countdown_${msgId}`]);
+        delete st.th[`countdown_${msgId}`];
+      }
+
+      // Remove pending confirmation
+      delete st.pc[msgId];
+      cleaned++;
+    }
+  });
+
+  if (cleaned > 0) {
+    console.log(`🧹 Cleaned up ${cleaned} stale pending confirmation(s)`);
+    save();
+  }
+}
+
+// Start periodic cleanup (every 2 minutes)
+let cleanupInterval = null;
+function startCleanupSchedule() {
+  if (!cleanupInterval) {
+    cleanupInterval = setInterval(cleanupPendingConfirmations, 120000); // 2 minutes
+    console.log("🧹 Started pending confirmations cleanup schedule");
+  }
+}
+
+function stopCleanupSchedule() {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+    console.log("⏹️ Stopped pending confirmations cleanup schedule");
+  }
+}
+
 // MODULE EXPORTS
 module.exports = {
   startItemAuction,
@@ -2222,7 +2277,10 @@ module.exports = {
   submitSessionTally: submitSessionTally,
   loadBiddingStateFromSheet: loadBiddingStateFromSheet,
   saveBiddingStateToSheet: saveBiddingStateToSheet,
-  clearPointsCache: clearCache,
+  cleanupPendingConfirmations,
+  startCleanupSchedule,
+  stopCleanupSchedule,
+  stopCacheAutoRefresh,
 
   confirmBid: async function (reaction, user, config) {
   const p = st.pc[reaction.message.id];
