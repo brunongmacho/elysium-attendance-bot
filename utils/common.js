@@ -84,12 +84,13 @@ function normalizeTimestamp(timestamp) {
 
   const str = timestamp.toString().trim();
 
-  // If already in MM/DD/YY HH:MM format, return as-is
-  if (/^\d{1,2}\/\d{1,2}\/\d{2}\s+\d{1,2}:\d{2}$/.test(str)) {
+  // Check if already in STRICT MM/DD/YY HH:MM format (must be zero-padded)
+  // This regex requires exactly 2 digits for MM, DD, and HH
+  if (/^\d{2}\/\d{2}\/\d{2}\s+\d{2}:\d{2}$/.test(str)) {
     return str;
   }
 
-  // Try to parse as Date (for Google Sheets format)
+  // Try to parse as Date (for Google Sheets format or non-padded timestamps)
   try {
     const date = new Date(str);
     if (isNaN(date.getTime())) return null;
