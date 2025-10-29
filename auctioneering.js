@@ -380,20 +380,31 @@ async function startAuctioneering(client, config, channel) {
     })
     .join("\n");
 
-  await channel.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.AUCTION)
-        .setTitle(`${EMOJI.FIRE} Auctioneering Started!`)
-        .setDescription(
-          `**${sessions.length} session(s)** queued\n\n${preview}`
-        )
-        .setFooter({ text: "Starting first session in 20s..." })
-        .setTimestamp(),
-    ],
-  });
+  const countdownEmbed = new EmbedBuilder()
+    .setColor(COLORS.AUCTION)
+    .setTitle(`${EMOJI.FIRE} Auctioneering Started!`)
+    .setDescription(
+      `**${sessions.length} session(s)** queued\n\n${preview}`
+    )
+    .setFooter({ text: "Starting first session in 20s..." })
+    .setTimestamp();
+
+  const feedbackMsg = await channel.send({ embeds: [countdownEmbed] });
+
+  // Countdown feedback every 5 seconds
+  let countdown = 20;
+  const countdownInterval = setInterval(async () => {
+    countdown -= 5;
+    if (countdown > 0) {
+      countdownEmbed.setFooter({ text: `Starting first session in ${countdown}s...` });
+      await feedbackMsg.edit({ embeds: [countdownEmbed] }).catch(err =>
+        console.warn(`⚠️ Failed to update countdown:`, err.message)
+      );
+    }
+  }, 5000);
 
   auctionState.timers.sessionStart = setTimeout(async () => {
+    clearInterval(countdownInterval);
     try {
       // Always use the configured bidding channel, not the command channel
       const guild = await client.guilds.fetch(config.main_guild_id);
@@ -584,9 +595,14 @@ async function auctionNextItem(client, config, channel) {
       "→ Also confirm config.bidding_channel_id points to a normal text channel."
     );
 
+    // Clean up partial state to prevent auction from being stuck
+    auctionState.currentItem = null;
+    auctionState.active = false;
+    saveState();
+
     try {
       await channel.send(
-        `❌ Unable to create thread for **${item.item}**. See logs for details.`
+        `❌ Unable to create thread for **${item.item}**. Thread creation failed. Auction cancelled.`
       );
     } catch (e) {
       console.error("❌ Also failed to send fallback message:", e);
@@ -728,6 +744,18 @@ async function itemGo3(client, config, channel) {
 }
 
 // =======================================================
+// SAFE TIMER CLEANUP HELPER
+// =======================================================
+function safelyCleanupTimers(...timerKeys) {
+  timerKeys.forEach(key => {
+    if (auctionState.timers[key]) {
+      clearTimeout(auctionState.timers[key]);
+      delete auctionState.timers[key];
+    }
+  });
+}
+
+// =======================================================
 // ITEM END — FIXED VERSION
 // Ensures next item only starts after completion
 // =======================================================
@@ -742,11 +770,8 @@ async function itemEnd(client, config, channel) {
   const item = auctionState.currentItem;
   item.status = "ended";
 
-  // 🧹 Clear timers to avoid duplicates
-  clearTimeout(auctionState.timers.itemEnd);
-  clearTimeout(auctionState.timers.go1);
-  clearTimeout(auctionState.timers.go2);
-  clearTimeout(auctionState.timers.go3);
+  // 🧹 Clear timers to avoid duplicates - safe cleanup
+  safelyCleanupTimers('itemEnd', 'go1', 'go2', 'go3');
 
   const timestamp = getTimestamp();
   const totalBids = item.bids ? item.bids.length : 0;
@@ -1094,10 +1119,7 @@ async function stopCurrentItem(client, config, channel) {
   }
 
   // 🧹 Clear timers safely
-  clearTimeout(auctionState.timers.itemEnd);
-  clearTimeout(auctionState.timers.go1);
-  clearTimeout(auctionState.timers.go2);
-  clearTimeout(auctionState.timers.go3);
+  safelyCleanupTimers('itemEnd', 'go1', 'go2', 'go3');
 
   const item = auctionState.currentItem;
 

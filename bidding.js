@@ -55,6 +55,24 @@ const EMOJI = {
   LIST: "📋",
 };
 
+// Error message constants (standardized for consistency)
+const ERROR_MESSAGES = {
+  NO_ROLE: `${EMOJI.ERROR} You need the ELYSIUM role to participate in auctions`,
+  NO_POINTS: `${EMOJI.ERROR} You have no bidding points available`,
+  CACHE_NOT_LOADED: `${EMOJI.ERROR} Points cache not loaded. Please try again shortly.`,
+  CACHE_LOAD_FAILED: `${EMOJI.ERROR} Failed to load bidding points from server`,
+  INVALID_BID: `${EMOJI.ERROR} Invalid bid amount. Please enter positive integers only.`,
+  INSUFFICIENT_POINTS: `${EMOJI.ERROR} Insufficient points available`,
+  RATE_LIMITED: `${EMOJI.CLOCK} Please wait before bidding again (rate limit: 3s)`,
+  NO_ACTIVE_AUCTION: `${EMOJI.ERROR} No active auction`,
+  NO_ACTIVE_ITEM: `${EMOJI.ERROR} No active auction item`,
+  SESSION_UNAVAILABLE: `${EMOJI.ERROR} Session data unavailable. Please contact admin.`,
+  AUCTION_IN_PROGRESS: `${EMOJI.WARNING} Auction start already in progress, please wait...`,
+  AUCTION_ALREADY_RUNNING: `${EMOJI.ERROR} An auction is already running`,
+  NO_ITEMS_QUEUED: `${EMOJI.ERROR} No items in queue`,
+  NO_ATTENDANCE: `${EMOJI.ERROR} You did not attend this boss. Only attendees can bid.`,
+};
+
 // Command aliases
 const COMMAND_ALIASES = {
   "!b": "!bid",
@@ -452,7 +470,6 @@ async function startSess(cli, cfg) {
 
   try {
     if (!(await loadCache(cfg.sheet_webhook_url))) {
-      st.auctionLock = false;
       return { ok: false, msg: `${EMOJI.ERROR} Cache load failed` };
     }
 
@@ -461,8 +478,6 @@ async function startSess(cli, cfg) {
     await startNext(cli, cfg);
     save();
 
-    st.auctionLock = false;
-
     return {
       ok: true,
       tot: st.q.length,
@@ -470,8 +485,11 @@ async function startSess(cli, cfg) {
       cached: Object.keys(st.cp).length,
     };
   } catch (err) {
-    st.auctionLock = false;
+    console.error(`❌ Auction start failed:`, err);
     throw err;
+  } finally {
+    // Always release lock, even on error or early return
+    st.auctionLock = false;
   }
 }
 
@@ -774,7 +792,9 @@ async function endAuc(cli, cfg) {
     });
   }
 
-  await th.setArchived(true, "Ended").catch(() => {});
+  await th.setArchived(true, "Ended").catch(err =>
+    console.warn(`⚠️ Failed to archive thread ${th.id}:`, err.message)
+  );
   st.q.shift();
   st.a = null;
   save();
@@ -989,21 +1009,33 @@ async function finalize(cli, cfg) {
 
 async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   const currentItem = auctState.currentItem;
+
+  // Safety check: Ensure currentItem and currentSession exist
+  if (!currentItem) {
+    await msg.reply(ERROR_MESSAGES.NO_ACTIVE_ITEM);
+    return { ok: false, msg: "No item" };
+  }
+
   const currentSession = currentItem.currentSession;
+  if (!currentSession) {
+    await msg.reply(ERROR_MESSAGES.SESSION_UNAVAILABLE);
+    console.error(`⚠️ Missing currentSession for item: ${currentItem.item}`);
+    return { ok: false, msg: "No session" };
+  }
 
   const m = msg.member,
     u = m.nickname || msg.author.username,
     uid = msg.author.id;
 
   if (!hasRole(m) && !isAdm(m, config)) {
-    await msg.reply(`${EMOJI.ERROR} Need ELYSIUM role`);
+    await msg.reply(ERROR_MESSAGES.NO_ROLE);
     return { ok: false, msg: "No role" };
   }
 
   // Attendance check (all items require attendance now)
   const canBid = auctRef.canUserBid(u, currentSession);
   if (!canBid) {
-    const bossName = currentSession?.bossName || "this boss";
+    const bossName = currentSession.bossName || "this boss";
     const errorMsg = await msg.channel.send(
       `❌ <@${uid}> You didn't attend **${bossName}**. Only attendees can bid on this item.\n\n*This message will be deleted in 10 seconds.*`
     );
@@ -1031,8 +1063,14 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 
   const bid = parseInt(amt);
   if (isNaN(bid) || bid <= 0 || !Number.isInteger(bid)) {
-    await msg.reply(`${EMOJI.ERROR} Invalid bid (integers only)`);
+    await msg.reply(ERROR_MESSAGES.INVALID_BID);
     return { ok: false, msg: "Invalid" };
+  }
+
+  // Boundary check: Prevent unreasonably large bids
+  if (bid > 99999999) {
+    await msg.reply(`${EMOJI.ERROR} Bid amount exceeds maximum allowed (99,999,999pts)`);
+    return { ok: false, msg: "Too large" };
   }
 
   if (bid < currentItem.curBid) {
