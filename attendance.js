@@ -93,7 +93,16 @@ function findBossMatch(input) {
     }
   }
 
-  // Fuzzy match
+  // Partial match (contains)
+  for (const name of Object.keys(bossPoints)) {
+    if (name.toLowerCase().includes(q) || q.includes(name.toLowerCase())) return name;
+    const meta = bossPoints[name];
+    for (const alias of meta.aliases || []) {
+      if (alias.toLowerCase().includes(q) || q.includes(alias.toLowerCase())) return name;
+    }
+  }
+
+  // Fuzzy match with adaptive threshold
   let best = { name: null, dist: 999 };
   for (const name of Object.keys(bossPoints)) {
     const dist = levenshtein.get(q, name.toLowerCase());
@@ -104,7 +113,9 @@ function findBossMatch(input) {
     }
   }
 
-  return best.dist <= 2 ? best.name : null;
+  // Adaptive threshold: allow more errors for longer names
+  const maxAllowedDistance = Math.max(2, Math.floor(q.length / 4));
+  return best.dist <= maxAllowedDistance ? best.name : null;
 }
 
 function parseThreadName(name) {
@@ -193,8 +204,17 @@ async function postToSheet(payload, retryCount = 0) {
 }
 
 async function checkColumnExists(boss, timestamp) {
-  const key = `${boss}|${timestamp}`;
-  if (activeColumns[key]) return true;
+  const normalizedTimestamp = normalizeTimestamp(timestamp);
+
+  // Check activeColumns with normalized timestamp comparison
+  for (const key of Object.keys(activeColumns)) {
+    const [keyBoss, keyTimestamp] = key.split('|');
+    const normalizedKeyTimestamp = normalizeTimestamp(keyTimestamp);
+    if (keyBoss.toUpperCase() === boss.toUpperCase() &&
+        normalizedKeyTimestamp === normalizedTimestamp) {
+      return true;
+    }
+  }
 
   const resp = await postToSheet({ action: "checkColumn", boss, timestamp });
   if (resp.ok) {

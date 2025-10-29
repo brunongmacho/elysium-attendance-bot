@@ -19,6 +19,29 @@ const COLUMNS = {
   FIRST_SPAWN: 5,
 };
 
+function normalizeTimestamp(timestamp) {
+  if (!timestamp) return null;
+
+  const str = timestamp.toString().trim();
+
+  // If already in MM/DD/YY HH:MM format, return as-is
+  if (/^\d{1,2}\/\d{1,2}\/\d{2}\s+\d{1,2}:\d{2}$/.test(str)) {
+    return str;
+  }
+
+  // Try to parse as Date (for Google Sheets format)
+  try {
+    const date = new Date(str);
+    if (isNaN(date.getTime())) return null;
+
+    // Convert to Manila timezone
+    const manilaTime = Utilities.formatDate(date, CONFIG.TIMEZONE, 'MM/dd/yy HH:mm');
+    return manilaTime;
+  } catch (e) {
+    return null;
+  }
+}
+
 // MAIN WEBHOOK HANDLER - COMPLETE VERSION
 function doPost(e) {
   try {
@@ -63,24 +86,30 @@ function doPost(e) {
 function handleCheckColumn(data) {
   const boss = (data.boss || '').toString().trim().toUpperCase();
   const timestamp = (data.timestamp || '').toString().trim();
-  
+
   if (!boss || !timestamp) return createResponse('error', 'Missing boss or timestamp');
-  
+
   const sheet = getCurrentWeekSheet();
   const lastCol = sheet.getLastColumn();
-  
+
   if (lastCol < COLUMNS.FIRST_SPAWN) return createResponse('ok', 'No columns', {exists: false});
-  
+
   const spawnData = sheet.getRange(1, COLUMNS.FIRST_SPAWN, 2, lastCol - COLUMNS.FIRST_SPAWN + 1).getValues();
   const row1 = spawnData[0];
   const row2 = spawnData[1];
-  
+
+  const normalizedInputTimestamp = normalizeTimestamp(timestamp);
+
   for (let i = 0; i < row1.length; i++) {
-    if ((row1[i] || '').toString().trim() === timestamp && (row2[i] || '').toString().trim().toUpperCase() === boss) {
+    const cellTimestamp = (row1[i] || '').toString().trim();
+    const cellBoss = (row2[i] || '').toString().trim().toUpperCase();
+    const normalizedCellTimestamp = normalizeTimestamp(cellTimestamp);
+
+    if (normalizedCellTimestamp === normalizedInputTimestamp && cellBoss === boss) {
       return createResponse('ok', 'Column exists', {exists: true, column: i + COLUMNS.FIRST_SPAWN});
     }
   }
-  
+
   return createResponse('ok', 'Does not exist', {exists: false});
 }
 
@@ -331,12 +360,18 @@ function handleSubmitAttendance(data) {
     const sheet = getCurrentWeekSheet();
     let lastCol = sheet.getLastColumn();
     let targetColumn = null;
-    
+
+    const normalizedInputTimestamp = normalizeTimestamp(timestamp);
+
     if (lastCol >= COLUMNS.FIRST_SPAWN) {
       const spawnData = sheet.getRange(1, COLUMNS.FIRST_SPAWN, 2, lastCol - COLUMNS.FIRST_SPAWN + 1).getValues();
       const row1 = spawnData[0], row2 = spawnData[1];
       for (let i = 0; i < row1.length; i++) {
-        if ((row1[i] || '').toString().trim() === timestamp && (row2[i] || '').toString().trim().toUpperCase() === boss) {
+        const cellTimestamp = (row1[i] || '').toString().trim();
+        const cellBoss = (row2[i] || '').toString().trim().toUpperCase();
+        const normalizedCellTimestamp = normalizeTimestamp(cellTimestamp);
+
+        if (normalizedCellTimestamp === normalizedInputTimestamp && cellBoss === boss) {
           targetColumn = i + COLUMNS.FIRST_SPAWN;
           break;
         }
@@ -551,25 +586,18 @@ function getAttendanceForBoss(data) {
   // Search for matching column
   const row1 = sheet.getRange(1, 5, 1, lastCol - 4).getValues()[0]; // Timestamps
   const row2 = sheet.getRange(2, 5, 1, lastCol - 4).getValues()[0]; // Boss names
-  
+
   let targetColumn = -1;
-  
+  const normalizedTargetTimestamp = normalizeTimestamp(targetTimestamp);
+
   for (let i = 0; i < row1.length; i++) {
     const cellTimestamp = (row1[i] || '').toString().trim();
     const cellBoss = (row2[i] || '').toString().trim().toUpperCase();
-    
-    // Try exact match first
-    if (cellTimestamp === targetTimestamp && cellBoss === bossName) {
+    const normalizedCellTimestamp = normalizeTimestamp(cellTimestamp);
+
+    // Match using normalized timestamps
+    if (normalizedCellTimestamp === normalizedTargetTimestamp && cellBoss === bossName) {
       targetColumn = i + 5; // +5 because we started from column E (5)
-      break;
-    }
-    
-    // Try fuzzy match (allow slight variations)
-    const timestampMatch = cellTimestamp.replace(/\s+/g, ' ') === targetTimestamp.replace(/\s+/g, ' ');
-    const bossMatch = cellBoss === bossName;
-    
-    if (timestampMatch && bossMatch) {
-      targetColumn = i + 5;
       break;
     }
   }
