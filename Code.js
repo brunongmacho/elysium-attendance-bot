@@ -783,11 +783,12 @@ function logAuctionResult(data) {
   
   // Update BiddingItems sheet if GoogleSheet item
   if (itemIndex > 0 && itemSource === 'GoogleSheet') {
-    sheet.getRange(itemIndex, 4).setValue(winner);      // Winner
-    sheet.getRange(itemIndex, 5).setValue(winningBid);  // Winning Bid
-    sheet.getRange(itemIndex, 6).setValue(auctionStartTime); // Auction Start
-    sheet.getRange(itemIndex, 7).setValue(auctionEndTime);   // Auction End
-    sheet.getRange(itemIndex, 8).setValue(new Date().toISOString()); // Timestamp
+    sheet.getRange(itemIndex, 4).setValue(winner);      // Winner (Column D)
+    sheet.getRange(itemIndex, 5).setValue(winningBid);  // Winning Bid (Column E)
+    sheet.getRange(itemIndex, 6).setValue(auctionStartTime); // Auction Start (Column F)
+    sheet.getRange(itemIndex, 7).setValue(auctionEndTime);   // Auction End (Column G)
+    sheet.getRange(itemIndex, 8).setValue(new Date().toISOString()); // Timestamp (Column H)
+    sheet.getRange(itemIndex, 9).setValue(totalBids);   // Total Bids (Column I)
   }
   
   return createResponse('ok', 'Auction result logged', {logged: true, source: itemSource});
