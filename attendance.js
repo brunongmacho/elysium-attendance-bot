@@ -118,6 +118,42 @@ function parseThreadName(name) {
   };
 }
 
+/**
+ * Normalize timestamp to MM/DD/YY HH:MM format for comparison
+ * Handles both formats:
+ * - Bot format: "10/29/25 09:22"
+ * - Google Sheets format: "Tue Oct 28 2025 18:10:00 GMT+0800 (Philippine Standard Time)"
+ */
+function normalizeTimestamp(timestamp) {
+  if (!timestamp) return null;
+
+  const str = timestamp.toString().trim();
+
+  // If already in MM/DD/YY HH:MM format, return as-is
+  if (/^\d{1,2}\/\d{1,2}\/\d{2}\s+\d{1,2}:\d{2}$/.test(str)) {
+    return str;
+  }
+
+  // Try to parse as Date (for Google Sheets format)
+  try {
+    const date = new Date(str);
+    if (isNaN(date.getTime())) return null;
+
+    // Convert to Manila timezone
+    const manilaTime = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+
+    const month = String(manilaTime.getMonth() + 1).padStart(2, "0");
+    const day = String(manilaTime.getDate()).padStart(2, "0");
+    const year = String(manilaTime.getFullYear()).slice(-2);
+    const hours = String(manilaTime.getHours()).padStart(2, "0");
+    const mins = String(manilaTime.getMinutes()).padStart(2, "0");
+
+    return `${month}/${day}/${year} ${hours}:${mins}`;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function postToSheet(payload, retryCount = 0) {
   const MAX_RETRIES = 3;
 
@@ -576,10 +612,13 @@ async function validateStateConsistency(client) {
     // Check 1: Threads without sheet columns
     for (const [threadId, spawn] of Object.entries(activeSpawns)) {
       const key = `${spawn.boss}|${spawn.timestamp}`;
-      const hasColumn = sheetColumns.some(col => 
-        col.boss.toUpperCase() === spawn.boss.toUpperCase() && 
-        col.timestamp === spawn.timestamp
-      );
+      const normalizedSpawnTimestamp = normalizeTimestamp(spawn.timestamp);
+
+      const hasColumn = sheetColumns.some(col => {
+        const normalizedColTimestamp = normalizeTimestamp(col.timestamp);
+        return col.boss.toUpperCase() === spawn.boss.toUpperCase() &&
+               normalizedColTimestamp === normalizedSpawnTimestamp;
+      });
 
       if (!hasColumn) {
         discrepancies.threadsWithoutColumns.push({
@@ -593,8 +632,15 @@ async function validateStateConsistency(client) {
 
     // Check 2: Sheet columns without threads
     for (const col of sheetColumns) {
-      const key = `${col.boss}|${col.timestamp}`;
-      const hasThread = activeColumns[key];
+      const normalizedColTimestamp = normalizeTimestamp(col.timestamp);
+
+      // Check if any activeColumns entry matches (by comparing normalized timestamps)
+      const hasThread = Object.keys(activeColumns).some(key => {
+        const [boss, timestamp] = key.split('|');
+        const normalizedActiveTimestamp = normalizeTimestamp(timestamp);
+        return boss.toUpperCase() === col.boss.toUpperCase() &&
+               normalizedActiveTimestamp === normalizedColTimestamp;
+      });
 
       if (!hasThread) {
         discrepancies.columnsWithoutThreads.push({
@@ -608,7 +654,8 @@ async function validateStateConsistency(client) {
     // Check 3: Duplicate columns (same boss+timestamp)
     const columnKeys = {};
     for (const col of sheetColumns) {
-      const key = `${col.boss}|${col.timestamp}`;
+      const normalizedTimestamp = normalizeTimestamp(col.timestamp);
+      const key = `${col.boss.toUpperCase()}|${normalizedTimestamp}`;
       if (columnKeys[key]) {
         discrepancies.duplicateColumns.push({
           boss: col.boss,
