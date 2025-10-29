@@ -1,448 +1,184 @@
-# Elysium Guild Attendance & Auction Bot
+# ELYSIUM Guild Bot
 
-A comprehensive Discord bot for managing guild boss spawn attendance tracking and item auction system with Google Sheets integration.
+Discord bot for managing guild attendance tracking and auction-based loot distribution.
 
 ![Status](https://img.shields.io/badge/status-production-green)
 ![Node](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-## 🌟 Features
+## Features
 
-### 📊 Attendance System
-- **Thread-based Check-ins**: Automatic thread creation for each boss spawn
-- **Screenshot Verification**: Requires screenshot proof for non-admin members
-- **Google Sheets Integration**: Auto-populates attendance columns with timestamps
-- **Week-based Tracking**: Organizes data by week (Sunday-based)
-- **State Recovery**: Recovers attendance state from existing threads on bot restart
-- **Validation Sweeps**: Three-tier validation to ensure data consistency
+### 🎯 Attendance System
+- Boss spawn check-ins with screenshot verification
+- Automatic points assignment
+- Admin verification workflow (✅/❌ reactions)
+- Google Sheets integration
+- State recovery on restart
 
-### 🎯 Auction System
-- **Boss-linked Auctions**: Items grouped by boss spawn with attendance requirements
-- **Smart Bidding**: Only members who attended the boss spawn can bid on its items
-- **Thread-per-Item**: Each auction item gets its own Discord thread
-- **Bid Confirmation**: Requires emoji confirmation to prevent accidental bids
-- **Last-minute Extensions**: Extends auction by 1 minute when bids placed in final 60 seconds (max 15 extensions)
-- **Points Management**: Tracks bidding points with lock/unlock mechanism
-- **Automated Results**: Submits winners and points to Google Sheets
+### 🔨 Auction System
+**Two Modes:**
+- **Attendance-Based** - Only attendees can bid on boss-specific items
+- **Open Auctions** - Manual queue items open to all members
 
-### 🔧 Admin Features
-- **State Management**: Save/load auction state to/from Google Sheets
-- **Force Submit**: Manually submit auction results
-- **Pause/Resume**: Control auction flow
-- **Emergency Stop**: End auctions immediately with !endauction
-- **Queue Management**: Preview and manage auction queue
-- **Validation Tools**: SWEEP commands to verify data integrity
+**Features:**
+- 30-second preview before each item with @everyone ping
+- Automatic pause if bid in last 10 seconds
+- +1 minute extension on confirmed bids
+- Point-based bidding with locked points system
+- Race condition protection
 
----
+### 🎁 Loot System
+- OCR-powered screenshot reading
+- Automatic item logging to Google Sheets
+- Boss loot tracking with blacklist filtering
 
-## 📋 Command Reference
+### 🚨 Emergency Recovery
+Complete toolkit for stuck states (requires confirmation):
+- Force close threads
+- Force end auctions
+- Unlock locked points
+- Clear pending confirmations
+- State diagnostics
+- Force sync to Google Sheets
 
-### 🛡️ Admin Commands (Admin Logs Channel Only)
+## Quick Start
 
-| Command | Description |
-|---------|-------------|
-| `!startauction` | Start auction session with confirmation |
-| `!startauctionnow` | Start auction immediately (bypasses cooldown) |
-| `!endauction` | End auction session immediately and submit results |
-| `!maintenance` or `!maint` | Create spawn threads for all 22 maintenance bosses at once |
-| `!queuelist` | Show auction queue preview |
-| `!forcesubmitresults` | Force submit auction results to sheets |
-| `!addthread <boss> (timestamp)` | Create attendance thread manually |
-| `!closethread` | Close current attendance thread |
-| `!sweep1` | Validate thread existence and column creation |
-| `!sweep2` | Load attendance state from Google Sheets |
-| `!sweep3` | Full state consistency validation |
-| `!clearstate` | Clear bot state (emergency use only) |
-| `!status` | Show bot status and uptime |
-
-### 🧵 Thread Commands (Auction Threads Only)
-
-| Command | Description |
-|---------|-------------|
-| `!pause` | Pause current auction |
-| `!resume` | Resume paused auction |
-| `!stop` | Stop current item immediately |
-| `!extend <minutes>` | Extend current auction time |
-
-### 💰 Bidding Commands (Auction Threads Only)
-
-| Command | Description |
-|---------|-------------|
-| `!bid <amount>` | Place bid (requires attendance) |
-| `!b <amount>` | Shorthand for !bid |
-
-### 👤 Member Commands (Bidding Channel)
-
-| Command | Description |
-|---------|-------------|
-| `!mypoints` | Check your bidding points |
-| `!bidstatus` | View current auction status |
-
-### ✅ Check-in Commands (Spawn Threads Only)
-
-| Keyword | Description |
-|---------|-------------|
-| `present` | Check in to boss spawn |
-| `here` | Check in to boss spawn |
-| `join` | Check in to boss spawn |
-| `checkin` | Check in to boss spawn |
-| `check-in` | Check in to boss spawn |
-
-*Note: Screenshot attachment required for non-admin members*
-
----
-
-## 📁 Project Structure
-
-```
-elysium-attendance-bot/
-├── index2.js              # Main bot entry point
-├── attendance.js          # Attendance tracking module
-├── bidding.js             # Bidding system module
-├── auctioneering.js       # Auction management module
-├── loot-system.js         # Loot distribution module
-├── help-system.js         # Help command system
-├── utils/                 # Utility modules
-│   ├── embed-builder.js   # Discord embed utilities
-│   ├── time-utils.js      # Time formatting & parsing
-│   ├── discord-utils.js   # Discord API helpers
-│   └── common.js          # Shared utilities
-├── tests/                 # Test suite
-│   ├── automated-tests.js # Automated unit tests
-│   └── test-scenarios.md  # Manual test scenarios
-├── docs/                  # Documentation
-│   └── OPTIMIZATION.md    # Performance & optimization guide
-└── config.json            # Bot configuration
-```
-
----
-
-## 🧪 Testing
-
-### Run Automated Tests
 ```bash
-node tests/automated-tests.js
-```
-
-**Test Coverage:**
-- ✅ 22 automated tests
-- ✅ 100% pass rate
-- ✅ Time utilities
-- ✅ Discord utilities
-- ✅ Embed builders
-- ✅ Performance benchmarks
-
-### Manual Testing
-See `tests/test-scenarios.md` for comprehensive manual test scenarios covering:
-- All bug fixes
-- Integration workflows
-- Edge cases
-- Performance tests
-
----
-
-## 🚀 Setup
-
-### Prerequisites
-- Node.js 16.0.0 or higher
-- Discord Bot Token
-- Google Sheets API access
-- Google Apps Script webhook URL
-
-### Installation
-
-1. **Clone the repository**
-```bash
-git clone https://github.com/yourusername/elysium-attendance-bot.git
-cd elysium-attendance-bot
-```
-
-2. **Install dependencies**
-```bash
+# Install
 npm install
-```
 
-3. **Configure the bot**
+# Configure
+cp config.example.json config.json
+# Edit config.json with your Discord IDs and Google Sheets webhook
 
-Create a `config.json` file:
-```json
-{
-  "token": "YOUR_DISCORD_BOT_TOKEN",
-  "main_guild_id": "YOUR_GUILD_ID",
-  "attendance_channel_id": "YOUR_ATTENDANCE_CHANNEL_ID",
-  "admin_logs_channel_id": "YOUR_ADMIN_LOGS_CHANNEL_ID",
-  "bidding_channel_id": "YOUR_BIDDING_CHANNEL_ID",
-  "sheet_webhook_url": "YOUR_GOOGLE_APPS_SCRIPT_WEBHOOK_URL",
-  "elysium_role_id": "YOUR_GUILD_ROLE_ID",
-  "admin_role_ids": ["ADMIN_ROLE_ID_1", "ADMIN_ROLE_ID_2"],
-  "auto_archive_minutes": 60
-}
-```
+# Set environment variable
+echo "DISCORD_TOKEN=your_token_here" > .env
 
-4. **Set up Google Sheets**
-
-- Create a Google Spreadsheet
-- Add sheets: `BossPoints`, `BiddingPoints`, `BiddingItems`
-- Deploy `Code.js` as a Web App in Google Apps Script
-- Copy the webhook URL to your config
-
-5. **Run the bot**
-```bash
+# Run
 node index2.js
 ```
 
----
+## Key Commands
 
-## 📐 Architecture
+### For Members
+- `present` or `here` - Check in for boss spawns (requires screenshot)
+- `!bid <amount>` - Bid on auction items
+- `!mypoints` - Check available points
 
-### File Structure
+### For Admins
+
+**Attendance:**
+- `!status` - Bot health check
+- `!verify @member` - Manual verification
+- `!forceclose` - Force close thread
+- `!closeallthread` - Mass close all threads
+
+**Auctions:**
+- `!startauction` - Start auction session
+- `!auction <item> <price> <duration>` - Add manual item
+- `!pause` / `!resume` - Control auction
+- `!stop` - End current item
+
+**Emergency (use when stuck):**
+- `!emergency diag` - Show state
+- `!emergency closeall` - Force close all threads
+- `!emergency endauction` - Force end auction
+- `!emergency unlock` - Unlock all points
+- `!emergency sync` - Force save to sheets
+
+Type `!help` in Discord for complete command list.
+
+## Configuration
+
+Edit `config.json`:
+
+```json
+{
+  "main_guild_id": "YOUR_GUILD_ID",
+  "attendance_channel_id": "CHANNEL_ID",
+  "admin_logs_channel_id": "CHANNEL_ID",
+  "bidding_channel_id": "CHANNEL_ID",
+  "timer_server_id": "SERVER_ID",
+  "sheet_webhook_url": "GOOGLE_APPS_SCRIPT_URL",
+  "admin_roles": ["Admin", "Officer"]
+}
 ```
-elysium-attendance-bot/
-├── index2.js              # Main bot entry point
-├── attendance.js          # Attendance tracking logic
-├── auctioneering.js       # Auction session management
-├── bidding.js            # Bidding and points logic
-├── loot-system.js        # Loot entry management
-├── help-system.js        # Help command handler
-├── Code.js               # Google Apps Script (deploy separately)
-├── utils/
-│   └── common.js         # Shared utilities
-├── config.json           # Bot configuration (create this)
-└── README.md             # This file
-```
 
-### Key Components
+## Google Sheets Setup
 
-#### Attendance System
-- **Thread Creation**: `[MM/DD/YY HH:MM] Boss Name` format
-- **Column Format**: Boss name + timestamp in Google Sheets
-- **State Management**: In-memory with Google Sheets backup
-- **Validation**: Three-tier sweep system
+Required sheets:
+1. **Attendance** - Boss spawn tracking
+2. **BiddingPoints** - Member points
+3. **BiddingItems** - Auction queue
+4. **BotState** - State persistence
 
-#### Auction System
-- **Session-based**: Items grouped by boss spawn
-- **Attendance Gating**: Checks attendance before allowing bids
-- **Thread Architecture**: One thread per item
-- **Points Locking**: Prevents over-bidding
+Deploy Apps Script with `doPost()` webhook handler.
 
-#### Google Sheets Integration
-- **Week Sheets**: `ELYSIUM_WEEK_YYYYMMDD` format
-- **Boss Points**: Points awarded per boss
-- **Bidding Points**: Member points and spending tracking
-- **Bidding Items**: Auction queue with boss linkage
-
----
-
-## 🔄 How It Works
+## How It Works
 
 ### Attendance Flow
-```
-1. Admin uses !addthread or boss spawn detected
-   ↓
-2. Bot creates thread: [10/29/25 14:30] Queen Ant
-   ↓
-3. Members check in with "present" + screenshot
-   ↓
-4. Bot creates Google Sheets column automatically
-   ↓
-5. Bot populates member checkboxes in column
-   ↓
-6. Thread closes after verification
-```
+1. Boss spawn detected → Thread created
+2. Members type `present` with screenshot
+3. Admin verifies with ✅ reaction
+4. Points auto-assigned
+5. Thread closed → Data submitted to sheets
 
 ### Auction Flow
-```
-1. Admin adds items to BiddingItems sheet with boss data
-   ↓
-2. Admin runs !startauction
-   ↓
-3. Bot groups items by boss spawn
-   ↓
-4. Bot loads attendance for each boss session
-   ↓
-5. For each item, bot creates auction thread
-   ↓
-6. Members bid (attendance verified)
-   ↓
-7. Auction ends → winner determined
-   ↓
-8. Results submitted to BiddingPoints sheet
-```
+1. Admin runs `!startauction`
+2. Items grouped by boss (attendance required)
+3. **30-second preview** with @everyone ping
+4. Members bid → 10-second confirmation
+5. If bid in last 10s → **auction pauses**
+6. On confirmation → **+1 min extension**
+7. Winner announced, points deducted
 
----
+## Emergency Recovery
 
-## 🛠️ Configuration Details
+If bot gets stuck:
+1. `!emergency diag` - Check state
+2. Use appropriate recovery command
+3. Confirm with ✅ reaction
+4. State auto-saves to Google Sheets
 
-### Boss Points Sheet
+## Architecture
+
 ```
-Columns: Boss | Points | Aliases
-Format:
-  Queen Ant | 50 | qa, queenant, ant
-  Core | 100 | core
+index2.js              - Main bot
+attendance.js          - Attendance system
+auctioneering.js       - Auction sessions
+bidding.js             - Bidding engine
+loot-system.js         - OCR processing
+emergency-commands.js  - Recovery toolkit
+help-system.js         - Command docs
 ```
 
-### BiddingItems Sheet
-```
-Columns: Item | Start Price | Duration | Winner | Winning Bid | Auction Start | Auction End | Timestamp | Total Bids | Source | Quantity | Boss
-Format:
-  Dragon Sword | 500 | 5 | | | | | | | LOOT | 1 | QUEEN ANT 10/29/2025 14:30:00
-```
+## State Persistence
 
-### BiddingPoints Sheet
-```
-Columns: Members | Points Consumed | Points Left | Attendance Points | [Boss spawn columns...]
-Format:
-  PlayerName | 500 | 1500 | 2000 | TRUE | FALSE | TRUE...
-```
+- **Local:** `bidding-state.json` (fast access)
+- **Cloud:** Google Sheets `BotState` tab (survives restarts)
+- Auto-sync every 5 minutes
+- Full recovery on startup
 
----
+## Security
 
-## 🔐 Permissions Required
+- Admin role verification
+- Confirmation for destructive actions
+- Rate limiting (3s cooldown on bids)
+- Screenshot verification required
+- Race condition protection
 
-### Discord Bot Permissions
-- Read Messages/View Channels
-- Send Messages
-- Manage Messages
-- Create Public Threads
-- Send Messages in Threads
-- Manage Threads
-- Add Reactions
-- Read Message History
-- Attach Files
-- Embed Links
+## Support
 
-### Google Apps Script Permissions
-- Read/Write access to Google Spreadsheet
-- Execute as Web App
-
----
-
-## 📅 Data Format Standards
-
-### Timestamps
-- **Format**: `MM/DD/YY HH:MM` (zero-padded)
-- **Timezone**: Asia/Manila (GMT+8)
-- **Example**: `10/29/25 14:30`
-
-### Boss Names
-- **Case**: UPPERCASE in sheets
-- **Matching**: Case-insensitive with fuzzy matching
-- **Example**: "QUEEN ANT", "CORE", "EGO"
-
-### Week Sheet Names
-- **Format**: `ELYSIUM_WEEK_YYYYMMDD`
-- **Example**: `ELYSIUM_WEEK_20251027` (Sunday of the week)
-
----
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Bot not responding to commands**
-- Check bot has proper permissions in channel
-- Verify bot is online and connected
-- Check command is in correct channel (admin logs vs threads)
-
-**Attendance not saving**
-- Run `!sweep1` to verify thread/column status
-- Check Google Sheets webhook URL is correct
-- Verify timestamp format matches (MM/DD/YY HH:MM)
-
-**Bidding blocked despite attendance**
-- Verify username matches exactly (case-insensitive)
-- Check boss spawn timestamp matches item timestamp
-- Run `!sweep3` to validate state consistency
-
-**"Column without thread" errors**
-- Run timestamp normalization check
-- Ensure manual sheet edits use zero-padded format
-- Use !sweep3 to identify discrepancies
-
----
-
-## 📊 Recent Updates
-
-### v5.1 - Maintenance, Bug Fixes & Refactoring (Latest)
-
-**New Features:**
-- ✅ Added !maintenance command to spawn all 22 maintenance bosses at once
-- ✅ Added comprehensive test suite (22 automated tests, 100% pass rate)
-- ✅ Added manual test scenarios (28 test cases)
-
-**Bug Fixes:**
-- ✅ Fixed bidding threads not closing after auctions end
-- ✅ Fixed ArrayValidator error in session finalization
-- ✅ Fixed message reference error when replying to deleted messages
-- ✅ Fixed !endauction to properly end entire session (not just current item)
-- ✅ Fixed false positive "columns without threads" validation warnings
-- ✅ Fixed missing bidding points tally summary after session ends
-
-**Code Quality & Performance:**
-- ✅ Extracted reusable utility modules (embed-builder, time-utils, discord-utils)
-- ✅ Improved thread archiving logic with proper parent channel detection
-- ✅ Enhanced error handling in embed field validation
-- ✅ Added graceful fallbacks for Discord API failures
-- ✅ Performance benchmarked and optimized (see docs/OPTIMIZATION.md)
-- ✅ 10% memory usage improvement
-
-### v5.0 - Comprehensive Overhaul
-- ✅ Abolished manual queue feature - all items require attendance
-- ✅ Fixed critical timestamp normalization bug (false negatives)
-- ✅ Restricted commands to proper channels (thread-only vs admin-only)
-- ✅ Added !endauction command for emergency session termination
-- ✅ Implemented proper attendance validation for auction bids
-- ✅ Added bid confirmation warnings
-- ✅ Auto-populate item prices from previous auctions
-- ✅ Time extension for last-minute bids (1 minute when bid in final 60s)
-- ✅ Consolidated duplicate utility functions
-- ✅ Fixed bid validation (allow bids at start price)
-- ✅ Removed 40 lines of redundant code
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
-## 📝 License
-
-This project is licensed under the MIT License.
-
----
-
-## 🙏 Acknowledgments
-
-- Built with [discord.js](https://discord.js.org/)
-- Google Sheets integration via Google Apps Script
-- Fuzzy matching powered by [fast-levenshtein](https://github.com/hiddentao/fast-levenshtein)
-
----
-
-## 📞 Support
-
-For issues and questions:
-- Open an issue on GitHub
+- Type `!help` in Discord
+- Use `!emergency diag` for diagnostics
+- Check GitHub issues
 - Contact guild admins
 
----
+## License
 
-## 🔮 Future Enhancements
-
-- [ ] Web dashboard for viewing auction history
-- [ ] Automated boss spawn detection
-- [ ] Statistical reports and analytics
-- [ ] Multi-guild support
-- [ ] Attendance leaderboards
-- [ ] Automated points distribution
+MIT License
 
 ---
 
-**Made with ❤️ for the Elysium Guild**
+**Version:** 3.1
+**Last Updated:** 2025-10-29

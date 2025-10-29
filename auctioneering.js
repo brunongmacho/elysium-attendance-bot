@@ -511,6 +511,57 @@ async function auctionNextItem(client, config, channel) {
     return auctionNextItem(client, config, channel);
   }
 
+  // ==========================================
+  // 30-SECOND PREVIEW BEFORE ITEM STARTS
+  // ==========================================
+  const remainingInSession = session.items.length - auctionState.currentItemIndex;
+  const previewEmbed = new EmbedBuilder()
+    .setColor(COLORS.AUCTION)
+    .setTitle(`${EMOJI.CLOCK} NEXT ITEM COMING UP`)
+    .setDescription(`**${item.item}**`)
+    .addFields(
+      {
+        name: `${EMOJI.BID} Starting Bid`,
+        value: `${item.startPrice || 0} points`,
+        inline: true,
+      },
+      {
+        name: `${EMOJI.TIME} Duration`,
+        value: `${item.duration || 2} minutes`,
+        inline: true,
+      },
+      {
+        name: `${EMOJI.LIST} Items Left`,
+        value: `${remainingInSession} in session`,
+        inline: true,
+      },
+      {
+        name: `${EMOJI.TROPHY} Boss`,
+        value: `${session.bossName}`,
+        inline: true,
+      },
+      {
+        name: `${EMOJI.FIRE} Attendance Required`,
+        value: session.bossName !== "Manual Queue" ? "Yes" : "No",
+        inline: true,
+      }
+    )
+    .setFooter({ text: "Auction starts in 30 seconds" })
+    .setTimestamp();
+
+  await channel.send({
+    content: "@everyone",
+    embeds: [previewEmbed],
+  });
+
+  console.log(`${EMOJI.CLOCK} 30-second preview for: ${item.item}`);
+
+  // Wait 30 seconds before starting
+  await new Promise(resolve => setTimeout(resolve, 30000));
+
+  // ==========================================
+  // START THE ACTUAL AUCTION
+  // ==========================================
   auctionState.currentItem = item;
   auctionState.currentItem.status = "active";
   auctionState.currentItem.bids = [];
