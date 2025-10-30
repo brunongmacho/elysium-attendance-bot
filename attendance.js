@@ -249,7 +249,8 @@ async function createSpawnThreads(
 // ==========================================
 
 async function scanThreadForPendingReactions(thread, client, bossName, parsed) {
-  const messages = await thread.messages.fetch({ limit: 100 }).catch(() => null);
+  // Reduced from 100 to 50 for memory optimization
+  const messages = await thread.messages.fetch({ limit: 50 }).catch(() => null);
   if (!messages) return { members: [], pending: [], confirmations: [] };
 
   const members = [];

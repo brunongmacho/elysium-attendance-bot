@@ -84,7 +84,7 @@ const COMMAND_ALIASES = {
 const config = JSON.parse(fs.readFileSync("./config.json"));
 const bossPoints = JSON.parse(fs.readFileSync("./boss_points.json"));
 
-// Initialize Discord client
+// Initialize Discord client with memory optimization
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -95,6 +95,35 @@ const client = new Client({
     GatewayIntentBits.DirectMessages,
   ],
   partials: [Partials.Channel, Partials.Message, Partials.Reaction],
+  // Memory optimization: Sweep caches regularly
+  sweepers: {
+    messages: {
+      interval: 300, // Every 5 minutes
+      lifetime: 600, // Remove messages older than 10 minutes
+    },
+    users: {
+      interval: 600, // Every 10 minutes
+      filter: () => (user) => user.bot && user.id !== client.user?.id, // Keep only non-bot users and self
+    },
+    guildMembers: {
+      interval: 900, // Every 15 minutes
+      filter: () => (member) => member.id !== client.user?.id, // Keep only self
+    },
+  },
+  // Disable caching for things we don't need
+  makeCache: (manager) => {
+    // Default to no caching for most things
+    if (manager.name === 'GuildMemberManager') return null;
+    if (manager.name === 'UserManager') return null;
+    if (manager.name === 'PresenceManager') return null;
+    if (manager.name === 'VoiceStateManager') return null;
+    if (manager.name === 'StageInstanceManager') return null;
+    if (manager.name === 'GuildBanManager') return null;
+    if (manager.name === 'GuildInviteManager') return null;
+    if (manager.name === 'GuildScheduledEventManager') return null;
+    // Keep default caching for essential managers
+    return undefined; // Use default for others
+  },
 });
 
 // ==========================================
@@ -1920,6 +1949,16 @@ client.once(Events.ClientReady, async () => {
 
   // START BIDDING CHANNEL CLEANUP SCHEDULE
   startBiddingChannelCleanupSchedule();
+
+  // START PERIODIC GARBAGE COLLECTION (Memory Optimization)
+  if (global.gc) {
+    console.log("🧹 Starting periodic garbage collection (every 10 minutes)");
+    setInterval(() => {
+      global.gc();
+      const memUsage = process.memoryUsage();
+      console.log(`🧹 GC: Heap used: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB / ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`);
+    }, 10 * 60 * 1000); // Every 10 minutes
+  }
 });
 
 // ==========================================
