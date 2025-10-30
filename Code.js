@@ -101,10 +101,18 @@ function handleCheckColumn(data) {
 
   const normalizedInputTimestamp = normalizeTimestamp(timestamp);
 
+  // Skip if input timestamp is invalid
+  if (!normalizedInputTimestamp) {
+    return createResponse('ok', 'Invalid timestamp', {exists: false});
+  }
+
   for (let i = 0; i < row1.length; i++) {
     const cellTimestamp = (row1[i] || '').toString().trim();
     const cellBoss = (row2[i] || '').toString().trim().toUpperCase();
     const normalizedCellTimestamp = normalizeTimestamp(cellTimestamp);
+
+    // Skip if cell timestamp is invalid
+    if (!normalizedCellTimestamp) continue;
 
     if (normalizedCellTimestamp === normalizedInputTimestamp && cellBoss === boss) {
       return createResponse('ok', 'Column exists', {exists: true, column: i + COLUMNS.FIRST_SPAWN});
@@ -382,6 +390,11 @@ function handleSubmitAttendance(data) {
 
     const normalizedInputTimestamp = normalizeTimestamp(timestamp);
 
+    // Skip if input timestamp is invalid
+    if (!normalizedInputTimestamp) {
+      return createResponse('error', 'Invalid timestamp format');
+    }
+
     if (lastCol >= COLUMNS.FIRST_SPAWN) {
       const spawnData = sheet.getRange(1, COLUMNS.FIRST_SPAWN, 2, lastCol - COLUMNS.FIRST_SPAWN + 1).getValues();
       const row1 = spawnData[0], row2 = spawnData[1];
@@ -389,6 +402,9 @@ function handleSubmitAttendance(data) {
         const cellTimestamp = (row1[i] || '').toString().trim();
         const cellBoss = (row2[i] || '').toString().trim().toUpperCase();
         const normalizedCellTimestamp = normalizeTimestamp(cellTimestamp);
+
+        // Skip if cell timestamp is invalid
+        if (!normalizedCellTimestamp) continue;
 
         if (normalizedCellTimestamp === normalizedInputTimestamp && cellBoss === boss) {
           targetColumn = i + COLUMNS.FIRST_SPAWN;
@@ -609,14 +625,22 @@ function getAttendanceForBoss(data) {
   let targetColumn = -1;
   const normalizedTargetTimestamp = normalizeTimestamp(targetTimestamp);
 
+  // Skip if target timestamp is invalid
+  if (!normalizedTargetTimestamp) {
+    return createResponse('error', 'Invalid timestamp format', {attendees: []});
+  }
+
   for (let i = 0; i < row1.length; i++) {
     const cellTimestamp = (row1[i] || '').toString().trim();
     const cellBoss = (row2[i] || '').toString().trim().toUpperCase();
     const normalizedCellTimestamp = normalizeTimestamp(cellTimestamp);
 
+    // Skip if cell timestamp is invalid
+    if (!normalizedCellTimestamp) continue;
+
     // Match using normalized timestamps
     if (normalizedCellTimestamp === normalizedTargetTimestamp && cellBoss === bossName) {
-      targetColumn = i + 5; // +5 because we started from column E (5)
+      targetColumn = i + COLUMNS.FIRST_SPAWN; // Use constant instead of hardcoded value
       break;
     }
   }
@@ -806,9 +830,9 @@ function handleSubmitBiddingResults(data) {
   let biddingItemsSheet = ss.getSheetByName('BiddingItems');
   if (!biddingItemsSheet) {
     biddingItemsSheet = ss.insertSheet('BiddingItems');
-    biddingItemsSheet.getRange(1, 1, 1, 11).setValues([[
-      'Item', 'Start Price', 'Duration', 'Winner', 'Winning Bid', 
-      'Auction Start', 'Auction End', 'Timestamp', 'Total Bids', 'Source', 'Quantity'
+    biddingItemsSheet.getRange(1, 1, 1, 12).setValues([[
+      'Item', 'Start Price', 'Duration', 'Winner', 'Winning Bid',
+      'Auction Start', 'Auction End', 'Timestamp', 'Total Bids', 'Source', 'Quantity', 'Boss'
     ]])
     .setFontWeight('bold')
     .setBackground('#4A90E2')
@@ -972,10 +996,21 @@ function moveQueueItemsToSheet(data) {
   let insertRow = lastRow + 1;
   
   items.forEach(item => {
-    sheet.getRange(insertRow, 1).setValue(item.item);
-    sheet.getRange(insertRow, 2).setValue(item.startPrice);
-    sheet.getRange(insertRow, 3).setValue(item.duration);
-    sheet.getRange(insertRow, 10).setValue('QueueList');
+    // Set all 12 columns with proper defaults
+    sheet.getRange(insertRow, 1, 1, 12).setValues([[
+      item.item,          // Item (Column A)
+      item.startPrice,    // Start Price (Column B)
+      item.duration,      // Duration (Column C)
+      '',                 // Winner (Column D) - empty
+      '',                 // Winning Bid (Column E) - empty
+      '',                 // Auction Start (Column F) - empty
+      '',                 // Auction End (Column G) - empty
+      '',                 // Timestamp (Column H) - empty
+      '',                 // Total Bids (Column I) - empty
+      'QueueList',        // Source (Column J)
+      1,                  // Quantity (Column K) - default to 1
+      ''                  // Boss (Column L) - empty
+    ]]);
     insertRow++;
   });
   
@@ -983,12 +1018,25 @@ function moveQueueItemsToSheet(data) {
 }
 
 function updateBiddingPoints() {
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
-  const bpSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
-  if (!bpSheet) return;
+  // Acquire lock to prevent race conditions
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (e) {
+    Logger.log('❌ Lock timeout in updateBiddingPoints: ' + e.toString());
+    return;
+  }
 
-  const lastRow = bpSheet.getLastRow();
-  const lastCol = bpSheet.getLastColumn();
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    const bpSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
+    if (!bpSheet) {
+      lock.releaseLock();
+      return;
+    }
+
+    const lastRow = bpSheet.getLastRow();
+    const lastCol = bpSheet.getLastColumn();
 
   // Get all data including session columns (columns 4+)
   const allData = lastRow > 1 ? bpSheet.getRange(2, 1, lastRow - 1, lastCol).getValues() : [];
@@ -1034,17 +1082,20 @@ function updateBiddingPoints() {
     });
   }
 
-  // --- Step 4: Update Column 3 (Points Consumed) and Column 2 (Points Left) for all members ---
-  Object.keys(memberMap).forEach(m => {
-    const consumed = memberMap[m].consumed;
-    const left = (attendancePoints[m] || 0) - consumed;
+    // --- Step 4: Update Column 3 (Points Consumed) and Column 2 (Points Left) for all members ---
+    Object.keys(memberMap).forEach(m => {
+      const consumed = memberMap[m].consumed;
+      const left = (attendancePoints[m] || 0) - consumed;
 
-    // Update both columns
-    bpSheet.getRange(memberMap[m].row, 2).setValue(left);      // Column 2 = Points Left
-    bpSheet.getRange(memberMap[m].row, 3).setValue(consumed);  // Column 3 = Points Consumed
-  });
+      // Update both columns
+      bpSheet.getRange(memberMap[m].row, 2).setValue(left);      // Column 2 = Points Left
+      bpSheet.getRange(memberMap[m].row, 3).setValue(consumed);  // Column 3 = Points Consumed
+    });
 
-  Logger.log(`✅ Updated bidding points for ${Object.keys(memberMap).length} members`);
+    Logger.log(`✅ Updated bidding points for ${Object.keys(memberMap).length} members`);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ===========================================================

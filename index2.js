@@ -2826,19 +2826,25 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
       return;
     }
 
-    // Admin check for attendance-related reactions
-    const adminMember = await guild.members.fetch(user.id).catch(() => null);
-    if (!adminMember || !isAdmin(adminMember)) {
-      try {
-        await reaction.users.remove(user.id);
-      } catch (e) {
-        console.error(`❌ Failed to remove non-admin reaction from ${user.tag}:`, e.message);
-      }
-      return;
-    }
-
     // Attendance verification
     const pending = pendingVerifications[msg.id];
+    const closePending = pendingClosures[msg.id];
+
+    // Admin check ONLY for attendance-related reactions
+    if (pending || closePending) {
+      const adminMember = await guild.members.fetch(user.id).catch(() => null);
+      if (!adminMember || !isAdmin(adminMember)) {
+        try {
+          await reaction.users.remove(user.id);
+        } catch (e) {
+          console.error(`❌ Failed to remove non-admin reaction from ${user.tag}:`, e.message);
+        }
+        return;
+      }
+    } else {
+      // Not an attendance-related message, ignore this reaction
+      return;
+    }
 
     if (pending) {
       const spawnInfo = activeSpawns[pending.threadId];
@@ -2914,8 +2920,6 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     }
 
     // Close confirmation
-    const closePending = pendingClosures[msg.id];
-
     if (closePending) {
       const spawnInfo = activeSpawns[closePending.threadId];
 
