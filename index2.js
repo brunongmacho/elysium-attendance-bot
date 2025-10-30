@@ -10,7 +10,6 @@ const {
   Partials,
   Events,
   EmbedBuilder,
-  Collection,
 } = require("discord.js");
 const fetch = require("node-fetch");
 const levenshtein = require("fast-levenshtein");
@@ -101,7 +100,7 @@ const client = new Client({
     GatewayIntentBits.DirectMessages,
   ],
   partials: [Partials.Channel, Partials.Message, Partials.Reaction],
-  // Memory optimization: Sweep caches regularly
+  // Memory optimization: Sweep caches regularly to manage 256MB RAM limit
   sweepers: {
     messages: {
       interval: 300, // Every 5 minutes
@@ -116,18 +115,7 @@ const client = new Client({
       filter: () => (member) => member.id !== client.user?.id, // Keep only self
     },
   },
-  // Disable caching for things we don't need
-  makeCache: (manager) => {
-    // Disable caching for non-essential managers (return null)
-    if (manager.name === 'PresenceManager') return null;
-    if (manager.name === 'VoiceStateManager') return null;
-    if (manager.name === 'StageInstanceManager') return null;
-    if (manager.name === 'GuildBanManager') return null;
-    if (manager.name === 'GuildInviteManager') return null;
-    if (manager.name === 'GuildScheduledEventManager') return null;
-    // Keep default caching for essential managers (Guild, Channel, Message, etc.)
-    return new Collection(); // Return Collection for all other managers
-  },
+  // Use default caching - rely on sweepers for memory management
 });
 
 // ==========================================
