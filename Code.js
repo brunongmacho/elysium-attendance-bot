@@ -444,10 +444,23 @@ function handleSubmitAttendance(data) {
       
       if (newMembers.length > 0) {
         const newMemberData = newMembers.map(m => [m.name]);
-        sheet.getRange(lastRow + 1, COLUMNS.MEMBERS, newMembers.length, 1).setValues(newMemberData);
+        const insertStart = lastRow + 1;
+
+        // Insert member names
+        sheet.getRange(insertStart, COLUMNS.MEMBERS, newMembers.length, 1).setValues(newMemberData);
+
+        // Copy formulas from previous row for columns B, C, D (if they exist)
+        if (lastRow >= 3) {
+          const formulas = sheet.getRange(lastRow, 2, 1, 3).getFormulas();
+          for (let i = 0; i < newMembers.length; i++) {
+            sheet.getRange(insertStart + i, 2, 1, 3).setFormulas(formulas);
+          }
+        }
+
+        // Fill FALSE for all previous spawn columns (E to newCol-1)
         if (newCol > COLUMNS.FIRST_SPAWN) {
           const falseArray = Array(newMembers.length).fill(null).map(() => Array(newCol - COLUMNS.FIRST_SPAWN).fill(false));
-          sheet.getRange(lastRow + 1, COLUMNS.FIRST_SPAWN, newMembers.length, newCol - COLUMNS.FIRST_SPAWN)
+          sheet.getRange(insertStart, COLUMNS.FIRST_SPAWN, newMembers.length, newCol - COLUMNS.FIRST_SPAWN)
                .setValues(falseArray).setDataValidation(checkboxRule);
         }
       }
@@ -1214,10 +1227,10 @@ function updateTotalAttendanceAndMembers() {
   const totalSheet = ss.getSheetByName(totalSheetName);
   const memberTotals = {};
 
-  // --- Step 1: Gather all members + count TRUE checkboxes ---
+  // --- Step 1: Gather all members + count TRUE checkboxes from all weekly sheets ---
   sheets.forEach(sheet => {
     const data = sheet.getDataRange().getValues();
-    for (let i = 1; i < data.length; i++) {
+    for (let i = 2; i < data.length; i++) { // Start from row 3 (index 2) to skip headers
       const name = data[i][0];
       if (!name) continue;
       const attendance = data[i].slice(4).filter(v => v === true).length;
@@ -1225,7 +1238,7 @@ function updateTotalAttendanceAndMembers() {
     }
   });
 
-  // --- Step 2: Update TOTAL ATTENDANCE sheet ---
+  // --- Step 2: Update TOTAL ATTENDANCE sheet ONLY ---
   const result = [["Member", "Total Attendance (Days)"]];
   Object.keys(memberTotals)
     .sort((a, b) => a.localeCompare(b))
@@ -1234,16 +1247,10 @@ function updateTotalAttendanceAndMembers() {
   totalSheet.clearContents();
   totalSheet.getRange(1, 1, result.length, 2).setValues(result);
 
-  // --- Step 3: Sync new members into all weekly sheets ---
-  const allMembers = Object.keys(memberTotals);
-  sheets.forEach(sheet => {
-    const existing = sheet.getRange("A2:A").getValues().flat().filter(String);
-    const missing = allMembers.filter(m => !existing.includes(m));
-    if (missing.length > 0) {
-      const insertStart = existing.length + 2;
-      sheet.getRange(insertStart, 1, missing.length, 1).setValues(missing.map(m => [m]));
-    }
-  });
+  Logger.log(`✅ Updated TOTAL ATTENDANCE sheet with ${result.length - 1} members`);
+
+  // NOTE: This function does NOT modify weekly sheets
+  // New members are added to weekly sheets automatically by handleSubmitAttendance() when attendance is submitted
 }
 // ==========================================
 // LEADERBOARD & WEEKLY REPORT FUNCTIONS

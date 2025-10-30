@@ -29,6 +29,11 @@ const COMMAND_ALIASES = {
   "!commands": "!help",
   "!cmds": "!help",
 
+  // Leaderboard commands
+  "!leadatt": "!leaderboardattendance",
+  "!leadbid": "!leaderboardbidding",
+  "!week": "!weeklyreport",
+
   // Attendance commands (admin)
   "!st": "!status",
   "!addth": "!addthread",
@@ -1759,6 +1764,17 @@ if (auctState.active && auctState.currentItem) {
     console.log(`📊 ${member.user.username} requested bidding leaderboard`);
     await leaderboardSystem.displayBiddingLeaderboard(message);
   },
+
+  weeklyreport: async (message, member) => {
+    if (!isAdmin(member)) {
+      await message.reply("❌ Only admins can trigger weekly reports.");
+      return;
+    }
+
+    console.log(`📅 ${member.user.username} manually triggered weekly report`);
+    await message.reply("📊 Generating weekly report...");
+    await leaderboardSystem.sendWeeklyReport();
+  },
 };
 
 // ==========================================
@@ -2237,6 +2253,37 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
       await commandHandlers.help(message, member);
+      return;
+    }
+
+    // Leaderboard commands (admin only, anywhere except spawn threads)
+    if (
+      resolvedCmd === "!leaderboardattendance" ||
+      resolvedCmd === "!leaderboardbidding" ||
+      resolvedCmd === "!weeklyreport"
+    ) {
+      if (!userIsAdmin) {
+        await message.reply("❌ Only admins can use leaderboard commands.");
+        return;
+      }
+
+      if (
+        message.channel.isThread() &&
+        message.channel.parentId === config.attendance_channel_id
+      ) {
+        await message.reply(
+          "⚠️ Please use leaderboard commands in admin logs channel to avoid cluttering spawn threads."
+        );
+        return;
+      }
+
+      if (resolvedCmd === "!leaderboardattendance") {
+        await commandHandlers.leaderboardattendance(message, member);
+      } else if (resolvedCmd === "!leaderboardbidding") {
+        await commandHandlers.leaderboardbidding(message, member);
+      } else if (resolvedCmd === "!weeklyreport") {
+        await commandHandlers.weeklyreport(message, member);
+      }
       return;
     }
 
