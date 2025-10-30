@@ -23,26 +23,19 @@ The error "Unknown action: getAttendanceLeaderboard" means your Google Apps Scri
 2. Paste the new code (Ctrl+V / Cmd+V)
 3. Click the **Save** button (💾 icon) or press Ctrl+S
 
-### Step 4: Deploy the Updated Script
+### Step 4: Update Your Existing Deployment (KEEP YOUR WEBHOOK URL)
 
-#### If this is your FIRST deployment:
-1. Click **Deploy → New deployment**
-2. Click the gear icon (⚙️) next to "Select type"
-3. Select **Web app**
-4. Configure:
-   - **Description:** "ELYSIUM Bot Webhook v2.0" (or any description)
-   - **Execute as:** Me (your email)
-   - **Who has access:** Anyone
-5. Click **Deploy**
-6. **Copy the Web app URL** - this is your webhook URL
-7. Update your `config.json` with this URL
+⚠️ **IMPORTANT: Do NOT create a new deployment! Update the existing one to keep your webhook URL.**
 
-#### If you've ALREADY deployed before:
 1. Click **Deploy → Manage deployments**
 2. Click the **Edit** button (✏️) next to your existing deployment
 3. Under "Version", click **New version**
 4. Click **Deploy**
-5. Your webhook URL stays the same - no need to update config.json
+5. ✅ **Your webhook URL stays the same** - no need to update config.json
+
+**Why this matters:**
+- Creating a new deployment = new webhook URL (you don't want this)
+- Updating existing deployment = same webhook URL (this is what you want)
 
 ### Step 5: Test the Deployment
 1. In your Discord bot, try: `!leadatt`

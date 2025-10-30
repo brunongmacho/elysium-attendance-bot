@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - 'claude/**'  # Also deploy from claude/* feature branches
     paths:
       - 'Code.js'
       - 'appsscript.json'
