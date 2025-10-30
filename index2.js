@@ -21,6 +21,7 @@ const auctioneering = require("./auctioneering.js");
 const attendance = require("./attendance.js");
 const lootSystem = require("./loot-system.js");
 const emergencyCommands = require("./emergency-commands.js");
+const leaderboardSystem = require("./leaderboard-system.js");
 
 const COMMAND_ALIASES = {
   // Help commands
@@ -40,6 +41,10 @@ const COMMAND_ALIASES = {
   "!closeall": "!closeallthread",
   "!clear": "!clearstate",
   "!maint": "!maintenance",
+
+  // Leaderboard commands (admin)
+  "!leadatt": "!leaderboardattendance",
+  "!leadbid": "!leaderboardbidding",
 
   // Bidding commands (admin)
   "!auc": "!auction",
@@ -1743,6 +1748,30 @@ if (auctState.active && auctState.currentItem) {
       }
     );
   },
+
+  // ==========================================
+  // LEADERBOARD COMMANDS
+  // ==========================================
+
+  leaderboardattendance: async (message, member) => {
+    if (!isAdmin(member)) {
+      await message.reply("❌ Only admins can view leaderboards.");
+      return;
+    }
+
+    console.log(`📊 ${member.user.username} requested attendance leaderboard`);
+    await leaderboardSystem.displayAttendanceLeaderboard(message);
+  },
+
+  leaderboardbidding: async (message, member) => {
+    if (!isAdmin(member)) {
+      await message.reply("❌ Only admins can view leaderboards.");
+      return;
+    }
+
+    console.log(`📊 ${member.user.username} requested bidding leaderboard`);
+    await leaderboardSystem.displayBiddingLeaderboard(message);
+  },
 };
 
 // ==========================================
@@ -1764,6 +1793,7 @@ client.once(Events.ClientReady, async () => {
   auctioneering.setPostToSheet(attendance.postToSheet); // Use attendance module's postToSheet
   lootSystem.initialize(config, bossPoints, isAdmin);
   emergencyCommands.initialize(config, attendance, bidding, auctioneering, isAdmin);
+  leaderboardSystem.init(client, config); // Initialize leaderboard system
 
   console.log("\n╔═══════════════════════════════════════════════════════╗");
   console.log("║         🔄 BOT STATE RECOVERY (3-SWEEP SYSTEM)   ║");
@@ -1949,6 +1979,10 @@ client.once(Events.ClientReady, async () => {
 
   // START BIDDING CHANNEL CLEANUP SCHEDULE
   startBiddingChannelCleanupSchedule();
+
+  // START WEEKLY REPORT SCHEDULER (3am Monday GMT+8)
+  console.log("📅 Starting weekly report scheduler...");
+  leaderboardSystem.scheduleWeeklyReport();
 
   // START PERIODIC GARBAGE COLLECTION (Memory Optimization)
   if (global.gc) {
