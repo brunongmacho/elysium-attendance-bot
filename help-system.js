@@ -219,6 +219,41 @@ const COMMAND_HELP = {
   },
 
   // ========================================
+  // LEADERBOARD COMMANDS
+  // ========================================
+  leaderboardattendance: {
+    usage: "!leadatt",
+    description: "Display attendance leaderboard showing top members by attendance points",
+    category: "Leaderboard",
+    adminOnly: true,
+    example: "!leadatt",
+    aliases: ["!leadatt"],
+    features: [
+      "Shows top 10 members by attendance",
+      "Total attendance points per member",
+      "Current week statistics",
+      "Visual progress bars",
+      "Average attendance calculation"
+    ]
+  },
+
+  leaderboardbidding: {
+    usage: "!leadbid",
+    description: "Display bidding points leaderboard showing top members by points left",
+    category: "Leaderboard",
+    adminOnly: true,
+    example: "!leadbid",
+    aliases: ["!leadbid"],
+    features: [
+      "Shows top 10 members by points remaining",
+      "Points left and consumed breakdown",
+      "Total points distribution statistics",
+      "Visual progress bars",
+      "Real-time points data"
+    ]
+  },
+
+  // ========================================
   // AUCTIONEERING COMMANDS
   // ========================================
   startauction: {
@@ -557,6 +592,7 @@ const COMMAND_HELP = {
 
 const CATEGORIES = {
   Attendance: `${EMOJI.THREAD} Attendance System`,
+  Leaderboard: `${EMOJI.TROPHY} Leaderboard & Reports`,
   Auctioneering: `${EMOJI.FIRE} Auctioneering System`,
   Bidding: `${EMOJI.BID} Bidding System`,
   Loot: `${EMOJI.LOOT} Loot Recognition`,
@@ -566,6 +602,7 @@ const CATEGORIES = {
 
 const CATEGORY_DESCRIPTIONS = {
   Attendance: "Manage boss spawn check-ins, verifications, and Google Sheets submission",
+  Leaderboard: "View attendance and bidding leaderboards, automatic weekly reports",
   Auctioneering: "Session-based auction system with attendance filtering per boss",
   Bidding: "Point-based auction management with queue and item tracking",
   Loot: "OCR-powered loot screenshot processing and automatic logging",

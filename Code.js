@@ -73,6 +73,11 @@ function doPost(e) {
     if (action === 'getLootState') return getLootState(data);
     if (action === 'saveLootState') return saveLootState(data);
 
+    // Leaderboard & Weekly Report actions
+    if (action === 'getAttendanceLeaderboard') return getAttendanceLeaderboard(data);
+    if (action === 'getBiddingLeaderboard') return getBiddingLeaderboard(data);
+    if (action === 'getWeeklySummary') return getWeeklySummary(data);
+
     Logger.log(`❌ Unknown: ${action}`);
     return createResponse('error', 'Unknown action: ' + action);
 
@@ -1240,6 +1245,285 @@ function updateTotalAttendanceAndMembers() {
     }
   });
 }
+// ==========================================
+// LEADERBOARD & WEEKLY REPORT FUNCTIONS
+// ==========================================
+
+/**
+ * Get attendance leaderboard from TOTAL ATTENDANCE sheet
+ */
+function getAttendanceLeaderboard(data) {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    const totalSheet = ss.getSheetByName('TOTAL ATTENDANCE');
+
+    if (!totalSheet) {
+      return createResponse('error', 'TOTAL ATTENDANCE sheet not found');
+    }
+
+    const lastRow = totalSheet.getLastRow();
+    if (lastRow <= 1) {
+      return createResponse('ok', 'No attendance data', {
+        leaderboard: [],
+        weekName: 'N/A',
+        totalSpawns: 0,
+        averageAttendance: 0
+      });
+    }
+
+    // Read data from columns A (Member) and B (Total Attendance)
+    const data_range = totalSheet.getRange(2, 1, lastRow - 1, 2);
+    const values = data_range.getValues();
+
+    // Build leaderboard array
+    const leaderboard = [];
+    for (let i = 0; i < values.length; i++) {
+      const name = values[i][0];
+      const points = values[i][1] || 0;
+
+      if (name && name.toString().trim()) {
+        leaderboard.push({
+          name: name.toString().trim(),
+          points: typeof points === 'number' ? points : 0
+        });
+      }
+    }
+
+    // Sort by points (descending)
+    leaderboard.sort((a, b) => b.points - a.points);
+
+    // Get current week name
+    const currentWeekSheet = getCurrentWeekSheet();
+    const weekName = currentWeekSheet ? currentWeekSheet.getName() : 'N/A';
+
+    // Calculate statistics
+    const totalSpawns = currentWeekSheet ? Math.max(0, currentWeekSheet.getLastColumn() - COLUMNS.FIRST_SPAWN + 1) : 0;
+    const totalPoints = leaderboard.reduce((sum, m) => sum + m.points, 0);
+    const averageAttendance = leaderboard.length > 0 ? Math.round((totalPoints / leaderboard.length) * 10) / 10 : 0;
+
+    Logger.log(`✅ Fetched attendance leaderboard: ${leaderboard.length} members`);
+
+    return createResponse('ok', 'Attendance leaderboard fetched', {
+      leaderboard: leaderboard,
+      weekName: weekName,
+      totalSpawns: totalSpawns,
+      averageAttendance: averageAttendance
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error in getAttendanceLeaderboard: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Get bidding points leaderboard from BiddingPoints sheet
+ */
+function getBiddingLeaderboard(data) {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    const biddingSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
+
+    if (!biddingSheet) {
+      return createResponse('error', 'BiddingPoints sheet not found');
+    }
+
+    const lastRow = biddingSheet.getLastRow();
+    if (lastRow <= 1) {
+      return createResponse('ok', 'No bidding data', {
+        leaderboard: [],
+        totalPointsDistributed: 0,
+        totalPointsConsumed: 0
+      });
+    }
+
+    // Read data from columns A (Member), B (Points Left), C (Points Consumed)
+    const data_range = biddingSheet.getRange(2, 1, lastRow - 1, 3);
+    const values = data_range.getValues();
+
+    // Build leaderboard array
+    const leaderboard = [];
+    let totalDistributed = 0;
+    let totalConsumed = 0;
+
+    for (let i = 0; i < values.length; i++) {
+      const name = values[i][0];
+      const pointsLeft = values[i][1] || 0;
+      const pointsConsumed = values[i][2] || 0;
+
+      if (name && name.toString().trim()) {
+        leaderboard.push({
+          name: name.toString().trim(),
+          pointsLeft: typeof pointsLeft === 'number' ? pointsLeft : 0,
+          pointsConsumed: typeof pointsConsumed === 'number' ? pointsConsumed : 0
+        });
+
+        totalDistributed += (typeof pointsLeft === 'number' ? pointsLeft : 0) + (typeof pointsConsumed === 'number' ? pointsConsumed : 0);
+        totalConsumed += (typeof pointsConsumed === 'number' ? pointsConsumed : 0);
+      }
+    }
+
+    // Sort by points left (descending)
+    leaderboard.sort((a, b) => b.pointsLeft - a.pointsLeft);
+
+    Logger.log(`✅ Fetched bidding leaderboard: ${leaderboard.length} members`);
+
+    return createResponse('ok', 'Bidding leaderboard fetched', {
+      leaderboard: leaderboard,
+      totalPointsDistributed: totalDistributed,
+      totalPointsConsumed: totalConsumed
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error in getBiddingLeaderboard: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Get weekly summary for weekly report
+ */
+function getWeeklySummary(data) {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+
+    // Get attendance data
+    const totalSheet = ss.getSheetByName('TOTAL ATTENDANCE');
+    let attendanceData = {
+      totalSpawns: 0,
+      uniqueAttendees: 0,
+      averagePerSpawn: 0,
+      topAttendees: []
+    };
+
+    if (totalSheet && totalSheet.getLastRow() > 1) {
+      const lastRow = totalSheet.getLastRow();
+      const values = totalSheet.getRange(2, 1, lastRow - 1, 2).getValues();
+
+      const members = [];
+      for (let i = 0; i < values.length; i++) {
+        const name = values[i][0];
+        const points = values[i][1] || 0;
+        if (name && name.toString().trim()) {
+          members.push({
+            name: name.toString().trim(),
+            points: typeof points === 'number' ? points : 0
+          });
+        }
+      }
+
+      members.sort((a, b) => b.points - a.points);
+
+      const currentWeekSheet = getCurrentWeekSheet();
+      const totalSpawns = currentWeekSheet ? Math.max(0, currentWeekSheet.getLastColumn() - COLUMNS.FIRST_SPAWN + 1) : 0;
+      const totalPoints = members.reduce((sum, m) => sum + m.points, 0);
+
+      attendanceData = {
+        totalSpawns: totalSpawns,
+        uniqueAttendees: members.length,
+        averagePerSpawn: totalSpawns > 0 ? Math.round((totalPoints / totalSpawns) * 10) / 10 : 0,
+        topAttendees: members.slice(0, 5)
+      };
+    }
+
+    // Get bidding data
+    const biddingSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
+    let biddingData = {
+      totalDistributed: 0,
+      totalConsumed: 0,
+      totalRemaining: 0,
+      topSpenders: []
+    };
+
+    if (biddingSheet && biddingSheet.getLastRow() > 1) {
+      const lastRow = biddingSheet.getLastRow();
+      const values = biddingSheet.getRange(2, 1, lastRow - 1, 3).getValues();
+
+      const members = [];
+      let totalDist = 0;
+      let totalCons = 0;
+      let totalRem = 0;
+
+      for (let i = 0; i < values.length; i++) {
+        const name = values[i][0];
+        const pointsLeft = values[i][1] || 0;
+        const pointsConsumed = values[i][2] || 0;
+
+        if (name && name.toString().trim()) {
+          members.push({
+            name: name.toString().trim(),
+            consumed: typeof pointsConsumed === 'number' ? pointsConsumed : 0,
+            remaining: typeof pointsLeft === 'number' ? pointsLeft : 0
+          });
+
+          const pLeft = typeof pointsLeft === 'number' ? pointsLeft : 0;
+          const pCons = typeof pointsConsumed === 'number' ? pointsConsumed : 0;
+
+          totalDist += pLeft + pCons;
+          totalCons += pCons;
+          totalRem += pLeft;
+        }
+      }
+
+      members.sort((a, b) => b.consumed - a.consumed);
+
+      biddingData = {
+        totalDistributed: totalDist,
+        totalConsumed: totalCons,
+        totalRemaining: totalRem,
+        topSpenders: members.slice(0, 5)
+      };
+    }
+
+    // Calculate most active members (activity score = attendance points + bidding consumed / 10)
+    const mostActive = [];
+    const attendeeMap = {};
+    const bidderMap = {};
+
+    if (attendanceData.topAttendees) {
+      attendanceData.topAttendees.forEach(a => {
+        attendeeMap[a.name] = a.points;
+      });
+    }
+
+    if (biddingData.topSpenders) {
+      biddingData.topSpenders.forEach(b => {
+        bidderMap[b.name] = b.consumed;
+      });
+    }
+
+    const allNames = new Set([...Object.keys(attendeeMap), ...Object.keys(bidderMap)]);
+    allNames.forEach(name => {
+      const attPoints = attendeeMap[name] || 0;
+      const bidPoints = bidderMap[name] || 0;
+      const activityScore = attPoints + Math.floor(bidPoints / 10);
+
+      mostActive.push({
+        name: name,
+        score: activityScore
+      });
+    });
+
+    mostActive.sort((a, b) => b.score - a.score);
+
+    const currentWeekSheet = getCurrentWeekSheet();
+    const weekName = currentWeekSheet ? currentWeekSheet.getName() : 'N/A';
+
+    Logger.log(`✅ Generated weekly summary`);
+
+    return createResponse('ok', 'Weekly summary fetched', {
+      weekName: weekName,
+      attendance: attendanceData,
+      bidding: biddingData,
+      mostActive: mostActive.slice(0, 5)
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error in getWeeklySummary: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
 // UTILITIES
 function createResponse(status, message, data) {
   const response = {
