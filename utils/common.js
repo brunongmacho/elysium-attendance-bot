@@ -193,12 +193,105 @@ function bossNamesMatch(boss1, boss2) {
 }
 
 /**
+ * Normalize username for comparison
+ * - Converts to lowercase
+ * - Trims leading/trailing whitespace
+ * - Replaces multiple consecutive spaces with single space
+ * - Removes special characters (keeping only alphanumeric and spaces)
+ * @param {string} username - Username to normalize
+ * @returns {string} Normalized username
+ */
+function normalizeUsername(username) {
+  if (!username) return '';
+  return username
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')           // Replace multiple spaces with single space
+    .replace(/[^\w\s]/g, '');       // Remove special characters (keep alphanumeric and spaces)
+}
+
+/**
  * Sleep for specified milliseconds
  * @param {number} ms - Milliseconds to sleep
  * @returns {Promise}
  */
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Log error to admin channel with formatted embed
+ * @param {Object} client - Discord client
+ * @param {string} adminChannelId - Admin channel ID
+ * @param {Object} options - Error details
+ * @param {string} options.title - Error title
+ * @param {string} options.description - Error description
+ * @param {Error} [options.error] - Error object
+ * @param {Object} [options.context] - Additional context
+ * @returns {Promise<void>}
+ */
+async function logErrorToAdmin(client, adminChannelId, options) {
+  try {
+    if (!client || !adminChannelId) {
+      console.warn('⚠️ Cannot log to admin channel: missing client or channel ID');
+      return;
+    }
+
+    const { title, description, error, context } = options;
+
+    const guild = client.guilds.cache.first();
+    if (!guild) {
+      console.warn('⚠️ Cannot log to admin channel: no guild found');
+      return;
+    }
+
+    const adminChannel = await guild.channels.fetch(adminChannelId).catch(() => null);
+    if (!adminChannel) {
+      console.warn('⚠️ Cannot log to admin channel: channel not found');
+      return;
+    }
+
+    const embed = {
+      color: 0xFF0000, // Red for errors
+      title: `❌ ${title}`,
+      description: description || 'An error occurred',
+      fields: [],
+      timestamp: new Date().toISOString(),
+    };
+
+    if (error) {
+      embed.fields.push({
+        name: 'Error Message',
+        value: `\`\`\`${error.message || 'Unknown error'}\`\`\``,
+        inline: false,
+      });
+
+      if (error.stack) {
+        const stackTrace = error.stack.slice(0, 1000); // Limit to 1000 chars
+        embed.fields.push({
+          name: 'Stack Trace',
+          value: `\`\`\`${stackTrace}\`\`\``,
+          inline: false,
+        });
+      }
+    }
+
+    if (context) {
+      const contextStr = JSON.stringify(context, null, 2).slice(0, 1000);
+      embed.fields.push({
+        name: 'Context',
+        value: `\`\`\`json\n${contextStr}\`\`\``,
+        inline: false,
+      });
+    }
+
+    await adminChannel.send({ embeds: [embed] }).catch(err => {
+      console.error('❌ Failed to send error log to admin channel:', err);
+    });
+  } catch (err) {
+    console.error('❌ Error in logErrorToAdmin:', err);
+  }
 }
 
 module.exports = {
@@ -211,5 +304,7 @@ module.exports = {
   findBossMatch,
   timestampsMatch,
   bossNamesMatch,
+  normalizeUsername,
   sleep,
+  logErrorToAdmin,
 };

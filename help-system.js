@@ -203,12 +203,27 @@ const COMMAND_HELP = {
     ]
   },
 
+  maintenance: {
+    usage: "!maintenance",
+    description: "Bulk create attendance threads for all maintenance bosses at once",
+    category: "Attendance",
+    adminOnly: true,
+    example: "!maintenance",
+    features: [
+      "Creates threads for 22+ maintenance bosses",
+      "Automatic timestamp detection",
+      "Batch thread creation",
+      "Saves time during weekly maintenance",
+      "Confirmation required"
+    ]
+  },
+
   // ========================================
   // AUCTIONEERING COMMANDS
   // ========================================
   startauction: {
     usage: "!startauction",
-    description: "Start attendance-based auction session (Sheet items + manual queue)",
+    description: "Start attendance-based auction session (loads items from BiddingItems sheet)",
     category: "Auctioneering",
     adminOnly: true,
     example: "!startauction",
@@ -217,7 +232,6 @@ const COMMAND_HELP = {
       "10-minute cooldown protection",
       "Loads items from Google Sheets",
       "Groups items by boss (attendance-required sessions)",
-      "Manual queue items = OPEN to all",
       "Sheet items = attendance verification",
       "Auto-loads attendance per boss",
       "Session preview before start"
@@ -302,23 +316,6 @@ const COMMAND_HELP = {
   // ========================================
   // BIDDING COMMANDS (Admin)
   // ========================================
-  auction: {
-    usage: "!auction <item> <startPrice> <duration> [quantity]",
-    description: "Add item to manual queue (OPEN to all, no attendance requirement)",
-    category: "Bidding",
-    adminOnly: true,
-    example: "!auction Dragon Sword 500 30\n!auction Blue Stone 100 15 5",
-    aliases: ["!auc"],
-    features: [
-      "Manual queue items",
-      "Open to all members",
-      "Batch auction support (quantity)",
-      "Custom start price",
-      "Custom duration (minutes)",
-      "Queue position assigned"
-    ]
-  },
-
   queuelist: {
     usage: "!queuelist",
     description: "View complete auction queue preview (shows all sessions)",
@@ -327,7 +324,6 @@ const COMMAND_HELP = {
     example: "!queuelist",
     aliases: ["!ql", "!queue"],
     features: [
-      "Shows manual items (OPEN)",
       "Shows boss-grouped sessions",
       "Attendee counts per session",
       "Item details (price, duration)",
@@ -338,14 +334,13 @@ const COMMAND_HELP = {
 
   removeitem: {
     usage: "!removeitem <itemName>",
-    description: "Remove specific item from queue (manual or sheet queue)",
+    description: "Remove specific item from auction queue",
     category: "Bidding",
     adminOnly: true,
     example: "!removeitem Dragon Sword",
     aliases: ["!rm"],
     features: [
       "Case-insensitive search",
-      "Works on both queues",
       "Shows remaining count",
       "Confirmation of removal"
     ]
@@ -353,16 +348,14 @@ const COMMAND_HELP = {
 
   clearqueue: {
     usage: "!clearqueue",
-    description: "Remove ALL items from manual queue (requires confirmation)",
+    description: "Manual queue has been deprecated - items must be added via Google Sheets",
     category: "Bidding",
     adminOnly: true,
     example: "!clearqueue",
     aliases: ["!clearq"],
     features: [
-      "Clears entire manual queue",
-      "Cannot clear during auction",
-      "Confirmation required",
-      "Shows removed count"
+      "Shows deprecation message",
+      "All items must be added to BiddingItems sheet"
     ]
   },
 
@@ -426,23 +419,6 @@ const COMMAND_HELP = {
       "Unlocks points",
       "Moves to next item",
       "Confirmation required"
-    ]
-  },
-
-  testbidding: {
-    usage: "!testbidding",
-    description: "Run complete bidding system diagnostics (connection, cache, state)",
-    category: "Bidding",
-    adminOnly: true,
-    example: "!testbidding",
-    aliases: ["!testbid"],
-    features: [
-      "Tests Google Sheets connection",
-      "Tests webhook configuration",
-      "Tests channel access",
-      "Shows cache status",
-      "Shows queue status",
-      "Troubleshooting guidance"
     ]
   },
 
@@ -707,12 +683,12 @@ async function handleHelp(message, args, member) {
         `${EMOJI.ROCKET} **New in v8.0:**\n` +
         `${EMOJI.SUCCESS} Attendance-based auction filtering\n` +
         `${EMOJI.SUCCESS} Session-based auctions (grouped by boss)\n` +
-        `${EMOJI.SUCCESS} Manual items = OPEN (no attendance)\n` +
         `${EMOJI.SUCCESS} Sheet items = ATTENDANCE REQUIRED\n` +
         `${EMOJI.SUCCESS} OCR-powered loot logging\n` +
         `${EMOJI.SUCCESS} State persistence to Google Sheets\n` +
         `${EMOJI.SUCCESS} 10-minute auction cooldown\n` +
-        `${EMOJI.SUCCESS} Auto-bidding channel cleanup (12h)`
+        `${EMOJI.SUCCESS} Auto-bidding channel cleanup (12h)\n` +
+        `${EMOJI.SUCCESS} Maintenance bulk thread creation`
       )
       .addFields({
         name: `${EMOJI.CHART} Quick Stats`,
@@ -778,8 +754,7 @@ async function handleHelp(message, args, member) {
         `${EMOJI.SPARKLES} **Version ${BOT_VERSION}**\n\n` +
         `${EMOJI.INFO} Use \`!help <command>\` for detailed info\n\n` +
         `${EMOJI.WARNING} **Important:** Boss-specific auction items require attendance!\n` +
-        `Only members who attended that boss can bid on its items.\n` +
-        `Manual queue items are OPEN to everyone.`
+        `Only members who attended that boss can bid on its items.`
       );
 
     // Group by category
@@ -827,7 +802,6 @@ async function handleHelp(message, args, member) {
         name: `${EMOJI.FIRE} Attendance-Based Bidding`,
         value:
           `${EMOJI.BOSS} **Boss Items:** Only attendees can bid\n` +
-          `${EMOJI.STAR} **Manual Items:** Open to everyone\n` +
           `${EMOJI.INFO} Check auction message for restrictions\n` +
           `${EMOJI.TROPHY} Attend boss spawns to unlock more bidding!`,
         inline: false,

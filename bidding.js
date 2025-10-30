@@ -15,6 +15,7 @@
 const { EmbedBuilder } = require("discord.js");
 const fetch = require("node-fetch");
 const fs = require("fs");
+const { normalizeUsername } = require("./utils/common");
 
 let auctioneering = null;
 let cfg = null;
@@ -26,6 +27,19 @@ const RL = 3000; // rate limit (3s)
 const ME = 15; // max extensions
 const CACHE_REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
 const PREVIEW_TIME = 30000; // 30 seconds
+
+// Timeout constants
+const TIMEOUTS = {
+  CONFIRMATION: 30000,        // 30 seconds - user confirmation timeout
+  STALE_CONFIRMATION: 60000,  // 60 seconds - stale confirmation cleanup
+  NEXT_ITEM_DELAY: 20000,     // 20 seconds - delay before next item
+  QUICK_DELAY: 5000,          // 5 seconds - quick delay for next item
+  MESSAGE_DELETE: 3000,       // 3 seconds - delay before deleting messages
+  GOING_ONCE: 60000,          // 60 seconds - "going once" announcement
+  GOING_TWICE: 30000,         // 30 seconds - "going twice" announcement
+  FINAL_CALL: 10000,          // 10 seconds - final call announcement
+  FINALIZE_DELAY: 2000,       // 2 seconds - delay before finalize
+};
 
 // Color scheme (consistent throughout)
 const COLORS = {
@@ -249,6 +263,9 @@ function initializeBidding(config, isAdminFunc, auctioneeringRef) {
   isAdmFunc = isAdminFunc;
   cfg = config;
   auctioneering = auctioneeringRef;
+
+  // Start cleanup schedule for pending confirmations
+  startCleanupSchedule();
 }
 
 // Add after COLORS constant definition (around line 30)
@@ -614,12 +631,12 @@ function schedTimers(cli, cfg) {
   ["goingOnce", "goingTwice", "finalCall", "auctionEnd"].forEach((k) => {
     if (st.th[k]) clearTimeout(st.th[k]);
   });
-  if (t > 60000 && !a.go1)
-    st.th.goingOnce = setTimeout(async () => await ann1(cli, cfg), t - 60000);
-  if (t > 30000 && !a.go2)
-    st.th.goingTwice = setTimeout(async () => await ann2(cli, cfg), t - 30000);
-  if (t > 10000)
-    st.th.finalCall = setTimeout(async () => await ann3(cli, cfg), t - 10000);
+  if (t > TIMEOUTS.GOING_ONCE && !a.go1)
+    st.th.goingOnce = setTimeout(async () => await ann1(cli, cfg), t - TIMEOUTS.GOING_ONCE);
+  if (t > TIMEOUTS.GOING_TWICE && !a.go2)
+    st.th.goingTwice = setTimeout(async () => await ann2(cli, cfg), t - TIMEOUTS.GOING_TWICE);
+  if (t > TIMEOUTS.FINAL_CALL)
+    st.th.finalCall = setTimeout(async () => await ann3(cli, cfg), t - TIMEOUTS.FINAL_CALL);
   st.th.auctionEnd = setTimeout(async () => await endAuc(cli, cfg), t);
 }
 
@@ -804,9 +821,9 @@ async function endAuc(cli, cfg) {
     await th.parent.send(
       `${EMOJI.CLOCK} Next in 20s...\n${EMOJI.LIST} **${n.item}** - ${n.startPrice}pts`
     );
-    st.th.next = setTimeout(async () => await startNext(cli, cfg), 20000);
+    st.th.next = setTimeout(async () => await startNext(cli, cfg), TIMEOUTS.NEXT_ITEM_DELAY);
   } else {
-    setTimeout(async () => await finalize(cli, cfg), 2000);
+    setTimeout(async () => await finalize(cli, cfg), TIMEOUTS.FINALIZE_DELAY);
   }
 }
 
@@ -843,12 +860,12 @@ async function submitSessionTally(config, sessionItems) {
   const winners = {};
 
   sessionItems.forEach((item) => {
-    const normalizedWinner = item.winner.toLowerCase().trim();
+    const normalizedWinner = normalizeUsername(item.winner);
     winners[normalizedWinner] = (winners[normalizedWinner] || 0) + item.amount;
   });
 
   const res = allMembers.map((m) => {
-    const normalizedMember = m.toLowerCase().trim();
+    const normalizedMember = normalizeUsername(m);
     return {
       member: m,
       totalSpent: winners[normalizedMember] || 0,
@@ -931,12 +948,12 @@ async function finalize(cli, cfg) {
 
   const winners = {};
   st.h.forEach((a) => {
-    const normalizedWinner = a.winner.toLowerCase().trim();
+    const normalizedWinner = normalizeUsername(a.winner);
     winners[normalizedWinner] = (winners[normalizedWinner] || 0) + a.amount;
   });
 
   const res = allMembers.map((m) => {
-    const normalizedMember = m.toLowerCase().trim();
+    const normalizedMember = normalizeUsername(m);
     return {
       member: m,
       totalSpent: winners[normalizedMember] || 0,
@@ -1172,15 +1189,19 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     }
   }, 1000);
 
+  // Store countdown interval for cleanup
+  st.th[`countdown_${conf.id}`] = countdownInterval;
+
   st.th[`c_${conf.id}`] = setTimeout(async () => {
-    clearInterval(countdownInterval);
+    clearInterval(st.th[`countdown_${conf.id}`]);
+    delete st.th[`countdown_${conf.id}`];
     if (st.pc[conf.id]) {
       await conf.reactions.removeAll().catch(() => {});
       const timeoutEmbed = EmbedBuilder.from(confEmbed)
         .setColor(COLORS.INFO)
         .setFooter({ text: `${EMOJI.CLOCK} Timed out` });
       await conf.edit({ embeds: [timeoutEmbed] });
-      setTimeout(async () => await conf.delete().catch(() => {}), 3000);
+      setTimeout(async () => await conf.delete().catch(() => {}), TIMEOUTS.MESSAGE_DELETE);
       delete st.pc[conf.id];
       save();
     }
@@ -1325,6 +1346,9 @@ async function procBid(msg, amt, cfg) {
     }
   }, 1000);
 
+  // Store countdown interval for cleanup
+  st.th[`countdown_${conf.id}`] = countdownInterval;
+
   // Check if bid in last 10 seconds - PAUSE
   const timeLeft = a.endTime - Date.now();
   if (timeLeft <= 10000 && timeLeft > 0) {
@@ -1335,14 +1359,15 @@ async function procBid(msg, amt, cfg) {
   }
 
   st.th[`c_${conf.id}`] = setTimeout(async () => {
-    clearInterval(countdownInterval);
+    clearInterval(st.th[`countdown_${conf.id}`]);
+    delete st.th[`countdown_${conf.id}`];
     if (st.pc[conf.id]) {
       await conf.reactions.removeAll().catch(() => {});
       const timeoutEmbed = EmbedBuilder.from(confEmbed)
         .setColor(getColor(COLORS.INFO))
         .setFooter({ text: `${EMOJI.CLOCK} Timed out` });
       await conf.edit({ embeds: [timeoutEmbed] });
-      setTimeout(async () => await conf.delete().catch(() => {}), 3000);
+      setTimeout(async () => await conf.delete().catch(() => {}), TIMEOUTS.MESSAGE_DELETE);
       delete st.pc[conf.id];
       save();
 
@@ -1588,7 +1613,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
             u.id === msg.author.id,
           max: 1,
-          time: 30000,
+          time: TIMEOUTS.CONFIRMATION,
           errors: ["time"],
         });
 
@@ -1740,7 +1765,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
             u.id === msg.author.id,
           max: 1,
-          time: 30000,
+          time: TIMEOUTS.CONFIRMATION,
           errors: ["time"],
         });
 
@@ -1784,7 +1809,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
             u.id === msg.author.id,
           max: 1,
-          time: 30000,
+          time: TIMEOUTS.CONFIRMATION,
           errors: ["time"],
         });
         if (col.first().emoji.name === EMOJI.SUCCESS) {
@@ -1845,7 +1870,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
             u.id === msg.author.id,
           max: 1,
-          time: 30000,
+          time: TIMEOUTS.CONFIRMATION,
           errors: ["time"],
         });
         if (fsCol.first().emoji.name === EMOJI.SUCCESS) {
@@ -1853,14 +1878,14 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
           const winners = {};
           st.h.forEach((a) => {
-            const normalizedWinner = a.winner.toLowerCase().trim();
+            const normalizedWinner = normalizeUsername(a.winner);
             winners[normalizedWinner] =
               (winners[normalizedWinner] || 0) + a.amount;
           });
 
           const allMembers = Object.keys(st.cp || {});
           const res = allMembers.map((m) => {
-            const normalizedMember = m.toLowerCase().trim();
+            const normalizedMember = normalizeUsername(m);
             return {
               member: m,
               totalSpent: winners[normalizedMember] || 0,
@@ -1955,7 +1980,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
             u.id === msg.author.id,
           max: 1,
-          time: 30000,
+          time: TIMEOUTS.CONFIRMATION,
           errors: ["time"],
         });
         if (canCol.first().emoji.name === EMOJI.SUCCESS) {
@@ -1969,7 +1994,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           st.a = null;
           save();
           if (st.q.length > 0)
-            setTimeout(async () => await startNext(cli, cfg), 5000);
+            setTimeout(async () => await startNext(cli, cfg), TIMEOUTS.QUICK_DELAY);
           else await finalize(cli, cfg);
         } else {
           await canMsg.reactions.removeAll().catch(() => {});
@@ -2004,7 +2029,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
             u.id === msg.author.id,
           max: 1,
-          time: 30000,
+          time: TIMEOUTS.CONFIRMATION,
           errors: ["time"],
         });
         if (skpCol.first().emoji.name === EMOJI.SUCCESS) {
@@ -2016,7 +2041,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           st.a = null;
           save();
           if (st.q.length > 0)
-            setTimeout(async () => await startNext(cli, cfg), 5000);
+            setTimeout(async () => await startNext(cli, cfg), TIMEOUTS.QUICK_DELAY);
           else await finalize(cli, cfg);
         } else {
           await skpMsg.reactions.removeAll().catch(() => {});
@@ -2205,6 +2230,57 @@ async function startItemAuction(client, config, thread, item, session) {
   }, duration);
 }
 
+// CLEANUP FUNCTION FOR PENDING CONFIRMATIONS
+function cleanupPendingConfirmations() {
+  const now = Date.now();
+
+  let cleaned = 0;
+  Object.keys(st.pc).forEach(msgId => {
+    const pending = st.pc[msgId];
+
+    // Check if confirmation is older than timeout
+    if (pending.timestamp && (now - pending.timestamp > TIMEOUTS.STALE_CONFIRMATION)) {
+      // Clear associated timer if exists
+      if (st.th[`c_${msgId}`]) {
+        clearTimeout(st.th[`c_${msgId}`]);
+        delete st.th[`c_${msgId}`];
+      }
+
+      // Clear countdown interval if exists
+      if (st.th[`countdown_${msgId}`]) {
+        clearInterval(st.th[`countdown_${msgId}`]);
+        delete st.th[`countdown_${msgId}`];
+      }
+
+      // Remove pending confirmation
+      delete st.pc[msgId];
+      cleaned++;
+    }
+  });
+
+  if (cleaned > 0) {
+    console.log(`🧹 Cleaned up ${cleaned} stale pending confirmation(s)`);
+    save();
+  }
+}
+
+// Start periodic cleanup (every 2 minutes)
+let cleanupInterval = null;
+function startCleanupSchedule() {
+  if (!cleanupInterval) {
+    cleanupInterval = setInterval(cleanupPendingConfirmations, 120000); // 2 minutes
+    console.log("🧹 Started pending confirmations cleanup schedule");
+  }
+}
+
+function stopCleanupSchedule() {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+    console.log("⏹️ Stopped pending confirmations cleanup schedule");
+  }
+}
+
 // MODULE EXPORTS
 module.exports = {
   startItemAuction,
@@ -2222,7 +2298,10 @@ module.exports = {
   submitSessionTally: submitSessionTally,
   loadBiddingStateFromSheet: loadBiddingStateFromSheet,
   saveBiddingStateToSheet: saveBiddingStateToSheet,
-  clearPointsCache: clearCache,
+  cleanupPendingConfirmations,
+  startCleanupSchedule,
+  stopCleanupSchedule,
+  stopCacheAutoRefresh,
 
   confirmBid: async function (reaction, user, config) {
   const p = st.pc[reaction.message.id];

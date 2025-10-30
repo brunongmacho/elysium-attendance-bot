@@ -296,6 +296,117 @@ async function cleanupBiddingChannel() {
       return;
     }
 
+    // ========================================
+    // CLEANUP OLD THREADS (Lock & Archive)
+    // ========================================
+    console.log(`🧵 Checking for old auction threads...`);
+
+    // Check if there's an active auction session
+    const auctionState = auctioneering.getAuctionState();
+    const hasActiveAuction = auctionState && auctionState.active;
+
+    let threadsLocked = 0;
+    let threadsArchived = 0;
+    let threadsSkipped = 0;
+
+    if (hasActiveAuction) {
+      console.log(`⚠️ Active auction detected - skipping thread cleanup to avoid interfering`);
+    } else {
+
+      try {
+        // Fetch all active threads in the bidding channel
+        const activeThreads = await biddingChannel.threads.fetchActive().catch(() => null);
+
+        if (activeThreads && activeThreads.threads.size > 0) {
+          console.log(`📋 Found ${activeThreads.threads.size} active thread(s) in bidding channel`);
+
+          for (const [threadId, thread] of activeThreads.threads) {
+            try {
+              // Check if thread is an auction thread (type 11 or 12)
+              if (thread.type !== 11 && thread.type !== 12) {
+                threadsSkipped++;
+                continue;
+              }
+
+              // Lock the thread if not already locked
+              if (!thread.locked && typeof thread.setLocked === 'function') {
+                await thread.setLocked(true, "Bidding channel cleanup").catch(err => {
+                  console.warn(`⚠️ Failed to lock thread ${thread.name}:`, err.message);
+                });
+                threadsLocked++;
+                console.log(`🔒 Locked: ${thread.name}`);
+
+                // Small delay to avoid race conditions with Discord API
+                await new Promise(resolve => setTimeout(resolve, 300));
+              }
+
+              // Archive the thread if not already archived
+              if (!thread.archived && typeof thread.setArchived === 'function') {
+                await thread.setArchived(true, "Bidding channel cleanup").catch(err => {
+                  console.warn(`⚠️ Failed to archive thread ${thread.name}:`, err.message);
+                });
+                threadsArchived++;
+                console.log(`📦 Archived: ${thread.name}`);
+              }
+
+              // Rate limit: 500ms between thread operations
+              await new Promise(resolve => setTimeout(resolve, 500));
+            } catch (err) {
+              console.warn(`⚠️ Error processing thread ${thread.name}:`, err.message);
+              threadsSkipped++;
+            }
+          }
+
+          console.log(`✅ Thread cleanup: ${threadsLocked} locked, ${threadsArchived} archived, ${threadsSkipped} skipped`);
+        } else {
+          console.log(`📋 No active threads found in bidding channel`);
+        }
+
+        // Also check archived threads (fetch last 50)
+        const archivedThreads = await biddingChannel.threads.fetchArchived({ limit: 50 }).catch(() => null);
+
+        if (archivedThreads && archivedThreads.threads.size > 0) {
+          console.log(`📋 Found ${archivedThreads.threads.size} archived thread(s) to check`);
+
+          for (const [threadId, thread] of archivedThreads.threads) {
+            try {
+              // Lock archived threads that aren't locked yet
+              if (!thread.locked && typeof thread.setLocked === 'function') {
+                // Must unarchive first, then lock, then re-archive
+                await thread.setArchived(false, "Temporary unarchive for locking").catch(() => {});
+
+                // Small delay after unarchiving
+                await new Promise(resolve => setTimeout(resolve, 300));
+
+                await thread.setLocked(true, "Bidding channel cleanup").catch(err => {
+                  console.warn(`⚠️ Failed to lock archived thread ${thread.name}:`, err.message);
+                });
+
+                // Small delay after locking
+                await new Promise(resolve => setTimeout(resolve, 300));
+
+                await thread.setArchived(true, "Bidding channel cleanup").catch(() => {});
+                threadsLocked++;
+                console.log(`🔒 Locked archived: ${thread.name}`);
+
+                // Rate limit
+                await new Promise(resolve => setTimeout(resolve, 500));
+              }
+            } catch (err) {
+              console.warn(`⚠️ Error processing archived thread ${thread.name}:`, err.message);
+            }
+          }
+
+          console.log(`✅ Archived thread cleanup: ${threadsLocked} additional locked`);
+        }
+      } catch (err) {
+        console.error(`❌ Error during thread cleanup:`, err.message);
+      }
+    }
+
+    // ========================================
+    // CLEANUP OLD MESSAGES
+    // ========================================
     console.log(`📊 Fetching bidding channel history...`);
     let messagesDeleted = 0;
     let messagesFetched = 0;
@@ -373,7 +484,10 @@ async function cleanupBiddingChannel() {
 
     console.log(`✅ Bidding channel cleanup complete!`);
     console.log(
-      `📊 Fetched: ${messagesFetched} messages | Deleted: ${messagesDeleted} non-admin messages`
+      `📊 Messages: ${messagesFetched} fetched | ${messagesDeleted} deleted`
+    );
+    console.log(
+      `🧵 Threads: ${threadsLocked} locked | ${threadsArchived} archived | ${threadsSkipped} skipped`
     );
   } catch (e) {
     console.error(`❌ Bidding channel cleanup error:`, e);
@@ -2712,19 +2826,25 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
       return;
     }
 
-    // Admin check for attendance-related reactions
-    const adminMember = await guild.members.fetch(user.id).catch(() => null);
-    if (!adminMember || !isAdmin(adminMember)) {
-      try {
-        await reaction.users.remove(user.id);
-      } catch (e) {
-        console.error(`❌ Failed to remove non-admin reaction from ${user.tag}:`, e.message);
-      }
-      return;
-    }
-
     // Attendance verification
     const pending = pendingVerifications[msg.id];
+    const closePending = pendingClosures[msg.id];
+
+    // Admin check ONLY for attendance-related reactions
+    if (pending || closePending) {
+      const adminMember = await guild.members.fetch(user.id).catch(() => null);
+      if (!adminMember || !isAdmin(adminMember)) {
+        try {
+          await reaction.users.remove(user.id);
+        } catch (e) {
+          console.error(`❌ Failed to remove non-admin reaction from ${user.tag}:`, e.message);
+        }
+        return;
+      }
+    } else {
+      // Not an attendance-related message, ignore this reaction
+      return;
+    }
 
     if (pending) {
       const spawnInfo = activeSpawns[pending.threadId];
@@ -2800,8 +2920,6 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     }
 
     // Close confirmation
-    const closePending = pendingClosures[msg.id];
-
     if (closePending) {
       const spawnInfo = activeSpawns[closePending.threadId];
 
