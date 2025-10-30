@@ -49,34 +49,39 @@ if (match) {
 ## 3. Google Sheets Code.js Fixes
 
 ### A. Fixed `updateTotalAttendanceAndMembers`
-**File Changed:** `Code.js` (lines 1210-1278)
+**File Changed:** `Code.js` (lines 1223-1254)
 
 **Problems Fixed:**
 1. ❌ Was adding new members to **ALL** weekly sheets (including past weeks)
 2. ❌ Could overwrite existing data in historical sheets
-3. ❌ Inefficient when triggered frequently
+3. ❌ Function name implies it updates members, but it shouldn't touch weekly sheets
 
-**Solution:** Modified function to ONLY add new members to the **current week sheet**.
+**Solution:** Modified function to **ONLY** update the "TOTAL ATTENDANCE" sheet. It does NOT touch any weekly sheets.
 
 **Key Changes:**
-- Added logic to determine current week sheet
-- Only syncs new members to active week (not historical weeks)
-- Properly copies formulas from previous row for new members
-- Fills FALSE for all existing spawn columns when adding new members
-- Added logging for debugging
+- Removed ALL code that modifies weekly sheets
+- Function now only reads from weekly sheets and updates TOTAL ATTENDANCE
+- New members are added to weekly sheets by `handleSubmitAttendance()` when attendance is submitted by the bot
+- Added clear documentation that this function does not modify weekly sheets
 
 **Before:**
 ```javascript
-// Step 3: Sync new members into all weekly sheets
-sheets.forEach(sheet => { ... }); // BAD: Updates ALL sheets
+// Step 3: Sync new members into all weekly sheets (or current week)
+sheets.forEach(sheet => { ... }); // BAD: Updates sheets
 ```
 
 **After:**
 ```javascript
-// Step 3: ONLY sync new members to CURRENT WEEK sheet
-const currentWeekSheet = ss.getSheetByName(currentWeekSheetName);
-if (currentWeekSheet) { ... } // GOOD: Only updates current week
+// NOTE: This function does NOT modify weekly sheets
+// New members are added to weekly sheets automatically by handleSubmitAttendance()
+// This function ONLY updates TOTAL ATTENDANCE sheet
 ```
+
+**What it does now:**
+1. ✅ Reads attendance data from all ELYSIUM_WEEK_* sheets
+2. ✅ Calculates total attendance per member
+3. ✅ Updates TOTAL ATTENDANCE sheet
+4. ✅ Does NOT touch any weekly sheets
 
 ### B. Fixed `handleSubmitAttendance` - New Member Insertion
 **File Changed:** `Code.js` (lines 445-466)
@@ -110,8 +115,8 @@ You mentioned that `updateBiddingPoints` and `updateTotalAttendanceAndMembers` w
   - Needs to run regularly to stay in sync
 
 - ✅ **`updateTotalAttendanceAndMembers`** - Run **Daily at 1am** (once per day is enough)
-  - Updates TOTAL ATTENDANCE sheet
-  - Adds new members to current week ONLY
+  - Updates TOTAL ATTENDANCE sheet ONLY
+  - Does NOT modify weekly sheets (bot handles that)
   - Running daily prevents performance issues
 
 ### How to Set Up Triggers:
@@ -127,7 +132,7 @@ You mentioned that `updateBiddingPoints` and `updateTotalAttendanceAndMembers` w
 
 | Function | Old Trigger | New Trigger | Reason |
 |----------|------------|-------------|--------|
-| `updateTotalAttendanceAndMembers` | On Edit / Hourly | Daily (1am) | Prevents overwriting past weeks; reduces performance load |
+| `updateTotalAttendanceAndMembers` | On Edit / Hourly | Daily (1am) | Only updates TOTAL ATTENDANCE sheet; reduces performance load |
 | `updateBiddingPoints` | Hourly | Hourly | Needs to stay in sync with attendance changes |
 
 ---
@@ -140,8 +145,8 @@ You mentioned that `updateBiddingPoints` and `updateTotalAttendanceAndMembers` w
 3. ✅ Commands work in admin logs and bidding channels (not spawn threads)
 
 ### Google Sheets (Code.js):
-1. ✅ `updateTotalAttendanceAndMembers` now only updates **current week**
-2. ✅ Formula copying when adding new members
+1. ✅ `updateTotalAttendanceAndMembers` now ONLY updates **TOTAL ATTENDANCE** sheet (does not touch weekly sheets)
+2. ✅ Formula copying when adding new members (in `handleSubmitAttendance`)
 3. ✅ Better logging for debugging
 4. ✅ Prevents historical data corruption
 
