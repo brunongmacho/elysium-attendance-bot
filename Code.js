@@ -444,10 +444,23 @@ function handleSubmitAttendance(data) {
       
       if (newMembers.length > 0) {
         const newMemberData = newMembers.map(m => [m.name]);
-        sheet.getRange(lastRow + 1, COLUMNS.MEMBERS, newMembers.length, 1).setValues(newMemberData);
+        const insertStart = lastRow + 1;
+
+        // Insert member names
+        sheet.getRange(insertStart, COLUMNS.MEMBERS, newMembers.length, 1).setValues(newMemberData);
+
+        // Copy formulas from previous row for columns B, C, D (if they exist)
+        if (lastRow >= 3) {
+          const formulas = sheet.getRange(lastRow, 2, 1, 3).getFormulas();
+          for (let i = 0; i < newMembers.length; i++) {
+            sheet.getRange(insertStart + i, 2, 1, 3).setFormulas(formulas);
+          }
+        }
+
+        // Fill FALSE for all previous spawn columns (E to newCol-1)
         if (newCol > COLUMNS.FIRST_SPAWN) {
           const falseArray = Array(newMembers.length).fill(null).map(() => Array(newCol - COLUMNS.FIRST_SPAWN).fill(false));
-          sheet.getRange(lastRow + 1, COLUMNS.FIRST_SPAWN, newMembers.length, newCol - COLUMNS.FIRST_SPAWN)
+          sheet.getRange(insertStart, COLUMNS.FIRST_SPAWN, newMembers.length, newCol - COLUMNS.FIRST_SPAWN)
                .setValues(falseArray).setDataValidation(checkboxRule);
         }
       }
@@ -1217,7 +1230,7 @@ function updateTotalAttendanceAndMembers() {
   // --- Step 1: Gather all members + count TRUE checkboxes ---
   sheets.forEach(sheet => {
     const data = sheet.getDataRange().getValues();
-    for (let i = 1; i < data.length; i++) {
+    for (let i = 2; i < data.length; i++) { // Start from row 3 (index 2) to skip headers
       const name = data[i][0];
       if (!name) continue;
       const attendance = data[i].slice(4).filter(v => v === true).length;
@@ -1234,16 +1247,47 @@ function updateTotalAttendanceAndMembers() {
   totalSheet.clearContents();
   totalSheet.getRange(1, 1, result.length, 2).setValues(result);
 
-  // --- Step 3: Sync new members into all weekly sheets ---
-  const allMembers = Object.keys(memberTotals);
-  sheets.forEach(sheet => {
-    const existing = sheet.getRange("A2:A").getValues().flat().filter(String);
+  // --- Step 3: ONLY sync new members to CURRENT WEEK sheet (not past weeks) ---
+  const now = new Date();
+  const sunday = new Date(now);
+  sunday.setDate(sunday.getDate() - sunday.getDay());
+  const currentWeekIndex = Utilities.formatDate(sunday, CONFIG.TIMEZONE, 'yyyyMMdd');
+  const currentWeekSheetName = CONFIG.SHEET_NAME_PREFIX + currentWeekIndex;
+
+  const currentWeekSheet = ss.getSheetByName(currentWeekSheetName);
+  if (currentWeekSheet) {
+    const lastRow = currentWeekSheet.getLastRow();
+    const existing = lastRow >= 3 ? currentWeekSheet.getRange(3, 1, lastRow - 2, 1).getValues().flat().filter(String) : [];
+    const allMembers = Object.keys(memberTotals);
     const missing = allMembers.filter(m => !existing.includes(m));
+
     if (missing.length > 0) {
-      const insertStart = existing.length + 2;
-      sheet.getRange(insertStart, 1, missing.length, 1).setValues(missing.map(m => [m]));
+      const insertStart = lastRow + 1;
+      const lastCol = currentWeekSheet.getLastColumn();
+
+      // Insert member names
+      currentWeekSheet.getRange(insertStart, 1, missing.length, 1).setValues(missing.map(m => [m]));
+
+      // Copy formulas from previous row for columns B, C, D
+      if (lastRow >= 3) {
+        const formulas = currentWeekSheet.getRange(lastRow, 2, 1, 3).getFormulas();
+        for (let i = 0; i < missing.length; i++) {
+          currentWeekSheet.getRange(insertStart + i, 2, 1, 3).setFormulas(formulas);
+        }
+      }
+
+      // Fill FALSE for all spawn columns (E onwards) if any exist
+      if (lastCol >= COLUMNS.FIRST_SPAWN) {
+        const checkboxRule = SpreadsheetApp.newDataValidation().requireCheckbox().setAllowInvalid(false).build();
+        const falseArray = Array(missing.length).fill(null).map(() => Array(lastCol - COLUMNS.FIRST_SPAWN + 1).fill(false));
+        currentWeekSheet.getRange(insertStart, COLUMNS.FIRST_SPAWN, missing.length, lastCol - COLUMNS.FIRST_SPAWN + 1)
+          .setValues(falseArray)
+          .setDataValidation(checkboxRule);
+      }
+
+      Logger.log(`✅ Added ${missing.length} new members to current week: ${missing.join(', ')}`);
     }
-  });
+  }
 }
 // ==========================================
 // LEADERBOARD & WEEKLY REPORT FUNCTIONS

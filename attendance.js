@@ -553,13 +553,21 @@ async function validateStateConsistency(client) {
         // Only report as discrepancy if the spawn is recent (within 3 hours)
         // Old spawns are expected to have closed threads
         try {
-          const colTime = new Date(col.timestamp).getTime();
-          if (colTime > threeHoursAgo) {
-            discrepancies.columnsWithoutThreads.push({
-              boss: col.boss,
-              timestamp: col.timestamp,
-              column: col.column
-            });
+          // Parse MM/DD/YY HH:MM format properly
+          const match = col.timestamp.match(/(\d{2})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/);
+          if (match) {
+            const [_, month, day, year, hour, minute] = match;
+            // Construct full year (assume 20xx for years 00-99)
+            const fullYear = 2000 + parseInt(year);
+            const colTime = new Date(fullYear, parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute)).getTime();
+
+            if (colTime > threeHoursAgo) {
+              discrepancies.columnsWithoutThreads.push({
+                boss: col.boss,
+                timestamp: col.timestamp,
+                column: col.column
+              });
+            }
           }
         } catch (err) {
           // If we can't parse the timestamp, don't report it
