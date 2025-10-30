@@ -1,6 +1,20 @@
 /**
- * ELYSIUM Guild System - Google Apps Script v5.0
- * NEW: Auto-populate 0 for all members in bidding results
+ * ELYSIUM Guild System - Google Apps Script v6.0
+ *
+ * OPTIMIZATION UPDATES (v6.0):
+ * ✅ Auto-update on sheet edit - onEdit() trigger automatically updates BiddingPoints and TotalAttendance
+ * ✅ Sunday automation - sundayWeeklySheetCreation() creates new weekly sheets every Sunday
+ * ✅ Discord #admin-logs integration - Auto-notify when new weekly sheet is created
+ * ✅ Optimized data sync - Real-time updates ensure data consistency across all sheets
+ *
+ * SETUP INSTRUCTIONS:
+ * 1. Configure DISCORD_WEBHOOK_URL in CONFIG (line 12)
+ * 2. Set up Apps Script Triggers:
+ *    - onEdit: Edit trigger > On edit
+ *    - sundayWeeklySheetCreation: Time-driven > Week timer > Every Sunday > 12am-1am
+ *
+ * PREVIOUS FEATURES (v5.0):
+ * - Auto-populate 0 for all members in bidding results
  */
 
 const CONFIG = {
@@ -9,6 +23,7 @@ const CONFIG = {
   BOSS_POINTS_SHEET: 'BossPoints',
   BIDDING_SHEET: 'BiddingPoints',
   TIMEZONE: 'Asia/Manila',
+  DISCORD_WEBHOOK_URL: 'YOUR_DISCORD_WEBHOOK_URL', // To be configured by user
 };
 
 const COLUMNS = {
@@ -528,7 +543,12 @@ function copyMembersFromPreviousWeek(spreadsheet, newSheet) {
         newSheet.getRange(3, 2, members.length, 3).setFormulas(formulas);
       }
     }
+
+    // Return previous sheet name for logging
+    return prevSheet.getName();
   }
+
+  return null;
 }
 
 function logAttendance(spreadsheet, boss, timestamp, members) {
@@ -1560,4 +1580,137 @@ function createResponse(status, message, data) {
   return ContentService.createTextOutput(JSON.stringify(response)).setMimeType(ContentService.MimeType.JSON);
 }
 
-//test v4
+// ===========================================================
+// AUTO-UPDATE ON SHEET EDIT (OPTIMIZATION)
+// ===========================================================
+
+/**
+ * onEdit trigger - Automatically updates BiddingPoints and TotalAttendance when sheet is edited
+ * This replaces manual update calls and ensures data is always in sync
+ */
+function onEdit(e) {
+  try {
+    if (!e || !e.range) return;
+
+    const sheet = e.range.getSheet();
+    const sheetName = sheet.getName();
+
+    Logger.log(`📝 Sheet edited: ${sheetName}`);
+
+    // Trigger updates for weekly sheets or BiddingPoints sheet
+    const isWeeklySheet = sheetName.startsWith(CONFIG.SHEET_NAME_PREFIX);
+    const isBiddingSheet = sheetName === CONFIG.BIDDING_SHEET;
+    const isBiddingItemsSheet = sheetName === 'BiddingItems';
+
+    if (isWeeklySheet || isBiddingSheet || isBiddingItemsSheet) {
+      Logger.log('🔄 Triggering automatic updates...');
+
+      // Update bidding points (reads from all weekly sheets)
+      updateBiddingPoints();
+
+      // Update total attendance (reads from all weekly sheets)
+      updateTotalAttendanceAndMembers();
+
+      Logger.log('✅ Automatic updates completed');
+    }
+
+  } catch (err) {
+    Logger.log('❌ Error in onEdit trigger: ' + err.toString());
+  }
+}
+
+// ===========================================================
+// SUNDAY AUTOMATION - WEEKLY SHEET CREATION
+// ===========================================================
+
+/**
+ * Creates new weekly sheet every Sunday at midnight (Manila time)
+ * This should be set up as a time-driven trigger in Apps Script
+ * Trigger: Weekly > Every Sunday > 12am-1am
+ */
+function sundayWeeklySheetCreation() {
+  try {
+    Logger.log('🗓️ Running Sunday weekly sheet creation...');
+
+    const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    const now = new Date();
+
+    // Calculate next Sunday's week index
+    const nextSunday = new Date(now);
+    nextSunday.setDate(nextSunday.getDate() + (7 - nextSunday.getDay()));
+    const weekIndex = Utilities.formatDate(nextSunday, CONFIG.TIMEZONE, 'yyyyMMdd');
+    const sheetName = CONFIG.SHEET_NAME_PREFIX + weekIndex;
+
+    // Check if sheet already exists
+    let sheet = ss.getSheetByName(sheetName);
+
+    if (sheet) {
+      Logger.log(`⚠️ Sheet ${sheetName} already exists. Skipping creation.`);
+      return;
+    }
+
+    // Create new week sheet
+    Logger.log(`📄 Creating new weekly sheet: ${sheetName}`);
+    sheet = ss.insertSheet(sheetName);
+
+    // Set up headers
+    const headerData = [['MEMBERS', 'POINTS CONSUMED', 'POINTS LEFT', 'ATTENDANCE POINTS']];
+    sheet.getRange(1, COLUMNS.MEMBERS, 1, COLUMNS.ATTENDANCE_POINTS).setValues(headerData)
+         .setFontWeight('bold').setBackground('#4A90E2').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+    sheet.getRange(2, COLUMNS.MEMBERS, 1, COLUMNS.ATTENDANCE_POINTS).setBackground('#E8F4F8');
+    sheet.setColumnWidth(COLUMNS.MEMBERS, 150).setColumnWidth(COLUMNS.POINTS_CONSUMED, 120)
+         .setColumnWidth(COLUMNS.POINTS_LEFT, 100).setColumnWidth(COLUMNS.ATTENDANCE_POINTS, 150);
+
+    // Copy members from previous week
+    const previousSheetName = copyMembersFromPreviousWeek(ss, sheet);
+
+    Logger.log(`✅ New weekly sheet created: ${sheetName}`);
+
+    // Send notification to #admin-logs
+    sendAdminLogNotification(sheetName, previousSheetName);
+
+  } catch (err) {
+    Logger.log('❌ Error in sundayWeeklySheetCreation: ' + err.toString());
+    Logger.log(err.stack);
+  }
+}
+
+/**
+ * Send notification to Discord #admin-logs channel
+ */
+function sendAdminLogNotification(newSheetName, previousSheetName) {
+  try {
+    // Skip if webhook URL is not configured
+    if (!CONFIG.DISCORD_WEBHOOK_URL || CONFIG.DISCORD_WEBHOOK_URL === 'YOUR_DISCORD_WEBHOOK_URL') {
+      Logger.log('⚠️ Discord webhook URL not configured. Skipping notification.');
+      return;
+    }
+
+    const message = {
+      content: `📄 **New weekly sheet created:** ${newSheetName}\n✅ Format copied from previous week: ${previousSheetName || 'N/A'}`
+    };
+
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(message),
+      muteHttpExceptions: true
+    };
+
+    const response = UrlFetchApp.fetch(CONFIG.DISCORD_WEBHOOK_URL, options);
+    const responseCode = response.getResponseCode();
+
+    if (responseCode === 200 || responseCode === 204) {
+      Logger.log('✅ Discord notification sent successfully');
+    } else {
+      Logger.log(`⚠️ Discord notification failed with code ${responseCode}: ${response.getContentText()}`);
+    }
+
+  } catch (err) {
+    Logger.log('❌ Error sending Discord notification: ' + err.toString());
+  }
+}
+
+// ===========================================================
+// OPTIMIZED SHEET CREATION WITH AUTO-LOGGING
+// ===========================================================
