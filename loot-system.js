@@ -59,28 +59,45 @@ function isBlacklisted(item) {
 
 async function processImageOCR(imageBuffer) {
   const tempFile = `./tmp_loot_${Date.now()}.png`;
+  let worker = null;
 
   try {
-    // Enhance image for better OCR
+    // Enhance image for better OCR with reduced memory usage
     await sharp(imageBuffer)
-      .resize(3000, 3000, { fit: "inside", withoutEnlargement: true })
+      .resize(2000, 2000, { fit: "inside", withoutEnlargement: true }) // Reduced from 3000 to 2000 for memory
       .normalize()
       .sharpen()
       .gamma(1.2)
       .toFile(tempFile);
 
-    // Read the processed image
-    const processedBuffer = fs.readFileSync(tempFile);
+    // Create and initialize worker explicitly for proper cleanup
+    worker = await Tesseract.createWorker({
+      logger: () => {}, // Disable logging to reduce memory
+    });
 
-    // Run OCR
-    const result = await Tesseract.recognize(processedBuffer, "eng", {
+    await worker.loadLanguage('eng');
+    await worker.initialize('eng');
+    await worker.setParameters({
       tessedit_char_whitelist:
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789,./\\() ",
       tessedit_pageseg_mode: Tesseract.PSM.AUTO,
     });
 
+    // Run OCR
+    const result = await worker.recognize(tempFile);
+
     return result.data.text;
   } finally {
+    // Always terminate worker to free memory
+    if (worker) {
+      try {
+        await worker.terminate();
+        console.log(`🧹 Tesseract worker terminated`);
+      } catch (err) {
+        console.warn(`⚠️ Failed to terminate worker: ${err.message}`);
+      }
+    }
+
     // Always clean up temp file
     try {
       if (fs.existsSync(tempFile)) {
@@ -89,6 +106,11 @@ async function processImageOCR(imageBuffer) {
       }
     } catch (err) {
       console.warn(`⚠️ Failed to delete temp file ${tempFile}: ${err.message}`);
+    }
+
+    // Force garbage collection hint
+    if (global.gc) {
+      global.gc();
     }
   }
 }
