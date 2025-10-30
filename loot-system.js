@@ -59,46 +59,38 @@ function isBlacklisted(item) {
 
 async function processImageOCR(imageBuffer) {
   const tempFile = `./tmp_loot_${Date.now()}.png`;
-  let worker = null;
+  let textResult = "";
 
   try {
-    // Enhance image for better OCR with reduced memory usage
+    // Optimize image for OCR
     await sharp(imageBuffer)
-      .resize(2000, 2000, { fit: "inside", withoutEnlargement: true }) // Reduced from 3000 to 2000 for memory
+      .resize(2000, 2000, { fit: "inside", withoutEnlargement: true })
       .normalize()
       .sharpen()
       .gamma(1.2)
       .toFile(tempFile);
 
-    // Create and initialize worker explicitly for proper cleanup
-    worker = await Tesseract.createWorker({
-      logger: () => {}, // Disable logging to reduce memory
-    });
+    console.log("🔍 Starting OCR recognition (Tesseract v6 mode)...");
 
-    await worker.loadLanguage('eng');
-    await worker.initialize('eng');
-    await worker.setParameters({
+    // ✅ v6+ compatible (no worker)
+    const result = await Tesseract.recognize(tempFile, "eng", {
       tessedit_char_whitelist:
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789,./\\() ",
-      tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+      logger: (m) => {
+        if (m.status === "recognizing text") {
+          console.log(`🕓 Progress: ${(m.progress * 100).toFixed(1)}%`);
+        }
+      },
     });
 
-    // Run OCR
-    const result = await worker.recognize(tempFile);
-
-    return result.data.text;
+    textResult = result?.data?.text || result?.text || "";
+    console.log("✅ OCR recognition completed.");
+    return textResult;
+  } catch (err) {
+    console.error(`❌ OCR failed: ${err.message}`);
+    throw err;
   } finally {
-    // Always terminate worker to free memory
-    if (worker) {
-      try {
-        await worker.terminate();
-        console.log(`🧹 Tesseract worker terminated`);
-      } catch (err) {
-        console.warn(`⚠️ Failed to terminate worker: ${err.message}`);
-      }
-    }
-
-    // Always clean up temp file
+    // Clean up temp file
     try {
       if (fs.existsSync(tempFile)) {
         fs.unlinkSync(tempFile);
@@ -108,12 +100,11 @@ async function processImageOCR(imageBuffer) {
       console.warn(`⚠️ Failed to delete temp file ${tempFile}: ${err.message}`);
     }
 
-    // Force garbage collection hint
-    if (global.gc) {
-      global.gc();
-    }
+    if (global.gc) global.gc();
   }
 }
+
+
 
 function parseLoots(ocrText) {
   const loots = [];
