@@ -200,6 +200,111 @@ function getAllSpawnColumns(data) {
   return createResponse('ok', 'Columns fetched', {columns: columns});
 }
 
+// FUZZY MATCHING FUNCTIONS FOR LOOT NAME AUTO-CORRECTION
+
+/**
+ * Calculate Levenshtein distance between two strings
+ * Used for fuzzy matching to find similar item names
+ * @param {string} str1 - First string
+ * @param {string} str2 - Second string
+ * @return {number} The edit distance between the strings
+ */
+function levenshteinDistance(str1, str2) {
+  const s1 = str1.toLowerCase();
+  const s2 = str2.toLowerCase();
+
+  const len1 = s1.length;
+  const len2 = s2.length;
+
+  // Create a 2D array for dynamic programming
+  const matrix = [];
+
+  // Initialize first column and row
+  for (let i = 0; i <= len1; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= len2; j++) {
+    matrix[0][j] = j;
+  }
+
+  // Fill the matrix
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,      // deletion
+        matrix[i][j - 1] + 1,      // insertion
+        matrix[i - 1][j - 1] + cost // substitution
+      );
+    }
+  }
+
+  return matrix[len1][len2];
+}
+
+/**
+ * Find the best matching item name from existing items in BiddingItems sheet
+ * Uses fuzzy matching with similarity threshold
+ * @param {string} inputItem - The item name to match
+ * @param {Array} existingItems - Array of existing item names from BiddingItems
+ * @return {Object|null} Object with {name, price, similarity} or null if no good match
+ */
+function findBestMatch(inputItem, existingItems) {
+  if (!inputItem || !existingItems || existingItems.length === 0) {
+    return null;
+  }
+
+  const input = inputItem.trim().toLowerCase();
+  let bestMatch = null;
+  let bestSimilarity = 0;
+  let bestPrice = '';
+
+  for (let i = 0; i < existingItems.length; i++) {
+    const existingItem = (existingItems[i][0] || '').toString().trim();
+    const existingPrice = existingItems[i][1];
+
+    if (!existingItem) continue;
+
+    const existing = existingItem.toLowerCase();
+
+    // Exact match (case-insensitive)
+    if (input === existing) {
+      return {
+        name: existingItem,
+        price: existingPrice || '',
+        similarity: 1.0,
+        isExactMatch: true
+      };
+    }
+
+    // Calculate similarity using Levenshtein distance
+    const distance = levenshteinDistance(input, existing);
+    const maxLen = Math.max(input.length, existing.length);
+    const similarity = 1 - (distance / maxLen);
+
+    // Update best match if this is better
+    if (similarity > bestSimilarity) {
+      bestSimilarity = similarity;
+      bestMatch = existingItem;
+      bestPrice = existingPrice || '';
+    }
+  }
+
+  // Only return matches with similarity >= 0.7 (70% similar)
+  // This threshold catches typos like "Blue Rign" -> "Blue Ring"
+  // but avoids false matches
+  if (bestSimilarity >= 0.7) {
+    return {
+      name: bestMatch,
+      price: bestPrice,
+      similarity: bestSimilarity,
+      isExactMatch: false
+    };
+  }
+
+  return null;
+}
+
 function handleSubmitLootEntries(data) {
   const entries = data.entries || [];
   
@@ -296,30 +401,42 @@ function handleSubmitLootEntries(data) {
           // FIX 2: Format Boss - all uppercase
           const boss = rawBoss.toUpperCase();
 
-          // NEW: Check if item exists in sheet and get start price
+          // NEW: Check if item exists in sheet and get start price using fuzzy matching
           let startPrice = '';
+          let correctedItemName = item; // Will be updated if fuzzy match is found
           const defaultDuration = 5; // Default duration: 5 minutes
 
           if (lastRow > 1) {
             const existingData = biddingItemsSheet.getRange(2, 1, lastRow - 1, 2).getValues();
-            for (let row = 0; row < existingData.length; row++) {
-              const existingItem = (existingData[row][0] || '').toString().trim();
-              const existingPrice = existingData[row][1];
 
-              // Case-insensitive match
-              if (existingItem.toLowerCase() === item.toLowerCase()) {
-                startPrice = existingPrice || '';
-                Logger.log(`💡 Found existing item "${item}" with start price: ${startPrice}`);
-                break;
+            // Use fuzzy matching to find best match
+            const match = findBestMatch(item, existingData);
+
+            if (match) {
+              startPrice = match.price;
+
+              if (match.isExactMatch) {
+                // Exact match found
+                correctedItemName = match.name; // Use the exact casing from sheet
+                Logger.log(`💡 Found existing item "${correctedItemName}" with start price: ${startPrice}`);
+              } else {
+                // Fuzzy match found - auto-correct the spelling
+                const similarityPercent = (match.similarity * 100).toFixed(1);
+                Logger.log(`🔧 AUTO-CORRECTED: "${item}" → "${match.name}" (${similarityPercent}% similar)`);
+                Logger.log(`💡 Using start price from existing item: ${startPrice}`);
+                correctedItemName = match.name; // Use the corrected name
               }
+            } else {
+              // No match found - this is a new item
+              Logger.log(`✨ New item detected: "${item}" - will be added to BiddingItems`);
             }
           }
 
-          Logger.log(`📝 Adding item ${i + 1}: ${item} (qty: ${quantity}, source: ${source}, boss: ${boss}, startPrice: ${startPrice || 'none'})`);
+          Logger.log(`📝 Adding item ${i + 1}: ${correctedItemName} (qty: ${quantity}, source: ${source}, boss: ${boss}, startPrice: ${startPrice || 'none'})`);
 
           // FIX 3: Build row data with start price lookup and default duration
           const rowData = [
-            item,                           // A: Item
+            correctedItemName,              // A: Item (corrected name if fuzzy match found)
             startPrice,                     // B: Start Price (from existing item or empty)
             defaultDuration,                // C: Duration (5 minutes default)
             '',                            // D: Winner (empty)
@@ -335,11 +452,11 @@ function handleSubmitLootEntries(data) {
 
           // Insert entire row at once
           biddingItemsSheet.getRange(insertRow, 1, 1, 12).setValues([rowData]);
-          
-          Logger.log(`✅ Added item at row ${insertRow}: ${item}`);
-          
+
+          Logger.log(`✅ Added item at row ${insertRow}: ${correctedItemName}`);
+
           submittedItems.push({
-            item: item,
+            item: correctedItemName,
             row: insertRow,
             boss: boss
           });
