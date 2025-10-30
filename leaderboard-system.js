@@ -34,7 +34,7 @@ async function fetchAttendanceLeaderboard() {
       throw new Error(result.message || 'Failed to fetch attendance leaderboard');
     }
 
-    return result.data;
+    return result;
   } catch (error) {
     console.error('❌ Error fetching attendance leaderboard:', error);
     throw error;
@@ -58,7 +58,7 @@ async function fetchBiddingLeaderboard() {
       throw new Error(result.message || 'Failed to fetch bidding leaderboard');
     }
 
-    return result.data;
+    return result;
   } catch (error) {
     console.error('❌ Error fetching bidding leaderboard:', error);
     throw error;
@@ -82,7 +82,7 @@ async function fetchWeeklySummary() {
       throw new Error(result.message || 'Failed to fetch weekly summary');
     }
 
-    return result.data;
+    return result;
   } catch (error) {
     console.error('❌ Error fetching weekly summary:', error);
     throw error;
