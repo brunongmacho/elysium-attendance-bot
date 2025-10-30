@@ -10,6 +10,7 @@ const {
   Partials,
   Events,
   EmbedBuilder,
+  Collection,
 } = require("discord.js");
 const fetch = require("node-fetch");
 const levenshtein = require("fast-levenshtein");
@@ -117,17 +118,15 @@ const client = new Client({
   },
   // Disable caching for things we don't need
   makeCache: (manager) => {
-    // Default to no caching for most things
-    if (manager.name === 'GuildMemberManager') return null;
-    if (manager.name === 'UserManager') return null;
+    // Disable caching for non-essential managers (return null)
     if (manager.name === 'PresenceManager') return null;
     if (manager.name === 'VoiceStateManager') return null;
     if (manager.name === 'StageInstanceManager') return null;
     if (manager.name === 'GuildBanManager') return null;
     if (manager.name === 'GuildInviteManager') return null;
     if (manager.name === 'GuildScheduledEventManager') return null;
-    // Keep default caching for essential managers
-    return undefined; // Use default for others
+    // Keep default caching for essential managers (Guild, Channel, Message, etc.)
+    return new Collection(); // Return Collection for all other managers
   },
 });
 
