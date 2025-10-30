@@ -2496,6 +2496,7 @@ attendance.setPendingVerifications(pendingVerifications);
           threadId: message.channel.id,
           adminId: message.author.id,
           type: "close",
+          timestamp: Date.now(), // For stale entry cleanup
         };
 
         if (!confirmationMessages[message.channel.id])

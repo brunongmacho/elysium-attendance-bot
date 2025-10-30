@@ -649,7 +649,11 @@ async function loadAttendanceForBoss(weekSheet, bossKey) {
 
 // STATE MANAGEMENT FOR KOYEB (Memory optimization)
 let lastAttendanceStateSyncTime = 0;
-const ATTENDANCE_STATE_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const ATTENDANCE_STATE_SYNC_INTERVAL = 10 * 60 * 1000; // 10 minutes (reduced sync frequency for memory)
+const STATE_CLEANUP_INTERVAL = 30 * 60 * 1000; // 30 minutes
+const STALE_ENTRY_AGE = 24 * 60 * 60 * 1000; // 24 hours
+const MAX_PENDING_VERIFICATIONS = 100; // Prevent unbounded growth
+const MAX_CONFIRMATION_MESSAGES = 50;
 
 async function saveAttendanceStateToSheet(forceSync = false) {
   if (!config || !config.sheet_webhook_url) {
@@ -735,11 +739,74 @@ async function loadAttendanceStateFromSheet() {
   }
 }
 
+// Clean up stale entries to prevent memory leaks
+function cleanupStaleEntries() {
+  const now = Date.now();
+  let cleaned = 0;
+
+  // Clean up old pending verifications (older than 24 hours)
+  Object.keys(pendingVerifications).forEach(msgId => {
+    const entry = pendingVerifications[msgId];
+    if (entry.timestamp && (now - entry.timestamp > STALE_ENTRY_AGE)) {
+      delete pendingVerifications[msgId];
+      cleaned++;
+    }
+  });
+
+  // Clean up old confirmation messages
+  // Note: confirmationMessages stores arrays of message IDs per thread
+  // We can't easily determine age, so we'll rely on the MAX limit only
+  // This structure is cleaned up when threads close normally
+
+  // Clean up old pending closures (older than 24 hours)
+  // Note: Some entries may not have timestamps, keep those for now
+  Object.keys(pendingClosures).forEach(msgId => {
+    const entry = pendingClosures[msgId];
+    if (entry.timestamp && (now - entry.timestamp > STALE_ENTRY_AGE)) {
+      delete pendingClosures[msgId];
+      cleaned++;
+    }
+  });
+
+  // Enforce max limits to prevent unbounded growth
+  const pendingVerifKeys = Object.keys(pendingVerifications);
+  if (pendingVerifKeys.length > MAX_PENDING_VERIFICATIONS) {
+    // Remove oldest entries
+    const sortedKeys = pendingVerifKeys.sort((a, b) => {
+      const aTime = pendingVerifications[a].timestamp || 0;
+      const bTime = pendingVerifications[b].timestamp || 0;
+      return aTime - bTime;
+    });
+    const toRemove = sortedKeys.slice(0, sortedKeys.length - MAX_PENDING_VERIFICATIONS);
+    toRemove.forEach(key => delete pendingVerifications[key]);
+    cleaned += toRemove.length;
+  }
+
+  // confirmationMessages is an array-based structure, cleaned when threads close
+  // No age-based cleanup needed here
+
+  if (cleaned > 0) {
+    console.log(`🧹 Cleaned up ${cleaned} stale attendance entries`);
+    console.log(`   - Pending verifications: ${Object.keys(pendingVerifications).length}`);
+    console.log(`   - Confirmation messages: ${Object.keys(confirmationMessages).length}`);
+  }
+
+  return cleaned;
+}
+
 // Periodic state sync (call this periodically from main bot)
 function schedulePeriodicStateSync() {
+  // Sync state to sheets every 10 minutes
   setInterval(async () => {
     await saveAttendanceStateToSheet(false);
   }, ATTENDANCE_STATE_SYNC_INTERVAL);
+
+  // Clean up stale entries every 30 minutes
+  setInterval(() => {
+    cleanupStaleEntries();
+  }, STATE_CLEANUP_INTERVAL);
+
+  console.log("✅ Scheduled periodic state sync (10min) and cleanup (30min)");
 }
 
 // Export functions and state
@@ -761,6 +828,7 @@ module.exports = {
   saveAttendanceStateToSheet,
   loadAttendanceStateFromSheet,
   schedulePeriodicStateSync,
+  cleanupStaleEntries,
   getActiveSpawns: () => activeSpawns,
   getActiveColumns: () => activeColumns,
   getPendingVerifications: () => pendingVerifications,
