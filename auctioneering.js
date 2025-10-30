@@ -280,7 +280,7 @@ async function startAuctioneering(client, config, channel) {
     return;
   }
 
-  // Fetch sheet items
+    // Fetch sheet items
   const sheetItems = await fetchSheetItems(config.sheet_webhook_url);
   if (!sheetItems) {
     await channel.send(`❌ Failed to load items`);
@@ -297,16 +297,45 @@ async function startAuctioneering(client, config, channel) {
   const bossGroups = {};
 
   // All items must come from Google Sheets with proper boss data
-  sheetItems.forEach((item, idx) => {
+  // 🔧 FIX: Filter out items that already have winners (past auctions)
+  // Check column D (Winner) - if it has ANY value, skip it
+  const availableItems = sheetItems.filter(item => {
+    // Check if winner exists and is not empty/null/undefined
+    const winner = item.winner;
+    const hasWinner = winner !== null && 
+                      winner !== undefined && 
+                      winner !== '' && 
+                      winner.toString().trim() !== '';
+    
+    // Only include items WITHOUT winners
+    if (hasWinner) {
+      console.log(`⏭️ Skipping "${item.item}" - already has winner: ${winner}`);
+    }
+    return !hasWinner;
+  });
+
+  if (availableItems.length === 0) {
+    await channel.send(
+      `❌ No available items to auction.\n\n` +
+      `All items in BiddingItems sheet already have winners.\n` +
+      `Please add new items or clear the Winner column (Column D) for items you want to re-auction.`
+    );
+    return;
+  }
+
+  console.log(`✅ Filtered items: ${availableItems.length}/${sheetItems.length} available (${sheetItems.length - availableItems.length} already have winners)`);
+
+  availableItems.forEach((item, idx) => {
     const bossData = (item.boss || "").trim();
     if (!bossData) {
       console.warn(`⚠️ Item ${item.item} has no boss data, skipping`);
       return;
     }
 
-    // Parse boss: "EGO 10/27/2025 5:57:00"
+    // Parse boss: "EGO 10/27/2025 5:57:00" or "EGO 10/27/25 5:57"
+    // CRITICAL: Normalize to MM/DD/YY HH:MM format (no seconds, 2-digit year)
     const match = bossData.match(
-      /^(.+?)\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/
+      /^(.+?)\s+(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/
     );
     if (!match) {
       console.warn(`⚠️ Invalid boss format: ${bossData}`);
@@ -316,11 +345,15 @@ async function startAuctioneering(client, config, channel) {
     const boss = match[1].trim().toUpperCase();
     const month = match[2].padStart(2, "0");
     const day = match[3].padStart(2, "0");
-    const year = match[4].slice(-2);
+    // Convert 4-digit year to 2-digit (2025 → 25, 25 → 25)
+    const year = match[4].length === 4 ? match[4].slice(-2) : match[4].padStart(2, "0");
     const hour = match[5].padStart(2, "0");
     const minute = match[6].padStart(2, "0");
 
+    // CRITICAL: Use MM/DD/YY HH:MM format (no seconds) to match sheet format
     const bossKey = `${boss} ${month}/${day}/${year} ${hour}:${minute}`;
+
+    console.log(`📋 Boss data: "${bossData}" → bossKey: "${bossKey}"`);
 
     if (!bossGroups[bossKey]) {
       bossGroups[bossKey] = [];

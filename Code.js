@@ -54,7 +54,6 @@ function normalizeTimestamp(timestamp) {
   const str = timestamp.toString().trim();
 
   // Check if already in STRICT MM/DD/YY HH:MM format (must be zero-padded)
-  // This regex requires exactly 2 digits for MM, DD, and HH
   if (/^\d{2}\/\d{2}\/\d{2}\s+\d{2}:\d{2}$/.test(str)) {
     return str;
   }
@@ -62,7 +61,9 @@ function normalizeTimestamp(timestamp) {
   // Try to parse as Date (for Google Sheets format or non-padded timestamps)
   try {
     const date = new Date(str);
-    if (isNaN(date.getTime())) return null;
+    if (isNaN(date.getTime())) {
+      return null;
+    }
 
     // Convert to Manila timezone with zero-padding
     const manilaTime = Utilities.formatDate(date, CONFIG.TIMEZONE, 'MM/dd/yy HH:mm');
@@ -766,24 +767,31 @@ function getAttendanceForBoss(data) {
   // Parse bossKey: "EGO 10/27/25 17:57"
   const match = bossKey.match(/^(.+?)\s+(\d{1,2})\/(\d{1,2})\/(\d{2})\s+(\d{1,2}):(\d{2})$/);
   if (!match) {
+    Logger.log(`❌ Invalid bossKey format: "${bossKey}" (expected: "BOSS MM/DD/YY HH:MM")`);
     return createResponse('error', `Invalid bossKey format: ${bossKey}`, {attendees: []});
   }
   
   const bossName = match[1].trim().toUpperCase();
   const month = match[2].padStart(2, '0');
   const day = match[3].padStart(2, '0');
-  const year = match[4];
+  const year = match[4].padStart(2, '0'); // Ensure 2-digit year
   const hour = match[5].padStart(2, '0');
   const minute = match[6].padStart(2, '0');
   
+  // Build target timestamp in exact format expected in sheet
   const targetTimestamp = `${month}/${day}/${year} ${hour}:${minute}`;
   
-  Logger.log(`🔍 Looking for: ${targetTimestamp} + ${bossName}`);
+  Logger.log(`🔍 === ATTENDANCE LOOKUP START ===`);
+  Logger.log(`🔍 Sheet: ${weekSheet}`);
+  Logger.log(`🔍 BossKey: "${bossKey}"`);
+  Logger.log(`🔍 Target Boss: "${bossName}"`);
+  Logger.log(`🔍 Target Timestamp: "${targetTimestamp}"`);
   
   const lastCol = sheet.getLastColumn();
   const lastRow = sheet.getLastRow();
   
   if (lastCol < 5 || lastRow < 3) {
+    Logger.log(`⚠️ Sheet has insufficient data (cols: ${lastCol}, rows: ${lastRow})`);
     return createResponse('error', 'Sheet has insufficient data', {attendees: []});
   }
   
@@ -792,34 +800,67 @@ function getAttendanceForBoss(data) {
   const row2 = sheet.getRange(2, 5, 1, lastCol - 4).getValues()[0]; // Boss names
 
   let targetColumn = -1;
-  const normalizedTargetTimestamp = normalizeTimestamp(targetTimestamp);
-
-  // Skip if target timestamp is invalid
-  if (!normalizedTargetTimestamp) {
-    return createResponse('error', 'Invalid timestamp format', {attendees: []});
-  }
+  let foundMatches = [];
 
   for (let i = 0; i < row1.length; i++) {
     const cellTimestamp = (row1[i] || '').toString().trim();
     const cellBoss = (row2[i] || '').toString().trim().toUpperCase();
+    
+    // Skip empty cells
+    if (!cellTimestamp || !cellBoss) continue;
+    
+    // Normalize the cell timestamp
     const normalizedCellTimestamp = normalizeTimestamp(cellTimestamp);
 
-    // Skip if cell timestamp is invalid
-    if (!normalizedCellTimestamp) continue;
+    // Skip if normalization failed
+    if (!normalizedCellTimestamp) {
+      Logger.log(`⚠️ Column ${i + 5}: Failed to normalize timestamp "${cellTimestamp}"`);
+      continue;
+    }
 
-    // Match using normalized timestamps
-    if (normalizedCellTimestamp === normalizedTargetTimestamp && cellBoss === bossName) {
-      targetColumn = i + COLUMNS.FIRST_SPAWN; // Use constant instead of hardcoded value
+    // Log comparison for debugging
+    Logger.log(`🔍 Column ${i + 5}: Boss="${cellBoss}" vs "${bossName}" | Timestamp="${normalizedCellTimestamp}" vs "${targetTimestamp}"`);
+
+    // EXACT match required - both boss name AND timestamp must match
+    const bossMatch = cellBoss === bossName;
+    const timestampMatch = normalizedCellTimestamp === targetTimestamp;
+
+    if (bossMatch && timestampMatch) {
+      targetColumn = i + 5;
+      Logger.log(`✅ EXACT MATCH FOUND at column ${targetColumn}!`);
       break;
+    } else if (bossMatch) {
+      // Boss matches but timestamp doesn't - log for debugging
+      foundMatches.push({
+        column: i + 5,
+        timestamp: normalizedCellTimestamp,
+        reason: 'Boss matches, timestamp differs'
+      });
     }
   }
   
   if (targetColumn === -1) {
-    Logger.log(`⚠️ Column not found for ${bossKey}`);
-    return createResponse('ok', 'Boss spawn not found in attendance sheet', {attendees: []});
+    Logger.log(`❌ No exact match found for "${bossKey}"`);
+    
+    if (foundMatches.length > 0) {
+      Logger.log(`⚠️ Found ${foundMatches.length} spawn(s) with same boss name but different timestamps:`);
+      foundMatches.forEach(m => {
+        Logger.log(`   - Column ${m.column}: ${m.timestamp} (expected: ${targetTimestamp})`);
+      });
+    }
+    
+    return createResponse('ok', 'Boss spawn not found in attendance sheet', {
+      attendees: [],
+      debugInfo: {
+        searchedFor: bossKey,
+        targetBoss: bossName,
+        targetTimestamp: targetTimestamp,
+        nearMatches: foundMatches
+      }
+    });
   }
   
-  Logger.log(`✅ Found column ${targetColumn}`);
+  Logger.log(`✅ Using column ${targetColumn} for attendance data`);
   
   // Get attendees (rows 3+, where checkbox = true)
   const memberNames = sheet.getRange(3, 1, lastRow - 2, 1).getValues().flat();
@@ -827,19 +868,28 @@ function getAttendanceForBoss(data) {
   
   const attendees = [];
   for (let i = 0; i < memberNames.length; i++) {
-    if (attendance[i] === true) {
-      const member = (memberNames[i] || '').toString().trim();
-      if (member) attendees.push(member);
+    const member = (memberNames[i] || '').toString().trim();
+    const attended = attendance[i] === true;
+    
+    if (attended && member) {
+      attendees.push(member);
+    }
+    
+    // Log first 5 members for debugging
+    if (i < 5) {
+      Logger.log(`   ${attended ? '✅' : '❌'} ${member || '(empty)'}`);
     }
   }
   
-  Logger.log(`✅ Found ${attendees.length} attendees: ${attendees.join(', ')}`);
+  Logger.log(`✅ Found ${attendees.length} attendees out of ${memberNames.length} total members`);
+  Logger.log(`🔍 === ATTENDANCE LOOKUP END ===`);
   
   return createResponse('ok', `Attendance loaded for ${bossKey}`, {
     attendees: attendees,
     bossKey: bossKey,
     weekSheet: weekSheet,
-    column: targetColumn
+    column: targetColumn,
+    totalMembers: memberNames.length
   });
 }
 
