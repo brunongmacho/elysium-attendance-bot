@@ -1257,18 +1257,18 @@ function updateTotalAttendanceAndMembers() {
 // ==========================================
 
 /**
- * Get attendance leaderboard from TOTAL ATTENDANCE sheet
+ * Get attendance leaderboard from AttendanceLog sheet
  */
 function getAttendanceLeaderboard(data) {
   try {
     const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
-    const totalSheet = ss.getSheetByName('TOTAL ATTENDANCE');
+    const logSheet = ss.getSheetByName('AttendanceLog');
 
-    if (!totalSheet) {
-      return createResponse('error', 'TOTAL ATTENDANCE sheet not found');
+    if (!logSheet) {
+      return createResponse('error', 'AttendanceLog sheet not found');
     }
 
-    const lastRow = totalSheet.getLastRow();
+    const lastRow = logSheet.getLastRow();
     if (lastRow <= 1) {
       return createResponse('ok', 'No attendance data', {
         leaderboard: [],
@@ -1278,22 +1278,36 @@ function getAttendanceLeaderboard(data) {
       });
     }
 
-    // Read data from columns A (Member) and B (Total Attendance)
-    const data_range = totalSheet.getRange(2, 1, lastRow - 1, 2);
+    // Read data from AttendanceLog: Columns A-E (Timestamp, Boss, Spawn Time, Members, Count)
+    const data_range = logSheet.getRange(2, 1, lastRow - 1, 5);
     const values = data_range.getValues();
+
+    // Count attendance per member
+    const memberCounts = {};
+    let totalSpawns = 0;
+
+    for (let i = 0; i < values.length; i++) {
+      const membersStr = (values[i][3] || '').toString().trim(); // Column D: Members (comma-separated)
+
+      if (membersStr) {
+        totalSpawns++;
+        const members = membersStr.split(',').map(m => m.trim()).filter(m => m);
+
+        members.forEach(member => {
+          if (member) {
+            memberCounts[member] = (memberCounts[member] || 0) + 1;
+          }
+        });
+      }
+    }
 
     // Build leaderboard array
     const leaderboard = [];
-    for (let i = 0; i < values.length; i++) {
-      const name = values[i][0];
-      const points = values[i][1] || 0;
-
-      if (name && name.toString().trim()) {
-        leaderboard.push({
-          name: name.toString().trim(),
-          points: typeof points === 'number' ? points : 0
-        });
-      }
+    for (const [name, points] of Object.entries(memberCounts)) {
+      leaderboard.push({
+        name: name,
+        points: points
+      });
     }
 
     // Sort by points (descending)
@@ -1304,11 +1318,10 @@ function getAttendanceLeaderboard(data) {
     const weekName = currentWeekSheet ? currentWeekSheet.getName() : 'N/A';
 
     // Calculate statistics
-    const totalSpawns = currentWeekSheet ? Math.max(0, currentWeekSheet.getLastColumn() - COLUMNS.FIRST_SPAWN + 1) : 0;
     const totalPoints = leaderboard.reduce((sum, m) => sum + m.points, 0);
     const averageAttendance = leaderboard.length > 0 ? Math.round((totalPoints / leaderboard.length) * 10) / 10 : 0;
 
-    Logger.log(`✅ Fetched attendance leaderboard: ${leaderboard.length} members`);
+    Logger.log(`✅ Fetched attendance leaderboard: ${leaderboard.length} members from ${totalSpawns} spawns`);
 
     return createResponse('ok', 'Attendance leaderboard fetched', {
       leaderboard: leaderboard,
@@ -1332,11 +1345,15 @@ function getBiddingLeaderboard(data) {
     const biddingSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
 
     if (!biddingSheet) {
+      Logger.log('❌ BiddingPoints sheet not found');
       return createResponse('error', 'BiddingPoints sheet not found');
     }
 
     const lastRow = biddingSheet.getLastRow();
-    if (lastRow <= 1) {
+    Logger.log(`📊 BiddingPoints sheet - Last row: ${lastRow}`);
+
+    if (lastRow < 2) {
+      Logger.log('⚠️ BiddingPoints sheet has no data rows (only headers or empty)');
       return createResponse('ok', 'No bidding data', {
         leaderboard: [],
         totalPointsDistributed: 0,
@@ -1347,6 +1364,7 @@ function getBiddingLeaderboard(data) {
     // Read data from columns A (Member), B (Points Left), C (Points Consumed)
     const data_range = biddingSheet.getRange(2, 1, lastRow - 1, 3);
     const values = data_range.getValues();
+    Logger.log(`📊 Read ${values.length} data rows from BiddingPoints`);
 
     // Build leaderboard array
     const leaderboard = [];
