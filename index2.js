@@ -335,6 +335,9 @@ async function cleanupBiddingChannel() {
                 });
                 threadsLocked++;
                 console.log(`🔒 Locked: ${thread.name}`);
+
+                // Small delay to avoid race conditions with Discord API
+                await new Promise(resolve => setTimeout(resolve, 300));
               }
 
               // Archive the thread if not already archived
@@ -371,9 +374,17 @@ async function cleanupBiddingChannel() {
               if (!thread.locked && typeof thread.setLocked === 'function') {
                 // Must unarchive first, then lock, then re-archive
                 await thread.setArchived(false, "Temporary unarchive for locking").catch(() => {});
+
+                // Small delay after unarchiving
+                await new Promise(resolve => setTimeout(resolve, 300));
+
                 await thread.setLocked(true, "Bidding channel cleanup").catch(err => {
                   console.warn(`⚠️ Failed to lock archived thread ${thread.name}:`, err.message);
                 });
+
+                // Small delay after locking
+                await new Promise(resolve => setTimeout(resolve, 300));
+
                 await thread.setArchived(true, "Bidding channel cleanup").catch(() => {});
                 threadsLocked++;
                 console.log(`🔒 Locked archived: ${thread.name}`);

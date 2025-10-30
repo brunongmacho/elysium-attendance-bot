@@ -7,7 +7,7 @@
 const { EmbedBuilder } = require("discord.js");
 const fetch = require("node-fetch");
 const { Timeout } = require("timers");
-const { getCurrentTimestamp, getSundayOfWeek, sleep } = require("./utils/common");
+const { getCurrentTimestamp, getSundayOfWeek, sleep, normalizeUsername } = require("./utils/common");
 const attendance = require("./attendance");
 
 // ==========================================
@@ -79,6 +79,13 @@ const EMOJI = {
   LOCK: "🔒",
 };
 
+// Timeout constants
+const TIMEOUTS = {
+  FETCH_TIMEOUT: 10000,        // 10 seconds - API fetch timeout
+  CONFIRMATION: 30000,         // 30 seconds - user confirmation timeout
+  PREVIEW_DELAY: 30000,        // 30 seconds - item preview delay
+};
+
 function initialize(config, isAdminFunc, biddingModuleRef) {
   cfg = config;
   isAdmFunc = isAdminFunc;
@@ -115,7 +122,7 @@ async function fetchSheetItems(url, retries = 3) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "getBiddingItems" }),
-        timeout: 10000, // 10 second timeout
+        timeout: TIMEOUTS.FETCH_TIMEOUT,
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json();
@@ -327,7 +334,6 @@ async function startAuctioneering(client, config, channel) {
         batchNumber: qty > 1 ? q + 1 : null,
         batchTotal: qty > 1 ? qty : null,
         source: "GoogleSheet",
-        sheetIndex: idx,
         bossName: boss,
         bossKey: bossKey,
       });
@@ -403,8 +409,12 @@ async function startAuctioneering(client, config, channel) {
     }
   }, 5000);
 
+  // Store countdown interval for cleanup
+  auctionState.timers.sessionStartCountdown = countdownInterval;
+
   auctionState.timers.sessionStart = setTimeout(async () => {
-    clearInterval(countdownInterval);
+    clearInterval(auctionState.timers.sessionStartCountdown);
+    delete auctionState.timers.sessionStartCountdown;
     try {
       // Always use the configured bidding channel, not the command channel
       const guild = await client.guilds.fetch(config.main_guild_id);
@@ -441,9 +451,9 @@ function canUserBid(username, currentSession) {
   }
 
   // Check if username is in attendees (case-insensitive)
-  const normalizedUsername = username.toLowerCase().trim();
+  const normalizedUsername = normalizeUsername(username);
   const attended = currentSession.attendees.some(attendee =>
-    attendee.toLowerCase().trim() === normalizedUsername
+    normalizeUsername(attendee) === normalizedUsername
   );
 
   console.log(`🔍 Attendance check: ${username} for ${currentSession.bossKey} - ${attended ? '✅ PASS' : '❌ FAIL'}`);
@@ -568,7 +578,7 @@ async function auctionNextItem(client, config, channel) {
   console.log(`${EMOJI.CLOCK} 30-second preview for: ${item.item}`);
 
   // Wait 30 seconds before starting
-  await new Promise(resolve => setTimeout(resolve, 30000));
+  await new Promise(resolve => setTimeout(resolve, TIMEOUTS.PREVIEW_DELAY));
 
   // ==========================================
   // START THE ACTUAL AUCTION
@@ -886,7 +896,7 @@ async function itemEnd(client, config, channel) {
       } else {
         await getPostToSheet()({
           action: "logAuctionResult",
-          itemIndex: item.source === "GoogleSheet" ? item.sheetIndex + 2 : -1,
+          itemIndex: item.source === "GoogleSheet" ? item.sheetIndex : -1,
           winner: item.curWin,
           winningBid: item.curBid,
           totalBids,
@@ -937,18 +947,28 @@ async function itemEnd(client, config, channel) {
   try {
     // Check if channel is a thread (type 11 or 12 = public/private thread)
     if (channel && (channel.type === 11 || channel.type === 12)) {
+      // Refetch thread to ensure it still exists
+      const refreshedThread = await channel.fetch().catch(() => null);
+      if (!refreshedThread) {
+        console.warn(`⚠️ Thread ${channel.id} no longer exists, skipping lock/archive`);
+        return;
+      }
+
       // Lock the thread first to prevent new messages
-      if (typeof channel.setLocked === 'function') {
-        await channel.setLocked(true, "Auction ended").catch(err => {
-          console.warn(`⚠️ Failed to lock thread ${channel.id}:`, err.message);
+      if (typeof refreshedThread.setLocked === 'function') {
+        await refreshedThread.setLocked(true, "Auction ended").catch(err => {
+          console.warn(`⚠️ Failed to lock thread ${refreshedThread.id}:`, err.message);
         });
         console.log(`🔒 Locked thread for ${item.item}`);
       }
 
+      // Small delay to avoid race conditions with Discord API
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       // Then archive it to hide from active list
-      if (typeof channel.setArchived === 'function') {
-        await channel.setArchived(true, "Auction ended").catch(err => {
-          console.warn(`⚠️ Failed to archive thread ${channel.id}:`, err.message);
+      if (typeof refreshedThread.setArchived === 'function') {
+        await refreshedThread.setArchived(true, "Auction ended").catch(err => {
+          console.warn(`⚠️ Failed to archive thread ${refreshedThread.id}:`, err.message);
         });
         console.log(`📦 Archived thread for ${item.item}`);
       }
@@ -1203,13 +1223,13 @@ async function buildCombinedResults(config) {
   // Combine all winners from session
   const winners = {};
   auctionState.sessionItems.forEach((item) => {
-    const normalizedWinner = item.winner.toLowerCase().trim();
+    const normalizedWinner = normalizeUsername(item.winner);
     winners[normalizedWinner] = (winners[normalizedWinner] || 0) + item.amount;
   });
 
   // Build results for ALL members (including 0s for clean logs)
   const results = allMembers.map((m) => {
-    const normalizedMember = m.toLowerCase().trim();
+    const normalizedMember = normalizeUsername(m);
     return {
       member: m,
       totalSpent: winners[normalizedMember] || 0,
@@ -1332,7 +1352,11 @@ function extendCurrentItem(minutes) {
 }
 
 function clearAllTimers() {
-  Object.values(auctionState.timers).forEach((t) => clearTimeout(t));
+  Object.values(auctionState.timers).forEach((t) => {
+    // Clear both timeouts and intervals
+    clearTimeout(t);
+    clearInterval(t);
+  });
   auctionState.timers = {};
 }
 
@@ -1714,7 +1738,7 @@ async function handleCancelItem(message) {
         [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
         u.id === message.author.id,
       max: 1,
-      time: 30000,
+      time: TIMEOUTS.CONFIRMATION,
       errors: ["time"],
     });
 
@@ -1737,17 +1761,27 @@ async function handleCancelItem(message) {
       const thread = message.channel;
       if (thread && (thread.type === 11 || thread.type === 12)) {
         try {
-          if (typeof thread.setLocked === 'function') {
-            await thread.setLocked(true, "Item cancelled").catch(err => {
-              console.warn(`⚠️ Failed to lock cancelled thread:`, err.message);
-            });
-            console.log(`🔒 Locked cancelled thread`);
-          }
-          if (typeof thread.setArchived === 'function') {
-            await thread.setArchived(true, "Item cancelled").catch(err => {
-              console.warn(`⚠️ Failed to archive cancelled thread:`, err.message);
-            });
-            console.log(`📦 Archived cancelled thread`);
+          // Refetch thread to ensure it still exists
+          const refreshedThread = await thread.fetch().catch(() => null);
+          if (!refreshedThread) {
+            console.warn(`⚠️ Thread ${thread.id} no longer exists, skipping lock/archive`);
+          } else {
+            if (typeof refreshedThread.setLocked === 'function') {
+              await refreshedThread.setLocked(true, "Item cancelled").catch(err => {
+                console.warn(`⚠️ Failed to lock cancelled thread:`, err.message);
+              });
+              console.log(`🔒 Locked cancelled thread`);
+            }
+
+            // Small delay to avoid race conditions with Discord API
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            if (typeof refreshedThread.setArchived === 'function') {
+              await refreshedThread.setArchived(true, "Item cancelled").catch(err => {
+                console.warn(`⚠️ Failed to archive cancelled thread:`, err.message);
+              });
+              console.log(`📦 Archived cancelled thread`);
+            }
           }
         } catch (err) {
           console.warn(`⚠️ Error closing cancelled thread:`, err.message);
@@ -1795,7 +1829,7 @@ async function handleSkipItem(message) {
         [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
         u.id === message.author.id,
       max: 1,
-      time: 30000,
+      time: TIMEOUTS.CONFIRMATION,
       errors: ["time"],
     });
 
@@ -1818,17 +1852,27 @@ async function handleSkipItem(message) {
       const thread = message.channel;
       if (thread && (thread.type === 11 || thread.type === 12)) {
         try {
-          if (typeof thread.setLocked === 'function') {
-            await thread.setLocked(true, "Item skipped").catch(err => {
-              console.warn(`⚠️ Failed to lock skipped thread:`, err.message);
-            });
-            console.log(`🔒 Locked skipped thread`);
-          }
-          if (typeof thread.setArchived === 'function') {
-            await thread.setArchived(true, "Item skipped").catch(err => {
-              console.warn(`⚠️ Failed to archive skipped thread:`, err.message);
-            });
-            console.log(`📦 Archived skipped thread`);
+          // Refetch thread to ensure it still exists
+          const refreshedThread = await thread.fetch().catch(() => null);
+          if (!refreshedThread) {
+            console.warn(`⚠️ Thread ${thread.id} no longer exists, skipping lock/archive`);
+          } else {
+            if (typeof refreshedThread.setLocked === 'function') {
+              await refreshedThread.setLocked(true, "Item skipped").catch(err => {
+                console.warn(`⚠️ Failed to lock skipped thread:`, err.message);
+              });
+              console.log(`🔒 Locked skipped thread`);
+            }
+
+            // Small delay to avoid race conditions with Discord API
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            if (typeof refreshedThread.setArchived === 'function') {
+              await refreshedThread.setArchived(true, "Item skipped").catch(err => {
+                console.warn(`⚠️ Failed to archive skipped thread:`, err.message);
+              });
+              console.log(`📦 Archived skipped thread`);
+            }
           }
         } catch (err) {
           console.warn(`⚠️ Error closing skipped thread:`, err.message);
@@ -1881,7 +1925,7 @@ async function handleForceSubmitResults(message, config, biddingModule) {
         [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
         u.id === message.author.id,
       max: 1,
-      time: 30000,
+      time: TIMEOUTS.CONFIRMATION,
       errors: ["time"],
     });
 
