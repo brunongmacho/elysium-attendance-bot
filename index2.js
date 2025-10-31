@@ -1517,8 +1517,6 @@ if (auctState.active && auctState.currentItem) {
 
 // Replace the !endauction handler in your commandHandlers object (around line 450 in index2.js)
 
-// Replace the !endauction handler in your commandHandlers object (around line 450 in index2.js)
-
 endauction: async (message, member) => {
   const auctState = auctioneering.getAuctionState();
   if (!auctState.active) {
@@ -1558,6 +1556,9 @@ endauction: async (message, member) => {
     );
   };
 
+  // Flag to prevent double execution
+  let executed = false;
+
   try {
     const collected = await confirmMsg.awaitReactions({
       filter,
@@ -1565,6 +1566,10 @@ endauction: async (message, member) => {
       time: 30000,
       errors: ['time'],
     });
+
+    // Prevent double execution
+    if (executed) return;
+    executed = true;
 
     const reaction = collected.first();
 
@@ -1574,7 +1579,7 @@ endauction: async (message, member) => {
 
       await message.reply(`🛑 Ending auction session immediately...`);
 
-      // Get bidding channel for finalization
+      // Get bidding channel for finalization (always use parent channel, not thread)
       const guild = await client.guilds.fetch(config.main_guild_id);
       const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
 
@@ -1588,20 +1593,29 @@ endauction: async (message, member) => {
           itemThread = await guild.channels.fetch(auctState.currentItem.threadId).catch(() => null);
         }
         
-        // Stop the current item (this will handle cleanup and finalization)
+        // Stop the current item (pass the thread for notifications, but use parent for operations)
         await auctioneering.stopCurrentItem(client, config, itemThread || biddingChannel);
       }
 
-      // End the auction session properly (submits results, clears state)
+      // CRITICAL: Always use the parent bidding channel (type 0 or 5), never a thread (type 11)
+      // This ensures auctioneering can create new threads and send messages properly
       await auctioneering.endAuctionSession(client, config, biddingChannel);
 
       await message.reply(`✅ Auction session ended and results submitted.`);
     } else {
+      // Prevent double execution
+      if (executed) return;
+      executed = true;
+
       // User cancelled
       await confirmMsg.reactions.removeAll().catch(() => {});
       await message.reply(`❌ End auction canceled`);
     }
   } catch (error) {
+    // Prevent double execution
+    if (executed) return;
+    executed = true;
+
     // Timeout or other error
     await confirmMsg.reactions.removeAll().catch(() => {});
     await message.reply(`⏱️ Confirmation timeout - auction continues`);
