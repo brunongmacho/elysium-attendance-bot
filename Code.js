@@ -32,7 +32,7 @@
  */
 
 const CONFIG = {
-  SHEET_ID: '1dGLGjmRhvG0io1Yta5ikfN-b_U-SSJJfWIHznK18qYQ',
+  SSHEET_ID: '1dGLGjmRhvG0io1Yta5ikfN-b_U-SSJJfWIHznK18qYQ',
   SHEET_NAME_PREFIX: 'ELYSIUM_WEEK_',
   BOSS_POINTS_SHEET: 'BossPoints',
   BIDDING_SHEET: 'BiddingPoints',
@@ -97,8 +97,9 @@ function doPost(e) {
     if (action === 'getBotState') return getBotState(data);
     if (action === 'saveBotState') return saveBotState(data);
     if (action === 'moveQueueItemsToSheet') return moveQueueItemsToSheet(data);
+    if (action === 'moveAuctionedItemsToForDistribution') return moveAllItemsWithWinnersToForDistribution();
 
-    // ⭐ LOOT LOGGER ACTIONS - ADD THESE THREE LINES! ⭐
+    // Loot logger actions
     if (action === 'submitLootEntries') return handleSubmitLootEntries(data);
     if (action === 'getLootState') return getLootState(data);
     if (action === 'saveLootState') return saveLootState(data);
@@ -164,7 +165,7 @@ function getAllSpawnColumns(data) {
     return createResponse('error', 'Missing weekSheet parameter', {columns: []});
   }
   
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(weekSheet);
   
   if (!sheet) {
@@ -326,7 +327,7 @@ function handleSubmitLootEntries(data) {
     }
 
     try {
-      const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
       let biddingItemsSheet = ss.getSheetByName('BiddingItems');
 
       // Create sheet if doesn't exist
@@ -631,7 +632,7 @@ function handleSubmitAttendance(data) {
 }
 
 function getCurrentWeekSheet() {
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   const now = new Date();
   const sunday = new Date(now);
   sunday.setDate(sunday.getDate() - sunday.getDay());
@@ -694,7 +695,7 @@ function logAttendance(spreadsheet, boss, timestamp, members) {
 }
 
 function getBiddingItems(data) {
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName('BiddingItems');
   if (!sheet) return createResponse('error', 'BiddingItems sheet not found', {items: []});
 
@@ -757,7 +758,7 @@ function getAttendanceForBoss(data) {
     return createResponse('error', 'Missing weekSheet or bossKey', {attendees: []});
   }
   
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(weekSheet);
   
   if (!sheet) {
@@ -774,7 +775,7 @@ function getAttendanceForBoss(data) {
   const bossName = match[1].trim().toUpperCase();
   const month = match[2].padStart(2, '0');
   const day = match[3].padStart(2, '0');
-  const year = match[4].padStart(2, '0'); // Ensure 2-digit year
+  const year = match[4].padStart(2, '0');
   const hour = match[5].padStart(2, '0');
   const minute = match[6].padStart(2, '0');
   
@@ -782,10 +783,10 @@ function getAttendanceForBoss(data) {
   const targetTimestamp = `${month}/${day}/${year} ${hour}:${minute}`;
   
   Logger.log(`🔍 === ATTENDANCE LOOKUP START ===`);
-  Logger.log(`🔍 Sheet: ${weekSheet}`);
-  Logger.log(`🔍 BossKey: "${bossKey}"`);
-  Logger.log(`🔍 Target Boss: "${bossName}"`);
-  Logger.log(`🔍 Target Timestamp: "${targetTimestamp}"`);
+  Logger.log(`📋 Sheet: ${weekSheet}`);
+  Logger.log(`🔑 BossKey: "${bossKey}"`);
+  Logger.log(`🎯 Target Boss: "${bossName}"`);
+  Logger.log(`📅 Target Timestamp: "${targetTimestamp}"`);
   
   const lastCol = sheet.getLastColumn();
   const lastRow = sheet.getLastRow();
@@ -795,7 +796,7 @@ function getAttendanceForBoss(data) {
     return createResponse('error', 'Sheet has insufficient data', {attendees: []});
   }
   
-  // Search for matching column
+  // Search for matching column - READ ALL COLUMNS AT ONCE
   const row1 = sheet.getRange(1, 5, 1, lastCol - 4).getValues()[0]; // Timestamps
   const row2 = sheet.getRange(2, 5, 1, lastCol - 4).getValues()[0]; // Boss names
 
@@ -894,7 +895,7 @@ function getAttendanceForBoss(data) {
 }
 
 function getSessionNumber(timestamp) {
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   const logSheet = ss.getSheetByName('AuctionLog');
   if (!logSheet) return 1;
   
@@ -931,7 +932,7 @@ function getSessionTimestamp() {
 }
 
 function logAuctionEvent(eventData) {
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   let logSheet = ss.getSheetByName('AuctionLog');
 
   if (!logSheet) {
@@ -965,7 +966,7 @@ function logAuctionEvent(eventData) {
 
 // BIDDING FUNCTIONS
 function handleGetBiddingPoints(data) {
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
   if (!sheet) return createResponse('error', `Sheet not found: ${CONFIG.BIDDING_SHEET}`);
   
@@ -998,7 +999,7 @@ function logAuctionResult(data) {
     return createResponse('ok', 'Skipped - no winner', {logged: false});
   }
 
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('BiddingItems');
   if (!sheet) return createResponse('error', 'BiddingItems sheet not found');
 
@@ -1042,7 +1043,7 @@ function handleSubmitBiddingResults(data) {
   const sessionTs = getSessionTimestamp();
   const columnHeader = sessionTs.columnHeader; // MM/DD/YY HH:MM #N
   
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   let biddingSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
   if (!biddingSheet) return createResponse('error', `Sheet not found: ${CONFIG.BIDDING_SHEET}`);
   
@@ -1148,7 +1149,7 @@ function handleSubmitBiddingResults(data) {
 }
 
 function getBotState(data) {
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName('_BotState');
   
   if (!sheet) {
@@ -1177,7 +1178,7 @@ function getBotState(data) {
 }
 
 function saveBotState(data) {
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName('_BotState');
 
   if (!sheet) {
@@ -1220,7 +1221,7 @@ function saveBotState(data) {
 }
 
 function moveQueueItemsToSheet(data) {
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('BiddingItems');
   if (!sheet) return createResponse('error', 'BiddingItems sheet not found');
   
@@ -1263,7 +1264,7 @@ function updateBiddingPoints() {
   }
 
   try {
-    const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
     const bpSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
     if (!bpSheet) {
       lock.releaseLock();
@@ -1341,7 +1342,7 @@ function updateBiddingPoints() {
 // ===========================================================
 function saveLootState(data) {
   const state = data.state || {};
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   let stateSheet = ss.getSheetByName('_LootState');
 
   if (!stateSheet) {
@@ -1364,7 +1365,7 @@ function saveLootState(data) {
 }
 
 function getLootState() {
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   const stateSheet = ss.getSheetByName('_LootState');
 
   if (!stateSheet) {
@@ -1379,7 +1380,7 @@ function getLootState() {
 
 // ATTENDANCE STATE MANAGEMENT (Memory optimization for Koyeb)
 function getAttendanceState(data) {
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName('_AttendanceState');
 
   if (!sheet) {
@@ -1408,7 +1409,7 @@ function getAttendanceState(data) {
 }
 
 function saveAttendanceState(data) {
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName('_AttendanceState');
 
   if (!sheet) {
@@ -1491,7 +1492,7 @@ function updateTotalAttendanceAndMembers() {
  */
 function getAttendanceLeaderboard(data) {
   try {
-    const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
     const logSheet = ss.getSheetByName('AttendanceLog');
 
     if (!logSheet) {
@@ -1571,7 +1572,7 @@ function getAttendanceLeaderboard(data) {
  */
 function getBiddingLeaderboard(data) {
   try {
-    const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
     const biddingSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
 
     if (!biddingSheet) {
@@ -1640,7 +1641,7 @@ function getBiddingLeaderboard(data) {
  */
 function getWeeklySummary(data) {
   try {
-    const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
 
     // Get attendance data
     const totalSheet = ss.getSheetByName('TOTAL ATTENDANCE');
@@ -1807,7 +1808,7 @@ var isManualUpdate = false;
  * TRIGGER CONDITIONS:
  * - Weekly sheets: Only when attendance data (columns 5+) or member names (column 1) are edited
  * - BiddingPoints: Only when member data (columns 1-3, rows 2+) is edited
- * - BiddingItems: Does NOT trigger (items don't affect points directly)
+ * - BiddingItems: Auto-moves items to ForDistribution when winner is added
  *
  * DEBOUNCING: Updates run at most once per 5 seconds
  * CONFLICT PREVENTION: Skips execution if manual update is in progress
@@ -1818,7 +1819,7 @@ function onEdit(e) {
 
     // Skip if manual update is already running (prevents double execution)
     if (isManualUpdate) {
-      Logger.log('⏭️ Skipping onEdit trigger (manual update in progress)');
+      Logger.log('⭐ Skipping onEdit trigger (manual update in progress)');
       return;
     }
 
@@ -1832,6 +1833,10 @@ function onEdit(e) {
     const now = Date.now();
     const isWeeklySheet = sheetName.startsWith(CONFIG.SHEET_NAME_PREFIX);
     const isBiddingSheet = sheetName === CONFIG.BIDDING_SHEET;
+    const isBiddingItemsSheet = sheetName === 'BiddingItems';
+
+    // NOTE: Items are no longer auto-moved on edit when winner is added
+    // They will be moved in batch when the auction session ends via moveAuctionedItemsToForDistribution
 
     // SMART FILTERING: Only trigger on meaningful edits
     if (isWeeklySheet) {
@@ -1845,18 +1850,18 @@ function onEdit(e) {
             updateBiddingPoints();
             lastBiddingPointsUpdate = now;
           } else {
-            Logger.log('⏭️ Skipping updateBiddingPoints (debounced)');
+            Logger.log('⭐ Skipping updateBiddingPoints (debounced)');
           }
 
           if (now - lastTotalAttendanceUpdate > UPDATE_DEBOUNCE_MS) {
             updateTotalAttendanceAndMembers();
             lastTotalAttendanceUpdate = now;
           } else {
-            Logger.log('⏭️ Skipping updateTotalAttendanceAndMembers (debounced)');
+            Logger.log('⭐ Skipping updateTotalAttendanceAndMembers (debounced)');
           }
         }
       } else {
-        Logger.log('⏭️ Skipping update (non-data column edited)');
+        Logger.log('⭐ Skipping update (non-data column edited)');
       }
     } else if (isBiddingSheet) {
       // Only trigger if member data (columns 1-3) were edited
@@ -1868,16 +1873,182 @@ function onEdit(e) {
           updateBiddingPoints();
           lastBiddingPointsUpdate = now;
         } else {
-          Logger.log('⏭️ Skipping updateBiddingPoints (debounced)');
+          Logger.log('⭐ Skipping updateBiddingPoints (debounced)');
         }
       } else {
-        Logger.log('⏭️ Skipping update (session column edited, not member data)');
+        Logger.log('⭐ Skipping update (session column edited, not member data)');
       }
     }
     // Note: BiddingItems edits do NOT trigger updates (items don't affect points)
 
   } catch (err) {
     Logger.log('❌ Error in onEdit trigger: ' + err.toString());
+  }
+}
+
+/**
+ * Move item from BiddingItems to ForDistribution sheet
+ * Copies all formatting using copyTo method, then deletes source row
+ * @param {string} sourceSheetName - The name of the source sheet
+ * @param {number} rowNumber - The row number to move
+ */
+function moveItemToForDistribution(sourceSheetName, rowNumber) {
+  Logger.log(`📦 START: Moving row ${rowNumber} from "${sourceSheetName}"`);
+  
+  try {
+    // Get active spreadsheet
+    const ss = SpreadsheetApp.getActive();
+    Logger.log(`✅ Got spreadsheet: ${ss.getName()}`);
+    
+    // Get source sheet
+    const sourceSheet = ss.getSheetByName(sourceSheetName);
+    Logger.log(`🔍 Looking for sheet: "${sourceSheetName}"`);
+    
+    if (!sourceSheet) {
+      Logger.log(`❌ ERROR: Sheet "${sourceSheetName}" not found!`);
+      Logger.log(`Available sheets: ${ss.getSheets().map(s => s.getName()).join(', ')}`);
+      return;
+    }
+    
+    Logger.log(`✅ Found source sheet: ${sourceSheet.getName()}`);
+    
+    // Get or create ForDistribution sheet
+    let targetSheet = ss.getSheetByName('ForDistribution');
+    if (!targetSheet) {
+      Logger.log('📋 Creating ForDistribution sheet...');
+      targetSheet = ss.insertSheet('ForDistribution');
+      targetSheet.getRange(1, 1, 1, 13).setValues([[
+        'Item', 'Start Price', 'Duration', 'Winner', 'Winning Bid', 
+        'Auction Start', 'Auction End', 'Timestamp', 'Total Bids', 'Source', 'Quantity', 'Boss', 'Notes'
+      ]]).setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
+      Logger.log('✅ ForDistribution sheet created');
+    }
+    
+    // Validate row number
+    const lastRow = sourceSheet.getLastRow();
+    if (rowNumber < 2 || rowNumber > lastRow) {
+      Logger.log(`❌ Invalid row: ${rowNumber} (sheet has ${lastRow} rows)`);
+      return false;
+    }
+    
+    // Get source range
+    Logger.log(`📊 Getting range: Row ${rowNumber}, Columns 1-13`);
+    const sourceRange = sourceSheet.getRange(rowNumber, 1, 1, 13);
+    const rowData = sourceRange.getValues()[0];
+    
+    // Check if winner exists
+    const winner = rowData[3]; // Column D
+    if (!winner || !winner.toString().trim()) {
+      Logger.log('⚠️ No winner found, skipping move');
+      return false;
+    }
+    
+    const itemName = rowData[0]; // Column A
+    Logger.log(`📦 Item: "${itemName}", Winner: "${winner}"`);
+    
+    // Find target row
+    const targetRow = targetSheet.getLastRow() + 1;
+    Logger.log(`📝 Target row: ${targetRow}`);
+    
+    // Copy everything (values + formatting)
+    const targetRange = targetSheet.getRange(targetRow, 1, 1, 13);
+    sourceRange.copyTo(targetRange, SpreadsheetApp.CopyPasteType.PASTE_NORMAL, false);
+    Logger.log('✅ Data and formatting copied');
+    
+    // DELETE source row (THIS WAS MISSING!)
+    Logger.log(`🗑️ Deleting row ${rowNumber} from ${sourceSheetName}...`);
+    sourceSheet.deleteRow(rowNumber);
+    Logger.log('✅ Source row deleted');
+    
+    Logger.log(`✅ SUCCESS: Moved "${itemName}" to ForDistribution row ${targetRow}`);
+    return true;
+    
+  } catch (err) {
+    Logger.log(`❌ EXCEPTION: ${err.toString()}`);
+    Logger.log(`Stack: ${err.stack}`);
+    return false;
+  }
+}
+
+/**
+ * Move ALL items with winners to ForDistribution
+ * Called automatically at the end of auction sessions
+ * Can also be called manually from Apps Script editor for cleanup
+ */
+function moveAllItemsWithWinnersToForDistribution() {
+  Logger.log('📋 === SCANNING FOR ITEMS WITH WINNERS ===');
+  
+  try {
+    const ss = SpreadsheetApp.getActive();
+    const biddingSheet = ss.getSheetByName('BiddingItems');
+    
+    if (!biddingSheet) {
+      Logger.log('❌ BiddingItems sheet not found');
+      return createResponse('error', 'BiddingItems sheet not found', {
+        moved: 0,
+        skipped: 0,
+        total: 0
+      });
+    }
+    
+    const lastRow = biddingSheet.getLastRow();
+    if (lastRow < 2) {
+      Logger.log('⚠️ No data rows in BiddingItems');
+      return createResponse('ok', 'No items to move', {
+        moved: 0,
+        skipped: 0,
+        total: 0
+      });
+    }
+    
+    Logger.log(`📊 Scanning ${lastRow - 1} rows...`);
+    
+    // Get all winner data (Column D)
+    const winnerData = biddingSheet.getRange(2, 4, lastRow - 1, 1).getValues();
+    
+    let movedCount = 0;
+    let skippedCount = 0;
+    
+    // Scan from BOTTOM to TOP (important! so row numbers don't shift)
+    for (let i = winnerData.length - 1; i >= 0; i--) {
+      const rowNumber = i + 2; // +2 because we start from row 2 (index 0 = row 2)
+      const winner = winnerData[i][0];
+      
+      if (winner && winner.toString().trim()) {
+        Logger.log(`\n🎯 Found winner at row ${rowNumber}: "${winner}"`);
+        const success = moveItemToForDistribution('BiddingItems', rowNumber);
+        if (success) {
+          movedCount++;
+        } else {
+          skippedCount++;
+        }
+        
+        // Add small delay to prevent overwhelming the API
+        Utilities.sleep(100);
+      } else {
+        skippedCount++;
+      }
+    }
+    
+    Logger.log(`\n✅ === SCAN COMPLETE ===`);
+    Logger.log(`📦 Moved: ${movedCount} items`);
+    Logger.log(`⭐ Skipped: ${skippedCount} items (no winner)`);
+    Logger.log(`📊 Total processed: ${winnerData.length} rows`);
+    
+    return createResponse('ok', `Moved ${movedCount} items to ForDistribution`, {
+      moved: movedCount,
+      skipped: skippedCount,
+      total: winnerData.length
+    });
+    
+  } catch (err) {
+    Logger.log(`❌ Error in moveAllItemsWithWinnersToForDistribution: ${err.toString()}`);
+    Logger.log(err.stack);
+    return createResponse('error', err.toString(), {
+      moved: 0,
+      skipped: 0,
+      total: 0
+    });
   }
 }
 
@@ -1894,7 +2065,7 @@ function sundayWeeklySheetCreation() {
   try {
     Logger.log('🗓️ Running Sunday weekly sheet creation...');
 
-    const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
     const now = new Date();
 
     // Calculate next Sunday's week index
@@ -1935,6 +2106,21 @@ function sundayWeeklySheetCreation() {
     Logger.log('❌ Error in sundayWeeklySheetCreation: ' + err.toString());
     Logger.log(err.stack);
   }
+}
+
+/**
+ * TEST FUNCTION - Manually test moving an item
+ * Edit the row number below to test with a specific row
+ */
+function testMoveItem() {
+  // EDIT THIS: Change to the row number you want to test
+  const testRow = 2; // Row 2 is the first data row (after headers)
+  
+  Logger.log(`🧪 Testing move for row ${testRow}...`);
+  
+  moveItemToForDistribution('BiddingItems', testRow);
+  
+  Logger.log('🧪 Test completed. Check logs above for details.');
 }
 
 /**

@@ -1144,7 +1144,38 @@ async function finalizeSession(client, config, channel) {
     );
   }
 
-  // STEP 3: Send detailed summary to admin logs
+  // STEP 3: Move all auctioned items to ForDistribution sheet
+  console.log(`📦 Moving completed auction items to ForDistribution...`);
+  try {
+    const moveResponse = await fetch(config.sheet_webhook_url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "moveAuctionedItemsToForDistribution" }),
+    });
+
+    if (moveResponse.ok) {
+      const moveData = await moveResponse.json();
+      console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution`);
+      
+      // Get admin logs channel
+      const mainGuild = await client.guilds.fetch(config.main_guild_id);
+      const adminLogs = await mainGuild.channels
+        .fetch(config.admin_logs_channel_id)
+        .catch(() => null);
+      
+      if (adminLogs && moveData.moved > 0) {
+        await adminLogs.send(
+          `📦 **Items Moved to ForDistribution:** ${moveData.moved} completed auction(s)`
+        );
+      }
+    } else {
+      console.error(`⚠️ Failed to move items to ForDistribution: HTTP ${moveResponse.status}`);
+    }
+  } catch (err) {
+    console.error(`⚠️ Error moving items to ForDistribution:`, err);
+  }
+
+  // STEP 4: Send detailed summary to admin logs
   const mainGuild = await client.guilds.fetch(config.main_guild_id);
   const adminLogs = await mainGuild.channels
     .fetch(config.admin_logs_channel_id)
