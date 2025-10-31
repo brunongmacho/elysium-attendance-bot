@@ -1515,67 +1515,98 @@ if (auctState.active && auctState.currentItem) {
     }
   },
 
-  endauction: async (message, member) => {
-    const auctState = auctioneering.getAuctionState();
-    if (!auctState.active) {
-      return await message.reply(`❌ No active auction to end`);
-    }
+// Replace the !endauction handler in your commandHandlers object (around line 450 in index2.js)
 
-    // Ask for confirmation
-    const confirmMsg = await message.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(0xffa500)
-          .setTitle(`⚠️ End Auction Session?`)
-          .setDescription(
-            `This will immediately end the current auction session and submit all completed items.\n\n` +
-            `**Current Item:** ${auctState.currentItem?.item || 'None'}\n` +
-            `**Completed Items:** ${auctState.sessionItems.length}\n\n` +
-            `React with ✅ to confirm or ❌ to cancel.`
-          )
-          .setFooter({ text: `30 seconds to respond` }),
-      ],
-    });
+// Replace the !endauction handler in your commandHandlers object (around line 450 in index2.js)
 
+endauction: async (message, member) => {
+  const auctState = auctioneering.getAuctionState();
+  if (!auctState.active) {
+    return await message.reply(`❌ No active auction to end`);
+  }
+
+  // Create confirmation embed
+  const confirmEmbed = new EmbedBuilder()
+    .setColor(0xffa500)
+    .setTitle(`⚠️ End Auction Session?`)
+    .setDescription(
+      `This will immediately end the current auction session and submit all completed items.\n\n` +
+      `**Current Item:** ${auctState.currentItem?.item || 'None'}\n` +
+      `**Completed Items:** ${auctState.sessionItems?.length || 0}\n\n` +
+      `React with ✅ to confirm or ❌ to cancel.`
+    )
+    .setFooter({ text: `30 seconds to respond` })
+    .setTimestamp();
+
+  const confirmMsg = await message.reply({ embeds: [confirmEmbed] });
+
+  // Add reactions
+  try {
     await confirmMsg.react('✅');
     await confirmMsg.react('❌');
+  } catch (err) {
+    console.error("Failed to add reactions:", err);
+    return await message.reply("❌ Failed to create confirmation prompt");
+  }
 
-    try {
-      const collected = await confirmMsg.awaitReactions({
-        filter: (r, u) =>
-          ['✅', '❌'].includes(r.emoji.name) && u.id === message.author.id,
-        max: 1,
-        time: 30000,
-        errors: ['time'],
-      });
+  // Create reaction collector with proper filter
+  const filter = (reaction, user) => {
+    return (
+      ['✅', '❌'].includes(reaction.emoji.name) &&
+      user.id === message.author.id &&
+      !user.bot
+    );
+  };
 
-      if (collected.first().emoji.name === '✅') {
-        await confirmMsg.reactions.removeAll().catch(() => {});
+  try {
+    const collected = await confirmMsg.awaitReactions({
+      filter,
+      max: 1,
+      time: 30000,
+      errors: ['time'],
+    });
 
-        await message.reply(`🛑 Ending auction session immediately...`);
+    const reaction = collected.first();
 
-        // Get bidding channel for finalization
-        const guild = await client.guilds.fetch(config.main_guild_id);
-        const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
-
-        // Call endAuctionSession which properly ends the entire session
-        // This will:
-        // 1. Stop all timers
-        // 2. Close the current item if active
-        // 3. Submit all completed items
-        // 4. Clear the session state
-        await auctioneering.endAuctionSession(client, config, biddingChannel);
-
-        await message.reply(`✅ Auction session ended and results submitted.`);
-      } else {
-        await confirmMsg.reactions.removeAll().catch(() => {});
-        await message.reply(`❌ End auction canceled`);
-      }
-    } catch (e) {
+    if (reaction.emoji.name === '✅') {
+      // User confirmed - end the auction
       await confirmMsg.reactions.removeAll().catch(() => {});
-      await message.reply(`⏱️ Confirmation timeout - auction continues`);
+
+      await message.reply(`🛑 Ending auction session immediately...`);
+
+      // Get bidding channel for finalization
+      const guild = await client.guilds.fetch(config.main_guild_id);
+      const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+
+      // If there's an active item, stop it first
+      if (auctState.currentItem && auctState.currentItem.status === 'active') {
+        console.log(`🛑 Stopping active item: ${auctState.currentItem.item}`);
+        
+        // Try to get the thread for the current item
+        let itemThread = null;
+        if (auctState.currentItem.threadId) {
+          itemThread = await guild.channels.fetch(auctState.currentItem.threadId).catch(() => null);
+        }
+        
+        // Stop the current item (this will handle cleanup and finalization)
+        await auctioneering.stopCurrentItem(client, config, itemThread || biddingChannel);
+      }
+
+      // End the auction session properly (submits results, clears state)
+      await auctioneering.endAuctionSession(client, config, biddingChannel);
+
+      await message.reply(`✅ Auction session ended and results submitted.`);
+    } else {
+      // User cancelled
+      await confirmMsg.reactions.removeAll().catch(() => {});
+      await message.reply(`❌ End auction canceled`);
     }
-  },
+  } catch (error) {
+    // Timeout or other error
+    await confirmMsg.reactions.removeAll().catch(() => {});
+    await message.reply(`⏱️ Confirmation timeout - auction continues`);
+  }
+},
 
   queuelist: async (message, member) => {
     await auctioneering.handleQueueList(message, bidding.getBiddingState());
