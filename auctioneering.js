@@ -7,7 +7,12 @@
 const { EmbedBuilder } = require("discord.js");
 const fetch = require("node-fetch");
 const { Timeout } = require("timers");
-const { getCurrentTimestamp, getSundayOfWeek, sleep, normalizeUsername } = require("./utils/common");
+const {
+  getCurrentTimestamp,
+  getSundayOfWeek,
+  sleep,
+  normalizeUsername,
+} = require("./utils/common");
 const attendance = require("./attendance");
 
 // ==========================================
@@ -81,9 +86,9 @@ const EMOJI = {
 
 // Timeout constants
 const TIMEOUTS = {
-  FETCH_TIMEOUT: 10000,        // 10 seconds - API fetch timeout
-  CONFIRMATION: 30000,         // 30 seconds - user confirmation timeout
-  PREVIEW_DELAY: 30000,        // 30 seconds - item preview delay
+  FETCH_TIMEOUT: 10000, // 10 seconds - API fetch timeout
+  CONFIRMATION: 30000, // 30 seconds - user confirmation timeout
+  PREVIEW_DELAY: 30000, // 30 seconds - item preview delay
 };
 
 function initialize(config, isAdminFunc, biddingModuleRef) {
@@ -193,7 +198,7 @@ async function saveAuctionState(url) {
       const seen = new WeakSet();
       return JSON.stringify(obj, (key, value) => {
         // Skip timers and circular references
-        if (key === 'timers' || key === 'currentSession') return undefined;
+        if (key === "timers" || key === "currentSession") return undefined;
         if (typeof value === "object" && value !== null) {
           if (seen.has(value)) return undefined;
           seen.add(value);
@@ -203,20 +208,21 @@ async function saveAuctionState(url) {
     };
 
     // 🧩 Clean item (avoid timers and circular data)
-    const cleanItem = auctionState.currentItem && typeof auctionState.currentItem === "object"
-      ? {
-          item: auctionState.currentItem.item,
-          startPrice: auctionState.currentItem.startPrice,
-          duration: auctionState.currentItem.duration,
-          curBid: auctionState.currentItem.curBid,
-          curWin: auctionState.currentItem.curWin,
-          curWinId: auctionState.currentItem.curWinId,
-          status: auctionState.currentItem.status,
-          source: auctionState.currentItem.source,
-          sheetIndex: auctionState.currentItem.sheetIndex,
-          bossName: auctionState.currentItem.bossName,
-        }
-      : null;
+    const cleanItem =
+      auctionState.currentItem && typeof auctionState.currentItem === "object"
+        ? {
+            item: auctionState.currentItem.item,
+            startPrice: auctionState.currentItem.startPrice,
+            duration: auctionState.currentItem.duration,
+            curBid: auctionState.currentItem.curBid,
+            curWin: auctionState.currentItem.curWin,
+            curWinId: auctionState.currentItem.curWinId,
+            status: auctionState.currentItem.status,
+            source: auctionState.currentItem.source,
+            sheetIndex: auctionState.currentItem.sheetIndex,
+            bossName: auctionState.currentItem.bossName,
+          }
+        : null;
 
     const stateToSave = {
       auctionState: {
@@ -247,6 +253,8 @@ async function saveAuctionState(url) {
   }
 }
 
+// REPLACE the entire startAuctioneering function (Line ~230 in auctioneering.js)
+// This version removes boss grouping and attendance requirements
 
 async function startAuctioneering(client, config, channel) {
   // Validate parameters
@@ -262,7 +270,7 @@ async function startAuctioneering(client, config, channel) {
 
   if (![0, 5].includes(channel.type)) {
     console.error(
-      `❌ Invalid channel type (${channel.type}) — must be text or announcement channel.`
+      `❌ Invalid channel type (${channel.type}) – must be text or announcement channel.`
     );
     const guild = await client.guilds.fetch(config.main_guild_id);
     channel = await guild.channels.fetch(config.bidding_channel_id);
@@ -280,34 +288,22 @@ async function startAuctioneering(client, config, channel) {
     return;
   }
 
-    // Fetch sheet items
+  // Fetch sheet items
   const sheetItems = await fetchSheetItems(config.sheet_webhook_url);
   if (!sheetItems) {
     await channel.send(`❌ Failed to load items`);
     return;
   }
 
-  // Calculate week sheet name
-  const attendance = require("./attendance.js");
-  const sundayDate = attendance.getSundayOfWeek();
-  const weekSheetName = `ELYSIUM_WEEK_${sundayDate}`;
-
-  // Group items by boss
-  const sessions = [];
-  const bossGroups = {};
-
-  // All items must come from Google Sheets with proper boss data
   // 🔧 FIX: Filter out items that already have winners (past auctions)
-  // Check column D (Winner) - if it has ANY value, skip it
-  const availableItems = sheetItems.filter(item => {
-    // Check if winner exists and is not empty/null/undefined
+  const availableItems = sheetItems.filter((item) => {
     const winner = item.winner;
-    const hasWinner = winner !== null && 
-                      winner !== undefined && 
-                      winner !== '' && 
-                      winner.toString().trim() !== '';
-    
-    // Only include items WITHOUT winners
+    const hasWinner =
+      winner !== null &&
+      winner !== undefined &&
+      winner !== "" &&
+      winner.toString().trim() !== "";
+
     if (hasWinner) {
       console.log(`⏭️ Skipping "${item.item}" - already has winner: ${winner}`);
     }
@@ -317,128 +313,88 @@ async function startAuctioneering(client, config, channel) {
   if (availableItems.length === 0) {
     await channel.send(
       `❌ No available items to auction.\n\n` +
-      `All items in BiddingItems sheet already have winners.\n` +
-      `Please add new items or clear the Winner column (Column D) for items you want to re-auction.`
+        `All items in BiddingItems sheet already have winners.\n` +
+        `Please add new items or clear the Winner column (Column D) for items you want to re-auction.`
     );
     return;
   }
 
-  console.log(`✅ Filtered items: ${availableItems.length}/${sheetItems.length} available (${sheetItems.length - availableItems.length} already have winners)`);
+  console.log(
+    `✅ Filtered items: ${availableItems.length}/${
+      sheetItems.length
+    } available (${
+      sheetItems.length - availableItems.length
+    } already have winners)`
+  );
 
-  availableItems.forEach((item, idx) => {
-    const bossData = (item.boss || "").trim();
-    if (!bossData) {
-      console.warn(`⚠️ Item ${item.item} has no boss data, skipping`);
-      return;
-    }
+  // 🎯 SIMPLIFIED: Treat all items as ONE session (no boss grouping)
+  const allItems = [];
 
-    // Parse boss: "EGO 10/27/2025 5:57:00" or "EGO 10/27/25 5:57"
-    // CRITICAL: Normalize to MM/DD/YY HH:MM format (no seconds, 2-digit year)
-    const match = bossData.match(
-      /^(.+?)\s+(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/
-    );
-    if (!match) {
-      console.warn(`⚠️ Invalid boss format: ${bossData}`);
-      return;
-    }
-
-    const boss = match[1].trim().toUpperCase();
-    const month = match[2].padStart(2, "0");
-    const day = match[3].padStart(2, "0");
-    // Convert 4-digit year to 2-digit (2025 → 25, 25 → 25)
-    const year = match[4].length === 4 ? match[4].slice(-2) : match[4].padStart(2, "0");
-    const hour = match[5].padStart(2, "0");
-    const minute = match[6].padStart(2, "0");
-
-    // CRITICAL: Use MM/DD/YY HH:MM format (no seconds) to match sheet format
-    const bossKey = `${boss} ${month}/${day}/${year} ${hour}:${minute}`;
-
-    console.log(`📋 Boss data: "${bossData}" → bossKey: "${bossKey}"`);
-
-    if (!bossGroups[bossKey]) {
-      bossGroups[bossKey] = [];
-    }
-
+  availableItems.forEach((item) => {
     const qty = parseInt(item.quantity) || 1;
     for (let q = 0; q < qty; q++) {
-      bossGroups[bossKey].push({
+      allItems.push({
         ...item,
         quantity: 1,
         batchNumber: qty > 1 ? q + 1 : null,
         batchTotal: qty > 1 ? qty : null,
         source: "GoogleSheet",
-        bossName: boss,
-        bossKey: bossKey,
+        bossName: (item.boss || "").split(" ")[0] || "Unknown", // Extract just boss name
       });
     }
   });
 
-  // Convert boss groups to sessions
-  for (const [bossKey, items] of Object.entries(bossGroups)) {
-    sessions.push({
-      bossName: items[0].bossName,
-      bossKey: bossKey,
-      items: items,
-      attendees: [],
-    });
-  }
-
-  if (sessions.length === 0) {
+  if (allItems.length === 0) {
     await channel.send(`❌ No items to auction`);
     return;
   }
 
-  // Load attendance for each boss session (all items require attendance now)
-  console.log(`📊 Loading attendance for ${sessions.length} boss sessions...`);
-  const weekSheet = getSundayOfWeek();
-  const sheetName = `ELYSIUM_WEEK_${weekSheet}`;
-
-  for (const session of sessions) {
-    try {
-      const attendees = await attendance.loadAttendanceForBoss(sheetName, session.bossKey);
-      session.attendees = attendees || [];
-      attendanceCache[session.bossKey] = session.attendees;
-      console.log(`✅ Loaded ${session.attendees.length} attendees for ${session.bossKey}`);
-    } catch (err) {
-      console.error(`❌ Failed to load attendance for ${session.bossKey}:`, err);
-      session.attendees = [];
-    }
-  }
-  console.log(`✅ Attendance loading complete. Cache has ${Object.keys(attendanceCache).length} boss spawns.`);
-
+  // Initialize auction state
   auctionState.active = true;
-  auctionState.sessions = sessions;
-  auctionState.currentSessionIndex = 0;
+  auctionState.sessionItems = allItems;
   auctionState.currentItemIndex = 0;
-  auctionState.sessionItems = [];
 
   // Show preview
-  const preview = sessions
-    .map((s, i) => {
-      return `${i + 1}. **${s.bossName}**: ${s.items.length} item(s) - ${s.attendees.length} attendees`;
+  const previewList = allItems
+    .slice(0, 10)
+    .map((item, i) => {
+      return `${i + 1}. **${item.item}** - ${item.startPrice}pts • ${
+        item.duration
+      }m${item.bossName !== "Unknown" ? ` (${item.bossName})` : ""}`;
     })
     .join("\n");
+
+  const moreItems =
+    allItems.length > 10 ? `\n\n*...+${allItems.length - 10} more items*` : "";
 
   const countdownEmbed = new EmbedBuilder()
     .setColor(COLORS.AUCTION)
     .setTitle(`${EMOJI.FIRE} Auctioneering Started!`)
     .setDescription(
-      `**${sessions.length} session(s)** queued\n\n${preview}`
+      `**${allItems.length} item(s)** queued for auction\n\n${previewList}${moreItems}\n\n` +
+        `✅ **No attendance required** - All ELYSIUM members can bid!`
     )
-    .setFooter({ text: "Starting first session in 20s..." })
+    .setFooter({ text: "Starting first item in 30s..." })
     .setTimestamp();
 
-  const feedbackMsg = await channel.send({ embeds: [countdownEmbed] });
+  const feedbackMsg = await channel.send({
+    content: "@everyone",
+    embeds: [countdownEmbed],
+  });
 
   // Countdown feedback every 5 seconds
-  let countdown = 20;
+  let countdown = 30;
   const countdownInterval = setInterval(async () => {
     countdown -= 5;
     if (countdown > 0) {
-      countdownEmbed.setFooter({ text: `Starting first session in ${countdown}s...` });
-      await feedbackMsg.edit({ embeds: [countdownEmbed] }).catch(err =>
-        console.warn(`⚠️ Failed to update countdown:`, err.message)
-      );
+      countdownEmbed.setFooter({
+        text: `Starting first item in ${countdown}s...`,
+      });
+      await feedbackMsg
+        .edit({ embeds: [countdownEmbed] })
+        .catch((err) =>
+          console.warn(`⚠️ Failed to update countdown:`, err.message)
+        );
     }
   }, 5000);
 
@@ -449,7 +405,7 @@ async function startAuctioneering(client, config, channel) {
     clearInterval(auctionState.timers.sessionStartCountdown);
     delete auctionState.timers.sessionStartCountdown;
     try {
-      // Always use the configured bidding channel, not the command channel
+      // Always use the configured bidding channel
       const guild = await client.guilds.fetch(config.main_guild_id);
       const biddingChannel = await guild.channels.fetch(
         config.bidding_channel_id
@@ -465,43 +421,35 @@ async function startAuctioneering(client, config, channel) {
       // Cleanup on error
       auctionState.active = false;
       clearAllTimers();
-      if (biddingModule && typeof biddingModule.stopCacheAutoRefresh === 'function') {
+      if (
+        biddingModule &&
+        typeof biddingModule.stopCacheAutoRefresh === "function"
+      ) {
         biddingModule.stopCacheAutoRefresh();
       }
 
-      await channel.send(
-        `❌ Failed to start auction session. Please try again or contact an admin.`
-      ).catch(() => {});
+      await channel
+        .send(
+          `❌ Failed to start auction. Please try again or contact an admin.`
+        )
+        .catch(() => {});
     }
-  }, 20000);
+  }, 30000); // 30 seconds preview
 }
 
 function canUserBid(username, currentSession) {
-  // All items now require attendance - no exceptions
-  if (!currentSession || !currentSession.attendees) {
-    console.warn(`⚠️ Missing session data for attendance check`);
-    return false;
-  }
-
-  // Check if username is in attendees (case-insensitive)
-  const normalizedUsername = normalizeUsername(username);
-  const attended = currentSession.attendees.some(attendee =>
-    normalizeUsername(attendee) === normalizedUsername
-  );
-
-  console.log(`🔍 Attendance check: ${username} for ${currentSession.bossKey} - ${attended ? '✅ PASS' : '❌ FAIL'}`);
-  return attended;
+  // No attendance required - all ELYSIUM members can bid
+  return true;
 }
 
-// =======================================================
-// AUCTION NEXT ITEM (thread per item) — FIXED VERSION
-// Prevents overlap, ensures currentItem is set before bids
-// =======================================================
+// REPLACE the entire auctionNextItem function (Line ~400 in auctioneering.js)
+// This version removes session/boss logic - just processes items linearly
+
 async function auctionNextItem(client, config, channel) {
-  // ✅ Ensure we’re using a proper guild text channel
+  // ✅ Ensure we're using a proper guild text channel
   if (![0, 5].includes(channel.type)) {
     console.warn(
-      `⚠️ Channel type ${channel.type} invalid — refetching bidding channel...`
+      `⚠️ Channel type ${channel.type} invalid – refetching bidding channel...`
     );
     try {
       const guild = await client.guilds.fetch(config.main_guild_id);
@@ -531,44 +479,29 @@ async function auctionNextItem(client, config, channel) {
     }
   }
 
-  // ✅ Log what channel we’re using for clarity
-  console.log("🔍 auctionNextItem channel info:", {
-    id: channel?.id,
-    name: channel?.name,
-    type: channel?.type,
-    threadsAvailable: !!(
-      channel &&
-      channel.threads &&
-      typeof channel.threads.create === "function"
-    ),
-  });
-
-  // ✅ Pull current sessions from state
-  const sessions = auctionState.sessions;
-  if (!sessions || sessions.length === 0) {
-    await channel.send(`✅ All sessions completed`);
+  // ✅ Check if all items are done
+  if (
+    !auctionState.sessionItems ||
+    auctionState.currentItemIndex >= auctionState.sessionItems.length
+  ) {
+    await channel.send(`✅ All items completed`);
     auctionState.active = false;
     await finalizeSession(client, config, channel);
     return;
   }
 
-  const session = sessions[auctionState.currentSessionIndex];
-  if (!session || session.items.length === 0) {
-    auctionState.currentSessionIndex++;
-    return auctionNextItem(client, config, channel);
-  }
-
-  const item = session.items[auctionState.currentItemIndex];
+  const item = auctionState.sessionItems[auctionState.currentItemIndex];
   if (!item) {
-    auctionState.currentSessionIndex++;
-    auctionState.currentItemIndex = 0;
-    return auctionNextItem(client, config, channel);
+    console.error("❌ No item at current index, finalizing...");
+    await finalizeSession(client, config, channel);
+    return;
   }
 
   // ==========================================
   // 30-SECOND PREVIEW BEFORE ITEM STARTS
   // ==========================================
-  const remainingInSession = session.items.length - auctionState.currentItemIndex;
+  const remainingItems =
+    auctionState.sessionItems.length - auctionState.currentItemIndex;
   const previewEmbed = new EmbedBuilder()
     .setColor(COLORS.AUCTION)
     .setTitle(`${EMOJI.CLOCK} NEXT ITEM COMING UP`)
@@ -586,20 +519,21 @@ async function auctionNextItem(client, config, channel) {
       },
       {
         name: `${EMOJI.LIST} Items Left`,
-        value: `${remainingInSession} in session`,
-        inline: true,
-      },
-      {
-        name: `${EMOJI.TROPHY} Boss`,
-        value: `${session.bossName}`,
-        inline: true,
-      },
-      {
-        name: `${EMOJI.FIRE} Attendance Required`,
-        value: session.bossName !== "Manual Queue" ? "Yes" : "No",
+        value: `${remainingItems} remaining`,
         inline: true,
       }
-    )
+    );
+
+  // Add boss info if available
+  if (item.bossName && item.bossName !== "Unknown") {
+    previewEmbed.addFields({
+      name: `${EMOJI.TROPHY} Boss`,
+      value: `${item.bossName}`,
+      inline: true,
+    });
+  }
+
+  previewEmbed
     .setFooter({ text: "Auction starts in 30 seconds" })
     .setTimestamp();
 
@@ -611,7 +545,7 @@ async function auctionNextItem(client, config, channel) {
   console.log(`${EMOJI.CLOCK} 30-second preview for: ${item.item}`);
 
   // Wait 30 seconds before starting
-  await new Promise(resolve => setTimeout(resolve, TIMEOUTS.PREVIEW_DELAY));
+  await new Promise((resolve) => setTimeout(resolve, TIMEOUTS.PREVIEW_DELAY));
 
   // ==========================================
   // START THE ACTUAL AUCTION
@@ -619,9 +553,10 @@ async function auctionNextItem(client, config, channel) {
   auctionState.currentItem = item;
   auctionState.currentItem.status = "active";
   auctionState.currentItem.bids = [];
-  auctionState.currentItem.currentSession = session; // Attach session for attendance check
 
-  const threadName = `${item.item} | ${item.startPrice || 0}pts | ${session.bossName}`;
+  const threadName = `${item.item} | ${item.startPrice || 0}pts${
+    item.bossName !== "Unknown" ? ` | ${item.bossName}` : ""
+  }`;
 
   let auctionThread = null;
 
@@ -636,7 +571,7 @@ async function auctionNextItem(client, config, channel) {
     } else {
       // ✅ Fallback: send starter message and create thread from it
       console.warn(
-        "⚠️ channel.threads.create not available — using message.startThread() fallback"
+        "⚠️ channel.threads.create not available – using message.startThread() fallback"
       );
       const starterMsg = await channel.send({
         content: `@everyone`,
@@ -645,9 +580,9 @@ async function auctionNextItem(client, config, channel) {
             .setColor(COLORS.AUCTION)
             .setTitle(`${EMOJI.AUCTION} New Auction Started`)
             .setDescription(
-              `**Item:** ${item.item}\n**Boss:** ${session.bossName}\n**Start Price:** ${item.startPrice || 0} pts\n**Duration:** ${
-                item.duration || 2
-              } min`
+              `**Item:** ${item.item}\n**Start Price:** ${
+                item.startPrice || 0
+              } pts\n**Duration:** ${item.duration || 2} min`
             )
             .setFooter({
               text: `Thread created per item • ${getTimestamp()}`,
@@ -681,9 +616,11 @@ async function auctionNextItem(client, config, channel) {
             .setColor(COLORS.AUCTION)
             .setTitle(`${EMOJI.AUCTION} New Auction Started`)
             .setDescription(
-              `**Item:** ${item.item}\n**Boss:** ${session.bossName}\n**Start Price:** ${item.startPrice || 0} pts\n**Duration:** ${
+              `**Item:** ${item.item}\n**Start Price:** ${
+                item.startPrice || 0
+              } pts\n**Duration:** ${
                 item.duration || 2
-              } min`
+              } min\n\n✅ **All ELYSIUM members can bid!**`
             )
             .setFooter({
               text: `Thread created per item • ${getTimestamp()}`,
@@ -695,9 +632,6 @@ async function auctionNextItem(client, config, channel) {
     console.error("❌ Failed to create auction thread:", err);
     console.error(
       "→ Check: Bot needs 'Create Public Threads' & 'Send Messages in Threads' in the bidding channel."
-    );
-    console.error(
-      "→ Also confirm config.bidding_channel_id points to a normal text channel."
     );
 
     // Clean up partial state to prevent auction from being stuck
@@ -712,23 +646,29 @@ async function auctionNextItem(client, config, channel) {
     } catch (e) {
       console.error("❌ Also failed to send fallback message:", e);
     }
-    return; // stop here for this item
+    return;
   }
 
   // ✅ Set currentItem properly BEFORE starting the auction
   auctionState.currentItem = item;
-  auctionState.currentItem.currentSession = session; // Attach session for attendance check
   item.status = "active";
   item.auctionStartTime = getTimestamp();
 
   // ✅ Start bidding in this thread
   try {
+    // Pass a dummy session for compatibility (no attendance check needed)
+    const dummySession = {
+      bossName: item.bossName || "Open",
+      bossKey: "open",
+      attendees: [], // Empty - not used anymore
+    };
+
     await biddingModule.startItemAuction(
       client,
       config,
       auctionThread,
       item,
-      session
+      dummySession
     );
   } catch (err) {
     console.error("❌ Error starting item auction:", err);
@@ -736,7 +676,6 @@ async function auctionNextItem(client, config, channel) {
     return;
   }
 
-  // ✅ DO NOT auto-queue next item immediately
   console.log(
     `🕐 Auction started for: ${item.item}. Waiting for bids to finish...`
   );
@@ -852,7 +791,7 @@ async function itemGo3(client, config, channel) {
 // SAFE TIMER CLEANUP HELPER
 // =======================================================
 function safelyCleanupTimers(...timerKeys) {
-  timerKeys.forEach(key => {
+  timerKeys.forEach((key) => {
     if (auctionState.timers[key]) {
       clearTimeout(auctionState.timers[key]);
       delete auctionState.timers[key];
@@ -860,10 +799,9 @@ function safelyCleanupTimers(...timerKeys) {
   });
 }
 
-// =======================================================
-// ITEM END — FIXED VERSION
-// Ensures next item only starts after completion
-// =======================================================
+// REPLACE the entire itemEnd function (Line ~600 in auctioneering.js)
+// This version removes session iteration - just moves to next item linearly
+
 async function itemEnd(client, config, channel) {
   if (!client || !config || !channel) {
     console.error(`${EMOJI.ERROR} Invalid parameters to itemEnd`);
@@ -876,7 +814,7 @@ async function itemEnd(client, config, channel) {
   item.status = "ended";
 
   // 🧹 Clear timers to avoid duplicates - safe cleanup
-  safelyCleanupTimers('itemEnd', 'go1', 'go2', 'go3');
+  safelyCleanupTimers("itemEnd", "go1", "go2", "go3");
 
   const timestamp = getTimestamp();
   const totalBids = item.bids ? item.bids.length : 0;
@@ -910,10 +848,7 @@ async function itemEnd(client, config, channel) {
             },
             {
               name: `${EMOJI.INFO} Source`,
-              value:
-                item.source === "GoogleSheet"
-                  ? "📊 Google Sheet"
-                  : "📝 Manual Queue",
+              value: "📊 Google Sheet",
               inline: true,
             }
           )
@@ -945,7 +880,7 @@ async function itemEnd(client, config, channel) {
       console.error(`${EMOJI.ERROR} Failed to log auction result:`, err);
     }
 
-    // 🧩 Add to session log
+    // 🧩 Add to session history
     auctionState.sessionItems.push({
       item: item.item,
       winner: item.curWin,
@@ -963,13 +898,12 @@ async function itemEnd(client, config, channel) {
         new EmbedBuilder()
           .setColor(COLORS.INFO)
           .setTitle(`${EMOJI.ERROR} NO BIDS`)
-          .setDescription(`**${item.item}** had no bids and will be requeued.`)
+          .setDescription(
+            `**${item.item}** had no bids (will not be recorded).`
+          )
           .addFields({
-            name: `${EMOJI.INFO} Source`,
-            value:
-              item.source === "GoogleSheet"
-                ? "📊 Google Sheet (stays in queue)"
-                : "📝 Manual Queue (added to sheet)",
+            name: `${EMOJI.INFO} Note`,
+            value: "Item remains in BiddingItems sheet for future auctions.",
             inline: false,
           }),
       ],
@@ -983,66 +917,73 @@ async function itemEnd(client, config, channel) {
       // Refetch thread to ensure it still exists
       const refreshedThread = await channel.fetch().catch(() => null);
       if (!refreshedThread) {
-        console.warn(`⚠️ Thread ${channel.id} no longer exists, skipping lock/archive`);
-        return;
-      }
+        console.warn(
+          `⚠️ Thread ${channel.id} no longer exists, skipping lock/archive`
+        );
+      } else {
+        // Lock the thread first to prevent new messages
+        if (typeof refreshedThread.setLocked === "function") {
+          await refreshedThread
+            .setLocked(true, "Auction ended")
+            .catch((err) => {
+              console.warn(
+                `⚠️ Failed to lock thread ${refreshedThread.id}:`,
+                err.message
+              );
+            });
+          console.log(`🔒 Locked thread for ${item.item}`);
+        }
 
-      // Lock the thread first to prevent new messages
-      if (typeof refreshedThread.setLocked === 'function') {
-        await refreshedThread.setLocked(true, "Auction ended").catch(err => {
-          console.warn(`⚠️ Failed to lock thread ${refreshedThread.id}:`, err.message);
-        });
-        console.log(`🔒 Locked thread for ${item.item}`);
-      }
+        // Small delay to avoid race conditions with Discord API
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Small delay to avoid race conditions with Discord API
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Then archive it to hide from active list
-      if (typeof refreshedThread.setArchived === 'function') {
-        await refreshedThread.setArchived(true, "Auction ended").catch(err => {
-          console.warn(`⚠️ Failed to archive thread ${refreshedThread.id}:`, err.message);
-        });
-        console.log(`📦 Archived thread for ${item.item}`);
+        // Then archive it to hide from active list
+        if (typeof refreshedThread.setArchived === "function") {
+          await refreshedThread
+            .setArchived(true, "Auction ended")
+            .catch((err) => {
+              console.warn(
+                `⚠️ Failed to archive thread ${refreshedThread.id}:`,
+                err.message
+              );
+            });
+          console.log(`📦 Archived thread for ${item.item}`);
+        }
       }
     }
   } catch (err) {
     console.warn(`⚠️ Error locking/archiving thread:`, err.message);
   }
 
-  // ✅ Move to next item or session
-  const session = auctionState.sessions[auctionState.currentSessionIndex];
+  // ✅ Move to next item
   auctionState.currentItemIndex++;
+  auctionState.currentItem = null;
 
   // Get the parent bidding channel for next auction (not the thread)
   let biddingChannel = channel;
-  if (channel && (channel.type === 11 || channel.type === 12) && channel.parent) {
+  if (
+    channel &&
+    (channel.type === 11 || channel.type === 12) &&
+    channel.parent
+  ) {
     // If current channel is a thread, use its parent
     biddingChannel = channel.parent;
   }
 
-  if (session && auctionState.currentItemIndex < session.items.length) {
-    // ➡️ Next item in same session
-    auctionState.currentItem = null;
-    console.log(`⏭️ Moving to next item in current session...`);
+  // 🎯 SIMPLIFIED: Just check if there are more items
+  if (auctionState.currentItemIndex < auctionState.sessionItems.length) {
+    // ➡️ Next item
+    console.log(`⏭️ Moving to next item...`);
     await auctionNextItem(client, config, biddingChannel);
   } else {
-    // ✅ End of session
-    auctionState.currentSessionIndex++;
-    auctionState.currentItemIndex = 0;
-    auctionState.currentItem = null;
-
-    if (auctionState.currentSessionIndex < auctionState.sessions.length) {
-      console.log(`🔥 Moving to next boss session...`);
-      await auctionNextItem(client, config, biddingChannel);
-    } else {
-      // ✅ ALL DONE
-      console.log(`🏁 All items completed. Finalizing session.`);
-      await finalizeSession(client, config, biddingChannel);
-    }
+    // ✅ ALL DONE
+    console.log(`🎉 All items completed. Finalizing session.`);
+    await finalizeSession(client, config, biddingChannel);
   }
-
 }
+
+// REPLACE the entire finalizeSession function (Line ~750 in auctioneering.js)
+// This version already handles tally correctly - just minor cleanup
 
 async function finalizeSession(client, config, channel) {
   // Validate parameters
@@ -1057,21 +998,24 @@ async function finalizeSession(client, config, channel) {
   clearAllTimers();
 
   // Stop cache auto-refresh timer from bidding module
-  if (biddingModule && typeof biddingModule.stopCacheAutoRefresh === 'function') {
+  if (
+    biddingModule &&
+    typeof biddingModule.stopCacheAutoRefresh === "function"
+  ) {
     biddingModule.stopCacheAutoRefresh();
   }
 
-  const summary = auctionState.sessionItems
-    .map(
-      (s, i) =>
-        `${i + 1}. **${s.item}** 📊: ${s.winner} - ${s.amount}pts`
-    )
+  // Get only items that were sold (have winners)
+  const soldItems = auctionState.sessionItems.filter((s) => s.winner);
+
+  const summary = soldItems
+    .map((s, i) => `${i + 1}. **${s.item}** 📊: ${s.winner} - ${s.amount}pts`)
     .join("\n");
 
   const mainEmbed = new EmbedBuilder()
     .setColor(COLORS.SUCCESS)
     .setTitle(`${EMOJI.SUCCESS} Auctioneering Session Complete!`)
-    .setDescription(`**${auctionState.sessionItems.length}** item(s) auctioned`)
+    .setDescription(`**${soldItems.length}** item(s) sold`)
     .addFields({
       name: `${EMOJI.LIST} Summary`,
       value: summary || "No sales",
@@ -1119,18 +1063,25 @@ async function finalizeSession(client, config, channel) {
       console.log(`${EMOJI.SUCCESS} Session results submitted successfully`);
 
       // Display tally summary in bidding channel
-      const winnersWithSpending = combinedResults.filter(r => r.totalSpent > 0);
+      const winnersWithSpending = combinedResults.filter(
+        (r) => r.totalSpent > 0
+      );
       if (winnersWithSpending.length > 0) {
         const tallyEmbed = new EmbedBuilder()
           .setColor(COLORS.SUCCESS)
           .setTitle(`${EMOJI.CHART} Bidding Points Tally`)
-          .setDescription(`**Points spent this session:**\n\n${
-            winnersWithSpending
+          .setDescription(
+            `**Points spent this session:**\n\n${winnersWithSpending
               .sort((a, b) => b.totalSpent - a.totalSpent)
               .map((r, i) => `${i + 1}. **${r.member}** - ${r.totalSpent} pts`)
-              .join('\n')
-          }`)
-          .setFooter({ text: `Total: ${winnersWithSpending.reduce((sum, r) => sum + r.totalSpent, 0)} pts spent` })
+              .join("\n")}`
+          )
+          .setFooter({
+            text: `Total: ${winnersWithSpending.reduce(
+              (sum, r) => sum + r.totalSpent,
+              0
+            )} pts spent`,
+          })
           .setTimestamp();
 
         await channel.send({ embeds: [tallyEmbed] });
@@ -1156,20 +1107,22 @@ async function finalizeSession(client, config, channel) {
     if (moveResponse.ok) {
       const moveData = await moveResponse.json();
       console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution`);
-      
+
       // Get admin logs channel
       const mainGuild = await client.guilds.fetch(config.main_guild_id);
       const adminLogs = await mainGuild.channels
         .fetch(config.admin_logs_channel_id)
         .catch(() => null);
-      
+
       if (adminLogs && moveData.moved > 0) {
         await adminLogs.send(
           `📦 **Items Moved to ForDistribution:** ${moveData.moved} completed auction(s)`
         );
       }
     } else {
-      console.error(`⚠️ Failed to move items to ForDistribution: HTTP ${moveResponse.status}`);
+      console.error(
+        `⚠️ Failed to move items to ForDistribution: HTTP ${moveResponse.status}`
+      );
     }
   } catch (err) {
     console.error(`⚠️ Error moving items to ForDistribution:`, err);
@@ -1182,19 +1135,14 @@ async function finalizeSession(client, config, channel) {
     .catch(() => null);
 
   if (adminLogs) {
-    const itemsWithWinners = auctionState.sessionItems.length;
-    const totalRevenue = auctionState.sessionItems.reduce(
-      (sum, s) => sum + s.amount,
-      0
-    );
+    const itemsWithWinners = soldItems.length;
+    const totalRevenue = soldItems.reduce((sum, s) => sum + s.amount, 0);
 
     // Ensure summary is properly formatted and within Discord's limits
     let summaryValue = summary || "No sales recorded";
-    // Discord embed field values have a 1024 character limit
     if (summaryValue.length > 1024) {
       summaryValue = summaryValue.substring(0, 1020) + "...";
     }
-    // Ensure it's not empty
     if (!summaryValue || summaryValue.trim().length === 0) {
       summaryValue = "No sales recorded";
     }
@@ -1240,11 +1188,8 @@ async function finalizeSession(client, config, channel) {
     await adminLogs.send({ embeds: [adminEmbed] });
   }
 
-  console.log("🧹 Clearing session caches...");
-  attendanceCache = {}; // Clear all attendance data
-  currentSessionBoss = null;
-  auctionState.sessions = [];
-  auctionState.sessionItems = [];
+  console.log("🧹 Clearing session data...");
+  auctionState.sessionItems = []; // Clear sold items history
 
   // Clear bidding module cache AND locked points
   const biddingModule = require("./bidding.js");
@@ -1344,7 +1289,7 @@ async function stopCurrentItem(client, config, channel) {
   }
 
   // 🧹 Clear timers safely
-  safelyCleanupTimers('itemEnd', 'go1', 'go2', 'go3');
+  safelyCleanupTimers("itemEnd", "go1", "go2", "go3");
 
   const item = auctionState.currentItem;
 
@@ -1446,10 +1391,9 @@ async function handleQueueList(message, biddingState) {
     let itemNumber = 1;
 
     auctQueue.forEach((session, sessionIdx) => {
-      const sessionTitle = `🔥 SESSION ${sessionIdx + 1} - ${session.bossName} (${session.bossKey
-        .split(" ")
-        .slice(1)
-        .join(" ")})`;
+      const sessionTitle = `🔥 SESSION ${sessionIdx + 1} - ${
+        session.bossName
+      } (${session.bossKey.split(" ").slice(1).join(" ")})`;
 
       const attendeeInfo = `👥 Attendees: ${session.attendees.length} members`;
 
@@ -1816,7 +1760,9 @@ async function handleCancelItem(message) {
         biddingModule.saveBiddingState();
       }
 
-      const itemName = auctionState.currentItem ? auctionState.currentItem.item : 'Unknown Item';
+      const itemName = auctionState.currentItem
+        ? auctionState.currentItem.item
+        : "Unknown Item";
       await message.channel.send(
         `${EMOJI.ERROR} **${itemName}** canceled. Points refunded.`
       );
@@ -1828,22 +1774,34 @@ async function handleCancelItem(message) {
           // Refetch thread to ensure it still exists
           const refreshedThread = await thread.fetch().catch(() => null);
           if (!refreshedThread) {
-            console.warn(`⚠️ Thread ${thread.id} no longer exists, skipping lock/archive`);
+            console.warn(
+              `⚠️ Thread ${thread.id} no longer exists, skipping lock/archive`
+            );
           } else {
-            if (typeof refreshedThread.setLocked === 'function') {
-              await refreshedThread.setLocked(true, "Item cancelled").catch(err => {
-                console.warn(`⚠️ Failed to lock cancelled thread:`, err.message);
-              });
+            if (typeof refreshedThread.setLocked === "function") {
+              await refreshedThread
+                .setLocked(true, "Item cancelled")
+                .catch((err) => {
+                  console.warn(
+                    `⚠️ Failed to lock cancelled thread:`,
+                    err.message
+                  );
+                });
               console.log(`🔒 Locked cancelled thread`);
             }
 
             // Small delay to avoid race conditions with Discord API
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise((resolve) => setTimeout(resolve, 500));
 
-            if (typeof refreshedThread.setArchived === 'function') {
-              await refreshedThread.setArchived(true, "Item cancelled").catch(err => {
-                console.warn(`⚠️ Failed to archive cancelled thread:`, err.message);
-              });
+            if (typeof refreshedThread.setArchived === "function") {
+              await refreshedThread
+                .setArchived(true, "Item cancelled")
+                .catch((err) => {
+                  console.warn(
+                    `⚠️ Failed to archive cancelled thread:`,
+                    err.message
+                  );
+                });
               console.log(`📦 Archived cancelled thread`);
             }
           }
@@ -1907,10 +1865,10 @@ async function handleSkipItem(message) {
         biddingModule.saveBiddingState();
       }
 
-      const itemName = auctionState.currentItem ? auctionState.currentItem.item : 'Unknown Item';
-      await message.channel.send(
-        `⭐️ **${itemName}** skipped (no sale).`
-      );
+      const itemName = auctionState.currentItem
+        ? auctionState.currentItem.item
+        : "Unknown Item";
+      await message.channel.send(`⭐️ **${itemName}** skipped (no sale).`);
 
       // Lock and archive the skipped item's thread
       const thread = message.channel;
@@ -1919,22 +1877,34 @@ async function handleSkipItem(message) {
           // Refetch thread to ensure it still exists
           const refreshedThread = await thread.fetch().catch(() => null);
           if (!refreshedThread) {
-            console.warn(`⚠️ Thread ${thread.id} no longer exists, skipping lock/archive`);
+            console.warn(
+              `⚠️ Thread ${thread.id} no longer exists, skipping lock/archive`
+            );
           } else {
-            if (typeof refreshedThread.setLocked === 'function') {
-              await refreshedThread.setLocked(true, "Item skipped").catch(err => {
-                console.warn(`⚠️ Failed to lock skipped thread:`, err.message);
-              });
+            if (typeof refreshedThread.setLocked === "function") {
+              await refreshedThread
+                .setLocked(true, "Item skipped")
+                .catch((err) => {
+                  console.warn(
+                    `⚠️ Failed to lock skipped thread:`,
+                    err.message
+                  );
+                });
               console.log(`🔒 Locked skipped thread`);
             }
 
             // Small delay to avoid race conditions with Discord API
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise((resolve) => setTimeout(resolve, 500));
 
-            if (typeof refreshedThread.setArchived === 'function') {
-              await refreshedThread.setArchived(true, "Item skipped").catch(err => {
-                console.warn(`⚠️ Failed to archive skipped thread:`, err.message);
-              });
+            if (typeof refreshedThread.setArchived === "function") {
+              await refreshedThread
+                .setArchived(true, "Item skipped")
+                .catch((err) => {
+                  console.warn(
+                    `⚠️ Failed to archive skipped thread:`,
+                    err.message
+                  );
+                });
               console.log(`📦 Archived skipped thread`);
             }
           }
@@ -2014,6 +1984,9 @@ function updateCurrentItemState(updates) {
   return true;
 }
 
+// ADD this function to auctioneering.js (around line 1100, before module.exports)
+// This is called by !endauction to force-end the entire session
+
 async function endAuctionSession(client, config, channel) {
   console.log(`🛑 Ending auction session (forced by admin)...`);
 
@@ -2026,25 +1999,30 @@ async function endAuctionSession(client, config, channel) {
   clearAllTimers();
 
   // If there's a current item, mark it as cancelled
-  if (auctionState.currentItem && auctionState.currentItem.status === "active") {
+  if (
+    auctionState.currentItem &&
+    auctionState.currentItem.status === "active"
+  ) {
     auctionState.currentItem.status = "cancelled";
 
     // Try to notify in the current item thread if possible
     try {
       const currentThread = auctionState.currentItem.thread;
-      if (currentThread && typeof currentThread.send === 'function') {
+      if (currentThread && typeof currentThread.send === "function") {
         await currentThread.send({
           embeds: [
             new EmbedBuilder()
               .setColor(COLORS.ERROR)
               .setTitle(`${EMOJI.ERROR} Auction Cancelled`)
-              .setDescription(`This auction was ended by an administrator.`)
-          ]
+              .setDescription(`This auction was ended by an administrator.`),
+          ],
         });
 
         // Archive the thread
-        if (typeof currentThread.setArchived === 'function') {
-          await currentThread.setArchived(true, "Session ended by admin").catch(() => {});
+        if (typeof currentThread.setArchived === "function") {
+          await currentThread
+            .setArchived(true, "Session ended by admin")
+            .catch(() => {});
         }
       }
     } catch (err) {

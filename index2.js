@@ -336,15 +336,20 @@ async function cleanupBiddingChannel() {
     let threadsSkipped = 0;
 
     if (hasActiveAuction) {
-      console.log(`⚠️ Active auction detected - skipping thread cleanup to avoid interfering`);
+      console.log(
+        `⚠️ Active auction detected - skipping thread cleanup to avoid interfering`
+      );
     } else {
-
       try {
         // Fetch all active threads in the bidding channel
-        const activeThreads = await biddingChannel.threads.fetchActive().catch(() => null);
+        const activeThreads = await biddingChannel.threads
+          .fetchActive()
+          .catch(() => null);
 
         if (activeThreads && activeThreads.threads.size > 0) {
-          console.log(`📋 Found ${activeThreads.threads.size} active thread(s) in bidding channel`);
+          console.log(
+            `📋 Found ${activeThreads.threads.size} active thread(s) in bidding channel`
+          );
 
           for (const [threadId, thread] of activeThreads.threads) {
             try {
@@ -355,75 +360,111 @@ async function cleanupBiddingChannel() {
               }
 
               // Lock the thread if not already locked
-              if (!thread.locked && typeof thread.setLocked === 'function') {
-                await thread.setLocked(true, "Bidding channel cleanup").catch(err => {
-                  console.warn(`⚠️ Failed to lock thread ${thread.name}:`, err.message);
-                });
+              if (!thread.locked && typeof thread.setLocked === "function") {
+                await thread
+                  .setLocked(true, "Bidding channel cleanup")
+                  .catch((err) => {
+                    console.warn(
+                      `⚠️ Failed to lock thread ${thread.name}:`,
+                      err.message
+                    );
+                  });
                 threadsLocked++;
                 console.log(`🔒 Locked: ${thread.name}`);
 
                 // Small delay to avoid race conditions with Discord API
-                await new Promise(resolve => setTimeout(resolve, 300));
+                await new Promise((resolve) => setTimeout(resolve, 300));
               }
 
               // Archive the thread if not already archived
-              if (!thread.archived && typeof thread.setArchived === 'function') {
-                await thread.setArchived(true, "Bidding channel cleanup").catch(err => {
-                  console.warn(`⚠️ Failed to archive thread ${thread.name}:`, err.message);
-                });
+              if (
+                !thread.archived &&
+                typeof thread.setArchived === "function"
+              ) {
+                await thread
+                  .setArchived(true, "Bidding channel cleanup")
+                  .catch((err) => {
+                    console.warn(
+                      `⚠️ Failed to archive thread ${thread.name}:`,
+                      err.message
+                    );
+                  });
                 threadsArchived++;
                 console.log(`📦 Archived: ${thread.name}`);
               }
 
               // Rate limit: 500ms between thread operations
-              await new Promise(resolve => setTimeout(resolve, 500));
+              await new Promise((resolve) => setTimeout(resolve, 500));
             } catch (err) {
-              console.warn(`⚠️ Error processing thread ${thread.name}:`, err.message);
+              console.warn(
+                `⚠️ Error processing thread ${thread.name}:`,
+                err.message
+              );
               threadsSkipped++;
             }
           }
 
-          console.log(`✅ Thread cleanup: ${threadsLocked} locked, ${threadsArchived} archived, ${threadsSkipped} skipped`);
+          console.log(
+            `✅ Thread cleanup: ${threadsLocked} locked, ${threadsArchived} archived, ${threadsSkipped} skipped`
+          );
         } else {
           console.log(`📋 No active threads found in bidding channel`);
         }
 
         // Also check archived threads (fetch last 50)
-        const archivedThreads = await biddingChannel.threads.fetchArchived({ limit: 50 }).catch(() => null);
+        const archivedThreads = await biddingChannel.threads
+          .fetchArchived({ limit: 50 })
+          .catch(() => null);
 
         if (archivedThreads && archivedThreads.threads.size > 0) {
-          console.log(`📋 Found ${archivedThreads.threads.size} archived thread(s) to check`);
+          console.log(
+            `📋 Found ${archivedThreads.threads.size} archived thread(s) to check`
+          );
 
           for (const [threadId, thread] of archivedThreads.threads) {
             try {
               // Lock archived threads that aren't locked yet
-              if (!thread.locked && typeof thread.setLocked === 'function') {
+              if (!thread.locked && typeof thread.setLocked === "function") {
                 // Must unarchive first, then lock, then re-archive
-                await thread.setArchived(false, "Temporary unarchive for locking").catch(() => {});
+                await thread
+                  .setArchived(false, "Temporary unarchive for locking")
+                  .catch(() => {});
 
                 // Small delay after unarchiving
-                await new Promise(resolve => setTimeout(resolve, 300));
+                await new Promise((resolve) => setTimeout(resolve, 300));
 
-                await thread.setLocked(true, "Bidding channel cleanup").catch(err => {
-                  console.warn(`⚠️ Failed to lock archived thread ${thread.name}:`, err.message);
-                });
+                await thread
+                  .setLocked(true, "Bidding channel cleanup")
+                  .catch((err) => {
+                    console.warn(
+                      `⚠️ Failed to lock archived thread ${thread.name}:`,
+                      err.message
+                    );
+                  });
 
                 // Small delay after locking
-                await new Promise(resolve => setTimeout(resolve, 300));
+                await new Promise((resolve) => setTimeout(resolve, 300));
 
-                await thread.setArchived(true, "Bidding channel cleanup").catch(() => {});
+                await thread
+                  .setArchived(true, "Bidding channel cleanup")
+                  .catch(() => {});
                 threadsLocked++;
                 console.log(`🔒 Locked archived: ${thread.name}`);
 
                 // Rate limit
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise((resolve) => setTimeout(resolve, 500));
               }
             } catch (err) {
-              console.warn(`⚠️ Error processing archived thread ${thread.name}:`, err.message);
+              console.warn(
+                `⚠️ Error processing archived thread ${thread.name}:`,
+                err.message
+              );
             }
           }
 
-          console.log(`✅ Archived thread cleanup: ${threadsLocked} additional locked`);
+          console.log(
+            `✅ Archived thread cleanup: ${threadsLocked} additional locked`
+          );
         }
       } catch (err) {
         console.error(`❌ Error during thread cleanup:`, err.message);
@@ -596,7 +637,7 @@ const commandHandlers = {
   loot: async (message, member, args) => {
     await lootSystem.handleLootCommand(message, args, client);
   },
-  
+
   help: async (message, member) => {
     const args = message.content.trim().split(/\s+/).slice(1);
     await helpSystem.handleHelp(message, args, member);
@@ -610,7 +651,7 @@ const commandHandlers = {
         ? `${Math.floor((Date.now() - lastSheetCall) / 1000)} seconds ago`
         : "Never";
 
-        activeSpawns = attendance.getActiveSpawns();
+    activeSpawns = attendance.getActiveSpawns();
     pendingVerifications = attendance.getPendingVerifications();
 
     const totalSpawns = Object.keys(activeSpawns).length;
@@ -652,195 +693,217 @@ const commandHandlers = {
           } more spawns (sorted oldest first - close old ones first!)*`
         : "";
 
-const auctState = auctioneering.getAuctionState();
-if (auctState.active && auctState.currentItem) {
-  const biddingState = bidding.getBiddingState();
-  const pendingBid = biddingState.pc[msg.id];
-  
-  if (pendingBid && pendingBid.isAuctioneering) {
-    if (reaction.emoji.name === "✅") {
-      // Handle auctioneering bid confirmation
-      const currentItem = auctState.currentItem;
-      
-      if (!currentItem || currentItem.status === "ended") {
-        await msg.channel.send(`❌ <@${user.id}> Auction item no longer active`);
-        await msg.reactions.removeAll().catch(() => {});
-        await msg.delete().catch(() => {});
-        delete biddingState.pc[msg.id];
-        bidding.saveBiddingState();
-        return;
+    const auctState = auctioneering.getAuctionState();
+    if (auctState.active && auctState.currentItem) {
+      const biddingState = bidding.getBiddingState();
+      const pendingBid = biddingState.pc[msg.id];
+
+      if (pendingBid && pendingBid.isAuctioneering) {
+        if (reaction.emoji.name === "✅") {
+          // Handle auctioneering bid confirmation
+          const currentItem = auctState.currentItem;
+
+          if (!currentItem || currentItem.status === "ended") {
+            await msg.channel.send(
+              `❌ <@${user.id}> Auction item no longer active`
+            );
+            await msg.reactions.removeAll().catch(() => {});
+            await msg.delete().catch(() => {});
+            delete biddingState.pc[msg.id];
+            bidding.saveBiddingState();
+            return;
+          }
+
+          if (pendingBid.amount <= currentItem.curBid) {
+            await msg.channel.send(
+              `❌ <@${user.id}> Bid invalid. Current: ${currentItem.curBid}pts`
+            );
+            await msg.reactions.removeAll().catch(() => {});
+            await msg.delete().catch(() => {});
+            delete biddingState.pc[msg.id];
+            bidding.saveBiddingState();
+            return;
+          }
+
+          // Handle previous winner
+          if (currentItem.curWin && !pendingBid.isSelf) {
+            const prevWinner = currentItem.curWin;
+            const prevAmount = currentItem.curBid;
+
+            // Unlock previous winner's points
+            const biddingStateMod = bidding.getBiddingState();
+            biddingStateMod.lp[prevWinner] = Math.max(
+              0,
+              (biddingStateMod.lp[prevWinner] || 0) - prevAmount
+            );
+            bidding.saveBiddingState();
+
+            await msg.channel.send({
+              content: `<@${currentItem.curWinId}>`,
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(0xffa500)
+                  .setTitle(`⚠️ Outbid!`)
+                  .setDescription(
+                    `Someone bid **${pendingBid.amount}pts** on **${currentItem.item}**`
+                  ),
+              ],
+            });
+          }
+
+          // Lock new bidder's points
+          const biddingStateMod = bidding.getBiddingState();
+          biddingStateMod.lp[pendingBid.username] =
+            (biddingStateMod.lp[pendingBid.username] || 0) + pendingBid.needed;
+          bidding.saveBiddingState();
+
+          const prevBid = currentItem.curBid;
+          const updatedBids = [
+            ...currentItem.bids,
+            {
+              user: pendingBid.username,
+              userId: pendingBid.userId,
+              amount: pendingBid.amount,
+              timestamp: Date.now(),
+            },
+          ];
+
+          const timeLeft = currentItem.endTime - Date.now();
+          let newEndTime = currentItem.endTime;
+          let newExtCnt = currentItem.extCnt;
+
+          if (timeLeft < 60000 && currentItem.extCnt < 15) {
+            newEndTime = currentItem.endTime + 60000;
+            newExtCnt = currentItem.extCnt + 1;
+          }
+
+          // Update auctioneering state
+          auctioneering.updateCurrentItemState({
+            curBid: pendingBid.amount,
+            curWin: pendingBid.username,
+            curWinId: pendingBid.userId,
+            bids: updatedBids,
+            endTime: newEndTime,
+            extCnt: newExtCnt,
+            go1:
+              timeLeft < 60000 && currentItem.extCnt < 15
+                ? false
+                : currentItem.go1,
+            go2:
+              timeLeft < 60000 && currentItem.extCnt < 15
+                ? false
+                : currentItem.go2,
+          });
+
+          if (biddingState.th[`c_${msg.id}`]) {
+            clearTimeout(biddingState.th[`c_${msg.id}`]);
+            delete biddingState.th[`c_${msg.id}`];
+          }
+
+          await msg.edit({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0x00ff00)
+                .setTitle(`✅ Bid Confirmed!`)
+                .setDescription(`Highest bidder on **${currentItem.item}**`)
+                .addFields(
+                  {
+                    name: `💰 Your Bid`,
+                    value: `${pendingBid.amount}pts`,
+                    inline: true,
+                  },
+                  {
+                    name: `📊 Previous`,
+                    value: `${prevBid}pts`,
+                    inline: true,
+                  },
+                  {
+                    name: `⏱️ Time Left`,
+                    value: `${Math.floor(timeLeft / 60000)}m ${Math.floor(
+                      (timeLeft % 60000) / 1000
+                    )}s`,
+                    inline: true,
+                  }
+                )
+                .setFooter({
+                  text: pendingBid.isSelf
+                    ? `Self-overbid (+${pendingBid.needed}pts)`
+                    : timeLeft < 60000 && currentItem.extCnt < 15
+                    ? `🕐 Extended!`
+                    : "Good luck!",
+                }),
+            ],
+          });
+          await msg.reactions.removeAll().catch(() => {});
+
+          await msg.channel.send({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0xffd700)
+                .setTitle(`🔥 New High Bid!`)
+                .addFields(
+                  {
+                    name: `💰 Amount`,
+                    value: `${pendingBid.amount}pts`,
+                    inline: true,
+                  },
+                  {
+                    name: "👤 Bidder",
+                    value: pendingBid.username,
+                    inline: true,
+                  }
+                ),
+            ],
+          });
+
+          setTimeout(async () => await msg.delete().catch(() => {}), 5000);
+          if (pendingBid.origMsgId) {
+            const orig = await msg.channel.messages
+              .fetch(pendingBid.origMsgId)
+              .catch(() => null);
+            if (orig) await orig.delete().catch(() => {});
+          }
+
+          delete biddingState.pc[msg.id];
+          bidding.saveBiddingState();
+
+          console.log(
+            `✅ Auctioneering bid: ${pendingBid.username} - ${
+              pendingBid.amount
+            }pts${pendingBid.isSelf ? ` (self +${pendingBid.needed}pts)` : ""}`
+          );
+          return;
+        } else if (reaction.emoji.name === "❌") {
+          // Cancel auctioneering bid
+          await msg.edit({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0x4a90e2)
+                .setTitle(`❌ Bid Canceled`)
+                .setDescription("Not placed"),
+            ],
+          });
+          await msg.reactions.removeAll().catch(() => {});
+          setTimeout(async () => await msg.delete().catch(() => {}), 3000);
+
+          if (pendingBid.origMsgId) {
+            const orig = await msg.channel.messages
+              .fetch(pendingBid.origMsgId)
+              .catch(() => null);
+            if (orig) await orig.delete().catch(() => {});
+          }
+
+          if (biddingState.th[`c_${msg.id}`]) {
+            clearTimeout(biddingState.th[`c_${msg.id}`]);
+            delete biddingState.th[`c_${msg.id}`];
+          }
+
+          delete biddingState.pc[msg.id];
+          bidding.saveBiddingState();
+          return;
+        }
       }
-
-      if (pendingBid.amount <= currentItem.curBid) {
-        await msg.channel.send(`❌ <@${user.id}> Bid invalid. Current: ${currentItem.curBid}pts`);
-        await msg.reactions.removeAll().catch(() => {});
-        await msg.delete().catch(() => {});
-        delete biddingState.pc[msg.id];
-        bidding.saveBiddingState();
-        return;
-      }
-
-      // Handle previous winner
-      if (currentItem.curWin && !pendingBid.isSelf) {
-        const prevWinner = currentItem.curWin;
-        const prevAmount = currentItem.curBid;
-        
-        // Unlock previous winner's points
-        const biddingStateMod = bidding.getBiddingState();
-        biddingStateMod.lp[prevWinner] = Math.max(0, (biddingStateMod.lp[prevWinner] || 0) - prevAmount);
-        bidding.saveBiddingState();
-
-        await msg.channel.send({
-          content: `<@${currentItem.curWinId}>`,
-          embeds: [
-            new EmbedBuilder()
-              .setColor(0xffa500)
-              .setTitle(`⚠️ Outbid!`)
-              .setDescription(`Someone bid **${pendingBid.amount}pts** on **${currentItem.item}**`),
-          ],
-        });
-      }
-
-      // Lock new bidder's points
-      const biddingStateMod = bidding.getBiddingState();
-      biddingStateMod.lp[pendingBid.username] = (biddingStateMod.lp[pendingBid.username] || 0) + pendingBid.needed;
-      bidding.saveBiddingState();
-
-      const prevBid = currentItem.curBid;
-      const updatedBids = [
-        ...currentItem.bids,
-        {
-          user: pendingBid.username,
-          userId: pendingBid.userId,
-          amount: pendingBid.amount,
-          timestamp: Date.now(),
-        },
-      ];
-
-      const timeLeft = currentItem.endTime - Date.now();
-      let newEndTime = currentItem.endTime;
-      let newExtCnt = currentItem.extCnt;
-
-      if (timeLeft < 60000 && currentItem.extCnt < 15) {
-        newEndTime = currentItem.endTime + 60000;
-        newExtCnt = currentItem.extCnt + 1;
-      }
-
-      // Update auctioneering state
-      auctioneering.updateCurrentItemState({
-        curBid: pendingBid.amount,
-        curWin: pendingBid.username,
-        curWinId: pendingBid.userId,
-        bids: updatedBids,
-        endTime: newEndTime,
-        extCnt: newExtCnt,
-        go1: timeLeft < 60000 && currentItem.extCnt < 15 ? false : currentItem.go1,
-        go2: timeLeft < 60000 && currentItem.extCnt < 15 ? false : currentItem.go2,
-      });
-
-      if (biddingState.th[`c_${msg.id}`]) {
-        clearTimeout(biddingState.th[`c_${msg.id}`]);
-        delete biddingState.th[`c_${msg.id}`];
-      }
-
-      await msg.edit({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(0x00ff00)
-            .setTitle(`✅ Bid Confirmed!`)
-            .setDescription(`Highest bidder on **${currentItem.item}**`)
-            .addFields(
-              {
-                name: `💰 Your Bid`,
-                value: `${pendingBid.amount}pts`,
-                inline: true,
-              },
-              {
-                name: `📊 Previous`,
-                value: `${prevBid}pts`,
-                inline: true,
-              },
-              {
-                name: `⏱️ Time Left`,
-                value: `${Math.floor(timeLeft / 60000)}m ${Math.floor((timeLeft % 60000) / 1000)}s`,
-                inline: true,
-              }
-            )
-            .setFooter({
-              text: pendingBid.isSelf
-                ? `Self-overbid (+${pendingBid.needed}pts)`
-                : timeLeft < 60000 && currentItem.extCnt < 15
-                ? `🕐 Extended!`
-                : "Good luck!",
-            }),
-        ],
-      });
-      await msg.reactions.removeAll().catch(() => {});
-
-      await msg.channel.send({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(0xffd700)
-            .setTitle(`🔥 New High Bid!`)
-            .addFields(
-              {
-                name: `💰 Amount`,
-                value: `${pendingBid.amount}pts`,
-                inline: true,
-              },
-              { name: '👤 Bidder', value: pendingBid.username, inline: true }
-            ),
-        ],
-      });
-
-      setTimeout(async () => await msg.delete().catch(() => {}), 5000);
-      if (pendingBid.origMsgId) {
-        const orig = await msg.channel.messages
-          .fetch(pendingBid.origMsgId)
-          .catch(() => null);
-        if (orig) await orig.delete().catch(() => {});
-      }
-
-      delete biddingState.pc[msg.id];
-      bidding.saveBiddingState();
-
-      console.log(
-        `✅ Auctioneering bid: ${pendingBid.username} - ${pendingBid.amount}pts${
-          pendingBid.isSelf ? ` (self +${pendingBid.needed}pts)` : ""
-        }`
-      );
-      return;
-    } else if (reaction.emoji.name === "❌") {
-      // Cancel auctioneering bid
-      await msg.edit({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(0x4a90e2)
-            .setTitle(`❌ Bid Canceled`)
-            .setDescription("Not placed"),
-        ],
-      });
-      await msg.reactions.removeAll().catch(() => {});
-      setTimeout(async () => await msg.delete().catch(() => {}), 3000);
-
-      if (pendingBid.origMsgId) {
-        const orig = await msg.channel.messages
-          .fetch(pendingBid.origMsgId)
-          .catch(() => null);
-        if (orig) await orig.delete().catch(() => {});
-      }
-
-      if (biddingState.th[`c_${msg.id}`]) {
-        clearTimeout(biddingState.th[`c_${msg.id}`]);
-        delete biddingState.th[`c_${msg.id}`];
-      }
-
-      delete biddingState.pc[msg.id];
-      bidding.saveBiddingState();
-      return;
     }
-  }
-}
 
     const biddingState = bidding.getBiddingState();
     const biddingStatus = biddingState.a
@@ -1098,7 +1161,9 @@ if (auctState.active && auctState.currentItem) {
               await message.channel.send(
                 `   ├─ 🧹 Cleaning up reactions from thread...`
               );
-              const cleanupStats = await attendance.cleanupAllThreadReactions(thread);
+              const cleanupStats = await attendance.cleanupAllThreadReactions(
+                thread
+              );
               totalReactionsRemoved += cleanupStats.success;
               totalReactionsFailed += cleanupStats.failed;
 
@@ -1515,112 +1580,127 @@ if (auctState.active && auctState.currentItem) {
     }
   },
 
-// Replace the !endauction handler in your commandHandlers object (around line 450 in index2.js)
+  // Replace the !endauction handler in your commandHandlers object (around line 450 in index2.js)
 
-endauction: async (message, member) => {
-  const auctState = auctioneering.getAuctionState();
-  if (!auctState.active) {
-    return await message.reply(`❌ No active auction to end`);
-  }
+  // REPLACE the entire !endauction handler in index2.js commandHandlers object (Line ~450)
+  // This version fixes the race condition with double execution
 
-  // Create confirmation embed
-  const confirmEmbed = new EmbedBuilder()
-    .setColor(0xffa500)
-    .setTitle(`⚠️ End Auction Session?`)
-    .setDescription(
-      `This will immediately end the current auction session and submit all completed items.\n\n` +
-      `**Current Item:** ${auctState.currentItem?.item || 'None'}\n` +
-      `**Completed Items:** ${auctState.sessionItems?.length || 0}\n\n` +
-      `React with ✅ to confirm or ❌ to cancel.`
-    )
-    .setFooter({ text: `30 seconds to respond` })
-    .setTimestamp();
+  endauction: async (message, member) => {
+    const auctState = auctioneering.getAuctionState();
+    if (!auctState.active) {
+      return await message.reply(`❌ No active auction to end`);
+    }
 
-  const confirmMsg = await message.reply({ embeds: [confirmEmbed] });
+    // Create confirmation embed
+    const confirmEmbed = new EmbedBuilder()
+      .setColor(0xffa500)
+      .setTitle(`⚠️ End Auction Session?`)
+      .setDescription(
+        `This will immediately end the current auction session and submit all completed items.\n\n` +
+          `**Current Item:** ${auctState.currentItem?.item || "None"}\n` +
+          `**Completed Items:** ${
+            auctState.sessionItems?.filter((s) => s.winner).length || 0
+          }\n\n` +
+          `React with ✅ to confirm or ❌ to cancel.`
+      )
+      .setFooter({ text: `30 seconds to respond` })
+      .setTimestamp();
 
-  // Add reactions
-  try {
-    await confirmMsg.react('✅');
-    await confirmMsg.react('❌');
-  } catch (err) {
-    console.error("Failed to add reactions:", err);
-    return await message.reply("❌ Failed to create confirmation prompt");
-  }
+    const confirmMsg = await message.reply({ embeds: [confirmEmbed] });
 
-  // Create reaction collector with proper filter
-  const filter = (reaction, user) => {
-    return (
-      ['✅', '❌'].includes(reaction.emoji.name) &&
-      user.id === message.author.id &&
-      !user.bot
-    );
-  };
+    // Add reactions
+    try {
+      await confirmMsg.react("✅");
+      await confirmMsg.react("❌");
+    } catch (err) {
+      console.error("Failed to add reactions:", err);
+      return await message.reply("❌ Failed to create confirmation prompt");
+    }
 
-  // Flag to prevent double execution
-  let executed = false;
+    // Create reaction collector with proper filter
+    const filter = (reaction, user) => {
+      return (
+        ["✅", "❌"].includes(reaction.emoji.name) &&
+        user.id === message.author.id &&
+        !user.bot
+      );
+    };
 
-  try {
-    const collected = await confirmMsg.awaitReactions({
-      filter,
-      max: 1,
-      time: 30000,
-      errors: ['time'],
-    });
+    // Flag to prevent double execution
+    let executed = false;
 
-    // Prevent double execution
-    if (executed) return;
-    executed = true;
+    try {
+      const collected = await confirmMsg.awaitReactions({
+        filter,
+        max: 1,
+        time: 30000,
+        errors: ["time"],
+      });
 
-    const reaction = collected.first();
-
-    if (reaction.emoji.name === '✅') {
-      // User confirmed - end the auction
-      await confirmMsg.reactions.removeAll().catch(() => {});
-
-      await message.reply(`🛑 Ending auction session immediately...`);
-
-      // Get bidding channel for finalization (always use parent channel, not thread)
-      const guild = await client.guilds.fetch(config.main_guild_id);
-      const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
-
-      // If there's an active item, stop it first
-      if (auctState.currentItem && auctState.currentItem.status === 'active') {
-        console.log(`🛑 Stopping active item: ${auctState.currentItem.item}`);
-        
-        // Try to get the thread for the current item
-        let itemThread = null;
-        if (auctState.currentItem.threadId) {
-          itemThread = await guild.channels.fetch(auctState.currentItem.threadId).catch(() => null);
-        }
-        
-        // Stop the current item (pass the thread for notifications, but use parent for operations)
-        await auctioneering.stopCurrentItem(client, config, itemThread || biddingChannel);
-      }
-
-      // CRITICAL: Always use the parent bidding channel (type 0 or 5), never a thread (type 11)
-      // This ensures auctioneering can create new threads and send messages properly
-      await auctioneering.endAuctionSession(client, config, biddingChannel);
-
-      await message.reply(`✅ Auction session ended and results submitted.`);
-    } else {
       // Prevent double execution
       if (executed) return;
       executed = true;
 
-      // User cancelled
-      await confirmMsg.reactions.removeAll().catch(() => {});
-      await message.reply(`❌ End auction canceled`);
-    }
-  } catch (error) {
-    // Prevent double execution
-    if (executed) return;
-    executed = true;
+      const reaction = collected.first();
 
-    // Timeout or other error
-    await confirmMsg.reactions.removeAll().catch(() => {});
-    await message.reply(`⏱️ Confirmation timeout - auction continues`);
-  }
-},
+      if (reaction.emoji.name === "✅") {
+        // User confirmed - end the auction
+        await confirmMsg.reactions.removeAll().catch(() => {});
+
+        await message.reply(`🛑 Ending auction session immediately...`);
+
+        // Get bidding channel for finalization (always use parent channel, not thread)
+        const guild = await client.guilds.fetch(config.main_guild_id);
+        const biddingChannel = await guild.channels.fetch(
+          config.bidding_channel_id
+        );
+
+        // If there's an active item, stop it first
+        if (
+          auctState.currentItem &&
+          auctState.currentItem.status === "active"
+        ) {
+          console.log(`🛑 Stopping active item: ${auctState.currentItem.item}`);
+
+          // Try to get the thread for the current item
+          let itemThread = null;
+          if (auctState.currentItem.threadId) {
+            itemThread = await guild.channels
+              .fetch(auctState.currentItem.threadId)
+              .catch(() => null);
+          }
+
+          // Stop the current item (pass the thread for notifications, but use parent for operations)
+          await auctioneering.stopCurrentItem(
+            client,
+            config,
+            itemThread || biddingChannel
+          );
+        }
+
+        // CRITICAL: Always use the parent bidding channel (type 0 or 5), never a thread (type 11)
+        await auctioneering.endAuctionSession(client, config, biddingChannel);
+
+        await message.reply(`✅ Auction session ended and results submitted.`);
+      } else {
+        // Prevent double execution
+        if (executed) return;
+        executed = true;
+
+        // User cancelled
+        await confirmMsg.reactions.removeAll().catch(() => {});
+        await message.reply(`❌ End auction canceled`);
+      }
+    } catch (error) {
+      // Prevent double execution
+      if (executed) return;
+      executed = true;
+
+      // Timeout or other error
+      await confirmMsg.reactions.removeAll().catch(() => {});
+      await message.reply(`⏱️ Confirmation timeout - auction continues`);
+    }
+  },
 
   queuelist: async (message, member) => {
     await auctioneering.handleQueueList(message, bidding.getBiddingState());
@@ -1679,7 +1759,7 @@ endauction: async (message, member) => {
       "Secreta",
       "Ordo",
       "Asta",
-      "Supore"
+      "Supore",
     ];
 
     // Show confirmation message
@@ -1688,23 +1768,23 @@ endauction: async (message, member) => {
       member,
       `⚠️ **Spawn Maintenance Threads?**\n\n` +
         `This will create spawn threads for **${maintenanceBosses.length} bosses** that spawn during maintenance:\n\n` +
-        `${maintenanceBosses.map((b, i) => `${i + 1}. ${b}`).join('\n')}\n\n` +
+        `${maintenanceBosses.map((b, i) => `${i + 1}. ${b}`).join("\n")}\n\n` +
         `**Spawn time:** 5 minutes from now\n\n` +
         `React ✅ to confirm or ❌ to cancel.`,
       async (confirmMsg) => {
         // Get current time + 5 minutes
         const spawnDate = new Date(Date.now() + 5 * 60 * 1000);
         const year = spawnDate.getFullYear();
-        const month = String(spawnDate.getMonth() + 1).padStart(2, '0');
-        const day = String(spawnDate.getDate()).padStart(2, '0');
-        const hours = String(spawnDate.getHours()).padStart(2, '0');
-        const minutes = String(spawnDate.getMinutes()).padStart(2, '0');
+        const month = String(spawnDate.getMonth() + 1).padStart(2, "0");
+        const day = String(spawnDate.getDate()).padStart(2, "0");
+        const hours = String(spawnDate.getHours()).padStart(2, "0");
+        const minutes = String(spawnDate.getMinutes()).padStart(2, "0");
         const formattedTimestamp = `${year}-${month}-${day} ${hours}:${minutes}`;
 
         await message.reply(
           `🔄 **Creating maintenance spawn threads...**\n\n` +
-          `Spawning ${maintenanceBosses.length} boss threads...\n` +
-          `Please wait...`
+            `Spawning ${maintenanceBosses.length} boss threads...\n` +
+            `Please wait...`
         );
 
         let successCount = 0;
@@ -1729,16 +1809,20 @@ endauction: async (message, member) => {
             } else {
               // Try direct thread creation if attendance module fails
               const guild = await client.guilds.fetch(config.main_guild_id);
-              const attChannel = await guild.channels.fetch(config.attendance_channel_id);
+              const attChannel = await guild.channels.fetch(
+                config.attendance_channel_id
+              );
               const spawnMessage = `⚠️ ${bossName} will spawn in 5 minutes! (${formattedTimestamp}) @everyone`;
 
               const thread = await attChannel.threads.create({
-                name: `[${month}/${day}/${year.toString().slice(-2)} ${hours}:${minutes}] ${bossName}`,
+                name: `[${month}/${day}/${year
+                  .toString()
+                  .slice(-2)} ${hours}:${minutes}] ${bossName}`,
                 autoArchiveDuration: config.auto_archive_minutes || 60,
                 message: {
-                  content: spawnMessage
+                  content: spawnMessage,
                 },
-                reason: `Maintenance spawn by ${member.user.username}`
+                reason: `Maintenance spawn by ${member.user.username}`,
               });
 
               if (thread) {
@@ -1751,7 +1835,7 @@ endauction: async (message, member) => {
             }
 
             // Small delay to avoid rate limits
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise((resolve) => setTimeout(resolve, 500));
           } catch (err) {
             failCount++;
             results.push(`❌ ${bossName} - ${err.message}`);
@@ -1764,12 +1848,12 @@ endauction: async (message, member) => {
           .setTitle(`✅ Maintenance Threads Created`)
           .setDescription(
             `**Success:** ${successCount}/${maintenanceBosses.length}\n` +
-            `**Failed:** ${failCount}/${maintenanceBosses.length}`
+              `**Failed:** ${failCount}/${maintenanceBosses.length}`
           )
           .addFields({
-            name: '📋 Results',
-            value: results.join('\n'),
-            inline: false
+            name: "📋 Results",
+            value: results.join("\n"),
+            inline: false,
           })
           .setFooter({ text: `Executed by ${member.user.username}` })
           .setTimestamp();
@@ -1840,7 +1924,13 @@ client.once(Events.ClientReady, async () => {
   bidding.initializeBidding(config, isAdmin, auctioneering);
   auctioneering.setPostToSheet(attendance.postToSheet); // Use attendance module's postToSheet
   lootSystem.initialize(config, bossPoints, isAdmin);
-  emergencyCommands.initialize(config, attendance, bidding, auctioneering, isAdmin);
+  emergencyCommands.initialize(
+    config,
+    attendance,
+    bidding,
+    auctioneering,
+    isAdmin
+  );
   leaderboardSystem.init(client, config); // Initialize leaderboard system
 
   console.log("\n╔═══════════════════════════════════════════════════════╗");
@@ -1868,7 +1958,7 @@ client.once(Events.ClientReady, async () => {
   if (!sweep1.success || sweep1.recovered === 0) {
     console.log("⚠️ Sweep 1 found no threads, attempting Sheets recovery...");
     sweep2LoadedState = await attendance.loadAttendanceStateFromSheet();
-    
+
     if (sweep2LoadedState) {
       console.log("✅ SWEEP 2: State loaded from Google Sheets");
     } else {
@@ -1983,7 +2073,9 @@ client.once(Events.ClientReady, async () => {
           .slice(0, 3)
           .map(
             (d) =>
-              `• **${d.boss}** (${d.timestamp}) - Columns: ${d.columns.join(", ")}`
+              `• **${d.boss}** (${d.timestamp}) - Columns: ${d.columns.join(
+                ", "
+              )}`
           )
           .join("\n");
         embed.addFields({
@@ -2007,10 +2099,13 @@ client.once(Events.ClientReady, async () => {
   console.log("╚═══════════════════════════════════════════════════════╝\n");
 
   // If thread recovery didn't find much, try Google Sheets
-  if (!sweep1.success || Object.keys(attendance.getActiveSpawns()).length === 0) {
-  console.log("📊 Attempting to load attendance state from Google Sheets...");
-  await attendance.loadAttendanceStateFromSheet();
-}
+  if (
+    !sweep1.success ||
+    Object.keys(attendance.getActiveSpawns()).length === 0
+  ) {
+    console.log("📊 Attempting to load attendance state from Google Sheets...");
+    await attendance.loadAttendanceStateFromSheet();
+  }
 
   await bidding.recoverBiddingState(client, config);
 
@@ -2038,7 +2133,11 @@ client.once(Events.ClientReady, async () => {
     setInterval(() => {
       global.gc();
       const memUsage = process.memoryUsage();
-      console.log(`🧹 GC: Heap used: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB / ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`);
+      console.log(
+        `🧹 GC: Heap used: ${Math.round(
+          memUsage.heapUsed / 1024 / 1024
+        )}MB / ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`
+      );
     }, 10 * 60 * 1000); // Every 10 minutes
   }
 });
@@ -2160,7 +2259,14 @@ client.on(Events.MessageCreate, async (message) => {
             console.log(`⏰ Using current timestamp: ${fullTimestamp}`);
           }
 
-          await attendance.createSpawnThreads(client, bossName, dateStr, timeStr, fullTimestamp, "timer");
+          await attendance.createSpawnThreads(
+            client,
+            bossName,
+            dateStr,
+            timeStr,
+            fullTimestamp,
+            "timer"
+          );
         }
         return;
       }
@@ -2211,7 +2317,10 @@ client.on(Events.MessageCreate, async (message) => {
       console.log(`   inBiddingChannel: ${inBiddingChannel}`);
 
       // Bid commands must be in threads only, not main bidding channel
-      if (!message.channel.isThread() || message.channel.parentId !== config.bidding_channel_id) {
+      if (
+        !message.channel.isThread() ||
+        message.channel.parentId !== config.bidding_channel_id
+      ) {
         console.log(`❌ !bid blocked - not in auction thread`);
         await message.reply(
           `❌ You can only use \`${rawCmd}\` in auction threads (inside <#${config.bidding_channel_id}>)!`
@@ -2338,8 +2447,8 @@ client.on(Events.MessageCreate, async (message) => {
       message.channel.parentId === config.attendance_channel_id
     ) {
       // Sync state
-  activeSpawns = attendance.getActiveSpawns();
-  pendingVerifications = attendance.getPendingVerifications();
+      activeSpawns = attendance.getActiveSpawns();
+      pendingVerifications = attendance.getPendingVerifications();
 
       const content = message.content.trim().toLowerCase();
       const keyword = content.split(/\s+/)[0];
@@ -2384,7 +2493,7 @@ client.on(Events.MessageCreate, async (message) => {
           threadId: message.channel.id,
           timestamp: Date.now(),
         };
-attendance.setPendingVerifications(pendingVerifications);
+        attendance.setPendingVerifications(pendingVerifications);
 
         const statusText = userIsAdmin
           ? `⏩ **${username}** (Admin) registered for **${spawnInfo.boss}**\n\nFast-track verification (no screenshot required)...`
@@ -2470,7 +2579,8 @@ attendance.setPendingVerifications(pendingVerifications);
               const originalMsg = await message.channel.messages
                 .fetch(msgId)
                 .catch(() => null);
-              if (originalMsg) await attendance.removeAllReactionsWithRetry(originalMsg);
+              if (originalMsg)
+                await attendance.removeAllReactionsWithRetry(originalMsg);
 
               delete pendingVerifications[msgId];
             }
@@ -2735,15 +2845,23 @@ attendance.setPendingVerifications(pendingVerifications);
       if (lootCmd === "!loot") {
         console.log(`🎯 Loot command detected`);
         client.config = config; // Store config for loot system
-        await lootSystem.handleLootCommand(message, message.content.trim().split(/\s+/).slice(1), client);
+        await lootSystem.handleLootCommand(
+          message,
+          message.content.trim().split(/\s+/).slice(1),
+          client
+        );
         return;
       }
 
       // Admin logs override commands
       if (
-        ["!clearstate", "!status", "!closeallthread", "!emergency", "!maintenance"].includes(
-          adminCmd
-        )
+        [
+          "!clearstate",
+          "!status",
+          "!closeallthread",
+          "!emergency",
+          "!maintenance",
+        ].includes(adminCmd)
       ) {
         const now = Date.now();
         if (now - lastOverrideTime < TIMING.OVERRIDE_COOLDOWN) {
@@ -2794,11 +2912,9 @@ attendance.setPendingVerifications(pendingVerifications);
         // Route to appropriate handler
         // These are handled by commandHandlers
         if (
-          [
-            "!startauction",
-            "!startauctionnow",
-            "!endauction",
-          ].includes(adminCmd)
+          ["!startauction", "!startauctionnow", "!endauction"].includes(
+            adminCmd
+          )
         ) {
           const handlerName = adminCmd.slice(1); // Remove the "!"
           if (commandHandlers[handlerName]) {
@@ -2896,7 +3012,14 @@ attendance.setPendingVerifications(pendingVerifications);
           `🔧 Manual spawn creation: ${bossName} at ${fullTimestamp} by ${message.author.username}`
         );
 
-        await attendance.createSpawnThreads(client, bossName, dateStr, timeStr, fullTimestamp, "timer");
+        await attendance.createSpawnThreads(
+          client,
+          bossName,
+          dateStr,
+          timeStr,
+          fullTimestamp,
+          "timer"
+        );
 
         await message.reply(
           `✅ **Spawn thread created successfully!**\n\n` +
@@ -2956,12 +3079,13 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         try {
           await reaction.users.remove(user.id);
           await msg.channel
-            .send(
-              `⚠️ <@${user.id}>, this spawn is closed. Reaction removed.`
-            )
+            .send(`⚠️ <@${user.id}>, this spawn is closed. Reaction removed.`)
             .then((m) => setTimeout(() => m.delete().catch(() => {}), 5000));
         } catch (err) {
-          console.error(`❌ Failed to send/delete closed spawn message:`, err.message);
+          console.error(
+            `❌ Failed to send/delete closed spawn message:`,
+            err.message
+          );
         }
         return;
       }
@@ -2990,7 +3114,10 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         try {
           await reaction.users.remove(user.id);
         } catch (e) {
-          console.error(`❌ Failed to remove non-admin reaction from ${user.tag}:`, e.message);
+          console.error(
+            `❌ Failed to remove non-admin reaction from ${user.tag}:`,
+            e.message
+          );
         }
         return;
       }
@@ -3026,7 +3153,9 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         attendance.setActiveSpawns(activeSpawns); // Sync
 
         await attendance.removeAllReactionsWithRetry(msg); // CHANGED
-        await msg.reply(`✅ **${pending.author}** verified by ${user.username}!`);
+        await msg.reply(
+          `✅ **${pending.author}** verified by ${user.username}!`
+        );
 
         if (spawnInfo.confirmThreadId) {
           const confirmThread = await guild.channels
@@ -3128,7 +3257,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
           delete pendingClosures[msg.id];
           delete confirmationMessages[closePending.threadId];
-          
+
           // Sync all changes
           attendance.setActiveSpawns(activeSpawns);
           attendance.setActiveColumns(activeColumns);

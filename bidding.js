@@ -30,15 +30,15 @@ const PREVIEW_TIME = 30000; // 30 seconds
 
 // Timeout constants
 const TIMEOUTS = {
-  CONFIRMATION: 30000,        // 30 seconds - user confirmation timeout
-  STALE_CONFIRMATION: 60000,  // 60 seconds - stale confirmation cleanup
-  NEXT_ITEM_DELAY: 20000,     // 20 seconds - delay before next item
-  QUICK_DELAY: 5000,          // 5 seconds - quick delay for next item
-  MESSAGE_DELETE: 3000,       // 3 seconds - delay before deleting messages
-  GOING_ONCE: 60000,          // 60 seconds - "going once" announcement
-  GOING_TWICE: 30000,         // 30 seconds - "going twice" announcement
-  FINAL_CALL: 10000,          // 10 seconds - final call announcement
-  FINALIZE_DELAY: 2000,       // 2 seconds - delay before finalize
+  CONFIRMATION: 30000, // 30 seconds - user confirmation timeout
+  STALE_CONFIRMATION: 60000, // 60 seconds - stale confirmation cleanup
+  NEXT_ITEM_DELAY: 20000, // 20 seconds - delay before next item
+  QUICK_DELAY: 5000, // 5 seconds - quick delay for next item
+  MESSAGE_DELETE: 3000, // 3 seconds - delay before deleting messages
+  GOING_ONCE: 60000, // 60 seconds - "going once" announcement
+  GOING_TWICE: 30000, // 30 seconds - "going twice" announcement
+  FINAL_CALL: 10000, // 10 seconds - final call announcement
+  FINALIZE_DELAY: 2000, // 2 seconds - delay before finalize
 };
 
 // Color scheme (consistent throughout)
@@ -185,16 +185,20 @@ function save(forceSync = false) {
       fs.writeFileSync(SF, JSON.stringify(cleanState, null, 2));
     } catch (fileErr) {
       // On Koyeb, file system might be read-only or restricted
-      console.warn("⚠️ Local file save failed (expected on Koyeb):", fileErr.message);
+      console.warn(
+        "⚠️ Local file save failed (expected on Koyeb):",
+        fileErr.message
+      );
     }
 
     // Sync to Google Sheets for persistence across Koyeb restarts
     const now = Date.now();
-    const shouldSync = forceSync || (now - lastSheetSyncTime > SHEET_SYNC_INTERVAL);
+    const shouldSync =
+      forceSync || now - lastSheetSyncTime > SHEET_SYNC_INTERVAL;
 
     if (cfg && cfg.sheet_webhook_url && shouldSync) {
       lastSheetSyncTime = now;
-      saveBiddingStateToSheet().catch(err => {
+      saveBiddingStateToSheet().catch((err) => {
         console.error("❌ Background sheet sync failed:", err.message);
       });
       if (forceSync) {
@@ -321,7 +325,7 @@ async function submitRes(url, res, time) {
 // CACHE WITH AUTO-REFRESH
 async function loadCache(url) {
   // Validate URL parameter
-  if (!url || typeof url !== 'string') {
+  if (!url || typeof url !== "string") {
     console.error("❌ Invalid URL provided to loadCache");
     return false;
   }
@@ -632,11 +636,20 @@ function schedTimers(cli, cfg) {
     if (st.th[k]) clearTimeout(st.th[k]);
   });
   if (t > TIMEOUTS.GOING_ONCE && !a.go1)
-    st.th.goingOnce = setTimeout(async () => await ann1(cli, cfg), t - TIMEOUTS.GOING_ONCE);
+    st.th.goingOnce = setTimeout(
+      async () => await ann1(cli, cfg),
+      t - TIMEOUTS.GOING_ONCE
+    );
   if (t > TIMEOUTS.GOING_TWICE && !a.go2)
-    st.th.goingTwice = setTimeout(async () => await ann2(cli, cfg), t - TIMEOUTS.GOING_TWICE);
+    st.th.goingTwice = setTimeout(
+      async () => await ann2(cli, cfg),
+      t - TIMEOUTS.GOING_TWICE
+    );
   if (t > TIMEOUTS.FINAL_CALL)
-    st.th.finalCall = setTimeout(async () => await ann3(cli, cfg), t - TIMEOUTS.FINAL_CALL);
+    st.th.finalCall = setTimeout(
+      async () => await ann3(cli, cfg),
+      t - TIMEOUTS.FINAL_CALL
+    );
   st.th.auctionEnd = setTimeout(async () => await endAuc(cli, cfg), t);
 }
 
@@ -809,9 +822,11 @@ async function endAuc(cli, cfg) {
     });
   }
 
-  await th.setArchived(true, "Ended").catch(err =>
-    console.warn(`⚠️ Failed to archive thread ${th.id}:`, err.message)
-  );
+  await th
+    .setArchived(true, "Ended")
+    .catch((err) =>
+      console.warn(`⚠️ Failed to archive thread ${th.id}:`, err.message)
+    );
   st.q.shift();
   st.a = null;
   save();
@@ -821,7 +836,10 @@ async function endAuc(cli, cfg) {
     await th.parent.send(
       `${EMOJI.CLOCK} Next in 20s...\n${EMOJI.LIST} **${n.item}** - ${n.startPrice}pts`
     );
-    st.th.next = setTimeout(async () => await startNext(cli, cfg), TIMEOUTS.NEXT_ITEM_DELAY);
+    st.th.next = setTimeout(
+      async () => await startNext(cli, cfg),
+      TIMEOUTS.NEXT_ITEM_DELAY
+    );
   } else {
     setTimeout(async () => await finalize(cli, cfg), TIMEOUTS.FINALIZE_DELAY);
   }
@@ -1086,7 +1104,9 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 
   // Boundary check: Prevent unreasonably large bids
   if (bid > 99999999) {
-    await msg.reply(`${EMOJI.ERROR} Bid amount exceeds maximum allowed (99,999,999pts)`);
+    await msg.reply(
+      `${EMOJI.ERROR} Bid amount exceeds maximum allowed (99,999,999pts)`
+    );
     return { ok: false, msg: "Too large" };
   }
 
@@ -1101,7 +1121,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   }
 
   const tot = getPts(u);
-  
+
   if (tot === 0) {
     await msg.reply(`${EMOJI.ERROR} No points`);
     return { ok: false, msg: "No pts" };
@@ -1111,7 +1131,8 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   const curLocked = st.lp[u] || 0;
   const av = tot - curLocked;
 
-  const isSelf = currentItem.curWin && currentItem.curWin.toLowerCase() === u.toLowerCase();
+  const isSelf =
+    currentItem.curWin && currentItem.curWin.toLowerCase() === u.toLowerCase();
   const needed = isSelf ? Math.max(0, bid - currentItem.curBid) : bid;
 
   if (needed > av) {
@@ -1126,11 +1147,13 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     .setTitle(`${EMOJI.CLOCK} Confirm Your Bid`)
     .setDescription(
       `**Item:** ${currentItem.item}\n` +
-      `**Action:** ${isSelf ? 'Increase your bid' : 'Place bid and lock points'}\n\n` +
-      `⚠️ **By confirming, you agree to:**\n` +
-      `• Lock ${needed}pts from your available points\n` +
-      `• ${isSelf ? 'Increase' : 'Place'} your bid to ${bid}pts\n` +
-      `• Lose points if you win but didn't attend`
+        `**Action:** ${
+          isSelf ? "Increase your bid" : "Place bid and lock points"
+        }\n\n` +
+        `⚠️ **By confirming, you agree to:**\n` +
+        `• Lock ${needed}pts from your available points\n` +
+        `• ${isSelf ? "Increase" : "Place"} your bid to ${bid}pts\n` +
+        `• Lose points if you win but didn't attend`
     )
     .addFields(
       { name: `${EMOJI.BID} Your Bid`, value: `${bid}pts`, inline: true },
@@ -1151,12 +1174,14 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   }
 
   confEmbed.setFooter({
-    text: `${EMOJI.SUCCESS} YES, PLACE BID / ${EMOJI.ERROR} NO, CANCEL • ${isSelf ? 'Overbidding yourself' : 'Outbidding current leader'} • 10s timeout`,
+    text: `${EMOJI.SUCCESS} YES, PLACE BID / ${EMOJI.ERROR} NO, CANCEL • ${
+      isSelf ? "Overbidding yourself" : "Outbidding current leader"
+    } • 10s timeout`,
   });
 
   const conf = await msg.reply({
     content: `<@${uid}> **CONFIRM YOUR BID - React below within 10 seconds**`,
-    embeds: [confEmbed]
+    embeds: [confEmbed],
   });
   await conf.react(EMOJI.SUCCESS);
   await conf.react(EMOJI.ERROR);
@@ -1201,7 +1226,10 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
         .setColor(COLORS.INFO)
         .setFooter({ text: `${EMOJI.CLOCK} Timed out` });
       await conf.edit({ embeds: [timeoutEmbed] });
-      setTimeout(async () => await conf.delete().catch(() => {}), TIMEOUTS.MESSAGE_DELETE);
+      setTimeout(
+        async () => await conf.delete().catch(() => {}),
+        TIMEOUTS.MESSAGE_DELETE
+      );
       delete st.pc[conf.id];
       save();
     }
@@ -1288,16 +1316,24 @@ async function procBid(msg, amt, cfg) {
     .setColor(COLORS.AUCTION)
     .setTitle(`${EMOJI.CLOCK} Confirm Your Bid`)
     .setDescription(
-      `**Item:** ${a.item}${a.quantity > 1 ? ` (${a.quantity} available)` : ""}\n` +
-      `**Action:** ${isSelf ? 'Increase your bid' : 'Place bid and lock points'}\n\n` +
-      `⚠️ **By confirming, you agree to:**\n` +
-      `• Lock ${needed}pts from your available points\n` +
-      `• ${isSelf ? 'Increase' : 'Place'} your bid to ${bid}pts\n` +
-      `• Lose points if you win but didn't attend`
+      `**Item:** ${a.item}${
+        a.quantity > 1 ? ` (${a.quantity} available)` : ""
+      }\n` +
+        `**Action:** ${
+          isSelf ? "Increase your bid" : "Place bid and lock points"
+        }\n\n` +
+        `⚠️ **By confirming, you agree to:**\n` +
+        `• Lock ${needed}pts from your available points\n` +
+        `• ${isSelf ? "Increase" : "Place"} your bid to ${bid}pts\n` +
+        `• Lose points if you win but didn't attend`
     )
     .addFields(
       { name: `${EMOJI.BID} Your Bid`, value: `${bid}pts`, inline: true },
-      { name: `${EMOJI.CHART} Current High`, value: `${a.curBid}pts`, inline: true },
+      {
+        name: `${EMOJI.CHART} Current High`,
+        value: `${a.curBid}pts`,
+        inline: true,
+      },
       { name: "💳 Points After", value: `${av - needed}pts left`, inline: true }
     );
 
@@ -1310,12 +1346,14 @@ async function procBid(msg, amt, cfg) {
   }
 
   confEmbed.setFooter({
-    text: `${EMOJI.SUCCESS} YES, PLACE BID / ${EMOJI.ERROR} NO, CANCEL • ${isSelf ? 'Overbidding yourself' : 'Outbidding current leader'} • 10s timeout`,
+    text: `${EMOJI.SUCCESS} YES, PLACE BID / ${EMOJI.ERROR} NO, CANCEL • ${
+      isSelf ? "Overbidding yourself" : "Outbidding current leader"
+    } • 10s timeout`,
   });
 
   const conf = await msg.reply({
     content: `<@${uid}> **CONFIRM YOUR BID - React below within 10 seconds**`,
-    embeds: [confEmbed]
+    embeds: [confEmbed],
   });
   await conf.react(EMOJI.SUCCESS);
   await conf.react(EMOJI.ERROR);
@@ -1367,7 +1405,10 @@ async function procBid(msg, amt, cfg) {
         .setColor(getColor(COLORS.INFO))
         .setFooter({ text: `${EMOJI.CLOCK} Timed out` });
       await conf.edit({ embeds: [timeoutEmbed] });
-      setTimeout(async () => await conf.delete().catch(() => {}), TIMEOUTS.MESSAGE_DELETE);
+      setTimeout(
+        async () => await conf.delete().catch(() => {}),
+        TIMEOUTS.MESSAGE_DELETE
+      );
       delete st.pc[conf.id];
       save();
 
@@ -1661,7 +1702,9 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           return await msg.reply(`${EMOJI.ERROR} Usage: \`!bid <amount>\``);
         } catch (err) {
           // If reply fails (message deleted), send regular message
-          return await msg.channel.send(`${EMOJI.ERROR} Usage: \`!bid <amount>\``);
+          return await msg.channel.send(
+            `${EMOJI.ERROR} Usage: \`!bid <amount>\``
+          );
         }
       }
       const res = await procBid(msg, args[0], cfg);
@@ -1670,7 +1713,9 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           await msg.reply(`${EMOJI.ERROR} ${res.msg}`);
         } catch (err) {
           // If reply fails (message deleted), send regular message
-          await msg.channel.send(`${EMOJI.ERROR} <@${msg.author.id}> ${res.msg}`);
+          await msg.channel.send(
+            `${EMOJI.ERROR} <@${msg.author.id}> ${res.msg}`
+          );
         }
       }
       break;
@@ -1994,7 +2039,10 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           st.a = null;
           save();
           if (st.q.length > 0)
-            setTimeout(async () => await startNext(cli, cfg), TIMEOUTS.QUICK_DELAY);
+            setTimeout(
+              async () => await startNext(cli, cfg),
+              TIMEOUTS.QUICK_DELAY
+            );
           else await finalize(cli, cfg);
         } else {
           await canMsg.reactions.removeAll().catch(() => {});
@@ -2041,7 +2089,10 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           st.a = null;
           save();
           if (st.q.length > 0)
-            setTimeout(async () => await startNext(cli, cfg), TIMEOUTS.QUICK_DELAY);
+            setTimeout(
+              async () => await startNext(cli, cfg),
+              TIMEOUTS.QUICK_DELAY
+            );
           else await finalize(cli, cfg);
         } else {
           await skpMsg.reactions.removeAll().catch(() => {});
@@ -2159,13 +2210,13 @@ async function startItemAuction(client, config, thread, item, session) {
         .setTitle(`🔨 Auction Started: ${item.item}`)
         .setDescription(
           `**Boss:** ${session.bossName || "OPEN"}\n` +
-          `**Starting Price:** ${item.startPrice || 0} pts\n` +
-          `**Duration:** ${item.duration || 2} min\n\n` +
-          `Use \`!bid <amount>\` to place your bids.`
+            `**Starting Price:** ${item.startPrice || 0} pts\n` +
+            `**Duration:** ${item.duration || 2} min\n\n` +
+            `Use \`!bid <amount>\` to place your bids.`
         )
         .setFooter({ text: "Auction open — place your bids now!" })
-        .setTimestamp()
-    ]
+        .setTimestamp(),
+    ],
   });
 
   // Schedule end timer
@@ -2178,8 +2229,8 @@ async function startItemAuction(client, config, thread, item, session) {
         new EmbedBuilder()
           .setColor(0xffa500)
           .setTitle("⚠️ Going Once!")
-          .setDescription("1 minute remaining.")
-      ]
+          .setDescription("1 minute remaining."),
+      ],
     });
   }, duration - 60000);
 
@@ -2190,8 +2241,8 @@ async function startItemAuction(client, config, thread, item, session) {
         new EmbedBuilder()
           .setColor(0xffa500)
           .setTitle("⚠️ Going Twice!")
-          .setDescription("30 seconds remaining.")
-      ]
+          .setDescription("30 seconds remaining."),
+      ],
     });
   }, duration - 30000);
 
@@ -2202,8 +2253,8 @@ async function startItemAuction(client, config, thread, item, session) {
         new EmbedBuilder()
           .setColor(0xff0000)
           .setTitle("🚨 Final Call!")
-          .setDescription("10 seconds left to bid!")
-      ]
+          .setDescription("10 seconds left to bid!"),
+      ],
     });
   }, duration - 10000);
 
@@ -2221,8 +2272,8 @@ async function startItemAuction(client, config, thread, item, session) {
             item.curWin
               ? `**Winner:** <@${item.curWinId}> (${item.curBid} pts)`
               : `No bids were placed.`
-          )
-      ]
+          ),
+      ],
     });
 
     // Notify auctioneering to finalize and move to the next item
@@ -2235,11 +2286,14 @@ function cleanupPendingConfirmations() {
   const now = Date.now();
 
   let cleaned = 0;
-  Object.keys(st.pc).forEach(msgId => {
+  Object.keys(st.pc).forEach((msgId) => {
     const pending = st.pc[msgId];
 
     // Check if confirmation is older than timeout
-    if (pending.timestamp && (now - pending.timestamp > TIMEOUTS.STALE_CONFIRMATION)) {
+    if (
+      pending.timestamp &&
+      now - pending.timestamp > TIMEOUTS.STALE_CONFIRMATION
+    ) {
       // Clear associated timer if exists
       if (st.th[`c_${msgId}`]) {
         clearTimeout(st.th[`c_${msgId}`]);
@@ -2304,26 +2358,229 @@ module.exports = {
   stopCacheAutoRefresh,
 
   confirmBid: async function (reaction, user, config) {
-  const p = st.pc[reaction.message.id];
-  if (!p) return;
+    const p = st.pc[reaction.message.id];
+    if (!p) return;
 
-  const guild = reaction.message.guild,
-    member = await guild.members.fetch(user.id).catch(() => null);
-  if (!member) return;
+    const guild = reaction.message.guild,
+      member = await guild.members.fetch(user.id).catch(() => null);
+    if (!member) return;
 
-  if (p.userId !== user.id) {
-  await reaction.users.remove(user.id).catch(() => {});
-  return;
-}
+    if (p.userId !== user.id) {
+      await reaction.users.remove(user.id).catch(() => {});
+      return;
+    }
 
-  // CRITICAL: Check if this is an auctioneering bid
-  if (p.isAuctioneering) {
-    console.log(`🎯 Processing auctioneering bid confirmation`);
+    // CRITICAL: Check if this is an auctioneering bid
+    if (p.isAuctioneering) {
+      console.log(`🎯 Processing auctioneering bid confirmation`);
 
-    const auctState = p.auctStateRef;
-    const currentItem = auctState.currentItem;
+      const auctState = p.auctStateRef;
+      const currentItem = auctState.currentItem;
 
-    if (!currentItem || currentItem.status !== "active") {
+      if (!currentItem || currentItem.status !== "active") {
+        await reaction.message.channel.send(
+          `❌ <@${user.id}> Auction no longer active`
+        );
+        await reaction.message.reactions.removeAll().catch(() => {});
+        await reaction.message.delete().catch(() => {});
+        delete st.pc[reaction.message.id];
+        save();
+        return;
+      }
+
+      if (p.amount < currentItem.curBid) {
+        await reaction.message.channel.send(
+          `❌ <@${user.id}> Bid invalid. Current: ${currentItem.curBid}pts`
+        );
+        await reaction.message.reactions.removeAll().catch(() => {});
+        await reaction.message.delete().catch(() => {});
+        delete st.pc[reaction.message.id];
+        save();
+        return;
+      }
+
+      // Check for higher pending bids from other users
+      const higherPendingBids = Object.entries(st.pc)
+        .filter(([msgId, pending]) => {
+          return (
+            msgId !== reaction.message.id && // Not this confirmation
+            pending.isAuctioneering && // Is auctioneering bid
+            pending.amount > p.amount && // Higher amount
+            pending.userId !== p.userId
+          ); // Different user
+        })
+        .sort((a, b) => b[1].amount - a[1].amount); // Sort by amount desc
+
+      if (higherPendingBids.length > 0) {
+        const highestPending = higherPendingBids[0][1];
+        await reaction.message.channel.send({
+          content: `<@${user.id}>`,
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0xffa500)
+              .setTitle(`⚠️ Higher Bid Pending!`)
+              .setDescription(
+                `Your bid: **${p.amount}pts**\n` +
+                  `Higher pending bid: **${highestPending.amount}pts** (waiting for confirmation)\n\n` +
+                  `Someone else has a higher bid pending. If they confirm first, your bid will be rejected.\n` +
+                  `**Your confirmation has been CANCELLED.**`
+              ),
+          ],
+        });
+        await reaction.message.reactions.removeAll().catch(() => {});
+        await reaction.message.delete().catch(() => {});
+        delete st.pc[reaction.message.id];
+        save();
+        return;
+      }
+
+      // Handle previous winner
+      if (currentItem.curWin && !p.isSelf) {
+        unlock(currentItem.curWin, currentItem.curBid);
+        await reaction.message.channel.send({
+          content: `<@${currentItem.curWinId}>`,
+          embeds: [
+            new EmbedBuilder()
+              .setColor(getColor(COLORS.WARNING))
+              .setTitle(`${EMOJI.WARNING} Outbid!`)
+              .setDescription(
+                `Someone bid **${p.amount}pts** on **${currentItem.item}**`
+              ),
+          ],
+        });
+      }
+
+      // Lock the new bid
+      lock(p.username, p.needed);
+
+      // Update current item
+      const prevBid = currentItem.curBid;
+      currentItem.curBid = p.amount;
+      currentItem.curWin = p.username;
+      currentItem.curWinId = p.userId;
+
+      if (!currentItem.bids) currentItem.bids = [];
+      currentItem.bids.push({
+        user: p.username,
+        userId: p.userId,
+        amount: p.amount,
+        timestamp: Date.now(),
+      });
+
+      // Check if bid is in last minute - extend time by 1 minute
+      const timeLeft = currentItem.endTime - Date.now();
+      if (!currentItem.extCnt) currentItem.extCnt = 0; // Initialize if not exists
+      if (timeLeft < 60000 && timeLeft > 0 && currentItem.extCnt < ME) {
+        const extensionTime = 60000; // 1 minute
+        currentItem.endTime += extensionTime;
+        currentItem.extCnt++;
+
+        await reaction.message.channel.send({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0xffa500)
+              .setTitle(`⏰ Time Extended!`)
+              .setDescription(
+                `Bid placed in final minute - adding 1 more minute to the auction!`
+              )
+              .addFields({
+                name: "⏱️ New Time Remaining",
+                value: `${Math.ceil(
+                  (currentItem.endTime - Date.now()) / 1000
+                )}s`,
+                inline: true,
+              }),
+          ],
+        });
+
+        console.log(
+          `⏰ Time extended for ${currentItem.item} by 1 minute (bid in final minute, ext #${currentItem.extCnt})`
+        );
+      }
+
+      // Update via auctioneering module
+      if (p.auctRef && typeof p.auctRef.updateCurrentItemState === "function") {
+        p.auctRef.updateCurrentItemState({
+          curBid: p.amount,
+          curWin: p.username,
+          curWinId: p.userId,
+          bids: currentItem.bids,
+        });
+      }
+
+      // Clear timeout
+      if (st.th[`c_${reaction.message.id}`]) {
+        clearTimeout(st.th[`c_${reaction.message.id}`]);
+        delete st.th[`c_${reaction.message.id}`];
+      }
+
+      // Send confirmation
+      await reaction.message.edit({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(getColor(COLORS.SUCCESS))
+            .setTitle(`${EMOJI.SUCCESS} Bid Confirmed!`)
+            .setDescription(`Highest bidder on **${currentItem.item}**`)
+            .addFields(
+              {
+                name: `${EMOJI.BID} Your Bid`,
+                value: `${p.amount}pts`,
+                inline: true,
+              },
+              {
+                name: `${EMOJI.CHART} Previous`,
+                value: `${prevBid}pts`,
+                inline: true,
+              }
+            )
+            .setFooter({
+              text: p.isSelf ? `Self-overbid (+${p.needed}pts)` : "Good luck!",
+            }),
+        ],
+      });
+      await reaction.message.reactions.removeAll().catch(() => {});
+
+      await reaction.message.channel.send({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(getColor(COLORS.AUCTION))
+            .setTitle(`${EMOJI.FIRE} New High Bid!`)
+            .addFields(
+              {
+                name: `${EMOJI.BID} Amount`,
+                value: `${p.amount}pts`,
+                inline: true,
+              },
+              { name: "👤 Bidder", value: p.username, inline: true }
+            ),
+        ],
+      });
+
+      setTimeout(
+        async () => await reaction.message.delete().catch(() => {}),
+        5000
+      );
+      if (p.origMsgId) {
+        const orig = await reaction.message.channel.messages
+          .fetch(p.origMsgId)
+          .catch(() => null);
+        if (orig) await orig.delete().catch(() => {});
+      }
+
+      delete st.pc[reaction.message.id];
+      save();
+
+      console.log(
+        `${EMOJI.SUCCESS} Auctioneering bid: ${p.username} - ${p.amount}pts${
+          p.isSelf ? ` (self +${p.needed}pts)` : ""
+        }`
+      );
+      return;
+    }
+
+    // Original bidding.js auction logic (not auctioneering)
+    const a = st.a;
+    if (!a || a.status !== "active") {
       await reaction.message.channel.send(
         `❌ <@${user.id}> Auction no longer active`
       );
@@ -2331,27 +2588,43 @@ module.exports = {
       await reaction.message.delete().catch(() => {});
       delete st.pc[reaction.message.id];
       save();
+
+      if (st.pause) {
+        resumeAuction(reaction.client, config);
+        await reaction.message.channel.send(
+          `▶️ **RESUMED** - Auction continues...`
+        );
+      }
       return;
     }
 
-    if (p.amount < currentItem.curBid) {
+    if (p.amount < a.curBid) {
       await reaction.message.channel.send(
-        `❌ <@${user.id}> Bid invalid. Current: ${currentItem.curBid}pts`
+        `❌ <@${user.id}> Bid invalid. Current: ${a.curBid}pts`
       );
       await reaction.message.reactions.removeAll().catch(() => {});
       await reaction.message.delete().catch(() => {});
       delete st.pc[reaction.message.id];
       save();
+
+      if (st.pause) {
+        resumeAuction(reaction.client, config);
+        await reaction.message.channel.send(
+          `▶️ **RESUMED** - Auction continues...`
+        );
+      }
       return;
     }
 
     // Check for higher pending bids from other users
     const higherPendingBids = Object.entries(st.pc)
       .filter(([msgId, pending]) => {
-        return msgId !== reaction.message.id && // Not this confirmation
-               pending.isAuctioneering && // Is auctioneering bid
-               pending.amount > p.amount && // Higher amount
-               pending.userId !== p.userId; // Different user
+        return (
+          msgId !== reaction.message.id && // Not this confirmation
+          !pending.isAuctioneering && // Regular bidding.js auction
+          pending.amount > p.amount && // Higher amount
+          pending.userId !== p.userId
+        ); // Different user
       })
       .sort((a, b) => b[1].amount - a[1].amount); // Sort by amount desc
 
@@ -2365,98 +2638,98 @@ module.exports = {
             .setTitle(`⚠️ Higher Bid Pending!`)
             .setDescription(
               `Your bid: **${p.amount}pts**\n` +
-              `Higher pending bid: **${highestPending.amount}pts** (waiting for confirmation)\n\n` +
-              `Someone else has a higher bid pending. If they confirm first, your bid will be rejected.\n` +
-              `**Your confirmation has been CANCELLED.**`
-            )
+                `Higher pending bid: **${highestPending.amount}pts** (waiting for confirmation)\n\n` +
+                `Someone else has a higher bid pending. If they confirm first, your bid will be rejected.\n` +
+                `**Your confirmation has been CANCELLED.**`
+            ),
         ],
       });
       await reaction.message.reactions.removeAll().catch(() => {});
       await reaction.message.delete().catch(() => {});
       delete st.pc[reaction.message.id];
       save();
+
+      if (st.pause) {
+        resumeAuction(reaction.client, config);
+        await reaction.message.channel.send(
+          `▶️ **RESUMED** - Auction continues...`
+        );
+      }
       return;
     }
 
     // Handle previous winner
-    if (currentItem.curWin && !p.isSelf) {
-      unlock(currentItem.curWin, currentItem.curBid);
+    if (a.curWin && !p.isSelf) {
+      unlock(a.curWin, a.curBid);
       await reaction.message.channel.send({
-        content: `<@${currentItem.curWinId}>`,
+        content: `<@${a.curWinId}>`,
         embeds: [
           new EmbedBuilder()
             .setColor(getColor(COLORS.WARNING))
             .setTitle(`${EMOJI.WARNING} Outbid!`)
-            .setDescription(`Someone bid **${p.amount}pts** on **${currentItem.item}**`),
+            .setDescription(`Someone bid **${p.amount}pts** on **${a.item}**`),
         ],
       });
     }
 
-    // Lock the new bid
     lock(p.username, p.needed);
 
-    // Update current item
-    const prevBid = currentItem.curBid;
-    currentItem.curBid = p.amount;
-    currentItem.curWin = p.username;
-    currentItem.curWinId = p.userId;
-
-    if (!currentItem.bids) currentItem.bids = [];
-    currentItem.bids.push({
+    const prevBid = a.curBid;
+    a.curBid = p.amount;
+    a.curWin = p.username;
+    a.curWinId = p.userId;
+    a.bids.push({
       user: p.username,
       userId: p.userId,
       amount: p.amount,
       timestamp: Date.now(),
     });
 
-    // Check if bid is in last minute - extend time by 1 minute
-    const timeLeft = currentItem.endTime - Date.now();
-    if (!currentItem.extCnt) currentItem.extCnt = 0; // Initialize if not exists
-    if (timeLeft < 60000 && timeLeft > 0 && currentItem.extCnt < ME) {
-      const extensionTime = 60000; // 1 minute
-      currentItem.endTime += extensionTime;
-      currentItem.extCnt++;
+    const timeLeft = st.pause ? st.a.remainingTime : a.endTime - Date.now();
+    if (timeLeft < 60000 && a.extCnt < ME) {
+      if (!st.pause) {
+        a.endTime += 60000;
+      } else {
+        st.a.remainingTime += 60000;
+      }
+      a.extCnt++;
+      a.go1 = false;
+      a.go2 = false;
 
       await reaction.message.channel.send({
         embeds: [
           new EmbedBuilder()
             .setColor(0xffa500)
             .setTitle(`⏰ Time Extended!`)
-            .setDescription(`Bid placed in final minute - adding 1 more minute to the auction!`)
+            .setDescription(
+              `Bid placed in final minute - adding 1 more minute to the auction!`
+            )
             .addFields({
-              name: '⏱️ New Time Remaining',
-              value: `${Math.ceil((currentItem.endTime - Date.now()) / 1000)}s`,
-              inline: true
-            })
+              name: "⏱️ New Time Remaining",
+              value: `${Math.ceil(
+                (st.pause ? st.a.remainingTime : a.endTime - Date.now()) / 1000
+              )}s`,
+              inline: true,
+            }),
         ],
       });
 
-      console.log(`⏰ Time extended for ${currentItem.item} by 1 minute (bid in final minute, ext #${currentItem.extCnt})`);
+      console.log(
+        `⏰ Time extended for ${a.item} by 1 minute (bid in final minute)`
+      );
     }
 
-    // Update via auctioneering module
-    if (p.auctRef && typeof p.auctRef.updateCurrentItemState === 'function') {
-      p.auctRef.updateCurrentItemState({
-        curBid: p.amount,
-        curWin: p.username,
-        curWinId: p.userId,
-        bids: currentItem.bids,
-      });
-    }
-
-    // Clear timeout
     if (st.th[`c_${reaction.message.id}`]) {
       clearTimeout(st.th[`c_${reaction.message.id}`]);
       delete st.th[`c_${reaction.message.id}`];
     }
 
-    // Send confirmation
     await reaction.message.edit({
       embeds: [
         new EmbedBuilder()
           .setColor(getColor(COLORS.SUCCESS))
           .setTitle(`${EMOJI.SUCCESS} Bid Confirmed!`)
-          .setDescription(`Highest bidder on **${currentItem.item}**`)
+          .setDescription(`Highest bidder on **${a.item}**`)
           .addFields(
             {
               name: `${EMOJI.BID} Your Bid`,
@@ -2467,10 +2740,19 @@ module.exports = {
               name: `${EMOJI.CHART} Previous`,
               value: `${prevBid}pts`,
               inline: true,
+            },
+            {
+              name: `${EMOJI.TIME} Time Left`,
+              value: fmtTime(timeLeft),
+              inline: true,
             }
           )
           .setFooter({
-            text: p.isSelf ? `Self-overbid (+${p.needed}pts)` : "Good luck!",
+            text: p.isSelf
+              ? `Self-overbid (+${p.needed}pts)`
+              : timeLeft < 60000 && a.extCnt < ME
+              ? `${EMOJI.CLOCK} Extended!`
+              : "Good luck!",
           }),
       ],
     });
@@ -2487,7 +2769,7 @@ module.exports = {
               value: `${p.amount}pts`,
               inline: true,
             },
-            { name: '👤 Bidder', value: p.username, inline: true }
+            { name: "👤 Bidder", value: p.username, inline: true }
           ),
       ],
     });
@@ -2506,233 +2788,23 @@ module.exports = {
     delete st.pc[reaction.message.id];
     save();
 
+    if (st.pause) {
+      resumeAuction(reaction.client, config);
+      await reaction.message.channel.send(
+        `${EMOJI.PLAY} **RESUMED** - Timer continues with ${fmtTime(
+          a.endTime - Date.now()
+        )} remaining...`
+      );
+    } else if (timeLeft < 60000) {
+      schedTimers(reaction.client, config);
+    }
+
     console.log(
-      `${EMOJI.SUCCESS} Auctioneering bid: ${p.username} - ${p.amount}pts${
+      `${EMOJI.SUCCESS} Bid: ${p.username} - ${p.amount}pts${
         p.isSelf ? ` (self +${p.needed}pts)` : ""
       }`
     );
-    return;
-  }
-
-  // Original bidding.js auction logic (not auctioneering)
-  const a = st.a;
-  if (!a || a.status !== "active") {
-    await reaction.message.channel.send(
-      `❌ <@${user.id}> Auction no longer active`
-    );
-    await reaction.message.reactions.removeAll().catch(() => {});
-    await reaction.message.delete().catch(() => {});
-    delete st.pc[reaction.message.id];
-    save();
-
-    if (st.pause) {
-      resumeAuction(reaction.client, config);
-      await reaction.message.channel.send(
-        `▶️ **RESUMED** - Auction continues...`
-      );
-    }
-    return;
-  }
-
-  if (p.amount < a.curBid) {
-    await reaction.message.channel.send(
-      `❌ <@${user.id}> Bid invalid. Current: ${a.curBid}pts`
-    );
-    await reaction.message.reactions.removeAll().catch(() => {});
-    await reaction.message.delete().catch(() => {});
-    delete st.pc[reaction.message.id];
-    save();
-
-    if (st.pause) {
-      resumeAuction(reaction.client, config);
-      await reaction.message.channel.send(
-        `▶️ **RESUMED** - Auction continues...`
-      );
-    }
-    return;
-  }
-
-  // Check for higher pending bids from other users
-  const higherPendingBids = Object.entries(st.pc)
-    .filter(([msgId, pending]) => {
-      return msgId !== reaction.message.id && // Not this confirmation
-             !pending.isAuctioneering && // Regular bidding.js auction
-             pending.amount > p.amount && // Higher amount
-             pending.userId !== p.userId; // Different user
-    })
-    .sort((a, b) => b[1].amount - a[1].amount); // Sort by amount desc
-
-  if (higherPendingBids.length > 0) {
-    const highestPending = higherPendingBids[0][1];
-    await reaction.message.channel.send({
-      content: `<@${user.id}>`,
-      embeds: [
-        new EmbedBuilder()
-          .setColor(0xffa500)
-          .setTitle(`⚠️ Higher Bid Pending!`)
-          .setDescription(
-            `Your bid: **${p.amount}pts**\n` +
-            `Higher pending bid: **${highestPending.amount}pts** (waiting for confirmation)\n\n` +
-            `Someone else has a higher bid pending. If they confirm first, your bid will be rejected.\n` +
-            `**Your confirmation has been CANCELLED.**`
-          )
-      ],
-    });
-    await reaction.message.reactions.removeAll().catch(() => {});
-    await reaction.message.delete().catch(() => {});
-    delete st.pc[reaction.message.id];
-    save();
-
-    if (st.pause) {
-      resumeAuction(reaction.client, config);
-      await reaction.message.channel.send(
-        `▶️ **RESUMED** - Auction continues...`
-      );
-    }
-    return;
-  }
-
-  // Handle previous winner
-  if (a.curWin && !p.isSelf) {
-    unlock(a.curWin, a.curBid);
-    await reaction.message.channel.send({
-      content: `<@${a.curWinId}>`,
-      embeds: [
-        new EmbedBuilder()
-          .setColor(getColor(COLORS.WARNING))
-          .setTitle(`${EMOJI.WARNING} Outbid!`)
-          .setDescription(`Someone bid **${p.amount}pts** on **${a.item}**`),
-      ],
-    });
-  }
-
-  lock(p.username, p.needed);
-
-  const prevBid = a.curBid;
-  a.curBid = p.amount;
-  a.curWin = p.username;
-  a.curWinId = p.userId;
-  a.bids.push({
-    user: p.username,
-    userId: p.userId,
-    amount: p.amount,
-    timestamp: Date.now(),
-  });
-
-  const timeLeft = st.pause ? st.a.remainingTime : a.endTime - Date.now();
-  if (timeLeft < 60000 && a.extCnt < ME) {
-    if (!st.pause) {
-      a.endTime += 60000;
-    } else {
-      st.a.remainingTime += 60000;
-    }
-    a.extCnt++;
-    a.go1 = false;
-    a.go2 = false;
-
-    await reaction.message.channel.send({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(0xffa500)
-          .setTitle(`⏰ Time Extended!`)
-          .setDescription(`Bid placed in final minute - adding 1 more minute to the auction!`)
-          .addFields({
-            name: '⏱️ New Time Remaining',
-            value: `${Math.ceil((st.pause ? st.a.remainingTime : (a.endTime - Date.now())) / 1000)}s`,
-            inline: true
-          })
-      ],
-    });
-
-    console.log(`⏰ Time extended for ${a.item} by 1 minute (bid in final minute)`);
-  }
-
-  if (st.th[`c_${reaction.message.id}`]) {
-    clearTimeout(st.th[`c_${reaction.message.id}`]);
-    delete st.th[`c_${reaction.message.id}`];
-  }
-
-  await reaction.message.edit({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(getColor(COLORS.SUCCESS))
-        .setTitle(`${EMOJI.SUCCESS} Bid Confirmed!`)
-        .setDescription(`Highest bidder on **${a.item}**`)
-        .addFields(
-          {
-            name: `${EMOJI.BID} Your Bid`,
-            value: `${p.amount}pts`,
-            inline: true,
-          },
-          {
-            name: `${EMOJI.CHART} Previous`,
-            value: `${prevBid}pts`,
-            inline: true,
-          },
-          {
-            name: `${EMOJI.TIME} Time Left`,
-            value: fmtTime(timeLeft),
-            inline: true,
-          }
-        )
-        .setFooter({
-          text: p.isSelf
-            ? `Self-overbid (+${p.needed}pts)`
-            : timeLeft < 60000 && a.extCnt < ME
-            ? `${EMOJI.CLOCK} Extended!`
-            : "Good luck!",
-        }),
-    ],
-  });
-  await reaction.message.reactions.removeAll().catch(() => {});
-
-  await reaction.message.channel.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(getColor(COLORS.AUCTION))
-        .setTitle(`${EMOJI.FIRE} New High Bid!`)
-        .addFields(
-          {
-            name: `${EMOJI.BID} Amount`,
-            value: `${p.amount}pts`,
-            inline: true,
-          },
-          { name: '👤 Bidder', value: p.username, inline: true }
-        ),
-    ],
-  });
-
-  setTimeout(
-    async () => await reaction.message.delete().catch(() => {}),
-    5000
-  );
-  if (p.origMsgId) {
-    const orig = await reaction.message.channel.messages
-      .fetch(p.origMsgId)
-      .catch(() => null);
-    if (orig) await orig.delete().catch(() => {});
-  }
-
-  delete st.pc[reaction.message.id];
-  save();
-
-  if (st.pause) {
-    resumeAuction(reaction.client, config);
-    await reaction.message.channel.send(
-      `${EMOJI.PLAY} **RESUMED** - Timer continues with ${fmtTime(
-        a.endTime - Date.now()
-      )} remaining...`
-    );
-  } else if (timeLeft < 60000) {
-    schedTimers(reaction.client, config);
-  }
-
-  console.log(
-    `${EMOJI.SUCCESS} Bid: ${p.username} - ${p.amount}pts${
-      p.isSelf ? ` (self +${p.needed}pts)` : ""
-    }`
-  );
-},
+  },
 
   cancelBid: async function (reaction, user, config) {
     const p = st.pc[reaction.message.id];
@@ -2825,7 +2897,14 @@ module.exports = {
     console.log(`${EMOJI.EMERGENCY} Force ending auction: ${st.a.item}`);
 
     // Clear all timers
-    ["goingOnce", "goingTwice", "finalCall", "auctionEnd", "next", "aStart"].forEach((k) => {
+    [
+      "goingOnce",
+      "goingTwice",
+      "finalCall",
+      "auctionEnd",
+      "next",
+      "aStart",
+    ].forEach((k) => {
       if (st.th[k]) {
         clearTimeout(st.th[k]);
         delete st.th[k];

@@ -6,7 +6,14 @@
   "attendance_channel_id": "1429059892735508531",
   "bidding_channel_id": "1430924721691689011",
   "admin_logs_channel_id": "1429074047529914439",
-  "admin_roles": ["GUILD LEADER", "ELITE", "Admin", "Martin Romualdez", "BOT", "XXX"],
+  "admin_roles": [
+    "GUILD LEADER",
+    "ELITE",
+    "Admin",
+    "Martin Romualdez",
+    "BOT",
+    "XXX"
+  ],
   "week_start": "Sunday",
   "sheet_webhook_url": "https://script.google.com/macros/s/AKfycbyUzmDjlSOP31bVUJHS9EetV5jT_aYwf6vC7m1F0Ik1fC8mmfofh8gKYZYLZ5qWIkbI/exec",
   "timezone": "Asia/Manila",

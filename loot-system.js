@@ -104,8 +104,6 @@ async function processImageOCR(imageBuffer) {
   }
 }
 
-
-
 function parseLoots(ocrText) {
   const loots = [];
   const lines = ocrText.split("\n");
@@ -320,7 +318,10 @@ async function handleLootCommand(message, args, client) {
         name: "🎁 Loot List",
         value:
           allLoots
-            .map((l, i) => `${i + 1}. ${l.item}${l.quantity > 1 ? ` x${l.quantity}` : ""}`)
+            .map(
+              (l, i) =>
+                `${i + 1}. ${l.item}${l.quantity > 1 ? ` x${l.quantity}` : ""}`
+            )
             .join("\n") || "None",
         inline: false,
       }
@@ -405,9 +406,9 @@ async function submitLootToSheet(
     // Prepare payload for each loot item
     const lootEntries = loots.map((loot) => ({
       item: loot.item,
-      source: source,           // "Loot" or "Guild Boss" (proper case)
+      source: source, // "Loot" or "Guild Boss" (proper case)
       quantity: loot.quantity,
-      boss: bossKeyUpperCase,   // All uppercase
+      boss: bossKeyUpperCase, // All uppercase
     }));
 
     // Send to sheet webhook
@@ -442,18 +443,22 @@ async function submitLootToSheet(
       data = JSON.parse(responseText);
     } catch (parseErr) {
       console.error(`❌ JSON parse error: ${parseErr.message}`);
-      throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}`);
+      throw new Error(
+        `Invalid JSON response: ${responseText.substring(0, 200)}`
+      );
     }
 
     console.log(`📊 Parsed response:`, JSON.stringify(data, null, 2));
 
     // Check if submission actually succeeded
-    if (data.status === 'error') {
-      throw new Error(`Sheet error: ${data.message || 'Unknown error'}`);
+    if (data.status === "error") {
+      throw new Error(`Sheet error: ${data.message || "Unknown error"}`);
     }
 
     if (data.submitted === 0) {
-      throw new Error(`No items were submitted to the sheet. Check Apps Script logs.`);
+      throw new Error(
+        `No items were submitted to the sheet. Check Apps Script logs.`
+      );
     }
 
     // Remove reactions
@@ -464,8 +469,10 @@ async function submitLootToSheet(
       .setColor(0x00ff00)
       .setTitle(`${EMOJI.SUCCESS} Loot Submitted Successfully!`)
       .setDescription(
-        `**${data.submitted || lootEntries.length}** item(s) added to BiddingItems sheet` +
-        (data.failed > 0 ? `\n⚠️ ${data.failed} item(s) failed` : '')
+        `**${
+          data.submitted || lootEntries.length
+        }** item(s) added to BiddingItems sheet` +
+          (data.failed > 0 ? `\n⚠️ ${data.failed} item(s) failed` : "")
       )
       .addFields(
         {
@@ -492,14 +499,19 @@ async function submitLootToSheet(
           name: "📋 Items Logged",
           value:
             lootEntries
-              .map((e, i) => `${i + 1}. ${e.item}${e.quantity > 1 ? ` x${e.quantity}` : ""}`)
+              .map(
+                (e, i) =>
+                  `${i + 1}. ${e.item}${
+                    e.quantity > 1 ? ` x${e.quantity}` : ""
+                  }`
+              )
               .slice(0, 10) // Show max 10 items
               .join("\n") || "None",
           inline: false,
         }
       )
-      .setFooter({ 
-        text: `Data saved to BiddingItems | Last row: ${data.lastRow || 'N/A'}` 
+      .setFooter({
+        text: `Data saved to BiddingItems | Last row: ${data.lastRow || "N/A"}`,
       })
       .setTimestamp();
 
@@ -507,8 +519,10 @@ async function submitLootToSheet(
     if (lootEntries.length > 10) {
       successEmbed.addFields({
         name: "📋 Additional Items",
-        value: `+${lootEntries.length - 10} more items (total: ${lootEntries.length})`,
-        inline: false
+        value: `+${lootEntries.length - 10} more items (total: ${
+          lootEntries.length
+        })`,
+        inline: false,
       });
     }
 
@@ -518,13 +532,12 @@ async function submitLootToSheet(
       `✅ Loot submitted: ${bossName} - ${data.submitted}/${lootEntries.length} items`
     );
     console.log(`   Source: ${source} | Boss: ${bossKeyUpperCase}`);
-    
   } catch (err) {
     console.error(`❌ Sheet submission error:`, err);
     console.error(`❌ Error stack:`, err.stack);
 
     await confirmMsg.reactions.removeAll().catch(() => {});
-    
+
     const errorEmbed = new EmbedBuilder()
       .setColor(0xff0000)
       .setTitle(`${EMOJI.ERROR} Failed to Submit to Google Sheets`)
@@ -532,21 +545,26 @@ async function submitLootToSheet(
       .addFields(
         {
           name: "🔍 Troubleshooting Steps",
-          value: 
+          value:
             `1. Check if webhook URL is correct in config.json\n` +
             `2. Check Apps Script logs: https://script.google.com\n` +
             `3. Verify BiddingItems sheet exists\n` +
             `4. Check if Apps Script has permissions`,
-          inline: false
+          inline: false,
         },
         {
           name: "📦 Items to Log Manually",
-          value: 
+          value:
             loots
-              .map((l, i) => `${i + 1}. ${l.item}${l.quantity > 1 ? ` x${l.quantity}` : ""}`)
+              .map(
+                (l, i) =>
+                  `${i + 1}. ${l.item}${
+                    l.quantity > 1 ? ` x${l.quantity}` : ""
+                  }`
+              )
               .slice(0, 10)
               .join("\n") || "None",
-          inline: false
+          inline: false,
         }
       )
       .setFooter({ text: `Boss: ${bossName} | Time: ${dateStr} ${timeStr}` })
