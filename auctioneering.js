@@ -1464,31 +1464,73 @@ async function handleQueueList(message, biddingState) {
     bossGroups[boss].push(item);
   });
 
+  // 🔧 FIX: Limit items shown to prevent exceeding 4096 character limit
+  const MAX_ITEMS_TO_SHOW = 50; // Show first 50 items max
+  const MAX_CHARS = 3800; // Leave buffer for headers/footers
+
   let queueText = "";
   let position = 1;
   let sessionNum = 1;
+  let itemsShown = 0;
+  let charsUsed = 0;
 
   // All items must have boss data now
   for (const [boss, items] of Object.entries(bossGroups)) {
-    queueText += `**🔥 SESSION ${sessionNum} - ${boss}**\n`;
-    items.forEach((item) => {
+    // Check if we've hit limits
+    if (itemsShown >= MAX_ITEMS_TO_SHOW || charsUsed >= MAX_CHARS) {
+      const remaining = sheetItems.length - itemsShown;
+      queueText += `\n*...and ${remaining} more items (use !startauction to see all)*\n`;
+      break;
+    }
+
+    const sessionHeader = `**🔥 SESSION ${sessionNum} - ${boss}**\n`;
+    
+    // Estimate chars for this section
+    const estimatedChars = sessionHeader.length + 
+      items.reduce((sum, item) => {
+        const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
+        return sum + `${position}. ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`.length;
+      }, 0) + 30; // +30 for attendance line
+
+    // Check if adding this session would exceed limits
+    if (charsUsed + estimatedChars > MAX_CHARS && itemsShown > 0) {
+      const remaining = sheetItems.length - itemsShown;
+      queueText += `\n*...and ${remaining} more items in ${Object.keys(bossGroups).length - sessionNum + 1} more sessions*\n`;
+      break;
+    }
+
+    queueText += sessionHeader;
+    
+    for (const item of items) {
+      if (itemsShown >= MAX_ITEMS_TO_SHOW) break;
+      
       const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
-      queueText += `${position}. ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
+      const itemLine = `${position}. ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
+      queueText += itemLine;
+      charsUsed += itemLine.length;
       position++;
-    });
-    queueText += `👥 Attendance required\n\n`;
+      itemsShown++;
+    }
+    
+    const attendanceLine = `👥 Attendance required\n\n`;
+    queueText += attendanceLine;
+    charsUsed += sessionHeader.length + attendanceLine.length;
     sessionNum++;
   }
 
   // Items without boss
-  if (noBossItems.length > 0) {
+  if (noBossItems.length > 0 && itemsShown < MAX_ITEMS_TO_SHOW) {
     queueText += `**⚠️ ITEMS WITHOUT BOSS (Will be skipped)**\n`;
-    noBossItems.forEach((item) => {
+    noBossItems.slice(0, 5).forEach((item) => {
       queueText += `• ${item.item} - Missing boss data\n`;
     });
+    if (noBossItems.length > 5) {
+      queueText += `*...and ${noBossItems.length - 5} more*\n`;
+    }
   }
 
-  queueText += `\n**ℹ️ Note:** Order shown is how items will auction when you run \`!startauction\`\n**⚠️ All items require attendance at the corresponding boss spawn.**`;
+  const footerNote = `\n**ℹ️ Note:** Order shown is how items will auction when you run \`!startauction\`\n**⚠️ All items require attendance at the corresponding boss spawn.**`;
+  queueText += footerNote;
 
   const totalSessions = Object.keys(bossGroups).length;
   const totalItems = sheetItems.length;
@@ -1510,7 +1552,7 @@ async function handleQueueList(message, biddingState) {
       }
     )
     .setFooter({
-      text: "Use !startauction to begin • All items require attendance",
+      text: `Showing ${itemsShown}/${totalItems} items • Use !startauction to begin`,
     })
     .setTimestamp();
 
