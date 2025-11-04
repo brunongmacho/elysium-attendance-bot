@@ -772,7 +772,7 @@ const commandHandlers = {
           let newEndTime = currentItem.endTime;
           let newExtCnt = currentItem.extCnt;
 
-          if (timeLeft < 60000 && currentItem.extCnt < 15) {
+          if (timeLeft < 60000 && currentItem.extCnt < 60) {
             newEndTime = currentItem.endTime + 60000;
             newExtCnt = currentItem.extCnt + 1;
           }
@@ -786,11 +786,11 @@ const commandHandlers = {
             endTime: newEndTime,
             extCnt: newExtCnt,
             go1:
-              timeLeft < 60000 && currentItem.extCnt < 15
+              timeLeft < 60000 && currentItem.extCnt < 60
                 ? false
                 : currentItem.go1,
             go2:
-              timeLeft < 60000 && currentItem.extCnt < 15
+              timeLeft < 60000 && currentItem.extCnt < 60
                 ? false
                 : currentItem.go2,
           });
@@ -828,7 +828,7 @@ const commandHandlers = {
                 .setFooter({
                   text: pendingBid.isSelf
                     ? `Self-overbid (+${pendingBid.needed}pts)`
-                    : timeLeft < 60000 && currentItem.extCnt < 15
+                    : timeLeft < 60000 && currentItem.extCnt < 60
                     ? `🕐 Extended!`
                     : "Good luck!",
                 }),

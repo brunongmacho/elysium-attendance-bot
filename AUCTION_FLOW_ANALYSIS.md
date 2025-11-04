@@ -1,11 +1,15 @@
 # ELYSIUM Auction Flow - Complete Analysis
 
 ## Overview
-The ELYSIUM auction system is a sophisticated Discord-based bidding and loot distribution platform with two complementary auction modes:
-1. **Auctioneering Mode** - Admin-driven bulk auctions (Google Sheets based)
-2. **Bidding Mode** - Manual queue-based auctions (Discord commands)
+The ELYSIUM auction system is a sophisticated Discord-based bidding and loot distribution platform.
 
-Both systems share the same points and bidding infrastructure but have different workflows and initialization mechanisms.
+**⚠️ v9.0 UPDATE:**
+- ❌ **Manual queue system has been REMOVED**
+- ✅ All auction items must now come from **Google Sheets BiddingItems tab**
+- ✅ Max auction extensions increased from 15 to 60
+- ✅ New admin commands added: `!auctionaudit`, `!fixlockedpoints`, `!recoverauction`, `!resetauction`
+
+All auctions are now Google Sheets-based for better consistency and management.
 
 ---
 
@@ -77,34 +81,18 @@ Results → Google Sheets (submission)
    ...
 ```
 
-### B. BIDDING MODE (Manual Queue)
+### B. ~~BIDDING MODE (Manual Queue)~~ - **REMOVED IN v9.0**
 
-**Function:** `startSess()` in bidding.js (Line 477)
+**Status:** ❌ **DEPRECATED AND REMOVED**
 
-**Trigger:** Admin command `!startauction` (with manual queue via `!auction <item> <price> <duration>`)
+The manual queue system has been completely removed. All auction items must now come from Google Sheets.
 
-**Flow:**
-```
-1. Queue Check
-   ├─ Verify st.q has items
-   └─ Set auctionLock (prevent concurrent starts)
+**Removed Commands:**
+- ❌ `!auction <item> <price> <duration>` - Add manual item
+- ❌ `!removeitem <name>` - Remove from queue
+- ❌ `!clearqueue` - Clear manual queue
 
-2. Cache Load
-   ├─ Load points from Google Sheets
-   ├─ Store in st.cp (cached points)
-   └─ Start auto-refresh every 30 minutes
-
-3. Start First Item
-   └─ Call startNext() which:
-       ├─ Create auction thread
-       ├─ Show 30-second preview
-       └─ Schedule activate() after preview
-```
-
-**Key Variables:**
-- `st.q[]` - Manual queue of items
-- `st.cp` - Cached points (member name → points)
-- `st.a` - Current active auction object
+**Migration:** All items should be added to the **BiddingItems** tab in Google Sheets.
 
 ---
 
@@ -521,22 +509,25 @@ Points spent this session:
 
 ### Admin Commands
 
-| Command | Function | Mode |
-|---------|----------|------|
-| `!startauction` | Start auction session | Both |
-| `!endauction` | Force end all items | Auctioneering |
-| `!pause` | Pause current item | Bidding |
-| `!resume` | Resume paused item | Bidding |
-| `!stop` | End current item early | Both |
-| `!extend <minutes>` | Extend current item | Both |
-| `!cancelitem` | Refund and skip | Both |
-| `!skipitem` | Mark no sale | Both |
-| `!auction <item> <price> <duration> [qty]` | Add manual item | Bidding |
-| `!queuelist` | Show queue | Bidding |
-| `!removeitem <name>` | Remove from queue | Bidding |
-| `!clearqueue` | Clear all items | Bidding |
-| `!forcesubmitresults` | Manually submit tally | Bidding |
-| `!resetbids` | Full reset | Bidding |
+| Command | Function | Notes |
+|---------|----------|-------|
+| `!startauction` | Start auction from Google Sheets | Admin only |
+| `!endauction` | Force end entire session | Admin only |
+| `!pause` | Pause current item | Admin only |
+| `!resume` | Resume paused item | Admin only |
+| `!stop` | End current item early | Admin only |
+| `!extend <minutes>` | Extend current item | Admin only |
+| `!cancelitem` | Refund and skip | Admin only |
+| `!skipitem` | Mark no sale | Admin only |
+| `!auctionaudit` ⭐ | System health check | **NEW v9.0** |
+| `!fixlockedpoints` ⭐ | Clear stuck locked points | **NEW v9.0** |
+| `!recoverauction` ⭐ | Recover from crash | **NEW v9.0** |
+| `!resetauction` ⭐ | Nuclear reset option | **NEW v9.0** |
+| `!forcesubmitresults` | Manually submit tally | Admin only |
+| `!resetbids` | Partial reset | Admin only |
+| ~~`!auction`~~ | ❌ REMOVED | Use Google Sheets |
+| ~~`!removeitem`~~ | ❌ REMOVED | Edit Google Sheets |
+| ~~`!clearqueue`~~ | ❌ REMOVED | Not needed |
 
 ### Member Commands
 
@@ -694,7 +685,7 @@ delete st.lp[prevWinner]
 
 ```javascript
 const timeLeft = item.endTime - Date.now()
-if (timeLeft < 60000 && item.extCnt < 15) {
+if (timeLeft < 60000 && item.extCnt < 60) {  // Changed from 15 to 60
   item.endTime += 60000  // Add 1 minute
   item.extCnt++
   rescheduleTimers()    // Reschedule go1/go2/final/end
@@ -714,11 +705,19 @@ For `quantity > 1`:
 ## Summary
 
 The ELYSIUM auction system provides a robust, Discord-integrated auction platform with:
-- **Flexible Item Management** (Google Sheets or manual)
+- **Google Sheets Item Management** (all items from BiddingItems tab)
 - **Smart Points Handling** (locked/available tracking)
-- **Auction Anti-Sniping** (auto-extend in final minute)
+- **Enhanced Anti-Sniping** (60 extensions max, 60 minutes total)
 - **Pending Bid Conflict Resolution** (reject if higher bid pending)
 - **Comprehensive Logging** (Google Sheets integration)
 - **Clean State Management** (local + remote persistence)
+- **Advanced Admin Tools** (audit, recovery, reset commands)
 
-Both auction modes share the same underlying bidding engine but differ in initialization and item sourcing.
+**v9.0 Changes:**
+- ❌ Manual queue completely removed
+- ✅ Max extensions increased from 15 to 60
+- ✅ Self-overbidding triggers extensions
+- ✅ Four new admin commands for troubleshooting
+- ✅ Better auction pause during bid confirmation
+
+**For detailed admin instructions, see:** `AUCTION_ADMIN_GUIDE.md`

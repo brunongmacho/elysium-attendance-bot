@@ -24,7 +24,7 @@ let cfg = null;
 const SF = "./bidding-state.json";
 const CT = 10000; // confirm timeout (10s)
 const RL = 3000; // rate limit (3s)
-const ME = 15; // max extensions
+const ME = 60; // max extensions (increased from 15 to prevent sniping)
 const CACHE_REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
 const PREVIEW_TIME = 30000; // 30 seconds
 
@@ -99,9 +99,8 @@ const COMMAND_ALIASES = {
   "!mp": "!mypoints",
 };
 
-// STATE
+// STATE (Manual queue 'q' removed - all items now from Google Sheets)
 let st = {
-  q: [], // queue
   a: null, // active auction
   lp: {}, // locked points
   h: [], // history
@@ -399,14 +398,17 @@ function clearCache() {
   save();
 }
 
-// QUEUE
+// ❌ DEPRECATED: Manual queue functions removed
+// All items now come from Google Sheets BiddingItems tab
+// These functions are kept commented for reference only
+/*
 const addQ = (itm, pr, dur, qty = 1) => {
   const a = {
     id: `a_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     item: itm.trim(),
     startPrice: parseInt(pr),
     duration: parseInt(dur),
-    quantity: parseInt(qty), // Batch auction support
+    quantity: parseInt(qty),
     addedAt: Date.now(),
   };
   st.q.push(a);
@@ -426,6 +428,7 @@ const clrQ = () => {
   save();
   return c;
 };
+*/
 
 // PAUSE/RESUME
 function pauseAuction() {
@@ -1410,268 +1413,82 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
   switch (actualCmd) {
     case "!auction":
-      if (args.length < 3)
-        return await msg.reply(
-          `${EMOJI.ERROR} Usage: \`!auction <item> <price> <duration> [quantity]\`\n\nExample: \`!auction Dragon Sword 500 30 3\` (for 3 items)`
-        );
-
-      // Check if last arg is quantity (for batch auctions)
-      let qty = 1;
-      let lastArg = parseInt(args[args.length - 1]);
-      let secondLastArg = parseInt(args[args.length - 2]);
-
-      // If last two args are both numbers, second-to-last is duration, last is quantity
-      if (!isNaN(lastArg) && !isNaN(secondLastArg) && args.length >= 4) {
-        qty = lastArg;
-        const dur = secondLastArg;
-        const pr = parseInt(args[args.length - 3]);
-        const itm = args.slice(0, -3).join(" ");
-
-        if (
-          isNaN(pr) ||
-          pr <= 0 ||
-          isNaN(dur) ||
-          dur <= 0 ||
-          !itm.trim() ||
-          isNaN(qty) ||
-          qty <= 0
-        ) {
-          return await msg.reply(`${EMOJI.ERROR} Invalid params`);
-        }
-
-        if (qty > 10) {
-          return await msg.reply(
-            `${EMOJI.ERROR} Max quantity is 10 items per auction`
-          );
-        }
-
-        if (st.q.find((a) => a.item.toLowerCase() === itm.toLowerCase())) {
-          return await msg.reply(`${EMOJI.ERROR} **${itm}** already queued`);
-        }
-
-        addQ(itm, pr, dur, qty);
-        await msg.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor(getColor(COLORS.SUCCESS))
-              .setTitle(`${EMOJI.SUCCESS} Queued (Batch Auction)`)
-              .setDescription(`**${itm}** x${qty}`)
-              .addFields(
-                {
-                  name: `${EMOJI.BID} Starting Price`,
-                  value: `${pr}pts`,
-                  inline: true,
-                },
-                {
-                  name: `${EMOJI.TIME} Duration`,
-                  value: fmtDur(dur),
-                  inline: true,
-                },
-                {
-                  name: `${EMOJI.LIST} Position`,
-                  value: `#${st.q.length}`,
-                  inline: true,
-                },
-                {
-                  name: `${EMOJI.FIRE} Batch Auction`,
-                  value: `Top ${qty} bidders will win!`,
-                  inline: false,
-                }
-              )
-              .setFooter({ text: "!startauction to begin" })
-              .setTimestamp(),
-          ],
-        });
-      } else {
-        // Regular single-item auction
-        const dur = parseInt(args[args.length - 1]),
-          pr = parseInt(args[args.length - 2]),
-          itm = args.slice(0, -2).join(" ");
-
-        if (isNaN(pr) || pr <= 0 || isNaN(dur) || dur <= 0 || !itm.trim()) {
-          return await msg.reply(`${EMOJI.ERROR} Invalid params`);
-        }
-
-        if (st.q.find((a) => a.item.toLowerCase() === itm.toLowerCase())) {
-          return await msg.reply(`${EMOJI.ERROR} **${itm}** already queued`);
-        }
-
-        addQ(itm, pr, dur, 1);
-        await msg.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor(getColor(COLORS.SUCCESS))
-              .setTitle(`${EMOJI.SUCCESS} Queued`)
-              .setDescription(`**${itm}**`)
-              .addFields(
-                { name: `${EMOJI.BID} Price`, value: `${pr}pts`, inline: true },
-                {
-                  name: `${EMOJI.TIME} Duration`,
-                  value: fmtDur(dur),
-                  inline: true,
-                },
-                {
-                  name: `${EMOJI.LIST} Position`,
-                  value: `#${st.q.length}`,
-                  inline: true,
-                }
-              )
-              .setFooter({ text: "!startauction to begin" })
-              .setTimestamp(),
-          ],
-        });
-      }
-      break;
-
-    case "!queuelist":
-      if (st.q.length === 0) return await msg.reply(`${EMOJI.LIST} Empty`);
-      await msg.reply({
+      // ❌ MANUAL QUEUE REMOVED - All items must come from Google Sheets
+      return await msg.reply({
         embeds: [
           new EmbedBuilder()
-            .setColor(COLORS.INFO)
-            .setTitle(`${EMOJI.LIST} Queue`)
+            .setColor(getColor(COLORS.ERROR))
+            .setTitle(`${EMOJI.ERROR} Manual Queue Removed`)
             .setDescription(
-              st.q
-                .map(
-                  (a, i) =>
-                    `**${i + 1}.** ${a.item}${
-                      a.quantity > 1 ? ` x${a.quantity}` : ""
-                    } - ${a.startPrice}pts • ${fmtDur(a.duration)}`
-                )
-                .join("\n")
+              `The \`!auction\` command has been **removed**.\n\n` +
+              `**All auction items must now be added to the Google Sheets "BiddingItems" tab.**\n\n` +
+              `This ensures:\n` +
+              `✅ Better item tracking\n` +
+              `✅ Automated boss association\n` +
+              `✅ Consistent data management\n` +
+              `✅ No manual queue conflicts`
             )
             .addFields({
-              name: `${EMOJI.CHART} Total`,
-              value: `${st.q.length}`,
-              inline: true,
+              name: "📋 How to Add Items",
+              value:
+                `1. Open the Google Sheet\n` +
+                `2. Go to **BiddingItems** tab\n` +
+                `3. Add: Item Name | Boss | Start Price | Duration | Quantity\n` +
+                `4. Run \`!startauction\` to begin`,
+              inline: false,
             })
+            .setFooter({ text: "Contact admin if you need help" })
             .setTimestamp(),
         ],
       });
-      break;
+
+    case "!queuelist":
+      // Show Google Sheets preview instead of manual queue
+      return await msg.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLORS.INFO)
+            .setTitle(`${EMOJI.INFO} Queue Preview`)
+            .setDescription(
+              `Manual queue has been removed.\n\n` +
+              `Use \`!queuelist\` from **auctioneering module** to preview Google Sheets items.`
+            ),
+        ],
+      });
 
     case "!removeitem":
-      if (args.length === 0)
-        return await msg.reply(`${EMOJI.ERROR} Usage: \`!removeitem <name>\``);
-      const rm = rmQ(args.join(" "));
-      if (!rm) return await msg.reply(`${EMOJI.ERROR} Not found`);
-      await msg.reply({
+      // ❌ MANUAL QUEUE REMOVED
+      return await msg.reply({
         embeds: [
           new EmbedBuilder()
-            .setColor(getColor(COLORS.WARNING))
-            .setTitle(`${EMOJI.SUCCESS} Removed`)
+            .setColor(getColor(COLORS.ERROR))
+            .setTitle(`${EMOJI.ERROR} Command Removed`)
             .setDescription(
-              `**${rm.item}**${rm.quantity > 1 ? ` x${rm.quantity}` : ""}`
+              `The \`!removeitem\` command has been **removed**.\n\n` +
+              `To manage items:\n` +
+              `1. Edit the **BiddingItems** tab in Google Sheets\n` +
+              `2. Delete rows or clear the Winner column to re-auction items`
             )
-            .addFields({
-              name: `${EMOJI.LIST} Left`,
-              value: `${st.q.length}`,
-              inline: true,
-            }),
+            .setFooter({ text: "Manual queue is no longer supported" })
+            .setTimestamp(),
         ],
       });
-      break;
 
     case "!startauction":
-      if (st.q.length === 0)
-        return await msg.reply(`${EMOJI.ERROR} Empty queue`);
-      if (st.a) return await msg.reply(`${EMOJI.ERROR} Already active`);
-
-      const prev = st.q
-        .slice(0, 10)
-        .map(
-          (a, i) =>
-            `${i + 1}. **${a.item}**${
-              a.quantity > 1 ? ` x${a.quantity}` : ""
-            } - ${a.startPrice}pts`
-        )
-        .join("\n");
-
-      const cMsg = await msg.reply({
+      // ❌ MANUAL QUEUE REMOVED - This command now only works through auctioneering module
+      return await msg.reply({
         embeds: [
           new EmbedBuilder()
-            .setColor(COLORS.AUCTION)
-            .setTitle(`${EMOJI.WARNING} Start?`)
+            .setColor(getColor(COLORS.ERROR))
+            .setTitle(`${EMOJI.ERROR} Wrong Module`)
             .setDescription(
-              `**${st.q.length} item(s)**:\n\n${prev}${
-                st.q.length > 10 ? `\n*...+${st.q.length - 10} more*` : ""
-              }`
+              `This command is handled by the **auctioneering module**.\n\n` +
+              `Manual queue has been removed - all auctions now run from Google Sheets.`
             )
-            .setFooter({
-              text: `${EMOJI.SUCCESS} start / ${EMOJI.ERROR} cancel • 30s timeout`,
-            }),
+            .setFooter({ text: "Admins: Use !startauction in bidding channel" })
+            .setTimestamp(),
         ],
       });
-
-      await cMsg.react(EMOJI.SUCCESS);
-      await cMsg.react(EMOJI.ERROR);
-
-      // Countdown timer for confirmation
-      let confirmCountdown = 30;
-      const confirmInterval = setInterval(async () => {
-        confirmCountdown -= 5;
-        if (confirmCountdown > 0 && confirmCountdown <= 30) {
-          const updatedEmbed = new EmbedBuilder()
-            .setColor(getColor(COLORS.AUCTION))
-            .setTitle(`${EMOJI.WARNING} Start?`)
-            .setDescription(
-              `**${st.q.length} item(s)**:\n\n${prev}${
-                st.q.length > 10 ? `\n*...+${st.q.length - 10} more*` : ""
-              }`
-            )
-            .setFooter({
-              text: `${EMOJI.SUCCESS} start / ${EMOJI.ERROR} cancel • ${confirmCountdown}s remaining`,
-            });
-          await cMsg.edit({ embeds: [updatedEmbed] }).catch(() => {});
-        }
-      }, 5000);
-
-      try {
-        const col = await cMsg.awaitReactions({
-          filter: (r, u) =>
-            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
-            u.id === msg.author.id,
-          max: 1,
-          time: TIMEOUTS.CONFIRMATION,
-          errors: ["time"],
-        });
-
-        clearInterval(confirmInterval);
-
-        if (col.first().emoji.name === EMOJI.SUCCESS) {
-          await cMsg.reactions.removeAll().catch(() => {});
-          const load = await msg.channel.send(
-            `${EMOJI.CLOCK} Loading cache...`
-          );
-          const r = await startSess(cli, cfg);
-          await load.delete().catch(() => {});
-          if (r.ok) {
-            await msg.channel.send({
-              embeds: [
-                new EmbedBuilder()
-                  .setColor(getColor(COLORS.SUCCESS))
-                  .setTitle(`${EMOJI.FIRE} Started!`)
-                  .setDescription(
-                    `**${r.tot} item(s)** • First: **${r.first}**`
-                  )
-                  .addFields({
-                    name: `${EMOJI.CHART} Cached`,
-                    value: `${r.cached} members`,
-                    inline: true,
-                  })
-                  .setFooter({ text: `${EMOJI.FIRE} Instant bidding!` })
-                  .setTimestamp(),
-              ],
-            });
-          } else await msg.channel.send(`${EMOJI.ERROR} Failed: ${r.msg}`);
-        } else {
-          clearInterval(confirmInterval);
-          await cMsg.reactions.removeAll().catch(() => {});
-        }
-      } catch (e) {
-        clearInterval(confirmInterval);
-        await cMsg.reactions.removeAll().catch(() => {});
-      }
       break;
 
     case "!bid":
@@ -1760,50 +1577,20 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       break;
 
     case "!clearqueue":
-      if (st.q.length === 0) return await msg.reply(`${EMOJI.LIST} Empty`);
-      if (st.a)
-        return await msg.reply(`${EMOJI.ERROR} Can't clear during auction`);
-
-      // Admin confirmation required
-      const clearMsg = await msg.reply({
+      // ❌ MANUAL QUEUE REMOVED
+      return await msg.reply({
         embeds: [
           new EmbedBuilder()
-            .setColor(getColor(COLORS.WARNING))
-            .setTitle(`${EMOJI.WARNING} Clear Queue?`)
+            .setColor(getColor(COLORS.ERROR))
+            .setTitle(`${EMOJI.ERROR} Command Removed`)
             .setDescription(
-              `This will remove **${st.q.length} item(s)** from the queue.`
+              `The \`!clearqueue\` command has been **removed**.\n\n` +
+              `Manual queue is no longer supported. All items come from Google Sheets.`
             )
-            .setFooter({
-              text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel`,
-            }),
+            .setFooter({ text: "Use !resetauction to reset all auction state" })
+            .setTimestamp(),
         ],
       });
-
-      await clearMsg.react(EMOJI.SUCCESS);
-      await clearMsg.react(EMOJI.ERROR);
-
-      try {
-        const clearCol = await clearMsg.awaitReactions({
-          filter: (r, u) =>
-            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
-            u.id === msg.author.id,
-          max: 1,
-          time: TIMEOUTS.CONFIRMATION,
-          errors: ["time"],
-        });
-
-        if (clearCol.first().emoji.name === EMOJI.SUCCESS) {
-          const cnt = clrQ();
-          await clearMsg.reactions.removeAll().catch(() => {});
-          await msg.reply(`${EMOJI.SUCCESS} Cleared ${cnt} item(s)`);
-        } else {
-          await clearMsg.reactions.removeAll().catch(() => {});
-          await msg.reply(`${EMOJI.ERROR} Clear canceled`);
-        }
-      } catch (e) {
-        await clearMsg.reactions.removeAll().catch(() => {});
-      }
-      break;
 
     case "!resetbids":
       const rstMsg = await msg.reply({
@@ -1813,11 +1600,11 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             .setTitle(`${EMOJI.WARNING} RESET ALL?`)
             .setDescription(
               `Clears:\n` +
-                `• Queue (${st.q.length} items)\n` +
                 `• Active auction\n` +
                 `• Locked points (${Object.keys(st.lp).length} members)\n` +
                 `• History (${st.h.length} records)\n` +
-                `• Cache`
+                `• Cache\n\n` +
+                `⚠️ **NOTE:** Use \`!resetauction\` for full auction reset including saved state.`
             )
             .setFooter({
               text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel`,
@@ -1839,7 +1626,6 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           Object.values(st.th).forEach((h) => clearTimeout(h));
           stopCacheAutoRefresh();
           st = {
-            q: [],
             a: null,
             lp: {},
             h: [],
@@ -2013,15 +1799,12 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             `${EMOJI.ERROR} **${st.a.item}** canceled. Points refunded.`
           );
           await msg.channel.setArchived(true, "Canceled").catch(() => {});
-          st.q.shift();
           st.a = null;
           save();
-          if (st.q.length > 0)
-            setTimeout(
-              async () => await startNext(cli, cfg),
-              TIMEOUTS.QUICK_DELAY
-            );
-          else await finalize(cli, cfg);
+          // Manual queue removed - cancel just ends current item
+          await msg.channel.send(
+            `${EMOJI.INFO} Item cancelled. Use !endauction to end the entire session.`
+          );
         } else {
           await canMsg.reactions.removeAll().catch(() => {});
         }
@@ -2063,15 +1846,12 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           if (st.a.curWin) unlock(st.a.curWin, st.a.curBid);
           await msg.channel.send(`⏭️ **${st.a.item}** skipped (no sale).`);
           await msg.channel.setArchived(true, "Skipped").catch(() => {});
-          st.q.shift();
           st.a = null;
           save();
-          if (st.q.length > 0)
-            setTimeout(
-              async () => await startNext(cli, cfg),
-              TIMEOUTS.QUICK_DELAY
-            );
-          else await finalize(cli, cfg);
+          // Manual queue removed - skip just ends current item
+          await msg.channel.send(
+            `${EMOJI.INFO} Item skipped. Use !endauction to end the entire session.`
+          );
         } else {
           await skpMsg.reactions.removeAll().catch(() => {});
         }
@@ -2158,6 +1938,428 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       setTimeout(async () => {
         await ptsMsg.delete().catch(() => {});
       }, 30000);
+      break;
+
+    case "!fixlockedpoints":
+      // 🔧 AUDIT AND FIX STUCK LOCKED POINTS
+      const lockedMembers = Object.keys(st.lp).filter(
+        (member) => st.lp[member] > 0
+      );
+
+      if (lockedMembers.length === 0) {
+        return await msg.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(getColor(COLORS.SUCCESS))
+              .setTitle(`${EMOJI.SUCCESS} All Clear!`)
+              .setDescription(`No locked points found. System is clean.`)
+              .setTimestamp(),
+          ],
+        });
+      }
+
+      // Build audit report
+      const auditReport = lockedMembers
+        .map((member) => `• **${member}**: ${st.lp[member]}pts locked`)
+        .join("\n");
+
+      const fixMsg = await msg.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(getColor(COLORS.WARNING))
+            .setTitle(`${EMOJI.WARNING} Locked Points Found`)
+            .setDescription(
+              `Found **${lockedMembers.length} members** with locked points:\n\n${auditReport}\n\n` +
+                `**Action:** Clear all locked points?\n` +
+                `⚠️ Only do this if no auction is running or if points are stuck.`
+            )
+            .setFooter({
+              text: `${EMOJI.SUCCESS} clear all / ${EMOJI.ERROR} cancel`,
+            }),
+        ],
+      });
+
+      await fixMsg.react(EMOJI.SUCCESS);
+      await fixMsg.react(EMOJI.ERROR);
+
+      try {
+        const fixCol = await fixMsg.awaitReactions({
+          filter: (r, u) =>
+            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
+            u.id === msg.author.id,
+          max: 1,
+          time: TIMEOUTS.CONFIRMATION,
+          errors: ["time"],
+        });
+
+        if (fixCol.first().emoji.name === EMOJI.SUCCESS) {
+          const clearedCount = lockedMembers.length;
+          const totalLocked = Object.values(st.lp).reduce(
+            (sum, pts) => sum + pts,
+            0
+          );
+          st.lp = {};
+          save();
+          await fixMsg.reactions.removeAll().catch(() => {});
+          await msg.reply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(getColor(COLORS.SUCCESS))
+                .setTitle(`${EMOJI.SUCCESS} Locked Points Cleared`)
+                .setDescription(
+                  `Freed **${totalLocked}pts** from **${clearedCount} members**`
+                )
+                .setFooter({
+                  text: "Points are now available for bidding",
+                })
+                .setTimestamp(),
+            ],
+          });
+        } else {
+          await fixMsg.reactions.removeAll().catch(() => {});
+        }
+      } catch (e) {
+        await fixMsg.reactions.removeAll().catch(() => {});
+      }
+      break;
+
+    case "!auctionaudit":
+      // 📊 SHOW DETAILED AUCTION STATE
+      const auditEmbed = new EmbedBuilder()
+        .setColor(COLORS.INFO)
+        .setTitle(`${EMOJI.CHART} Auction System Audit`)
+        .setTimestamp();
+
+      // Bidding module state
+      auditEmbed.addFields({
+        name: "🔹 Bidding Module",
+        value:
+          `**Active Auction:** ${st.a ? st.a.item : "None"}\n` +
+          `**Locked Points:** ${Object.keys(st.lp).length} members (${Object.values(
+            st.lp
+          ).reduce((sum, pts) => sum + pts, 0)}pts total)\n` +
+          `**Pending Confirmations:** ${Object.keys(st.pc).length}\n` +
+          `**History:** ${st.h.length} items\n` +
+          `**Cache:** ${st.cp ? Object.keys(st.cp).length : 0} members\n` +
+          `**Paused:** ${st.pause ? "Yes" : "No"}`,
+        inline: false,
+      });
+
+      // Auctioneering module state
+      const auctioneering = require("./auctioneering.js");
+      const auctState = auctioneering.getAuctionState();
+
+      auditEmbed.addFields({
+        name: "🔹 Auctioneering Module",
+        value:
+          `**Active:** ${auctState.active ? "Yes" : "No"}\n` +
+          `**Current Item:** ${
+            auctState.currentItem ? auctState.currentItem.item : "None"
+          }\n` +
+          `**Session Items:** ${auctState.sessionItems.length}\n` +
+          `**Current Index:** ${auctState.currentItemIndex}\n` +
+          `**Paused:** ${auctState.paused ? "Yes" : "No"}`,
+        inline: false,
+      });
+
+      // Active timers
+      const activeTimers = Object.keys(st.th).length;
+      const auctTimers = Object.keys(auctState.timers || {}).length;
+
+      auditEmbed.addFields({
+        name: "⏱️ Active Timers",
+        value:
+          `**Bidding Module:** ${activeTimers} timer(s)\n` +
+          `**Auctioneering Module:** ${auctTimers} timer(s)`,
+        inline: false,
+      });
+
+      // Health check
+      const issues = [];
+      if (st.a && !auctState.active) {
+        issues.push("⚠️ Bidding has active auction but auctioneering doesn't");
+      }
+      if (!st.a && auctState.active) {
+        issues.push("⚠️ Auctioneering active but bidding has no auction");
+      }
+      if (Object.keys(st.lp).length > 0 && !st.a && !auctState.active) {
+        issues.push("⚠️ Locked points exist but no auction is running");
+      }
+      if (Object.keys(st.pc).length > 10) {
+        issues.push("⚠️ High number of pending confirmations (possible memory leak)");
+      }
+
+      if (issues.length > 0) {
+        auditEmbed.addFields({
+          name: "⚠️ Issues Detected",
+          value: issues.join("\n"),
+          inline: false,
+        });
+        auditEmbed.setColor(getColor(COLORS.WARNING));
+      } else {
+        auditEmbed.addFields({
+          name: "✅ Health Status",
+          value: "All systems operational",
+          inline: false,
+        });
+      }
+
+      auditEmbed.setFooter({
+        text: "Use !fixlockedpoints to clear stuck points | !resetauction for full reset",
+      });
+
+      await msg.reply({ embeds: [auditEmbed] });
+      break;
+
+    case "!resetauction":
+      // 🔄 COMPLETE AUCTION RESET (NUCLEAR OPTION)
+      const resetAuditEmbed = new EmbedBuilder()
+        .setColor(COLORS.ERROR)
+        .setTitle(`${EMOJI.WARNING} COMPLETE AUCTION RESET`)
+        .setDescription(
+          `⚠️ **THIS IS A NUCLEAR OPTION** ⚠️\n\n` +
+            `This will completely reset the entire auction system:\n\n` +
+            `**Bidding Module:**\n` +
+            `• Active auction: ${st.a ? st.a.item : "None"}\n` +
+            `• Locked points: ${Object.keys(st.lp).length} members\n` +
+            `• History: ${st.h.length} items\n` +
+            `• Cache: ${st.cp ? Object.keys(st.cp).length : 0} members\n\n` +
+            `**Auctioneering Module:**\n` +
+            `• Session items: ${require("./auctioneering.js").getAuctionState().sessionItems.length}\n\n` +
+            `**State Files:**\n` +
+            `• bidding-state.json will be cleared\n` +
+            `• All timers will be stopped\n` +
+            `• All caches will be cleared\n\n` +
+            `✅ **Safe to use when:**\n` +
+            `• Auction is stuck/crashed\n` +
+            `• Starting fresh session\n` +
+            `• Points are glitched\n\n` +
+            `❌ **DO NOT use during active auction!**`
+        )
+        .setFooter({
+          text: `${EMOJI.SUCCESS} RESET EVERYTHING / ${EMOJI.ERROR} cancel`,
+        });
+
+      const resetConfirmMsg = await msg.reply({ embeds: [resetAuditEmbed] });
+      await resetConfirmMsg.react(EMOJI.SUCCESS);
+      await resetConfirmMsg.react(EMOJI.ERROR);
+
+      try {
+        const resetCol = await resetConfirmMsg.awaitReactions({
+          filter: (r, u) =>
+            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
+            u.id === msg.author.id,
+          max: 1,
+          time: 30000, // 30 second timeout for such a critical action
+          errors: ["time"],
+        });
+
+        if (resetCol.first().emoji.name === EMOJI.SUCCESS) {
+          await resetConfirmMsg.reactions.removeAll().catch(() => {});
+
+          // Stop all timers
+          Object.values(st.th).forEach((h) => clearTimeout(h));
+          stopCacheAutoRefresh();
+
+          // Reset auctioneering module
+          const auctioneering = require("./auctioneering.js");
+          const auctState = auctioneering.getAuctionState();
+
+          // Clear auctioneering timers
+          if (auctState.timers) {
+            Object.values(auctState.timers).forEach((t) => {
+              clearTimeout(t);
+              clearInterval(t);
+            });
+          }
+
+          // Reset auctioneering state
+          auctState.active = false;
+          auctState.currentItem = null;
+          auctState.sessionItems = [];
+          auctState.currentItemIndex = 0;
+          auctState.timers = {};
+          auctState.paused = false;
+          auctState.pausedTime = null;
+
+          // Reset bidding state
+          st = {
+            a: null,
+            lp: {},
+            h: [],
+            th: {},
+            pc: {},
+            sd: null,
+            cp: null,
+            ct: null,
+            lb: {},
+            pause: false,
+            pauseTimer: null,
+            auctionLock: false,
+            cacheRefreshTimer: null,
+          };
+
+          save();
+
+          // Also try to save auctioneering state if available
+          if (cfg && cfg.sheet_webhook_url) {
+            try {
+              await fetch(cfg.sheet_webhook_url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  action: "saveBotState",
+                  state: { auctionState: auctState, timestamp: new Date().toISOString() },
+                }),
+              });
+            } catch (err) {
+              console.warn("⚠️ Failed to save auctioneering state:", err.message);
+            }
+          }
+
+          await msg.reply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(getColor(COLORS.SUCCESS))
+                .setTitle(`${EMOJI.SUCCESS} Complete Reset Successful`)
+                .setDescription(
+                  `**All auction systems have been reset:**\n\n` +
+                    `✅ All timers stopped\n` +
+                    `✅ All locked points cleared\n` +
+                    `✅ All caches cleared\n` +
+                    `✅ All state files reset\n` +
+                    `✅ Both modules reset\n\n` +
+                    `The system is now ready for a fresh start.`
+                )
+                .setFooter({
+                  text: "You can now run !startauction to begin a new session",
+                })
+                .setTimestamp(),
+            ],
+          });
+        } else {
+          await resetConfirmMsg.reactions.removeAll().catch(() => {});
+          await msg.reply(`${EMOJI.INFO} Reset cancelled`);
+        }
+      } catch (e) {
+        await resetConfirmMsg.reactions.removeAll().catch(() => {});
+        await msg.reply(`${EMOJI.INFO} Reset timed out (cancelled)`);
+      }
+      break;
+
+    case "!recoverauction":
+      // 🔧 RECOVER FROM CRASHED AUCTION
+      const auctioneering2 = require("./auctioneering.js");
+      const auctState2 = auctioneering2.getAuctionState();
+
+      const recoveryEmbed = new EmbedBuilder()
+        .setColor(COLORS.WARNING)
+        .setTitle(`${EMOJI.WARNING} Auction Recovery`)
+        .setDescription(
+          `Use this command to recover from a crashed or stuck auction.\n\n` +
+            `**Current State:**\n` +
+            `• Auctioneering active: ${auctState2.active ? "Yes" : "No"}\n` +
+            `• Current item: ${
+              auctState2.currentItem ? auctState2.currentItem.item : "None"
+            }\n` +
+            `• Bidding auction: ${st.a ? st.a.item : "None"}\n` +
+            `• Locked points: ${Object.keys(st.lp).length} members\n\n` +
+            `**Recovery Options:**\n\n` +
+            `1️⃣ **Clear stuck state** - Unlock points, clear timers\n` +
+            `2️⃣ **Force finalize** - End current session, submit results\n` +
+            `3️⃣ **Full reset** - Use \`!resetauction\` instead\n\n` +
+            `What would you like to do?`
+        )
+        .setFooter({ text: "React: 1️⃣ Clear | 2️⃣ Finalize | ❌ Cancel" });
+
+      const recoveryMsg = await msg.reply({ embeds: [recoveryEmbed] });
+      await recoveryMsg.react("1️⃣");
+      await recoveryMsg.react("2️⃣");
+      await recoveryMsg.react(EMOJI.ERROR);
+
+      try {
+        const recoveryCol = await recoveryMsg.awaitReactions({
+          filter: (r, u) =>
+            ["1️⃣", "2️⃣", EMOJI.ERROR].includes(r.emoji.name) &&
+            u.id === msg.author.id,
+          max: 1,
+          time: 30000,
+          errors: ["time"],
+        });
+
+        const choice = recoveryCol.first().emoji.name;
+        await recoveryMsg.reactions.removeAll().catch(() => {});
+
+        if (choice === "1️⃣") {
+          // Clear stuck state
+          Object.values(st.th).forEach((h) => clearTimeout(h));
+          st.lp = {};
+          st.pc = {};
+          st.th = {};
+          st.pause = false;
+          save();
+
+          await msg.reply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(getColor(COLORS.SUCCESS))
+                .setTitle(`${EMOJI.SUCCESS} Stuck State Cleared`)
+                .setDescription(
+                  `**Cleared:**\n` +
+                    `✅ All timers stopped\n` +
+                    `✅ Locked points freed\n` +
+                    `✅ Pending confirmations cleared\n\n` +
+                    `Active auctions are still running. Use \`!endauction\` if needed.`
+                )
+                .setTimestamp(),
+            ],
+          });
+        } else if (choice === "2️⃣") {
+          // Force finalize
+          if (!auctState2.active) {
+            return await msg.reply(
+              `${EMOJI.ERROR} No active auctioneering session to finalize`
+            );
+          }
+
+          try {
+            // Get the channel
+            const guild = await cli.guilds.fetch(cfg.main_guild_id);
+            const channel = await guild.channels.fetch(cfg.bidding_channel_id);
+
+            // Call finalize from auctioneering module (need to check if this exists)
+            await msg.reply(
+              `${EMOJI.CLOCK} Forcing session finalization...`
+            );
+
+            // This requires the auctioneering module to have the client and config
+            // We'll need to make sure this works
+            const auctioneering3 = require("./auctioneering.js");
+            if (
+              typeof auctioneering3.endAuctionSession === "function"
+            ) {
+              await auctioneering3.endAuctionSession(cli, cfg, channel);
+              await msg.reply(
+                `${EMOJI.SUCCESS} Session force-finalized successfully`
+              );
+            } else {
+              await msg.reply(
+                `${EMOJI.ERROR} Force finalize function not available. Use !resetauction instead.`
+              );
+            }
+          } catch (err) {
+            console.error("Recovery finalize error:", err);
+            await msg.reply(
+              `${EMOJI.ERROR} Failed to finalize: ${err.message}`
+            );
+          }
+        } else {
+          await msg.reply(`${EMOJI.INFO} Recovery cancelled`);
+        }
+      } catch (e) {
+        await recoveryMsg.reactions.removeAll().catch(() => {});
+        await msg.reply(`${EMOJI.INFO} Recovery timed out (cancelled)`);
+      }
       break;
   }
 }
