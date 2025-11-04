@@ -2329,7 +2329,7 @@ function startCleanupSchedule() {
 
 // MODULE EXPORTS
 module.exports = {
-  // startItemAuction - REMOVED: Not used anywhere
+  // startItemAuction - REMOVED: Not used anywhere (logic moved to auctioneering.js)
   initializeBidding,
   loadBiddingState: load,
   saveBiddingState: save,
@@ -2338,7 +2338,7 @@ module.exports = {
   // isAdmin: isAdm - REMOVED: Not used anywhere
   // getCachedPoints: getPts - REMOVED: Not used anywhere
   // loadPointsCache: loadCache - REMOVED: Not used anywhere
-  // clearPointsCache: clearCache - REMOVED: Not used anywhere
+  clearPointsCache: clearCache, // Re-exported: Used by auctioneering.js:1278
   handleCommand: handleCmd,
   // loadPointsCacheForAuction - REMOVED: Not used anywhere
   submitSessionTally: submitSessionTally,
