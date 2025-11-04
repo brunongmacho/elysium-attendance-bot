@@ -1658,7 +1658,7 @@ async function handleMyPoints(message, biddingModule, config) {
     );
   }
 
-  const u = message.member.nickname || message.author.username;
+  const u = (message.member?.nickname || message.author?.username || 'Unknown User');
 
   const freshPts = await fetch(config.sheet_webhook_url, {
     method: "POST",
@@ -1666,7 +1666,11 @@ async function handleMyPoints(message, biddingModule, config) {
     body: JSON.stringify({ action: "getBiddingPoints" }),
   })
     .then((r) => r.json())
-    .then((d) => d.points || {});
+    .then((d) => d.points || {})
+    .catch((err) => {
+      console.error(`❌ Failed to fetch points for !mypoints:`, err.message);
+      return {};
+    });
 
   let userPts = freshPts[u];
   if (userPts === undefined) {
