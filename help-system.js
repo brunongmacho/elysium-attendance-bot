@@ -258,7 +258,7 @@ const COMMAND_HELP = {
   // ========================================
   startauction: {
     usage: "!startauction",
-    description: "Start attendance-based auction session (loads items from BiddingItems sheet)",
+    description: "Start auction session (loads items from BiddingItems sheet)",
     category: "Auctioneering",
     adminOnly: true,
     example: "!startauction",
@@ -266,9 +266,8 @@ const COMMAND_HELP = {
     features: [
       "10-minute cooldown protection",
       "Loads items from Google Sheets",
-      "Groups items by boss (attendance-required sessions)",
-      "Sheet items = attendance verification",
-      "Auto-loads attendance per boss",
+      "All ELYSIUM members can bid",
+      "No attendance restrictions",
       "Session preview before start"
     ]
   },
@@ -500,14 +499,13 @@ const COMMAND_HELP = {
 
   bid: {
     usage: "!bid <amount> OR !b <amount>",
-    description: "Place bid on current auction item (attendance-checked for boss items)",
+    description: "Place bid on current auction item (all ELYSIUM members can bid)",
     category: "Member",
     adminOnly: false,
     example: "!bid 750\n!b 1000",
     aliases: ["!b"],
     features: [
       "10-second confirmation window",
-      "Attendance verification (boss items)",
       "Points validation",
       "Self-overbid support",
       "Locked points tracking",
@@ -602,8 +600,8 @@ const CATEGORIES = {
 
 const CATEGORY_DESCRIPTIONS = {
   Attendance: "Manage boss spawn check-ins, verifications, and Google Sheets submission",
-  Leaderboard: "View attendance and bidding leaderboards, automatic weekly reports",
-  Auctioneering: "Session-based auction system with attendance filtering per boss",
+  Leaderboard: "View attendance and bidding leaderboards, automatic weekly reports (Saturday 11:59pm)",
+  Auctioneering: "Auction system open to all ELYSIUM members",
   Bidding: "Point-based auction management with queue and item tracking",
   Loot: "OCR-powered loot screenshot processing and automatic logging",
   Member: "Commands available to all ELYSIUM members",
@@ -717,10 +715,11 @@ async function handleHelp(message, args, member) {
         `• Use \`!help <command>\` for detailed info\n` +
         `• Scroll through pages for all categories\n` +
         `• Commands organized by function\n\n` +
-        `${EMOJI.ROCKET} **New in v8.0:**\n` +
-        `${EMOJI.SUCCESS} Attendance-based auction filtering\n` +
-        `${EMOJI.SUCCESS} Session-based auctions (grouped by boss)\n` +
-        `${EMOJI.SUCCESS} Sheet items = ATTENDANCE REQUIRED\n` +
+        `${EMOJI.ROCKET} **New in v8.1:**\n` +
+        `${EMOJI.SUCCESS} Open bidding - all ELYSIUM members can participate\n` +
+        `${EMOJI.SUCCESS} No attendance restrictions on auctions\n` +
+        `${EMOJI.SUCCESS} Improved leaderboards with percentage bars\n` +
+        `${EMOJI.SUCCESS} Weekly reports on Saturday 11:59pm\n` +
         `${EMOJI.SUCCESS} OCR-powered loot logging\n` +
         `${EMOJI.SUCCESS} State persistence to Google Sheets\n` +
         `${EMOJI.SUCCESS} 10-minute auction cooldown\n` +
@@ -790,8 +789,8 @@ async function handleHelp(message, args, member) {
       .setDescription(
         `${EMOJI.SPARKLES} **Version ${BOT_VERSION}**\n\n` +
         `${EMOJI.INFO} Use \`!help <command>\` for detailed info\n\n` +
-        `${EMOJI.WARNING} **Important:** Boss-specific auction items require attendance!\n` +
-        `Only members who attended that boss can bid on its items.`
+        `${EMOJI.FIRE} **Good News:** All ELYSIUM members can now bid on auction items!\n` +
+        `No attendance restrictions - everyone can participate in auctions.`
       );
 
     // Group by category
@@ -831,16 +830,16 @@ async function handleHelp(message, args, member) {
           "1. Wait for auction thread to open\n" +
           "2. Type `!bid <amount>` or `!b <amount>`\n" +
           "3. React ✅ to confirm within 10 seconds\n" +
-          "4. **NOTE:** If item is from a boss spawn, only attendees can bid!\n" +
-          "5. Winner announced at end",
+          "4. Winner announced at end\n" +
+          "5. All ELYSIUM members can participate!",
         inline: false,
       },
       {
-        name: `${EMOJI.FIRE} Attendance-Based Bidding`,
+        name: `${EMOJI.FIRE} Open Bidding System`,
         value:
-          `${EMOJI.BOSS} **Boss Items:** Only attendees can bid\n` +
-          `${EMOJI.INFO} Check auction message for restrictions\n` +
-          `${EMOJI.TROPHY} Attend boss spawns to unlock more bidding!`,
+          `${EMOJI.SUCCESS} **All items:** Everyone can bid\n` +
+          `${EMOJI.INFO} No attendance requirements\n` +
+          `${EMOJI.TROPHY} Just need bidding points to participate!`,
         inline: false,
       }
     );

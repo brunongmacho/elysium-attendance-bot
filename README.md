@@ -16,9 +16,10 @@ Discord bot for managing guild attendance tracking and auction-based loot distri
 - State recovery on restart
 
 ### 🔨 Auction System
-**Two Modes:**
-- **Attendance-Based** - Only attendees can bid on boss-specific items
-- **Open Auctions** - Manual queue items open to all members
+**Open to All ELYSIUM Members:**
+- All members can bid on any auction item
+- No attendance restrictions
+- Point-based bidding system
 
 **Features:**
 - 30-second preview before each item with @everyone ping
@@ -26,6 +27,7 @@ Discord bot for managing guild attendance tracking and auction-based loot distri
 - +1 minute extension on confirmed bids
 - Point-based bidding with locked points system
 - Race condition protection
+- 10-minute auction cooldown
 
 ### 🎁 Loot System
 - OCR-powered screenshot reading
@@ -125,9 +127,9 @@ Deploy Apps Script with `doPost()` webhook handler.
 
 ### Auction Flow
 1. Admin runs `!startauction`
-2. Items grouped by boss (attendance required)
+2. Items loaded from Google Sheets BiddingItems
 3. **30-second preview** with @everyone ping
-4. Members bid → 10-second confirmation
+4. All members can bid → 10-second confirmation
 5. If bid in last 10s → **auction pauses**
 6. On confirmation → **+1 min extension**
 7. Winner announced, points deducted
@@ -180,5 +182,5 @@ MIT License
 
 ---
 
-**Version:** 3.1
-**Last Updated:** 2025-10-29
+**Version:** 8.1
+**Last Updated:** 2025-11-04

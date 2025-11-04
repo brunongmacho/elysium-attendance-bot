@@ -127,7 +127,7 @@ const client = new Client({
 // CONSTANTS & STATE
 // ==========================================
 
-const BOT_VERSION = "3.1";
+const BOT_VERSION = "8.1";
 const BOT_START_TIME = Date.now();
 const PORT = process.env.PORT || 8000;
 

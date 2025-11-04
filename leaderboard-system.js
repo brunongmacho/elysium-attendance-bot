@@ -111,10 +111,19 @@ async function displayAttendanceLeaderboard(message) {
     const topMembers = data.leaderboard.slice(0, 10);
     let leaderboardText = '';
 
+    // Find max points for percentage calculation
+    const maxPoints = topMembers.length > 0 ? topMembers[0].points : 1;
+
     topMembers.forEach((member, index) => {
       const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-      const bar = '█'.repeat(Math.min(Math.floor(member.points / 2), 20));
-      leaderboardText += `${medal} **${member.name}** - ${member.points} pts\n${bar}\n`;
+
+      // Calculate percentage and create visual bar (20 chars total)
+      const percentage = maxPoints > 0 ? (member.points / maxPoints) * 100 : 0;
+      const filledLength = Math.round((percentage / 100) * 20);
+      const emptyLength = 20 - filledLength;
+      const bar = '█'.repeat(filledLength) + '░'.repeat(emptyLength);
+
+      leaderboardText += `${medal} **${member.name}** - ${member.points} pts\n${bar} ${percentage.toFixed(1)}%\n`;
     });
 
     embed.addFields({
@@ -160,12 +169,21 @@ async function displayBiddingLeaderboard(message) {
     const topMembers = data.leaderboard.slice(0, 10);
     let leaderboardText = '';
 
+    // Find max points for percentage calculation
+    const maxPointsLeft = topMembers.length > 0 ? topMembers[0].pointsLeft : 1;
+
     topMembers.forEach((member, index) => {
       const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-      const bar = '█'.repeat(Math.min(Math.floor(member.pointsLeft / 5), 20));
+
+      // Calculate percentage and create visual bar (20 chars total)
+      const percentage = maxPointsLeft > 0 ? (member.pointsLeft / maxPointsLeft) * 100 : 0;
+      const filledLength = Math.round((percentage / 100) * 20);
+      const emptyLength = 20 - filledLength;
+      const bar = '█'.repeat(filledLength) + '░'.repeat(emptyLength);
+
       leaderboardText += `${medal} **${member.name}**\n`;
       leaderboardText += `   💰 Points Left: **${member.pointsLeft}** | 💸 Consumed: **${member.pointsConsumed}**\n`;
-      leaderboardText += `   ${bar}\n`;
+      leaderboardText += `   ${bar} ${percentage.toFixed(1)}%\n`;
     });
 
     embed.addFields({
@@ -280,7 +298,7 @@ async function sendWeeklyReport() {
       });
     }
 
-    embed.setFooter({ text: 'Generated automatically every Monday at 3am GMT+8' });
+    embed.setFooter({ text: 'Generated automatically every Saturday at 11:59pm GMT+8' });
 
     await adminLogsChannel.send({ embeds: [embed] });
     console.log('✅ Weekly report sent successfully');
@@ -290,37 +308,40 @@ async function sendWeeklyReport() {
 }
 
 /**
- * Schedule weekly report for 3am Monday GMT+8
+ * Schedule weekly report for Saturday 11:59pm GMT+8
+ * (End of week since weeks start on Sunday)
  */
 function scheduleWeeklyReport() {
-  // Calculate next Monday 3am GMT+8
-  const calculateNextMonday3AM = () => {
+  // Calculate next Saturday 11:59pm GMT+8
+  const calculateNextSaturday1159PM = () => {
     const now = new Date();
     const manila = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
 
-    // Get current day (0 = Sunday, 1 = Monday, etc.)
+    // Get current day (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
     const currentDay = manila.getDay();
 
-    // Calculate days until next Monday (0 if today is Monday)
-    let daysUntilMonday = (1 - currentDay + 7) % 7;
-    if (daysUntilMonday === 0 && manila.getHours() >= 3) {
-      daysUntilMonday = 7; // If it's Monday after 3am, schedule for next Monday
+    // Calculate days until next Saturday
+    let daysUntilSaturday = (6 - currentDay + 7) % 7;
+
+    // If today is Saturday and it's already past 11:59pm, schedule for next Saturday
+    if (daysUntilSaturday === 0 && (manila.getHours() > 23 || (manila.getHours() === 23 && manila.getMinutes() >= 59))) {
+      daysUntilSaturday = 7;
     }
 
     // Create target date
     const target = new Date(manila);
-    target.setDate(target.getDate() + daysUntilMonday);
-    target.setHours(3, 0, 0, 0);
+    target.setDate(target.getDate() + daysUntilSaturday);
+    target.setHours(23, 59, 0, 0);
 
     return target;
   };
 
   const scheduleNext = () => {
-    const nextMonday = calculateNextMonday3AM();
+    const nextSaturday = calculateNextSaturday1159PM();
     const now = new Date();
-    const delay = nextMonday.getTime() - now.getTime();
+    const delay = nextSaturday.getTime() - now.getTime();
 
-    console.log(`📅 Next weekly report scheduled for: ${nextMonday.toLocaleString('en-US', { timeZone: 'Asia/Manila' })} (in ${Math.floor(delay / 1000 / 60 / 60)} hours)`);
+    console.log(`📅 Next weekly report scheduled for: ${nextSaturday.toLocaleString('en-US', { timeZone: 'Asia/Manila' })} (in ${Math.floor(delay / 1000 / 60 / 60)} hours)`);
 
     setTimeout(async () => {
       await sendWeeklyReport();
@@ -329,7 +350,7 @@ function scheduleWeeklyReport() {
   };
 
   scheduleNext();
-  console.log('✅ Weekly report scheduler initialized');
+  console.log('✅ Weekly report scheduler initialized (Saturday 11:59pm GMT+8)');
 }
 
 module.exports = {
