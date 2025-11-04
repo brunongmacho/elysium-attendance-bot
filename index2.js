@@ -12,7 +12,7 @@ const {
   EmbedBuilder,
 } = require("discord.js");
 const fetch = require("node-fetch");
-const levenshtein = require("fast-levenshtein");
+// levenshtein removed - fuzzy matching now in utils/common.js via utils/cache-manager.js
 const fs = require("fs");
 const http = require("http");
 const bidding = require("./bidding.js");
@@ -2150,6 +2150,7 @@ client.once(Events.ClientReady, async () => {
 client.on(Events.MessageCreate, async (message) => {
   try {
     // 🧹 BIDDING CHANNEL PROTECTION: Delete non-admin messages immediately
+    // EXCEPT for member commands (!mypoints, !bidstatus, etc.)
     if (
       message.guild &&
       message.channel.id === config.bidding_channel_id &&
@@ -2159,19 +2160,31 @@ client.on(Events.MessageCreate, async (message) => {
         .fetch(message.author.id)
         .catch(() => null);
 
-      // If not an admin, delete message immediately
+      // If not an admin, check if it's a valid member command
       if (member && !isAdmin(member)) {
-        try {
-          await errorHandler.safeDelete(message, 'message deletion');
-          console.log(
-            `🧹 Deleted non-admin message from ${message.author.username} in bidding channel`
-          );
-        } catch (e) {
-          console.warn(
-            `⚠️ Could not delete message from ${message.author.username}: ${e.message}`
-          );
+        const content = message.content.trim().toLowerCase();
+        const memberCommands = [
+          '!mypoints', '!mp', '!pts', '!mypts',
+          '!bidstatus', '!bs', '!bstatus'
+        ];
+
+        // Allow member commands through, delete everything else
+        const isMemberCommand = memberCommands.some(cmd => content.startsWith(cmd));
+
+        if (!isMemberCommand) {
+          try {
+            await errorHandler.safeDelete(message, 'message deletion');
+            console.log(
+              `🧹 Deleted non-admin message from ${message.author.username} in bidding channel`
+            );
+          } catch (e) {
+            console.warn(
+              `⚠️ Could not delete message from ${message.author.username}: ${e.message}`
+            );
+          }
+          return; // Stop processing
         }
-        return; // Stop processing
+        // If it IS a member command, continue processing below
       }
     }
     // Debug for !bid detection

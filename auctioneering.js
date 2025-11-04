@@ -438,11 +438,6 @@ async function startAuctioneering(client, config, channel) {
   }, 30000); // 30 seconds preview
 }
 
-function canUserBid(username, currentSession) {
-  // No attendance required - all ELYSIUM members can bid
-  return true;
-}
-
 // REPLACE the entire auctionNextItem function (Line ~400 in auctioneering.js)
 // This version removes session/boss logic - just processes items linearly
 
@@ -1663,7 +1658,7 @@ async function handleMyPoints(message, biddingModule, config) {
     );
   }
 
-  const u = message.member.nickname || message.author.username;
+  const u = (message.member?.nickname || message.author?.username || 'Unknown User');
 
   const freshPts = await fetch(config.sheet_webhook_url, {
     method: "POST",
@@ -1671,7 +1666,11 @@ async function handleMyPoints(message, biddingModule, config) {
     body: JSON.stringify({ action: "getBiddingPoints" }),
   })
     .then((r) => r.json())
-    .then((d) => d.points || {});
+    .then((d) => d.points || {})
+    .catch((err) => {
+      console.error(`❌ Failed to fetch points for !mypoints:`, err.message);
+      return {};
+    });
 
   let userPts = freshPts[u];
   if (userPts === undefined) {
@@ -2285,12 +2284,12 @@ module.exports = {
   initialize,
   itemEnd,
   startAuctioneering,
-  auctionNextItem,
+  auctionNextItem, // Used internally by startAuctioneering and itemEnd
   endAuctionSession,
   getAuctionState: () => auctionState,
-  canUserBid,
+  // canUserBid - REMOVED: Not used anywhere
   setPostToSheet,
-  getPostToSheet,
+  getPostToSheet, // Used internally by startAuctioneering
   pauseSession,
   resumeSession,
   stopCurrentItem,
@@ -2305,5 +2304,5 @@ module.exports = {
   handleSkipItem,
   handleForceSubmitResults,
   handleMoveToDistribution,
-  getCurrentSessionBoss: () => currentSessionBoss,
+  // getCurrentSessionBoss: () => currentSessionBoss - REMOVED: Not used anywhere
 };

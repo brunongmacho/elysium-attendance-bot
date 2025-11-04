@@ -628,33 +628,6 @@ async function validateStateConsistency(client) {
 }
 
 // Load attendance for specific boss from week sheet
-async function loadAttendanceForBoss(weekSheet, bossKey) {
-  try {
-    const payload = {
-      action: "getAttendanceForBoss",
-      weekSheet: weekSheet,
-      bossKey: bossKey,
-    };
-
-    const resp = await fetch(config.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!resp.ok) {
-      console.error(`❌ Failed to load attendance: HTTP ${resp.status}`);
-      return null;
-    }
-
-    const data = await resp.json();
-    return data.attendees || [];
-  } catch (err) {
-    console.error(`❌ Load attendance error:`, err);
-    return null;
-  }
-}
-
 // STATE MANAGEMENT FOR KOYEB (Memory optimization)
 let lastAttendanceStateSyncTime = 0;
 const ATTENDANCE_STATE_SYNC_INTERVAL = 10 * 60 * 1000; // 10 minutes (reduced sync frequency for memory)
@@ -821,22 +794,22 @@ function schedulePeriodicStateSync() {
 module.exports = {
   initialize,
   getCurrentTimestamp,
-  getSundayOfWeek,
+  getSundayOfWeek, // Used internally by saveAttendanceStateToSheet
   formatUptime,
   findBossMatch,
-  parseThreadName,
+  parseThreadName, // Used internally by recoverStateFromThreads
   postToSheet,
-  checkColumnExists,
+  checkColumnExists, // Used internally by createSpawnThreads
   removeAllReactionsWithRetry,
   cleanupAllThreadReactions,
   createSpawnThreads,
   recoverStateFromThreads,
   validateStateConsistency,
-  loadAttendanceForBoss,
+  // loadAttendanceForBoss - REMOVED: Not used anywhere
   saveAttendanceStateToSheet,
   loadAttendanceStateFromSheet,
   schedulePeriodicStateSync,
-  cleanupStaleEntries,
+  cleanupStaleEntries, // Used internally by schedulePeriodicStateSync
   getActiveSpawns: () => activeSpawns,
   getActiveColumns: () => activeColumns,
   getPendingVerifications: () => pendingVerifications,

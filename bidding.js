@@ -399,38 +399,6 @@ function clearCache() {
   save();
 }
 
-// ❌ DEPRECATED: Manual queue functions removed
-// All items now come from Google Sheets BiddingItems tab
-// These functions are kept commented for reference only
-/*
-const addQ = (itm, pr, dur, qty = 1) => {
-  const a = {
-    id: `a_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    item: itm.trim(),
-    startPrice: parseInt(pr),
-    duration: parseInt(dur),
-    quantity: parseInt(qty),
-    addedAt: Date.now(),
-  };
-  st.q.push(a);
-  save();
-  return a;
-};
-const rmQ = (itm) => {
-  const i = st.q.findIndex((a) => a.item.toLowerCase() === itm.toLowerCase());
-  if (i === -1) return null;
-  const rm = st.q.splice(i, 1)[0];
-  save();
-  return rm;
-};
-const clrQ = () => {
-  const c = st.q.length;
-  st.q = [];
-  save();
-  return c;
-};
-*/
-
 // PAUSE/RESUME
 function pauseAuction() {
   if (st.pause || !st.a || st.a.status !== "active") return false;
@@ -478,44 +446,7 @@ function resumeAuction(cli, cfg) {
 }
 
 // AUCTION LIFECYCLE
-async function startSess(cli, cfg) {
-  if (st.q.length === 0) return { ok: false, msg: "No items" };
-  if (st.a) return { ok: false, msg: "Already active" };
-
-  // Concurrent auction protection
-  if (st.auctionLock) {
-    return {
-      ok: false,
-      msg: `${EMOJI.WARNING} Auction start already in progress, please wait...`,
-    };
-  }
-
-  st.auctionLock = true;
-
-  try {
-    if (!(await loadCache(cfg.sheet_webhook_url))) {
-      return { ok: false, msg: `${EMOJI.ERROR} Cache load failed` };
-    }
-
-    st.sd = ts();
-    const f = st.q[0];
-    await startNext(cli, cfg);
-    save();
-
-    return {
-      ok: true,
-      tot: st.q.length,
-      first: f.item,
-      cached: Object.keys(st.cp).length,
-    };
-  } catch (err) {
-    console.error(`❌ Auction start failed:`, err);
-    throw err;
-  } finally {
-    // Always release lock, even on error or early return
-    st.auctionLock = false;
-  }
-}
+// startSess removed - unused function
 
 async function startNext(cli, cfg) {
   if (st.q.length === 0) {
@@ -848,26 +779,7 @@ async function endAuc(cli, cfg) {
   }
 }
 
-async function loadPointsCacheForAuction(url) {
-  console.log(`⚡ Loading cache for auction...`);
-  const t0 = Date.now();
-  const p = await fetchPts(url, false);
-  if (!p) {
-    console.error(`❌ Cache fail`);
-    return false;
-  }
-  st.cp = p;
-  st.ct = Date.now();
-  save();
-  console.log(
-    `✅ Cache: ${Date.now() - t0}ms - ${Object.keys(p).length} members`
-  );
-
-  // START AUTO-REFRESH FOR AUCTIONEERING SESSIONS
-  startCacheAutoRefresh(url);
-
-  return true;
-}
+// loadPointsCacheForAuction removed - unused function
 
 async function submitSessionTally(config, sessionItems) {
   if (!st.cp || sessionItems.length === 0) {
@@ -2365,102 +2277,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
   }
 }
 
-async function startItemAuction(client, config, thread, item, session) {
-  const { EmbedBuilder } = require("discord.js");
-  const auctioneering = require("./auctioneering.js");
-
-  console.log(`🔨 Starting item auction: ${item.item}`);
-
-  // Initialize the auction item state
-  item.curBid = item.startPrice || 0;
-  item.curWin = null;
-  item.curWinId = null;
-  item.bids = [];
-  item.status = "active";
-  item.extCnt = 0; // Extension counter for time extensions
-
-  const duration = (item.duration || 2) * 60 * 1000;
-  item.endTime = Date.now() + duration;
-
-  // Announce the start of the auction
-  await thread.send({
-    content: `@everyone`,
-    embeds: [
-      new EmbedBuilder()
-        .setColor(0xffd700)
-        .setTitle(`🔨 Auction Started: ${item.item}`)
-        .setDescription(
-          `**Boss:** ${session.bossName || "OPEN"}\n` +
-            `**Starting Price:** ${item.startPrice || 0} pts\n` +
-            `**Duration:** ${item.duration || 2} min\n\n` +
-            `Use \`!bid <amount>\` to place your bids.`
-        )
-        .setFooter({ text: "Auction open — place your bids now!" })
-        .setTimestamp(),
-    ],
-  });
-
-  // Schedule end timer
-  item.timers = {};
-
-  item.timers.go1 = setTimeout(async () => {
-    if (item.status !== "active") return;
-    await thread.send({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(0xffa500)
-          .setTitle("⚠️ Going Once!")
-          .setDescription("1 minute remaining."),
-      ],
-    });
-  }, duration - 60000);
-
-  item.timers.go2 = setTimeout(async () => {
-    if (item.status !== "active") return;
-    await thread.send({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(0xffa500)
-          .setTitle("⚠️ Going Twice!")
-          .setDescription("30 seconds remaining."),
-      ],
-    });
-  }, duration - 30000);
-
-  item.timers.final = setTimeout(async () => {
-    if (item.status !== "active") return;
-    await thread.send({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(0xff0000)
-          .setTitle("🚨 Final Call!")
-          .setDescription("10 seconds left to bid!"),
-      ],
-    });
-  }, duration - 10000);
-
-  // End auction
-  item.timers.end = setTimeout(async () => {
-    if (item.status !== "active") return;
-
-    item.status = "ended";
-    await thread.send({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(0x00ff00)
-          .setTitle(`🏁 Auction Ended: ${item.item}`)
-          .setDescription(
-            item.curWin
-              ? `**Winner:** <@${item.curWinId}> (${item.curBid} pts)`
-              : `No bids were placed.`
-          ),
-      ],
-    });
-
-    // Notify auctioneering to finalize and move to the next item
-    await auctioneering.itemEnd(client, config, thread);
-  }, duration);
-}
+// startItemAuction removed - unused function
 
 // CLEANUP FUNCTION FOR PENDING CONFIRMATIONS
 function cleanupPendingConfirmations() {
@@ -2508,35 +2325,29 @@ function startCleanupSchedule() {
   }
 }
 
-function stopCleanupSchedule() {
-  if (cleanupInterval) {
-    clearInterval(cleanupInterval);
-    cleanupInterval = null;
-    console.log("⏹️ Stopped pending confirmations cleanup schedule");
-  }
-}
+// stopCleanupSchedule removed - unused function
 
 // MODULE EXPORTS
 module.exports = {
-  startItemAuction,
+  // startItemAuction - REMOVED: Not used anywhere
   initializeBidding,
   loadBiddingState: load,
   saveBiddingState: save,
   getBiddingState: () => st,
-  hasElysiumRole: hasRole,
-  isAdmin: isAdm,
-  getCachedPoints: getPts,
-  loadPointsCache: loadCache,
-  clearPointsCache: clearCache,
+  // hasElysiumRole: hasRole - REMOVED: Not used anywhere
+  // isAdmin: isAdm - REMOVED: Not used anywhere
+  // getCachedPoints: getPts - REMOVED: Not used anywhere
+  // loadPointsCache: loadCache - REMOVED: Not used anywhere
+  // clearPointsCache: clearCache - REMOVED: Not used anywhere
   handleCommand: handleCmd,
-  loadPointsCacheForAuction: loadPointsCacheForAuction,
+  // loadPointsCacheForAuction - REMOVED: Not used anywhere
   submitSessionTally: submitSessionTally,
   loadBiddingStateFromSheet: loadBiddingStateFromSheet,
-  saveBiddingStateToSheet: saveBiddingStateToSheet,
-  cleanupPendingConfirmations,
-  startCleanupSchedule,
-  stopCleanupSchedule,
-  stopCacheAutoRefresh,
+  saveBiddingStateToSheet: saveBiddingStateToSheet, // Used internally
+  // cleanupPendingConfirmations - REMOVED: Not used anywhere
+  startCleanupSchedule, // Used internally by initializeBidding
+  // stopCleanupSchedule - REMOVED: Not used anywhere
+  stopCacheAutoRefresh, // Used internally by startCleanupSchedule
 
   confirmBid: async function (reaction, user, config) {
     const p = st.pc[reaction.message.id];

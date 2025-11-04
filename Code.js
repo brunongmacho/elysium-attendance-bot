@@ -103,6 +103,7 @@ function doPost(e) {
     if (action === 'submitLootEntries') return handleSubmitLootEntries(data);
     if (action === 'getLootState') return getLootState(data);
     if (action === 'saveLootState') return saveLootState(data);
+    if (action === 'getHistoricalPrices') return getHistoricalPrices(data);
 
     // Leaderboard & Weekly Report actions
     if (action === 'getAttendanceLeaderboard') return getAttendanceLeaderboard(data);
@@ -403,12 +404,17 @@ function handleSubmitLootEntries(data) {
           // FIX 2: Format Boss - all uppercase
           const boss = rawBoss.toUpperCase();
 
-          // NEW: Check if item exists in sheet and get start price using fuzzy matching
+          // NEW: Check for start price - prioritize provided price over fuzzy matching
           let startPrice = '';
           let correctedItemName = item; // Will be updated if fuzzy match is found
           const defaultDuration = 5; // Default duration: 5 minutes
 
-          if (lastRow > 1) {
+          // Check if bot provided a suggested starting price from historical data
+          if (entry.startingPrice !== undefined && entry.startingPrice !== null && entry.startingPrice > 0) {
+            startPrice = entry.startingPrice;
+            Logger.log(`💰 Using suggested historical price: ${startPrice} for "${item}"`);
+          } else if (lastRow > 1) {
+            // Fallback to fuzzy matching against existing items
             const existingData = biddingItemsSheet.getRange(2, 1, lastRow - 1, 2).getValues();
 
             // Use fuzzy matching to find best match
@@ -626,7 +632,7 @@ function handleSubmitAttendance(data) {
       sheet.getRange(3, newCol, members.length, 1).setValues(members.map(() => [true])).setDataValidation(checkboxRule);
     }
     
-    logAttendance(SpreadsheetApp.openById(CONFIG.SHEET_ID), boss, timestamp, members);
+    logAttendance(SpreadsheetApp.openById(CONFIG.SSHEET_ID), boss, timestamp, members);
     return createResponse('ok', `Submitted: ${members.length}`, {column: newCol, boss, timestamp, membersCount: members.length});
   } finally { lock.releaseLock(); }
 }
@@ -1256,8 +1262,11 @@ function moveQueueItemsToSheet(data) {
 function updateBiddingPoints() {
   // Acquire lock to prevent race conditions
   const lock = LockService.getScriptLock();
+  let lockAcquired = false;
+
   try {
     lock.waitLock(30000);
+    lockAcquired = true;
   } catch (e) {
     Logger.log('❌ Lock timeout in updateBiddingPoints: ' + e.toString());
     return;
@@ -1267,7 +1276,7 @@ function updateBiddingPoints() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const bpSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
     if (!bpSheet) {
-      lock.releaseLock();
+      Logger.log('⚠️ BiddingPoints sheet not found');
       return;
     }
 
@@ -1333,7 +1342,9 @@ function updateBiddingPoints() {
 
     Logger.log(`✅ Updated bidding points for ${Object.keys(memberMap).length} members`);
   } finally {
-    lock.releaseLock();
+    if (lockAcquired) {
+      lock.releaseLock();
+    }
   }
 }
 
@@ -1376,6 +1387,65 @@ function getLootState() {
   const parsed = data ? JSON.parse(data) : {};
 
   return createResponse('ok', 'Loot state retrieved', { state: parsed });
+}
+
+/**
+ * Get historical prices from ForDistribution sheet
+ * Returns a map of item names to their starting prices
+ * Used for auto-pricing loot items based on past auctions
+ */
+function getHistoricalPrices(data) {
+  try {
+    Logger.log('📊 Fetching historical prices from ForDistribution...');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const forDistSheet = ss.getSheetByName('ForDistribution');
+
+    if (!forDistSheet) {
+      Logger.log('⚠️ ForDistribution sheet not found');
+      return createResponse('ok', 'No historical data available', { prices: {} });
+    }
+
+    const lastRow = forDistSheet.getLastRow();
+    if (lastRow < 2) {
+      Logger.log('⚠️ No data in ForDistribution sheet');
+      return createResponse('ok', 'No historical data available', { prices: {} });
+    }
+
+    // Read columns A (Item) and B (Start Price)
+    const dataRange = forDistSheet.getRange(2, 1, lastRow - 1, 2);
+    const values = dataRange.getValues();
+
+    const prices = {};
+    let itemCount = 0;
+
+    for (let i = 0; i < values.length; i++) {
+      const itemName = (values[i][0] || '').toString().trim();
+      const startPrice = values[i][1];
+
+      // Skip if item name is empty or start price is invalid
+      if (!itemName || itemName.length < 3) continue;
+      if (startPrice === '' || startPrice === null || startPrice === undefined) continue;
+
+      const priceNum = Number(startPrice);
+      if (isNaN(priceNum) || priceNum <= 0) continue;
+
+      // Use the most recent price for each item (last occurrence wins)
+      prices[itemName] = priceNum;
+      itemCount++;
+    }
+
+    Logger.log(`✅ Loaded ${Object.keys(prices).length} unique items with historical prices`);
+
+    return createResponse('ok', 'Historical prices fetched', {
+      prices: prices,
+      totalItems: Object.keys(prices).length
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error fetching historical prices: ' + err.toString());
+    return createResponse('error', err.toString(), { prices: {} });
+  }
 }
 
 // ATTENDANCE STATE MANAGEMENT (Memory optimization for Koyeb)
