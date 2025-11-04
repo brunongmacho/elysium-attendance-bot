@@ -2518,25 +2518,25 @@ function stopCleanupSchedule() {
 
 // MODULE EXPORTS
 module.exports = {
-  startItemAuction,
+  // startItemAuction - REMOVED: Not used anywhere
   initializeBidding,
   loadBiddingState: load,
   saveBiddingState: save,
   getBiddingState: () => st,
-  hasElysiumRole: hasRole,
-  isAdmin: isAdm,
-  getCachedPoints: getPts,
-  loadPointsCache: loadCache,
-  clearPointsCache: clearCache,
+  // hasElysiumRole: hasRole - REMOVED: Not used anywhere
+  // isAdmin: isAdm - REMOVED: Not used anywhere
+  // getCachedPoints: getPts - REMOVED: Not used anywhere
+  // loadPointsCache: loadCache - REMOVED: Not used anywhere
+  // clearPointsCache: clearCache - REMOVED: Not used anywhere
   handleCommand: handleCmd,
-  loadPointsCacheForAuction: loadPointsCacheForAuction,
+  // loadPointsCacheForAuction - REMOVED: Not used anywhere
   submitSessionTally: submitSessionTally,
   loadBiddingStateFromSheet: loadBiddingStateFromSheet,
-  saveBiddingStateToSheet: saveBiddingStateToSheet,
-  cleanupPendingConfirmations,
-  startCleanupSchedule,
-  stopCleanupSchedule,
-  stopCacheAutoRefresh,
+  saveBiddingStateToSheet: saveBiddingStateToSheet, // Used internally
+  // cleanupPendingConfirmations - REMOVED: Not used anywhere
+  startCleanupSchedule, // Used internally by initializeBidding
+  // stopCleanupSchedule - REMOVED: Not used anywhere
+  stopCacheAutoRefresh, // Used internally by startCleanupSchedule
 
   confirmBid: async function (reaction, user, config) {
     const p = st.pc[reaction.message.id];

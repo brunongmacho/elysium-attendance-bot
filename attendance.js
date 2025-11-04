@@ -821,22 +821,22 @@ function schedulePeriodicStateSync() {
 module.exports = {
   initialize,
   getCurrentTimestamp,
-  getSundayOfWeek,
+  getSundayOfWeek, // Used internally by saveAttendanceStateToSheet
   formatUptime,
   findBossMatch,
-  parseThreadName,
+  parseThreadName, // Used internally by recoverStateFromThreads
   postToSheet,
-  checkColumnExists,
+  checkColumnExists, // Used internally by createSpawnThreads
   removeAllReactionsWithRetry,
   cleanupAllThreadReactions,
   createSpawnThreads,
   recoverStateFromThreads,
   validateStateConsistency,
-  loadAttendanceForBoss,
+  // loadAttendanceForBoss - REMOVED: Not used anywhere
   saveAttendanceStateToSheet,
   loadAttendanceStateFromSheet,
   schedulePeriodicStateSync,
-  cleanupStaleEntries,
+  cleanupStaleEntries, // Used internally by schedulePeriodicStateSync
   getActiveSpawns: () => activeSpawns,
   getActiveColumns: () => activeColumns,
   getPendingVerifications: () => pendingVerifications,

@@ -2285,12 +2285,12 @@ module.exports = {
   initialize,
   itemEnd,
   startAuctioneering,
-  auctionNextItem,
+  auctionNextItem, // Used internally by startAuctioneering and itemEnd
   endAuctionSession,
   getAuctionState: () => auctionState,
-  canUserBid,
+  // canUserBid - REMOVED: Not used anywhere
   setPostToSheet,
-  getPostToSheet,
+  getPostToSheet, // Used internally by startAuctioneering
   pauseSession,
   resumeSession,
   stopCurrentItem,
@@ -2305,5 +2305,5 @@ module.exports = {
   handleSkipItem,
   handleForceSubmitResults,
   handleMoveToDistribution,
-  getCurrentSessionBoss: () => currentSessionBoss,
+  // getCurrentSessionBoss: () => currentSessionBoss - REMOVED: Not used anywhere
 };
