@@ -1133,17 +1133,16 @@ async function itemEnd(client, config, channel) {
       console.error(`${EMOJI.ERROR} Failed to log auction result:`, err);
     }
 
-    // 🧩 Add to session history
-    auctionState.sessionItems.push({
-      item: item.item,
-      winner: item.curWin,
-      winnerId: item.curWinId,
-      amount: item.curBid,
-      source: item.source,
-      timestamp,
-      auctionStartTime: item.auctionStartTime,
-      auctionEndTime: endTimeStr,
-    });
+    // 🧩 Update item in queue array with winner info (don't push, or it loops forever!)
+    // The item is already in sessionItems at currentItemIndex, just add winner fields
+    const currentItem = auctionState.sessionItems[auctionState.currentItemIndex];
+    if (currentItem) {
+      currentItem.winner = item.curWin;
+      currentItem.winnerId = item.curWinId;
+      currentItem.amount = item.curBid;
+      currentItem.timestamp = timestamp;
+      currentItem.auctionEndTime = endTimeStr;
+    }
   } else {
     // ⚠️ NO WINNER
     await channel.send({
@@ -1670,6 +1669,32 @@ function clearAllTimers() {
     clearInterval(t);
   });
   auctionState.timers = {};
+}
+
+/**
+ * Reschedule item timers after time extension
+ * This is critical when bids extend the auction time - we need to clear
+ * old timers and create new ones based on the updated endTime
+ */
+function rescheduleItemTimers(client, config, channel) {
+  if (!auctionState.active || !auctionState.currentItem) {
+    console.warn(`${EMOJI.WARNING} Cannot reschedule timers - no active item`);
+    return false;
+  }
+
+  // Clear existing item timers
+  const timerKeys = ['go1', 'go2', 'go3', 'itemEnd'];
+  timerKeys.forEach(key => {
+    if (auctionState.timers[key]) {
+      clearTimeout(auctionState.timers[key]);
+      delete auctionState.timers[key];
+    }
+  });
+
+  // Reschedule based on new endTime
+  scheduleItemTimers(client, config, channel);
+  console.log(`${EMOJI.SUCCESS} Item timers rescheduled for ${auctionState.currentItem.item}`);
+  return true;
 }
 
 function getAuctionState() {
@@ -2664,6 +2689,7 @@ module.exports = {
   stopCurrentItem,
   extendCurrentItem,
   updateCurrentItemState,
+  rescheduleItemTimers, // Reschedule timers after bid extension
   handleQueueList,
   handleRemoveItem,
   handleClearQueue,

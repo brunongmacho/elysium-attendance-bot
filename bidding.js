@@ -1046,8 +1046,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
         }\n\n` +
         `⚠️ **By confirming, you agree to:**\n` +
         `• Lock ${needed}pts from your available points\n` +
-        `• ${isSelf ? "Increase" : "Place"} your bid to ${bid}pts\n` +
-        `• Lose points if you win but didn't attend`
+        `• ${isSelf ? "Increase" : "Place"} your bid to ${bid}pts`
     )
     .addFields(
       { name: `${EMOJI.BID} Your Bid`, value: `${bid}pts`, inline: true },
@@ -1099,12 +1098,21 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 
   let countdown = 10;
   const countdownInterval = setInterval(async () => {
-    countdown--;
-    if (countdown > 0 && countdown <= 10 && st.pc[conf.id]) {
-      const updatedEmbed = EmbedBuilder.from(confEmbed).setFooter({
-        text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • ${countdown}s remaining`,
-      });
-      await errorHandler.safeEdit(conf, { embeds: [updatedEmbed] }, 'message edit');
+    try {
+      countdown--;
+      if (countdown > 0 && countdown <= 10 && st.pc[conf.id]) {
+        const updatedEmbed = EmbedBuilder.from(confEmbed).setFooter({
+          text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • ${countdown}s remaining`,
+        });
+        await errorHandler.safeEdit(conf, { embeds: [updatedEmbed] }, 'message edit');
+      }
+    } catch (err) {
+      // Handle archived thread or deleted message errors
+      console.warn(`⚠️ Countdown interval error (${conf.id}):`, err.message);
+      clearInterval(countdownInterval);
+      if (st.th[`countdown_${conf.id}`]) {
+        delete st.th[`countdown_${conf.id}`];
+      }
     }
   }, 1000);
 
@@ -1218,8 +1226,7 @@ async function procBid(msg, amt, cfg) {
         }\n\n` +
         `⚠️ **By confirming, you agree to:**\n` +
         `• Lock ${needed}pts from your available points\n` +
-        `• ${isSelf ? "Increase" : "Place"} your bid to ${bid}pts\n` +
-        `• Lose points if you win but didn't attend`
+        `• ${isSelf ? "Increase" : "Place"} your bid to ${bid}pts`
     )
     .addFields(
       { name: `${EMOJI.BID} Your Bid`, value: `${bid}pts`, inline: true },
@@ -1269,12 +1276,21 @@ async function procBid(msg, amt, cfg) {
   // Countdown timer
   let countdown = 10;
   const countdownInterval = setInterval(async () => {
-    countdown--;
-    if (countdown > 0 && countdown <= 10 && st.pc[conf.id]) {
-      const updatedEmbed = EmbedBuilder.from(confEmbed).setFooter({
-        text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • ${countdown}s remaining`,
-      });
-      await errorHandler.safeEdit(conf, { embeds: [updatedEmbed] }, 'message edit');
+    try {
+      countdown--;
+      if (countdown > 0 && countdown <= 10 && st.pc[conf.id]) {
+        const updatedEmbed = EmbedBuilder.from(confEmbed).setFooter({
+          text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • ${countdown}s remaining`,
+        });
+        await errorHandler.safeEdit(conf, { embeds: [updatedEmbed] }, 'message edit');
+      }
+    } catch (err) {
+      // Handle archived thread or deleted message errors
+      console.warn(`⚠️ Countdown interval error (${conf.id}):`, err.message);
+      clearInterval(countdownInterval);
+      if (st.th[`countdown_${conf.id}`]) {
+        delete st.th[`countdown_${conf.id}`];
+      }
     }
   }, 1000);
 
@@ -2488,6 +2504,15 @@ module.exports = {
         console.log(
           `⏰ Time extended for ${currentItem.item} by 1 minute (bid in final minute, ext #${currentItem.extCnt})`
         );
+
+        // CRITICAL: Reschedule timers to reflect new endTime
+        if (p.auctRef && typeof p.auctRef.rescheduleItemTimers === "function") {
+          p.auctRef.rescheduleItemTimers(
+            reaction.client,
+            config,
+            reaction.message.channel
+          );
+        }
       }
 
       // Update via auctioneering module
@@ -2709,6 +2734,9 @@ module.exports = {
       console.log(
         `⏰ Time extended for ${a.item} by 1 minute (bid in final minute)`
       );
+
+      // CRITICAL: Reschedule timers to reflect new endTime
+      schedTimers(reaction.client, config);
     }
 
     if (st.th[`c_${reaction.message.id}`]) {
