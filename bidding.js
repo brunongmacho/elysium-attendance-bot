@@ -1036,108 +1036,154 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     return { ok: false, msg: "Insufficient" };
   }
 
-  const confEmbed = new EmbedBuilder()
-    .setColor(COLORS.AUCTION)
-    .setTitle(`${EMOJI.CLOCK} Confirm Your Bid`)
-    .setDescription(
-      `**Item:** ${currentItem.item}\n` +
-        `**Action:** ${
-          isSelf ? "Increase your bid" : "Place bid and lock points"
-        }\n\n` +
-        `⚠️ **By confirming, you agree to:**\n` +
-        `• Lock ${needed}pts from your available points\n` +
-        `• ${isSelf ? "Increase" : "Place"} your bid to ${bid}pts`
-    )
-    .addFields(
-      { name: `${EMOJI.BID} Your Bid`, value: `${bid}pts`, inline: true },
-      {
-        name: `${EMOJI.CHART} Current High`,
-        value: `${currentItem.curBid}pts`,
-        inline: true,
-      },
-      { name: `💳 Points After`, value: `${av - needed}pts left`, inline: true }
+  // ==========================================
+  // INSTANT BIDDING - NO CONFIRMATIONS
+  // Bids process immediately with 3s rate limit spam protection
+  // ==========================================
+
+  // Update rate limit immediately to prevent rapid-fire bids
+  st.lb[uid] = now;
+
+  // Handle previous winner (unlock their points)
+  if (currentItem.curWin && !isSelf) {
+    unlock(currentItem.curWin, currentItem.curBid);
+  }
+
+  // Lock the new bid
+  lock(u, needed);
+
+  // Store previous bid for display
+  const prevBid = currentItem.curBid;
+
+  // Update current item
+  currentItem.curBid = bid;
+  currentItem.curWin = u;
+  currentItem.curWinId = uid;
+
+  if (!currentItem.bids) currentItem.bids = [];
+  currentItem.bids.push({
+    user: u,
+    userId: uid,
+    amount: bid,
+    timestamp: now,
+  });
+
+  // Check if bid is in last minute - extend time by 1 minute
+  const timeLeft = currentItem.endTime - Date.now();
+  if (!currentItem.extCnt) currentItem.extCnt = 0;
+
+  let timeExtended = false;
+  if (timeLeft < 60000 && timeLeft > 0 && currentItem.extCnt < ME) {
+    const extensionTime = 60000; // 1 minute
+    currentItem.endTime += extensionTime;
+    currentItem.extCnt++;
+    timeExtended = true;
+
+    console.log(
+      `⏰ Time extended for ${currentItem.item} by 1 minute (bid in final minute, ext #${currentItem.extCnt}/${ME})`
     );
 
-  if (isSelf) {
-    confEmbed.addFields({
-      name: `${EMOJI.FIRE} Self-Overbid Details`,
-      value: `Your current bid: ${currentItem.curBid}pts\nNew bid: ${bid}pts\n**Additional points needed: +${needed}pts**`,
-      inline: false,
+    // CRITICAL: Reschedule timers to reflect new endTime
+    if (auctRef && typeof auctRef.rescheduleItemTimers === "function") {
+      auctRef.rescheduleItemTimers(
+        msg.client,
+        config,
+        msg.channel
+      );
+    }
+  }
+
+  // Update via auctioneering module
+  if (auctRef && typeof auctRef.updateCurrentItemState === "function") {
+    auctRef.updateCurrentItemState({
+      curBid: bid,
+      curWin: u,
+      curWinId: uid,
+      bids: currentItem.bids,
     });
   }
 
-  confEmbed.setFooter({
-    text: `${EMOJI.SUCCESS} YES, PLACE BID / ${EMOJI.ERROR} NO, CANCEL • ${
-      isSelf ? "Overbidding yourself" : "Outbidding current leader"
-    } • 10s timeout`,
-  });
-
-  const conf = await msg.reply({
-    content: `<@${uid}> **CONFIRM YOUR BID - React below within 10 seconds**`,
-    embeds: [confEmbed],
-  });
-  await conf.react(EMOJI.SUCCESS);
-  await conf.react(EMOJI.ERROR);
-
-  st.pc[conf.id] = {
-    userId: uid,
-    username: u,
-    threadId: null,
-    amount: bid,
-    timestamp: now,
-    origMsgId: msg.id,
-    isSelf,
-    needed,
-    isAuctioneering: true,
-    auctStateRef: auctState,
-    auctRef: auctRef,
-  };
+  // Save state
   save();
 
-  st.lb[uid] = now;
+  // Send immediate confirmation to bidder
+  await msg.reply({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(COLORS.SUCCESS)
+        .setTitle(`${EMOJI.SUCCESS} Bid Placed!`)
+        .setDescription(`You're now the highest bidder on **${currentItem.item}**`)
+        .addFields(
+          {
+            name: `${EMOJI.BID} Your Bid`,
+            value: `${bid}pts`,
+            inline: true,
+          },
+          {
+            name: `${EMOJI.CHART} Previous`,
+            value: `${prevBid}pts`,
+            inline: true,
+          },
+          {
+            name: `💳 Available`,
+            value: `${av - needed}pts`,
+            inline: true,
+          }
+        )
+        .setFooter({
+          text: isSelf
+            ? `Self-overbid (+${needed}pts) • ${currentItem.extCnt}/${ME} extensions`
+            : `Locked ${needed}pts • ${currentItem.extCnt}/${ME} extensions`,
+        }),
+    ],
+  });
 
-  let countdown = 10;
-  const countdownInterval = setInterval(async () => {
-    try {
-      countdown--;
-      if (countdown > 0 && countdown <= 10 && st.pc[conf.id]) {
-        const updatedEmbed = EmbedBuilder.from(confEmbed).setFooter({
-          text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • ${countdown}s remaining`,
-        });
-        await errorHandler.safeEdit(conf, { embeds: [updatedEmbed] }, 'message edit');
+  // Announce to channel
+  const announceEmbed = new EmbedBuilder()
+    .setColor(COLORS.AUCTION)
+    .setTitle(`${EMOJI.FIRE} New High Bid!`)
+    .setDescription(`**${currentItem.item}**`)
+    .addFields(
+      {
+        name: `${EMOJI.BID} Amount`,
+        value: `${bid}pts`,
+        inline: true,
+      },
+      {
+        name: "👤 Bidder",
+        value: u,
+        inline: true
+      },
+      {
+        name: "⏱️ Time",
+        value: `${Math.ceil((currentItem.endTime - Date.now()) / 1000)}s remaining`,
+        inline: true,
       }
-    } catch (err) {
-      // Handle archived thread or deleted message errors
-      console.warn(`⚠️ Countdown interval error (${conf.id}):`, err.message);
-      clearInterval(countdownInterval);
-      if (st.th[`countdown_${conf.id}`]) {
-        delete st.th[`countdown_${conf.id}`];
-      }
-    }
-  }, 1000);
+    );
 
-  // Store countdown interval for cleanup
-  st.th[`countdown_${conf.id}`] = countdownInterval;
+  await msg.channel.send({ embeds: [announceEmbed] });
 
-  st.th[`c_${conf.id}`] = setTimeout(async () => {
-    clearInterval(st.th[`countdown_${conf.id}`]);
-    delete st.th[`countdown_${conf.id}`];
-    if (st.pc[conf.id]) {
-      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
-      const timeoutEmbed = EmbedBuilder.from(confEmbed)
-        .setColor(COLORS.INFO)
-        .setFooter({ text: `${EMOJI.CLOCK} Timed out` });
-      await errorHandler.safeEdit(conf, { embeds: [timeoutEmbed] }, 'message edit');
-      setTimeout(
-        async () => await errorHandler.safeDelete(conf, 'message deletion'),
-        TIMEOUTS.MESSAGE_DELETE
-      );
-      delete st.pc[conf.id];
-      save();
-    }
-  }, 10000);
+  // Announce time extension if it happened
+  if (timeExtended) {
+    await msg.channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0xffa500)
+          .setTitle(`⏰ Time Extended!`)
+          .setDescription(
+            `Bid placed in final minute - adding 1 more minute to the auction!`
+          )
+          .addFields({
+            name: "⏱️ New Time Remaining",
+            value: `${Math.ceil((currentItem.endTime - Date.now()) / 1000)}s`,
+            inline: true,
+          })
+          .setFooter({ text: `Extension ${currentItem.extCnt}/${ME}` }),
+      ],
+    });
+  }
 
-  return { ok: true, confId: conf.id };
+  return { ok: true, instant: true };
 }
 
 // BIDDING (OPTIMIZED)
