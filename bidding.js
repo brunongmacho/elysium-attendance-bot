@@ -84,7 +84,6 @@ const ERROR_MESSAGES = {
   AUCTION_IN_PROGRESS: `${EMOJI.WARNING} Auction start already in progress, please wait...`,
   AUCTION_ALREADY_RUNNING: `${EMOJI.ERROR} An auction is already running`,
   NO_ITEMS_QUEUED: `${EMOJI.ERROR} No items in queue`,
-  NO_ATTENDANCE: `${EMOJI.ERROR} You did not attend this boss. Only attendees can bid.`,
 };
 
 // Command aliases
@@ -1067,28 +1066,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     return { ok: false, msg: "No role" };
   }
 
-  // Attendance check (all items require attendance now)
-  const canBid = auctRef.canUserBid(u, currentSession);
-  if (!canBid) {
-    const bossName = currentSession.bossName || "this boss";
-    const errorMsg = await msg.channel.send(
-      `❌ <@${uid}> You didn't attend **${bossName}**. Only attendees can bid on this item.\n\n*This message will be deleted in 10 seconds.*`
-    );
-
-    try {
-      await msg.delete().catch(() => {});
-    } catch (e) {
-      console.warn(`⚠️ Could not delete bid message: ${e.message}`);
-    }
-
-    setTimeout(async () => {
-      await errorMsg.delete().catch(() => {});
-    }, 10000);
-
-    console.log(`❌ Bid rejected: ${u} didn't attend ${bossName}`);
-    return { ok: false, msg: "No attendance" };
-  }
-
+  // Attendance check removed - all ELYSIUM members can now bid freely
   const now = Date.now();
   if (st.lb[uid] && now - st.lb[uid] < 3000) {
     const wait = Math.ceil((3000 - (now - st.lb[uid])) / 1000);
