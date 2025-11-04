@@ -131,11 +131,90 @@ function parseLoots(ocrText) {
       loots.push({
         item: item,
         quantity: 1,
+        suggestedPrice: null, // Will be filled by fetchHistoricalPrices
       });
     }
   }
 
   return loots;
+}
+
+/**
+ * Fetch historical prices from ForDistribution tab
+ * @returns {Object} Map of item names to their last starting price
+ */
+async function fetchHistoricalPrices() {
+  try {
+    console.log('📊 Fetching historical prices from ForDistribution tab...');
+
+    const payload = {
+      action: "getHistoricalPrices"
+    };
+
+    const response = await fetch(config.sheet_webhook_url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.warn(`⚠️ Failed to fetch historical prices: HTTP ${response.status}`);
+      return {};
+    }
+
+    const data = await response.json();
+
+    if (data.status === "ok" && data.prices) {
+      console.log(`✅ Loaded ${Object.keys(data.prices).length} historical prices`);
+      return data.prices;
+    }
+
+    console.warn(`⚠️ No historical prices available`);
+    return {};
+  } catch (err) {
+    console.error(`❌ Error fetching historical prices:`, err.message);
+    return {};
+  }
+}
+
+/**
+ * Match loot items with historical prices
+ * @param {Array} loots - Array of loot objects
+ * @param {Object} historicalPrices - Map of item names to prices
+ * @returns {Array} Loots with suggested prices
+ */
+function matchHistoricalPrices(loots, historicalPrices) {
+  if (!historicalPrices || Object.keys(historicalPrices).length === 0) {
+    return loots;
+  }
+
+  return loots.map(loot => {
+    const itemLower = loot.item.toLowerCase().trim();
+
+    // Try exact match first
+    for (const [historicalItem, price] of Object.entries(historicalPrices)) {
+      if (historicalItem.toLowerCase().trim() === itemLower) {
+        return {
+          ...loot,
+          suggestedPrice: price
+        };
+      }
+    }
+
+    // Try partial match (item name contains or is contained in historical name)
+    for (const [historicalItem, price] of Object.entries(historicalPrices)) {
+      const histLower = historicalItem.toLowerCase().trim();
+      if (itemLower.includes(histLower) || histLower.includes(itemLower)) {
+        return {
+          ...loot,
+          suggestedPrice: price
+        };
+      }
+    }
+
+    // No match found
+    return loot;
+  });
 }
 
 function findBossMatch(input) {
@@ -290,6 +369,17 @@ async function handleLootCommand(message, args, client) {
     return;
   }
 
+  // Fetch historical prices and match with loot items
+  console.log('📊 Fetching historical prices for auto-pricing...');
+  const historicalPrices = await fetchHistoricalPrices();
+  const enrichedLoots = matchHistoricalPrices(allLoots, historicalPrices);
+
+  // Count how many items got suggested prices
+  const withPrices = enrichedLoots.filter(l => l.suggestedPrice !== null).length;
+  if (withPrices > 0) {
+    console.log(`✅ Found suggested prices for ${withPrices}/${enrichedLoots.length} items`);
+  }
+
   // Build result embed
   const resultEmbed = new EmbedBuilder()
     .setColor(0x4a90e2)
@@ -318,10 +408,12 @@ async function handleLootCommand(message, args, client) {
       {
         name: "🎁 Loot List",
         value:
-          allLoots
+          enrichedLoots
             .map(
               (l, i) =>
-                `${i + 1}. ${l.item}${l.quantity > 1 ? ` x${l.quantity}` : ""}`
+                `${i + 1}. ${l.item}${l.quantity > 1 ? ` x${l.quantity}` : ""}${
+                  l.suggestedPrice !== null ? ` 💰 **${l.suggestedPrice}pts**` : ""
+                }`
             )
             .join("\n") || "None",
         inline: false,
@@ -361,7 +453,7 @@ async function handleLootCommand(message, args, client) {
     if (reaction.emoji.name === EMOJI.SUCCESS) {
       // Submit to sheets
       await submitLootToSheet(
-        allLoots,
+        enrichedLoots,
         bossName,
         fullBossKey,
         dateStr,
@@ -405,12 +497,21 @@ async function submitLootToSheet(
     const bossKeyUpperCase = fullBossKey.toUpperCase();
 
     // Prepare payload for each loot item
-    const lootEntries = loots.map((loot) => ({
-      item: loot.item,
-      source: source, // "Loot" or "Guild Boss" (proper case)
-      quantity: loot.quantity,
-      boss: bossKeyUpperCase, // All uppercase
-    }));
+    const lootEntries = loots.map((loot) => {
+      const entry = {
+        item: loot.item,
+        source: source, // "Loot" or "Guild Boss" (proper case)
+        quantity: loot.quantity,
+        boss: bossKeyUpperCase, // All uppercase
+      };
+
+      // Include suggested price if available
+      if (loot.suggestedPrice !== null) {
+        entry.startingPrice = loot.suggestedPrice;
+      }
+
+      return entry;
+    });
 
     // Send to sheet webhook
     const payload = {
