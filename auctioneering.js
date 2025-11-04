@@ -257,6 +257,9 @@ async function saveAuctionState(url) {
 // REPLACE the entire startAuctioneering function (Line ~230 in auctioneering.js)
 // This version removes boss grouping and attendance requirements
 
+// REPLACE the entire startAuctioneering function (Line ~230 in auctioneering.js)
+// This version removes boss grouping and attendance requirements
+
 async function startAuctioneering(client, config, channel) {
   // Validate parameters
   if (!client || !config || !channel) {
@@ -269,23 +272,56 @@ async function startAuctioneering(client, config, channel) {
     return;
   }
 
-  if (![0, 5].includes(channel.type)) {
-    console.error(
-      `❌ Invalid channel type (${channel.type}) – must be text or announcement channel.`
-    );
+  // ✅ FIX: Always fetch the correct bidding channel from config
+  try {
     const guild = await client.guilds.fetch(config.main_guild_id);
-    channel = await guild.channels.fetch(config.bidding_channel_id);
-    console.log(
-      `✅ Recovered correct bidding channel: ${channel.name} (${channel.id})`
-    );
+    const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+    
+    // Use the fetched channel instead of the parameter
+    channel = biddingChannel;
+    
+    console.log(`✅ Using bidding channel: ${channel.name} (${channel.id}), Type: ${channel.type}`);
+    
+    // Validate it's a text channel
+    if (![0, 5].includes(channel.type)) {
+      console.error(`❌ Invalid channel type (${channel.type}) – must be text (0) or announcement (5)`);
+      await channel.send(`❌ Invalid channel type. This command must be run in the bidding channel.`);
+      return;
+    }
+  } catch (err) {
+    console.error(`❌ Failed to fetch bidding channel:`, err);
+    return;
   }
 
-  // Load points
-  const pointsFetched = await biddingModule.loadPointsCacheForAuction(
-    config.sheet_webhook_url
-  );
-  if (!pointsFetched) {
-    await channel.send(`❌ Failed to load points`);
+  // Load points cache
+  try {
+    const pointsResponse = await fetch(config.sheet_webhook_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'getBiddingPoints' }),
+    });
+    
+    if (!pointsResponse.ok) {
+      await channel.send(`❌ Failed to load points from server (HTTP ${pointsResponse.status})`);
+      return;
+    }
+    
+    const pointsData = await pointsResponse.json();
+    if (!pointsData.points) {
+      await channel.send(`❌ No points data received`);
+      return;
+    }
+    
+    // Store in bidding module's cache
+    const biddingState = biddingModule.getBiddingState();
+    biddingState.cp = pointsData.points;
+    biddingState.ct = Date.now();
+    biddingModule.saveBiddingState();
+    
+    console.log(`✅ Loaded ${Object.keys(pointsData.points).length} members' points`);
+  } catch (err) {
+    console.error(`❌ Failed to load points:`, err);
+    await channel.send(`❌ Failed to load points: ${err.message}`);
     return;
   }
 
@@ -306,7 +342,7 @@ async function startAuctioneering(client, config, channel) {
       winner.toString().trim() !== "";
 
     if (hasWinner) {
-      console.log(`⏭️ Skipping "${item.item}" - already has winner: ${winner}`);
+      console.log(`⭐ Skipping "${item.item}" - already has winner: ${winner}`);
     }
     return !hasWinner;
   });
