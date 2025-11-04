@@ -7,6 +7,7 @@
 const { EmbedBuilder } = require("discord.js");
 const fetch = require("node-fetch");
 const { Timeout } = require("timers");
+const errorHandler = require('./utils/error-handler');
 const {
   getCurrentTimestamp,
   getSundayOfWeek,
@@ -1488,7 +1489,7 @@ async function handleQueueList(message, biddingState) {
     return;
   }
 
-  await loadingMsg.delete().catch(() => {});
+  await errorHandler.safeDelete(loadingMsg, 'message deletion');
 
   if (sheetItems.length === 0) {
     return await message.reply(
@@ -1713,7 +1714,7 @@ async function handleMyPoints(message, biddingModule, config) {
   }
 
   try {
-    await message.delete().catch(() => {});
+    await errorHandler.safeDelete(message, 'message deletion');
   } catch (e) {
     console.warn(
       `${EMOJI.WARNING} Could not delete user message: ${e.message}`
@@ -1721,7 +1722,7 @@ async function handleMyPoints(message, biddingModule, config) {
   }
 
   setTimeout(async () => {
-    await ptsMsg.delete().catch(() => {});
+    await errorHandler.safeDelete(ptsMsg, 'message deletion');
   }, 30000);
 }
 
@@ -1843,7 +1844,7 @@ async function handleCancelItem(message) {
     });
 
     if (canCol.first().emoji.name === EMOJI.SUCCESS) {
-      await canMsg.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(canMsg, 'reaction removal');
       // Unlock points for current bidder
       const biddingState = biddingModule.getBiddingState();
       if (auctionState.currentItem && auctionState.currentItem.curWin) {
@@ -1910,10 +1911,10 @@ async function handleCancelItem(message) {
         await auctionNextItem(message.client, cfg, parentChannel);
       }, 20000);
     } else {
-      await canMsg.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(canMsg, 'reaction removal');
     }
   } catch (e) {
-    await canMsg.reactions.removeAll().catch(() => {});
+    await errorHandler.safeRemoveReactions(canMsg, 'reaction removal');
   }
 }
 
@@ -1948,7 +1949,7 @@ async function handleSkipItem(message) {
     });
 
     if (skpCol.first().emoji.name === EMOJI.SUCCESS) {
-      await skpMsg.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(skpMsg, 'reaction removal');
       // Unlock points for current bidder
       const biddingState = biddingModule.getBiddingState();
       if (auctionState.currentItem && auctionState.currentItem.curWin) {
@@ -2013,10 +2014,10 @@ async function handleSkipItem(message) {
         await auctionNextItem(message.client, cfg, parentChannel);
       }, 20000);
     } else {
-      await skpMsg.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(skpMsg, 'reaction removal');
     }
   } catch (e) {
-    await skpMsg.reactions.removeAll().catch(() => {});
+    await errorHandler.safeRemoveReactions(skpMsg, 'reaction removal');
   }
 }
 
@@ -2056,15 +2057,15 @@ async function handleForceSubmitResults(message, config, biddingModule) {
     });
 
     if (fsCol.first().emoji.name === EMOJI.SUCCESS) {
-      await fsMsg.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(fsMsg, 'reaction removal');
       await biddingModule.submitSessionTally(config, auctionState.sessionItems);
       await message.reply(`${EMOJI.SUCCESS} Results submitted!`);
       auctionState.sessionItems = [];
     } else {
-      await fsMsg.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(fsMsg, 'reaction removal');
     }
   } catch (e) {
-    await fsMsg.reactions.removeAll().catch(() => {});
+    await errorHandler.safeRemoveReactions(fsMsg, 'reaction removal');
   }
 }
 

@@ -16,6 +16,7 @@ const { EmbedBuilder } = require("discord.js");
 const fetch = require("node-fetch");
 const fs = require("fs");
 const { normalizeUsername } = require("./utils/common");
+const errorHandler = require('./utils/error-handler');
 
 let auctioneering = null;
 let cfg = null;
@@ -1191,7 +1192,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
       const updatedEmbed = EmbedBuilder.from(confEmbed).setFooter({
         text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • ${countdown}s remaining`,
       });
-      await conf.edit({ embeds: [updatedEmbed] }).catch(() => {});
+      await errorHandler.safeEdit(conf, { embeds: [updatedEmbed] }, 'message edit');
     }
   }, 1000);
 
@@ -1202,13 +1203,13 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     clearInterval(st.th[`countdown_${conf.id}`]);
     delete st.th[`countdown_${conf.id}`];
     if (st.pc[conf.id]) {
-      await conf.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
       const timeoutEmbed = EmbedBuilder.from(confEmbed)
         .setColor(COLORS.INFO)
         .setFooter({ text: `${EMOJI.CLOCK} Timed out` });
       await conf.edit({ embeds: [timeoutEmbed] });
       setTimeout(
-        async () => await conf.delete().catch(() => {}),
+        async () => await errorHandler.safeDelete(conf, 'message deletion'),
         TIMEOUTS.MESSAGE_DELETE
       );
       delete st.pc[conf.id];
@@ -1361,7 +1362,7 @@ async function procBid(msg, amt, cfg) {
       const updatedEmbed = EmbedBuilder.from(confEmbed).setFooter({
         text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • ${countdown}s remaining`,
       });
-      await conf.edit({ embeds: [updatedEmbed] }).catch(() => {});
+      await errorHandler.safeEdit(conf, { embeds: [updatedEmbed] }, 'message edit');
     }
   }, 1000);
 
@@ -1381,13 +1382,13 @@ async function procBid(msg, amt, cfg) {
     clearInterval(st.th[`countdown_${conf.id}`]);
     delete st.th[`countdown_${conf.id}`];
     if (st.pc[conf.id]) {
-      await conf.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
       const timeoutEmbed = EmbedBuilder.from(confEmbed)
         .setColor(getColor(COLORS.INFO))
         .setFooter({ text: `${EMOJI.CLOCK} Timed out` });
       await conf.edit({ embeds: [timeoutEmbed] });
       setTimeout(
-        async () => await conf.delete().catch(() => {}),
+        async () => await errorHandler.safeDelete(conf, 'message deletion'),
         TIMEOUTS.MESSAGE_DELETE
       );
       delete st.pc[conf.id];
@@ -1643,10 +1644,10 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           save();
           await msg.reply(`${EMOJI.SUCCESS} Reset (cache cleared)`);
         } else {
-          await rstMsg.reactions.removeAll().catch(() => {});
+          await errorHandler.safeRemoveReactions(rstMsg, 'reaction removal');
         }
       } catch (e) {
-        await rstMsg.reactions.removeAll().catch(() => {});
+        await errorHandler.safeRemoveReactions(rstMsg, 'reaction removal');
       }
       break;
 
@@ -1757,10 +1758,10 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             });
           }
         } else {
-          await fsMsg.reactions.removeAll().catch(() => {});
+          await errorHandler.safeRemoveReactions(fsMsg, 'reaction removal');
         }
       } catch (e) {
-        await fsMsg.reactions.removeAll().catch(() => {});
+        await errorHandler.safeRemoveReactions(fsMsg, 'reaction removal');
       }
       break;
 
@@ -1798,7 +1799,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           await msg.channel.send(
             `${EMOJI.ERROR} **${st.a.item}** canceled. Points refunded.`
           );
-          await msg.channel.setArchived(true, "Canceled").catch(() => {});
+          await msg.channel.setArchived(true, "Canceled").catch(errorHandler.safeCatch('thread archive'));
           st.a = null;
           save();
           // Manual queue removed - cancel just ends current item
@@ -1806,10 +1807,10 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             `${EMOJI.INFO} Item cancelled. Use !endauction to end the entire session.`
           );
         } else {
-          await canMsg.reactions.removeAll().catch(() => {});
+          await errorHandler.safeRemoveReactions(canMsg, 'reaction removal');
         }
       } catch (e) {
-        await canMsg.reactions.removeAll().catch(() => {});
+        await errorHandler.safeRemoveReactions(canMsg, 'reaction removal');
       }
       break;
 
@@ -1845,7 +1846,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           Object.values(st.th).forEach((h) => clearTimeout(h));
           if (st.a.curWin) unlock(st.a.curWin, st.a.curBid);
           await msg.channel.send(`⏭️ **${st.a.item}** skipped (no sale).`);
-          await msg.channel.setArchived(true, "Skipped").catch(() => {});
+          await msg.channel.setArchived(true, "Skipped").catch(errorHandler.safeCatch('thread archive'));
           st.a = null;
           save();
           // Manual queue removed - skip just ends current item
@@ -1853,10 +1854,10 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             `${EMOJI.INFO} Item skipped. Use !endauction to end the entire session.`
           );
         } else {
-          await skpMsg.reactions.removeAll().catch(() => {});
+          await errorHandler.safeRemoveReactions(skpMsg, 'reaction removal');
         }
       } catch (e) {
-        await skpMsg.reactions.removeAll().catch(() => {});
+        await errorHandler.safeRemoveReactions(skpMsg, 'reaction removal');
       }
       break;
 
@@ -1927,7 +1928,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
       // DELETE USER MESSAGE IMMEDIATELY + DELETE REPLY AFTER 30s
       try {
-        await msg.delete().catch(() => {});
+        await errorHandler.safeDelete(msg, 'message deletion');
       } catch (e) {
         console.warn(
           `${EMOJI.WARNING} Could not delete user message: ${e.message}`
@@ -1936,7 +1937,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
       // Delete reply embed after 30s
       setTimeout(async () => {
-        await ptsMsg.delete().catch(() => {});
+        await errorHandler.safeDelete(ptsMsg, 'message deletion');
       }, 30000);
       break;
 
@@ -2000,7 +2001,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           );
           st.lp = {};
           save();
-          await fixMsg.reactions.removeAll().catch(() => {});
+          await errorHandler.safeRemoveReactions(fixMsg, 'reaction removal');
           await msg.reply({
             embeds: [
               new EmbedBuilder()
@@ -2016,10 +2017,10 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             ],
           });
         } else {
-          await fixMsg.reactions.removeAll().catch(() => {});
+          await errorHandler.safeRemoveReactions(fixMsg, 'reaction removal');
         }
       } catch (e) {
-        await fixMsg.reactions.removeAll().catch(() => {});
+        await errorHandler.safeRemoveReactions(fixMsg, 'reaction removal');
       }
       break;
 
@@ -2155,7 +2156,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         });
 
         if (resetCol.first().emoji.name === EMOJI.SUCCESS) {
-          await resetConfirmMsg.reactions.removeAll().catch(() => {});
+          await errorHandler.safeRemoveReactions(resetConfirmMsg, 'reaction removal');
 
           // Stop all timers
           Object.values(st.th).forEach((h) => clearTimeout(h));
@@ -2238,11 +2239,11 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             ],
           });
         } else {
-          await resetConfirmMsg.reactions.removeAll().catch(() => {});
+          await errorHandler.safeRemoveReactions(resetConfirmMsg, 'reaction removal');
           await msg.reply(`${EMOJI.INFO} Reset cancelled`);
         }
       } catch (e) {
-        await resetConfirmMsg.reactions.removeAll().catch(() => {});
+        await errorHandler.safeRemoveReactions(resetConfirmMsg, 'reaction removal');
         await msg.reply(`${EMOJI.INFO} Reset timed out (cancelled)`);
       }
       break;
@@ -2288,7 +2289,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         });
 
         const choice = recoveryCol.first().emoji.name;
-        await recoveryMsg.reactions.removeAll().catch(() => {});
+        await errorHandler.safeRemoveReactions(recoveryMsg, 'reaction removal');
 
         if (choice === "1️⃣") {
           // Clear stuck state
@@ -2357,7 +2358,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           await msg.reply(`${EMOJI.INFO} Recovery cancelled`);
         }
       } catch (e) {
-        await recoveryMsg.reactions.removeAll().catch(() => {});
+        await errorHandler.safeRemoveReactions(recoveryMsg, 'reaction removal');
         await msg.reply(`${EMOJI.INFO} Recovery timed out (cancelled)`);
       }
       break;
@@ -2744,7 +2745,7 @@ module.exports = {
         const orig = await reaction.message.channel.messages
           .fetch(p.origMsgId)
           .catch(() => null);
-        if (orig) await orig.delete().catch(() => {});
+        if (orig) await errorHandler.safeDelete(orig, 'message deletion');
       }
 
       delete st.pc[reaction.message.id];
@@ -2962,7 +2963,7 @@ module.exports = {
       const orig = await reaction.message.channel.messages
         .fetch(p.origMsgId)
         .catch(() => null);
-      if (orig) await orig.delete().catch(() => {});
+      if (orig) await errorHandler.safeDelete(orig, 'message deletion');
     }
 
     delete st.pc[reaction.message.id];
@@ -3020,7 +3021,7 @@ module.exports = {
       const orig = await reaction.message.channel.messages
         .fetch(p.origMsgId)
         .catch(() => null);
-      if (orig) await orig.delete().catch(() => {});
+      if (orig) await errorHandler.safeDelete(orig, 'message deletion');
     }
 
     if (st.th[`c_${reaction.message.id}`]) {
