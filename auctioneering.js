@@ -2372,46 +2372,78 @@ async function handleMoveToDistribution(message, config, client) {
 // DAILY AUCTION SCHEDULER
 // ============================================
 
+// Scheduler state to prevent duplicates
+let dailyAuctionTimer = null;
+
 /**
  * Schedule daily auction at 8:30 PM GMT+8 (Asia/Manila timezone)
  * Automatically starts auction every day at the scheduled time
+ *
+ * FIXED: Proper timezone handling using UTC offset calculations
  */
 function scheduleDailyAuction(client, config) {
+  // Prevent duplicate schedulers
+  if (dailyAuctionTimer) {
+    console.log(`${EMOJI.WARNING} Daily auction scheduler already running, skipping initialization`);
+    return;
+  }
+
   console.log(`${EMOJI.CLOCK} Initializing daily auction scheduler...`);
 
   const calculateNext830PM = () => {
     const now = new Date();
-    const manila = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
 
-    const target = new Date(manila);
-    target.setHours(20, 30, 0, 0); // 8:30 PM
+    // GMT+8 offset in milliseconds
+    const GMT8_OFFSET = 8 * 60 * 60 * 1000;
 
-    // If it's already past 8:30 PM today, schedule for tomorrow
-    if (target.getTime() <= manila.getTime()) {
-      target.setDate(target.getDate() + 1);
+    // Get current time in GMT+8
+    const nowGMT8 = new Date(now.getTime() + GMT8_OFFSET);
+
+    // Set to 8:30 PM today in GMT+8
+    const targetGMT8 = new Date(nowGMT8);
+    targetGMT8.setUTCHours(20, 30, 0, 0);
+
+    // If already past 8:30 PM today, schedule for tomorrow
+    if (targetGMT8.getTime() <= nowGMT8.getTime()) {
+      targetGMT8.setUTCDate(targetGMT8.getUTCDate() + 1);
     }
 
-    return target;
+    // Convert back to UTC for the actual timer
+    const targetUTC = new Date(targetGMT8.getTime() - GMT8_OFFSET);
+
+    return targetUTC;
   };
 
   const scheduleNext = () => {
-    const next = calculateNext830PM();
+    const nextUTC = calculateNext830PM();
     const now = new Date();
-    const manila = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-    const delay = next.getTime() - manila.getTime();
+    const delay = nextUTC.getTime() - now.getTime();
 
-    console.log(`${EMOJI.CLOCK} Next daily auction scheduled for: ${next.toLocaleString('en-US', { timeZone: 'Asia/Manila' })} (in ${Math.round(delay / 1000 / 60)} minutes)`);
+    // Format for display in Manila time
+    const displayTime = new Date(nextUTC.getTime() + 8 * 60 * 60 * 1000);
+    const hours = Math.floor(delay / 1000 / 60 / 60);
+    const minutes = Math.floor((delay / 1000 / 60) % 60);
 
-    setTimeout(async () => {
+    console.log(`${EMOJI.CLOCK} Next daily auction scheduled for: ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${hours}h ${minutes}m)`);
+
+    dailyAuctionTimer = setTimeout(async () => {
       console.log(`${EMOJI.AUCTION} Daily auction time! Starting auction...`);
 
       try {
+        // Check if auction is already running
+        if (auctionState.active) {
+          console.log(`${EMOJI.WARNING} Auction already running, skipping scheduled start`);
+          scheduleNext();
+          return;
+        }
+
         // Fetch the bidding channel
         const guild = await client.guilds.fetch(config.main_guild_id);
         const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
 
         if (!biddingChannel) {
           console.error(`${EMOJI.ERROR} Could not fetch bidding channel for scheduled auction`);
+          scheduleNext();
           return;
         }
 
@@ -2445,7 +2477,7 @@ function scheduleDailyAuction(client, config) {
   };
 
   scheduleNext();
-  console.log(`${EMOJI.SUCCESS} Daily auction scheduler initialized`);
+  console.log(`${EMOJI.SUCCESS} Daily auction scheduler initialized (8:30 PM GMT+8)`);
 }
 
 module.exports = {

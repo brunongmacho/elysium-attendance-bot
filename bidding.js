@@ -1119,7 +1119,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
       const timeoutEmbed = EmbedBuilder.from(confEmbed)
         .setColor(COLORS.INFO)
         .setFooter({ text: `${EMOJI.CLOCK} Timed out` });
-      await conf.edit({ embeds: [timeoutEmbed] });
+      await errorHandler.safeEdit(conf, { embeds: [timeoutEmbed] }, 'message edit');
       setTimeout(
         async () => await errorHandler.safeDelete(conf, 'message deletion'),
         TIMEOUTS.MESSAGE_DELETE
@@ -1298,7 +1298,7 @@ async function procBid(msg, amt, cfg) {
       const timeoutEmbed = EmbedBuilder.from(confEmbed)
         .setColor(getColor(COLORS.INFO))
         .setFooter({ text: `${EMOJI.CLOCK} Timed out` });
-      await conf.edit({ embeds: [timeoutEmbed] });
+      await errorHandler.safeEdit(conf, { embeds: [timeoutEmbed] }, 'message edit');
       setTimeout(
         async () => await errorHandler.safeDelete(conf, 'message deletion'),
         TIMEOUTS.MESSAGE_DELETE
@@ -2507,7 +2507,7 @@ module.exports = {
       }
 
       // Send confirmation
-      await reaction.message.edit({
+      await errorHandler.safeEdit(reaction.message, {
         embeds: [
           new EmbedBuilder()
             .setColor(getColor(COLORS.SUCCESS))
@@ -2529,7 +2529,7 @@ module.exports = {
               text: p.isSelf ? `Self-overbid (+${p.needed}pts)` : "Good luck!",
             }),
         ],
-      });
+      }, 'message edit');
       await reaction.message.reactions.removeAll().catch(() => {});
 
       await reaction.message.channel.send({
@@ -2716,7 +2716,7 @@ module.exports = {
       delete st.th[`c_${reaction.message.id}`];
     }
 
-    await reaction.message.edit({
+    await errorHandler.safeEdit(reaction.message, {
       embeds: [
         new EmbedBuilder()
           .setColor(getColor(COLORS.SUCCESS))
@@ -2747,7 +2747,7 @@ module.exports = {
               : "Good luck!",
           }),
       ],
-    });
+    }, 'message edit');
     await reaction.message.reactions.removeAll().catch(() => {});
 
     await reaction.message.channel.send({
@@ -2814,14 +2814,14 @@ module.exports = {
       return;
     }
 
-    await reaction.message.edit({
+    await errorHandler.safeEdit(reaction.message, {
       embeds: [
         new EmbedBuilder()
           .setColor(getColor(COLORS.INFO))
           .setTitle(`${EMOJI.ERROR} Bid Canceled`)
           .setDescription("Not placed"),
       ],
-    });
+    }, 'message edit');
     await reaction.message.reactions.removeAll().catch(() => {});
     setTimeout(
       async () => await reaction.message.delete().catch(() => {}),
