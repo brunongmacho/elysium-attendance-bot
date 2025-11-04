@@ -438,11 +438,6 @@ async function startAuctioneering(client, config, channel) {
   }, 30000); // 30 seconds preview
 }
 
-function canUserBid(username, currentSession) {
-  // No attendance required - all ELYSIUM members can bid
-  return true;
-}
-
 // REPLACE the entire auctionNextItem function (Line ~400 in auctioneering.js)
 // This version removes session/boss logic - just processes items linearly
 
