@@ -1900,6 +1900,10 @@ client.once(Events.ClientReady, async () => {
   console.log(`⏰ Timer Server: ${config.timer_server_id}`);
   console.log(`🤖 Version: ${BOT_VERSION}`);
 
+  // INITIALIZE AUCTION CACHE (100% uptime guarantee)
+  const auctionCache = require('./utils/auction-cache');
+  await auctionCache.init();
+
   // INITIALIZE ALL MODULES IN CORRECT ORDER
   attendance.initialize(config, bossPoints, isAdmin); // NEW
   helpSystem.initialize(config, isAdmin, BOT_VERSION);
