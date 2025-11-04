@@ -22,6 +22,7 @@ const attendance = require("./attendance.js");
 const lootSystem = require("./loot-system.js");
 const emergencyCommands = require("./emergency-commands.js");
 const leaderboardSystem = require("./leaderboard-system.js");
+const errorHandler = require('./utils/error-handler');
 
 const COMMAND_ALIASES = {
   // Help commands
@@ -520,7 +521,7 @@ async function cleanupBiddingChannel() {
 
           // DELETE: Non-admin, non-bot messages
           try {
-            await message.delete().catch(() => {});
+            await errorHandler.safeDelete(message, 'message deletion');
             messagesDeleted++;
 
             // Rate limit: 1 delete per 500ms to avoid Discord API issues
@@ -707,8 +708,8 @@ const commandHandlers = {
             await msg.channel.send(
               `❌ <@${user.id}> Auction item no longer active`
             );
-            await msg.reactions.removeAll().catch(() => {});
-            await msg.delete().catch(() => {});
+            await errorHandler.safeRemoveReactions(msg, 'reaction removal');
+            await errorHandler.safeDelete(msg, 'message deletion');
             delete biddingState.pc[msg.id];
             bidding.saveBiddingState();
             return;
@@ -718,8 +719,8 @@ const commandHandlers = {
             await msg.channel.send(
               `❌ <@${user.id}> Bid invalid. Current: ${currentItem.curBid}pts`
             );
-            await msg.reactions.removeAll().catch(() => {});
-            await msg.delete().catch(() => {});
+            await errorHandler.safeRemoveReactions(msg, 'reaction removal');
+            await errorHandler.safeDelete(msg, 'message deletion');
             delete biddingState.pc[msg.id];
             bidding.saveBiddingState();
             return;
@@ -834,7 +835,7 @@ const commandHandlers = {
                 }),
             ],
           });
-          await msg.reactions.removeAll().catch(() => {});
+          await errorHandler.safeRemoveReactions(msg, 'reaction removal');
 
           await msg.channel.send({
             embeds: [
@@ -856,12 +857,12 @@ const commandHandlers = {
             ],
           });
 
-          setTimeout(async () => await msg.delete().catch(() => {}), 5000);
+          setTimeout(async () => await errorHandler.safeDelete(msg, 'message deletion'), 5000);
           if (pendingBid.origMsgId) {
             const orig = await msg.channel.messages
               .fetch(pendingBid.origMsgId)
               .catch(() => null);
-            if (orig) await orig.delete().catch(() => {});
+            if (orig) await errorHandler.safeDelete(orig, 'message deletion');
           }
 
           delete biddingState.pc[msg.id];
@@ -883,14 +884,14 @@ const commandHandlers = {
                 .setDescription("Not placed"),
             ],
           });
-          await msg.reactions.removeAll().catch(() => {});
-          setTimeout(async () => await msg.delete().catch(() => {}), 3000);
+          await errorHandler.safeRemoveReactions(msg, 'reaction removal');
+          setTimeout(async () => await errorHandler.safeDelete(msg, 'message deletion'), 3000);
 
           if (pendingBid.origMsgId) {
             const orig = await msg.channel.messages
               .fetch(pendingBid.origMsgId)
               .catch(() => null);
-            if (orig) await orig.delete().catch(() => {});
+            if (orig) await errorHandler.safeDelete(orig, 'message deletion');
           }
 
           if (biddingState.th[`c_${msg.id}`]) {
@@ -1154,7 +1155,7 @@ const commandHandlers = {
                       `✅ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - ${spawnInfo.members.length} members recorded`
                     )
                     .catch(() => {});
-                  await confirmThread.delete().catch(() => {});
+                  await errorHandler.safeDelete(confirmThread, 'message deletion');
                 }
               }
 
@@ -1212,7 +1213,7 @@ const commandHandlers = {
                     .fetch(spawnInfo.confirmThreadId)
                     .catch(() => null);
                   if (confirmThread)
-                    await confirmThread.delete().catch(() => {});
+                    await errorHandler.safeDelete(confirmThread, 'message deletion');
                 }
 
                 await thread
@@ -1645,7 +1646,7 @@ const commandHandlers = {
 
       if (reaction.emoji.name === "✅") {
         // User confirmed - end the auction
-        await confirmMsg.reactions.removeAll().catch(() => {});
+        await errorHandler.safeRemoveReactions(confirmMsg, 'reaction removal');
 
         await message.reply(`🛑 Ending auction session immediately...`);
 
@@ -1688,7 +1689,7 @@ const commandHandlers = {
         executed = true;
 
         // User cancelled
-        await confirmMsg.reactions.removeAll().catch(() => {});
+        await errorHandler.safeRemoveReactions(confirmMsg, 'reaction removal');
         await message.reply(`❌ End auction canceled`);
       }
     } catch (error) {
@@ -1697,7 +1698,7 @@ const commandHandlers = {
       executed = true;
 
       // Timeout or other error
-      await confirmMsg.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(confirmMsg, 'reaction removal');
       await message.reply(`⏱️ Confirmation timeout - auction continues`);
     }
   },
@@ -2161,7 +2162,7 @@ client.on(Events.MessageCreate, async (message) => {
       // If not an admin, delete message immediately
       if (member && !isAdmin(member)) {
         try {
-          await message.delete().catch(() => {});
+          await errorHandler.safeDelete(message, 'message deletion');
           console.log(
             `🧹 Deleted non-admin message from ${message.author.username} in bidding channel`
           );
@@ -3194,7 +3195,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         delete pendingVerifications[msg.id];
         attendance.setPendingVerifications(pendingVerifications); // Sync
       } else if (reaction.emoji.name === "❌") {
-        await msg.delete().catch(() => {});
+        await errorHandler.safeDelete(msg, 'message deletion');
         await msg.channel.send(
           `<@${pending.authorId}>, your attendance was **denied** by ${user.username}. ` +
             `Please repost with a proper screenshot.`
@@ -3249,7 +3250,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
               await confirmThread.send(
                 `✅ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - ${spawnInfo.members.length} members`
               );
-              await confirmThread.delete().catch(() => {});
+              await errorHandler.safeDelete(confirmThread, 'message deletion');
             }
           }
 

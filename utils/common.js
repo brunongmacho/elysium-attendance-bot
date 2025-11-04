@@ -1,17 +1,25 @@
 /**
  * Common Utilities - Shared across all bot modules
  * Consolidates timestamp handling, formatting, and matching logic
+ * Enhanced with new centralized utilities for better performance and reliability
  */
 
 const levenshtein = require("fast-levenshtein");
+const { findBossMatchCached } = require('./cache-manager');
+const constants = require('./constants');
 
-// Timing constants
+// Legacy timing constants (kept for backward compatibility)
 const TIMING = {
   MIN_SHEET_DELAY: 1000,
   REACTION_RETRY_ATTEMPTS: 3,
   REACTION_RETRY_DELAY: 500,
   SUBMIT_DELAY: 2000,
 };
+
+// Export enhanced constants (prefer using these in new code)
+const TIMING_ENHANCED = constants.TIMING;
+const COLORS = constants.COLORS;
+const EMOJIS = constants.EMOJIS;
 
 /**
  * Get current timestamp in Manila timezone
@@ -127,46 +135,14 @@ function parseThreadName(name) {
 }
 
 /**
- * Find boss match with fuzzy matching
+ * Find boss match with fuzzy matching (with caching for performance)
  * @param {string} input - User input
  * @param {Object} bossPoints - Boss points database
  * @returns {string|null} Matched boss name
  */
 function findBossMatch(input, bossPoints) {
-  const q = input.toLowerCase().trim();
-
-  // Exact match first
-  for (const name of Object.keys(bossPoints)) {
-    if (name.toLowerCase() === q) return name;
-    const meta = bossPoints[name];
-    for (const alias of meta.aliases || []) {
-      if (alias.toLowerCase() === q) return name;
-    }
-  }
-
-  // Partial match (contains)
-  for (const name of Object.keys(bossPoints)) {
-    if (name.toLowerCase().includes(q) || q.includes(name.toLowerCase())) return name;
-    const meta = bossPoints[name];
-    for (const alias of meta.aliases || []) {
-      if (alias.toLowerCase().includes(q) || q.includes(alias.toLowerCase())) return name;
-    }
-  }
-
-  // Fuzzy match with adaptive threshold
-  let best = { name: null, dist: 999 };
-  for (const name of Object.keys(bossPoints)) {
-    const dist = levenshtein.get(q, name.toLowerCase());
-    if (dist < best.dist) best = { name, dist };
-    for (const alias of bossPoints[name].aliases || []) {
-      const d2 = levenshtein.get(q, alias.toLowerCase());
-      if (d2 < best.dist) best = { name, dist: d2 };
-    }
-  }
-
-  // Adaptive threshold: allow more errors for longer names
-  const maxAllowedDistance = Math.max(2, Math.floor(q.length / 4));
-  return best.dist <= maxAllowedDistance ? best.name : null;
+  // Use cached version for better performance
+  return findBossMatchCached(input, bossPoints);
 }
 
 /**
@@ -295,6 +271,7 @@ async function logErrorToAdmin(client, adminChannelId, options) {
 }
 
 module.exports = {
+  // Legacy exports (backward compatibility)
   TIMING,
   getCurrentTimestamp,
   getSundayOfWeek,
@@ -307,4 +284,10 @@ module.exports = {
   normalizeUsername,
   sleep,
   logErrorToAdmin,
+
+  // Enhanced exports (use these for new code)
+  TIMING_ENHANCED,
+  COLORS,
+  EMOJIS,
+  CONSTANTS: constants,
 };

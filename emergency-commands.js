@@ -5,6 +5,7 @@
  */
 
 const { EmbedBuilder } = require("discord.js");
+const errorHandler = require('./utils/error-handler');
 
 const EMOJI = {
   SUCCESS: "✅",
@@ -72,11 +73,11 @@ async function forceCloseAllAttendance(message) {
 
     if (collected.first().emoji.name === EMOJI.ERROR) {
       await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })] });
-      await conf.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
       return;
     }
 
-    await conf.reactions.removeAll().catch(() => {});
+    await errorHandler.safeRemoveReactions(conf, 'reaction removal');
 
     const guild = await message.client.guilds.fetch(config.main_guild_id);
     const attChannel = await guild.channels.fetch(config.attendance_channel_id);
@@ -134,7 +135,7 @@ async function forceCloseAllAttendance(message) {
   } catch (err) {
     if (err.message === "time") {
       await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })] });
-      await conf.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
     } else {
       console.error("Emergency close all error:", err);
       await message.reply(`${EMOJI.ERROR} Error: ${err.message}`);
@@ -222,11 +223,11 @@ async function forceEndAuction(message) {
 
     if (collected.first().emoji.name === EMOJI.ERROR) {
       await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })] });
-      await conf.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
       return;
     }
 
-    await conf.reactions.removeAll().catch(() => {});
+    await errorHandler.safeRemoveReactions(conf, 'reaction removal');
 
     // Check auctioneering first
     if (auctioneering) {
@@ -273,7 +274,7 @@ async function forceEndAuction(message) {
   } catch (err) {
     if (err.message === "time") {
       await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })] });
-      await conf.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
     } else {
       console.error("Emergency end auction error:", err);
       await message.reply(`${EMOJI.ERROR} Error: ${err.message}`);
@@ -320,11 +321,11 @@ async function unlockAllPoints(message) {
 
     if (collected.first().emoji.name === EMOJI.ERROR) {
       await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })] });
-      await conf.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
       return;
     }
 
-    await conf.reactions.removeAll().catch(() => {});
+    await errorHandler.safeRemoveReactions(conf, 'reaction removal');
 
     const totalUnlocked = Object.values(biddingState.lp).reduce((sum, pts) => sum + pts, 0);
 
@@ -345,7 +346,7 @@ async function unlockAllPoints(message) {
   } catch (err) {
     if (err.message === "time") {
       await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })] });
-      await conf.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
     } else {
       console.error("Emergency unlock error:", err);
       await message.reply(`${EMOJI.ERROR} Error: ${err.message}`);
@@ -388,11 +389,11 @@ async function clearPendingConfirmations(message) {
 
     if (collected.first().emoji.name === EMOJI.ERROR) {
       await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })] });
-      await conf.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
       return;
     }
 
-    await conf.reactions.removeAll().catch(() => {});
+    await errorHandler.safeRemoveReactions(conf, 'reaction removal');
 
     // Try to delete all pending confirmation messages
     const guild = message.guild;
@@ -406,7 +407,7 @@ async function clearPendingConfirmations(message) {
           if (thread) {
             const msg = await thread.messages.fetch(msgId).catch(() => null);
             if (msg) {
-              await msg.delete().catch(() => {});
+              await errorHandler.safeDelete(msg, 'message deletion');
               deletedCount++;
             }
           }
@@ -433,7 +434,7 @@ async function clearPendingConfirmations(message) {
   } catch (err) {
     if (err.message === "time") {
       await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })] });
-      await conf.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
     } else {
       console.error("Emergency clear confirmations error:", err);
       await message.reply(`${EMOJI.ERROR} Error: ${err.message}`);

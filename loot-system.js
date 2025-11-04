@@ -9,6 +9,7 @@ const Tesseract = require("tesseract.js");
 const sharp = require("sharp");
 const fs = require("fs");
 const fetch = require("node-fetch");
+const errorHandler = require('./utils/error-handler');
 
 const EMOJI = {
   SUCCESS: "✅",
@@ -369,13 +370,13 @@ async function handleLootCommand(message, args, client) {
         confirmMsg
       );
     } else {
-      await confirmMsg.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(confirmMsg, 'reaction removal');
       await message.reply(
         `${EMOJI.ERROR} Loot submission canceled. No data was saved.`
       );
     }
   } catch (err) {
-    await confirmMsg.reactions.removeAll().catch(() => {});
+    await errorHandler.safeRemoveReactions(confirmMsg, 'reaction removal');
     await message.reply(
       `${EMOJI.ERROR} Confirmation timed out. No data was saved.`
     );
@@ -462,7 +463,7 @@ async function submitLootToSheet(
     }
 
     // Remove reactions
-    await confirmMsg.reactions.removeAll().catch(() => {});
+    await errorHandler.safeRemoveReactions(confirmMsg, 'reaction removal');
 
     // Send success message with detailed info
     const successEmbed = new EmbedBuilder()
@@ -536,7 +537,7 @@ async function submitLootToSheet(
     console.error(`❌ Sheet submission error:`, err);
     console.error(`❌ Error stack:`, err.stack);
 
-    await confirmMsg.reactions.removeAll().catch(() => {});
+    await errorHandler.safeRemoveReactions(confirmMsg, 'reaction removal');
 
     const errorEmbed = new EmbedBuilder()
       .setColor(0xff0000)
