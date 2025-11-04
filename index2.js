@@ -12,7 +12,7 @@ const {
   EmbedBuilder,
 } = require("discord.js");
 const fetch = require("node-fetch");
-const levenshtein = require("fast-levenshtein");
+// levenshtein removed - fuzzy matching now in utils/common.js via utils/cache-manager.js
 const fs = require("fs");
 const http = require("http");
 const bidding = require("./bidding.js");
