@@ -2905,6 +2905,7 @@ client.on(Events.MessageCreate, async (message) => {
           "!resetbids",
           "!forcesubmitresults",
           "!endauction",
+          "!movetodistribution",
         ].includes(adminCmd)
       ) {
         console.log(`🎯 Processing auction command (${rawCmd} -> ${adminCmd})`);
@@ -2930,6 +2931,7 @@ client.on(Events.MessageCreate, async (message) => {
             "!forcesubmitresults",
             "!cancelitem",
             "!skipitem",
+            "!movetodistribution",
           ].includes(adminCmd)
         ) {
           const handler = adminCmd.slice(1); // Remove the "!"
@@ -2954,6 +2956,8 @@ client.on(Events.MessageCreate, async (message) => {
             await auctioneering.handleCancelItem(message);
           } else if (handler === "skipitem") {
             await auctioneering.handleSkipItem(message);
+          } else if (handler === "movetodistribution") {
+            await auctioneering.handleMoveToDistribution(message, config, client);
           }
         }
         // Everything else (!auction, !resetbids) goes to bidding.handleCommand

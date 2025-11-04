@@ -370,6 +370,75 @@ State Files:
 
 ---
 
+#### `!movetodistribution` ⭐ NEW
+**Purpose:** Manually move completed auction items to ForDistribution sheet
+**Location:** Bidding channel
+**Permissions:** Admin only
+
+**What It Does:**
+- Scans BiddingItems sheet for items with winners
+- Copies completed items to ForDistribution sheet
+- Deletes items from BiddingItems after successful copy
+- Provides detailed move report
+
+**When To Use:**
+- Automatic move failed during session finalization
+- Need to manually organize ForDistribution
+- Recovery after Google Sheets issues
+- Manual cleanup of completed auctions
+
+**Flow:**
+```
+Admin: !movetodistribution
+
+Bot: 🕐 Moving Items to ForDistribution
+     Scanning BiddingItems sheet...
+
+Bot: ✅ Items Moved Successfully
+     5 item(s) moved from BiddingItems to ForDistribution
+     2 item(s) skipped (no winner)
+     7 total items processed
+
+     Items with winners have been:
+     ✅ Copied to ForDistribution sheet
+     ✅ Removed from BiddingItems sheet
+
+     Items without winners remain in BiddingItems for future auctions.
+```
+
+**Features:**
+- ✅ **Retry Logic**: 3 attempts with exponential backoff (2s, 4s, 8s)
+- ✅ **Detailed Report**: Shows moved, skipped, and total counts
+- ✅ **Error Handling**: Clear error messages with troubleshooting steps
+- ✅ **Admin Logging**: Logs to admin channel with who triggered it
+
+**Error Handling:**
+If move fails after 3 attempts:
+```
+❌ Move Failed
+Failed to move items after 3 attempts.
+Error: HTTP 503
+
+⚠️ Possible Causes:
+• Google Sheets API timeout
+• Network connectivity issues
+• Sheet permissions problem
+• Webhook URL misconfigured
+
+📋 Manual Fix:
+Open Google Sheets and run:
+moveAllItemsWithWinnersToForDistribution()
+from the Apps Script editor (Extensions → Apps Script)
+```
+
+**Safety:**
+- ✅ Only moves items WITH winners
+- ✅ Items without winners stay in BiddingItems
+- ✅ Bottom-to-top scanning prevents row shift issues
+- ✅ No data loss (source only deleted after successful copy)
+
+---
+
 ### Member Commands
 
 #### `!bid <amount>`
@@ -563,6 +632,36 @@ Step 3: If still stuck
 - User must react faster
 - If auction in final 10s, auction pauses during confirmation
 - After timeout, user can bid again
+
+---
+
+#### ❌ ForDistribution Move Failed
+**Symptoms:**
+- Admin logs show "ForDistribution Move Failed"
+- Items remain in BiddingItems with winners
+- Automatic move during finalization didn't complete
+
+**Solution:**
+```
+Step 1: Verify the issue
+!auctionaudit
+(Check if session is truly ended)
+
+Step 2: Manually trigger move
+!movetodistribution
+
+Step 3: If still failing
+Open Google Sheets → Extensions → Apps Script
+Run: moveAllItemsWithWinnersToForDistribution()
+
+Step 4: Verify success
+Check ForDistribution sheet for moved items
+```
+
+**Prevention:**
+- Ensure stable internet during finalization
+- Don't close bot during session finalization
+- Monitor admin logs for move confirmation
 
 ---
 

@@ -1097,35 +1097,85 @@ async function finalizeSession(client, config, channel) {
 
   // STEP 3: Move all auctioned items to ForDistribution sheet
   console.log(`📦 Moving completed auction items to ForDistribution...`);
-  try {
-    const moveResponse = await fetch(config.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "moveAuctionedItemsToForDistribution" }),
-    });
 
-    if (moveResponse.ok) {
-      const moveData = await moveResponse.json();
-      console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution`);
+  // Retry logic with exponential backoff
+  const maxRetries = 3;
+  let moveSuccess = false;
+  let moveData = null;
+  let lastError = null;
 
-      // Get admin logs channel
-      const mainGuild = await client.guilds.fetch(config.main_guild_id);
-      const adminLogs = await mainGuild.channels
-        .fetch(config.admin_logs_channel_id)
-        .catch(() => null);
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`📦 Move attempt ${attempt}/${maxRetries}...`);
 
-      if (adminLogs && moveData.moved > 0) {
-        await adminLogs.send(
-          `📦 **Items Moved to ForDistribution:** ${moveData.moved} completed auction(s)`
-        );
+      const moveResponse = await fetch(config.sheet_webhook_url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "moveAuctionedItemsToForDistribution" }),
+      });
+
+      if (moveResponse.ok) {
+        moveData = await moveResponse.json();
+        console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution`);
+        moveSuccess = true;
+
+        // Get admin logs channel
+        const mainGuild = await client.guilds.fetch(config.main_guild_id);
+        const adminLogs = await mainGuild.channels
+          .fetch(config.admin_logs_channel_id)
+          .catch(() => null);
+
+        if (adminLogs && moveData.moved > 0) {
+          await adminLogs.send(
+            `📦 **Items Moved to ForDistribution:** ${moveData.moved} completed auction(s)`
+          );
+        }
+
+        // Success - break retry loop
+        break;
+      } else {
+        lastError = `HTTP ${moveResponse.status}`;
+        console.error(`⚠️ Move attempt ${attempt} failed: ${lastError}`);
+
+        // Retry with exponential backoff (2s, 4s, 8s)
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000;
+          console.log(`⏳ Retrying in ${delay/1000}s...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
-    } else {
-      console.error(
-        `⚠️ Failed to move items to ForDistribution: HTTP ${moveResponse.status}`
+    } catch (err) {
+      lastError = err.message;
+      console.error(`⚠️ Move attempt ${attempt} error:`, err);
+
+      // Retry with exponential backoff (2s, 4s, 8s)
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000;
+        console.log(`⏳ Retrying in ${delay/1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  // If all retries failed, notify admin
+  if (!moveSuccess) {
+    console.error(`❌ Failed to move items after ${maxRetries} attempts: ${lastError}`);
+
+    const mainGuild = await client.guilds.fetch(config.main_guild_id);
+    const adminLogs = await mainGuild.channels
+      .fetch(config.admin_logs_channel_id)
+      .catch(() => null);
+
+    if (adminLogs) {
+      await adminLogs.send(
+        `⚠️ **ForDistribution Move Failed**\n` +
+        `Failed to move items after ${maxRetries} attempts.\n` +
+        `**Error:** ${lastError}\n\n` +
+        `**Manual Fix:**\n` +
+        `Use \`!movetodistribution\` command to retry, or\n` +
+        `Run \`moveAllItemsWithWinnersToForDistribution()\` in Google Apps Script editor.`
       );
     }
-  } catch (err) {
-    console.error(`⚠️ Error moving items to ForDistribution:`, err);
   }
 
   // STEP 4: Send detailed summary to admin logs
@@ -2078,6 +2128,158 @@ async function endAuctionSession(client, config, channel) {
   console.log(`✅ Auction session ended successfully`);
 }
 
+async function handleMoveToDistribution(message, config, client) {
+  console.log(`📦 Admin triggered manual ForDistribution move...`);
+
+  try {
+    // Send processing message
+    const statusMsg = await message.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(COLORS.INFO)
+          .setTitle(`${EMOJI.CLOCK} Moving Items to ForDistribution`)
+          .setDescription(
+            `Scanning BiddingItems sheet for completed auctions...\n\n` +
+            `This may take a few seconds.`
+          ),
+      ],
+    });
+
+    // Call the Google Sheets function with retry logic
+    const maxRetries = 3;
+    let moveSuccess = false;
+    let moveData = null;
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`📦 Move attempt ${attempt}/${maxRetries}...`);
+
+        const moveResponse = await fetch(config.sheet_webhook_url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "moveAuctionedItemsToForDistribution" }),
+        });
+
+        if (moveResponse.ok) {
+          moveData = await moveResponse.json();
+          console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution`);
+          moveSuccess = true;
+          break; // Success - exit retry loop
+        } else {
+          lastError = `HTTP ${moveResponse.status}`;
+          console.error(`⚠️ Move attempt ${attempt} failed: ${lastError}`);
+
+          // Retry with exponential backoff (2s, 4s, 8s)
+          if (attempt < maxRetries) {
+            const delay = Math.pow(2, attempt) * 1000;
+            console.log(`⏳ Retrying in ${delay/1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      } catch (err) {
+        lastError = err.message;
+        console.error(`⚠️ Move attempt ${attempt} error:`, err);
+
+        // Retry with exponential backoff (2s, 4s, 8s)
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000;
+          console.log(`⏳ Retrying in ${delay/1000}s...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    // Update status message with result
+    if (moveSuccess) {
+      await statusMsg.edit({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLORS.SUCCESS)
+            .setTitle(`${EMOJI.SUCCESS} Items Moved Successfully`)
+            .setDescription(
+              `**${moveData.moved || 0} item(s)** moved from BiddingItems to ForDistribution\n\n` +
+              `**${moveData.skipped || 0} item(s)** skipped (no winner)\n` +
+              `**${moveData.total || 0} total items** processed`
+            )
+            .addFields({
+              name: `${EMOJI.INFO} Details`,
+              value:
+                `Items with winners have been:\n` +
+                `✅ Copied to ForDistribution sheet\n` +
+                `✅ Removed from BiddingItems sheet\n\n` +
+                `Items without winners remain in BiddingItems for future auctions.`,
+              inline: false,
+            })
+            .setFooter({
+              text: `Check the ForDistribution sheet in Google Sheets`,
+            })
+            .setTimestamp(),
+        ],
+      });
+
+      // Log to admin logs
+      const mainGuild = await client.guilds.fetch(config.main_guild_id);
+      const adminLogs = await mainGuild.channels
+        .fetch(config.admin_logs_channel_id)
+        .catch(() => null);
+
+      if (adminLogs && moveData.moved > 0) {
+        await adminLogs.send(
+          `📦 **Manual ForDistribution Move**\n` +
+          `Triggered by <@${message.author.id}>\n` +
+          `**Moved:** ${moveData.moved} items | **Skipped:** ${moveData.skipped} items`
+        );
+      }
+    } else {
+      // Failed after all retries
+      await statusMsg.edit({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLORS.ERROR)
+            .setTitle(`${EMOJI.ERROR} Move Failed`)
+            .setDescription(
+              `Failed to move items after ${maxRetries} attempts.\n\n` +
+              `**Error:** ${lastError}`
+            )
+            .addFields({
+              name: `${EMOJI.WARNING} Possible Causes`,
+              value:
+                `• Google Sheets API timeout\n` +
+                `• Network connectivity issues\n` +
+                `• Sheet permissions problem\n` +
+                `• Webhook URL misconfigured`,
+              inline: false,
+            }, {
+              name: `${EMOJI.INFO} Manual Fix`,
+              value:
+                `Open Google Sheets and run:\n` +
+                `\`\`\`\nmoveAllItemsWithWinnersToForDistribution()\n\`\`\`\n` +
+                `from the Apps Script editor (Extensions → Apps Script)`,
+              inline: false,
+            })
+            .setFooter({
+              text: `Contact support if issue persists`,
+            })
+            .setTimestamp(),
+        ],
+      });
+    }
+  } catch (err) {
+    console.error(`❌ handleMoveToDistribution error:`, err);
+    await message.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(COLORS.ERROR)
+          .setTitle(`${EMOJI.ERROR} Command Error`)
+          .setDescription(
+            `An unexpected error occurred:\n\`\`\`${err.message}\`\`\``
+          ),
+      ],
+    });
+  }
+}
+
 module.exports = {
   initialize,
   itemEnd,
@@ -2101,5 +2303,6 @@ module.exports = {
   handleCancelItem,
   handleSkipItem,
   handleForceSubmitResults,
+  handleMoveToDistribution,
   getCurrentSessionBoss: () => currentSessionBoss,
 };
