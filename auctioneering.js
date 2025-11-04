@@ -276,20 +276,42 @@ async function startAuctioneering(client, config, channel) {
   try {
     const guild = await client.guilds.fetch(config.main_guild_id);
     const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
-    
+
+    if (!biddingChannel) {
+      console.error(`❌ Could not fetch bidding channel with ID: ${config.bidding_channel_id}`);
+      await channel.send(`❌ Bidding channel not found. Please check config.`);
+      return;
+    }
+
     // Use the fetched channel instead of the parameter
     channel = biddingChannel;
-    
+
     console.log(`✅ Using bidding channel: ${channel.name} (${channel.id}), Type: ${channel.type}`);
-    
-    // Validate it's a text channel
+
+    // Validate it's a text channel (0 = GUILD_TEXT, 5 = GUILD_ANNOUNCEMENT)
     if (![0, 5].includes(channel.type)) {
-      console.error(`❌ Invalid channel type (${channel.type}) – must be text (0) or announcement (5)`);
-      await channel.send(`❌ Invalid channel type. This command must be run in the bidding channel.`);
+      console.error(
+        `❌ Invalid channel type (${channel.type}) for bidding channel.\n` +
+        `   Channel: ${channel.name} (${channel.id})\n` +
+        `   Expected: Text (0) or Announcement (5)\n` +
+        `   Got: ${channel.type === 11 ? 'Thread (11)' : channel.type === 12 ? 'Private Thread (12)' : `Unknown (${channel.type})`}\n` +
+        `   This means config.bidding_channel_id is pointing to the wrong channel.\n` +
+        `   Please update config with the correct text channel ID.`
+      );
+
+      const errorMsg = `❌ **Configuration Error**\n\n` +
+        `The configured bidding channel is not a valid text channel.\n` +
+        `**Current:** ${channel.name} (Type: ${channel.type})\n` +
+        `**Required:** Text or Announcement channel\n\n` +
+        `Please update \`config.bidding_channel_id\` with the correct channel ID.`;
+
+      // Try to send to the command channel
+      await channel.send(errorMsg).catch(() => {});
       return;
     }
   } catch (err) {
     console.error(`❌ Failed to fetch bidding channel:`, err);
+    await channel.send(`❌ Failed to fetch bidding channel: ${err.message}`).catch(() => {});
     return;
   }
 
@@ -686,31 +708,61 @@ async function auctionNextItem(client, config, channel) {
   item.status = "active";
   item.auctionStartTime = getTimestamp();
 
-  // ✅ Start bidding in this thread
-  try {
-    // Pass a dummy session for compatibility (no attendance check needed)
-    const dummySession = {
-      bossName: item.bossName || "Open",
-      bossKey: "open",
-      attendees: [], // Empty - not used anymore
-    };
+  // Initialize item auction state
+  item.curBid = item.startPrice || 0;
+  item.curWin = null;
+  item.curWinId = null;
+  item.bids = [];
+  item.extCnt = 0; // Extension counter
 
-    await biddingModule.startItemAuction(
-      client,
-      config,
-      auctionThread,
-      item,
-      dummySession
+  const duration = (item.duration || 2) * 60 * 1000;
+  item.endTime = Date.now() + duration;
+
+  // Store thread reference for later use
+  item.thread = auctionThread;
+  item.threadId = auctionThread.id;
+
+  // Set dummy session for bidding.js compatibility (attendance removed)
+  item.currentSession = {
+    bossName: item.bossName || "Open",
+    bossKey: "open",
+    attendees: [], // Not used anymore since attendance is removed
+  };
+
+  // ✅ Start bidding in this thread - send announcement
+  try {
+    await auctionThread.send({
+      content: `@everyone`,
+      embeds: [
+        new EmbedBuilder()
+          .setColor(COLORS.AUCTION)
+          .setTitle(`${EMOJI.AUCTION} Auction Started: ${item.item}`)
+          .setDescription(
+            `**Boss:** ${item.bossName !== "Unknown" ? item.bossName : "OPEN"}\n` +
+              `**Starting Price:** ${item.startPrice || 0} pts\n` +
+              `**Duration:** ${item.duration || 2} min\n\n` +
+              `Use \`!bid <amount>\` to place your bids.\n` +
+              `✅ **All ELYSIUM members can bid!**`
+          )
+          .setFooter({ text: "Auction open — place your bids now!" })
+          .setTimestamp(),
+      ],
+    });
+
+    // Schedule the auction end timers (go1, go2, go3, itemEnd)
+    scheduleItemTimers(client, config, auctionThread);
+
+    console.log(
+      `${EMOJI.SUCCESS} Auction started for: ${item.item} (${duration/60000} min)`
     );
   } catch (err) {
     console.error("❌ Error starting item auction:", err);
-    await channel.send(`❌ Failed to start auction for ${item.item}`);
+    await channel.send(`❌ Failed to start auction for ${item.item}: ${err.message}`);
+
+    // Clean up on error
+    auctionState.currentItem = null;
     return;
   }
-
-  console.log(
-    `🕐 Auction started for: ${item.item}. Waiting for bids to finish...`
-  );
 }
 
 function scheduleItemTimers(client, config, channel) {

@@ -1656,30 +1656,12 @@ const commandHandlers = {
           config.bidding_channel_id
         );
 
-        // If there's an active item, stop it first
-        if (
-          auctState.currentItem &&
-          auctState.currentItem.status === "active"
-        ) {
-          console.log(`🛑 Stopping active item: ${auctState.currentItem.item}`);
-
-          // Try to get the thread for the current item
-          let itemThread = null;
-          if (auctState.currentItem.threadId) {
-            itemThread = await guild.channels
-              .fetch(auctState.currentItem.threadId)
-              .catch(() => null);
-          }
-
-          // Stop the current item (pass the thread for notifications, but use parent for operations)
-          await auctioneering.stopCurrentItem(
-            client,
-            config,
-            itemThread || biddingChannel
-          );
-        }
+        // Don't call stopCurrentItem() here - endAuctionSession handles it
+        // stopCurrentItem() would call itemEnd() which moves to next item,
+        // but we want to END the entire session, not move to next item
 
         // CRITICAL: Always use the parent bidding channel (type 0 or 5), never a thread (type 11)
+        // endAuctionSession will handle stopping the current item and finalizing
         await auctioneering.endAuctionSession(client, config, biddingChannel);
 
         await message.reply(`✅ Auction session ended and results submitted.`);
