@@ -1079,6 +1079,10 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     currentItem.extCnt++;
     timeExtended = true;
 
+    // Reset announcement flags so they can fire again
+    currentItem.go1 = false;
+    currentItem.go2 = false;
+
     console.log(
       `⏰ Time extended for ${currentItem.item} by 1 minute (bid in final minute, ext #${currentItem.extCnt}/${ME})`
     );
