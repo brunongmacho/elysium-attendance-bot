@@ -632,7 +632,7 @@ function handleSubmitAttendance(data) {
       sheet.getRange(3, newCol, members.length, 1).setValues(members.map(() => [true])).setDataValidation(checkboxRule);
     }
     
-    logAttendance(SpreadsheetApp.openById(CONFIG.SHEET_ID), boss, timestamp, members);
+    logAttendance(SpreadsheetApp.openById(CONFIG.SSHEET_ID), boss, timestamp, members);
     return createResponse('ok', `Submitted: ${members.length}`, {column: newCol, boss, timestamp, membersCount: members.length});
   } finally { lock.releaseLock(); }
 }
@@ -1262,8 +1262,11 @@ function moveQueueItemsToSheet(data) {
 function updateBiddingPoints() {
   // Acquire lock to prevent race conditions
   const lock = LockService.getScriptLock();
+  let lockAcquired = false;
+
   try {
     lock.waitLock(30000);
+    lockAcquired = true;
   } catch (e) {
     Logger.log('❌ Lock timeout in updateBiddingPoints: ' + e.toString());
     return;
@@ -1273,7 +1276,7 @@ function updateBiddingPoints() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const bpSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
     if (!bpSheet) {
-      lock.releaseLock();
+      Logger.log('⚠️ BiddingPoints sheet not found');
       return;
     }
 
@@ -1339,7 +1342,9 @@ function updateBiddingPoints() {
 
     Logger.log(`✅ Updated bidding points for ${Object.keys(memberMap).length} members`);
   } finally {
-    lock.releaseLock();
+    if (lockAcquired) {
+      lock.releaseLock();
+    }
   }
 }
 
