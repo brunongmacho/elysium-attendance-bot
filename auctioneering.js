@@ -2368,6 +2368,86 @@ async function handleMoveToDistribution(message, config, client) {
   }
 }
 
+// ============================================
+// DAILY AUCTION SCHEDULER
+// ============================================
+
+/**
+ * Schedule daily auction at 8:30 PM GMT+8 (Asia/Manila timezone)
+ * Automatically starts auction every day at the scheduled time
+ */
+function scheduleDailyAuction(client, config) {
+  console.log(`${EMOJI.CLOCK} Initializing daily auction scheduler...`);
+
+  const calculateNext830PM = () => {
+    const now = new Date();
+    const manila = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+
+    const target = new Date(manila);
+    target.setHours(20, 30, 0, 0); // 8:30 PM
+
+    // If it's already past 8:30 PM today, schedule for tomorrow
+    if (target.getTime() <= manila.getTime()) {
+      target.setDate(target.getDate() + 1);
+    }
+
+    return target;
+  };
+
+  const scheduleNext = () => {
+    const next = calculateNext830PM();
+    const now = new Date();
+    const manila = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+    const delay = next.getTime() - manila.getTime();
+
+    console.log(`${EMOJI.CLOCK} Next daily auction scheduled for: ${next.toLocaleString('en-US', { timeZone: 'Asia/Manila' })} (in ${Math.round(delay / 1000 / 60)} minutes)`);
+
+    setTimeout(async () => {
+      console.log(`${EMOJI.AUCTION} Daily auction time! Starting auction...`);
+
+      try {
+        // Fetch the bidding channel
+        const guild = await client.guilds.fetch(config.main_guild_id);
+        const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+
+        if (!biddingChannel) {
+          console.error(`${EMOJI.ERROR} Could not fetch bidding channel for scheduled auction`);
+          return;
+        }
+
+        // Start the auction
+        await startAuctioneering(client, config, biddingChannel);
+        console.log(`${EMOJI.SUCCESS} Scheduled daily auction started successfully`);
+      } catch (err) {
+        console.error(`${EMOJI.ERROR} Failed to start scheduled auction:`, err);
+
+        // Try to notify admin logs
+        try {
+          const guild = await client.guilds.fetch(config.main_guild_id);
+          const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
+
+          if (adminLogs) {
+            await adminLogs.send(
+              `${EMOJI.ERROR} **Scheduled Auction Failed**\n` +
+              `Failed to start daily auction at 8:30 PM GMT+8.\n` +
+              `**Error:** ${err.message}\n\n` +
+              `Please check bot logs and try running \`!startauction\` manually.`
+            );
+          }
+        } catch (notifyErr) {
+          console.error(`${EMOJI.ERROR} Could not notify admin logs:`, notifyErr);
+        }
+      }
+
+      // Schedule next day's auction
+      scheduleNext();
+    }, delay);
+  };
+
+  scheduleNext();
+  console.log(`${EMOJI.SUCCESS} Daily auction scheduler initialized`);
+}
+
 module.exports = {
   initialize,
   itemEnd,
@@ -2392,5 +2472,6 @@ module.exports = {
   handleSkipItem,
   handleForceSubmitResults,
   handleMoveToDistribution,
+  scheduleDailyAuction, // Daily 8:30 PM GMT+8 auction scheduler
   // getCurrentSessionBoss: () => currentSessionBoss - REMOVED: Not used anywhere
 };
