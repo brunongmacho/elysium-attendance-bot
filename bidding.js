@@ -1563,25 +1563,9 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           { name: `${EMOJI.TIME} Time`, value: tLeft, inline: true }
         );
       }
-      statEmbed.setFooter({ text: "Use !auction to add" }).setTimestamp();
+      statEmbed.setFooter({ text: "Items managed via Google Sheets" }).setTimestamp();
       await msg.reply({ embeds: [statEmbed] });
       break;
-
-    case "!clearqueue":
-      // ❌ MANUAL QUEUE REMOVED
-      return await msg.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(getColor(COLORS.ERROR))
-            .setTitle(`${EMOJI.ERROR} Command Removed`)
-            .setDescription(
-              `The \`!clearqueue\` command has been **removed**.\n\n` +
-              `Manual queue is no longer supported. All items come from Google Sheets.`
-            )
-            .setFooter({ text: "Use !resetauction to reset all auction state" })
-            .setTimestamp(),
-        ],
-      });
 
     case "!resetbids":
       const rstMsg = await msg.reply({

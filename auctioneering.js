@@ -2092,7 +2092,7 @@ async function handleBidStatus(message, config) {
     }
   }
 
-  statEmbed.setFooter({ text: "Use !auction to add items" }).setTimestamp();
+  statEmbed.setFooter({ text: "Items managed via Google Sheets" }).setTimestamp();
 
   await message.reply({ embeds: [statEmbed] });
 }

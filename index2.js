@@ -2944,7 +2944,7 @@ client.on(Events.MessageCreate, async (message) => {
             await auctioneering.handleMoveToDistribution(message, config, client);
           }
         }
-        // Everything else (!auction, !resetbids) goes to bidding.handleCommand
+        // Everything else (!resetbids, etc.) goes to bidding.handleCommand
         else {
           await bidding.handleCommand(adminCmd, message, args, client, config);
         }
