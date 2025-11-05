@@ -2775,7 +2775,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             0
           );
           st.lp = {};
-          save();
+          save(true); // Force immediate sync to Google Sheets to persist the change
           await errorHandler.safeRemoveReactions(fixMsg, 'reaction removal');
           await msg.reply({
             embeds: [
