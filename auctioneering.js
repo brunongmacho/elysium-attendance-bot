@@ -212,6 +212,12 @@ let cfg = null;
 let sheetAPI = null;
 
 /**
+ * Discord channel cache for reducing API calls.
+ * @type {Object|null}
+ */
+let discordCache = null;
+
+/**
  * Reference to the bidding module for point validation.
  * @type {Object|null}
  */
@@ -308,11 +314,12 @@ const TIMEOUTS = {
  * @param {Function} isAdminFunc - Function to check if a user is an admin
  * @param {Object} biddingModuleRef - Reference to the bidding module for point management
  */
-function initialize(config, isAdminFunc, biddingModuleRef) {
+function initialize(config, isAdminFunc, biddingModuleRef, cache = null) {
   cfg = config;
   isAdmFunc = isAdminFunc;
   biddingModule = biddingModuleRef;
   sheetAPI = new SheetAPI(config.sheet_webhook_url);
+  discordCache = cache;
   console.log(`${EMOJI.SUCCESS} Auctioneering system initialized`);
 }
 

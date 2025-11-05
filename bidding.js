@@ -205,6 +205,12 @@ let cfg = null;
  */
 let sheetAPI = null;
 
+/**
+ * Discord channel cache for reducing API calls
+ * @type {Object|null}
+ */
+let discordCache = null;
+
 // ═══════════════════════════════════════════════════════════════════════════
 // SYSTEM CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -734,12 +740,14 @@ async function load() {
  * @param {Object} config - Bot configuration object
  * @param {Function} isAdminFunc - Function to check if user has admin privileges
  * @param {Object} auctioneeringRef - Reference to auctioneering.js module
+ * @param {Object} cache - Discord channel cache instance
  */
-function initializeBidding(config, isAdminFunc, auctioneeringRef) {
+function initializeBidding(config, isAdminFunc, auctioneeringRef, cache = null) {
   isAdmFunc = isAdminFunc;
   cfg = config;
   auctioneering = auctioneeringRef;
   sheetAPI = new SheetAPI(config.sheet_webhook_url);
+  discordCache = cache;
 
   // Start cleanup schedule for pending confirmations
   startCleanupSchedule();
