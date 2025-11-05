@@ -465,9 +465,12 @@ async function sendWeeklyReport() {
       return;
     }
 
-    // Get admin-logs channel
+    // Get admin-logs channel and ELYSIUM commands channel
     const guild = await client.guilds.fetch(config.main_guild_id);
     const adminLogsChannel = await guild.channels.fetch(config.admin_logs_channel_id);
+    const elysiumCommandsChannel = config.elysium_commands_channel_id
+      ? await guild.channels.fetch(config.elysium_commands_channel_id).catch(() => null)
+      : null;
 
     if (!adminLogsChannel) {
       console.error('❌ Admin logs channel not found');
@@ -540,8 +543,15 @@ async function sendWeeklyReport() {
 
     embed.setFooter({ text: 'Generated automatically every Saturday at 11:59pm GMT+8' });
 
+    // Send to admin logs channel
     await adminLogsChannel.send({ embeds: [embed] });
-    console.log('✅ Weekly report sent successfully');
+    console.log('✅ Weekly report sent to admin logs channel');
+
+    // Also send to ELYSIUM commands channel if configured
+    if (elysiumCommandsChannel) {
+      await elysiumCommandsChannel.send({ embeds: [embed] });
+      console.log('✅ Weekly report sent to ELYSIUM commands channel');
+    }
   } catch (error) {
     console.error('❌ Error sending weekly report:', error);
   }

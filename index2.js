@@ -594,6 +594,15 @@ function isAdmin(member) {
   return member.roles.cache.some((r) => config.admin_roles.includes(r.name));
 }
 
+/**
+ * Check if member has ELYSIUM role
+ * @param {GuildMember} member - Discord guild member
+ * @returns {boolean} - True if member has ELYSIUM role
+ */
+function hasElysiumRole(member) {
+  return member.roles.cache.some((r) => r.name === config.elysium_role);
+}
+
 // =====================================================================
 // SECTION 6: BIDDING CHANNEL CLEANUP
 // =====================================================================
@@ -2448,31 +2457,19 @@ const commandHandlers = {
   // ==========================================
 
   leaderboardattendance: async (message, member) => {
-    if (!isAdmin(member)) {
-      await message.reply("❌ Only admins can view leaderboards.");
-      return;
-    }
-
+    // Permission check is done in routing logic
     console.log(`📊 ${member.user.username} requested attendance leaderboard`);
     await leaderboardSystem.displayAttendanceLeaderboard(message);
   },
 
   leaderboardbidding: async (message, member) => {
-    if (!isAdmin(member)) {
-      await message.reply("❌ Only admins can view leaderboards.");
-      return;
-    }
-
+    // Permission check is done in routing logic
     console.log(`📊 ${member.user.username} requested bidding leaderboard`);
     await leaderboardSystem.displayBiddingLeaderboard(message);
   },
 
   weeklyreport: async (message, member) => {
-    if (!isAdmin(member)) {
-      await message.reply("❌ Only admins can trigger weekly reports.");
-      return;
-    }
-
+    // Permission check is done in routing logic
     console.log(`📅 ${member.user.username} manually triggered weekly report`);
     await message.reply("📊 Generating weekly report...");
     await leaderboardSystem.sendWeeklyReport();
@@ -2952,6 +2949,10 @@ client.on(Events.MessageCreate, async (message) => {
       message.channel.id === config.bidding_channel_id ||
       (message.channel.isThread() &&
         message.channel.parentId === config.bidding_channel_id);
+    const inElysiumCommandsChannel =
+      message.channel.id === config.elysium_commands_channel_id ||
+      (message.channel.isThread() &&
+        message.channel.parentId === config.elysium_commands_channel_id);
 
     // ✅ HANDLE !BID AND ALIASES IMMEDIATELY
     const rawCmd = message.content.trim().toLowerCase().split(/\s+/)[0];
@@ -3006,10 +3007,10 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
-    // ✅ HANDLE !MYPOINTS AND ALIASES - BIDDING CHANNEL ONLY (NOT DURING AUCTION)
+    // ✅ HANDLE !MYPOINTS AND ALIASES - BIDDING CHANNEL OR ELYSIUM COMMANDS CHANNEL (NOT DURING AUCTION)
     if (
       resolvedCmd === "!mypoints" &&
-      inBiddingChannel &&
+      (inBiddingChannel || inElysiumCommandsChannel) &&
       !message.channel.isThread()
     ) {
       const args = message.content.trim().split(/\s+/).slice(1);
@@ -3071,14 +3072,17 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
-    // Leaderboard commands (admin only, anywhere except spawn threads)
+    // Leaderboard commands (admin only OR ELYSIUM role in ELYSIUM commands channel, anywhere except spawn threads)
     if (
       resolvedCmd === "!leaderboardattendance" ||
       resolvedCmd === "!leaderboardbidding" ||
       resolvedCmd === "!weeklyreport"
     ) {
-      if (!userIsAdmin) {
-        await message.reply("❌ Only admins can use leaderboard commands.");
+      // Check permissions: either admin OR ELYSIUM role in ELYSIUM commands channel
+      const hasPermission = userIsAdmin || (hasElysiumRole(member) && inElysiumCommandsChannel);
+
+      if (!hasPermission) {
+        await message.reply("❌ Only admins or ELYSIUM members (in guild chat) can use leaderboard commands.");
         return;
       }
 
