@@ -807,6 +807,15 @@ async function endAuc(cli, cfg) {
     });
   }
 
+  // Lock the thread first to prevent new messages
+  if (typeof th.setLocked === "function") {
+    await th
+      .setLocked(true, "Auction ended")
+      .catch((err) =>
+        console.warn(`⚠️ Failed to lock thread ${th.id}:`, err.message)
+      );
+  }
+
   await th
     .setArchived(true, "Ended")
     .catch((err) =>
