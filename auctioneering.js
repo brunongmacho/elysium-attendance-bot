@@ -1941,25 +1941,48 @@ async function finalizeSession(client, config, channel) {
  * @returns {Promise<Array<Object>>} Array of {member, totalSpent} objects
  */
 async function buildCombinedResults(config) {
+  console.log(`${EMOJI.CHART} Building combined results for ${auctionState.sessionItems?.length || 0} session items...`);
+
   // Fetch fresh points from sheet
   let allPoints = {};
   try {
     const data = await sheetAPI.call('getBiddingPoints');
     allPoints = data.points || {};
+    console.log(`${EMOJI.SUCCESS} Fetched points for ${Object.keys(allPoints).length} members`);
   } catch (err) {
     console.error(`${EMOJI.ERROR} Failed to fetch bidding points:`, err);
     return [];
   }
+
+  // Validate sessionItems exists
+  if (!auctionState.sessionItems || !Array.isArray(auctionState.sessionItems)) {
+    console.error(`${EMOJI.ERROR} Invalid sessionItems array in auctionState`);
+    return [];
+  }
+
   // Use PointsCache for efficient operations
   const pointsCache = new PointsCache(allPoints);
   const allMembers = pointsCache.getAllUsernames();
 
-  // Combine all winners from session
+  // Combine all winners from session (only items with winners)
   const winners = {};
-  auctionState.sessionItems.forEach((item) => {
+  let skippedItems = 0;
+  let processedItems = 0;
+
+  auctionState.sessionItems.forEach((item, index) => {
+    // Skip items without winners (unsold items)
+    if (!item.winner || !item.amount) {
+      skippedItems++;
+      console.log(`${EMOJI.WARNING} Skipping item ${index + 1} "${item.item}" - no winner or amount`);
+      return;
+    }
+
     const normalizedWinner = normalizeUsername(item.winner);
     winners[normalizedWinner] = (winners[normalizedWinner] || 0) + item.amount;
+    processedItems++;
   });
+
+  console.log(`${EMOJI.SUCCESS} Processed ${processedItems} items with winners, skipped ${skippedItems} unsold items`);
 
   // Build results for ALL members (including 0s for clean logs)
   const results = allMembers.map((m) => {
