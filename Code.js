@@ -108,6 +108,7 @@ function doPost(e) {
     // Bidding actions
     if (action === 'getBiddingPoints') return handleGetBiddingPoints(data);
     if (action === 'submitBiddingResults') return handleSubmitBiddingResults(data);
+    if (action === 'removeMember') return handleRemoveMember(data);
     if (action === 'getBiddingItems') return getBiddingItems(data);
     if (action === 'logAuctionResult') return logAuctionResult(data);
     if (action === 'getBotState') return getBotState(data);
@@ -991,18 +992,85 @@ function handleGetBiddingPoints(data) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
   if (!sheet) return createResponse('error', `Sheet not found: ${CONFIG.BIDDING_SHEET}`);
-  
+
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return createResponse('ok','No members',{points:{}});
-  
+
   const dataRange = sheet.getRange(2,1,lastRow-1,2).getValues();
   const points = {};
-  dataRange.forEach(r => { 
-    const member = (r[0]||'').toString().trim(); 
-    if(member) points[member]=Number(r[1])||0; 
+  dataRange.forEach(r => {
+    const member = (r[0]||'').toString().trim();
+    if(member) points[member]=Number(r[1])||0;
   });
-  
+
   return createResponse('ok','Points fetched',{points});
+}
+
+/**
+ * Removes a member from the BiddingPoints sheet
+ * Used when members are kicked or banned from the guild
+ *
+ * @param {Object} data - Request data containing memberName
+ * @param {string} data.memberName - Name of the member to remove
+ * @returns {Object} Response object with status and result
+ */
+function handleRemoveMember(data) {
+  const memberName = (data.memberName || '').toString().trim();
+
+  if (!memberName) {
+    return createResponse('error', 'Missing memberName parameter');
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
+
+  if (!sheet) {
+    return createResponse('error', `Sheet not found: ${CONFIG.BIDDING_SHEET}`);
+  }
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return createResponse('error', 'No members found in sheet', {found: false});
+  }
+
+  // Get all member names from column 1
+  const memberNames = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+
+  // Find the member using normalized username matching
+  const normalizedTarget = normalizeUsername(memberName);
+  let rowIndex = -1;
+
+  for (let i = 0; i < memberNames.length; i++) {
+    const currentMember = (memberNames[i][0] || '').toString().trim();
+    const normalizedCurrent = normalizeUsername(currentMember);
+
+    if (normalizedCurrent === normalizedTarget) {
+      rowIndex = i + 2; // +2 because array is 0-indexed and we start from row 2
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    return createResponse('error', `Member "${memberName}" not found in sheet`, {found: false});
+  }
+
+  // Get member data before deletion for logging
+  const memberRow = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const actualMemberName = memberRow[0];
+  const pointsLeft = memberRow[1];
+
+  // Delete the row
+  sheet.deleteRow(rowIndex);
+
+  Logger.log(`✅ Removed member: ${actualMemberName} (had ${pointsLeft} points) from ${CONFIG.BIDDING_SHEET}`);
+
+  return createResponse('ok', `Member "${actualMemberName}" removed successfully`, {
+    found: true,
+    removed: true,
+    memberName: actualMemberName,
+    pointsLeft: pointsLeft,
+    rowIndex: rowIndex
+  });
 }
 
 function logAuctionResult(data) {

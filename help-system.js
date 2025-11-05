@@ -218,6 +218,23 @@ const COMMAND_HELP = {
     ]
   },
 
+  removemember: {
+    usage: "!removemember <member_name>",
+    description: "Remove a member from the BiddingPoints sheet (for kicked/banned members)",
+    category: "Member Management",
+    adminOnly: true,
+    example: "!removemember PlayerName",
+    aliases: ["!removemem", "!rmmember", "!delmember"],
+    features: [
+      "Removes member from BiddingPoints sheet",
+      "Deletes all point history",
+      "Uses fuzzy name matching",
+      "Logs to admin-logs channel",
+      "Confirmation required",
+      "Cannot be undone"
+    ]
+  },
+
   // ========================================
   // LEADERBOARD COMMANDS
   // ========================================

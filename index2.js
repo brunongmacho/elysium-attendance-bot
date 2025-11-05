@@ -126,6 +126,11 @@ const COMMAND_ALIASES = {
   // Emergency commands (admin)
   "!emerg": "!emergency",
 
+  // Member management commands (admin)
+  "!removemem": "!removemember",
+  "!rmmember": "!removemember",
+  "!delmember": "!removemember",
+
   // Bidding commands (member)
   "!b": "!bid",
   "!bstatus": "!bidstatus",
@@ -2286,6 +2291,121 @@ const commandHandlers = {
   },
 
   // ==========================================
+  // MEMBER MANAGEMENT COMMANDS
+  // ==========================================
+
+  /**
+   * Remove a member from the BiddingPoints sheet
+   * Used when members are kicked or banned from the guild
+   *
+   * Usage: !removemember <member_name>
+   * Aliases: !removemem, !rmmember, !delmember
+   */
+  removemember: async (message, member) => {
+    const args = message.content.trim().split(/\s+/).slice(1);
+
+    if (args.length === 0) {
+      await message.reply(
+        `❌ **Usage:** \`!removemember <member_name>\`\n\n` +
+          `**Example:** \`!removemember PlayerName\`\n\n` +
+          `**Aliases:** \`!removemem\`, \`!rmmember\`, \`!delmember\`\n\n` +
+          `This command removes a member from the BiddingPoints sheet.\n` +
+          `Use this when a member is kicked or banned from the guild.`
+      );
+      return;
+    }
+
+    const memberName = args.join(" ").trim();
+
+    await awaitConfirmation(
+      message,
+      member,
+      `⚠️ **Remove member from BiddingPoints sheet?**\n\n` +
+        `**Member:** ${memberName}\n\n` +
+        `This will:\n` +
+        `• Remove the member from BiddingPoints sheet\n` +
+        `• Delete all their point history\n` +
+        `• This action cannot be undone\n\n` +
+        `React ✅ to confirm or ❌ to cancel.`,
+      async (confirmMsg) => {
+        try {
+          // Call Google Sheets to remove the member
+          const response = await fetch(config.google_sheets_url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "removeMember",
+              memberName: memberName,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+
+          if (result.status === "ok" && result.data?.removed) {
+            const actualName = result.data.memberName;
+            const pointsLost = result.data.pointsLeft || 0;
+
+            const embed = new EmbedBuilder()
+              .setColor(0x00ff00)
+              .setTitle(`✅ Member Removed Successfully`)
+              .setDescription(
+                `**Member:** ${actualName}\n` +
+                  `**Points Lost:** ${pointsLost}\n\n` +
+                  `The member has been removed from the BiddingPoints sheet.`
+              )
+              .setFooter({ text: `Removed by ${member.user.username}` })
+              .setTimestamp();
+
+            await message.reply({ embeds: [embed] });
+
+            // Log to admin-logs channel
+            const guild = await client.guilds.fetch(config.main_guild_id);
+            const adminLogsChannel = await guild.channels.fetch(
+              config.admin_logs_channel_id
+            );
+
+            if (adminLogsChannel) {
+              const logEmbed = new EmbedBuilder()
+                .setColor(0xff9900)
+                .setTitle(`🗑️ Member Removed from Sheet`)
+                .setDescription(
+                  `**Removed Member:** ${actualName}\n` +
+                    `**Points Lost:** ${pointsLost}\n` +
+                    `**Removed By:** ${member.user.username}`
+                )
+                .setTimestamp();
+
+              await adminLogsChannel.send({ embeds: [logEmbed] });
+            }
+
+            console.log(
+              `🗑️ Removed member: ${actualName} (${pointsLost} points) by ${member.user.username}`
+            );
+          } else {
+            throw new Error(
+              result.message || result.data?.message || "Member not found"
+            );
+          }
+        } catch (err) {
+          console.error("❌ Remove member error:", err);
+          await message.reply(
+            `❌ **Failed to remove member!**\n\n` +
+              `Error: ${err.message}\n\n` +
+              `The member might not exist in the sheet, or there was a connection error.`
+          );
+        }
+      },
+      async (confirmMsg) => {
+        await message.reply("❌ Member removal canceled.");
+      }
+    );
+  },
+
+  // ==========================================
   // LEADERBOARD COMMANDS
   // ==========================================
 
@@ -3374,6 +3494,7 @@ client.on(Events.MessageCreate, async (message) => {
           "!closeallthread",
           "!emergency",
           "!maintenance",
+          "!removemember",
         ].includes(adminCmd)
       ) {
         const now = Date.now();
@@ -3402,6 +3523,8 @@ client.on(Events.MessageCreate, async (message) => {
           await emergencyCommands.handleEmergencyCommand(message, args);
         else if (adminCmd === "!maintenance")
           await commandHandlers.maintenance(message, member);
+        else if (adminCmd === "!removemember")
+          await commandHandlers.removemember(message, member);
         return;
       }
 
