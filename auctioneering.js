@@ -1885,25 +1885,28 @@ async function handleQueueList(message, biddingState) {
       position++;
       itemsShown++;
     }
-    
-    const attendanceLine = `👥 Attendance required\n\n`;
-    queueText += attendanceLine;
-    charsUsed += sessionHeader.length + attendanceLine.length;
+
+    queueText += `\n`;
+    charsUsed += sessionHeader.length;
     sessionNum++;
   }
 
-  // Items without boss
+  // Items without boss - include them in the display
   if (noBossItems.length > 0 && itemsShown < MAX_ITEMS_TO_SHOW) {
-    queueText += `**⚠️ ITEMS WITHOUT BOSS (Will be skipped)**\n`;
-    noBossItems.slice(0, 5).forEach((item) => {
-      queueText += `• ${item.item} - Missing boss data\n`;
+    queueText += `**🔥 SESSION ${sessionNum} - GENERAL ITEMS**\n`;
+    noBossItems.slice(0, Math.min(5, MAX_ITEMS_TO_SHOW - itemsShown)).forEach((item) => {
+      const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
+      queueText += `${position}. ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
+      position++;
+      itemsShown++;
     });
-    if (noBossItems.length > 5) {
+    if (noBossItems.length > 5 && itemsShown < MAX_ITEMS_TO_SHOW) {
       queueText += `*...and ${noBossItems.length - 5} more*\n`;
     }
+    queueText += `\n`;
   }
 
-  const footerNote = `\n**ℹ️ Note:** Order shown is how items will auction when you run \`!startauction\`\n**⚠️ All items require attendance at the corresponding boss spawn.**`;
+  const footerNote = `\n**ℹ️ Note:** Order shown is how items will auction when you run \`!startauction\`\n✅ **All ELYSIUM members can bid!**`;
   queueText += footerNote;
 
   const totalSessions = Object.keys(bossGroups).length;
