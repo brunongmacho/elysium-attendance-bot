@@ -1,5 +1,5 @@
 /**
- * Enhanced Help System for ELYSIUM Bot v8.0
+ * Enhanced Help System for ELYSIUM Bot v8.1
  * Comprehensive, fancy interface with all commands from codebase
  */
 
@@ -125,11 +125,11 @@ const COMMAND_HELP = {
   },
 
   forcesubmit: {
-    usage: "!forcesubmit",
+    usage: "!fs",
     description: "Submit attendance to Google Sheets WITHOUT closing the thread (allows continued check-ins)",
     category: "Attendance",
     adminOnly: true,
-    example: "!forcesubmit",
+    example: "!fs",
     aliases: ["!fs"],
     features: [
       "Keeps thread open",
@@ -250,6 +250,22 @@ const COMMAND_HELP = {
       "Total points distribution statistics",
       "Visual progress bars",
       "Real-time points data"
+    ]
+  },
+
+  weeklyreport: {
+    usage: "!weeklyreport",
+    description: "Manually trigger the weekly leaderboard report (normally auto-sent Saturday 11:59pm)",
+    category: "Leaderboard",
+    adminOnly: true,
+    example: "!weeklyreport",
+    aliases: ["!week"],
+    features: [
+      "Generates attendance leaderboard",
+      "Generates bidding leaderboard",
+      "Posts to designated channel",
+      "Same format as automatic weekly report",
+      "Useful for testing or manual updates"
     ]
   },
 
@@ -384,11 +400,11 @@ const COMMAND_HELP = {
   },
 
   forcesubmitresults: {
-    usage: "!forcesubmitresults",
+    usage: "!forcesubmitresults OR !forcesubmit",
     description: "Manually submit auction results to Google Sheets (recovery tool)",
     category: "Bidding",
     adminOnly: true,
-    example: "!forcesubmitresults",
+    example: "!forcesubmitresults\n!forcesubmit",
     aliases: ["!forcesubmit"],
     features: [
       "Recovery mechanism",
