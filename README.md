@@ -33,6 +33,7 @@
 - **Boss spawn check-ins** with screenshot verification for non-admins
 - **Automated verification workflow** using Discord reactions (✅/❌)
 - **Points system** with automatic assignment on verification
+- **20-minute auto-close** - threads automatically close to prevent attendance cheating
 - **Multi-thread management** with spawn tracking and closure automation
 - **Google Sheets integration** for persistent data storage
 - **State recovery** on bot restart with full crash recovery
@@ -239,6 +240,7 @@ When deployed, the bot automatically:
 - **Enables bidding channel cleanup** (every 12 hours)
 - **Sends weekly leaderboard reports** (Saturday 11:59 PM)
 - **Syncs state to Sheets** every 5 minutes
+- **Auto-closes attendance threads** after 20 minutes to prevent cheating
 
 ### Troubleshooting
 
@@ -343,7 +345,7 @@ PORT=8000  # Optional, defaults to 8000
 | `!clearstate` | `!clear` | Reset all bot memory and state |
 | `!maintenance` | `!maint` | Bulk create threads for maintenance bosses |
 | `!removemember <name>` | `!removemem`, `!rmmember`, `!delmember` | Remove member from ALL sheets (excludes ForDistribution) |
-| `close` | - | Close spawn thread (text command in threads) |
+| `close` | - | Close spawn thread manually (threads auto-close after 20 min) |
 
 ### Leaderboard Commands (Admin)
 
@@ -626,6 +628,7 @@ The bot sends POST requests with the following actions:
 1. Boss Spawn Detected (or manually created with !addthread)
    ↓
 2. Attendance Thread + Confirmation Thread Created
+   Thread shows: "⏰ Auto-closes in 20 minutes"
    ↓
 3. Member Types "present" or "here"
    ↓
@@ -637,9 +640,12 @@ The bot sends POST requests with the following actions:
 6. Member Added to Verified List
    Confirmation Thread Updated
    ↓
-7. Admin Types "close" in Thread
+7. Admin Types "close" in Thread (Manual Option)
+   OR
+   Thread Auto-Closes After 20 Minutes
    ↓
 8. Validation: No Pending Verifications?
+   (Auto-close: All pending members auto-verified)
    ↓
 9. Submit Attendance to Google Sheets
    ↓
