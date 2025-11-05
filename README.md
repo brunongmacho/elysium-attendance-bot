@@ -424,14 +424,55 @@ Persists bot state for crash recovery.
 
 Deploy `Code.js` as a web app:
 
+#### Method 1: Using clasp (Recommended)
+
+The project is configured to use [clasp](https://github.com/google/clasp) for automated deployment.
+
+```bash
+# Install clasp globally (one-time)
+npm install -g @google/clasp
+
+# Login to Google account (one-time)
+clasp login
+
+# Push Code.js to Google Apps Script
+clasp push
+
+# Create a new deployment
+clasp deploy --description "Initial deployment"
+```
+
+After deployment, get the web app URL:
+1. Run `clasp open` to open the script in browser
+2. Click "Deploy" → "Manage deployments"
+3. Copy the web app URL
+4. Add it to `config.json` as `sheet_webhook_url`
+
+**Updating the deployment:**
+When you update `Code.js`, always push changes:
+```bash
+# Option 1: Using clasp directly
+clasp push
+
+# Option 2: Using npm script (recommended)
+npm run deploy
+```
+
+No need to create a new deployment - the web app URL stays the same.
+
+#### Method 2: Manual Deployment
+
 1. Open Google Sheets
 2. Extensions → Apps Script
 3. Copy contents of `Code.js`
-4. Deploy → New deployment
-5. Select "Web app"
-6. Execute as: "Me"
-7. Who has access: "Anyone"
-8. Copy deployment URL to `config.json` as `sheet_webhook_url`
+4. Paste into the script editor
+5. Deploy → New deployment
+6. Select "Web app"
+7. Execute as: "Me"
+8. Who has access: "Anyone"
+9. Copy deployment URL to `config.json` as `sheet_webhook_url`
+
+**Note:** When using manual deployment, you must manually update the script whenever `Code.js` changes.
 
 ### Webhook Actions
 
@@ -443,6 +484,7 @@ The bot sends POST requests with the following actions:
 | `addBulkAttendance` | Add multiple attendance records |
 | `getPoints` | Fetch member points |
 | `updatePoints` | Update points (deduct/refund) |
+| `removeMember` | Remove member from all sheets |
 | `loadQueue` | Load auction items |
 | `submitResults` | Submit auction winners |
 | `logLoot` | Add loot items |
@@ -818,6 +860,32 @@ Common debug locations:
 2. Verify Google Sheets webhook connection
 3. Use `!forcesubmitresults` to retry submission
 4. Check Apps Script logs for errors
+
+#### Unknown Action Error
+**Symptoms:** Commands fail with `Error: Unknown action: <actionName>` (e.g., `removeMember`).
+
+**Cause:** The deployed Google Apps Script is outdated and missing new action handlers.
+
+**Solutions:**
+1. **Using clasp (recommended):**
+   ```bash
+   # Option 1: Using npm script
+   npm run deploy
+
+   # Option 2: Using clasp directly
+   clasp push
+   ```
+   This updates the deployed script with the latest `Code.js`.
+
+2. **Manual deployment:**
+   - Open Google Apps Script (Extensions → Apps Script in Google Sheets)
+   - Copy the latest `Code.js` from the repository
+   - Paste and save
+   - No need to redeploy - changes take effect immediately
+
+3. Verify the fix by running the failing command again
+
+**Note:** Always run `clasp push` or manually update the script after pulling repository updates.
 
 #### Threads Not Closing
 **Symptoms:** Threads stay open despite `close` command.
