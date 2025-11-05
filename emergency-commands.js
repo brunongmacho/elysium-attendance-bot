@@ -1,12 +1,61 @@
 /**
+ * ============================================================================
  * EMERGENCY COMMANDS MODULE
- * Provides admin-only commands to recover from stuck states
- * All commands require confirmation to prevent accidental use
+ * ============================================================================
+ *
+ * PURPOSE:
+ * Provides admin-only recovery commands for handling stuck or broken states
+ * in the bot's various systems (attendance, bidding, auctions).
+ *
+ * FEATURES:
+ * - Force close attendance threads (all or specific)
+ * - Force end stuck auctions
+ * - Unlock stuck points
+ * - Clear pending confirmations
+ * - State diagnostics
+ * - Force sync state to Google Sheets
+ *
+ * SAFETY MECHANISMS:
+ * - All commands require confirmation (15-30s timeout)
+ * - Admin-only access
+ * - Detailed feedback on what was changed
+ * - Logging to admin-logs channel
+ *
+ * WORKFLOW:
+ * 1. Admin runs emergency command (e.g., !emergency closeall)
+ * 2. Bot displays confirmation prompt with details
+ * 3. Admin reacts with checkmark or X
+ * 4. Bot executes action if confirmed
+ * 5. Bot displays results and logs to admin-logs
+ *
+ * USE CASES:
+ * - Attendance thread won't close (stuck reactions, API errors)
+ * - Auction ended but state not cleared
+ * - Points locked after crashed auction
+ * - Pending confirmations from previous session
+ * - State desync between bot and sheets
+ *
+ * PERMISSIONS:
+ * - Admin-only (verified by isAdmin function)
+ * - Can be used in any channel
+ *
+ * @module emergency-commands
  */
+
+// ============================================================================
+// DEPENDENCIES
+// ============================================================================
 
 const { EmbedBuilder } = require("discord.js");
 const errorHandler = require('./utils/error-handler');
 
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+/**
+ * Emoji constants for emergency command feedback
+ */
 const EMOJI = {
   SUCCESS: "✅",
   ERROR: "❌",
@@ -19,6 +68,9 @@ const EMOJI = {
   RESET: "🔄",
 };
 
+/**
+ * Color codes for embed messages
+ */
 const COLORS = {
   SUCCESS: 0x00ff00,
   ERROR: 0xff0000,
@@ -26,12 +78,36 @@ const COLORS = {
   EMERGENCY: 0xff4444,
 };
 
-let config = null;
-let attendance = null;
-let bidding = null;
-let auctioneering = null;
-let isAdminFunc = null;
+// ============================================================================
+// MODULE STATE
+// ============================================================================
 
+/**
+ * Module dependencies initialized by initialize()
+ */
+let config = null;           // Bot configuration
+let attendance = null;       // Attendance module reference
+let bidding = null;          // Bidding module reference
+let auctioneering = null;    // Auctioneering module reference
+let isAdminFunc = null;      // Admin check function
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+/**
+ * Initializes the emergency commands module with required dependencies
+ *
+ * @param {Object} cfg - Bot configuration object
+ * @param {Object} attModule - Attendance module instance
+ * @param {Object} bidModule - Bidding module instance
+ * @param {Object} auctModule - Auctioneering module instance
+ * @param {Function} isAdmin - Function to check admin permissions
+ *
+ * @example
+ * initialize(config, attendance, bidding, auctioneering, isAdmin);
+ * // Output: 🚨 Emergency commands module initialized
+ */
 function initialize(cfg, attModule, bidModule, auctModule, isAdmin) {
   config = cfg;
   attendance = attModule;
@@ -44,6 +120,37 @@ function initialize(cfg, attModule, bidModule, auctModule, isAdmin) {
 // ==========================================
 // EMERGENCY: FORCE CLOSE ALL ATTENDANCE THREADS
 // ==========================================
+
+/**
+ * Forces closure of all active attendance threads
+ *
+ * USE CASE:
+ * When multiple attendance threads are stuck open (won't close normally),
+ * this command forcefully closes and archives all of them.
+ *
+ * WARNING:
+ * This does NOT submit attendance to sheets! Only use if threads are
+ * genuinely stuck and cannot be closed through normal means.
+ *
+ * WORKFLOW:
+ * 1. Show confirmation prompt with details
+ * 2. If confirmed:
+ *    - Fetch all active threads in attendance channel
+ *    - Send emergency closure message to each thread
+ *    - Clean up reactions from each thread
+ *    - Archive each thread
+ *    - Clear all attendance state (spawns, verifications, closures)
+ *    - Save cleared state to sheets
+ * 3. Display results (threads closed, errors, state cleared)
+ * 4. Log to admin-logs channel
+ *
+ * @param {Message} message - Discord message that triggered the command
+ * @returns {Promise<void>}
+ *
+ * @example
+ * // Admin command: !emergency closeall
+ * await forceCloseAllAttendance(message);
+ */
 async function forceCloseAllAttendance(message) {
   const confirmEmbed = new EmbedBuilder()
     .setColor(COLORS.EMERGENCY)
@@ -146,6 +253,31 @@ async function forceCloseAllAttendance(message) {
 // ==========================================
 // EMERGENCY: FORCE CLOSE SPECIFIC ATTENDANCE THREAD
 // ==========================================
+
+/**
+ * Forces closure of a specific attendance thread by ID
+ *
+ * USE CASE:
+ * When a specific attendance thread is stuck and won't close normally.
+ * More surgical than closeall - only affects one thread.
+ *
+ * WORKFLOW:
+ * 1. Validate thread ID argument
+ * 2. Fetch and verify thread exists
+ * 3. Send emergency closure message
+ * 4. Clean up reactions
+ * 5. Archive thread
+ * 6. Remove from activeSpawns and activeColumns state
+ * 7. Save state to sheets
+ *
+ * @param {Message} message - Discord message that triggered the command
+ * @param {Array<string>} args - Command arguments [thread_id]
+ * @returns {Promise<void>}
+ *
+ * @example
+ * // Admin command: !emergency close 123456789012345678
+ * await forceCloseAttendanceThread(message, ["123456789012345678"]);
+ */
 async function forceCloseAttendanceThread(message, args) {
   if (args.length === 0) {
     return await message.reply(
@@ -195,6 +327,36 @@ async function forceCloseAttendanceThread(message, args) {
 // ==========================================
 // EMERGENCY: FORCE END AUCTION
 // ==========================================
+
+/**
+ * Forces the end of a currently active auction
+ *
+ * USE CASE:
+ * When an auction is stuck (timer didn't fire, state corrupted, etc.)
+ * and needs to be forcefully ended with submission to sheets.
+ *
+ * SYSTEM SUPPORT:
+ * - Handles auctioneering.js sessions (multi-item auctions)
+ * - Handles bidding.js single auctions
+ * - Auto-detects which system is active
+ *
+ * WORKFLOW:
+ * 1. Show confirmation prompt
+ * 2. If confirmed:
+ *    - Check auctioneering state first
+ *    - If auctioneering active: end session
+ *    - Otherwise check bidding.js auction state
+ *    - If bidding active: force end auction
+ *    - If neither active: show "no auction" message
+ * 3. Display results
+ *
+ * @param {Message} message - Discord message that triggered the command
+ * @returns {Promise<void>}
+ *
+ * @example
+ * // Admin command: !emergency endauction
+ * await forceEndAuction(message);
+ */
 async function forceEndAuction(message) {
   const confirmEmbed = new EmbedBuilder()
     .setColor(COLORS.EMERGENCY)
@@ -285,6 +447,37 @@ async function forceEndAuction(message) {
 // ==========================================
 // EMERGENCY: UNLOCK ALL POINTS
 // ==========================================
+
+/**
+ * Unlocks all locked points across all users
+ *
+ * USE CASE:
+ * When an auction crashes or fails to complete, points may remain
+ * locked (preventing users from bidding again). This command releases
+ * all locked points back to users.
+ *
+ * WHAT ARE LOCKED POINTS:
+ * When a user places a bid, those points are "locked" (reserved for
+ * that bid). If the auction completes normally, winning bids are
+ * deducted and losing bids are unlocked. If the auction crashes,
+ * points may remain locked indefinitely.
+ *
+ * WORKFLOW:
+ * 1. Check if any points are locked
+ * 2. If yes, show confirmation with list of affected users
+ * 3. If confirmed:
+ *    - Calculate total points to unlock
+ *    - Clear locked points map (biddingState.lp = {})
+ *    - Save state
+ * 4. Display results
+ *
+ * @param {Message} message - Discord message that triggered the command
+ * @returns {Promise<void>}
+ *
+ * @example
+ * // Admin command: !emergency unlock
+ * await unlockAllPoints(message);
+ */
 async function unlockAllPoints(message) {
   const biddingState = bidding.getBiddingState();
   const lockedCount = Object.keys(biddingState.lp).length;
@@ -357,6 +550,35 @@ async function unlockAllPoints(message) {
 // ==========================================
 // EMERGENCY: CLEAR PENDING CONFIRMATIONS
 // ==========================================
+
+/**
+ * Clears all pending bid confirmations
+ *
+ * USE CASE:
+ * When bid confirmation messages are stuck (bot restarted mid-confirmation,
+ * thread deleted, etc.), this command clears them so users can bid again.
+ *
+ * WHAT ARE PENDING CONFIRMATIONS:
+ * When a user places a bid, they must confirm it by reacting to a
+ * confirmation message. These are tracked in biddingState.pc. If the
+ * bot restarts or the message is deleted, these can become orphaned.
+ *
+ * WORKFLOW:
+ * 1. Check if any confirmations are pending
+ * 2. If yes, show confirmation prompt with count
+ * 3. If confirmed:
+ *    - Attempt to delete each confirmation message
+ *    - Clear pending confirmations map (biddingState.pc = {})
+ *    - Save state
+ * 4. Display results (cleared count, deleted message count)
+ *
+ * @param {Message} message - Discord message that triggered the command
+ * @returns {Promise<void>}
+ *
+ * @example
+ * // Admin command: !emergency clearbids
+ * await clearPendingConfirmations(message);
+ */
 async function clearPendingConfirmations(message) {
   const biddingState = bidding.getBiddingState();
   const pendingCount = Object.keys(biddingState.pc).length;
@@ -445,6 +667,33 @@ async function clearPendingConfirmations(message) {
 // ==========================================
 // EMERGENCY: STATE DIAGNOSTICS
 // ==========================================
+
+/**
+ * Displays comprehensive diagnostics of all bot state
+ *
+ * USE CASE:
+ * When debugging issues or checking if anything is stuck, this command
+ * provides a comprehensive view of all active state across all systems.
+ *
+ * INFORMATION DISPLAYED:
+ * - Active Attendance Spawns: Number of open attendance threads
+ * - Active Sheet Columns: Number of attendance columns in use
+ * - Pending Verifications: Users waiting for admin verification
+ * - Pending Closures: Threads waiting to be closed
+ * - Locked Points: Users with locked bidding points
+ * - Pending Confirmations: Outstanding bid confirmations
+ * - Bidding.js Auction: Current single auction state
+ * - Auctioneering Session: Current multi-item auction state
+ *
+ * This is a read-only command that doesn't change any state.
+ *
+ * @param {Message} message - Discord message that triggered the command
+ * @returns {Promise<void>}
+ *
+ * @example
+ * // Admin command: !emergency diag
+ * await stateDiagnostics(message);
+ */
 async function stateDiagnostics(message) {
   const activeSpawns = attendance.getActiveSpawns();
   const activeColumns = attendance.getActiveColumns();
@@ -475,6 +724,28 @@ async function stateDiagnostics(message) {
 // ==========================================
 // EMERGENCY: FORCE SYNC STATE TO SHEETS
 // ==========================================
+
+/**
+ * Forces synchronization of all bot state to Google Sheets
+ *
+ * USE CASE:
+ * When state becomes desynced between bot memory and Google Sheets
+ * (e.g., manual sheet edits, bot crash during save), this command
+ * forces a complete state sync.
+ *
+ * WHAT GETS SYNCED:
+ * - Attendance state (spawns, verifications, closures)
+ * - Bidding state (points, locked points, confirmations)
+ *
+ * This is useful for ensuring persistence after emergency operations.
+ *
+ * @param {Message} message - Discord message that triggered the command
+ * @returns {Promise<void>}
+ *
+ * @example
+ * // Admin command: !emergency sync
+ * await forceSyncState(message);
+ */
 async function forceSyncState(message) {
   await message.reply(`${EMOJI.RESET} Syncing all state to Google Sheets...`);
 
@@ -494,6 +765,36 @@ async function forceSyncState(message) {
 // ==========================================
 // COMMAND ROUTER
 // ==========================================
+
+/**
+ * Main router for all emergency commands
+ *
+ * Routes subcommands to appropriate handlers and displays help if needed.
+ *
+ * AVAILABLE SUBCOMMANDS:
+ * - closeall: Force close all attendance threads
+ * - close <id>: Force close specific thread
+ * - endauction: Force end current auction
+ * - unlock: Unlock all locked points
+ * - clearbids: Clear pending bid confirmations
+ * - diag/diagnostics: Show state diagnostics
+ * - sync: Force sync state to sheets
+ *
+ * If no subcommand provided, displays help embed with all commands.
+ *
+ * @param {Message} message - Discord message that triggered the command
+ * @param {Array<string>} args - Command arguments [subcommand, ...subcommand_args]
+ * @returns {Promise<void>}
+ *
+ * @example
+ * // Command: !emergency closeall
+ * await handleEmergencyCommand(message, ["closeall"]);
+ *
+ * @example
+ * // Command: !emergency (no args)
+ * await handleEmergencyCommand(message, []);
+ * // Displays help embed
+ */
 async function handleEmergencyCommand(message, args) {
   const subCommand = args[0]?.toLowerCase();
 
@@ -569,6 +870,10 @@ async function handleEmergencyCommand(message, args) {
       await message.reply(`${EMOJI.ERROR} Unknown emergency command. Use \`!emergency\` for help.`);
   }
 }
+
+// ============================================================================
+// MODULE EXPORTS
+// ============================================================================
 
 module.exports = {
   initialize,
