@@ -2365,6 +2365,7 @@ const commandHandlers = {
             const pointsLost = result.pointsLeft || 0;
             const biddingRemoved = result.biddingSheetRemoved || false;
             const attendanceRemoved = result.attendanceSheetsRemoved || 0;
+            const totalAttendanceRemoved = result.totalAttendanceRemoved || false;
             const totalSheets = result.totalSheetsAffected || 0;
             const totalAttendance = result.totalAttendancePoints || 0;
             const attendanceDetails = result.attendanceSheetsDetails || [];
@@ -2394,6 +2395,11 @@ const commandHandlers = {
                 });
                 description += `• ... and ${attendanceDetails.length - 5} more\n`;
               }
+            }
+
+            if (totalAttendanceRemoved) {
+              description += `**TOTAL ATTENDANCE Sheet:**\n`;
+              description += `• Removed from aggregated attendance sheet\n\n`;
             }
 
             description += `\n**Total sheets affected:** ${totalSheets}`;
