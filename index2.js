@@ -2360,14 +2360,14 @@ const commandHandlers = {
 
           const result = await response.json();
 
-          if (result.status === "ok" && result.data?.removed) {
-            const actualName = result.data.memberName;
-            const pointsLost = result.data.pointsLeft || 0;
-            const biddingRemoved = result.data.biddingSheetRemoved || false;
-            const attendanceRemoved = result.data.attendanceSheetsRemoved || 0;
-            const totalSheets = result.data.totalSheetsAffected || 0;
-            const totalAttendance = result.data.totalAttendancePoints || 0;
-            const attendanceDetails = result.data.attendanceSheetsDetails || [];
+          if (result.status === "ok" && result.removed) {
+            const actualName = result.memberName;
+            const pointsLost = result.pointsLeft || 0;
+            const biddingRemoved = result.biddingSheetRemoved || false;
+            const attendanceRemoved = result.attendanceSheetsRemoved || 0;
+            const totalSheets = result.totalSheetsAffected || 0;
+            const totalAttendance = result.totalAttendancePoints || 0;
+            const attendanceDetails = result.attendanceSheetsDetails || [];
 
             // Build detailed description
             let description = `**Member:** ${actualName}\n\n`;
@@ -2435,7 +2435,7 @@ const commandHandlers = {
             );
           } else {
             throw new Error(
-              result.message || result.data?.message || "Member not found"
+              result.message || "Member not found"
             );
           }
         } catch (err) {
