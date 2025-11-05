@@ -56,6 +56,11 @@ class TestRunner {
           throw new Error(`Expected object to have property '${prop}'`);
         }
       },
+      toBeGreaterThan(expected) {
+        if (value <= expected) {
+          throw new Error(`Expected ${value} to be greater than ${expected}`);
+        }
+      },
       toThrow() {
         let threw = false;
         try {
@@ -68,6 +73,10 @@ class TestRunner {
         }
       }
     };
+  }
+
+  run() {
+    this.printResults();
   }
 
   async runSyntaxTests() {

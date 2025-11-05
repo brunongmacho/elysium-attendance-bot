@@ -2496,6 +2496,10 @@ client.once(Events.ClientReady, async () => {
   console.log("🔄 Starting periodic state sync to Google Sheets...");
   attendance.schedulePeriodicStateSync();
 
+  // START AUTO-CLOSE SCHEDULER (20-minute thread timeout to prevent cheating)
+  console.log("⏰ Starting auto-close scheduler (20-minute attendance window)...");
+  attendance.startAutoCloseScheduler(client);
+
   // Sync state references
   activeSpawns = attendance.getActiveSpawns();
   activeColumns = attendance.getActiveColumns();

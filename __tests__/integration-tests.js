@@ -318,6 +318,70 @@ runner.test('index2.js - Size reduced from bugfix', () => {
 });
 
 // ============================================================================
+// TEST CATEGORY 10: Auto-Close Feature
+// ============================================================================
+console.log('\n📦 Category 10: Auto-Close Feature\n');
+
+runner.test('Auto-close scheduler exports exist', () => {
+  const attendanceCode = fs.readFileSync(path.join(__dirname, '..', 'attendance.js'), 'utf8');
+  const hasAutoClose = attendanceCode.includes('checkAndAutoCloseThreads');
+  const hasScheduler = attendanceCode.includes('startAutoCloseScheduler');
+  const hasExport1 = attendanceCode.includes('checkAndAutoCloseThreads,');
+  const hasExport2 = attendanceCode.includes('startAutoCloseScheduler,');
+
+  if (!hasAutoClose || !hasScheduler) {
+    throw new Error('Auto-close functions not found');
+  }
+  if (!hasExport1 || !hasExport2) {
+    throw new Error('Auto-close functions not exported');
+  }
+});
+
+runner.test('Auto-close constants are defined', () => {
+  const attendanceCode = fs.readFileSync(path.join(__dirname, '..', 'attendance.js'), 'utf8');
+  const hasThreadAutoClose = attendanceCode.includes('THREAD_AUTO_CLOSE_MINUTES');
+  const hasAgeCheckInterval = attendanceCode.includes('THREAD_AGE_CHECK_INTERVAL');
+
+  if (!hasThreadAutoClose || !hasAgeCheckInterval) {
+    throw new Error('Auto-close timing constants not defined');
+  }
+});
+
+runner.test('Threads get createdAt timestamp', () => {
+  const attendanceCode = fs.readFileSync(path.join(__dirname, '..', 'attendance.js'), 'utf8');
+  const hasCreatedAt = attendanceCode.includes('createdAt: Date.now()') ||
+                       attendanceCode.includes('createdAt: thread.createdTimestamp');
+
+  if (!hasCreatedAt) {
+    throw new Error('createdAt timestamp not added to threads');
+  }
+});
+
+runner.test('Auto-close scheduler started in index2.js', () => {
+  const index2Code = fs.readFileSync(path.join(__dirname, '..', 'index2.js'), 'utf8');
+  const hasSchedulerStart = index2Code.includes('startAutoCloseScheduler(client)');
+
+  if (!hasSchedulerStart) {
+    throw new Error('Auto-close scheduler not started in index2.js');
+  }
+});
+
+runner.test('Thread embed mentions 20-minute window', () => {
+  const attendanceCode = fs.readFileSync(path.join(__dirname, '..', 'attendance.js'), 'utf8');
+  const hasTwentyMinWarning = attendanceCode.includes('20 minutes') ||
+                              attendanceCode.includes('Auto-closes in 20');
+
+  if (!hasTwentyMinWarning) {
+    throw new Error('Thread embed does not mention 20-minute auto-close');
+  }
+});
+
+runner.test('Auto-close test file exists', () => {
+  const testFilePath = path.join(__dirname, 'attendance-autoclose.test.js');
+  runner.expect(fs.existsSync(testFilePath)).toExist();
+});
+
+// ============================================================================
 // PRINT RESULTS
 // ============================================================================
 

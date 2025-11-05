@@ -575,7 +575,7 @@ const COMMAND_HELP = {
 
   close: {
     usage: "close",
-    description: "Admin command in spawn threads to close and submit attendance",
+    description: "Admin command in spawn threads to close and submit attendance (threads auto-close after 20 minutes)",
     category: "Attendance",
     adminOnly: true,
     example: "close",
@@ -585,7 +585,8 @@ const COMMAND_HELP = {
       "Submits to Google Sheets",
       "Archives thread",
       "Cleans up confirmation thread",
-      "Requires ✅ confirmation"
+      "Requires ✅ confirmation",
+      "⏰ Threads auto-close after 20 min to prevent cheating"
     ]
   },
 
