@@ -52,7 +52,7 @@
  * ✓ Pause/resume functionality for admin control
  * ✓ Skip/cancel individual items
  * ✓ Force-submit results for error recovery
- * ✓ Scheduled daily auctions (8:30 PM GMT+8)
+ * ✓ Scheduled weekly auctions (Every Saturday 8:30 PM GMT+8)
  * ✓ Comprehensive error handling and logging
  *
  * ───────────────────────────────────────────────────────────────────────────
@@ -3277,26 +3277,26 @@ async function handleMoveToDistribution(message, config, client) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Timer reference for daily auction scheduler.
+ * Timer reference for weekly Saturday auction scheduler.
  * Prevents duplicate schedulers from being created.
  * @type {NodeJS.Timeout|null}
  */
-let dailyAuctionTimer = null;
+let weeklyAuctionTimer = null;
 
 /**
- * Schedules automatic daily auctions at 8:30 PM GMT+8 (Manila Time).
+ * Schedules automatic weekly auctions every Saturday at 8:30 PM GMT+8 (Manila Time).
  *
  * FEATURES:
- * - Calculates next 8:30 PM in GMT+8 timezone
- * - Automatically schedules next day's auction after completion
+ * - Calculates next Saturday at 8:30 PM in GMT+8 timezone
+ * - Automatically schedules next week's auction after completion
  * - Logs countdown until next auction
  * - Handles auction-already-running case
  *
  * PROCESS:
- * 1. Calculates time until next 8:30 PM GMT+8
+ * 1. Calculates time until next Saturday 8:30 PM GMT+8
  * 2. Sets timeout for that duration
  * 3. On trigger: starts auction if not already running
- * 4. Reschedules for next day
+ * 4. Reschedules for next Saturday
  *
  * ERROR HANDLING:
  * - Skips if auction already active
@@ -3306,16 +3306,16 @@ let dailyAuctionTimer = null;
  * @param {Discord.Client} client - Discord bot client
  * @param {Object} config - Bot configuration
  */
-function scheduleDailyAuction(client, config) {
+function scheduleWeeklySaturdayAuction(client, config) {
   // Prevent duplicate schedulers
-  if (dailyAuctionTimer) {
-    console.log(`${EMOJI.WARNING} Daily auction scheduler already running, skipping initialization`);
+  if (weeklyAuctionTimer) {
+    console.log(`${EMOJI.WARNING} Weekly auction scheduler already running, skipping initialization`);
     return;
   }
 
-  console.log(`${EMOJI.CLOCK} Initializing daily auction scheduler...`);
+  console.log(`${EMOJI.CLOCK} Initializing weekly Saturday auction scheduler...`);
 
-  const calculateNext830PM = () => {
+  const calculateNextSaturday830PM = () => {
     const now = new Date();
 
     // GMT+8 offset in milliseconds
@@ -3328,10 +3328,28 @@ function scheduleDailyAuction(client, config) {
     const targetGMT8 = new Date(nowGMT8);
     targetGMT8.setUTCHours(20, 30, 0, 0);
 
-    // If already past 8:30 PM today, schedule for tomorrow
-    if (targetGMT8.getTime() <= nowGMT8.getTime()) {
-      targetGMT8.setUTCDate(targetGMT8.getUTCDate() + 1);
+    // Get current day of week (0 = Sunday, 6 = Saturday)
+    const currentDay = targetGMT8.getUTCDay();
+
+    // Calculate days until next Saturday
+    let daysUntilSaturday;
+    if (currentDay === 6) {
+      // Today is Saturday
+      if (targetGMT8.getTime() > nowGMT8.getTime()) {
+        // Haven't reached 8:30 PM yet today
+        daysUntilSaturday = 0;
+      } else {
+        // Already past 8:30 PM, schedule for next Saturday
+        daysUntilSaturday = 7;
+      }
+    } else {
+      // Not Saturday, calculate days until next Saturday
+      daysUntilSaturday = (6 - currentDay + 7) % 7;
+      if (daysUntilSaturday === 0) daysUntilSaturday = 7;
     }
+
+    // Add days to target date
+    targetGMT8.setUTCDate(targetGMT8.getUTCDate() + daysUntilSaturday);
 
     // Convert back to UTC for the actual timer
     const targetUTC = new Date(targetGMT8.getTime() - GMT8_OFFSET);
@@ -3340,19 +3358,24 @@ function scheduleDailyAuction(client, config) {
   };
 
   const scheduleNext = () => {
-    const nextUTC = calculateNext830PM();
+    const nextUTC = calculateNextSaturday830PM();
     const now = new Date();
     const delay = nextUTC.getTime() - now.getTime();
 
     // Format for display in Manila time
     const displayTime = new Date(nextUTC.getTime() + 8 * 60 * 60 * 1000);
-    const hours = Math.floor(delay / 1000 / 60 / 60);
+    const days = Math.floor(delay / 1000 / 60 / 60 / 24);
+    const hours = Math.floor((delay / 1000 / 60 / 60) % 24);
     const minutes = Math.floor((delay / 1000 / 60) % 60);
 
-    console.log(`${EMOJI.CLOCK} Next daily auction scheduled for: ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${hours}h ${minutes}m)`);
+    // Get day name
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = dayNames[displayTime.getUTCDay()];
 
-    dailyAuctionTimer = setTimeout(async () => {
-      console.log(`${EMOJI.AUCTION} Daily auction time! Starting auction...`);
+    console.log(`${EMOJI.CLOCK} Next Saturday auction scheduled for: ${dayName}, ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${days}d ${hours}h ${minutes}m)`);
+
+    weeklyAuctionTimer = setTimeout(async () => {
+      console.log(`${EMOJI.AUCTION} Saturday auction time! Starting auction...`);
 
       try {
         // Check if auction is already running
@@ -3373,7 +3396,7 @@ function scheduleDailyAuction(client, config) {
 
         // Start the auction
         await startAuctioneering(client, config, biddingChannel);
-        console.log(`${EMOJI.SUCCESS} Scheduled daily auction started successfully`);
+        console.log(`${EMOJI.SUCCESS} Scheduled Saturday auction started successfully`);
       } catch (err) {
         console.error(`${EMOJI.ERROR} Failed to start scheduled auction:`, err);
 
@@ -3384,7 +3407,7 @@ function scheduleDailyAuction(client, config) {
           if (adminLogs) {
             await adminLogs.send(
               `${EMOJI.ERROR} **Scheduled Auction Failed**\n` +
-              `Failed to start daily auction at 8:30 PM GMT+8.\n` +
+              `Failed to start Saturday auction at 8:30 PM GMT+8.\n` +
               `**Error:** ${err.message}\n\n` +
               `Please check bot logs and try running \`!startauction\` manually.`
             );
@@ -3394,13 +3417,13 @@ function scheduleDailyAuction(client, config) {
         }
       }
 
-      // Schedule next day's auction
+      // Schedule next Saturday's auction
       scheduleNext();
     }, delay);
   };
 
   scheduleNext();
-  console.log(`${EMOJI.SUCCESS} Daily auction scheduler initialized (8:30 PM GMT+8)`);
+  console.log(`${EMOJI.SUCCESS} Weekly Saturday auction scheduler initialized (8:30 PM GMT+8)`);
 }
 
 module.exports = {
@@ -3427,6 +3450,6 @@ module.exports = {
   handleSkipItem,
   handleForceSubmitResults,
   handleMoveToDistribution,
-  scheduleDailyAuction, // Daily 8:30 PM GMT+8 auction scheduler
+  scheduleWeeklySaturdayAuction, // Weekly Saturday 8:30 PM GMT+8 auction scheduler
   // getCurrentSessionBoss: () => currentSessionBoss - REMOVED: Not used anywhere
 };
