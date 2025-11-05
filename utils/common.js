@@ -360,10 +360,10 @@ function bossNamesMatch(boss1, boss2) {
  * @returns {string} Normalized username
  *
  * @example
- * normalizeUsername("John Doe");       // "john doe"
- * normalizeUsername("  john  doe  ");  // "john doe"
+ * normalizeUsername("John Doe");       // "johndoe"
+ * normalizeUsername("  john  doe  ");  // "johndoe"
  * normalizeUsername("John-Doe");       // "johndoe"
- * normalizeUsername("JOHN DOE");       // "john doe"
+ * normalizeUsername("JOHN DOE");       // "johndoe"
  * normalizeUsername("");               // ""
  * normalizeUsername(null);             // ""
  */
@@ -374,8 +374,8 @@ function normalizeUsername(username) {
     .toString()
     .toLowerCase()                  // Convert to lowercase
     .trim()                         // Remove leading/trailing whitespace
-    .replace(/\s+/g, ' ')          // Replace multiple spaces with single space
-    .replace(/[^\w\s]/g, '');      // Remove special characters (keep alphanumeric and spaces)
+    .replace(/\s+/g, '')            // Remove all spaces
+    .replace(/[^\w]/g, '');         // Remove special characters (keep alphanumeric only)
 }
 
 // ============================================================================
