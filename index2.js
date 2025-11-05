@@ -77,6 +77,7 @@ const leaderboardSystem = require("./leaderboard-system.js"); // Leaderboards
 const errorHandler = require('./utils/error-handler');      // Centralized error handling
 const { SheetAPI } = require('./utils/sheet-api');          // Unified Google Sheets API
 const { DiscordCache } = require('./utils/discord-cache');  // Channel caching system
+const { normalizeUsername } = require('./utils/common');    // Username normalization
 
 /**
  * Command alias mapping for shorthand commands.
@@ -1303,7 +1304,7 @@ const commandHandlers = {
                 .filter(
                   ([msgId, p]) =>
                     !spawnInfo.members.some(
-                      (m) => m.toLowerCase() === p.author.toLowerCase()
+                      (m) => normalizeUsername(m) === normalizeUsername(p.author)
                     )
                 )
                 .map(([msgId, p]) => p.author);
@@ -2936,10 +2937,10 @@ client.on(Events.MessageCreate, async (message) => {
           return;
         }
 
-        // Check for duplicate check-in (case-insensitive)
+        // Check for duplicate check-in (normalized username comparison)
         const username = member.nickname || message.author.username;
         const isDuplicate = spawnInfo.members.some(
-          (m) => m.toLowerCase() === username.toLowerCase()
+          (m) => normalizeUsername(m) === normalizeUsername(username)
         );
 
         if (isDuplicate) {
@@ -3029,7 +3030,7 @@ client.on(Events.MessageCreate, async (message) => {
 
             for (const [msgId, pending] of pendingInThread) {
               const isDuplicate = spawnInfo.members.some(
-                (m) => m.toLowerCase() === pending.author.toLowerCase()
+                (m) => normalizeUsername(m) === normalizeUsername(pending.author)
               );
 
               if (!isDuplicate) {
@@ -3107,7 +3108,7 @@ client.on(Events.MessageCreate, async (message) => {
           : mentioned.username;
 
         const isDuplicate = spawnInfo.members.some(
-          (m) => m.toLowerCase() === username.toLowerCase()
+          (m) => normalizeUsername(m) === normalizeUsername(username)
         );
 
         if (isDuplicate) {
@@ -3642,7 +3643,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 
       if (reaction.emoji.name === "✅") {
         const isDuplicate = spawnInfo.members.some(
-          (m) => m.toLowerCase() === pending.author.toLowerCase()
+          (m) => normalizeUsername(m) === normalizeUsername(pending.author)
         );
 
         if (isDuplicate) {

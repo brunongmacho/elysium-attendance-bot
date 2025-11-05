@@ -65,6 +65,7 @@ const {
   findBossMatch: findBossMatchUtil,
   timestampsMatch,
   bossNamesMatch,
+  normalizeUsername,
   sleep,
 } = require("./utils/common");
 
@@ -1221,9 +1222,9 @@ async function checkAndAutoCloseThreads(client) {
           console.log(`   ✅ Auto-verifying ${pendingInThread.length} pending member(s)`);
 
           for (const [msgId, pending] of pendingInThread) {
-            // Check for duplicates before adding
+            // Check for duplicates before adding (normalized username comparison)
             const isDuplicate = spawnInfo.members.some(
-              (m) => m.toLowerCase() === pending.author.toLowerCase()
+              (m) => normalizeUsername(m) === normalizeUsername(pending.author)
             );
 
             if (!isDuplicate) {
