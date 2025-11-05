@@ -167,8 +167,11 @@ async function forceCloseAllAttendance(message) {
     .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 15s timeout` });
 
   const conf = await message.reply({ embeds: [confirmEmbed] });
-  await conf.react(EMOJI.SUCCESS);
-  await conf.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.2: Batch reactions in parallel instead of sequential
+  await Promise.all([
+    conf.react(EMOJI.SUCCESS),
+    conf.react(EMOJI.ERROR)
+  ]);
 
   try {
     const collected = await conf.awaitReactions({
@@ -187,8 +190,11 @@ async function forceCloseAllAttendance(message) {
     await errorHandler.safeRemoveReactions(conf, 'reaction removal');
 
     const guild = await message.client.guilds.fetch(config.main_guild_id);
-    const attChannel = await guild.channels.fetch(config.attendance_channel_id);
-    const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id);
+    // OPTIMIZATION v6.2: Fetch channels in parallel instead of sequential
+    const [attChannel, adminLogs] = await Promise.all([
+      guild.channels.fetch(config.attendance_channel_id),
+      guild.channels.fetch(config.admin_logs_channel_id)
+    ]);
 
     const threads = await attChannel.threads.fetchActive();
     let closedCount = 0;
@@ -372,8 +378,11 @@ async function forceEndAuction(message) {
     .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 15s timeout` });
 
   const conf = await message.reply({ embeds: [confirmEmbed] });
-  await conf.react(EMOJI.SUCCESS);
-  await conf.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.2: Batch reactions in parallel instead of sequential
+  await Promise.all([
+    conf.react(EMOJI.SUCCESS),
+    conf.react(EMOJI.ERROR)
+  ]);
 
   try {
     const collected = await conf.awaitReactions({
@@ -501,8 +510,11 @@ async function unlockAllPoints(message) {
     .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 15s timeout` });
 
   const conf = await message.reply({ embeds: [confirmEmbed] });
-  await conf.react(EMOJI.SUCCESS);
-  await conf.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.2: Batch reactions in parallel instead of sequential
+  await Promise.all([
+    conf.react(EMOJI.SUCCESS),
+    conf.react(EMOJI.ERROR)
+  ]);
 
   try {
     const collected = await conf.awaitReactions({
@@ -598,8 +610,11 @@ async function clearPendingConfirmations(message) {
     .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 15s timeout` });
 
   const conf = await message.reply({ embeds: [confirmEmbed] });
-  await conf.react(EMOJI.SUCCESS);
-  await conf.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.2: Batch reactions in parallel instead of sequential
+  await Promise.all([
+    conf.react(EMOJI.SUCCESS),
+    conf.react(EMOJI.ERROR)
+  ]);
 
   try {
     const collected = await conf.awaitReactions({
