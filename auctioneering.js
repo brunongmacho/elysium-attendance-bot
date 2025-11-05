@@ -1766,16 +1766,12 @@ async function finalizeSession(client, config, channel) {
     try {
       console.log(`📦 Move attempt ${attempt}/${maxRetries}...`);
 
-      try {
-        moveData = await sheetAPI.call('moveAuctionedItemsToForDistribution');
-        console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution`);
-        moveSuccess = true;
-      } catch (err) {
-        console.error(`❌ Move failed:`, err);
-        moveData = null;
-      }
+      moveData = await sheetAPI.call('moveAuctionedItemsToForDistribution');
 
-      if (moveSuccess) {
+      // Check if the call succeeded
+      if (moveData && moveData.status === 'ok') {
+        console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution (skipped ${moveData.skipped || 0})`);
+        moveSuccess = true;
 
         // Get admin logs channel
         const mainGuild = await client.guilds.fetch(config.main_guild_id);
@@ -1785,23 +1781,20 @@ async function finalizeSession(client, config, channel) {
 
         if (adminLogs && moveData.moved > 0) {
           await adminLogs.send(
-            `📦 **Items Moved to ForDistribution:** ${moveData.moved} completed auction(s)`
+            `📦 **Items Moved to ForDistribution:** ${moveData.moved} completed auction(s) (${moveData.skipped || 0} skipped)`
           );
         }
 
         // Success - break retry loop
         break;
       } else {
-        lastError = `HTTP ${moveResponse.status}`;
+        // API returned error status
+        lastError = moveData?.message || 'Unknown error from sheets API';
         console.error(`⚠️ Move attempt ${attempt} failed: ${lastError}`);
 
-        // OPTIMIZATION v6.7: Exponential backoff with jitter
         if (attempt < maxRetries) {
-          const delay = Math.min(
-            Math.pow(2, attempt) * 1000 + Math.random() * 1000,
-            30000 // Max 30s
-          );
-          console.log(`⏳ Retrying in ${Math.round(delay/1000)}s...`);
+          const delay = Math.pow(2, attempt) * 1000;
+          console.log(`⏳ Retrying in ${delay/1000}s...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
