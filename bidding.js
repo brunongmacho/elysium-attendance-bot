@@ -178,7 +178,7 @@
 
 const { EmbedBuilder } = require("discord.js");
 const fs = require("fs");
-const { normalizeUsername } = require("./utils/common");
+const { normalizeUsername, formatDuration } = require("./modules/bidding/utilities");
 const errorHandler = require('./utils/error-handler');
 const { PointsCache } = require('./utils/points-cache');
 const { SheetAPI } = require('./utils/sheet-api');
@@ -470,6 +470,8 @@ const ts = getFormattedManilaTime;
 /**
  * Formats duration in minutes to human-readable string
  *
+ * Uses shared utility from modules/bidding/utilities.js
+ *
  * @param {number} m - Duration in minutes
  * @returns {string} Formatted duration string
  * @example
@@ -477,12 +479,7 @@ const ts = getFormattedManilaTime;
  * fmtDur(90)   // "1h 30min"
  * fmtDur(120)  // "2h"
  */
-const fmtDur = (m) =>
-  m < 60
-    ? `${m}min`
-    : m % 60 > 0
-    ? `${Math.floor(m / 60)}h ${m % 60}min`
-    : `${Math.floor(m / 60)}h`;
+const fmtDur = formatDuration;
 
 /**
  * Formats time in milliseconds to human-readable string
