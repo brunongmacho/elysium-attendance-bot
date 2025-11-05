@@ -1275,7 +1275,7 @@ function scheduleItemTimers(client, config, channel) {
   }
 
   const item = auctionState.currentItem;
-  const t = item.endTime - Date.now();
+  const t = Math.max(0, item.endTime - Date.now());
 
   if (t > 60000 && !item.go1) {
     auctionState.timers.go1 = setTimeout(
@@ -1462,7 +1462,7 @@ async function itemEnd(client, config, channel) {
   const timestamp = getTimestamp();
   const totalBids = item.bids ? item.bids.length : 0;
   const bidCount = item.curWin
-    ? item.bids.filter((b) => b.user === item.curWin).length
+    ? item.bids.filter((b) => normalizeUsername(b.user) === normalizeUsername(item.curWin)).length
     : 0;
 
   // 🕐 Record end time
@@ -2616,7 +2616,7 @@ async function handleBidStatus(message, config) {
       ? `${EMOJI.PAUSE} PAUSED (${fmtTime(
           auctionState.currentItem.remainingTime || 0
         )})`
-      : fmtTime(auctionState.currentItem.endTime - Date.now());
+      : fmtTime(Math.max(0, auctionState.currentItem.endTime - Date.now()));
 
     statEmbed.addFields(
       {
