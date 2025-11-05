@@ -73,6 +73,22 @@ function normalizeTimestamp(timestamp) {
   }
 }
 
+/**
+ * Normalize username for consistent matching
+ * Matches the normalization in bidding.js utils/common.js
+ * @param {string} username - Username to normalize
+ * @returns {string} Normalized username
+ */
+function normalizeUsername(username) {
+  if (!username) return '';
+  return username
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')           // Replace multiple spaces with single space
+    .replace(/[^\w\s]/g, '');       // Remove special characters (keep alphanumeric and spaces)
+}
+
 // MAIN WEBHOOK HANDLER - COMPLETE VERSION
 function doPost(e) {
   try {
@@ -1126,7 +1142,9 @@ function handleSubmitBiddingResults(data) {
     results.forEach(r => {
       const member = r.member.trim();
       const total = r.totalSpent || 0;
-      let rowIndex = memberNames.findIndex(m => (m||'').toString().trim().toLowerCase() === member.toLowerCase());
+      // Use normalizeUsername for consistent matching (removes special chars, normalizes spacing)
+      const normalizedMember = normalizeUsername(member);
+      let rowIndex = memberNames.findIndex(m => normalizeUsername((m||'').toString()) === normalizedMember);
       if (rowIndex !== -1) {
         updates.push({row: rowIndex + 2, amount: total});
       } else if (total > 0) {

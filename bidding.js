@@ -149,14 +149,16 @@ const fmtTime = (ms) => {
   const h = Math.floor(m / 60);
   return m % 60 > 0 ? `${h}h ${m % 60}m` : `${h}h`;
 };
-const avail = (u, tot) => Math.max(0, tot - (st.lp[u] || 0));
+const avail = (u, tot) => Math.max(0, tot - (st.lp[normalizeUsername(u)] || 0));
 const lock = (u, amt) => {
-  st.lp[u] = (st.lp[u] || 0) + amt;
+  const key = normalizeUsername(u);
+  st.lp[key] = (st.lp[key] || 0) + amt;
   save();
 };
 const unlock = (u, amt) => {
-  st.lp[u] = Math.max(0, (st.lp[u] || 0) - amt);
-  if (st.lp[u] === 0) delete st.lp[u];
+  const key = normalizeUsername(u);
+  st.lp[key] = Math.max(0, (st.lp[key] || 0) - amt);
+  if (st.lp[key] === 0) delete st.lp[key];
   save();
 };
 
@@ -1028,7 +1030,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   }
 
   // Calculate locked points ACROSS ALL SYSTEMS (auctioneering uses st.lp from bidding.js)
-  const curLocked = st.lp[u] || 0;
+  const curLocked = st.lp[normalizeUsername(u)] || 0;
   const av = tot - curLocked;
 
   const isSelf =
@@ -1260,7 +1262,7 @@ async function procBid(msg, amt, cfg) {
 
   // Check if self-overbidding
   const isSelf = a.curWin && a.curWin.toLowerCase() === u.toLowerCase();
-  const curLocked = st.lp[u] || 0;
+  const curLocked = st.lp[normalizeUsername(u)] || 0;
   const needed = isSelf ? Math.max(0, bid - curLocked) : bid;
 
   if (needed > av) {
