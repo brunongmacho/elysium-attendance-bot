@@ -55,6 +55,7 @@ const { SheetAPI } = require('./utils/sheet-api');
 let config = null;  // Bot configuration from config.json
 let client = null;  // Discord.js client instance
 let sheetAPI = null;  // Unified Google Sheets API client
+let discordCache = null;  // Discord channel cache
 
 // ============================================================================
 // INITIALIZATION
@@ -71,10 +72,11 @@ let sheetAPI = null;  // Unified Google Sheets API client
  * @example
  * init(client, config);
  */
-function init(discordClient, botConfig) {
+function init(discordClient, botConfig, cache = null) {
   client = discordClient;
   config = botConfig;
   sheetAPI = new SheetAPI(botConfig.sheet_webhook_url);
+  discordCache = cache;
 }
 
 // ============================================================================
@@ -536,10 +538,9 @@ async function sendWeeklyReport() {
     }
 
     // Get admin-logs channel and ELYSIUM commands channel
-    const guild = await client.guilds.fetch(config.main_guild_id);
-    const adminLogsChannel = await guild.channels.fetch(config.admin_logs_channel_id);
+    const adminLogsChannel = await discordCache.getChannel('admin_logs_channel_id');
     const elysiumCommandsChannel = config.elysium_commands_channel_id
-      ? await guild.channels.fetch(config.elysium_commands_channel_id).catch(() => null)
+      ? await discordCache.getChannel('elysium_commands_channel_id').catch(() => null)
       : null;
 
     if (!adminLogsChannel) {

@@ -603,8 +603,7 @@ async function startAuctioneering(client, config, channel) {
 
   // ✅ FIX: Always fetch the correct bidding channel from config
   try {
-    const guild = await client.guilds.fetch(config.main_guild_id);
-    const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+    const biddingChannel = await discordCache.getChannel('bidding_channel_id');
 
     if (!biddingChannel) {
       console.error(`❌ Could not fetch bidding channel with ID: ${config.bidding_channel_id}`);
@@ -816,10 +815,7 @@ async function startAuctioneering(client, config, channel) {
     delete auctionState.timers.sessionStartCountdown;
     try {
       // Always use the configured bidding channel
-      const guild = await client.guilds.fetch(config.main_guild_id);
-      const biddingChannel = await guild.channels.fetch(
-        config.bidding_channel_id
-      );
+      const biddingChannel = await discordCache.getChannel('bidding_channel_id');
 
       console.log(
         `✅ Using bidding channel: ${biddingChannel.name} (${biddingChannel.id})`
@@ -978,8 +974,7 @@ async function auctionNextItem(client, config, channel) {
       `⚠️ Channel type ${channel.type} invalid – refetching bidding channel...`
     );
     try {
-      const guild = await client.guilds.fetch(config.main_guild_id);
-      channel = await guild.channels.fetch(config.bidding_channel_id);
+      channel = await discordCache.getChannel('bidding_channel_id');
       console.log(
         `✅ Corrected to bidding channel: ${channel.name} (${channel.id})`
       );
@@ -993,8 +988,7 @@ async function auctionNextItem(client, config, channel) {
   if (!channel) {
     console.warn("⚠️ Channel is undefined, attempting to refetch...");
     try {
-      const guild = await client.guilds.fetch(config.main_guild_id);
-      channel = await guild.channels.fetch(config.bidding_channel_id);
+      channel = await discordCache.getChannel('bidding_channel_id');
       if (!channel) {
         console.error("❌ Failed to refetch bidding channel.");
         return;
@@ -3329,8 +3323,7 @@ function scheduleDailyAuction(client, config) {
         }
 
         // Fetch the bidding channel
-        const guild = await client.guilds.fetch(config.main_guild_id);
-        const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+        const biddingChannel = await discordCache.getChannel('bidding_channel_id');
 
         if (!biddingChannel) {
           console.error(`${EMOJI.ERROR} Could not fetch bidding channel for scheduled auction`);
@@ -3346,8 +3339,7 @@ function scheduleDailyAuction(client, config) {
 
         // Try to notify admin logs
         try {
-          const guild = await client.guilds.fetch(config.main_guild_id);
-          const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
+          const adminLogs = await discordCache.getChannel('admin_logs_channel_id').catch(() => null);
 
           if (adminLogs) {
             await adminLogs.send(

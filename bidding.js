@@ -985,10 +985,7 @@ async function logBidRejection(client, config, details) {
     // Send to admin logs asynchronously (don't block bid processing)
     setTimeout(async () => {
       try {
-        const guild = await client.guilds.fetch(config.main_guild_id).catch(() => null);
-        if (!guild) return;
-
-        const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
+        const adminLogs = await discordCache?.getChannel('admin_logs_channel_id').catch(() => null);
         if (!adminLogs) return;
 
         const embed = new EmbedBuilder()
@@ -1144,8 +1141,7 @@ async function startNext(cli, cfg) {
   }
 
   const d = st.q[0];
-  const g = await cli.guilds.fetch(cfg.main_guild_id);
-  const ch = await g.channels.fetch(cfg.bidding_channel_id);
+  const ch = await discordCache.getChannel('bidding_channel_id');
 
   const isBatch = d.quantity > 1;
   const threadName = isBatch
@@ -1279,8 +1275,7 @@ function schedTimers(cli, cfg) {
 async function ann1(cli, cfg) {
   const a = st.a;
   if (!a || a.status !== "active" || st.pause) return;
-  const g = await cli.guilds.fetch(cfg.main_guild_id),
-    th = await g.channels.fetch(a.threadId);
+  const th = await cli.channels.fetch(a.threadId);
   await th.send({
     content: "@everyone",
     embeds: [
@@ -1304,8 +1299,7 @@ async function ann1(cli, cfg) {
 async function ann2(cli, cfg) {
   const a = st.a;
   if (!a || a.status !== "active" || st.pause) return;
-  const g = await cli.guilds.fetch(cfg.main_guild_id),
-    th = await g.channels.fetch(a.threadId);
+  const th = await cli.channels.fetch(a.threadId);
   await th.send({
     content: "@everyone",
     embeds: [
@@ -1329,8 +1323,7 @@ async function ann2(cli, cfg) {
 async function ann3(cli, cfg) {
   const a = st.a;
   if (!a || a.status !== "active" || st.pause) return;
-  const g = await cli.guilds.fetch(cfg.main_guild_id),
-    th = await g.channels.fetch(a.threadId);
+  const th = await cli.channels.fetch(a.threadId);
   await th.send({
     content: "@everyone",
     embeds: [
@@ -1354,8 +1347,7 @@ async function endAuc(cli, cfg) {
   const a = st.a;
   if (!a) return;
   a.status = "ended";
-  const g = await cli.guilds.fetch(cfg.main_guild_id),
-    th = await g.channels.fetch(a.threadId);
+  const th = await cli.channels.fetch(a.threadId);
 
   const isBatch = a.quantity > 1;
 
@@ -1546,9 +1538,10 @@ async function loadBiddingStateFromSheet(url) {
 }
 
 async function finalize(cli, cfg) {
-  const g = await cli.guilds.fetch(cfg.main_guild_id);
-  const adm = await g.channels.fetch(cfg.admin_logs_channel_id);
-  const bch = await g.channels.fetch(cfg.bidding_channel_id);
+  const [adm, bch] = await Promise.all([
+    discordCache.getChannel('admin_logs_channel_id'),
+    discordCache.getChannel('bidding_channel_id')
+  ]);
 
   // Stop cache auto-refresh
   stopCacheAutoRefresh();
@@ -3083,8 +3076,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
           try {
             // Get the channel
-            const guild = await cli.guilds.fetch(cfg.main_guild_id);
-            const channel = await guild.channels.fetch(cfg.bidding_channel_id);
+            const channel = await discordCache.getChannel('bidding_channel_id');
 
             // Call finalize from auctioneering module (need to check if this exists)
             await msg.reply(

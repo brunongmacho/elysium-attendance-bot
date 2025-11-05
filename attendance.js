@@ -79,6 +79,7 @@ let config = null;              // Bot configuration loaded at initialization
 let bossPoints = null;          // Boss name to points value mapping
 let isAdminFunc = null;         // Function to check admin privileges
 let sheetAPI = null;            // Unified Google Sheets API client
+let discordCache = null;        // Discord channel cache
 let activeSpawns = {};          // Active spawn threads and their data
 let activeColumns = {};         // Boss|timestamp to threadId mapping for deduplication
 let pendingVerifications = {};  // Message IDs awaiting admin verification
@@ -114,11 +115,12 @@ const TIMING = {
  * @example
  * initialize(config, { "VALAKAS": { points: 100 } }, (userId) => checkAdmin(userId));
  */
-function initialize(cfg, bossPointsData, isAdmin) {
+function initialize(cfg, bossPointsData, isAdmin, cache = null) {
   config = cfg;
   bossPoints = bossPointsData;
   isAdminFunc = isAdmin;
   sheetAPI = new SheetAPI(cfg.sheet_webhook_url);
+  discordCache = cache;
   console.log("✅ Attendance module initialized");
 }
 
@@ -599,14 +601,10 @@ async function recoverStateFromThreads(client) {
   console.log("═══════════════════════════════════════════════════════");
 
   try {
-    const mainGuild = await client.guilds.fetch(config.main_guild_id).catch(() => null);
-    if (!mainGuild) {
-      console.log("❌ Could not fetch main guild");
-      return { success: false, recovered: 0, pending: 0 };
-    }
-
-    const attChannel = await mainGuild.channels.fetch(config.attendance_channel_id).catch(() => null);
-    const adminLogs = await mainGuild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
+    const [attChannel, adminLogs] = await Promise.all([
+      discordCache.getChannel('attendance_channel_id').catch(() => null),
+      discordCache.getChannel('admin_logs_channel_id').catch(() => null)
+    ]);
 
     if (!attChannel || !adminLogs) {
       console.log("❌ Could not fetch required channels");
