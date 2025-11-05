@@ -1787,7 +1787,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   const av = tot - curLocked;
 
   const isSelf =
-    currentItem.curWin && currentItem.curWin.toLowerCase() === u.toLowerCase();
+    currentItem.curWin && normalizeUsername(currentItem.curWin) === normalizeUsername(u);
   const needed = isSelf ? Math.max(0, bid - currentItem.curBid) : bid;
 
   if (needed > av) {
@@ -1866,7 +1866,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     );
     console.log(`📊 Old end time: ${new Date(oldEndTime).toLocaleTimeString()}`);
     console.log(`📊 New end time: ${new Date(currentItem.endTime).toLocaleTimeString()}`);
-    console.log(`📊 New time left: ${Math.floor((currentItem.endTime - Date.now()) / 1000)}s`);
+    console.log(`📊 New time left: ${Math.ceil((currentItem.endTime - Date.now()) / 1000)}s`);
 
     // STEP 3: Reschedule timers with new endTime
     if (auctRef && typeof auctRef.rescheduleItemTimers === "function") {
@@ -2076,9 +2076,9 @@ async function procBid(msg, amt, cfg) {
   }
 
   // Check if self-overbidding
-  const isSelf = a.curWin && a.curWin.toLowerCase() === u.toLowerCase();
+  const isSelf = a.curWin && normalizeUsername(a.curWin) === normalizeUsername(u);
   const curLocked = st.lp[normalizeUsername(u)] || 0;
-  const needed = isSelf ? Math.max(0, bid - curLocked) : bid;
+  const needed = isSelf ? Math.max(0, bid - a.curBid) : bid;
 
   if (needed > av) {
     await msg.reply(
