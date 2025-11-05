@@ -65,13 +65,9 @@ const EMOJIS = constants.EMOJIS;
  * console.log(timestamp.time); // "09:22"
  */
 function getCurrentTimestamp() {
-  // Get current time in UTC
-  const now = new Date();
-
-  // Convert to Manila timezone using locale string
-  const manilaTime = new Date(
-    now.toLocaleString("en-US", { timeZone: "Asia/Manila" })
-  );
+  // Use cached Manila time conversion for performance (v6.2 optimization)
+  const { getManilaTime } = require('./timestamp-cache');
+  const manilaTime = getManilaTime();
 
   // Extract date components with zero-padding
   const month = String(manilaTime.getMonth() + 1).padStart(2, "0");
@@ -103,11 +99,9 @@ function getCurrentTimestamp() {
  * console.log(sunday); // "20251026" (Sunday of that week)
  */
 function getSundayOfWeek() {
-  // Get current time in Manila timezone
-  const now = new Date();
-  const manilaTime = new Date(
-    now.toLocaleString("en-US", { timeZone: "Asia/Manila" })
-  );
+  // Use cached Manila time conversion for performance (v6.2 optimization)
+  const { getManilaTime } = require('./timestamp-cache');
+  const manilaTime = getManilaTime();
 
   // Calculate Sunday of the current week
   // getDay() returns 0 for Sunday, 1 for Monday, etc.

@@ -453,10 +453,9 @@ const isAdm = (m, c) =>
  * ts() // "12/25/2024 14:30"
  */
 const ts = () => {
-  const d = new Date();
-  const manilaTime = new Date(
-    d.toLocaleString("en-US", { timeZone: "Asia/Manila" })
-  );
+  // Use cached Manila time conversion for performance (v6.2 optimization)
+  const { getManilaTime } = require('./utils/timestamp-cache');
+  const manilaTime = getManilaTime();
 
   return `${String(manilaTime.getMonth() + 1).padStart(2, "0")}/${String(
     manilaTime.getDate()
@@ -3208,16 +3207,102 @@ function cleanupPendingConfirmations() {
 }
 
 /**
+ * Prunes stuck locked points that should have been released (v6.2 optimization)
+ *
+ * CLEANUP LOGIC:
+ * - Checks if any auction is currently active
+ * - If no active auction and locked points exist, they're likely stuck
+ * - Logs warning for manual review
+ * - Does NOT auto-clear (requires manual !fixlockedpoints command for safety)
+ *
+ * MEMORY MANAGEMENT:
+ * - Prevents locked points from accumulating indefinitely
+ * - Detects orphaned locks from crashed auctions
+ * - Provides visibility into potential issues
+ *
+ * SAFETY:
+ * - Only reports issues, doesn't auto-fix
+ * - Admin must manually clear using !fixlockedpoints
+ * - Prevents accidental point loss
+ *
+ * @returns {Object} Pruning statistics
+ */
+function checkLockedPoints() {
+  const lockedCount = Object.keys(st.lp).length;
+  const totalLocked = Object.values(st.lp).reduce((sum, pts) => sum + pts, 0);
+
+  // Check if there's an active auction
+  const hasActiveAuction = st.a && st.a.status === 'active';
+
+  // Check auctioneering module too
+  let auctioneeringActive = false;
+  try {
+    const auctModule = require('./auctioneering.js');
+    const auctState = auctModule.getAuctionState();
+    auctioneeringActive = auctState && auctState.active;
+  } catch (e) {
+    // Auctioneering module might not be loaded yet
+  }
+
+  const anyActiveAuction = hasActiveAuction || auctioneeringActive;
+
+  // Report stuck points if no auction is running
+  if (lockedCount > 0 && !anyActiveAuction) {
+    console.log(
+      `⚠️ MEMORY WARNING: ${lockedCount} members have ${totalLocked}pts locked but no auction is active. ` +
+      `Run !fixlockedpoints to clear.`
+    );
+    return { stuck: true, count: lockedCount, total: totalLocked };
+  }
+
+  return { stuck: false, count: lockedCount, total: totalLocked };
+}
+
+/**
+ * Get memory usage statistics (v6.2 monitoring)
+ *
+ * METRICS:
+ * - Heap memory usage (used, total, limit)
+ * - State object sizes (pending confirmations, locked points, history)
+ * - Cache status
+ *
+ * @returns {Object} Memory statistics
+ */
+function getMemoryStats() {
+  const mem = process.memoryUsage();
+  const memMB = {
+    rss: Math.round(mem.rss / 1024 / 1024),
+    heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
+    heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
+    external: Math.round(mem.external / 1024 / 1024),
+  };
+
+  return {
+    memory: memMB,
+    state: {
+      pendingConfirmations: Object.keys(st.pc).length,
+      lockedPointsMembers: Object.keys(st.lp).length,
+      lockedPointsTotal: Object.values(st.lp).reduce((sum, pts) => sum + pts, 0),
+      historySize: st.h.length,
+      queueSize: st.q.length,
+      cacheSize: st.cp ? st.cp.size() : 0,
+    }
+  };
+}
+
+/**
  * Global cleanup interval reference
  * @type {NodeJS.Timeout|null}
  */
 let cleanupInterval = null;
 
 /**
- * Starts periodic cleanup schedule for pending confirmations
+ * Starts periodic cleanup schedule for pending confirmations and memory checks (v6.2 enhanced)
  *
  * SCHEDULE:
  * - Runs cleanupPendingConfirmations every 2 minutes
+ * - Runs checkLockedPoints every 5 minutes
+ * - Logs memory stats every 30 minutes
  * - Continues indefinitely until bot restart
  * - Prevents multiple schedules (checks if already running)
  *
@@ -3228,12 +3313,32 @@ let cleanupInterval = null;
  * MEMORY MANAGEMENT:
  * - Essential for long-running bot instances
  * - Prevents memory leaks from orphaned confirmations
+ * - Detects stuck locked points
+ * - Monitors overall memory usage
  * - Keeps state object clean and bounded
  */
 function startCleanupSchedule() {
   if (!cleanupInterval) {
-    cleanupInterval = setInterval(cleanupPendingConfirmations, 120000); // 2 minutes
-    console.log("🧹 Started pending confirmations cleanup schedule");
+    // Main cleanup: every 2 minutes
+    cleanupInterval = setInterval(() => {
+      cleanupPendingConfirmations();
+    }, 120000); // 2 minutes
+
+    // Locked points check: every 5 minutes
+    setInterval(() => {
+      checkLockedPoints();
+    }, 300000); // 5 minutes
+
+    // Memory stats: every 30 minutes
+    setInterval(() => {
+      const stats = getMemoryStats();
+      console.log(`📊 Memory: ${stats.memory.heapUsed}MB / ${stats.memory.heapTotal}MB heap, ` +
+                  `${stats.state.pendingConfirmations} pending, ` +
+                  `${stats.state.lockedPointsMembers} locked, ` +
+                  `${stats.state.historySize} history`);
+    }, 1800000); // 30 minutes
+
+    console.log("🧹 Started cleanup schedule (confirmations, locked points, memory monitoring)");
   }
 }
 

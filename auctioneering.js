@@ -316,10 +316,10 @@ function initialize(config, isAdminFunc, biddingModuleRef) {
  * @returns {string} Formatted timestamp string
  */
 function getTimestamp() {
-  const d = new Date();
-  const manilaTime = new Date(
-    d.toLocaleString("en-US", { timeZone: "Asia/Manila" })
-  );
+  // Use cached Manila time conversion for performance (v6.2 optimization)
+  const { getManilaTime } = require('./utils/timestamp-cache');
+  const manilaTime = getManilaTime();
+
   return `${String(manilaTime.getMonth() + 1).padStart(2, "0")}/${String(
     manilaTime.getDate()
   ).padStart(2, "0")}/${manilaTime.getFullYear()} ${String(
