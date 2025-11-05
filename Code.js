@@ -1007,6 +1007,33 @@ function handleGetBiddingPoints(data) {
 }
 
 /**
+ * Calculate similarity between two strings (0-1, higher is more similar)
+ * Uses a simple character overlap algorithm
+ */
+function calculateSimilarity(str1, str2) {
+  const s1 = str1.toLowerCase();
+  const s2 = str2.toLowerCase();
+
+  if (s1 === s2) return 1.0;
+  if (s1.length === 0 || s2.length === 0) return 0.0;
+
+  // Calculate overlap
+  let matches = 0;
+  const minLen = Math.min(s1.length, s2.length);
+
+  for (let i = 0; i < minLen; i++) {
+    if (s1[i] === s2[i]) matches++;
+  }
+
+  // Also check if one contains the other
+  if (s1.includes(s2) || s2.includes(s1)) {
+    matches += Math.min(s1.length, s2.length) * 0.5;
+  }
+
+  return matches / Math.max(s1.length, s2.length);
+}
+
+/**
  * Removes a member from ALL sheets (BiddingPoints and all attendance sheets)
  * Used when members are kicked or banned from the guild
  *
@@ -1028,11 +1055,16 @@ function handleRemoveMember(data) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const normalizedTarget = normalizeUsername(memberName);
 
+  Logger.log(`🔍 Searching for member: "${memberName}" (normalized: "${normalizedTarget}")`);
+
   let actualMemberName = memberName;
   let pointsLeft = 0;
   let biddingSheetRemoved = false;
   let attendanceSheetsRemoved = 0;
   const attendanceSheetsDetails = [];
+
+  // Collect all member names for debugging (if member not found)
+  const allMemberNames = new Set();
 
   // ==========================================
   // STEP 1: Remove from BiddingPoints sheet
@@ -1046,9 +1078,14 @@ function handleRemoveMember(data) {
       const memberNames = biddingSheet.getRange(2, 1, lastRow - 1, 1).getValues();
       let rowIndex = -1;
 
+      Logger.log(`📊 BiddingPoints sheet has ${memberNames.length} members`);
+
       for (let i = 0; i < memberNames.length; i++) {
         const currentMember = (memberNames[i][0] || '').toString().trim();
         const normalizedCurrent = normalizeUsername(currentMember);
+
+        // Collect for debugging
+        if (currentMember) allMemberNames.add(currentMember);
 
         if (normalizedCurrent === normalizedTarget) {
           rowIndex = i + 2; // +2 because array is 0-indexed and we start from row 2
@@ -1067,6 +1104,8 @@ function handleRemoveMember(data) {
         biddingSheetRemoved = true;
 
         Logger.log(`✅ Removed member: ${actualMemberName} from ${CONFIG.BIDDING_SHEET} (had ${pointsLeft} points)`);
+      } else {
+        Logger.log(`❌ Member not found in BiddingPoints sheet`);
       }
     }
   }
@@ -1089,6 +1128,7 @@ function handleRemoveMember(data) {
     const lastRow = sheet.getLastRow();
 
     if (lastRow < 3) {
+      Logger.log(`⏭️ Skipping ${sheetName} (no member data)`);
       return; // Skip sheets with no member data (only headers)
     }
 
@@ -1097,9 +1137,14 @@ function handleRemoveMember(data) {
       const memberNames = sheet.getRange(3, COLUMNS.MEMBERS, lastRow - 2, 1).getValues();
       let rowIndex = -1;
 
+      Logger.log(`📊 ${sheetName} has ${memberNames.length} members`);
+
       for (let i = 0; i < memberNames.length; i++) {
         const currentMember = (memberNames[i][0] || '').toString().trim();
         const normalizedCurrent = normalizeUsername(currentMember);
+
+        // Collect for debugging
+        if (currentMember) allMemberNames.add(currentMember);
 
         if (normalizedCurrent === normalizedTarget) {
           rowIndex = i + 3; // +3 because array is 0-indexed and we start from row 3
@@ -1125,6 +1170,8 @@ function handleRemoveMember(data) {
         });
 
         Logger.log(`✅ Removed member from ${sheetName} (had ${attendancePoints} attendance points)`);
+      } else {
+        Logger.log(`❌ Member not found in ${sheetName}`);
       }
     } catch (err) {
       Logger.log(`⚠️ Error removing from ${sheetName}: ${err.message}`);
@@ -1144,9 +1191,14 @@ function handleRemoveMember(data) {
       const memberNames = totalAttendanceSheet.getRange(2, 1, lastRow - 1, 1).getValues();
       let rowIndex = -1;
 
+      Logger.log(`📊 TOTAL ATTENDANCE sheet has ${memberNames.length} members`);
+
       for (let i = 0; i < memberNames.length; i++) {
         const currentMember = (memberNames[i][0] || '').toString().trim();
         const normalizedCurrent = normalizeUsername(currentMember);
+
+        // Collect for debugging
+        if (currentMember) allMemberNames.add(currentMember);
 
         if (normalizedCurrent === normalizedTarget) {
           rowIndex = i + 2; // +2 because array is 0-indexed and we start from row 2
@@ -1159,6 +1211,8 @@ function handleRemoveMember(data) {
         totalAttendanceSheet.deleteRow(rowIndex);
         totalAttendanceRemoved = true;
         Logger.log(`✅ Removed member from TOTAL ATTENDANCE sheet`);
+      } else {
+        Logger.log(`❌ Member not found in TOTAL ATTENDANCE sheet`);
       }
     }
   }
@@ -1167,11 +1221,57 @@ function handleRemoveMember(data) {
   // STEP 4: Return detailed results
   // ==========================================
   if (!biddingSheetRemoved && attendanceSheetsRemoved === 0 && !totalAttendanceRemoved) {
-    return createResponse('error', `Member "${memberName}" not found in any sheets`, {
+    // Member not found - provide helpful suggestions
+    const allMembersArray = Array.from(allMemberNames).filter(m => m && m.length > 0);
+
+    Logger.log(`❌ Member "${memberName}" not found in any sheets`);
+    Logger.log(`📋 Total unique members found across all sheets: ${allMembersArray.length}`);
+
+    // Find similar member names
+    const similarities = allMembersArray.map(name => ({
+      name: name,
+      similarity: calculateSimilarity(memberName, name)
+    }));
+
+    // Sort by similarity (highest first)
+    similarities.sort((a, b) => b.similarity - a.similarity);
+
+    // Get top 5 similar names
+    const topMatches = similarities.slice(0, 5);
+
+    Logger.log(`🔍 Top similar names:`);
+    topMatches.forEach(match => {
+      Logger.log(`  - "${match.name}" (similarity: ${(match.similarity * 100).toFixed(0)}%)`);
+    });
+
+    // Build error message with suggestions
+    let errorMessage = `Member "${memberName}" not found in any sheets.`;
+
+    if (topMatches.length > 0 && topMatches[0].similarity > 0.3) {
+      errorMessage += '\n\nDid you mean one of these?';
+      topMatches.forEach(match => {
+        if (match.similarity > 0.3) {
+          errorMessage += `\n• ${match.name}`;
+        }
+      });
+    } else if (allMembersArray.length > 0) {
+      // Show first 10 members if no good matches
+      errorMessage += `\n\nAvailable members (first 10 of ${allMembersArray.length}):`;
+      allMembersArray.slice(0, 10).forEach(name => {
+        errorMessage += `\n• ${name}`;
+      });
+      if (allMembersArray.length > 10) {
+        errorMessage += `\n... and ${allMembersArray.length - 10} more`;
+      }
+    }
+
+    return createResponse('error', errorMessage, {
       found: false,
       biddingSheetRemoved: false,
       attendanceSheetsRemoved: 0,
-      totalAttendanceRemoved: false
+      totalAttendanceRemoved: false,
+      suggestions: topMatches.map(m => m.name),
+      totalMembersFound: allMembersArray.length
     });
   }
 
