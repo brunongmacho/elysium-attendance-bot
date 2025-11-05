@@ -1866,7 +1866,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     );
     console.log(`📊 Old end time: ${new Date(oldEndTime).toLocaleTimeString()}`);
     console.log(`📊 New end time: ${new Date(currentItem.endTime).toLocaleTimeString()}`);
-    console.log(`📊 New time left: ${Math.floor((currentItem.endTime - Date.now()) / 1000)}s`);
+    console.log(`📊 New time left: ${Math.ceil((currentItem.endTime - Date.now()) / 1000)}s`);
 
     // STEP 3: Reschedule timers with new endTime
     if (auctRef && typeof auctRef.rescheduleItemTimers === "function") {

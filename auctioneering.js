@@ -2005,6 +2005,11 @@ function pauseSession() {
   auctionState.paused = true;
   auctionState.pausedTime = Date.now();
 
+  // Store remaining time for accurate display during pause
+  if (auctionState.currentItem) {
+    auctionState.currentItem.remainingTime = auctionState.currentItem.endTime - Date.now();
+  }
+
   clearAllAuctionTimers();
   console.log(`${EMOJI.PAUSE} Session paused`);
 
@@ -2041,6 +2046,11 @@ function resumeSession(client, config, channel) {
 
   const pausedDuration = Date.now() - auctionState.pausedTime;
   auctionState.currentItem.endTime += pausedDuration;
+
+  // Clean up remainingTime field after resume
+  if (auctionState.currentItem) {
+    delete auctionState.currentItem.remainingTime;
+  }
 
   scheduleItemTimers(client, config, channel);
   console.log(`${EMOJI.PLAY} Session resumed`);
@@ -2604,7 +2614,7 @@ async function handleBidStatus(message, config) {
   if (auctionState.active && auctionState.currentItem) {
     const timeLeft = auctionState.paused
       ? `${EMOJI.PAUSE} PAUSED (${fmtTime(
-          auctionState.currentItem.endTime - Date.now()
+          auctionState.currentItem.remainingTime || 0
         )})`
       : fmtTime(auctionState.currentItem.endTime - Date.now());
 
