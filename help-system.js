@@ -348,7 +348,8 @@ const COMMAND_HELP = {
     aliases: ["!auc-pause", "!hold"],
     features: [
       "Freezes current item timer",
-      "Preserves remaining time",
+      "Preserves remaining time (clamped to non-negative)",
+      "Handles edge cases (pause at/after end time)",
       "Allows admin intervention",
       "Resume with !resume"
     ]
@@ -550,7 +551,7 @@ const COMMAND_HELP = {
     features: [
       "Active auction info",
       "Current bid amount",
-      "Time remaining",
+      "Time remaining (always non-negative)",
       "Queue preview",
       "Remaining items count"
     ]
@@ -751,7 +752,8 @@ async function handleHelp(message, args, member) {
         `${EMOJI.SUCCESS} State persistence to Google Sheets\n` +
         `${EMOJI.SUCCESS} 10-minute auction cooldown\n` +
         `${EMOJI.SUCCESS} Auto-bidding channel cleanup (12h)\n` +
-        `${EMOJI.SUCCESS} Maintenance bulk thread creation`
+        `${EMOJI.SUCCESS} Maintenance bulk thread creation\n` +
+        `${EMOJI.SUCCESS} Enhanced time calculations (always non-negative)`
       )
       .addFields({
         name: `${EMOJI.CHART} Quick Stats`,

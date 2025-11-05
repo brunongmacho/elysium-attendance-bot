@@ -1275,7 +1275,7 @@ function scheduleItemTimers(client, config, channel) {
   }
 
   const item = auctionState.currentItem;
-  const t = item.endTime - Date.now();
+  const t = Math.max(0, item.endTime - Date.now());
 
   if (t > 60000 && !item.go1) {
     auctionState.timers.go1 = setTimeout(
@@ -1462,7 +1462,7 @@ async function itemEnd(client, config, channel) {
   const timestamp = getTimestamp();
   const totalBids = item.bids ? item.bids.length : 0;
   const bidCount = item.curWin
-    ? item.bids.filter((b) => b.user === item.curWin).length
+    ? item.bids.filter((b) => normalizeUsername(b.user) === normalizeUsername(item.curWin)).length
     : 0;
 
   // 🕐 Record end time
@@ -1766,16 +1766,12 @@ async function finalizeSession(client, config, channel) {
     try {
       console.log(`📦 Move attempt ${attempt}/${maxRetries}...`);
 
-      try {
-        moveData = await sheetAPI.call('moveAuctionedItemsToForDistribution');
-        console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution`);
-        moveSuccess = true;
-      } catch (err) {
-        console.error(`❌ Move failed:`, err);
-        moveData = null;
-      }
+      moveData = await sheetAPI.call('moveAuctionedItemsToForDistribution');
 
-      if (moveSuccess) {
+      // Check if the call succeeded
+      if (moveData && moveData.status === 'ok') {
+        console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution (skipped ${moveData.skipped || 0})`);
+        moveSuccess = true;
 
         // Get admin logs channel
         const mainGuild = await client.guilds.fetch(config.main_guild_id);
@@ -1785,23 +1781,20 @@ async function finalizeSession(client, config, channel) {
 
         if (adminLogs && moveData.moved > 0) {
           await adminLogs.send(
-            `📦 **Items Moved to ForDistribution:** ${moveData.moved} completed auction(s)`
+            `📦 **Items Moved to ForDistribution:** ${moveData.moved} completed auction(s) (${moveData.skipped || 0} skipped)`
           );
         }
 
         // Success - break retry loop
         break;
       } else {
-        lastError = `HTTP ${moveResponse.status}`;
+        // API returned error status
+        lastError = moveData?.message || 'Unknown error from sheets API';
         console.error(`⚠️ Move attempt ${attempt} failed: ${lastError}`);
 
-        // OPTIMIZATION v6.7: Exponential backoff with jitter
         if (attempt < maxRetries) {
-          const delay = Math.min(
-            Math.pow(2, attempt) * 1000 + Math.random() * 1000,
-            30000 // Max 30s
-          );
-          console.log(`⏳ Retrying in ${Math.round(delay/1000)}s...`);
+          const delay = Math.pow(2, attempt) * 1000;
+          console.log(`⏳ Retrying in ${delay/1000}s...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
@@ -1941,25 +1934,48 @@ async function finalizeSession(client, config, channel) {
  * @returns {Promise<Array<Object>>} Array of {member, totalSpent} objects
  */
 async function buildCombinedResults(config) {
+  console.log(`${EMOJI.CHART} Building combined results for ${auctionState.sessionItems?.length || 0} session items...`);
+
   // Fetch fresh points from sheet
   let allPoints = {};
   try {
     const data = await sheetAPI.call('getBiddingPoints');
     allPoints = data.points || {};
+    console.log(`${EMOJI.SUCCESS} Fetched points for ${Object.keys(allPoints).length} members`);
   } catch (err) {
     console.error(`${EMOJI.ERROR} Failed to fetch bidding points:`, err);
     return [];
   }
+
+  // Validate sessionItems exists
+  if (!auctionState.sessionItems || !Array.isArray(auctionState.sessionItems)) {
+    console.error(`${EMOJI.ERROR} Invalid sessionItems array in auctionState`);
+    return [];
+  }
+
   // Use PointsCache for efficient operations
   const pointsCache = new PointsCache(allPoints);
   const allMembers = pointsCache.getAllUsernames();
 
-  // Combine all winners from session
+  // Combine all winners from session (only items with winners)
   const winners = {};
-  auctionState.sessionItems.forEach((item) => {
+  let skippedItems = 0;
+  let processedItems = 0;
+
+  auctionState.sessionItems.forEach((item, index) => {
+    // Skip items without winners (unsold items)
+    if (!item.winner || !item.amount) {
+      skippedItems++;
+      console.log(`${EMOJI.WARNING} Skipping item ${index + 1} "${item.item}" - no winner or amount`);
+      return;
+    }
+
     const normalizedWinner = normalizeUsername(item.winner);
     winners[normalizedWinner] = (winners[normalizedWinner] || 0) + item.amount;
+    processedItems++;
   });
+
+  console.log(`${EMOJI.SUCCESS} Processed ${processedItems} items with winners, skipped ${skippedItems} unsold items`);
 
   // Build results for ALL members (including 0s for clean logs)
   const results = allMembers.map((m) => {
@@ -2007,7 +2023,7 @@ function pauseSession() {
 
   // Store remaining time for accurate display during pause
   if (auctionState.currentItem) {
-    auctionState.currentItem.remainingTime = auctionState.currentItem.endTime - Date.now();
+    auctionState.currentItem.remainingTime = Math.max(0, auctionState.currentItem.endTime - Date.now());
   }
 
   clearAllAuctionTimers();
@@ -2616,7 +2632,7 @@ async function handleBidStatus(message, config) {
       ? `${EMOJI.PAUSE} PAUSED (${fmtTime(
           auctionState.currentItem.remainingTime || 0
         )})`
-      : fmtTime(auctionState.currentItem.endTime - Date.now());
+      : fmtTime(Math.max(0, auctionState.currentItem.endTime - Date.now()));
 
     statEmbed.addFields(
       {

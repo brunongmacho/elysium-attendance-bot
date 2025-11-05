@@ -54,6 +54,7 @@
 - **Bid confirmation** - 10-second window to confirm bids
 - **Locked points system** - prevents double-spending
 - **Race condition protection** - thread locking for bid safety
+- **Reliable time calculations** - always displays non-negative time values
 - **10-minute cooldown** between auction sessions
 - **Queue system** - loads items from Google Sheets
 - **Session history** - tracks all winners and bids
@@ -1137,6 +1138,17 @@ SOFTWARE.
 
 ## 📈 Changelog
 
+### Version 8.1.1 (2025-11-05)
+- 🐛 Fixed negative time display issues in auction system
+  - Clamped `remainingTime` when pausing to prevent negative values
+  - Clamped time display in status embed (always non-negative)
+  - Clamped timer calculations to prevent negative setTimeout values
+- 🔧 Improved username normalization consistency
+  - Normalized usernames in bid count filter for accuracy
+  - Ensures consistent username matching across all operations
+- 📝 Enhanced documentation for pause/resume functionality
+- ✅ Better edge case handling for late pauses and timer operations
+
 ### Version 8.1 (2025-11-05)
 - ✨ Added missing `!weeklyreport` command documentation
 - 🐛 Fixed `!fs` vs `!forcesubmit` naming conflict in help system
@@ -1155,7 +1167,7 @@ SOFTWARE.
 
 ---
 
-**Version:** 8.1
+**Version:** 8.1.1
 **Last Updated:** 2025-11-05
 **Maintainer:** ELYSIUM Guild
 **Status:** Production Ready ✅
