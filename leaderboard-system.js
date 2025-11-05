@@ -264,7 +264,7 @@ async function displayAttendanceLeaderboard(message) {
 
     // Check if data exists
     if (!data || !data.leaderboard || data.leaderboard.length === 0) {
-      await message.reply('📊 No attendance data available yet.');
+      await message.reply({ content: '📊 No attendance data available yet.', failIfNotExists: false });
       return;
     }
 
@@ -313,10 +313,10 @@ async function displayAttendanceLeaderboard(message) {
       });
     }
 
-    await message.reply({ embeds: [embed] });
+    await message.reply({ embeds: [embed], failIfNotExists: false });
   } catch (error) {
     console.error('❌ Error displaying attendance leaderboard:', error);
-    await message.reply('❌ Failed to fetch attendance leaderboard. Please try again later.');
+    await message.reply({ content: '❌ Failed to fetch attendance leaderboard. Please try again later.', failIfNotExists: false });
   }
 }
 
@@ -351,7 +351,7 @@ async function displayBiddingLeaderboard(message) {
     const data = await fetchBiddingLeaderboard();
 
     if (!data || !data.leaderboard || data.leaderboard.length === 0) {
-      await message.reply('📊 No bidding points data available yet.');
+      await message.reply({ content: '📊 No bidding points data available yet.', failIfNotExists: false });
       return;
     }
 
@@ -396,10 +396,10 @@ async function displayBiddingLeaderboard(message) {
       });
     }
 
-    await message.reply({ embeds: [embed] });
+    await message.reply({ embeds: [embed], failIfNotExists: false });
   } catch (error) {
     console.error('❌ Error displaying bidding leaderboard:', error);
-    await message.reply('❌ Failed to fetch bidding points leaderboard. Please try again later.');
+    await message.reply({ content: '❌ Failed to fetch bidding points leaderboard. Please try again later.', failIfNotExists: false });
   }
 }
 
