@@ -2078,7 +2078,7 @@ async function procBid(msg, amt, cfg) {
   // Check if self-overbidding
   const isSelf = a.curWin && normalizeUsername(a.curWin) === normalizeUsername(u);
   const curLocked = st.lp[normalizeUsername(u)] || 0;
-  const needed = isSelf ? Math.max(0, bid - curLocked) : bid;
+  const needed = isSelf ? Math.max(0, bid - a.curBid) : bid;
 
   if (needed > av) {
     await msg.reply(
