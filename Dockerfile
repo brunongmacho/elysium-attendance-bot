@@ -3,8 +3,13 @@ FROM node:18-slim AS deps
 WORKDIR /app
 COPY package*.json ./
 
-# Install required build tools for sharp
-RUN apt-get update && apt-get install -y python3 make g++ \
+# Install required build tools for sharp and native modules
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    pkg-config \
+    libvips-dev \
     && npm ci --production --no-audit --progress=false --include=optional \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
