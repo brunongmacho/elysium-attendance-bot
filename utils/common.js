@@ -8,15 +8,7 @@ const levenshtein = require("fast-levenshtein");
 const { findBossMatchCached } = require('./cache-manager');
 const constants = require('./constants');
 
-// Legacy timing constants (kept for backward compatibility)
-const TIMING = {
-  MIN_SHEET_DELAY: 1000,
-  REACTION_RETRY_ATTEMPTS: 3,
-  REACTION_RETRY_DELAY: 500,
-  SUBMIT_DELAY: 2000,
-};
-
-// Export enhanced constants (prefer using these in new code)
+// Export enhanced constants
 const TIMING_ENHANCED = constants.TIMING;
 const COLORS = constants.COLORS;
 const EMOJIS = constants.EMOJIS;
@@ -271,8 +263,6 @@ async function logErrorToAdmin(client, adminChannelId, options) {
 }
 
 module.exports = {
-  // Legacy exports (backward compatibility)
-  TIMING,
   getCurrentTimestamp,
   getSundayOfWeek,
   formatUptime,
@@ -284,8 +274,6 @@ module.exports = {
   normalizeUsername,
   sleep,
   logErrorToAdmin,
-
-  // Enhanced exports (use these for new code)
   TIMING_ENHANCED,
   COLORS,
   EMOJIS,
