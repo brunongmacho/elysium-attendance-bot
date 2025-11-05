@@ -2362,8 +2362,12 @@ client.once(Events.ClientReady, async () => {
   isRecovering = false;
 
   // ═══════════════════════════════════════════════════════
-  // SEND RECOVERY SUMMARY TO ADMIN LOGS
+  // RECOVERY SUMMARY (CONSOLE ONLY - Discord logging disabled to prevent spam)
   // ═══════════════════════════════════════════════════════
+  // Recovery summary is now only logged to console to prevent Discord spam
+  // If you need to re-enable Discord notifications, uncomment the code below
+
+  /* DISABLED: Recovery summary Discord notification
   const adminLogs = await discordCache.getChannel('admin_logs_channel_id').catch(() => null);
 
   if (adminLogs) {
@@ -2476,6 +2480,7 @@ client.once(Events.ClientReady, async () => {
 
     await adminLogs.send({ embeds: [embed] });
   }
+  */
 
   console.log("\n╔═══════════════════════════════════════════════════════╗");
   console.log("║              ✅ RECOVERY COMPLETE                ║");
