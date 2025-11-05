@@ -1903,7 +1903,10 @@ async function finalizeSession(client, config, channel) {
   auctionState.sessionItems = []; // Clear sold items history
 
   // Clear bidding module cache AND locked points
-  const biddingModule = require("./bidding.js");
+  // Use existing module-level biddingModule (already required at module init)
+  if (!biddingModule) {
+    biddingModule = require("./bidding.js");
+  }
   biddingModule.clearPointsCache();
 
   // CRITICAL: Clear all locked points after session
