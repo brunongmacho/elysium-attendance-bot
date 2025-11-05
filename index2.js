@@ -1900,6 +1900,9 @@ client.once(Events.ClientReady, async () => {
   console.log(`⏰ Timer Server: ${config.timer_server_id}`);
   console.log(`🤖 Version: ${BOT_VERSION}`);
 
+  // Attach config to client for module access
+  client.config = config;
+
   // INITIALIZE AUCTION CACHE (100% uptime guarantee)
   const auctionCache = require('./utils/auction-cache');
   await auctionCache.init();
@@ -2848,7 +2851,6 @@ client.on(Events.MessageCreate, async (message) => {
       const lootCmd = resolveCommandAlias(rawCmd);
       if (lootCmd === "!loot") {
         console.log(`🎯 Loot command detected`);
-        client.config = config; // Store config for loot system
         await lootSystem.handleLootCommand(
           message,
           message.content.trim().split(/\s+/).slice(1),
