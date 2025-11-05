@@ -307,43 +307,66 @@ async function sendWeeklyReport() {
   }
 }
 
+// Scheduler state to prevent duplicates
+let weeklyReportTimer = null;
+
 /**
  * Schedule weekly report for Saturday 11:59pm GMT+8
  * (End of week since weeks start on Sunday)
+ *
+ * FIXED: Proper timezone handling using UTC offset calculations
  */
 function scheduleWeeklyReport() {
+  // Prevent duplicate schedulers
+  if (weeklyReportTimer) {
+    console.log('⚠️ Weekly report scheduler already running, skipping initialization');
+    return;
+  }
+
   // Calculate next Saturday 11:59pm GMT+8
   const calculateNextSaturday1159PM = () => {
     const now = new Date();
-    const manila = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+
+    // GMT+8 offset in milliseconds
+    const GMT8_OFFSET = 8 * 60 * 60 * 1000;
+
+    // Get current time in GMT+8
+    const nowGMT8 = new Date(now.getTime() + GMT8_OFFSET);
 
     // Get current day (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
-    const currentDay = manila.getDay();
+    const currentDay = nowGMT8.getUTCDay();
 
     // Calculate days until next Saturday
     let daysUntilSaturday = (6 - currentDay + 7) % 7;
 
     // If today is Saturday and it's already past 11:59pm, schedule for next Saturday
-    if (daysUntilSaturday === 0 && (manila.getHours() > 23 || (manila.getHours() === 23 && manila.getMinutes() >= 59))) {
+    if (daysUntilSaturday === 0 && (nowGMT8.getUTCHours() > 23 || (nowGMT8.getUTCHours() === 23 && nowGMT8.getUTCMinutes() >= 59))) {
       daysUntilSaturday = 7;
     }
 
-    // Create target date
-    const target = new Date(manila);
-    target.setDate(target.getDate() + daysUntilSaturday);
-    target.setHours(23, 59, 0, 0);
+    // Create target date in GMT+8
+    const targetGMT8 = new Date(nowGMT8);
+    targetGMT8.setUTCDate(targetGMT8.getUTCDate() + daysUntilSaturday);
+    targetGMT8.setUTCHours(23, 59, 0, 0);
 
-    return target;
+    // Convert back to UTC for the actual timer
+    const targetUTC = new Date(targetGMT8.getTime() - GMT8_OFFSET);
+
+    return targetUTC;
   };
 
   const scheduleNext = () => {
-    const nextSaturday = calculateNextSaturday1159PM();
+    const nextSaturdayUTC = calculateNextSaturday1159PM();
     const now = new Date();
-    const delay = nextSaturday.getTime() - now.getTime();
+    const delay = nextSaturdayUTC.getTime() - now.getTime();
 
-    console.log(`📅 Next weekly report scheduled for: ${nextSaturday.toLocaleString('en-US', { timeZone: 'Asia/Manila' })} (in ${Math.floor(delay / 1000 / 60 / 60)} hours)`);
+    // Format for display in Manila time
+    const displayTime = new Date(nextSaturdayUTC.getTime() + 8 * 60 * 60 * 1000);
+    const hours = Math.floor(delay / 1000 / 60 / 60);
 
-    setTimeout(async () => {
+    console.log(`📅 Next weekly report scheduled for: ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${hours} hours)`);
+
+    weeklyReportTimer = setTimeout(async () => {
       await sendWeeklyReport();
       scheduleNext(); // Schedule next week
     }, delay);

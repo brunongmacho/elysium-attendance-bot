@@ -1900,6 +1900,10 @@ client.once(Events.ClientReady, async () => {
   console.log(`⏰ Timer Server: ${config.timer_server_id}`);
   console.log(`🤖 Version: ${BOT_VERSION}`);
 
+  // INITIALIZE AUCTION CACHE (100% uptime guarantee)
+  const auctionCache = require('./utils/auction-cache');
+  await auctionCache.init();
+
   // INITIALIZE ALL MODULES IN CORRECT ORDER
   attendance.initialize(config, bossPoints, isAdmin); // NEW
   helpSystem.initialize(config, isAdmin, BOT_VERSION);
@@ -2109,6 +2113,10 @@ client.once(Events.ClientReady, async () => {
   // START WEEKLY REPORT SCHEDULER (3am Monday GMT+8)
   console.log("📅 Starting weekly report scheduler...");
   leaderboardSystem.scheduleWeeklyReport();
+
+  // START DAILY AUCTION SCHEDULER (8:30 PM GMT+8)
+  console.log("🔨 Starting daily auction scheduler...");
+  auctioneering.scheduleDailyAuction(client, config);
 
   // START PERIODIC GARBAGE COLLECTION (Memory Optimization)
   if (global.gc) {

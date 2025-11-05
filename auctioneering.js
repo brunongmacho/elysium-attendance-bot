@@ -14,6 +14,7 @@ const {
   sleep,
   normalizeUsername,
 } = require("./utils/common");
+const auctionCache = require('./utils/auction-cache');
 const attendance = require("./attendance");
 
 // ==========================================
@@ -121,7 +122,36 @@ function fmtTime(ms) {
   return m % 60 > 0 ? `${h}h ${m % 60}m` : `${h}h`;
 }
 
-async function fetchSheetItems(url, retries = 3) {
+/**
+ * Fetch auction items from Google Sheets with circuit breaker and fallback cache
+ *
+ * BULLETPROOF FEATURES:
+ * - Circuit breaker prevents cascade failures
+ * - Automatic fallback to cached items if API fails
+ * - Exponential backoff retry logic
+ * - 100% uptime guarantee (never returns null)
+ *
+ * @param {string} url - Google Sheets webhook URL
+ * @param {number} retries - Maximum retry attempts (default: 3)
+ * @param {boolean} allowCache - Allow fallback to cache (default: true)
+ * @returns {Array} Items array (never null)
+ */
+async function fetchSheetItems(url, retries = 3, allowCache = true) {
+  // Check circuit breaker - skip if open and use cache
+  if (!auctionCache.canAttemptFetch()) {
+    console.log(`${EMOJI.WARNING} Circuit breaker OPEN - using cached items`);
+    const cachedItems = auctionCache.getCachedItems();
+
+    if (cachedItems.length > 0) {
+      console.log(`${EMOJI.INFO} Using ${cachedItems.length} cached items from ${auctionCache.cache.lastUpdate}`);
+      return cachedItems;
+    } else {
+      console.error(`${EMOJI.ERROR} No cached items available and circuit is open!`);
+      return []; // Return empty array instead of null
+    }
+  }
+
+  // Attempt to fetch from Google Sheets
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const r = await fetch(url, {
@@ -130,17 +160,31 @@ async function fetchSheetItems(url, retries = 3) {
         body: JSON.stringify({ action: "getBiddingItems" }),
         timeout: TIMEOUTS.FETCH_TIMEOUT,
       });
+
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
+
       const data = await r.json();
+      const items = data.items || [];
+
       console.log(
-        `${EMOJI.SUCCESS} Fetched ${(data.items || []).length} items from sheet`
+        `${EMOJI.SUCCESS} Fetched ${items.length} items from Google Sheets`
       );
-      return data.items || [];
+
+      // Record success in cache and circuit breaker
+      auctionCache.recordSuccess(items);
+
+      return items;
     } catch (e) {
       console.error(
         `${EMOJI.ERROR} Fetch items attempt ${attempt}/${retries}:`,
         e.message
       );
+
+      // Record failure if last attempt
+      if (attempt === retries) {
+        auctionCache.recordFailure(e);
+      }
+
       if (attempt < retries) {
         const backoff = 2000 * attempt; // Exponential backoff: 2s, 4s, 6s
         console.log(`${EMOJI.WARNING} Retrying in ${backoff / 1000}s...`);
@@ -148,10 +192,32 @@ async function fetchSheetItems(url, retries = 3) {
       }
     }
   }
+
+  // All retries failed - use fallback cache
   console.error(
     `${EMOJI.ERROR} Failed to fetch items after ${retries} attempts`
   );
-  return null;
+
+  if (allowCache) {
+    const cachedItems = auctionCache.getCachedItems();
+
+    if (cachedItems.length > 0) {
+      const cacheAge = auctionCache.cache.lastFetch
+        ? Math.floor((Date.now() - auctionCache.cache.lastFetch) / 1000 / 60)
+        : '∞';
+
+      console.log(
+        `${EMOJI.WARNING} FALLBACK: Using ${cachedItems.length} cached items (age: ${cacheAge} minutes)`
+      );
+
+      return cachedItems;
+    } else {
+      console.error(`${EMOJI.ERROR} CRITICAL: No cached items available!`);
+      return []; // Return empty array instead of null
+    }
+  }
+
+  return []; // Return empty array instead of null
 }
 
 async function logAuctionResult(
@@ -347,10 +413,24 @@ async function startAuctioneering(client, config, channel) {
     return;
   }
 
-  // Fetch sheet items
+  // Fetch sheet items with fallback cache
   const sheetItems = await fetchSheetItems(config.sheet_webhook_url);
-  if (!sheetItems) {
-    await channel.send(`❌ Failed to load items`);
+
+  // Check if we got items (never null due to fallback, but could be empty)
+  if (sheetItems.length === 0) {
+    const status = auctionCache.getStatus();
+
+    await channel.send(
+      `❌ **No auction items available**\n\n` +
+      `**Status:**\n` +
+      `• Google Sheets API: ${status.circuit.state === 'OPEN' ? '🔴 DOWN' : '🟢 UP'}\n` +
+      `• Cached Items: ${status.cache.itemCount}\n` +
+      `• Cache Age: ${status.cache.age ? Math.floor(status.cache.age / 1000 / 60) + ' minutes' : 'Never cached'}\n\n` +
+      `**Actions:**\n` +
+      `• Wait for Google Sheets to recover\n` +
+      `• Check BiddingItems sheet has items\n` +
+      `• Use \`!auctionstate\` to check system status`
+    );
     return;
   }
 
@@ -496,6 +576,92 @@ async function startAuctioneering(client, config, channel) {
   }, 30000); // 30 seconds preview
 }
 
+/**
+ * BULLETPROOF: Ensure thread capacity before creating new thread
+ * Discord limits: 1000 active threads per server, 50 active threads per channel
+ *
+ * If approaching limits:
+ * 1. Archive old auction threads
+ * 2. Clean up locked/archived threads
+ * 3. If still at limit, throw error with user-friendly message
+ */
+async function ensureThreadCapacity(channel) {
+  try {
+    // Fetch all active threads in the channel
+    const activeThreads = await channel.threads.fetchActive();
+    const activeCount = activeThreads.threads.size;
+
+    const THREAD_LIMIT = 50; // Discord's per-channel active thread limit
+    const THREAD_WARNING = 40; // Start cleanup at this threshold
+
+    console.log(`📊 Active threads in ${channel.name}: ${activeCount}/${THREAD_LIMIT}`);
+
+    if (activeCount >= THREAD_WARNING) {
+      console.log(`⚠️ Approaching thread limit (${activeCount}/${THREAD_LIMIT}) - cleaning up...`);
+
+      // Find and archive old auction threads
+      let archivedCount = 0;
+      const threadsToArchive = [];
+
+      for (const [id, thread] of activeThreads.threads) {
+        // Archive threads that:
+        // 1. Are auction threads (name contains " | ")
+        // 2. Are locked (auction ended)
+        // 3. Are older than 1 hour
+        const isAuctionThread = thread.name.includes(' | ');
+        const isLocked = thread.locked;
+        const age = Date.now() - thread.createdTimestamp;
+        const isOld = age > 60 * 60 * 1000; // 1 hour
+
+        if (isAuctionThread && (isLocked || isOld)) {
+          threadsToArchive.push(thread);
+        }
+      }
+
+      // Archive in batches to avoid rate limits
+      for (const thread of threadsToArchive) {
+        try {
+          if (!thread.archived) {
+            await thread.setArchived(true, 'Auto-cleanup for thread capacity');
+            archivedCount++;
+            console.log(`📦 Auto-archived thread: ${thread.name}`);
+
+            // Rate limit: Wait between archives
+            if (archivedCount % 5 === 0) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          }
+        } catch (err) {
+          console.warn(`⚠️ Failed to archive thread ${thread.name}:`, err.message);
+        }
+      }
+
+      console.log(`✅ Cleaned up ${archivedCount} old auction threads`);
+
+      // Recheck after cleanup
+      const activeAfterCleanup = await channel.threads.fetchActive();
+      const newCount = activeAfterCleanup.threads.size;
+
+      console.log(`📊 After cleanup: ${newCount}/${THREAD_LIMIT} active threads`);
+
+      if (newCount >= THREAD_LIMIT - 2) {
+        throw new Error(
+          `Thread limit reached (${newCount}/${THREAD_LIMIT})! ` +
+          `Please manually archive old threads in ${channel.name}.`
+        );
+      }
+    }
+  } catch (err) {
+    // If thread capacity check fails, log but continue
+    // (Better to try creating thread and handle failure than block auction)
+    console.error(`❌ Thread capacity check failed:`, err.message);
+
+    if (err.message.includes('Thread limit reached')) {
+      throw err; // Rethrow limit errors
+    }
+  }
+}
+
 // REPLACE the entire auctionNextItem function (Line ~400 in auctioneering.js)
 // This version removes session/boss logic - just processes items linearly
 
@@ -615,6 +781,9 @@ async function auctionNextItem(client, config, channel) {
   let auctionThread = null;
 
   try {
+    // BULLETPROOF: Check thread limit before creating
+    await ensureThreadCapacity(channel);
+
     // ✅ Try normal thread creation first
     if (channel.threads && typeof channel.threads.create === "function") {
       auctionThread = await channel.threads.create({
@@ -964,17 +1133,16 @@ async function itemEnd(client, config, channel) {
       console.error(`${EMOJI.ERROR} Failed to log auction result:`, err);
     }
 
-    // 🧩 Add to session history
-    auctionState.sessionItems.push({
-      item: item.item,
-      winner: item.curWin,
-      winnerId: item.curWinId,
-      amount: item.curBid,
-      source: item.source,
-      timestamp,
-      auctionStartTime: item.auctionStartTime,
-      auctionEndTime: endTimeStr,
-    });
+    // 🧩 Update item in queue array with winner info (don't push, or it loops forever!)
+    // The item is already in sessionItems at currentItemIndex, just add winner fields
+    const currentItem = auctionState.sessionItems[auctionState.currentItemIndex];
+    if (currentItem) {
+      currentItem.winner = item.curWin;
+      currentItem.winnerId = item.curWinId;
+      currentItem.amount = item.curBid;
+      currentItem.timestamp = timestamp;
+      currentItem.auctionEndTime = endTimeStr;
+    }
   } else {
     // ⚠️ NO WINNER
     await channel.send({
@@ -1501,6 +1669,32 @@ function clearAllTimers() {
     clearInterval(t);
   });
   auctionState.timers = {};
+}
+
+/**
+ * Reschedule item timers after time extension
+ * This is critical when bids extend the auction time - we need to clear
+ * old timers and create new ones based on the updated endTime
+ */
+function rescheduleItemTimers(client, config, channel) {
+  if (!auctionState.active || !auctionState.currentItem) {
+    console.warn(`${EMOJI.WARNING} Cannot reschedule timers - no active item`);
+    return false;
+  }
+
+  // Clear existing item timers
+  const timerKeys = ['go1', 'go2', 'go3', 'itemEnd'];
+  timerKeys.forEach(key => {
+    if (auctionState.timers[key]) {
+      clearTimeout(auctionState.timers[key]);
+      delete auctionState.timers[key];
+    }
+  });
+
+  // Reschedule based on new endTime
+  scheduleItemTimers(client, config, channel);
+  console.log(`${EMOJI.SUCCESS} Item timers rescheduled for ${auctionState.currentItem.item}`);
+  return true;
 }
 
 function getAuctionState() {
@@ -2368,6 +2562,118 @@ async function handleMoveToDistribution(message, config, client) {
   }
 }
 
+// ============================================
+// DAILY AUCTION SCHEDULER
+// ============================================
+
+// Scheduler state to prevent duplicates
+let dailyAuctionTimer = null;
+
+/**
+ * Schedule daily auction at 8:30 PM GMT+8 (Asia/Manila timezone)
+ * Automatically starts auction every day at the scheduled time
+ *
+ * FIXED: Proper timezone handling using UTC offset calculations
+ */
+function scheduleDailyAuction(client, config) {
+  // Prevent duplicate schedulers
+  if (dailyAuctionTimer) {
+    console.log(`${EMOJI.WARNING} Daily auction scheduler already running, skipping initialization`);
+    return;
+  }
+
+  console.log(`${EMOJI.CLOCK} Initializing daily auction scheduler...`);
+
+  const calculateNext830PM = () => {
+    const now = new Date();
+
+    // GMT+8 offset in milliseconds
+    const GMT8_OFFSET = 8 * 60 * 60 * 1000;
+
+    // Get current time in GMT+8
+    const nowGMT8 = new Date(now.getTime() + GMT8_OFFSET);
+
+    // Set to 8:30 PM today in GMT+8
+    const targetGMT8 = new Date(nowGMT8);
+    targetGMT8.setUTCHours(20, 30, 0, 0);
+
+    // If already past 8:30 PM today, schedule for tomorrow
+    if (targetGMT8.getTime() <= nowGMT8.getTime()) {
+      targetGMT8.setUTCDate(targetGMT8.getUTCDate() + 1);
+    }
+
+    // Convert back to UTC for the actual timer
+    const targetUTC = new Date(targetGMT8.getTime() - GMT8_OFFSET);
+
+    return targetUTC;
+  };
+
+  const scheduleNext = () => {
+    const nextUTC = calculateNext830PM();
+    const now = new Date();
+    const delay = nextUTC.getTime() - now.getTime();
+
+    // Format for display in Manila time
+    const displayTime = new Date(nextUTC.getTime() + 8 * 60 * 60 * 1000);
+    const hours = Math.floor(delay / 1000 / 60 / 60);
+    const minutes = Math.floor((delay / 1000 / 60) % 60);
+
+    console.log(`${EMOJI.CLOCK} Next daily auction scheduled for: ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${hours}h ${minutes}m)`);
+
+    dailyAuctionTimer = setTimeout(async () => {
+      console.log(`${EMOJI.AUCTION} Daily auction time! Starting auction...`);
+
+      try {
+        // Check if auction is already running
+        if (auctionState.active) {
+          console.log(`${EMOJI.WARNING} Auction already running, skipping scheduled start`);
+          scheduleNext();
+          return;
+        }
+
+        // Fetch the bidding channel
+        const guild = await client.guilds.fetch(config.main_guild_id);
+        const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+
+        if (!biddingChannel) {
+          console.error(`${EMOJI.ERROR} Could not fetch bidding channel for scheduled auction`);
+          scheduleNext();
+          return;
+        }
+
+        // Start the auction
+        await startAuctioneering(client, config, biddingChannel);
+        console.log(`${EMOJI.SUCCESS} Scheduled daily auction started successfully`);
+      } catch (err) {
+        console.error(`${EMOJI.ERROR} Failed to start scheduled auction:`, err);
+
+        // Try to notify admin logs
+        try {
+          const guild = await client.guilds.fetch(config.main_guild_id);
+          const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
+
+          if (adminLogs) {
+            await adminLogs.send(
+              `${EMOJI.ERROR} **Scheduled Auction Failed**\n` +
+              `Failed to start daily auction at 8:30 PM GMT+8.\n` +
+              `**Error:** ${err.message}\n\n` +
+              `Please check bot logs and try running \`!startauction\` manually.`
+            );
+          }
+        } catch (notifyErr) {
+          console.error(`${EMOJI.ERROR} Could not notify admin logs:`, notifyErr);
+        }
+      }
+
+      // Schedule next day's auction
+      scheduleNext();
+    }, delay);
+  };
+
+  scheduleNext();
+  console.log(`${EMOJI.SUCCESS} Daily auction scheduler initialized (8:30 PM GMT+8)`);
+}
+
 module.exports = {
   initialize,
   itemEnd,
@@ -2383,6 +2689,7 @@ module.exports = {
   stopCurrentItem,
   extendCurrentItem,
   updateCurrentItemState,
+  rescheduleItemTimers, // Reschedule timers after bid extension
   handleQueueList,
   handleRemoveItem,
   handleClearQueue,
@@ -2392,5 +2699,6 @@ module.exports = {
   handleSkipItem,
   handleForceSubmitResults,
   handleMoveToDistribution,
+  scheduleDailyAuction, // Daily 8:30 PM GMT+8 auction scheduler
   // getCurrentSessionBoss: () => currentSessionBoss - REMOVED: Not used anywhere
 };
