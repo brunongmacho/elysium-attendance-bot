@@ -4,14 +4,20 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install required build tools for sharp and native modules
+# Note: ca-certificates and git are needed for npm package installations
 RUN apt-get update && apt-get install -y \
+    ca-certificates \
     python3 \
     make \
     g++ \
+    gcc \
     pkg-config \
     libvips-dev \
-    && npm ci --production --no-audit --progress=false --include=optional \
+    git \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install npm dependencies separately for better error isolation
+RUN npm ci --production --no-audit --progress=false --include=optional
 
 # Stage 2: Copy source files
 FROM node:18-slim AS builder
