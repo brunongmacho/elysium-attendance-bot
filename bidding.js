@@ -2216,42 +2216,16 @@ async function procBid(msg, amt, cfg) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Main command handler - Routes commands to appropriate handlers
+ * Route an incoming bot command to the appropriate bidding or admin handler.
  *
- * COMMAND ROUTING:
- * - Resolves command aliases (!b -> !bid, !pts -> !mypoints, etc.)
- * - Routes to specific command handler based on command name
- * - Handles both user commands (!bid, !mypoints) and admin commands (!reset, !audit)
+ * Handles alias resolution, user commands (e.g., bid, mypoints, bidstatus) and
+ * administrative commands that perform state changes, recoveries, or exports.
  *
- * SUPPORTED COMMANDS:
- *
- * USER COMMANDS:
- * - !bid <amount> - Place bid on active auction
- * - !mypoints - Check your bidding points balance
- * - !bidstatus - Show current auction status and queue
- *
- * ADMIN COMMANDS:
- * - !resetbids - Reset bidding state (clears active auction, locked points, history)
- * - !resetauction - Nuclear reset (both bidding and auctioneering modules)
- * - !forcesubmitresults - Manually submit session results to Google Sheets
- * - !cancelitem - Cancel current auction item (refund points)
- * - !skipitem - Skip current item without sale
- * - !fixlockedpoints - Audit and clear stuck locked points
- * - !auctionaudit - Show detailed system state for debugging
- * - !recoverauction - Recovery tools for crashed/stuck auctions
- *
- * COMMAND ALIASES:
- * - !b -> !bid
- * - !pts, !mypts, !mp -> !mypoints
- * - !ql, !queue -> !queuelist
- * - !bstatus -> !bidstatus
- * - !start -> !startauction
- *
- * @param {string} cmd - Command name (with ! prefix)
- * @param {Message} msg - Discord message object
- * @param {Array<string>} args - Command arguments
- * @param {Client} cli - Discord client instance
- * @param {Object} cfg - Bot configuration object
+ * @param {string} cmd - Raw command string (including the leading `!`); aliases are resolved internally.
+ * @param {Message} msg - Discord message that invoked the command; used for replies, reactions, and context validation.
+ * @param {Array<string>} args - Command arguments (space-split tokens after the command).
+ * @param {Client} cli - Discord client instance used for cross-module interactions and channel lookups.
+ * @param {Object} cfg - Bot configuration object (contains channel IDs, webhook URLs, admin roles, etc.).
  */
 async function handleCmd(cmd, msg, args, cli, cfg) {
   // Handle command aliases
@@ -3270,14 +3244,11 @@ function checkLockedPoints() {
 }
 
 /**
- * Get memory usage statistics (v6.2 monitoring)
+ * Collects process memory usage and basic bidding-engine state metrics.
  *
- * METRICS:
- * - Heap memory usage (used, total, limit)
- * - State object sizes (pending confirmations, locked points, history)
- * - Cache status
+ * Returns an object with a `memory` snapshot in megabytes and a `state` summary of key counts and sizes.
  *
- * @returns {Object} Memory statistics
+ * @returns {{memory: {rss: number, heapUsed: number, heapTotal: number, external: number}, state: {pendingConfirmations: number, lockedPointsMembers: number, lockedPointsTotal: number, historySize: number, queueSize: number, cacheSize: number}}}
  */
 function getMemoryStats() {
   const mem = process.memoryUsage();
