@@ -383,6 +383,9 @@ let st = {
    */
   lp: {},
 
+  /** @type {Array<Object>} Auction queue (items waiting to be auctioned) */
+  q: [],
+
   /** @type {Array<Object>} Session history of completed auctions */
   h: [],
 
@@ -2379,6 +2382,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           st = {
             a: null,
             lp: {},
+            q: [],
             h: [],
             th: {},
             pc: {},
@@ -2970,6 +2974,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           st = {
             a: null,
             lp: {},
+            q: [],
             h: [],
             th: {},
             pc: {},
@@ -3286,11 +3291,11 @@ function getMemoryStats() {
   return {
     memory: memMB,
     state: {
-      pendingConfirmations: Object.keys(st.pc).length,
-      lockedPointsMembers: Object.keys(st.lp).length,
-      lockedPointsTotal: Object.values(st.lp).reduce((sum, pts) => sum + pts, 0),
-      historySize: st.h.length,
-      queueSize: st.q.length,
+      pendingConfirmations: Object.keys(st.pc || {}).length,
+      lockedPointsMembers: Object.keys(st.lp || {}).length,
+      lockedPointsTotal: Object.values(st.lp || {}).reduce((sum, pts) => sum + pts, 0),
+      historySize: (st.h || []).length,
+      queueSize: (st.q || []).length,
       cacheSize: st.cp ? st.cp.size() : 0,
     }
   };
