@@ -1783,16 +1783,24 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         if (canCol.first().emoji.name === EMOJI.SUCCESS) {
           Object.values(st.th).forEach((h) => clearTimeout(h));
           if (st.a.curWin) unlock(st.a.curWin, st.a.curBid);
+
+          // Send messages before locking/archiving
           await msg.channel.send(
-            `${EMOJI.ERROR} **${st.a.item}** canceled. Points refunded.`
+            `${EMOJI.ERROR} **${st.a.item}** canceled. Points refunded.\n\n${EMOJI.INFO} Item cancelled. Use !endauction to end the entire session.`
           );
+
+          // Lock the thread first to prevent new messages
+          if (typeof msg.channel.setLocked === "function") {
+            await msg.channel
+              .setLocked(true, "Item cancelled")
+              .catch((err) =>
+                console.warn(`⚠️ Failed to lock thread ${msg.channel.id}:`, err.message)
+              );
+          }
+
           await msg.channel.setArchived(true, "Canceled").catch(errorHandler.safeCatch('thread archive'));
           st.a = null;
           save();
-          // Manual queue removed - cancel just ends current item
-          await msg.channel.send(
-            `${EMOJI.INFO} Item cancelled. Use !endauction to end the entire session.`
-          );
         } else {
           await errorHandler.safeRemoveReactions(canMsg, 'reaction removal');
         }
@@ -1832,14 +1840,24 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         if (skpCol.first().emoji.name === EMOJI.SUCCESS) {
           Object.values(st.th).forEach((h) => clearTimeout(h));
           if (st.a.curWin) unlock(st.a.curWin, st.a.curBid);
-          await msg.channel.send(`⏭️ **${st.a.item}** skipped (no sale).`);
+
+          // Send messages before locking/archiving
+          await msg.channel.send(
+            `⏭️ **${st.a.item}** skipped (no sale).\n\n${EMOJI.INFO} Item skipped. Use !endauction to end the entire session.`
+          );
+
+          // Lock the thread first to prevent new messages
+          if (typeof msg.channel.setLocked === "function") {
+            await msg.channel
+              .setLocked(true, "Item skipped")
+              .catch((err) =>
+                console.warn(`⚠️ Failed to lock thread ${msg.channel.id}:`, err.message)
+              );
+          }
+
           await msg.channel.setArchived(true, "Skipped").catch(errorHandler.safeCatch('thread archive'));
           st.a = null;
           save();
-          // Manual queue removed - skip just ends current item
-          await msg.channel.send(
-            `${EMOJI.INFO} Item skipped. Use !endauction to end the entire session.`
-          );
         } else {
           await errorHandler.safeRemoveReactions(skpMsg, 'reaction removal');
         }
