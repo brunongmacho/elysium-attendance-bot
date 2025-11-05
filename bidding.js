@@ -807,6 +807,15 @@ async function endAuc(cli, cfg) {
     });
   }
 
+  // Lock the thread first to prevent new messages
+  if (typeof th.setLocked === "function") {
+    await th
+      .setLocked(true, "Auction ended")
+      .catch((err) =>
+        console.warn(`⚠️ Failed to lock thread ${th.id}:`, err.message)
+      );
+  }
+
   await th
     .setArchived(true, "Ended")
     .catch((err) =>
@@ -1061,10 +1070,12 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     return { ok: false, msg: "Too large" };
   }
 
-  // Require strictly higher bids to prevent race condition with simultaneous identical bids
-  // Standard auction rules: you must OUTBID, not MATCH
-  if (bid <= currentItem.curBid) {
-    await msg.reply(`${EMOJI.ERROR} Must be > ${currentItem.curBid}pts (current: ${currentItem.curBid}pts)`);
+  // Bid validation: First bid can match starting price, subsequent bids must exceed current bid
+  // This prevents race conditions while allowing the starting bid to be placed
+  const hasWinner = currentItem.curWin !== null && currentItem.curWin !== undefined;
+  if (hasWinner ? (bid <= currentItem.curBid) : (bid < currentItem.curBid)) {
+    const minBid = hasWinner ? currentItem.curBid + 1 : currentItem.curBid;
+    await msg.reply(`${EMOJI.ERROR} Must be >= ${minBid}pts (current: ${currentItem.curBid}pts${hasWinner ? ', outbid required' : ', starting bid'})`);
     return { ok: false, msg: "Too low" };
   }
 
@@ -1322,10 +1333,12 @@ async function procBid(msg, amt, cfg) {
     return { ok: false, msg: "Invalid" };
   }
 
-  // Require strictly higher bids to prevent race condition with simultaneous identical bids
-  // Standard auction rules: you must OUTBID, not MATCH
-  if (bid <= a.curBid) {
-    await msg.reply(`${EMOJI.ERROR} Must be > ${a.curBid}pts (current: ${a.curBid}pts)`);
+  // Bid validation: First bid can match starting price, subsequent bids must exceed current bid
+  // This prevents race conditions while allowing the starting bid to be placed
+  const hasWinner = a.curWin !== null && a.curWin !== undefined;
+  if (hasWinner ? (bid <= a.curBid) : (bid < a.curBid)) {
+    const minBid = hasWinner ? a.curBid + 1 : a.curBid;
+    await msg.reply(`${EMOJI.ERROR} Must be >= ${minBid}pts (current: ${a.curBid}pts${hasWinner ? ', outbid required' : ', starting bid'})`);
     return { ok: false, msg: "Too low" };
   }
 
@@ -1770,16 +1783,24 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         if (canCol.first().emoji.name === EMOJI.SUCCESS) {
           Object.values(st.th).forEach((h) => clearTimeout(h));
           if (st.a.curWin) unlock(st.a.curWin, st.a.curBid);
+
+          // Send messages before locking/archiving
           await msg.channel.send(
-            `${EMOJI.ERROR} **${st.a.item}** canceled. Points refunded.`
+            `${EMOJI.ERROR} **${st.a.item}** canceled. Points refunded.\n\n${EMOJI.INFO} Item cancelled. Use !endauction to end the entire session.`
           );
+
+          // Lock the thread first to prevent new messages
+          if (typeof msg.channel.setLocked === "function") {
+            await msg.channel
+              .setLocked(true, "Item cancelled")
+              .catch((err) =>
+                console.warn(`⚠️ Failed to lock thread ${msg.channel.id}:`, err.message)
+              );
+          }
+
           await msg.channel.setArchived(true, "Canceled").catch(errorHandler.safeCatch('thread archive'));
           st.a = null;
           save();
-          // Manual queue removed - cancel just ends current item
-          await msg.channel.send(
-            `${EMOJI.INFO} Item cancelled. Use !endauction to end the entire session.`
-          );
         } else {
           await errorHandler.safeRemoveReactions(canMsg, 'reaction removal');
         }
@@ -1819,14 +1840,24 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         if (skpCol.first().emoji.name === EMOJI.SUCCESS) {
           Object.values(st.th).forEach((h) => clearTimeout(h));
           if (st.a.curWin) unlock(st.a.curWin, st.a.curBid);
-          await msg.channel.send(`⏭️ **${st.a.item}** skipped (no sale).`);
+
+          // Send messages before locking/archiving
+          await msg.channel.send(
+            `⏭️ **${st.a.item}** skipped (no sale).\n\n${EMOJI.INFO} Item skipped. Use !endauction to end the entire session.`
+          );
+
+          // Lock the thread first to prevent new messages
+          if (typeof msg.channel.setLocked === "function") {
+            await msg.channel
+              .setLocked(true, "Item skipped")
+              .catch((err) =>
+                console.warn(`⚠️ Failed to lock thread ${msg.channel.id}:`, err.message)
+              );
+          }
+
           await msg.channel.setArchived(true, "Skipped").catch(errorHandler.safeCatch('thread archive'));
           st.a = null;
           save();
-          // Manual queue removed - skip just ends current item
-          await msg.channel.send(
-            `${EMOJI.INFO} Item skipped. Use !endauction to end the entire session.`
-          );
         } else {
           await errorHandler.safeRemoveReactions(skpMsg, 'reaction removal');
         }
