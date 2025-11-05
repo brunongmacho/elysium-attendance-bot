@@ -1010,6 +1010,10 @@ function handleGetBiddingPoints(data) {
  * Removes a member from ALL sheets (BiddingPoints and all attendance sheets)
  * Used when members are kicked or banned from the guild
  *
+ * EXEMPTIONS:
+ * - ForDistribution sheet is NOT touched (historical auction log)
+ * - Only removes from BiddingPoints and ELYSIUM_WEEK_* attendance sheets
+ *
  * @param {Object} data - Request data containing memberName
  * @param {string} data.memberName - Name of the member to remove
  * @returns {Object} Response object with status and result
@@ -1069,11 +1073,16 @@ function handleRemoveMember(data) {
 
   // ==========================================
   // STEP 2: Remove from all attendance sheets (ELYSIUM_WEEK_*)
+  // NOTE: ForDistribution sheet is EXCLUDED as it's a historical auction log
   // ==========================================
   const allSheets = ss.getSheets();
-  const attendanceSheets = allSheets.filter(s => s.getName().startsWith(CONFIG.SHEET_NAME_PREFIX));
+  const attendanceSheets = allSheets.filter(s => {
+    const sheetName = s.getName();
+    // Include only ELYSIUM_WEEK_ sheets, exclude ForDistribution
+    return sheetName.startsWith(CONFIG.SHEET_NAME_PREFIX) && sheetName !== 'ForDistribution';
+  });
 
-  Logger.log(`🔍 Found ${attendanceSheets.length} attendance sheets to check`);
+  Logger.log(`🔍 Found ${attendanceSheets.length} attendance sheets to check (excluding ForDistribution)`);
 
   attendanceSheets.forEach(sheet => {
     const sheetName = sheet.getName();

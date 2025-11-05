@@ -2309,7 +2309,10 @@ const commandHandlers = {
         `❌ **Usage:** \`!removemember <member_name>\`\n\n` +
           `**Example:** \`!removemember PlayerName\`\n\n` +
           `**Aliases:** \`!removemem\`, \`!rmmember\`, \`!delmember\`\n\n` +
-          `This command removes a member from the BiddingPoints sheet.\n` +
+          `This command removes a member from:\n` +
+          `• BiddingPoints sheet\n` +
+          `• All attendance week sheets\n\n` +
+          `**Exemption:** ForDistribution sheet (historical log) is NOT touched.\n\n` +
           `Use this when a member is kicked or banned from the guild.`
       );
       return;
@@ -2326,6 +2329,7 @@ const commandHandlers = {
         `• Remove the member from BiddingPoints sheet\n` +
         `• Remove the member from ALL attendance week sheets\n` +
         `• Delete all their point and attendance history\n` +
+        `• ForDistribution sheet will NOT be touched (historical log)\n` +
         `• This action cannot be undone\n\n` +
         `React ✅ to confirm or ❌ to cancel.`,
       async (confirmMsg) => {

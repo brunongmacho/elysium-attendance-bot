@@ -228,6 +228,7 @@ const COMMAND_HELP = {
     features: [
       "Removes member from BiddingPoints sheet",
       "Removes member from ALL attendance week sheets",
+      "ForDistribution sheet NOT touched (historical log preserved)",
       "Deletes all point and attendance history",
       "Shows detailed removal statistics",
       "Uses fuzzy name matching",
