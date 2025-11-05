@@ -1787,7 +1787,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   const av = tot - curLocked;
 
   const isSelf =
-    currentItem.curWin && currentItem.curWin.toLowerCase() === u.toLowerCase();
+    currentItem.curWin && normalizeUsername(currentItem.curWin) === normalizeUsername(u);
   const needed = isSelf ? Math.max(0, bid - currentItem.curBid) : bid;
 
   if (needed > av) {
@@ -2076,7 +2076,7 @@ async function procBid(msg, amt, cfg) {
   }
 
   // Check if self-overbidding
-  const isSelf = a.curWin && a.curWin.toLowerCase() === u.toLowerCase();
+  const isSelf = a.curWin && normalizeUsername(a.curWin) === normalizeUsername(u);
   const curLocked = st.lp[normalizeUsername(u)] || 0;
   const needed = isSelf ? Math.max(0, bid - curLocked) : bid;
 
