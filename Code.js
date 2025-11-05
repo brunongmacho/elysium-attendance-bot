@@ -108,6 +108,7 @@ function doPost(e) {
     // Bidding actions
     if (action === 'getBiddingPoints') return handleGetBiddingPoints(data);
     if (action === 'submitBiddingResults') return handleSubmitBiddingResults(data);
+    if (action === 'removeMember') return handleRemoveMember(data);
     if (action === 'getBiddingItems') return getBiddingItems(data);
     if (action === 'logAuctionResult') return logAuctionResult(data);
     if (action === 'getBotState') return getBotState(data);
@@ -991,18 +992,172 @@ function handleGetBiddingPoints(data) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
   if (!sheet) return createResponse('error', `Sheet not found: ${CONFIG.BIDDING_SHEET}`);
-  
+
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return createResponse('ok','No members',{points:{}});
-  
+
   const dataRange = sheet.getRange(2,1,lastRow-1,2).getValues();
   const points = {};
-  dataRange.forEach(r => { 
-    const member = (r[0]||'').toString().trim(); 
-    if(member) points[member]=Number(r[1])||0; 
+  dataRange.forEach(r => {
+    const member = (r[0]||'').toString().trim();
+    if(member) points[member]=Number(r[1])||0;
   });
-  
+
   return createResponse('ok','Points fetched',{points});
+}
+
+/**
+ * Removes a member from ALL sheets (BiddingPoints and all attendance sheets)
+ * Used when members are kicked or banned from the guild
+ *
+ * EXEMPTIONS:
+ * - ForDistribution sheet is NOT touched (historical auction log)
+ * - Only removes from BiddingPoints and ELYSIUM_WEEK_* attendance sheets
+ *
+ * @param {Object} data - Request data containing memberName
+ * @param {string} data.memberName - Name of the member to remove
+ * @returns {Object} Response object with status and result
+ */
+function handleRemoveMember(data) {
+  const memberName = (data.memberName || '').toString().trim();
+
+  if (!memberName) {
+    return createResponse('error', 'Missing memberName parameter');
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const normalizedTarget = normalizeUsername(memberName);
+
+  let actualMemberName = memberName;
+  let pointsLeft = 0;
+  let biddingSheetRemoved = false;
+  let attendanceSheetsRemoved = 0;
+  const attendanceSheetsDetails = [];
+
+  // ==========================================
+  // STEP 1: Remove from BiddingPoints sheet
+  // ==========================================
+  const biddingSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
+
+  if (biddingSheet) {
+    const lastRow = biddingSheet.getLastRow();
+
+    if (lastRow >= 2) {
+      const memberNames = biddingSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      let rowIndex = -1;
+
+      for (let i = 0; i < memberNames.length; i++) {
+        const currentMember = (memberNames[i][0] || '').toString().trim();
+        const normalizedCurrent = normalizeUsername(currentMember);
+
+        if (normalizedCurrent === normalizedTarget) {
+          rowIndex = i + 2; // +2 because array is 0-indexed and we start from row 2
+          break;
+        }
+      }
+
+      if (rowIndex !== -1) {
+        // Get member data before deletion for logging
+        const memberRow = biddingSheet.getRange(rowIndex, 1, 1, Math.min(biddingSheet.getLastColumn(), 4)).getValues()[0];
+        actualMemberName = memberRow[0];
+        pointsLeft = memberRow[1] || 0;
+
+        // Delete the row
+        biddingSheet.deleteRow(rowIndex);
+        biddingSheetRemoved = true;
+
+        Logger.log(`✅ Removed member: ${actualMemberName} from ${CONFIG.BIDDING_SHEET} (had ${pointsLeft} points)`);
+      }
+    }
+  }
+
+  // ==========================================
+  // STEP 2: Remove from all attendance sheets (ELYSIUM_WEEK_*)
+  // NOTE: ForDistribution sheet is EXCLUDED as it's a historical auction log
+  // ==========================================
+  const allSheets = ss.getSheets();
+  const attendanceSheets = allSheets.filter(s => {
+    const sheetName = s.getName();
+    // Include only ELYSIUM_WEEK_ sheets, exclude ForDistribution
+    return sheetName.startsWith(CONFIG.SHEET_NAME_PREFIX) && sheetName !== 'ForDistribution';
+  });
+
+  Logger.log(`🔍 Found ${attendanceSheets.length} attendance sheets to check (excluding ForDistribution)`);
+
+  attendanceSheets.forEach(sheet => {
+    const sheetName = sheet.getName();
+    const lastRow = sheet.getLastRow();
+
+    if (lastRow < 3) {
+      return; // Skip sheets with no member data (only headers)
+    }
+
+    try {
+      // Get all member names from column A (starting from row 3)
+      const memberNames = sheet.getRange(3, COLUMNS.MEMBERS, lastRow - 2, 1).getValues();
+      let rowIndex = -1;
+
+      for (let i = 0; i < memberNames.length; i++) {
+        const currentMember = (memberNames[i][0] || '').toString().trim();
+        const normalizedCurrent = normalizeUsername(currentMember);
+
+        if (normalizedCurrent === normalizedTarget) {
+          rowIndex = i + 3; // +3 because array is 0-indexed and we start from row 3
+          break;
+        }
+      }
+
+      if (rowIndex !== -1) {
+        // Get attendance points before deletion
+        let attendancePoints = 0;
+        const memberRow = sheet.getRange(rowIndex, 1, 1, Math.min(sheet.getLastColumn(), COLUMNS.ATTENDANCE_POINTS)).getValues()[0];
+        if (memberRow.length >= COLUMNS.ATTENDANCE_POINTS) {
+          attendancePoints = memberRow[COLUMNS.ATTENDANCE_POINTS - 1] || 0;
+        }
+
+        // Delete the row
+        sheet.deleteRow(rowIndex);
+        attendanceSheetsRemoved++;
+
+        attendanceSheetsDetails.push({
+          sheet: sheetName,
+          attendancePoints: attendancePoints
+        });
+
+        Logger.log(`✅ Removed member from ${sheetName} (had ${attendancePoints} attendance points)`);
+      }
+    } catch (err) {
+      Logger.log(`⚠️ Error removing from ${sheetName}: ${err.message}`);
+    }
+  });
+
+  // ==========================================
+  // STEP 3: Return detailed results
+  // ==========================================
+  if (!biddingSheetRemoved && attendanceSheetsRemoved === 0) {
+    return createResponse('error', `Member "${memberName}" not found in any sheets`, {
+      found: false,
+      biddingSheetRemoved: false,
+      attendanceSheetsRemoved: 0
+    });
+  }
+
+  const totalSheetsRemoved = (biddingSheetRemoved ? 1 : 0) + attendanceSheetsRemoved;
+  const totalAttendancePoints = attendanceSheetsDetails.reduce((sum, detail) => sum + detail.attendancePoints, 0);
+
+  Logger.log(`✅ COMPLETE: Removed ${actualMemberName} from ${totalSheetsRemoved} sheet(s)`);
+
+  return createResponse('ok', `Member "${actualMemberName}" removed from ${totalSheetsRemoved} sheet(s)`, {
+    found: true,
+    removed: true,
+    memberName: actualMemberName,
+    pointsLeft: pointsLeft,
+    biddingSheetRemoved: biddingSheetRemoved,
+    attendanceSheetsRemoved: attendanceSheetsRemoved,
+    attendanceSheetsDetails: attendanceSheetsDetails,
+    totalSheetsAffected: totalSheetsRemoved,
+    totalAttendancePoints: totalAttendancePoints
+  });
 }
 
 function logAuctionResult(data) {

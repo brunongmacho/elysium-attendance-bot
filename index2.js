@@ -126,6 +126,11 @@ const COMMAND_ALIASES = {
   // Emergency commands (admin)
   "!emerg": "!emergency",
 
+  // Member management commands (admin)
+  "!removemem": "!removemember",
+  "!rmmember": "!removemember",
+  "!delmember": "!removemember",
+
   // Bidding commands (member)
   "!b": "!bid",
   "!bstatus": "!bidstatus",
@@ -2286,6 +2291,159 @@ const commandHandlers = {
   },
 
   // ==========================================
+  // MEMBER MANAGEMENT COMMANDS
+  // ==========================================
+
+  /**
+   * Remove a member from the BiddingPoints sheet
+   * Used when members are kicked or banned from the guild
+   *
+   * Usage: !removemember <member_name>
+   * Aliases: !removemem, !rmmember, !delmember
+   */
+  removemember: async (message, member) => {
+    const args = message.content.trim().split(/\s+/).slice(1);
+
+    if (args.length === 0) {
+      await message.reply(
+        `❌ **Usage:** \`!removemember <member_name>\`\n\n` +
+          `**Example:** \`!removemember PlayerName\`\n\n` +
+          `**Aliases:** \`!removemem\`, \`!rmmember\`, \`!delmember\`\n\n` +
+          `This command removes a member from:\n` +
+          `• BiddingPoints sheet\n` +
+          `• All attendance week sheets\n\n` +
+          `**Exemption:** ForDistribution sheet (historical log) is NOT touched.\n\n` +
+          `Use this when a member is kicked or banned from the guild.`
+      );
+      return;
+    }
+
+    const memberName = args.join(" ").trim();
+
+    await awaitConfirmation(
+      message,
+      member,
+      `⚠️ **Remove member from ALL sheets?**\n\n` +
+        `**Member:** ${memberName}\n\n` +
+        `This will:\n` +
+        `• Remove the member from BiddingPoints sheet\n` +
+        `• Remove the member from ALL attendance week sheets\n` +
+        `• Delete all their point and attendance history\n` +
+        `• ForDistribution sheet will NOT be touched (historical log)\n` +
+        `• This action cannot be undone\n\n` +
+        `React ✅ to confirm or ❌ to cancel.`,
+      async (confirmMsg) => {
+        try {
+          // Call Google Sheets to remove the member
+          const response = await fetch(config.google_sheets_url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "removeMember",
+              memberName: memberName,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+
+          if (result.status === "ok" && result.data?.removed) {
+            const actualName = result.data.memberName;
+            const pointsLost = result.data.pointsLeft || 0;
+            const biddingRemoved = result.data.biddingSheetRemoved || false;
+            const attendanceRemoved = result.data.attendanceSheetsRemoved || 0;
+            const totalSheets = result.data.totalSheetsAffected || 0;
+            const totalAttendance = result.data.totalAttendancePoints || 0;
+            const attendanceDetails = result.data.attendanceSheetsDetails || [];
+
+            // Build detailed description
+            let description = `**Member:** ${actualName}\n\n`;
+
+            if (biddingRemoved) {
+              description += `**BiddingPoints Sheet:**\n`;
+              description += `• Removed (had ${pointsLost} points)\n\n`;
+            }
+
+            if (attendanceRemoved > 0) {
+              description += `**Attendance Sheets:**\n`;
+              description += `• Removed from ${attendanceRemoved} week sheet(s)\n`;
+              description += `• Total attendance points: ${totalAttendance}\n\n`;
+
+              if (attendanceDetails.length > 0 && attendanceDetails.length <= 5) {
+                description += `**Details:**\n`;
+                attendanceDetails.forEach(detail => {
+                  description += `• ${detail.sheet}: ${detail.attendancePoints} pts\n`;
+                });
+              } else if (attendanceDetails.length > 5) {
+                description += `**Recent sheets:**\n`;
+                attendanceDetails.slice(0, 5).forEach(detail => {
+                  description += `• ${detail.sheet}: ${detail.attendancePoints} pts\n`;
+                });
+                description += `• ... and ${attendanceDetails.length - 5} more\n`;
+              }
+            }
+
+            description += `\n**Total sheets affected:** ${totalSheets}`;
+
+            const embed = new EmbedBuilder()
+              .setColor(0x00ff00)
+              .setTitle(`✅ Member Removed Successfully`)
+              .setDescription(description)
+              .setFooter({ text: `Removed by ${member.user.username}` })
+              .setTimestamp();
+
+            await message.reply({ embeds: [embed] });
+
+            // Log to admin-logs channel
+            const guild = await client.guilds.fetch(config.main_guild_id);
+            const adminLogsChannel = await guild.channels.fetch(
+              config.admin_logs_channel_id
+            );
+
+            if (adminLogsChannel) {
+              const logEmbed = new EmbedBuilder()
+                .setColor(0xff9900)
+                .setTitle(`🗑️ Member Removed from All Sheets`)
+                .setDescription(
+                  `**Removed Member:** ${actualName}\n` +
+                    `**Bidding Points Lost:** ${pointsLost}\n` +
+                    `**Attendance Points Lost:** ${totalAttendance}\n` +
+                    `**Attendance Sheets:** ${attendanceRemoved}\n` +
+                    `**Total Sheets:** ${totalSheets}\n` +
+                    `**Removed By:** ${member.user.username}`
+                )
+                .setTimestamp();
+
+              await adminLogsChannel.send({ embeds: [logEmbed] });
+            }
+
+            console.log(
+              `🗑️ Removed member: ${actualName} from ${totalSheets} sheet(s) (${pointsLost} bidding pts, ${totalAttendance} attendance pts) by ${member.user.username}`
+            );
+          } else {
+            throw new Error(
+              result.message || result.data?.message || "Member not found"
+            );
+          }
+        } catch (err) {
+          console.error("❌ Remove member error:", err);
+          await message.reply(
+            `❌ **Failed to remove member!**\n\n` +
+              `Error: ${err.message}\n\n` +
+              `The member might not exist in the sheet, or there was a connection error.`
+          );
+        }
+      },
+      async (confirmMsg) => {
+        await message.reply("❌ Member removal canceled.");
+      }
+    );
+  },
+
+  // ==========================================
   // LEADERBOARD COMMANDS
   // ==========================================
 
@@ -3374,6 +3532,7 @@ client.on(Events.MessageCreate, async (message) => {
           "!closeallthread",
           "!emergency",
           "!maintenance",
+          "!removemember",
         ].includes(adminCmd)
       ) {
         const now = Date.now();
@@ -3402,6 +3561,8 @@ client.on(Events.MessageCreate, async (message) => {
           await emergencyCommands.handleEmergencyCommand(message, args);
         else if (adminCmd === "!maintenance")
           await commandHandlers.maintenance(message, member);
+        else if (adminCmd === "!removemember")
+          await commandHandlers.removemember(message, member);
         return;
       }
 

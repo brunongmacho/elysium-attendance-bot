@@ -218,6 +218,26 @@ const COMMAND_HELP = {
     ]
   },
 
+  removemember: {
+    usage: "!removemember <member_name>",
+    description: "Remove a member from ALL sheets - BiddingPoints and all attendance sheets (for kicked/banned members)",
+    category: "Member Management",
+    adminOnly: true,
+    example: "!removemember PlayerName",
+    aliases: ["!removemem", "!rmmember", "!delmember"],
+    features: [
+      "Removes member from BiddingPoints sheet",
+      "Removes member from ALL attendance week sheets",
+      "ForDistribution sheet NOT touched (historical log preserved)",
+      "Deletes all point and attendance history",
+      "Shows detailed removal statistics",
+      "Uses fuzzy name matching",
+      "Logs to admin-logs channel",
+      "Confirmation required",
+      "Cannot be undone"
+    ]
+  },
+
   // ========================================
   // LEADERBOARD COMMANDS
   // ========================================
