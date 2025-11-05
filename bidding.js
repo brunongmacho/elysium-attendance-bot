@@ -973,6 +973,12 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     return { ok: false, msg: "No session" };
   }
 
+  // Check if item has already ended (force-stopped)
+  if (currentItem.status === "ended") {
+    await msg.reply(`${EMOJI.ERROR} **Auction Ended** - This item is no longer accepting bids.`);
+    return { ok: false, msg: "Ended" };
+  }
+
   const m = msg.member,
     u = m.nickname || msg.author.username,
     uid = msg.author.id;

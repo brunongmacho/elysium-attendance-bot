@@ -1121,6 +1121,7 @@ function handleSubmitBiddingResults(data) {
 
   // Process results (includes all members with 0 for non-winners)
   const updates = [];
+  const unmappedBidders = [];
   if (results && results.length > 0) {
     results.forEach(r => {
       const member = r.member.trim();
@@ -1128,6 +1129,10 @@ function handleSubmitBiddingResults(data) {
       let rowIndex = memberNames.findIndex(m => (m||'').toString().trim().toLowerCase() === member.toLowerCase());
       if (rowIndex !== -1) {
         updates.push({row: rowIndex + 2, amount: total});
+      } else if (total > 0) {
+        // CRITICAL: Log when bidder not found in sheet (accounting mismatch!)
+        unmappedBidders.push({member: member, amount: total});
+        Logger.log(`⚠️ WARNING: Bidder "${member}" not found in BiddingPoints sheet. ${total}pts not recorded!`);
       }
     });
 
@@ -1145,6 +1150,19 @@ function handleSubmitBiddingResults(data) {
   }
 
   Logger.log(`✅ Session tally submitted: ${columnHeader}`);
+
+  // Add warning to response if there are unmapped bidders
+  if (unmappedBidders.length > 0) {
+    Logger.log(`⚠️ ACCOUNTING WARNING: ${unmappedBidders.length} bidder(s) not found in sheet!`);
+    const warningMsg = `Submitted: Session ${columnHeader} with ${updates.length} members | ⚠️ WARNING: ${unmappedBidders.length} bidder(s) not found in sheet - check logs!`;
+    return createResponse('ok', warningMsg, {
+      timestampColumn,
+      membersUpdated: updates.length,
+      sessionHeader: columnHeader,
+      manualItemsAdded: manualItems ? manualItems.length : 0,
+      unmappedBidders: unmappedBidders
+    });
+  }
 
   return createResponse('ok', `Submitted: Session ${columnHeader} with ${updates.length} members`, {
     timestampColumn,
