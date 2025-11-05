@@ -181,6 +181,7 @@ const fetch = require("node-fetch");
 const fs = require("fs");
 const { normalizeUsername } = require("./utils/common");
 const errorHandler = require('./utils/error-handler');
+const { PointsCache } = require('./utils/points-cache');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MODULE REFERENCES
@@ -612,6 +613,8 @@ function save(forceSync = false) {
           return [key, cleanVal];
         })
       ),
+      // Convert PointsCache instance to plain object for JSON serialization
+      cp: s.cp && s.cp.toObject ? s.cp.toObject() : s.cp,
     };
 
     // Always save to local file for quick access (works even on ephemeral Koyeb FS)
@@ -666,6 +669,8 @@ async function load() {
       st = {
         ...st,
         ...d,
+        // Wrap points cache back in PointsCache for efficient lookups
+        cp: d.cp ? new PointsCache(d.cp) : null,
         th: {},
         lb: {},
         pause: false,
@@ -860,7 +865,8 @@ async function loadCache(url) {
     console.error("❌ Cache fail");
     return false;
   }
-  st.cp = p;
+  // Wrap points data in PointsCache for O(1) lookups
+  st.cp = new PointsCache(p);
   st.ct = Date.now();
   save();
   console.log(
@@ -936,14 +942,8 @@ function stopCacheAutoRefresh() {
  */
 function getPts(u) {
   if (!st.cp) return null;
-  let p = st.cp[u];
-  if (p === undefined) {
-    const m = Object.keys(st.cp).find(
-      (n) => n.toLowerCase() === u.toLowerCase()
-    );
-    p = m ? st.cp[m] : 0;
-  }
-  return p || 0;
+  // Use PointsCache for efficient O(1) lookup
+  return st.cp.getPoints(u);
 }
 
 /**
@@ -1488,7 +1488,7 @@ async function submitSessionTally(config, sessionItems) {
 
   if (!st.sd) st.sd = ts();
 
-  const allMembers = Object.keys(st.cp);
+  const allMembers = st.cp.getAllUsernames();
   const winners = {};
 
   sessionItems.forEach((item) => {
@@ -1576,7 +1576,7 @@ async function finalize(cli, cfg) {
 
   if (!st.sd) st.sd = ts();
 
-  const allMembers = Object.keys(st.cp || {});
+  const allMembers = st.cp ? st.cp.getAllUsernames() : [];
 
   const winners = {};
   st.h.forEach((a) => {
@@ -2301,7 +2301,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         statEmbed.addFields({
           name: `${EMOJI.CHART} Cache`,
           value: `${EMOJI.SUCCESS} Loaded (${
-            Object.keys(st.cp).length
+            st.cp.size()
           } members)\n${EMOJI.TIME} Age: ${age}m\n${autoRefreshStatus}`,
           inline: false,
         });
@@ -2450,7 +2450,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
               (winners[normalizedWinner] || 0) + a.amount;
           });
 
-          const allMembers = Object.keys(st.cp || {});
+          const allMembers = st.cp ? st.cp.getAllUsernames() : [];
           const res = allMembers.map((m) => {
             const normalizedMember = normalizeUsername(m);
             return {
@@ -2661,12 +2661,12 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         );
       }
 
-      let userPts = freshPts[u];
-      if (userPts === undefined) {
-        const match = Object.keys(freshPts).find(
-          (n) => n.toLowerCase() === u.toLowerCase()
-        );
-        userPts = match ? freshPts[match] : null;
+      // Use PointsCache for efficient O(1) lookup
+      const ptsCache = new PointsCache(freshPts);
+      let userPts = ptsCache.getPoints(u);
+      if (userPts === 0 && !ptsCache.hasUser(u)) {
+        // User not found in system
+        userPts = null;
       }
 
       let ptsMsg;
@@ -2816,7 +2816,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           ).reduce((sum, pts) => sum + pts, 0)}pts total)\n` +
           `**Pending Confirmations:** ${Object.keys(st.pc).length}\n` +
           `**History:** ${st.h.length} items\n` +
-          `**Cache:** ${st.cp ? Object.keys(st.cp).length : 0} members\n` +
+          `**Cache:** ${st.cp ? st.cp.size() : 0} members\n` +
           `**Paused:** ${st.pause ? "Yes" : "No"}`,
         inline: false,
       });
@@ -2899,7 +2899,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             `• Active auction: ${st.a ? st.a.item : "None"}\n` +
             `• Locked points: ${Object.keys(st.lp).length} members\n` +
             `• History: ${st.h.length} items\n` +
-            `• Cache: ${st.cp ? Object.keys(st.cp).length : 0} members\n\n` +
+            `• Cache: ${st.cp ? st.cp.size() : 0} members\n\n` +
             `**Auctioneering Module:**\n` +
             `• Session items: ${require("./auctioneering.js").getAuctionState().sessionItems.length}\n\n` +
             `**State Files:**\n` +
@@ -3937,7 +3937,7 @@ module.exports = {
         const age = Math.floor((Date.now() - st.ct) / 60000);
         console.log(
           `${EMOJI.CHART} Cache: ${
-            Object.keys(st.cp).length
+            st.cp.size()
           } members (${age}m old)`
         );
         if (age > 60) {

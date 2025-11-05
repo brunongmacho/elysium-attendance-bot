@@ -112,6 +112,7 @@ const { EmbedBuilder } = require("discord.js");
 const fetch = require("node-fetch");
 const { Timeout } = require("timers");
 const errorHandler = require('./utils/error-handler');
+const { PointsCache } = require('./utils/points-cache');
 const {
   getCurrentTimestamp,
   getSundayOfWeek,
@@ -672,13 +673,13 @@ async function startAuctioneering(client, config, channel) {
       return;
     }
     
-    // Store in bidding module's cache
+    // Store in bidding module's cache with PointsCache for O(1) lookups
     const biddingState = biddingModule.getBiddingState();
-    biddingState.cp = pointsData.points;
+    biddingState.cp = new PointsCache(pointsData.points);
     biddingState.ct = Date.now();
     biddingModule.saveBiddingState();
-    
-    console.log(`✅ Loaded ${Object.keys(pointsData.points).length} members' points`);
+
+    console.log(`✅ Loaded ${biddingState.cp.size()} members' points`);
   } catch (err) {
     console.error(`❌ Failed to load points:`, err);
     await channel.send(`❌ Failed to load points: ${err.message}`);
@@ -1975,7 +1976,9 @@ async function buildCombinedResults(config) {
 
   const data = await response.json();
   const allPoints = data.points || {};
-  const allMembers = Object.keys(allPoints);
+  // Use PointsCache for efficient operations
+  const pointsCache = new PointsCache(allPoints);
+  const allMembers = pointsCache.getAllUsernames();
 
   // Combine all winners from session
   const winners = {};
@@ -2552,12 +2555,12 @@ async function handleMyPoints(message, biddingModule, config) {
       return {};
     });
 
-  let userPts = freshPts[u];
-  if (userPts === undefined) {
-    const match = Object.keys(freshPts).find(
-      (n) => n.toLowerCase() === u.toLowerCase()
-    );
-    userPts = match ? freshPts[match] : null;
+  // Use PointsCache for efficient O(1) lookup
+  const ptsCache = new PointsCache(freshPts);
+  let userPts = ptsCache.getPoints(u);
+  if (userPts === 0 && !ptsCache.hasUser(u)) {
+    // User not found in system
+    userPts = null;
   }
 
   let ptsMsg;
