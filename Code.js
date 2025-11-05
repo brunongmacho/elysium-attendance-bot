@@ -1132,17 +1132,60 @@ function handleRemoveMember(data) {
   });
 
   // ==========================================
-  // STEP 3: Return detailed results
+  // STEP 3: Remove from TOTAL ATTENDANCE sheet
   // ==========================================
-  if (!biddingSheetRemoved && attendanceSheetsRemoved === 0) {
+  let totalAttendanceRemoved = false;
+  const totalAttendanceSheet = ss.getSheetByName('TOTAL ATTENDANCE');
+
+  if (totalAttendanceSheet) {
+    const lastRow = totalAttendanceSheet.getLastRow();
+
+    if (lastRow >= 2) {
+      const memberNames = totalAttendanceSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      let rowIndex = -1;
+
+      for (let i = 0; i < memberNames.length; i++) {
+        const currentMember = (memberNames[i][0] || '').toString().trim();
+        const normalizedCurrent = normalizeUsername(currentMember);
+
+        if (normalizedCurrent === normalizedTarget) {
+          rowIndex = i + 2; // +2 because array is 0-indexed and we start from row 2
+          break;
+        }
+      }
+
+      if (rowIndex !== -1) {
+        // Delete the row from TOTAL ATTENDANCE
+        totalAttendanceSheet.deleteRow(rowIndex);
+        totalAttendanceRemoved = true;
+        Logger.log(`✅ Removed member from TOTAL ATTENDANCE sheet`);
+      }
+    }
+  }
+
+  // ==========================================
+  // STEP 4: Return detailed results
+  // ==========================================
+  if (!biddingSheetRemoved && attendanceSheetsRemoved === 0 && !totalAttendanceRemoved) {
     return createResponse('error', `Member "${memberName}" not found in any sheets`, {
       found: false,
       biddingSheetRemoved: false,
-      attendanceSheetsRemoved: 0
+      attendanceSheetsRemoved: 0,
+      totalAttendanceRemoved: false
     });
   }
 
-  const totalSheetsRemoved = (biddingSheetRemoved ? 1 : 0) + attendanceSheetsRemoved;
+  // Regenerate TOTAL ATTENDANCE sheet to ensure consistency
+  if (attendanceSheetsRemoved > 0) {
+    try {
+      updateTotalAttendanceAndMembers();
+      Logger.log(`✅ Regenerated TOTAL ATTENDANCE sheet after removal`);
+    } catch (err) {
+      Logger.log(`⚠️ Failed to regenerate TOTAL ATTENDANCE: ${err.message}`);
+    }
+  }
+
+  const totalSheetsRemoved = (biddingSheetRemoved ? 1 : 0) + attendanceSheetsRemoved + (totalAttendanceRemoved ? 1 : 0);
   const totalAttendancePoints = attendanceSheetsDetails.reduce((sum, detail) => sum + detail.attendancePoints, 0);
 
   Logger.log(`✅ COMPLETE: Removed ${actualMemberName} from ${totalSheetsRemoved} sheet(s)`);
@@ -1154,6 +1197,7 @@ function handleRemoveMember(data) {
     pointsLeft: pointsLeft,
     biddingSheetRemoved: biddingSheetRemoved,
     attendanceSheetsRemoved: attendanceSheetsRemoved,
+    totalAttendanceRemoved: totalAttendanceRemoved,
     attendanceSheetsDetails: attendanceSheetsDetails,
     totalSheetsAffected: totalSheetsRemoved,
     totalAttendancePoints: totalAttendancePoints
