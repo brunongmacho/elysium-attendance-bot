@@ -2345,7 +2345,7 @@ const commandHandlers = {
       async (confirmMsg) => {
         try {
           // Call Google Sheets to remove the member
-          const response = await fetch(config.google_sheets_url, {
+          const response = await fetch(config.sheet_webhook_url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
