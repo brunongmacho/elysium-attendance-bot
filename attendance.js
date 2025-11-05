@@ -1118,12 +1118,22 @@ function cleanupStaleEntries() {
 function schedulePeriodicStateSync() {
   // Sync state to sheets every 10 minutes for crash recovery
   setInterval(async () => {
-    await saveAttendanceStateToSheet(false);
+    try {
+      await saveAttendanceStateToSheet(false);
+    } catch (error) {
+      console.error("❌ Error in periodic state sync:", error.message);
+      // Continue interval, don't break it
+    }
   }, ATTENDANCE_STATE_SYNC_INTERVAL);
 
   // Clean up stale entries every 30 minutes to prevent memory bloat
   setInterval(() => {
-    cleanupStaleEntries();
+    try {
+      cleanupStaleEntries();
+    } catch (error) {
+      console.error("❌ Error in cleanup:", error.message);
+      // Continue interval, don't break it
+    }
   }, STATE_CLEANUP_INTERVAL);
 
   console.log("✅ Scheduled periodic state sync (10min) and cleanup (30min)");

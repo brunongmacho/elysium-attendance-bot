@@ -814,16 +814,21 @@ async function startAuctioneering(client, config, channel) {
   // Countdown feedback every 5 seconds
   let countdown = 30;
   const countdownInterval = setInterval(async () => {
-    countdown -= 5;
-    if (countdown > 0) {
-      countdownEmbed.setFooter({
-        text: `Starting first item in ${countdown}s...`,
-      });
-      await feedbackMsg
-        .edit({ embeds: [countdownEmbed] })
-        .catch((err) =>
-          console.warn(`⚠️ Failed to update countdown:`, err.message)
-        );
+    try {
+      countdown -= 5;
+      if (countdown > 0) {
+        countdownEmbed.setFooter({
+          text: `Starting first item in ${countdown}s...`,
+        });
+        await feedbackMsg
+          .edit({ embeds: [countdownEmbed] })
+          .catch((err) =>
+            console.warn(`⚠️ Failed to update countdown:`, err.message)
+          );
+      }
+    } catch (error) {
+      console.error("❌ Error in countdown interval:", error.message);
+      // Continue interval, don't break it
     }
   }, 5000);
 

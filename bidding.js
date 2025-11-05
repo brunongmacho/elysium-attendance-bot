@@ -772,7 +772,7 @@ function getColor(color) {
 function clearAllTimers() {
   if (!st.th || typeof st.th !== 'object') return 0;
   const count = Object.keys(st.th).length;
-  clearAllTimers();
+  Object.values(st.th).forEach((h) => clearTimeout(h));
   st.th = {};
   return count;
 }
@@ -912,12 +912,17 @@ function startCacheAutoRefresh(url) {
 
   // Set up auto-refresh every 30 minutes
   st.cacheRefreshTimer = setInterval(async () => {
-    if (st.a && st.a.status === "active") {
-      console.log("🔄 Auto-refreshing cache...");
-      await loadCache(url);
-    } else {
-      // Stop refreshing if no active auction
-      stopCacheAutoRefresh();
+    try {
+      if (st.a && st.a.status === "active") {
+        console.log("🔄 Auto-refreshing cache...");
+        await loadCache(url);
+      } else {
+        // Stop refreshing if no active auction
+        stopCacheAutoRefresh();
+      }
+    } catch (error) {
+      console.error("❌ Error in cache auto-refresh:", error.message);
+      // Continue interval, don't break it
     }
   }, CACHE_REFRESH_INTERVAL);
 

@@ -927,8 +927,13 @@ function startBiddingChannelCleanupSchedule() {
 
   // Then schedule every 12 hours
   biddingChannelCleanupTimer = setInterval(async () => {
-    console.log(`⏰ Running scheduled bidding channel cleanup...`);
-    await cleanupBiddingChannel().catch(console.error);
+    try {
+      console.log(`⏰ Running scheduled bidding channel cleanup...`);
+      await cleanupBiddingChannel();
+    } catch (error) {
+      console.error("❌ Error in bidding channel cleanup:", error.message);
+      // Continue interval, don't break it
+    }
   }, BIDDING_CHANNEL_CLEANUP_INTERVAL);
 }
 
