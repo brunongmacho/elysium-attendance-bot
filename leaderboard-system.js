@@ -1,24 +1,110 @@
 /**
- * ELYSIUM Leaderboard & Weekly Report System
- * Features: Attendance leaderboard, Bidding points leaderboard, Weekly reports
+ * ============================================================================
+ * ELYSIUM LEADERBOARD & WEEKLY REPORT SYSTEM
+ * ============================================================================
+ *
+ * PURPOSE:
+ * Provides ranking and analytics for guild members based on their attendance
+ * and bidding activity. Generates automated weekly reports.
+ *
+ * FEATURES:
+ * - Attendance Leaderboard: Ranks members by attendance points
+ * - Bidding Points Leaderboard: Shows members' remaining bidding points
+ * - Weekly Reports: Automated summary reports every Saturday
+ * - Visual Progress Bars: Graphical representation of rankings
+ * - Top Performers Highlighting: Gold/silver/bronze medals
+ * - Statistics: Total spawns, average attendance, points consumed, etc.
+ *
+ * LEADERBOARDS:
+ * 1. ATTENDANCE LEADERBOARD (!leaderboard attendance)
+ *    - Shows top 10 members by attendance points
+ *    - Displays visual progress bars
+ *    - Shows total spawns and average attendance
+ *
+ * 2. BIDDING LEADERBOARD (!leaderboard bidding)
+ *    - Shows top 10 members by points remaining
+ *    - Displays points left and points consumed
+ *    - Shows total points distributed and consumed
+ *
+ * WEEKLY REPORTS:
+ * - Auto-generated every Saturday at 11:59pm GMT+8
+ * - Sent to admin-logs channel
+ * - Includes attendance summary, bidding summary, top members
+ * - Timezone-aware scheduling (GMT+8 / Asia/Manila)
+ *
+ * DATA SOURCE:
+ * All data fetched from Google Sheets via webhook
+ *
+ * @module leaderboard-system
  */
+
+// ============================================================================
+// DEPENDENCIES
+// ============================================================================
 
 const { EmbedBuilder } = require('discord.js');
 const fetch = require('node-fetch');
 
-let config = null;
-let client = null;
+// ============================================================================
+// MODULE STATE
+// ============================================================================
 
 /**
- * Initialize the leaderboard system
+ * Module configuration and Discord client
+ */
+let config = null;  // Bot configuration from config.json
+let client = null;  // Discord.js client instance
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+/**
+ * Initializes the leaderboard system with Discord client and config
+ *
+ * Must be called before any leaderboard commands or scheduling.
+ *
+ * @param {Client} discordClient - Discord.js client instance
+ * @param {Object} botConfig - Bot configuration object from config.json
+ *
+ * @example
+ * init(client, config);
  */
 function init(discordClient, botConfig) {
   client = discordClient;
   config = botConfig;
 }
 
+// ============================================================================
+// DATA FETCHING
+// ============================================================================
+
 /**
- * Fetch attendance leaderboard from Google Sheets
+ * Fetches attendance leaderboard data from Google Sheets
+ *
+ * SHEET INTEGRATION:
+ * Calls Apps Script with action: "getAttendanceLeaderboard"
+ * Apps Script calculates attendance points per member from attendance logs
+ *
+ * RESPONSE FORMAT:
+ * {
+ *   status: "ok",
+ *   weekName: "Week 45 (Nov 3-9, 2025)",
+ *   leaderboard: [
+ *     { name: "Player1", points: 150 },
+ *     { name: "Player2", points: 145 },
+ *     ...
+ *   ],
+ *   totalSpawns: 25,
+ *   averageAttendance: 18
+ * }
+ *
+ * @returns {Promise<Object>} Leaderboard data object
+ * @throws {Error} If fetch fails or response status is not 'ok'
+ *
+ * @example
+ * const data = await fetchAttendanceLeaderboard();
+ * // { status: "ok", weekName: "Week 45", leaderboard: [...], ... }
  */
 async function fetchAttendanceLeaderboard() {
   try {
@@ -42,7 +128,30 @@ async function fetchAttendanceLeaderboard() {
 }
 
 /**
- * Fetch bidding points leaderboard from Google Sheets
+ * Fetches bidding points leaderboard data from Google Sheets
+ *
+ * SHEET INTEGRATION:
+ * Calls Apps Script with action: "getBiddingLeaderboard"
+ * Apps Script reads MemberPoints tab to get current point balances
+ *
+ * RESPONSE FORMAT:
+ * {
+ *   status: "ok",
+ *   leaderboard: [
+ *     { name: "Player1", pointsLeft: 500, pointsConsumed: 100 },
+ *     { name: "Player2", pointsLeft: 450, pointsConsumed: 150 },
+ *     ...
+ *   ],
+ *   totalPointsDistributed: 10000,
+ *   totalPointsConsumed: 2500
+ * }
+ *
+ * @returns {Promise<Object>} Leaderboard data object
+ * @throws {Error} If fetch fails or response status is not 'ok'
+ *
+ * @example
+ * const data = await fetchBiddingLeaderboard();
+ * // { status: "ok", leaderboard: [...], totalPointsDistributed: 10000, ... }
  */
 async function fetchBiddingLeaderboard() {
   try {
@@ -66,7 +175,37 @@ async function fetchBiddingLeaderboard() {
 }
 
 /**
- * Fetch weekly summary data from Google Sheets
+ * Fetches weekly summary data from Google Sheets
+ *
+ * SHEET INTEGRATION:
+ * Calls Apps Script with action: "getWeeklySummary"
+ * Apps Script aggregates data from multiple tabs for comprehensive report
+ *
+ * RESPONSE FORMAT:
+ * {
+ *   status: "ok",
+ *   weekName: "Week 45 (Nov 3-9, 2025)",
+ *   attendance: {
+ *     totalSpawns: 25,
+ *     uniqueAttendees: 45,
+ *     averagePerSpawn: 18,
+ *     topAttendees: [{ name: "Player1", points: 150 }, ...]
+ *   },
+ *   bidding: {
+ *     totalDistributed: 10000,
+ *     totalConsumed: 2500,
+ *     totalRemaining: 7500,
+ *     topSpenders: [{ name: "Player1", consumed: 300 }, ...]
+ *   },
+ *   mostActive: [{ name: "Player1", score: 500 }, ...]
+ * }
+ *
+ * @returns {Promise<Object>} Weekly summary data object
+ * @throws {Error} If fetch fails or response status is not 'ok'
+ *
+ * @example
+ * const data = await fetchWeeklySummary();
+ * // { status: "ok", weekName: "Week 45", attendance: {...}, bidding: {...} }
  */
 async function fetchWeeklySummary() {
   try {
@@ -89,36 +228,69 @@ async function fetchWeeklySummary() {
   }
 }
 
+// ============================================================================
+// LEADERBOARD DISPLAY
+// ============================================================================
+
 /**
- * Display attendance leaderboard
+ * Displays the attendance leaderboard in Discord
+ *
+ * VISUAL FEATURES:
+ * - Top 10 members ranked by attendance points
+ * - Medal emojis for top 3 (🥇🥈🥉)
+ * - Progress bars showing relative performance (20 character width)
+ * - Percentage relative to top performer
+ * - Week name and total member count
+ * - Statistics (total spawns, average attendance)
+ *
+ * WORKFLOW:
+ * 1. Fetch attendance data from sheets
+ * 2. Check if data exists
+ * 3. Build embed with top 10 members
+ * 4. Generate visual progress bars
+ * 5. Add statistics if available
+ * 6. Send embed to channel
+ *
+ * @param {Message} message - Discord message that triggered the command
+ * @returns {Promise<void>}
+ *
+ * @example
+ * // User command: !leaderboard attendance
+ * await displayAttendanceLeaderboard(message);
  */
 async function displayAttendanceLeaderboard(message) {
   try {
     const data = await fetchAttendanceLeaderboard();
 
+    // Check if data exists
     if (!data || !data.leaderboard || data.leaderboard.length === 0) {
       await message.reply('📊 No attendance data available yet.');
       return;
     }
 
+    // Build leaderboard embed
     const embed = new EmbedBuilder()
       .setColor('#3498db')
       .setTitle('🏆 Attendance Leaderboard')
       .setDescription(`**Current Week:** ${data.weekName || 'N/A'}\n**Total Members:** ${data.leaderboard.length}`)
       .setTimestamp();
 
-    // Top 10 members
+    // Get top 10 members
     const topMembers = data.leaderboard.slice(0, 10);
     let leaderboardText = '';
 
-    // Find max points for percentage calculation
+    // Find max points for percentage calculation (top performer = 100%)
     const maxPoints = topMembers.length > 0 ? topMembers[0].points : 1;
 
+    // Build leaderboard text with visual progress bars
     topMembers.forEach((member, index) => {
+      // Medal for top 3, number for others
       const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
 
-      // Calculate percentage and create visual bar (20 chars total)
+      // Calculate percentage relative to top performer
       const percentage = maxPoints > 0 ? (member.points / maxPoints) * 100 : 0;
+
+      // Create visual bar (20 chars: filled blocks + empty blocks)
       const filledLength = Math.round((percentage / 100) * 20);
       const emptyLength = 20 - filledLength;
       const bar = '█'.repeat(filledLength) + '░'.repeat(emptyLength);
@@ -132,6 +304,7 @@ async function displayAttendanceLeaderboard(message) {
       inline: false
     });
 
+    // Add statistics if available
     if (data.totalSpawns) {
       embed.addFields({
         name: '📊 Statistics',
@@ -148,7 +321,30 @@ async function displayAttendanceLeaderboard(message) {
 }
 
 /**
- * Display bidding points leaderboard
+ * Displays the bidding points leaderboard in Discord
+ *
+ * VISUAL FEATURES:
+ * - Top 10 members ranked by points remaining
+ * - Medal emojis for top 3 (🥇🥈🥉)
+ * - Shows both points left and points consumed
+ * - Progress bars showing relative point balances
+ * - Percentage relative to top point holder
+ * - Total points distributed and consumed
+ *
+ * WORKFLOW:
+ * 1. Fetch bidding data from sheets
+ * 2. Check if data exists
+ * 3. Build embed with top 10 members
+ * 4. Generate visual progress bars
+ * 5. Add statistics if available
+ * 6. Send embed to channel
+ *
+ * @param {Message} message - Discord message that triggered the command
+ * @returns {Promise<void>}
+ *
+ * @example
+ * // User command: !leaderboard bidding
+ * await displayBiddingLeaderboard(message);
  */
 async function displayBiddingLeaderboard(message) {
   try {
@@ -207,11 +403,53 @@ async function displayBiddingLeaderboard(message) {
   }
 }
 
+// ============================================================================
+// WEEKLY REPORTS
+// ============================================================================
+
 /**
- * Generate and send weekly report
+ * Generates and sends the weekly summary report to admin-logs
+ *
+ * REPORT CONTENTS:
+ * 1. Attendance Summary:
+ *    - Total spawns for the week
+ *    - Unique attendees count
+ *    - Average attendance per spawn
+ *    - Top 3 attendees with medal emojis
+ *
+ * 2. Bidding Summary:
+ *    - Total points distributed
+ *    - Total points consumed
+ *    - Total points remaining
+ *    - Top 3 spenders with medal emojis
+ *
+ * 3. Most Active Members:
+ *    - Combined activity score (attendance + bidding)
+ *    - Top 5 most active members
+ *
+ * SCHEDULING:
+ * Called automatically every Saturday at 11:59pm GMT+8
+ * Can also be manually triggered for testing
+ *
+ * ERROR HANDLING:
+ * - Validates client and config are initialized
+ * - Validates data exists
+ * - Validates admin-logs channel exists
+ * - Logs errors but doesn't throw (to prevent scheduler crash)
+ *
+ * @returns {Promise<void>}
+ *
+ * @example
+ * // Automatic (via scheduler)
+ * // Every Saturday 11:59pm GMT+8
+ *
+ * @example
+ * // Manual trigger
+ * await sendWeeklyReport();
  */
 async function sendWeeklyReport() {
   try {
+    // Validate initialization
     if (!client || !config) {
       console.error('❌ Leaderboard system not initialized');
       return;
@@ -219,6 +457,7 @@ async function sendWeeklyReport() {
 
     console.log('📅 Generating weekly report...');
 
+    // Fetch summary data from sheets
     const data = await fetchWeeklySummary();
 
     if (!data) {
@@ -226,6 +465,7 @@ async function sendWeeklyReport() {
       return;
     }
 
+    // Get admin-logs channel
     const guild = await client.guilds.fetch(config.main_guild_id);
     const adminLogsChannel = await guild.channels.fetch(config.admin_logs_channel_id);
 
@@ -307,74 +547,129 @@ async function sendWeeklyReport() {
   }
 }
 
-// Scheduler state to prevent duplicates
+// ============================================================================
+// SCHEDULER
+// ============================================================================
+
+/**
+ * Timer reference for the weekly report scheduler
+ * Prevents duplicate schedulers from being created
+ */
 let weeklyReportTimer = null;
 
 /**
- * Schedule weekly report for Saturday 11:59pm GMT+8
- * (End of week since weeks start on Sunday)
+ * Schedules weekly reports for every Saturday at 11:59pm GMT+8
  *
- * FIXED: Proper timezone handling using UTC offset calculations
+ * TIMEZONE HANDLING:
+ * This function properly handles timezone conversions for GMT+8 (Asia/Manila).
+ * The server may be running in any timezone, so we calculate the next
+ * Saturday 11:59pm GMT+8 in terms of UTC time.
+ *
+ * WEEK DEFINITION:
+ * Weeks start on Sunday and end on Saturday. Reports are generated at
+ * the end of the week (Saturday 11:59pm) to capture all week activity.
+ *
+ * SCHEDULING LOGIC:
+ * 1. Calculate days until next Saturday
+ * 2. Set target time to 11:59pm GMT+8 on that Saturday
+ * 3. Convert to UTC for setTimeout
+ * 4. After report runs, automatically schedule next week
+ *
+ * DUPLICATE PREVENTION:
+ * Checks weeklyReportTimer to prevent multiple schedulers.
+ * If scheduler already exists, logs warning and returns.
+ *
+ * AUTO-RESCHEDULING:
+ * After each report is sent, automatically schedules the next one.
+ * This creates a recurring weekly schedule.
+ *
+ * @returns {void}
+ *
+ * @example
+ * // Called once at bot startup
+ * scheduleWeeklyReport();
+ * // Logs: ✅ Weekly report scheduler initialized (Saturday 11:59pm GMT+8)
+ * // Logs: 📅 Next weekly report scheduled for: 2025-11-09 23:59:00 GMT+8 (in 168 hours)
  */
 function scheduleWeeklyReport() {
-  // Prevent duplicate schedulers
+  // ========================================
+  // DUPLICATE PREVENTION
+  // ========================================
+  // Prevent multiple schedulers if function called twice
   if (weeklyReportTimer) {
     console.log('⚠️ Weekly report scheduler already running, skipping initialization');
     return;
   }
 
-  // Calculate next Saturday 11:59pm GMT+8
+  /**
+   * Calculates the next Saturday at 11:59pm GMT+8 in UTC time
+   *
+   * @returns {Date} UTC date object representing next Saturday 11:59pm GMT+8
+   */
   const calculateNextSaturday1159PM = () => {
     const now = new Date();
 
-    // GMT+8 offset in milliseconds
+    // GMT+8 offset in milliseconds (Asia/Manila timezone)
     const GMT8_OFFSET = 8 * 60 * 60 * 1000;
 
-    // Get current time in GMT+8
+    // Get current time in GMT+8 by adding offset
     const nowGMT8 = new Date(now.getTime() + GMT8_OFFSET);
 
     // Get current day (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
     const currentDay = nowGMT8.getUTCDay();
 
     // Calculate days until next Saturday
+    // Formula: (target_day - current_day + 7) % 7
     let daysUntilSaturday = (6 - currentDay + 7) % 7;
 
-    // If today is Saturday and it's already past 11:59pm, schedule for next Saturday
+    // Special case: If today IS Saturday and it's already past 11:59pm,
+    // schedule for next Saturday (7 days from now)
     if (daysUntilSaturday === 0 && (nowGMT8.getUTCHours() > 23 || (nowGMT8.getUTCHours() === 23 && nowGMT8.getUTCMinutes() >= 59))) {
       daysUntilSaturday = 7;
     }
 
-    // Create target date in GMT+8
+    // Create target date in GMT+8 timezone
     const targetGMT8 = new Date(nowGMT8);
     targetGMT8.setUTCDate(targetGMT8.getUTCDate() + daysUntilSaturday);
-    targetGMT8.setUTCHours(23, 59, 0, 0);
+    targetGMT8.setUTCHours(23, 59, 0, 0);  // 11:59:00pm
 
-    // Convert back to UTC for the actual timer
+    // Convert back to UTC for setTimeout (which uses UTC)
     const targetUTC = new Date(targetGMT8.getTime() - GMT8_OFFSET);
 
     return targetUTC;
   };
 
+  /**
+   * Schedules the next weekly report execution
+   * Automatically called after each report completes
+   */
   const scheduleNext = () => {
+    // Calculate when next report should run (in UTC)
     const nextSaturdayUTC = calculateNextSaturday1159PM();
     const now = new Date();
     const delay = nextSaturdayUTC.getTime() - now.getTime();
 
-    // Format for display in Manila time
+    // Format for logging (convert back to GMT+8 for display)
     const displayTime = new Date(nextSaturdayUTC.getTime() + 8 * 60 * 60 * 1000);
     const hours = Math.floor(delay / 1000 / 60 / 60);
 
     console.log(`📅 Next weekly report scheduled for: ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${hours} hours)`);
 
+    // Schedule the report
     weeklyReportTimer = setTimeout(async () => {
       await sendWeeklyReport();
-      scheduleNext(); // Schedule next week
+      scheduleNext(); // Automatically schedule next week's report
     }, delay);
   };
 
+  // Start the scheduling cycle
   scheduleNext();
   console.log('✅ Weekly report scheduler initialized (Saturday 11:59pm GMT+8)');
 }
+
+// ============================================================================
+// MODULE EXPORTS
+// ============================================================================
 
 module.exports = {
   init,

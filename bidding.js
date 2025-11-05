@@ -1,16 +1,180 @@
 /**
- * ELYSIUM Guild Bidding System - Version 6.0 (FULLY ENHANCED)
- * NEW FEATURES:
- * - Cache auto-refresh every 30 minutes during active auctions
- * - Extended preview time (30 seconds)
- * - Concurrent auction protection (mutex)
- * - Better confirmation messages with countdown timers
- * - Emoji consistency throughout
- * - Color-coded embeds (standardized)
- * - Command aliases (!b, !ql, etc.)
- * - Batch auctions (multiple identical items)
- * - Admin action confirmation for destructive commands
+ * ╔═══════════════════════════════════════════════════════════════════════════╗
+ * ║                    ELYSIUM GUILD BIDDING ENGINE                           ║
+ * ║                         Version 6.0 - Enhanced                            ║
+ * ╚═══════════════════════════════════════════════════════════════════════════╝
+ *
+ * @fileoverview Comprehensive bidding system for Discord-based guild auctions
+ * with advanced features including instant bidding, points management, race
+ * condition prevention, and dual-module support (standalone & auctioneering).
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ARCHITECTURE OVERVIEW
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * This bidding engine operates in two modes:
+ *
+ * 1. STANDALONE MODE (bidding.js native):
+ *    - Traditional queue-based auction system
+ *    - Items loaded from Google Sheets
+ *    - Automatic session management with timers
+ *    - Bid confirmation workflow with user acceptance
+ *
+ * 2. AUCTIONEERING MODE (auctioneering.js integration):
+ *    - Manual auction control by admins
+ *    - Instant bidding without confirmations
+ *    - Shared points locking system
+ *    - Real-time bid processing
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * STATE MANAGEMENT
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * The system maintains a centralized state object (st) with the following:
+ *
+ * AUCTION STATE:
+ *   - a: Active auction details (item, bids, timers, winner)
+ *   - q: Item queue loaded from Google Sheets
+ *   - pause: Pause status for bid confirmations
+ *
+ * POINTS MANAGEMENT:
+ *   - lp: Locked points per user (prevents double-spending)
+ *   - cp: Cached points from Google Sheets
+ *   - ct: Cache timestamp for staleness detection
+ *
+ * BID TRACKING:
+ *   - h: Session history (all completed auctions)
+ *   - pc: Pending bid confirmations with timeouts
+ *   - lb: Last bid time per user (rate limiting)
+ *
+ * TIMERS & LIFECYCLE:
+ *   - th: Timer handles for cleanup
+ *   - pauseTimer: Pause state timer
+ *   - cacheRefreshTimer: Auto-refresh interval
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * RACE CONDITION PREVENTION
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * CRITICAL MECHANISMS:
+ *
+ * 1. POINTS LOCKING:
+ *    - When a user bids, their points are immediately locked
+ *    - Prevents simultaneous bids on multiple items exceeding total points
+ *    - Atomic lock/unlock operations with state persistence
+ *    - Shared across both bidding modules (bidding.js + auctioneering.js)
+ *
+ * 2. BID VALIDATION:
+ *    - First bid can MATCH starting price (allows auction to start)
+ *    - Subsequent bids must EXCEED current bid (prevents ties)
+ *    - Real-time availability check: totalPoints - lockedPoints
+ *    - Self-overbidding only locks the difference
+ *
+ * 3. RATE LIMITING:
+ *    - 3-second cooldown between bids per user
+ *    - Prevents spam and accidental duplicate submissions
+ *    - Timestamp-based tracking in st.lb
+ *
+ * 4. TIME EXTENSION LOGIC:
+ *    - Bids in final 60 seconds extend auction by 1 minute
+ *    - Maximum 60 extensions prevents infinite auctions
+ *    - Timers are CLEARED then RESCHEDULED to prevent double-firing
+ *
+ * 5. PENDING CONFIRMATION HANDLING:
+ *    - Higher pending bids cancel lower pending bids
+ *    - Automatic cleanup of stale confirmations (60s timeout)
+ *    - Thread locking prevents new bids during finalization
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * KEY FEATURES
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * BIDDING:
+ *   ✓ Instant bidding (auctioneering mode) - no confirmations
+ *   ✓ Confirmed bidding (standalone mode) - reaction-based acceptance
+ *   ✓ Batch auctions - multiple winners for identical items
+ *   ✓ Self-overbidding - users can increase their own bids
+ *   ✓ Bid validation with boundary checks (max 99,999,999 pts)
+ *
+ * POINTS MANAGEMENT:
+ *   ✓ Real-time points locking/unlocking
+ *   ✓ Auto-refresh cache every 30 minutes during auctions
+ *   ✓ Case-insensitive username matching
+ *   ✓ Google Sheets integration for persistence
+ *   ✓ Stale cache detection and cleanup
+ *
+ * SAFETY & RECOVERY:
+ *   ✓ Thread locking on auction end (prevents late bids)
+ *   ✓ Admin audit tools (!auctionaudit, !fixlockedpoints)
+ *   ✓ State recovery from Google Sheets (survives Koyeb restarts)
+ *   ✓ Comprehensive error handling with safe operations
+ *   ✓ Graceful degradation on permission failures
+ *
+ * AUTOMATION:
+ *   ✓ Automatic session finalization with results submission
+ *   ✓ Going once/twice/final call announcements
+ *   ✓ Countdown timers on bid confirmations
+ *   ✓ Auto-archive completed auction threads
+ *   ✓ Scheduled cleanup of pending confirmations
+ *
+ * ADMIN TOOLS:
+ *   ✓ Force reset (!resetauction) - nuclear option for stuck auctions
+ *   ✓ Recovery tools (!recoverauction) - selective cleanup
+ *   ✓ Locked points audit - detect and fix stuck points
+ *   ✓ Command aliases for convenience (!b, !pts, !ql)
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * BIDDING LOGIC FLOW
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * STANDALONE MODE (!bid command):
+ *   1. Validate user has ELYSIUM role
+ *   2. Check rate limit (3s cooldown)
+ *   3. Validate bid amount (integer, positive, not too large)
+ *   4. Calculate available points (total - locked)
+ *   5. Check if self-overbidding (only lock difference)
+ *   6. Send confirmation message with reactions
+ *   7. Wait for user to react (✅ confirm / ❌ cancel)
+ *   8. On confirm:
+ *      - Unlock previous winner's points
+ *      - Lock new bidder's points
+ *      - Update auction state
+ *      - Check if time extension needed (<60s remaining)
+ *      - Announce new high bid
+ *   9. Auto-timeout after 10 seconds if no reaction
+ *
+ * AUCTIONEERING MODE (procBidAuctioneering):
+ *   1. Validate user has ELYSIUM role
+ *   2. Check rate limit (3s cooldown)
+ *   3. Validate bid amount (integer, positive, not too large)
+ *   4. Calculate available points (total - locked)
+ *   5. Check if self-overbidding (only lock difference)
+ *   6. INSTANT PROCESSING (no confirmation):
+ *      - Unlock previous winner's points immediately
+ *      - Lock new bidder's points immediately
+ *      - Update auction state immediately
+ *      - Check if time extension needed (<60s remaining)
+ *      - Send immediate success confirmation
+ *      - Announce new high bid
+ *   7. Return success result
+ *
+ * TIME EXTENSION MECHANISM:
+ *   - If bid occurs with <60s remaining AND extensions < 60:
+ *     1. CLEAR all auction timers (prevents race condition)
+ *     2. ADD 60 seconds to endTime
+ *     3. INCREMENT extension counter
+ *     4. RESCHEDULE all timers with new endTime
+ *     5. Announce time extension to channel
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * @author ELYSIUM Development Team
+ * @version 6.0.0
+ * @since 2024
  */
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DEPENDENCIES
+// ═══════════════════════════════════════════════════════════════════════════
 
 const { EmbedBuilder } = require("discord.js");
 const fetch = require("node-fetch");
@@ -18,59 +182,135 @@ const fs = require("fs");
 const { normalizeUsername } = require("./utils/common");
 const errorHandler = require('./utils/error-handler');
 
+// ═══════════════════════════════════════════════════════════════════════════
+// MODULE REFERENCES
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Reference to auctioneering module for dual-mode operation
+ * @type {Object|null}
+ */
 let auctioneering = null;
+
+/**
+ * Bot configuration object loaded from config.json
+ * @type {Object|null}
+ */
 let cfg = null;
 
-// CONSTANTS
-const SF = "./bidding-state.json";
-const CT = 10000; // confirm timeout (10s)
-const RL = 3000; // rate limit (3s)
-const ME = 60; // max extensions (increased from 15 to prevent sniping)
-const CACHE_REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
-const PREVIEW_TIME = 30000; // 30 seconds
+// ═══════════════════════════════════════════════════════════════════════════
+// SYSTEM CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════
 
-// Timeout constants
+/**
+ * Path to local state persistence file
+ * @constant {string}
+ */
+const SF = "./bidding-state.json";
+
+/**
+ * Bid confirmation timeout in milliseconds (10 seconds)
+ * @constant {number}
+ */
+const CT = 10000;
+
+/**
+ * Rate limit between bids per user in milliseconds (3 seconds)
+ * Prevents spam and accidental duplicate submissions
+ * @constant {number}
+ */
+const RL = 3000;
+
+/**
+ * Maximum time extensions allowed per auction (60 extensions)
+ * Prevents infinite auctions from continuous last-minute bidding
+ * @constant {number}
+ */
+const ME = 60;
+
+/**
+ * Cache auto-refresh interval in milliseconds (30 minutes)
+ * Keeps points data fresh during long auction sessions
+ * @constant {number}
+ */
+const CACHE_REFRESH_INTERVAL = 30 * 60 * 1000;
+
+/**
+ * Preview time before auction starts in milliseconds (30 seconds)
+ * Gives users time to prepare before bidding begins
+ * @constant {number}
+ */
+const PREVIEW_TIME = 30000;
+
+/**
+ * Timeout durations for various auction events
+ * All values in milliseconds
+ * @constant {Object}
+ */
 const TIMEOUTS = {
-  CONFIRMATION: 30000, // 30 seconds - user confirmation timeout
-  STALE_CONFIRMATION: 60000, // 60 seconds - stale confirmation cleanup
-  NEXT_ITEM_DELAY: 20000, // 20 seconds - delay before next item
-  QUICK_DELAY: 5000, // 5 seconds - quick delay for next item
-  MESSAGE_DELETE: 3000, // 3 seconds - delay before deleting messages
-  GOING_ONCE: 60000, // 60 seconds - "going once" announcement
-  GOING_TWICE: 30000, // 30 seconds - "going twice" announcement
-  FINAL_CALL: 10000, // 10 seconds - final call announcement
-  FINALIZE_DELAY: 2000, // 2 seconds - delay before finalize
+  /** User confirmation timeout before auto-cancel (30 seconds) */
+  CONFIRMATION: 30000,
+  /** Stale confirmation cleanup threshold (60 seconds) */
+  STALE_CONFIRMATION: 60000,
+  /** Delay before starting next auction item (20 seconds) */
+  NEXT_ITEM_DELAY: 20000,
+  /** Quick delay for rapid transitions (5 seconds) */
+  QUICK_DELAY: 5000,
+  /** Delay before auto-deleting confirmation messages (3 seconds) */
+  MESSAGE_DELETE: 3000,
+  /** Time before "going once" announcement (60 seconds remaining) */
+  GOING_ONCE: 60000,
+  /** Time before "going twice" announcement (30 seconds remaining) */
+  GOING_TWICE: 30000,
+  /** Time before "final call" announcement (10 seconds remaining) */
+  FINAL_CALL: 10000,
+  /** Delay before finalizing session results (2 seconds) */
+  FINALIZE_DELAY: 2000,
 };
 
-// Color scheme (consistent throughout)
+/**
+ * Discord embed color scheme for consistent visual feedback
+ * @constant {Object}
+ */
 const COLORS = {
+  /** Green for successful operations (0x00ff00) */
   SUCCESS: 0x00ff00,
+  /** Orange for warnings and cautions (0xffa500) */
   WARNING: 0xffa500,
+  /** Red for errors and failures (0xff0000) */
   ERROR: 0xff0000,
+  /** Blue for informational messages (0x4a90e2) */
   INFO: 0x4a90e2,
+  /** Gold for auction-related messages (0xffd700) */
   AUCTION: 0xffd700,
 };
 
-// Emoji constants (consistent throughout)
+/**
+ * Emoji constants for consistent visual indicators across all messages
+ * @constant {Object}
+ */
 const EMOJI = {
-  SUCCESS: "✅",
-  ERROR: "❌",
-  WARNING: "⚠️",
-  INFO: "ℹ️",
-  AUCTION: "🔨",
-  BID: "💰",
-  TIME: "⏱️",
-  TROPHY: "🏆",
-  FIRE: "🔥",
-  LOCK: "🔒",
-  CHART: "📊",
-  PAUSE: "⏸️",
-  PLAY: "▶️",
-  CLOCK: "🕐",
-  LIST: "📋",
+  SUCCESS: "✅",     // Successful operations
+  ERROR: "❌",      // Errors and failures
+  WARNING: "⚠️",    // Warnings and cautions
+  INFO: "ℹ️",       // Informational messages
+  AUCTION: "🔨",    // Auction-related
+  BID: "💰",        // Bid amounts and points
+  TIME: "⏱️",       // Time-related
+  TROPHY: "🏆",     // Winners and achievements
+  FIRE: "🔥",       // Active/hot items
+  LOCK: "🔒",       // Locked points
+  CHART: "📊",      // Statistics and data
+  PAUSE: "⏸️",      // Paused state
+  PLAY: "▶️",       // Resume/play
+  CLOCK: "🕐",      // Countdown and timing
+  LIST: "📋",       // Lists and queues
 };
 
-// Error message constants (standardized for consistency)
+/**
+ * Standardized error messages for consistent user experience
+ * @constant {Object}
+ */
 const ERROR_MESSAGES = {
   NO_ROLE: `${EMOJI.ERROR} You need the ELYSIUM role to participate in auctions`,
   NO_POINTS: `${EMOJI.ERROR} You have no bidding points available`,
@@ -87,40 +327,130 @@ const ERROR_MESSAGES = {
   NO_ITEMS_QUEUED: `${EMOJI.ERROR} No items in queue`,
 };
 
-// Command aliases
+/**
+ * Command aliases for user convenience
+ * Maps short commands to their full command names
+ * @constant {Object}
+ */
 const COMMAND_ALIASES = {
-  "!b": "!bid",
-  "!ql": "!queuelist",
-  "!queue": "!queuelist",
-  "!start": "!startauction",
-  "!bstatus": "!bidstatus",
-  "!pts": "!mypoints",
-  "!mypts": "!mypoints",
-  "!mp": "!mypoints",
+  "!b": "!bid",                  // Quick bid command
+  "!ql": "!queuelist",           // Quick queue list
+  "!queue": "!queuelist",        // Alternative queue list
+  "!start": "!startauction",     // Quick start
+  "!bstatus": "!bidstatus",      // Bid status check
+  "!pts": "!mypoints",           // Quick points check
+  "!mypts": "!mypoints",         // Alternative points check
+  "!mp": "!mypoints",            // Shortest points check
 };
 
-// STATE (Manual queue 'q' removed - all items now from Google Sheets)
+// ═══════════════════════════════════════════════════════════════════════════
+// CENTRALIZED STATE OBJECT
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Centralized bidding system state
+ *
+ * This object is persisted to both local file system and Google Sheets
+ * for resilience across bot restarts and Koyeb deployments.
+ *
+ * CRITICAL: The 'lp' (locked points) object is SHARED across both
+ * bidding.js and auctioneering.js modules to prevent race conditions
+ * where users bid more points than they have across multiple auctions.
+ *
+ * @type {Object}
+ */
 let st = {
-  a: null, // active auction
-  lp: {}, // locked points
-  h: [], // history
-  th: {}, // timer handles
-  pc: {}, // pending confirmations
-  sd: null, // session date
-  cp: null, // cached points
-  ct: null, // cache timestamp
-  lb: {}, // last bid time (rate limit)
-  pause: false, // is paused
+  /** @type {Object|null} Active auction details (item, bids, winner, status) */
+  a: null,
+
+  /**
+   * @type {Object.<string, number>} Locked points per user
+   * Key: normalized username, Value: points locked
+   * SHARED across bidding.js and auctioneering.js modules
+   */
+  lp: {},
+
+  /** @type {Array<Object>} Session history of completed auctions */
+  h: [],
+
+  /** @type {Object.<string, NodeJS.Timeout>} Timer handles for cleanup */
+  th: {},
+
+  /**
+   * @type {Object.<string, Object>} Pending bid confirmations
+   * Key: message ID, Value: confirmation details
+   */
+  pc: {},
+
+  /** @type {string|null} Session start timestamp (Manila timezone) */
+  sd: null,
+
+  /** @type {Object.<string, number>|null} Cached points from Google Sheets */
+  cp: null,
+
+  /** @type {number|null} Cache load timestamp for staleness detection */
+  ct: null,
+
+  /**
+   * @type {Object.<string, number>} Last bid timestamp per user for rate limiting
+   * Key: user ID, Value: timestamp
+   */
+  lb: {},
+
+  /** @type {boolean} Pause state for bid confirmation handling */
+  pause: false,
+
+  /** @type {NodeJS.Timeout|null} Pause timer reference */
   pauseTimer: null,
-  auctionLock: false, // concurrent auction protection
-  cacheRefreshTimer: null, // auto-refresh timer
+
+  /** @type {boolean} Concurrent auction protection mutex */
+  auctionLock: false,
+
+  /** @type {NodeJS.Timeout|null} Auto-refresh timer for points cache */
+  cacheRefreshTimer: null,
 };
+
+/**
+ * Admin check function reference (injected by initializeBidding)
+ * @type {Function|null}
+ */
 let isAdmFunc = null;
 
-// HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS - Role & Permission Checks
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Checks if member has ELYSIUM role required for bidding
+ *
+ * @param {GuildMember} m - Discord guild member object
+ * @returns {boolean} True if member has ELYSIUM role
+ */
 const hasRole = (m) => m.roles.cache.some((r) => r.name === "ELYSIUM");
+
+/**
+ * Checks if member has admin privileges based on configured admin roles
+ *
+ * @param {GuildMember} m - Discord guild member object
+ * @param {Object} c - Bot configuration with admin_roles array
+ * @returns {boolean} True if member has any admin role
+ */
 const isAdm = (m, c) =>
   m.roles.cache.some((r) => c.admin_roles.includes(r.name));
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS - Time & Duration Formatting
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Generates timestamp string in Manila timezone (MM/DD/YYYY HH:MM)
+ *
+ * Used for session tracking and Google Sheets submissions
+ *
+ * @returns {string} Formatted timestamp string
+ * @example
+ * ts() // "12/25/2024 14:30"
+ */
 const ts = () => {
   const d = new Date();
   const manilaTime = new Date(
@@ -133,12 +463,34 @@ const ts = () => {
     manilaTime.getHours()
   ).padStart(2, "0")}:${String(manilaTime.getMinutes()).padStart(2, "0")}`;
 };
+
+/**
+ * Formats duration in minutes to human-readable string
+ *
+ * @param {number} m - Duration in minutes
+ * @returns {string} Formatted duration string
+ * @example
+ * fmtDur(45)   // "45min"
+ * fmtDur(90)   // "1h 30min"
+ * fmtDur(120)  // "2h"
+ */
 const fmtDur = (m) =>
   m < 60
     ? `${m}min`
     : m % 60 > 0
     ? `${Math.floor(m / 60)}h ${m % 60}min`
     : `${Math.floor(m / 60)}h`;
+
+/**
+ * Formats time in milliseconds to human-readable string
+ *
+ * @param {number} ms - Time in milliseconds
+ * @returns {string} Formatted time string
+ * @example
+ * fmtTime(30000)    // "30s"
+ * fmtTime(90000)    // "1m 30s"
+ * fmtTime(3600000)  // "1h"
+ */
 const fmtTime = (ms) => {
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s`;
@@ -148,12 +500,63 @@ const fmtTime = (ms) => {
   const h = Math.floor(m / 60);
   return m % 60 > 0 ? `${h}h ${m % 60}m` : `${h}h`;
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// POINTS LOCKING SYSTEM - Race Condition Prevention
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Calculates available (unlocked) points for a user
+ *
+ * CRITICAL: This function prevents users from bidding more points than they have
+ * across multiple simultaneous auctions by subtracting locked points from total.
+ *
+ * @param {string} u - Username (will be normalized)
+ * @param {number} tot - Total points the user has
+ * @returns {number} Available points (never negative)
+ * @example
+ * // User has 1000 total points, 300 locked in another auction
+ * avail("Username", 1000) // Returns 700
+ */
 const avail = (u, tot) => Math.max(0, tot - (st.lp[normalizeUsername(u)] || 0));
+
+/**
+ * Locks points for a user (atomic operation with persistence)
+ *
+ * CRITICAL RACE CONDITION PREVENTION:
+ * - Immediately locks points when bid is placed
+ * - Persists state to prevent double-spending if bot crashes
+ * - Shared across bidding.js and auctioneering.js modules
+ *
+ * USAGE:
+ * - Called when user places a bid
+ * - Called when user increases their existing bid (only lock difference)
+ *
+ * @param {string} u - Username (will be normalized)
+ * @param {number} amt - Amount of points to lock
+ */
 const lock = (u, amt) => {
   const key = normalizeUsername(u);
   st.lp[key] = (st.lp[key] || 0) + amt;
   save();
 };
+
+/**
+ * Unlocks points for a user (atomic operation with persistence)
+ *
+ * CRITICAL RACE CONDITION PREVENTION:
+ * - Releases points when user is outbid
+ * - Releases points when auction is cancelled
+ * - Automatically removes entry if points reach 0 (keeps state clean)
+ *
+ * USAGE:
+ * - Called when user is outbid by someone else
+ * - Called when auction is cancelled or skipped
+ * - Called after session finalization
+ *
+ * @param {string} u - Username (will be normalized)
+ * @param {number} amt - Amount of points to unlock
+ */
 const unlock = (u, amt) => {
   const key = normalizeUsername(u);
   st.lp[key] = Math.max(0, (st.lp[key] || 0) - amt);
@@ -161,10 +564,41 @@ const unlock = (u, amt) => {
   save();
 };
 
-// STATE PERSISTENCE
-let lastSheetSyncTime = 0;
-const SHEET_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
+// ═══════════════════════════════════════════════════════════════════════════
+// STATE PERSISTENCE - Dual Storage Strategy
+// ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Last successful Google Sheets sync timestamp
+ * @type {number}
+ */
+let lastSheetSyncTime = 0;
+
+/**
+ * Interval between automatic Google Sheets syncs (5 minutes)
+ * @constant {number}
+ */
+const SHEET_SYNC_INTERVAL = 5 * 60 * 1000;
+
+/**
+ * Persists bidding state to both local file and Google Sheets
+ *
+ * DUAL STORAGE STRATEGY:
+ * 1. LOCAL FILE (bidding-state.json):
+ *    - Fast access for immediate state recovery
+ *    - May be ephemeral on Koyeb (resets on restart)
+ *
+ * 2. GOOGLE SHEETS:
+ *    - Persistent across Koyeb restarts
+ *    - Synced every 5 minutes (throttled to prevent API rate limits)
+ *    - Force sync available via forceSync parameter
+ *
+ * STATE CLEANING:
+ * - Removes circular references from pending confirmations
+ * - Excludes non-serializable timer handles
+ *
+ * @param {boolean} [forceSync=false] - Force immediate Google Sheets sync
+ */
 function save(forceSync = false) {
   try {
     const { th, pauseTimer, cacheRefreshTimer, ...s } = st;
@@ -210,6 +644,20 @@ function save(forceSync = false) {
   }
 }
 
+/**
+ * Loads bidding state from local file or Google Sheets
+ *
+ * LOADING PRIORITY:
+ * 1. LOCAL FILE: Attempt to load from bidding-state.json first (fastest)
+ * 2. GOOGLE SHEETS: Fallback for Koyeb restarts where local file is lost
+ * 3. FRESH STATE: Start with clean state if both sources fail
+ *
+ * STATE RESTORATION:
+ * - Preserves: queue, active auction, locked points, history
+ * - Resets: timers, rate limits, pause state, cache refresh timer
+ *
+ * @returns {Promise<boolean>} True if state was loaded successfully
+ */
 async function load() {
   try {
     // Try local file first (fast)
@@ -263,6 +711,20 @@ async function load() {
   return false;
 }
 
+/**
+ * Initializes the bidding module with configuration and dependencies
+ *
+ * SETUP:
+ * - Injects config and admin check function
+ * - Links auctioneering module for dual-mode support
+ * - Starts automatic cleanup schedule for stale confirmations
+ *
+ * MUST be called before any bidding operations
+ *
+ * @param {Object} config - Bot configuration object
+ * @param {Function} isAdminFunc - Function to check if user has admin privileges
+ * @param {Object} auctioneeringRef - Reference to auctioneering.js module
+ */
 function initializeBidding(config, isAdminFunc, auctioneeringRef) {
   isAdmFunc = isAdminFunc;
   cfg = config;
@@ -272,12 +734,34 @@ function initializeBidding(config, isAdminFunc, auctioneeringRef) {
   startCleanupSchedule();
 }
 
-// Add after COLORS constant definition (around line 30)
+/**
+ * Returns color value (passthrough for future color customization)
+ *
+ * @param {number} color - Hex color value
+ * @returns {number} The same color value
+ */
 function getColor(color) {
   return color;
 }
 
-// SHEETS API
+// ═══════════════════════════════════════════════════════════════════════════
+// GOOGLE SHEETS API - Points & State Management
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Fetches bidding points from Google Sheets via webhook
+ *
+ * POINTS STRUCTURE:
+ * - Key: username (case-insensitive matching)
+ * - Value: available points balance
+ *
+ * FAILURE HANDLING:
+ * - Returns null on any error (network, HTTP, parsing)
+ * - Caller should handle null gracefully (show cache error)
+ *
+ * @param {string} url - Google Sheets webhook URL
+ * @returns {Promise<Object|null>} Points object or null on failure
+ */
 async function fetchPts(url) {
   try {
     const r = await fetch(url, {
@@ -293,6 +777,26 @@ async function fetchPts(url) {
   }
 }
 
+/**
+ * Submits auction results to Google Sheets with retry logic
+ *
+ * RESULT FORMAT:
+ * - Array of objects: { member: username, totalSpent: points }
+ * - Includes ALL members (winners and non-winners with 0 spent)
+ *
+ * RETRY LOGIC:
+ * - Up to 3 attempts with exponential backoff (2s, 4s, 6s)
+ * - Returns detailed error info on final failure
+ *
+ * CRITICAL:
+ * - Only called after session ends (all auctions complete)
+ * - Points are deducted from user balances in Google Sheets
+ *
+ * @param {string} url - Google Sheets webhook URL
+ * @param {Array<Object>} res - Results array with member and totalSpent
+ * @param {string} time - Session timestamp (Manila timezone)
+ * @returns {Promise<Object>} { ok: boolean, d: data, err: error, res: results }
+ */
 async function submitRes(url, res, time) {
   if (!time || !res || res.length === 0)
     return { ok: false, err: "Missing data" };
@@ -322,7 +826,26 @@ async function submitRes(url, res, time) {
   }
 }
 
-// CACHE WITH AUTO-REFRESH
+// ═══════════════════════════════════════════════════════════════════════════
+// POINTS CACHE MANAGEMENT - Auto-Refresh System
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Loads and caches bidding points from Google Sheets
+ *
+ * CACHING STRATEGY:
+ * - Caches points in memory (st.cp) for fast access during bidding
+ * - Records cache timestamp (st.ct) for staleness detection
+ * - Automatically starts auto-refresh if auction is active
+ *
+ * AUTO-REFRESH:
+ * - Refreshes cache every 30 minutes during active auctions
+ * - Keeps data fresh without manual intervention
+ * - Prevents stale point balances in long auction sessions
+ *
+ * @param {string} url - Google Sheets webhook URL
+ * @returns {Promise<boolean>} True if cache loaded successfully
+ */
 async function loadCache(url) {
   // Validate URL parameter
   if (!url || typeof url !== "string") {
@@ -352,6 +875,16 @@ async function loadCache(url) {
   return true;
 }
 
+/**
+ * Starts automatic cache refresh interval (30 minutes)
+ *
+ * AUTO-REFRESH BEHAVIOR:
+ * - Only runs while auction is active
+ * - Automatically stops when auction ends
+ * - Prevents memory leaks by clearing existing timer first
+ *
+ * @param {string} url - Google Sheets webhook URL for refresh
+ */
 function startCacheAutoRefresh(url) {
   // Clear existing timer
   if (st.cacheRefreshTimer) {
@@ -372,6 +905,14 @@ function startCacheAutoRefresh(url) {
   console.log("✅ Cache auto-refresh enabled (every 30 minutes)");
 }
 
+/**
+ * Stops automatic cache refresh interval
+ *
+ * CLEANUP:
+ * - Clears interval timer
+ * - Nullifies timer reference
+ * - Called when auction ends or is cancelled
+ */
 function stopCacheAutoRefresh() {
   if (st.cacheRefreshTimer) {
     clearInterval(st.cacheRefreshTimer);
@@ -380,6 +921,19 @@ function stopCacheAutoRefresh() {
   }
 }
 
+/**
+ * Retrieves points for a user from cache with case-insensitive matching
+ *
+ * MATCHING LOGIC:
+ * 1. Try exact match first (fastest)
+ * 2. Try case-insensitive match (fallback)
+ * 3. Return 0 if user not found
+ *
+ * IMPORTANT: Returns 0 for unknown users (allows them to bid with 0 points warning)
+ *
+ * @param {string} u - Username to look up
+ * @returns {number|null} Points balance or null if cache not loaded
+ */
 function getPts(u) {
   if (!st.cp) return null;
   let p = st.cp[u];
@@ -393,8 +947,26 @@ function getPts(u) {
 }
 
 /**
- * Log critical bid rejections to admin channel for visibility
- * This helps admins monitor bid failures and identify potential issues
+ * Logs critical bid rejections to admin channel for visibility and debugging
+ *
+ * THROTTLING:
+ * - Only logs once per user per 30 seconds to prevent spam
+ * - Stores last log time per user in st.lastBidRejectionLog
+ *
+ * LOG DETAILS:
+ * - User info (name, mention, ID)
+ * - Item being bid on
+ * - Bid amount
+ * - Rejection reason
+ * - Points breakdown (total, available, locked, needed)
+ *
+ * ASYNC & NON-BLOCKING:
+ * - Runs asynchronously after 0ms timeout (doesn't block bidding)
+ * - Silent fail if admin channel unavailable (doesn't break bidding)
+ *
+ * @param {Client} client - Discord client instance
+ * @param {Object} config - Bot configuration with admin_logs_channel_id
+ * @param {Object} details - Rejection details (user, item, bidAmount, reason, etc.)
  */
 async function logBidRejection(client, config, details) {
   try {
@@ -442,6 +1014,23 @@ async function logBidRejection(client, config, details) {
   }
 }
 
+/**
+ * Clears points cache and stops auto-refresh
+ *
+ * CLEANUP:
+ * - Stops auto-refresh timer (prevents memory leaks)
+ * - Nullifies cache (st.cp) and timestamp (st.ct)
+ * - Persists cleared state
+ *
+ * WHEN TO USE:
+ * - After session finalization
+ * - When starting fresh auction session
+ * - When cache is too stale (>60 minutes old)
+ *
+ * SIDE EFFECTS:
+ * - Users won't be able to bid until cache is reloaded
+ * - Any pending bids will fail with "cache not loaded" error
+ */
 function clearCache() {
   console.log("🧹 Clear cache");
   stopCacheAutoRefresh();
@@ -450,7 +1039,30 @@ function clearCache() {
   save();
 }
 
-// PAUSE/RESUME
+// ═══════════════════════════════════════════════════════════════════════════
+// AUCTION PAUSE/RESUME SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Pauses active auction (for bid confirmation in final seconds)
+ *
+ * PAUSE MECHANISM:
+ * - Sets pause flag (st.pause = true)
+ * - Records remaining time (endTime - now)
+ * - Records pause timestamp
+ * - CLEARS all auction timers (going once/twice/final/end)
+ *
+ * CRITICAL:
+ * - Only works if auction is active and not already paused
+ * - Preserves exact remaining time for accurate resume
+ * - Prevents timer race conditions during confirmation
+ *
+ * USAGE:
+ * - Called automatically when bid occurs in final 10 seconds
+ * - Gives user time to confirm without auction ending
+ *
+ * @returns {boolean} True if successfully paused, false otherwise
+ */
 function pauseAuction() {
   if (st.pause || !st.a || st.a.status !== "active") return false;
   st.pause = true;
@@ -469,6 +1081,33 @@ function pauseAuction() {
   return true;
 }
 
+/**
+ * Resumes paused auction with time extension if needed
+ *
+ * RESUME MECHANISM:
+ * - Clears pause flag (st.pause = false)
+ * - Calculates new endTime based on remaining time
+ * - EXTENDS to 60 seconds minimum if paused with <60s remaining
+ * - Reschedules all auction timers
+ *
+ * TIME EXTENSION LOGIC:
+ * - If remaining time was <60s: Extend to 60s from now
+ * - If remaining time was >=60s: Resume with original remaining time
+ * - Resets "going once/twice" flags if time is extended
+ *
+ * CRITICAL:
+ * - Only works if auction is paused and active
+ * - Cleans up pause metadata (pausedAt, remainingTime)
+ * - Reschedules timers with new endTime
+ *
+ * USAGE:
+ * - Called after bid confirmation (confirm/cancel/timeout)
+ * - Ensures auction continues fairly after pause
+ *
+ * @param {Client} cli - Discord client instance
+ * @param {Object} cfg - Bot configuration object
+ * @returns {boolean} True if successfully resumed, false otherwise
+ */
 function resumeAuction(cli, cfg) {
   if (!st.pause || !st.a || st.a.status !== "active") return false;
   st.pause = false;
@@ -1017,6 +1656,59 @@ async function finalize(cli, cfg) {
   save();
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// BID PROCESSING - Auctioneering Mode (Instant Bidding)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Processes instant bids for auctioneering mode (NO confirmations)
+ *
+ * CRITICAL FEATURES:
+ *
+ * 1. INSTANT PROCESSING:
+ *    - No confirmation required (unlike standalone mode)
+ *    - Immediate points locking and state update
+ *    - Real-time feedback to bidder
+ *
+ * 2. RACE CONDITION PREVENTION:
+ *    - Rate limiting: 3-second cooldown per user
+ *    - Points locking: Immediate lock before state update
+ *    - Bid validation: First bid matches start price, subsequent bids must exceed
+ *    - Self-overbidding: Only locks the difference
+ *
+ * 3. TIME EXTENSION:
+ *    - Bids in final 60 seconds extend auction by 1 minute
+ *    - Maximum 60 extensions to prevent infinite auctions
+ *    - CRITICAL: Timers are CLEARED before updating endTime (prevents race condition)
+ *    - Timers are RESCHEDULED after endTime update
+ *
+ * 4. VALIDATION CHECKS:
+ *    - ELYSIUM role requirement
+ *    - Rate limit enforcement
+ *    - Bid amount validation (integer, positive, not too large)
+ *    - Points availability check (total - locked >= needed)
+ *    - Current bid validation (first bid: >=start, subsequent: >current)
+ *
+ * 5. STATE UPDATES:
+ *    - Unlocks previous winner's points
+ *    - Locks new bidder's points
+ *    - Updates currentItem (curBid, curWin, curWinId, bids array)
+ *    - Persists state immediately
+ *    - Notifies auctioneering module via updateCurrentItemState
+ *
+ * 6. USER FEEDBACK:
+ *    - Immediate confirmation embed with bid details
+ *    - Shows previous bid and available points after bid
+ *    - Channel announcement of new high bid
+ *    - Time extension announcement if applicable
+ *
+ * @param {Message} msg - Discord message object
+ * @param {string} amt - Bid amount as string (will be parsed to integer)
+ * @param {Object} auctState - Auctioneering module state reference
+ * @param {Object} auctRef - Auctioneering module reference (for callbacks)
+ * @param {Object} config - Bot configuration object
+ * @returns {Promise<Object>} { ok: boolean, msg?: string, instant?: true }
+ */
 async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   const currentItem = auctState.currentItem;
 
@@ -1290,7 +1982,44 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   return { ok: true, instant: true };
 }
 
-// BIDDING (OPTIMIZED)
+// ═══════════════════════════════════════════════════════════════════════════
+// BID PROCESSING - Standalone Mode (Confirmation-Based Bidding)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Processes bids for standalone mode with user confirmation workflow
+ *
+ * DUAL MODE ROUTING:
+ * - First checks if auctioneering module is active
+ * - Routes to procBidAuctioneering if auctioneering is active
+ * - Continues with standalone mode if not
+ *
+ * CONFIRMATION WORKFLOW:
+ * 1. Validate user and bid amount
+ * 2. Check points availability
+ * 3. Send confirmation embed with reactions (✅ confirm / ❌ cancel)
+ * 4. Wait for user reaction (10 second timeout)
+ * 5. Process bid on confirm, cancel on reject/timeout
+ *
+ * PAUSE MECHANISM:
+ * - If bid occurs in final 10 seconds, auction is PAUSED
+ * - Gives user time to confirm without rushing
+ * - RESUMES on confirm/cancel/timeout
+ *
+ * COUNTDOWN TIMER:
+ * - Updates confirmation embed every second
+ * - Shows remaining time to user
+ * - Cleaned up on confirm/cancel/timeout
+ *
+ * RATE LIMITING:
+ * - 3-second cooldown between bids per user
+ * - Prevents spam and accidental duplicates
+ *
+ * @param {Message} msg - Discord message object
+ * @param {string} amt - Bid amount as string (will be parsed to integer)
+ * @param {Object} cfg - Bot configuration object
+ * @returns {Promise<Object>} { ok: boolean, msg?: string, confId?: string }
+ */
 async function procBid(msg, amt, cfg) {
   // CRITICAL FIX: Check if auctioneering is active first
   if (auctioneering && typeof auctioneering.getAuctionState === "function") {
@@ -1489,7 +2218,48 @@ async function procBid(msg, amt, cfg) {
   return { ok: true, confId: conf.id };
 }
 
-// COMMAND HANDLERS
+// ═══════════════════════════════════════════════════════════════════════════
+// COMMAND HANDLERS - User & Admin Commands
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Main command handler - Routes commands to appropriate handlers
+ *
+ * COMMAND ROUTING:
+ * - Resolves command aliases (!b -> !bid, !pts -> !mypoints, etc.)
+ * - Routes to specific command handler based on command name
+ * - Handles both user commands (!bid, !mypoints) and admin commands (!reset, !audit)
+ *
+ * SUPPORTED COMMANDS:
+ *
+ * USER COMMANDS:
+ * - !bid <amount> - Place bid on active auction
+ * - !mypoints - Check your bidding points balance
+ * - !bidstatus - Show current auction status and queue
+ *
+ * ADMIN COMMANDS:
+ * - !resetbids - Reset bidding state (clears active auction, locked points, history)
+ * - !resetauction - Nuclear reset (both bidding and auctioneering modules)
+ * - !forcesubmitresults - Manually submit session results to Google Sheets
+ * - !cancelitem - Cancel current auction item (refund points)
+ * - !skipitem - Skip current item without sale
+ * - !fixlockedpoints - Audit and clear stuck locked points
+ * - !auctionaudit - Show detailed system state for debugging
+ * - !recoverauction - Recovery tools for crashed/stuck auctions
+ *
+ * COMMAND ALIASES:
+ * - !b -> !bid
+ * - !pts, !mypts, !mp -> !mypoints
+ * - !ql, !queue -> !queuelist
+ * - !bstatus -> !bidstatus
+ * - !start -> !startauction
+ *
+ * @param {string} cmd - Command name (with ! prefix)
+ * @param {Message} msg - Discord message object
+ * @param {Array<string>} args - Command arguments
+ * @param {Client} cli - Discord client instance
+ * @param {Object} cfg - Bot configuration object
+ */
 async function handleCmd(cmd, msg, args, cli, cfg) {
   // Handle command aliases
   const actualCmd = COMMAND_ALIASES[cmd] || cmd;
@@ -2372,7 +3142,35 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
 // startItemAuction removed - unused function
 
-// CLEANUP FUNCTION FOR PENDING CONFIRMATIONS
+// ═══════════════════════════════════════════════════════════════════════════
+// MEMORY LEAK PREVENTION - Automatic Cleanup System
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Cleans up stale pending bid confirmations (prevents memory leaks)
+ *
+ * CLEANUP LOGIC:
+ * - Scans all pending confirmations (st.pc)
+ * - Identifies confirmations older than 60 seconds
+ * - Clears associated timers (confirmation timeout + countdown interval)
+ * - Removes stale confirmation from state
+ * - Persists cleaned state
+ *
+ * MEMORY LEAK PREVENTION:
+ * - Without cleanup, failed/orphaned confirmations accumulate
+ * - Timers continue running indefinitely
+ * - State object grows unbounded
+ * - Bot memory usage increases over time
+ *
+ * TRIGGERS:
+ * - Automatically called every 2 minutes via startCleanupSchedule
+ * - Can be called manually for immediate cleanup
+ *
+ * SAFETY:
+ * - Only removes confirmations older than 60 seconds (safety threshold)
+ * - Logs cleanup activity for monitoring
+ * - Non-blocking operation
+ */
 function cleanupPendingConfirmations() {
   const now = Date.now();
 
@@ -2409,8 +3207,29 @@ function cleanupPendingConfirmations() {
   }
 }
 
-// Start periodic cleanup (every 2 minutes)
+/**
+ * Global cleanup interval reference
+ * @type {NodeJS.Timeout|null}
+ */
 let cleanupInterval = null;
+
+/**
+ * Starts periodic cleanup schedule for pending confirmations
+ *
+ * SCHEDULE:
+ * - Runs cleanupPendingConfirmations every 2 minutes
+ * - Continues indefinitely until bot restart
+ * - Prevents multiple schedules (checks if already running)
+ *
+ * INITIALIZATION:
+ * - Called automatically by initializeBidding
+ * - Should only be called once during bot startup
+ *
+ * MEMORY MANAGEMENT:
+ * - Essential for long-running bot instances
+ * - Prevents memory leaks from orphaned confirmations
+ * - Keeps state object clean and bounded
+ */
 function startCleanupSchedule() {
   if (!cleanupInterval) {
     cleanupInterval = setInterval(cleanupPendingConfirmations, 120000); // 2 minutes
@@ -2420,28 +3239,120 @@ function startCleanupSchedule() {
 
 // stopCleanupSchedule removed - unused function
 
-// MODULE EXPORTS
+// ═══════════════════════════════════════════════════════════════════════════
+// MODULE EXPORTS - Public API
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Public API exports for bidding module
+ *
+ * INITIALIZATION:
+ * - initializeBidding: Setup function (MUST be called first)
+ * - startCleanupSchedule: Memory leak prevention (called by init)
+ *
+ * STATE MANAGEMENT:
+ * - loadBiddingState: Load state from file/sheets
+ * - saveBiddingState: Persist state to file/sheets
+ * - getBiddingState: Get current state object
+ * - loadBiddingStateFromSheet: Load from Google Sheets
+ * - saveBiddingStateToSheet: Save to Google Sheets
+ *
+ * COMMAND HANDLING:
+ * - handleCommand: Main command router
+ *
+ * POINTS MANAGEMENT:
+ * - clearPointsCache: Clear cached points (used by auctioneering.js)
+ * - stopCacheAutoRefresh: Stop auto-refresh timer
+ *
+ * SESSION MANAGEMENT:
+ * - submitSessionTally: Submit results to Google Sheets
+ *
+ * BID CONFIRMATION:
+ * - confirmBid: Handle bid confirmation reactions
+ * - cancelBid: Handle bid cancellation reactions
+ *
+ * STATE RECOVERY:
+ * - recoverBiddingState: Recover state after bot restart
+ *
+ * EMERGENCY FUNCTIONS:
+ * - forceEndAuction: Force end stuck auction
+ * - forceSaveState: Force save state to sheets
+ */
 module.exports = {
-  // startItemAuction - REMOVED: Not used anywhere (logic moved to auctioneering.js)
+  // ═════════════════════════════════════════════════════════════════════════
+  // INITIALIZATION
+  // ═════════════════════════════════════════════════════════════════════════
   initializeBidding,
+  startCleanupSchedule, // Used internally by initializeBidding
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // STATE MANAGEMENT
+  // ═════════════════════════════════════════════════════════════════════════
   loadBiddingState: load,
   saveBiddingState: save,
   getBiddingState: () => st,
-  // hasElysiumRole: hasRole - REMOVED: Not used anywhere
-  // isAdmin: isAdm - REMOVED: Not used anywhere
-  // getCachedPoints: getPts - REMOVED: Not used anywhere
-  // loadPointsCache: loadCache - REMOVED: Not used anywhere
-  clearPointsCache: clearCache, // Re-exported: Used by auctioneering.js:1278
-  handleCommand: handleCmd,
-  // loadPointsCacheForAuction - REMOVED: Not used anywhere
-  submitSessionTally: submitSessionTally,
   loadBiddingStateFromSheet: loadBiddingStateFromSheet,
-  saveBiddingStateToSheet: saveBiddingStateToSheet, // Used internally
-  // cleanupPendingConfirmations - REMOVED: Not used anywhere
-  startCleanupSchedule, // Used internally by initializeBidding
-  // stopCleanupSchedule - REMOVED: Not used anywhere
-  stopCacheAutoRefresh, // Used internally by startCleanupSchedule
+  saveBiddingStateToSheet: saveBiddingStateToSheet,
 
+  // ═════════════════════════════════════════════════════════════════════════
+  // COMMAND HANDLING
+  // ═════════════════════════════════════════════════════════════════════════
+  handleCommand: handleCmd,
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // POINTS MANAGEMENT
+  // ═════════════════════════════════════════════════════════════════════════
+  clearPointsCache: clearCache, // Used by auctioneering.js
+  stopCacheAutoRefresh,
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // SESSION MANAGEMENT
+  // ═════════════════════════════════════════════════════════════════════════
+  submitSessionTally: submitSessionTally,
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // BID CONFIRMATION - Reaction-Based Workflow
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Handles bid confirmation reactions (✅ confirm)
+   *
+   * DUAL MODE SUPPORT:
+   * - Auctioneering mode: Direct processing with instant feedback
+   * - Standalone mode: Confirmation workflow with pause/resume
+   *
+   * VALIDATION:
+   * - Verifies pending confirmation exists
+   * - Checks user is the bidder (prevents others from confirming)
+   * - Validates auction is still active
+   * - Checks bid is still valid (not outbid)
+   *
+   * RACE CONDITION PREVENTION:
+   * - Checks for higher pending bids from other users
+   * - Cancels lower bid if higher pending bid exists
+   * - Prevents simultaneous confirmations from causing issues
+   *
+   * POINTS LOCKING:
+   * - Unlocks previous winner's points
+   * - Locks new bidder's points
+   * - Handles self-overbidding (only lock difference)
+   *
+   * TIME EXTENSION:
+   * - Extends auction if bid in final minute (<60s remaining)
+   * - Reschedules all timers with new endTime
+   * - Maximum 60 extensions enforced
+   *
+   * CLEANUP:
+   * - Removes pending confirmation from state
+   * - Clears confirmation timeout timer
+   * - Clears countdown interval timer
+   * - Deletes confirmation message after 5 seconds
+   * - Resumes auction if paused
+   *
+   * @param {MessageReaction} reaction - Discord reaction object
+   * @param {User} user - Discord user who reacted
+   * @param {Object} config - Bot configuration object
+   */
   confirmBid: async function (reaction, user, config) {
     const p = st.pc[reaction.message.id];
     if (!p) return;
@@ -2903,6 +3814,36 @@ module.exports = {
     );
   },
 
+  /**
+   * Handles bid cancellation reactions (❌ cancel)
+   *
+   * AUTHORIZATION:
+   * - Bid owner can always cancel their own bid
+   * - Admins can cancel any pending bid
+   * - Others cannot cancel (reaction is removed)
+   *
+   * CANCELLATION PROCESS:
+   * 1. Update confirmation message to show "Bid Canceled"
+   * 2. Remove all reactions from message
+   * 3. Delete confirmation message after 3 seconds
+   * 4. Delete original bid command message
+   * 5. Clear confirmation timeout timer
+   * 6. Remove pending confirmation from state
+   * 7. Resume auction if paused (standalone mode only)
+   *
+   * POINTS MANAGEMENT:
+   * - NO points are locked/unlocked (bid never processed)
+   * - User's points remain fully available
+   *
+   * STATE CLEANUP:
+   * - Removes pending confirmation (st.pc)
+   * - Clears timeout timer (st.th)
+   * - Persists cleaned state
+   *
+   * @param {MessageReaction} reaction - Discord reaction object
+   * @param {User} user - Discord user who reacted
+   * @param {Object} config - Bot configuration object
+   */
   cancelBid: async function (reaction, user, config) {
     const p = st.pc[reaction.message.id];
     if (!p) return;
@@ -2957,6 +3898,38 @@ module.exports = {
     }
   },
 
+  // ═════════════════════════════════════════════════════════════════════════
+  // STATE RECOVERY - Bot Restart Handling
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Recovers bidding state after bot restart
+   *
+   * RECOVERY PROCESS:
+   * 1. Load state from local file or Google Sheets
+   * 2. Validate cache freshness (<60 minutes old)
+   * 3. Clear stale cache if too old
+   * 4. Reschedule auction timers if auction is active
+   *
+   * CACHE HANDLING:
+   * - Checks cache age (Date.now() - st.ct)
+   * - Clears cache if older than 60 minutes (prevents stale data)
+   * - Logs warning if active auction has no cache
+   *
+   * TIMER RECOVERY:
+   * - Reschedules going once/twice/final/end timers
+   * - Calculates new timeouts based on saved endTime
+   * - Critical for auction continuity after restart
+   *
+   * VALIDATION:
+   * - Checks if auction is still active
+   * - Warns if auction active but cache missing
+   * - Ensures state consistency
+   *
+   * @param {Client} client - Discord client instance
+   * @param {Object} config - Bot configuration object
+   * @returns {Promise<boolean>} True if state recovered successfully
+   */
   recoverBiddingState: async (client, config) => {
     if (await load()) {
       console.log(`${EMOJI.SUCCESS} State recovered`);
@@ -2984,7 +3957,39 @@ module.exports = {
     return false;
   },
 
-  // EMERGENCY FUNCTIONS
+  // ═════════════════════════════════════════════════════════════════════════
+  // EMERGENCY FUNCTIONS - Admin Recovery Tools
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Forces immediate end of active auction (emergency recovery)
+   *
+   * CRITICAL - ADMIN ONLY:
+   * - Should only be used when auction is stuck/crashed
+   * - Bypasses normal auction end workflow
+   * - Forces session finalization immediately
+   *
+   * CLEANUP PROCESS:
+   * 1. Clear ALL auction timers (going once/twice/final/end/next/start)
+   * 2. Call finalize() to submit results and clear state
+   * 3. Log force-end action
+   *
+   * WHEN TO USE:
+   * - Auction is stuck (timers not firing)
+   * - Bot crashed during auction
+   * - Need to end auction immediately
+   * - Normal !endauction command not working
+   *
+   * SIDE EFFECTS:
+   * - Session results submitted to Google Sheets
+   * - All locked points cleared
+   * - History cleared after submission
+   * - Cache cleared
+   * - Queue remains intact (if items left)
+   *
+   * @param {Client} client - Discord client instance
+   * @param {Object} config - Bot configuration object
+   */
   forceEndAuction: async (client, config) => {
     if (!st.a) {
       console.log(`${EMOJI.WARNING} No active auction to end`);
@@ -3014,6 +4019,34 @@ module.exports = {
     console.log(`${EMOJI.SUCCESS} Auction force-ended`);
   },
 
+  /**
+   * Forces immediate state save to Google Sheets (emergency backup)
+   *
+   * CRITICAL - ADMIN ONLY:
+   * - Bypasses normal save throttling
+   * - Immediately syncs state to Google Sheets
+   * - Use when state must be persisted immediately
+   *
+   * USE CASES:
+   * - Before planned bot restart
+   * - After critical state change
+   * - Before risky operation
+   * - Manual backup request
+   *
+   * WHAT GETS SAVED:
+   * - Active auction state
+   * - Item queue
+   * - Locked points
+   * - Session history
+   *
+   * WHAT IS NOT SAVED:
+   * - Timer handles (recreated on load)
+   * - Pending confirmations (cleaned up)
+   * - Rate limit timestamps (reset on restart)
+   * - Cache refresh timer (recreated on load)
+   *
+   * @returns {Promise<void>} Resolves when save completes
+   */
   forceSaveState: async () => {
     return await saveBiddingStateToSheet();
   },

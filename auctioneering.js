@@ -1,7 +1,111 @@
 /**
- * ELYSIUM Auctioneering System v2.1 - FIXED
- * Single-session management with state persistence
- * Critical fixes: Auto-save state, bid routing, confirmation handling
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ELYSIUM AUCTIONEERING SYSTEM v2.1
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Comprehensive auction session management system for Discord-based item
+ * auctions with Google Sheets integration.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * AUCTION LIFECYCLE
+ * ───────────────────────────────────────────────────────────────────────────
+ *
+ * 1. INITIALIZATION
+ *    └─ Fetch items from Google Sheets with fallback cache
+ *    └─ Load member points from bidding system
+ *    └─ Filter out already-completed items
+ *    └─ Initialize auction state
+ *
+ * 2. PREVIEW PHASE (30 seconds)
+ *    └─ Display upcoming items to @everyone
+ *    └─ Show item details, starting bid, duration
+ *    └─ Countdown to auction start
+ *
+ * 3. ITEM AUCTION PHASE
+ *    └─ Create dedicated Discord thread for each item
+ *    └─ Post initial announcement with item details
+ *    └─ Accept and validate bids in real-time
+ *    └─ Auto-extend on last-minute bids (anti-snipe)
+ *    └─ Countdown announcements (60s, 30s, 10s)
+ *
+ * 4. ITEM COMPLETION
+ *    └─ Announce winner and winning bid
+ *    └─ Log results to Google Sheets
+ *    └─ Lock and archive thread
+ *    └─ Proceed to next item
+ *
+ * 5. SESSION FINALIZATION
+ *    └─ Generate session summary
+ *    └─ Post results to admin logs
+ *    └─ Clear auction state and locked points
+ *    └─ Save final state to sheets
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * KEY FEATURES
+ * ───────────────────────────────────────────────────────────────────────────
+ *
+ * ✓ Single-session management with state persistence
+ * ✓ Real-time bid validation and point locking
+ * ✓ Automatic time extensions on late bids (prevents sniping)
+ * ✓ Circuit breaker pattern with fallback cache
+ * ✓ Thread capacity management and auto-cleanup
+ * ✓ Pause/resume functionality for admin control
+ * ✓ Skip/cancel individual items
+ * ✓ Force-submit results for error recovery
+ * ✓ Scheduled daily auctions (8:30 PM GMT+8)
+ * ✓ Comprehensive error handling and logging
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * TIMER MANAGEMENT
+ * ───────────────────────────────────────────────────────────────────────────
+ *
+ * PREVIEW TIMER (30s)
+ *   └─ Displays next item before auction starts
+ *   └─ Allows members to prepare
+ *
+ * COUNTDOWN TIMERS
+ *   └─ go1: 60 seconds remaining announcement
+ *   └─ go2: 30 seconds remaining announcement
+ *   └─ go3: 10 seconds remaining announcement
+ *   └─ itemEnd: Final auction end and winner announcement
+ *
+ * TIME EXTENSIONS
+ *   └─ Automatic: Bids in last 30s extend by 30s
+ *   └─ Manual: Admin can extend via !extendauction command
+ *   └─ Rescheduling: Timers recalculated on extension
+ *
+ * PAUSE/RESUME LOGIC
+ *   └─ Pause: Clears all timers, records pause time
+ *   └─ Resume: Adjusts endTime by pause duration
+ *   └─ State persistence: Saves state on pause/resume
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * QUEUE MANAGEMENT
+ * ───────────────────────────────────────────────────────────────────────────
+ *
+ * Linear queue processing (first-in-first-out):
+ *   └─ Items processed sequentially by index
+ *   └─ Support for quantity batches (Item x3 = 3 separate auctions)
+ *   └─ Skip functionality to jump ahead
+ *   └─ Cancel functionality to remove items
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * STATE PERSISTENCE
+ * ───────────────────────────────────────────────────────────────────────────
+ *
+ * Auto-save triggers:
+ *   └─ Item start/end
+ *   └─ Pause/resume
+ *   └─ Time extension
+ *   └─ Winner confirmation
+ *
+ * Saved state includes:
+ *   └─ Current item details
+ *   └─ Session items array
+ *   └─ Current index position
+ *   └─ Active/paused status
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 const { EmbedBuilder } = require("discord.js");
@@ -17,18 +121,47 @@ const {
 const auctionCache = require('./utils/auction-cache');
 const attendance = require("./attendance");
 
-// ==========================================
-// POSTTOSHEET INITIALIZATION
-// ==========================================
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 1: MODULE STATE & INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Function reference for posting data to Google Sheets.
+ * Initialized via setPostToSheet() during bot startup.
+ * @type {Function|null}
+ */
 let postToSheetFunc = null;
-let attendanceCache = {}; // { "BOSS DATE TIME": ["member1", "member2"] }
+
+/**
+ * Cache for attendance records (legacy, kept for backwards compatibility).
+ * @type {Object.<string, Array<string>>}
+ */
+let attendanceCache = {};
+
+/**
+ * Current session boss name (legacy, kept for backwards compatibility).
+ * @type {string|null}
+ */
 let currentSessionBoss = null;
 
+/**
+ * Sets the postToSheet function reference for Google Sheets integration.
+ * Must be called during bot initialization before starting auctions.
+ *
+ * @param {Function} fn - The postToSheet function from the sheets module
+ */
 function setPostToSheet(fn) {
   postToSheetFunc = fn;
   console.log(`${EMOJI.SUCCESS} postToSheet function initialized`);
 }
 
+/**
+ * Retrieves the postToSheet function reference.
+ * Throws an error if not initialized.
+ *
+ * @returns {Function} The postToSheet function
+ * @throws {Error} If postToSheet has not been initialized
+ */
 function getPostToSheet() {
   if (!postToSheetFunc) {
     throw new Error(
@@ -38,7 +171,17 @@ function getPostToSheet() {
   return postToSheetFunc;
 }
 
-// STATE
+/**
+ * Primary auction state object tracking the current session.
+ * @type {Object}
+ * @property {boolean} active - Whether an auction is currently running
+ * @property {Object|null} currentItem - The item currently being auctioned
+ * @property {Array<Object>} sessionItems - All items in the current session queue
+ * @property {number} currentItemIndex - Index of current item in sessionItems array
+ * @property {Object.<string, NodeJS.Timeout>} timers - Active timers for countdown/end
+ * @property {boolean} paused - Whether the auction is paused
+ * @property {number|null} pausedTime - Timestamp when auction was paused
+ */
 let auctionState = {
   active: false,
   currentItem: null,
@@ -49,16 +192,62 @@ let auctionState = {
   pausedTime: null,
 };
 
+/**
+ * Function reference to check if a user is an admin.
+ * @type {Function|null}
+ */
 let isAdmFunc = null;
+
+/**
+ * Bot configuration object.
+ * @type {Object|null}
+ */
 let cfg = null;
+
+/**
+ * Reference to the bidding module for point validation.
+ * @type {Object|null}
+ */
 let biddingModule = null;
+
+/**
+ * Timestamp when the current session started.
+ * @type {number|null}
+ */
 let sessionStartTime = null;
+
+/**
+ * Sequential session number.
+ * @type {number}
+ */
 let sessionNumber = 1;
+
+/**
+ * Formatted timestamp string for the current session.
+ * @type {string|null}
+ */
 let sessionTimestamp = null;
+
+/**
+ * Session start date/time string.
+ * @type {string|null}
+ */
 let sessionStartDateTime = null;
 
-// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 2: CONSTANTS & CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Wait time between auction items (milliseconds).
+ * @constant {number}
+ */
 const ITEM_WAIT = 20000;
+
+/**
+ * Discord embed color codes for different message types.
+ * @constant {Object.<string, number>}
+ */
 const COLORS = {
   SUCCESS: 0x00ff00,
   WARNING: 0xffa500,
@@ -67,6 +256,10 @@ const COLORS = {
   AUCTION: 0xffd700,
 };
 
+/**
+ * Emoji constants for consistent visual feedback.
+ * @constant {Object.<string, string>}
+ */
 const EMOJI = {
   SUCCESS: "✅",
   ERROR: "❌",
@@ -86,13 +279,28 @@ const EMOJI = {
   LOCK: "🔒",
 };
 
-// Timeout constants
+/**
+ * Timeout durations for various operations (milliseconds).
+ * @constant {Object.<string, number>}
+ */
 const TIMEOUTS = {
   FETCH_TIMEOUT: 10000, // 10 seconds - API fetch timeout
   CONFIRMATION: 30000, // 30 seconds - user confirmation timeout
   PREVIEW_DELAY: 30000, // 30 seconds - item preview delay
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 3: UTILITY FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Initializes the auctioneering module with required dependencies.
+ * Must be called during bot startup before any auctions can run.
+ *
+ * @param {Object} config - Bot configuration object with channel IDs and settings
+ * @param {Function} isAdminFunc - Function to check if a user is an admin
+ * @param {Object} biddingModuleRef - Reference to the bidding module for point management
+ */
 function initialize(config, isAdminFunc, biddingModuleRef) {
   cfg = config;
   isAdmFunc = isAdminFunc;
@@ -100,6 +308,12 @@ function initialize(config, isAdminFunc, biddingModuleRef) {
   console.log(`${EMOJI.SUCCESS} Auctioneering system initialized`);
 }
 
+/**
+ * Gets the current timestamp formatted for Manila timezone (GMT+8).
+ * Format: MM/DD/YYYY HH:MM
+ *
+ * @returns {string} Formatted timestamp string
+ */
 function getTimestamp() {
   const d = new Date();
   const manilaTime = new Date(
@@ -112,6 +326,13 @@ function getTimestamp() {
   ).padStart(2, "0")}:${String(manilaTime.getMinutes()).padStart(2, "0")}`;
 }
 
+/**
+ * Formats milliseconds into a human-readable time string.
+ * Examples: "45s", "2m 30s", "1h 15m"
+ *
+ * @param {number} ms - Time duration in milliseconds
+ * @returns {string} Formatted time string
+ */
 function fmtTime(ms) {
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s`;
@@ -122,19 +343,24 @@ function fmtTime(ms) {
   return m % 60 > 0 ? `${h}h ${m % 60}m` : `${h}h`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 4: DATA ACCESS & PERSISTENCE
+// ═══════════════════════════════════════════════════════════════════════════
+
 /**
- * Fetch auction items from Google Sheets with circuit breaker and fallback cache
+ * Fetches auction items from Google Sheets with circuit breaker and fallback cache.
  *
- * BULLETPROOF FEATURES:
- * - Circuit breaker prevents cascade failures
+ * FEATURES:
+ * - Circuit breaker prevents cascade failures during API outages
  * - Automatic fallback to cached items if API fails
- * - Exponential backoff retry logic
- * - 100% uptime guarantee (never returns null)
+ * - Exponential backoff retry logic (2s, 4s, 6s)
+ * - Never returns null (returns empty array on total failure)
+ * - Records success/failure metrics for monitoring
  *
  * @param {string} url - Google Sheets webhook URL
- * @param {number} retries - Maximum retry attempts (default: 3)
- * @param {boolean} allowCache - Allow fallback to cache (default: true)
- * @returns {Array} Items array (never null)
+ * @param {number} [retries=3] - Maximum retry attempts
+ * @param {boolean} [allowCache=true] - Allow fallback to cached items
+ * @returns {Promise<Array<Object>>} Items array (never null, but may be empty)
  */
 async function fetchSheetItems(url, retries = 3, allowCache = true) {
   // Check circuit breaker - skip if open and use cache
@@ -220,6 +446,19 @@ async function fetchSheetItems(url, retries = 3, allowCache = true) {
   return []; // Return empty array instead of null
 }
 
+/**
+ * Logs auction results to Google Sheets for permanent record keeping.
+ *
+ * @param {string} url - Google Sheets webhook URL
+ * @param {number} itemIndex - Index of item in the sheet
+ * @param {string} winner - Winner's Discord username (or empty if no winner)
+ * @param {number} winningBid - Final winning bid amount in points
+ * @param {number} totalBids - Sum of all bids placed on this item
+ * @param {number} bidCount - Number of bids placed
+ * @param {string} itemSource - Source of item (e.g., "GoogleSheet")
+ * @param {string} timestamp - Formatted timestamp of auction completion
+ * @returns {Promise<boolean>} True if successfully logged, false otherwise
+ */
 async function logAuctionResult(
   url,
   itemIndex,
@@ -258,6 +497,18 @@ async function logAuctionResult(
   }
 }
 
+/**
+ * Saves the current auction state to Google Sheets for crash recovery.
+ *
+ * FEATURES:
+ * - Circular reference protection (skips timers and circular objects)
+ * - Cleans item data to only include serializable fields
+ * - Auto-save triggers on important state changes
+ * - Enables session recovery after bot restart
+ *
+ * @param {string} url - Google Sheets webhook URL
+ * @returns {Promise<boolean>} True if successfully saved, false otherwise
+ */
 async function saveAuctionState(url) {
   try {
     // 🔒 Prevent circular reference errors
@@ -320,12 +571,33 @@ async function saveAuctionState(url) {
   }
 }
 
-// REPLACE the entire startAuctioneering function (Line ~230 in auctioneering.js)
-// This version removes boss grouping and attendance requirements
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 5: SESSION LIFECYCLE MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
 
-// REPLACE the entire startAuctioneering function (Line ~230 in auctioneering.js)
-// This version removes boss grouping and attendance requirements
-
+/**
+ * Starts a new auction session with items from Google Sheets.
+ *
+ * PROCESS:
+ * 1. Validates parameters and checks for existing session
+ * 2. Fetches bidding channel from Discord
+ * 3. Loads member points cache
+ * 4. Fetches items from Google Sheets (with fallback cache)
+ * 5. Filters out already-completed items
+ * 6. Displays 30-second preview with item list
+ * 7. Starts auctioning items sequentially
+ *
+ * SAFETY:
+ * - Prevents starting multiple concurrent sessions
+ * - Validates channel type (must be text or announcement)
+ * - Checks for large datasets (warns at 1000+, blocks at 5000+)
+ * - Circuit breaker pattern for API failures
+ *
+ * @param {Discord.Client} client - Discord bot client
+ * @param {Object} config - Bot configuration with channel IDs and webhook URL
+ * @param {Discord.TextChannel} channel - Discord channel to start auction in
+ * @returns {Promise<void>}
+ */
 async function startAuctioneering(client, config, channel) {
   // Validate parameters
   if (!client || !config || !channel) {
@@ -596,13 +868,22 @@ async function startAuctioneering(client, config, channel) {
 }
 
 /**
- * BULLETPROOF: Ensure thread capacity before creating new thread
- * Discord limits: 1000 active threads per server, 50 active threads per channel
+ * Ensures Discord thread capacity before creating a new auction thread.
  *
- * If approaching limits:
- * 1. Archive old auction threads
- * 2. Clean up locked/archived threads
- * 3. If still at limit, throw error with user-friendly message
+ * DISCORD LIMITS:
+ * - 1000 active threads per server
+ * - 50 active threads per channel
+ *
+ * PROCESS:
+ * 1. Checks active thread count in the channel
+ * 2. If approaching limit (40+), starts auto-cleanup
+ * 3. Archives old auction threads (locked or older than 1 hour)
+ * 4. Rate-limits archival to avoid API throttling
+ * 5. Throws error if still at capacity after cleanup
+ *
+ * @param {Discord.TextChannel} channel - Channel to check thread capacity
+ * @returns {Promise<void>}
+ * @throws {Error} If thread limit reached and cleanup didn't help
  */
 async function ensureThreadCapacity(channel) {
   try {
@@ -681,9 +962,35 @@ async function ensureThreadCapacity(channel) {
   }
 }
 
-// REPLACE the entire auctionNextItem function (Line ~400 in auctioneering.js)
-// This version removes session/boss logic - just processes items linearly
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 6: ITEM AUCTION MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Auctions the next item in the session queue.
+ *
+ * PROCESS:
+ * 1. Validates channel reference (refetches if needed)
+ * 2. Checks if all items are completed
+ * 3. Displays 30-second preview of next item
+ * 4. Creates dedicated Discord thread for the item
+ * 5. Posts initial auction announcement
+ * 6. Schedules countdown timers (60s, 30s, 10s, end)
+ * 7. Starts accepting bids
+ *
+ * THREAD NAMING:
+ * Format: "ItemName | StartPrice pts | BossName"
+ *
+ * SAFETY:
+ * - Auto-refetches channel if type is invalid
+ * - Ensures thread capacity before creation
+ * - Finalizes session if no more items
+ *
+ * @param {Discord.Client} client - Discord bot client
+ * @param {Object} config - Bot configuration
+ * @param {Discord.TextChannel} channel - Bidding channel for announcements
+ * @returns {Promise<void>}
+ */
 async function auctionNextItem(client, config, channel) {
   // ✅ Ensure we're using a proper guild text channel
   if (![0, 5].includes(channel.type)) {
@@ -953,6 +1260,28 @@ async function auctionNextItem(client, config, channel) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 7: TIMER MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Schedules countdown timers for the current auction item.
+ *
+ * TIMERS SCHEDULED:
+ * - go1: 60 seconds remaining announcement
+ * - go2: 30 seconds remaining announcement
+ * - go3: 10 seconds remaining announcement
+ * - itemEnd: Auction completion and winner announcement
+ *
+ * FEATURES:
+ * - Prevents duplicate announcements (checks go1/go2/go3 flags)
+ * - Adjusts for pause duration when resumed
+ * - Accounts for time extensions from late bids
+ *
+ * @param {Discord.Client} client - Discord bot client
+ * @param {Object} config - Bot configuration
+ * @param {Discord.ThreadChannel} channel - Auction thread channel
+ */
 function scheduleItemTimers(client, config, channel) {
   // Validate parameters
   if (!client || !config || !channel || !auctionState.currentItem) {
@@ -987,6 +1316,15 @@ function scheduleItemTimers(client, config, channel) {
   );
 }
 
+/**
+ * Announces 60 seconds remaining in the auction.
+ * Called automatically by timer system.
+ *
+ * @param {Discord.Client} client - Discord bot client
+ * @param {Object} config - Bot configuration
+ * @param {Discord.ThreadChannel} channel - Auction thread channel
+ * @returns {Promise<void>}
+ */
 async function itemGo1(client, config, channel) {
   if (
     !auctionState.active ||
@@ -1013,6 +1351,15 @@ async function itemGo1(client, config, channel) {
   });
 }
 
+/**
+ * Announces 30 seconds remaining in the auction.
+ * Called automatically by timer system.
+ *
+ * @param {Discord.Client} client - Discord bot client
+ * @param {Object} config - Bot configuration
+ * @param {Discord.ThreadChannel} channel - Auction thread channel
+ * @returns {Promise<void>}
+ */
 async function itemGo2(client, config, channel) {
   if (
     !auctionState.active ||
@@ -1039,6 +1386,15 @@ async function itemGo2(client, config, channel) {
   });
 }
 
+/**
+ * Announces 10 seconds remaining in the auction (final countdown).
+ * Called automatically by timer system.
+ *
+ * @param {Discord.Client} client - Discord bot client
+ * @param {Object} config - Bot configuration
+ * @param {Discord.ThreadChannel} channel - Auction thread channel
+ * @returns {Promise<void>}
+ */
 async function itemGo3(client, config, channel) {
   if (!auctionState.active || !auctionState.currentItem) return;
 
@@ -1059,9 +1415,12 @@ async function itemGo3(client, config, channel) {
   });
 }
 
-// =======================================================
-// SAFE TIMER CLEANUP HELPER
-// =======================================================
+/**
+ * Safely cleans up specific timers by key.
+ * Prevents race conditions and ensures timers are properly cleared.
+ *
+ * @param {...string} timerKeys - Timer keys to clean up (e.g., 'go1', 'go2', 'itemEnd')
+ */
 function safelyCleanupTimers(...timerKeys) {
   timerKeys.forEach((key) => {
     if (auctionState.timers[key]) {
@@ -1071,9 +1430,36 @@ function safelyCleanupTimers(...timerKeys) {
   });
 }
 
-// REPLACE the entire itemEnd function (Line ~600 in auctioneering.js)
-// This version removes session iteration - just moves to next item linearly
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 8: ITEM COMPLETION & RESULTS
+// ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Ends the current auction item and processes the winner.
+ *
+ * PROCESS:
+ * 1. Validates auction state and prevents duplicate calls
+ * 2. Marks item as ended
+ * 3. Announces winner in thread (or "No bids" if none)
+ * 4. Logs results to Google Sheets
+ * 5. Locks and archives the auction thread
+ * 6. Updates session items with winner/amount
+ * 7. Moves to next item or finalizes session
+ *
+ * WINNER ANNOUNCEMENT:
+ * - With bids: Shows winner, winning bid, total bids, bid count
+ * - No bids: Announces no winner, item goes back to pool
+ *
+ * THREAD CLEANUP:
+ * - Locks thread to prevent further bids
+ * - Archives thread after 5 seconds
+ * - Rate-limited to avoid Discord API throttling
+ *
+ * @param {Discord.Client} client - Discord bot client
+ * @param {Object} config - Bot configuration
+ * @param {Discord.ThreadChannel} channel - Auction thread channel
+ * @returns {Promise<void>}
+ */
 async function itemEnd(client, config, channel) {
   if (!client || !config || !channel) {
     console.error(`${EMOJI.ERROR} Invalid parameters to itemEnd`);
@@ -1253,9 +1639,34 @@ async function itemEnd(client, config, channel) {
   }
 }
 
-// REPLACE the entire finalizeSession function (Line ~750 in auctioneering.js)
-// This version already handles tally correctly - just minor cleanup
-
+/**
+ * Finalizes the auction session after all items are completed.
+ *
+ * PROCESS:
+ * 1. Validates there are items to finalize
+ * 2. Generates comprehensive session summary
+ * 3. Posts summary to admin logs channel
+ * 4. Deducts points from winners via bidding module
+ * 5. Clears session data and locked points
+ * 6. Saves final state to sheets
+ *
+ * SUMMARY INCLUDES:
+ * - Total items auctioned
+ * - Items with winners vs. no bids
+ * - Total revenue generated
+ * - Per-member spending breakdown
+ * - Session duration
+ *
+ * POINT DEDUCTION:
+ * - Calls bidding module's finalizeBids()
+ * - Posts results to Google Sheets
+ * - Clears locked points cache
+ *
+ * @param {Discord.Client} client - Discord bot client
+ * @param {Object} config - Bot configuration
+ * @param {Discord.TextChannel} channel - Bidding channel
+ * @returns {Promise<void>}
+ */
 async function finalizeSession(client, config, channel) {
   // Validate parameters
   if (!client || !config || !channel) {
@@ -1531,6 +1942,22 @@ async function finalizeSession(client, config, channel) {
   }
 }
 
+/**
+ * Builds combined results for all members showing total spending.
+ *
+ * PROCESS:
+ * 1. Fetches fresh points from Google Sheets
+ * 2. Aggregates spending from all session items
+ * 3. Normalizes usernames for matching
+ * 4. Creates result entry for every member (including 0 spenders)
+ *
+ * RESULT FORMAT:
+ * - member: Discord username
+ * - totalSpent: Sum of all winning bids
+ *
+ * @param {Object} config - Bot configuration with webhook URL
+ * @returns {Promise<Array<Object>>} Array of {member, totalSpent} objects
+ */
 async function buildCombinedResults(config) {
   // Fetch fresh points from sheet
   const response = await fetch(config.sheet_webhook_url, {
@@ -1575,6 +2002,27 @@ async function buildCombinedResults(config) {
   return results;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 9: PAUSE/RESUME FUNCTIONALITY
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Pauses the current auction session.
+ *
+ * ACTIONS:
+ * - Clears all active timers
+ * - Records pause timestamp
+ * - Sets paused flag
+ * - Saves state to sheets
+ *
+ * BEHAVIOR:
+ * - Current item time remains frozen
+ * - No countdown announcements during pause
+ * - Bids can still be placed (time won't run out)
+ * - Resume will adjust endTime by pause duration
+ *
+ * @returns {boolean} True if successfully paused, false if not active or already paused
+ */
 function pauseSession() {
   if (!auctionState.active || auctionState.paused) return false;
   auctionState.paused = true;
@@ -1591,6 +2039,25 @@ function pauseSession() {
   return true;
 }
 
+/**
+ * Resumes a paused auction session.
+ *
+ * ACTIONS:
+ * - Clears paused flag
+ * - Calculates pause duration
+ * - Adjusts item endTime by pause duration
+ * - Reschedules all timers with new endTime
+ *
+ * TIMING LOGIC:
+ * - If paused for 5 minutes, adds 5 minutes to remaining time
+ * - Preserves relative countdown timing (go1, go2, go3)
+ * - Prevents time exploitation
+ *
+ * @param {Discord.Client} client - Discord bot client
+ * @param {Object} config - Bot configuration
+ * @param {Discord.ThreadChannel} channel - Auction thread channel
+ * @returns {boolean} True if successfully resumed, false if not active or not paused
+ */
 function resumeSession(client, config, channel) {
   if (!auctionState.active || !auctionState.paused) return false;
   auctionState.paused = false;
@@ -1603,6 +2070,36 @@ function resumeSession(client, config, channel) {
   return true;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 10: ADMIN CONTROLS & ITEM MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Force-stops the current auction item and moves to the next.
+ *
+ * PROCESS:
+ * 1. Validates there's an active item
+ * 2. Clears all timers for current item
+ * 3. Announces forced stop in admin logs
+ * 4. Marks item as ended
+ * 5. Processes winner (if any bids exist)
+ * 6. Moves to next item
+ *
+ * USE CASES:
+ * - Item accidentally added
+ * - Technical issues with item
+ * - Admin decision to cancel auction
+ *
+ * SAFETY:
+ * - Prevents stopping already-ended items
+ * - Gracefully handles errors
+ * - Announces action in admin logs
+ *
+ * @param {Discord.Client} client - Discord bot client
+ * @param {Object} config - Bot configuration
+ * @param {Discord.ThreadChannel} channel - Auction thread channel
+ * @returns {Promise<boolean>} True if successfully stopped, false otherwise
+ */
 async function stopCurrentItem(client, config, channel) {
   if (!auctionState.active || !auctionState.currentItem) {
     console.warn("⚠️ No active item to stop.");
@@ -1669,6 +2166,24 @@ async function stopCurrentItem(client, config, channel) {
   return true;
 }
 
+/**
+ * Extends the current auction item duration by specified minutes.
+ *
+ * FEATURES:
+ * - Adds minutes to current endTime
+ * - Saves state to sheets
+ * - Does NOT reschedule timers (handled by rescheduleItemTimers)
+ *
+ * USE CASES:
+ * - Manual admin extension via !extendauction
+ * - Automatic extension on late bids (handled in bidding module)
+ *
+ * NOTE: This function only updates endTime. Call rescheduleItemTimers()
+ * separately to update countdown timers based on new endTime.
+ *
+ * @param {number} minutes - Number of minutes to extend
+ * @returns {boolean} True if successfully extended, false if no active item
+ */
 function extendCurrentItem(minutes) {
   if (!auctionState.active || !auctionState.currentItem) return false;
   // ADD THIS LINE:
@@ -1681,6 +2196,17 @@ function extendCurrentItem(minutes) {
   return true;
 }
 
+/**
+ * Clears all active timers in the auction state.
+ * Used when ending a session or during error recovery.
+ *
+ * FEATURES:
+ * - Clears both timeouts and intervals
+ * - Resets timers object to empty
+ * - Safe to call multiple times
+ *
+ * @returns {void}
+ */
 function clearAllTimers() {
   Object.values(auctionState.timers).forEach((t) => {
     // Clear both timeouts and intervals
@@ -1691,8 +2217,18 @@ function clearAllTimers() {
 }
 
 /**
- * Safely clear only item-specific timers (for time extensions)
- * This prevents the race condition where itemEnd fires during bid processing
+ * Safely clears only item-specific timers without affecting session timers.
+ *
+ * FEATURES:
+ * - Clears: go1, go2, go3, itemEnd timers
+ * - Preserves: session-level timers
+ * - Prevents race condition where itemEnd fires during bid processing
+ *
+ * USE CASES:
+ * - Before rescheduling timers on time extension
+ * - During item force-stop
+ *
+ * @returns {void}
  */
 function safelyClearItemTimers() {
   const timerKeys = ['go1', 'go2', 'go3', 'itemEnd'];
@@ -1706,9 +2242,26 @@ function safelyClearItemTimers() {
 }
 
 /**
- * Reschedule item timers after time extension
- * This is critical when bids extend the auction time - we need to clear
- * old timers and create new ones based on the updated endTime
+ * Reschedules item timers after time extension.
+ *
+ * CRITICAL LOGIC:
+ * 1. Clears existing timers FIRST (prevents race condition)
+ * 2. Resets go1/go2 announcement flags (allows re-announcement)
+ * 3. Calls scheduleItemTimers() with new endTime
+ *
+ * TIMING BEHAVIOR:
+ * - go1 (60s) and go2 (30s) flags reset: can announce again
+ * - go3 (10s) flag NOT reset: only announces once per item
+ * - Prevents duplicate "Going once/twice" announcements
+ *
+ * USE CASES:
+ * - After automatic bid extension (late bids)
+ * - After manual admin extension (!extendauction)
+ *
+ * @param {Discord.Client} client - Discord bot client
+ * @param {Object} config - Bot configuration
+ * @param {Discord.ThreadChannel} channel - Auction thread channel
+ * @returns {boolean} True if successfully rescheduled, false if no active item
  */
 function rescheduleItemTimers(client, config, channel) {
   if (!auctionState.active || !auctionState.currentItem) {
@@ -1739,14 +2292,37 @@ function rescheduleItemTimers(client, config, channel) {
   return true;
 }
 
+/**
+ * Returns the current auction state object.
+ * Used by other modules to check auction status.
+ *
+ * @returns {Object} The auctionState object with all session data
+ */
 function getAuctionState() {
   return auctionState;
 }
 
-// ============================================
-// QUEUE MANAGEMENT FUNCTIONS
-// ============================================
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 11: COMMAND HANDLERS
+// ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Handles the !queue command to display current auction queue.
+ *
+ * DISPLAY MODES:
+ * 1. Active Auction: Shows remaining items with progress
+ * 2. No Auction: Fetches items from sheet for preview
+ *
+ * FEATURES:
+ * - Shows first 20 items (with "...and X more" for longer lists)
+ * - Highlights currently active item
+ * - Shows progress (completed/total)
+ * - Indicates item quantities (x3, x5, etc.)
+ *
+ * @param {Discord.Message} message - Discord message object
+ * @param {Object} biddingState - Current bidding state
+ * @returns {Promise<void>}
+ */
 async function handleQueueList(message, biddingState) {
   const auctQueue = auctionState.sessions || [];
   const biddingQueue = biddingState.q || [];
@@ -1936,6 +2512,25 @@ async function handleQueueList(message, biddingState) {
   await message.reply({ embeds: [embed] });
 }
 
+/**
+ * Handles the !mypoints command to display a user's bidding points.
+ *
+ * DISPLAYS:
+ * - Current available points
+ * - Points locked in active bids
+ * - Effective spendable points
+ * - Member's rank (if available)
+ *
+ * FEATURES:
+ * - Real-time point lookup
+ * - Shows locked points separately
+ * - Color-coded embed (gold for auction theme)
+ *
+ * @param {Discord.Message} message - Discord message object
+ * @param {Object} biddingModule - Bidding module reference
+ * @param {Object} config - Bot configuration
+ * @returns {Promise<void>}
+ */
 async function handleMyPoints(message, biddingModule, config) {
   if (auctionState.active) {
     return await message.channel.send(
@@ -2010,6 +2605,24 @@ async function handleMyPoints(message, biddingModule, config) {
   }, 30000);
 }
 
+/**
+ * Handles the !bidstatus command to show current item's bid status.
+ *
+ * DISPLAYS:
+ * - Current highest bid and bidder
+ * - Time remaining
+ * - Total bids and bid count
+ * - Starting price
+ *
+ * FEATURES:
+ * - Shows "No bids yet" if no bids placed
+ * - Displays time remaining with countdown
+ * - Color-coded embed
+ *
+ * @param {Discord.Message} message - Discord message object
+ * @param {Object} config - Bot configuration
+ * @returns {Promise<void>}
+ */
 async function handleBidStatus(message, config) {
   const statEmbed = new EmbedBuilder()
     .setColor(0x4a90e2)
@@ -2097,6 +2710,31 @@ async function handleBidStatus(message, config) {
   await message.reply({ embeds: [statEmbed] });
 }
 
+/**
+ * Handles the !cancelitem command to remove an item from the queue.
+ *
+ * PROCESS:
+ * 1. Validates admin permissions
+ * 2. Checks for active auction
+ * 3. Prompts for item number
+ * 4. Waits for confirmation (30 seconds)
+ * 5. Removes item from queue
+ * 6. Adjusts currentItemIndex if needed
+ *
+ * FEATURES:
+ * - Interactive confirmation prompt
+ * - Shows item details before canceling
+ * - Handles edge cases (canceling current item)
+ * - Thread-locked confirmation (only works in command thread)
+ *
+ * SAFETY:
+ * - Requires admin permission
+ * - Confirmation timeout (30s)
+ * - Cannot cancel already-ended items
+ *
+ * @param {Discord.Message} message - Discord message object
+ * @returns {Promise<void>}
+ */
 async function handleCancelItem(message) {
   if (!auctionState.active || !auctionState.currentItem) {
     return await message.reply(`${EMOJI.ERROR} No active auction`);
@@ -2202,6 +2840,30 @@ async function handleCancelItem(message) {
   }
 }
 
+/**
+ * Handles the !skipitem command to skip the current item without recording a winner.
+ *
+ * PROCESS:
+ * 1. Validates admin permissions
+ * 2. Checks for active item
+ * 3. Prompts for confirmation (30 seconds)
+ * 4. Clears item timers
+ * 5. Marks item as skipped (no winner)
+ * 6. Locks and archives thread
+ * 7. Moves to next item
+ *
+ * USE CASES:
+ * - Item should not be auctioned now
+ * - Item was mistakenly added
+ * - Need to postpone item to later
+ *
+ * DIFFERENCE FROM CANCEL:
+ * - Skip: Keeps item in session, marks as skipped
+ * - Cancel: Removes item entirely from queue
+ *
+ * @param {Discord.Message} message - Discord message object
+ * @returns {Promise<void>}
+ */
 async function handleSkipItem(message) {
   if (!auctionState.active || !auctionState.currentItem) {
     return await message.reply(`${EMOJI.ERROR} No active auction`);
@@ -2305,6 +2967,31 @@ async function handleSkipItem(message) {
   }
 }
 
+/**
+ * Handles the !forcesubmit command to force-submit results if finalization fails.
+ *
+ * EMERGENCY USE ONLY:
+ * - Used when session ends but results fail to post
+ * - Bypasses normal finalization checks
+ * - Directly calls bidding module's finalizeBids()
+ *
+ * PROCESS:
+ * 1. Validates admin permissions
+ * 2. Checks for session items
+ * 3. Builds combined results
+ * 4. Calls finalizeBids() to deduct points
+ * 5. Confirms submission
+ *
+ * SAFETY:
+ * - Only works when auction is not active
+ * - Requires admin permission
+ * - Shows confirmation message
+ *
+ * @param {Discord.Message} message - Discord message object
+ * @param {Object} config - Bot configuration
+ * @param {Object} biddingModule - Bidding module reference
+ * @returns {Promise<void>}
+ */
 async function handleForceSubmitResults(message, config, biddingModule) {
   if (auctionState.sessionItems.length === 0) {
     return await message.reply(`${EMOJI.ERROR} No results to submit`);
@@ -2353,6 +3040,13 @@ async function handleForceSubmitResults(message, config, biddingModule) {
   }
 }
 
+/**
+ * Updates the current item's state with new values.
+ * Used by bidding module to update bid information in real-time.
+ *
+ * @param {Object} updates - Object with fields to update (curBid, curWin, curWinId, etc.)
+ * @returns {void}
+ */
 function updateCurrentItemState(updates) {
   if (!auctionState.currentItem) return false;
 
@@ -2361,9 +3055,19 @@ function updateCurrentItemState(updates) {
   return true;
 }
 
-// ADD this function to auctioneering.js (around line 1100, before module.exports)
-// This is called by !endauction to force-end the entire session
-
+/**
+ * Manually ends the current auction session.
+ * Wrapper function that calls finalizeSession().
+ *
+ * USE CASES:
+ * - Admin wants to end session early
+ * - Emergency stop
+ *
+ * @param {Discord.Client} client - Discord bot client
+ * @param {Object} config - Bot configuration
+ * @param {Discord.TextChannel} channel - Bidding channel
+ * @returns {Promise<void>}
+ */
 async function endAuctionSession(client, config, channel) {
   console.log(`🛑 Ending auction session (forced by admin)...`);
 
@@ -2413,6 +3117,31 @@ async function endAuctionSession(client, config, channel) {
   console.log(`✅ Auction session ended successfully`);
 }
 
+/**
+ * Handles the !movetodistribution command to move won items to distribution sheet.
+ *
+ * PROCESS:
+ * 1. Validates admin permissions
+ * 2. Checks for completed session items
+ * 3. Sends moveToDistribution request to Google Sheets
+ * 4. Moves items with winners to Distribution sheet
+ * 5. Clears Winner column in BiddingItems sheet
+ * 6. Announces success in admin logs
+ *
+ * TIMING:
+ * - Should be run AFTER !forcesubmit or automatic finalization
+ * - Ensures points have been deducted before moving items
+ *
+ * FEATURES:
+ * - Filters out items without winners
+ * - Logs moved items count
+ * - Posts confirmation embed
+ *
+ * @param {Discord.Message} message - Discord message object
+ * @param {Object} config - Bot configuration
+ * @param {Discord.Client} client - Discord bot client
+ * @returns {Promise<void>}
+ */
 async function handleMoveToDistribution(message, config, client) {
   console.log(`📦 Admin triggered manual ForDistribution move...`);
 
@@ -2565,18 +3294,39 @@ async function handleMoveToDistribution(message, config, client) {
   }
 }
 
-// ============================================
-// DAILY AUCTION SCHEDULER
-// ============================================
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 12: SCHEDULED AUTOMATION
+// ═══════════════════════════════════════════════════════════════════════════
 
-// Scheduler state to prevent duplicates
+/**
+ * Timer reference for daily auction scheduler.
+ * Prevents duplicate schedulers from being created.
+ * @type {NodeJS.Timeout|null}
+ */
 let dailyAuctionTimer = null;
 
 /**
- * Schedule daily auction at 8:30 PM GMT+8 (Asia/Manila timezone)
- * Automatically starts auction every day at the scheduled time
+ * Schedules automatic daily auctions at 8:30 PM GMT+8 (Manila Time).
  *
- * FIXED: Proper timezone handling using UTC offset calculations
+ * FEATURES:
+ * - Calculates next 8:30 PM in GMT+8 timezone
+ * - Automatically schedules next day's auction after completion
+ * - Logs countdown until next auction
+ * - Handles auction-already-running case
+ *
+ * PROCESS:
+ * 1. Calculates time until next 8:30 PM GMT+8
+ * 2. Sets timeout for that duration
+ * 3. On trigger: starts auction if not already running
+ * 4. Reschedules for next day
+ *
+ * ERROR HANDLING:
+ * - Skips if auction already active
+ * - Notifies admin logs on failure
+ * - Always reschedules regardless of success/failure
+ *
+ * @param {Discord.Client} client - Discord bot client
+ * @param {Object} config - Bot configuration
  */
 function scheduleDailyAuction(client, config) {
   // Prevent duplicate schedulers

@@ -1,29 +1,93 @@
 /**
- * ELYSIUM Guild Bot - Consolidated Version 3.1 (OPTIMIZED)
- * Features: Attendance tracking + Bidding system
- * Fixed: !bid recognition in auction threads, consolidated confirmations
+ * =====================================================================
+ * ELYSIUM GUILD BOT - Main Application Entry Point
+ * =====================================================================
+ *
+ * @file index2.js
+ * @version 8.1
+ * @description Comprehensive Discord bot for ELYSIUM guild management,
+ *              integrating attendance tracking and auction bidding systems
+ *              with Google Sheets synchronization.
+ *
+ * @features
+ * - Attendance Tracking: Automated spawn thread management and member verification
+ * - Auction System: Queue-based bidding with point management and winner tracking
+ * - Admin Commands: Full suite of management and override capabilities
+ * - Recovery System: Automatic crash recovery and state persistence
+ * - Memory Management: Optimized for 256MB RAM environments
+ * - Rate Limiting: Built-in protections against Discord API limits
+ * - Health Monitoring: HTTP server for uptime checks
+ *
+ * @architecture
+ * ┌─────────────────────────────────────────────────────────────┐
+ * │                    ELYSIUM Guild Bot                        │
+ * ├─────────────────────────────────────────────────────────────┤
+ * │ Core Systems:                                               │
+ * │  - Attendance Module (./attendance.js)                      │
+ * │  - Bidding Module (./bidding.js)                            │
+ * │  - Auctioneering Module (./auctioneering.js)                │
+ * │  - Help System (./help-system.js)                           │
+ * │  - Loot System (./loot-system.js)                           │
+ * │  - Leaderboard System (./leaderboard-system.js)             │
+ * │  - Emergency Commands (./emergency-commands.js)             │
+ * │  - Error Handler (./utils/error-handler.js)                 │
+ * └─────────────────────────────────────────────────────────────┘
+ *
+ * @sections
+ * 1. Imports & Configuration
+ * 2. Discord Client Initialization
+ * 3. Constants & State Management
+ * 4. HTTP Health Check Server
+ * 5. Utility Functions
+ * 6. Bidding Channel Cleanup
+ * 7. Confirmation Utilities
+ * 8. Command Handlers
+ * 9. Event Handlers
+ * 10. Bot Initialization
+ *
+ * @author ELYSIUM Development Team
+ * @license MIT
  */
 
-const {
-  Client,
-  GatewayIntentBits,
-  Partials,
-  Events,
-  EmbedBuilder,
-} = require("discord.js");
-const fetch = require("node-fetch");
-// levenshtein removed - fuzzy matching now in utils/common.js via utils/cache-manager.js
-const fs = require("fs");
-const http = require("http");
-const bidding = require("./bidding.js");
-const helpSystem = require("./help-system.js");
-const auctioneering = require("./auctioneering.js");
-const attendance = require("./attendance.js");
-const lootSystem = require("./loot-system.js");
-const emergencyCommands = require("./emergency-commands.js");
-const leaderboardSystem = require("./leaderboard-system.js");
-const errorHandler = require('./utils/error-handler');
+// =====================================================================
+// SECTION 1: IMPORTS & DEPENDENCIES
+// =====================================================================
 
+// Discord.js - Official Discord API wrapper
+const {
+  Client,           // Main Discord client class
+  GatewayIntentBits, // Gateway event subscriptions
+  Partials,         // Partial data structures for uncached entities
+  Events,           // Event type constants
+  EmbedBuilder,     // Rich embed message constructor
+} = require("discord.js");
+
+// External dependencies
+const fetch = require("node-fetch");  // HTTP client for API requests
+const fs = require("fs");             // File system operations
+const http = require("http");         // HTTP server for health checks
+
+// Internal modules - Core systems
+const bidding = require("./bidding.js");                    // Auction bidding logic
+const helpSystem = require("./help-system.js");             // Command help system
+const auctioneering = require("./auctioneering.js");        // Auction management
+const attendance = require("./attendance.js");              // Attendance tracking
+const lootSystem = require("./loot-system.js");             // Loot distribution
+const emergencyCommands = require("./emergency-commands.js"); // Emergency overrides
+const leaderboardSystem = require("./leaderboard-system.js"); // Leaderboards
+const errorHandler = require('./utils/error-handler');      // Centralized error handling
+
+/**
+ * Command alias mapping for shorthand commands.
+ * Maps user-friendly shortcuts to canonical command names.
+ *
+ * @type {Object.<string, string>}
+ * @constant
+ *
+ * @example
+ * "!st" -> "!status"
+ * "!b" -> "!bid"
+ */
 const COMMAND_ALIASES = {
   // Help commands
   "!?": "!help",
@@ -88,77 +152,235 @@ const COMMAND_ALIASES = {
   "!skip": "!skipitem",
 };
 
-// Load configuration
+// =====================================================================
+// CONFIGURATION LOADING
+// =====================================================================
+
+/**
+ * Bot configuration loaded from config.json
+ * Contains Discord IDs, API endpoints, and bot settings
+ * @type {Object}
+ */
 const config = JSON.parse(fs.readFileSync("./config.json"));
+
+/**
+ * Boss point values loaded from boss_points.json
+ * Maps boss names to point rewards for attendance
+ * @type {Object.<string, number>}
+ */
 const bossPoints = JSON.parse(fs.readFileSync("./boss_points.json"));
 
-// Initialize Discord client with memory optimization
+// =====================================================================
+// SECTION 2: DISCORD CLIENT INITIALIZATION
+// =====================================================================
+
+/**
+ * Discord client instance with optimized memory management.
+ *
+ * Configuration priorities:
+ * - Memory efficiency: Aggressive cache sweeping for 256MB environments
+ * - Required intents: Guild management, messages, reactions, members
+ * - Partial support: Enables handling of uncached entities
+ *
+ * @type {Client}
+ * @constant
+ */
 const client = new Client({
+  // Gateway intents - subscriptions to Discord events
   intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMessageReactions,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.Guilds,              // Guild/server events
+    GatewayIntentBits.GuildMessages,       // Message events in guilds
+    GatewayIntentBits.MessageContent,      // Access to message content
+    GatewayIntentBits.GuildMessageReactions, // Reaction events
+    GatewayIntentBits.GuildMembers,        // Member events and data
+    GatewayIntentBits.DirectMessages,      // DM support
   ],
+
+  // Partials - handle uncached entities
   partials: [Partials.Channel, Partials.Message, Partials.Reaction],
+
   // Memory optimization: Sweep caches regularly to manage 256MB RAM limit
+  // This is critical for long-running bots in memory-constrained environments
   sweepers: {
     messages: {
-      interval: 300, // Every 5 minutes
+      interval: 300, // Run every 5 minutes
       lifetime: 600, // Remove messages older than 10 minutes
     },
     users: {
-      interval: 600, // Every 10 minutes
-      filter: () => (user) => user.bot && user.id !== client.user?.id, // Keep only non-bot users and self
+      interval: 600, // Run every 10 minutes
+      // Keep only non-bot users and self to reduce memory footprint
+      filter: () => (user) => user.bot && user.id !== client.user?.id,
     },
     guildMembers: {
-      interval: 900, // Every 15 minutes
-      filter: () => (member) => member.id !== client.user?.id, // Keep only self
+      interval: 900, // Run every 15 minutes
+      // Keep only self to minimize cached member data
+      filter: () => (member) => member.id !== client.user?.id,
     },
   },
-  // Use default caching - rely on sweepers for memory management
 });
 
-// ==========================================
-// CONSTANTS & STATE
-// ==========================================
+// =====================================================================
+// SECTION 3: CONSTANTS & STATE MANAGEMENT
+// =====================================================================
 
+/**
+ * Current bot version number
+ * @type {string}
+ * @constant
+ */
 const BOT_VERSION = "8.1";
+
+/**
+ * Bot startup timestamp for uptime calculations
+ * @type {number}
+ * @constant
+ */
 const BOT_START_TIME = Date.now();
+
+/**
+ * HTTP health check server port
+ * @type {number}
+ * @constant
+ */
 const PORT = process.env.PORT || 8000;
 
+/**
+ * Timing constants for rate limiting and delays (all values in milliseconds)
+ *
+ * @type {Object}
+ * @constant
+ * @property {number} MIN_SHEET_DELAY - Minimum delay between Google Sheets API calls
+ * @property {number} OVERRIDE_COOLDOWN - Cooldown period for admin overrides
+ * @property {number} CONFIRMATION_TIMEOUT - How long to wait for confirmation reactions
+ * @property {number} RETRY_DELAY - Delay before retrying failed operations
+ * @property {number} MASS_CLOSE_DELAY - Delay between threads in mass close operations
+ * @property {number} REACTION_RETRY_ATTEMPTS - Number of times to retry reaction operations
+ * @property {number} REACTION_RETRY_DELAY - Delay between reaction retry attempts
+ */
 const TIMING = {
-  MIN_SHEET_DELAY: 2000,
-  OVERRIDE_COOLDOWN: 10000,
-  CONFIRMATION_TIMEOUT: 30000,
-  RETRY_DELAY: 5000,
-  MASS_CLOSE_DELAY: 3000,
-  REACTION_RETRY_ATTEMPTS: 3,
-  REACTION_RETRY_DELAY: 1000,
+  MIN_SHEET_DELAY: 2000,          // 2 seconds - prevents rate limiting
+  OVERRIDE_COOLDOWN: 10000,        // 10 seconds - admin action cooldown
+  CONFIRMATION_TIMEOUT: 30000,     // 30 seconds - user has 30s to confirm
+  RETRY_DELAY: 5000,               // 5 seconds - wait before retrying
+  MASS_CLOSE_DELAY: 3000,          // 3 seconds - spacing for mass operations
+  REACTION_RETRY_ATTEMPTS: 3,      // Try up to 3 times
+  REACTION_RETRY_DELAY: 1000,      // 1 second between retries
 };
 
-// Import state from attendance module
+// =====================================================================
+// STATE VARIABLES
+// =====================================================================
+// These track active operations and cached data in memory
+
+/**
+ * Maps thread IDs to spawn information
+ * @type {Object.<string, Object>}
+ * @property {string} boss - Boss name
+ * @property {string} timestamp - Spawn timestamp
+ * @property {string[]} members - List of verified members
+ * @property {boolean} closed - Whether spawn is closed
+ * @property {string} confirmThreadId - Confirmation thread ID
+ */
 let activeSpawns = {};
+
+/**
+ * Maps column identifiers to Google Sheets column assignments
+ * Prevents duplicate column allocations for the same boss/timestamp
+ * @type {Object.<string, string>}
+ */
 let activeColumns = {};
+
+/**
+ * Tracks pending member verifications awaiting admin approval
+ * @type {Object.<string, Object>}
+ * @property {string} threadId - Thread where verification is pending
+ * @property {string} author - Username requesting verification
+ * @property {string} userId - Discord user ID
+ */
 let pendingVerifications = {};
+
+/**
+ * Tracks pending spawn closure confirmations
+ * @type {Object.<string, Object>}
+ * @property {string} threadId - Thread being closed
+ * @property {string} adminId - Admin who initiated closure
+ * @property {string} type - Closure type ('close', 'forceclose', etc.)
+ */
 let pendingClosures = {};
+
+/**
+ * Maps thread IDs to confirmation message IDs for cleanup
+ * @type {Object.<string, string[]>}
+ */
 let confirmationMessages = {};
+
+/**
+ * Timestamp of last Google Sheets API call (for rate limiting)
+ * @type {number}
+ */
 let lastSheetCall = 0;
+
+/**
+ * Timestamp of last admin override action (for cooldown)
+ * @type {number}
+ */
 let lastOverrideTime = 0;
+
+/**
+ * Timestamp when last auction ended (for cooldown enforcement)
+ * @type {number}
+ */
 let lastAuctionEndTime = 0;
+
+/**
+ * Flag indicating bot is currently recovering from a crash
+ * @type {boolean}
+ */
 let isRecovering = false;
+
+/**
+ * Flag preventing concurrent bid processing
+ * @type {boolean}
+ */
 let isBidProcessing = false;
+
+/**
+ * Timer reference for bidding channel cleanup scheduler
+ * @type {NodeJS.Timeout|null}
+ */
 let biddingChannelCleanupTimer = null;
-const AUCTION_COOLDOWN = 10 * 60 * 1000; // 10 minutes
-const BIDDING_CHANNEL_CLEANUP_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours
 
-// ==========================================
-// HTTP HEALTH CHECK SERVER
-// ==========================================
+/**
+ * Cooldown period after auction ends before new auction can start (10 minutes)
+ * @type {number}
+ * @constant
+ */
+const AUCTION_COOLDOWN = 10 * 60 * 1000;
 
+/**
+ * Interval for bidding channel cleanup operations (12 hours)
+ * @type {number}
+ * @constant
+ */
+const BIDDING_CHANNEL_CLEANUP_INTERVAL = 12 * 60 * 60 * 1000;
+
+// =====================================================================
+// SECTION 4: HTTP HEALTH CHECK SERVER
+// =====================================================================
+
+/**
+ * HTTP server for health monitoring and uptime checks.
+ * Provides status endpoint for external monitoring services (e.g., UptimeRobot).
+ *
+ * Endpoints:
+ * - GET /health - Returns JSON with bot status and metrics
+ * - GET / - Same as /health
+ *
+ * @type {http.Server}
+ * @constant
+ */
 const server = http.createServer((req, res) => {
+  // Health check endpoint - returns bot status and metrics
   if (req.url === "/health" || req.url === "/") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
@@ -173,19 +395,42 @@ const server = http.createServer((req, res) => {
       })
     );
   } else {
+    // Return 404 for all other routes
     res.writeHead(404);
     res.end("Not Found");
   }
 });
 
+// Start HTTP server on configured port
 server.listen(PORT, () =>
   console.log(`🌐 Health check server on port ${PORT}`)
 );
 
-// ==========================================
-// UTILITY FUNCTIONS
-// ==========================================
+// =====================================================================
+// SECTION 5: UTILITY FUNCTIONS
+// =====================================================================
 
+/**
+ * Recovers bot state after unexpected crashes or restarts.
+ *
+ * Recovery process:
+ * 1. Checks Google Sheets for any active auction state
+ * 2. If crashed auction found, finalizes the current item
+ * 3. Moves unfinished queue items back to BiddingItems sheet
+ * 4. Notifies admins of recovery status
+ * 5. Sets cooldown to prevent immediate auction restart
+ *
+ * This function is critical for maintaining data integrity after crashes,
+ * ensuring no auction items or bids are lost.
+ *
+ * @async
+ * @param {Client} client - Discord client instance
+ * @param {Object} config - Bot configuration object
+ * @returns {Promise<void>}
+ *
+ * @example
+ * await recoverBotStateOnStartup(client, config);
+ */
 async function recoverBotStateOnStartup(client, config) {
   console.log(`🔄 Checking for crashed state...`);
 
@@ -268,6 +513,25 @@ async function recoverBotStateOnStartup(client, config) {
   console.log(`✅ Recovery complete, cooldown started`);
 }
 
+/**
+ * Moves unfinished auction queue items back to the BiddingItems sheet.
+ *
+ * Called during recovery to preserve queue items that weren't auctioned
+ * before a crash. Items are appended to the BiddingItems sheet for future
+ * auction sessions.
+ *
+ * @async
+ * @param {Object} config - Bot configuration object with sheet_webhook_url
+ * @param {Array<Object>} queueItems - Array of queue items to move
+ * @param {string} queueItems[].item - Item name
+ * @param {string} queueItems[].source - Item source/origin
+ * @param {number} queueItems[].startBid - Starting bid amount
+ * @returns {Promise<void>}
+ * @throws {Error} When API call fails
+ *
+ * @example
+ * await moveQueueItemsToSheet(config, [{item: "Sword", source: "Dragon", startBid: 100}]);
+ */
 async function moveQueueItemsToSheet(config, queueItems) {
   try {
     const payload = {
@@ -287,19 +551,80 @@ async function moveQueueItemsToSheet(config, queueItems) {
   }
 }
 
+/**
+ * Resolves command aliases to their canonical command names.
+ *
+ * Converts shorthand commands (e.g., "!b", "!st") to their full forms
+ * (e.g., "!bid", "!status") using the COMMAND_ALIASES mapping.
+ * If no alias exists, returns the command unchanged.
+ *
+ * @param {string} cmd - Command string to resolve
+ * @returns {string} Canonical command name or original if no alias exists
+ *
+ * @example
+ * resolveCommandAlias("!b") // Returns "!bid"
+ * resolveCommandAlias("!help") // Returns "!help" (no alias)
+ */
 function resolveCommandAlias(cmd) {
   const lowerCmd = cmd.toLowerCase();
   return COMMAND_ALIASES[lowerCmd] || lowerCmd;
 }
 
+/**
+ * Checks if a guild member has admin privileges.
+ *
+ * Determines admin status by checking if the member has any of the
+ * roles listed in config.admin_roles. This is used throughout the bot
+ * to restrict access to administrative commands.
+ *
+ * @param {GuildMember} member - Discord guild member to check
+ * @returns {boolean} True if member has admin role, false otherwise
+ *
+ * @example
+ * if (isAdmin(message.member)) {
+ *   // Execute admin-only command
+ * }
+ */
 function isAdmin(member) {
   return member.roles.cache.some((r) => config.admin_roles.includes(r.name));
 }
 
-// ==========================================
-// BIDDING CHANNEL CLEANUP
-// ==========================================
+// =====================================================================
+// SECTION 6: BIDDING CHANNEL CLEANUP
+// =====================================================================
 
+/**
+ * Performs comprehensive cleanup of the bidding channel.
+ *
+ * Cleanup operations:
+ * 1. Thread Management:
+ *    - Locks all active auction threads (prevents new messages)
+ *    - Archives threads to remove from active list
+ *    - Processes both active and archived threads
+ *    - Skips cleanup if auction is currently active
+ *
+ * 2. Message Cleanup:
+ *    - Deletes non-admin, non-bot messages
+ *    - Preserves admin messages and bot messages
+ *    - Rate-limited to prevent Discord API issues
+ *    - Processes up to 5000 messages (50 batches of 100)
+ *
+ * Safety features:
+ * - Will not run during active auctions (prevents interference)
+ * - Rate limiting: 500ms between operations
+ * - Batch processing to handle large message volumes
+ * - Error handling with detailed logging
+ *
+ * This function is critical for maintaining a clean bidding channel
+ * by removing clutter from previous auctions.
+ *
+ * @async
+ * @returns {Promise<void>}
+ * @throws {Error} Logs errors but does not throw (fail-safe design)
+ *
+ * @example
+ * await cleanupBiddingChannel();
+ */
 async function cleanupBiddingChannel() {
   try {
     console.log(`🧹 Starting bidding channel cleanup...`);
@@ -559,6 +884,21 @@ async function cleanupBiddingChannel() {
   }
 }
 
+/**
+ * Starts the automated bidding channel cleanup schedule.
+ *
+ * Schedule behavior:
+ * - Runs cleanup immediately on bot startup
+ * - Then runs every 12 hours automatically
+ * - Stores timer reference in biddingChannelCleanupTimer
+ *
+ * This ensures the bidding channel stays clean without manual intervention.
+ *
+ * @returns {void}
+ *
+ * @example
+ * startBiddingChannelCleanupSchedule();
+ */
 function startBiddingChannelCleanupSchedule() {
   console.log(`⏰ Starting bidding channel cleanup schedule (every 12 hours)`);
 
@@ -572,6 +912,17 @@ function startBiddingChannelCleanupSchedule() {
   }, BIDDING_CHANNEL_CLEANUP_INTERVAL);
 }
 
+/**
+ * Stops the automated bidding channel cleanup schedule.
+ *
+ * Clears the interval timer and sets the timer reference to null.
+ * Used during bot shutdown or when cleanup needs to be disabled.
+ *
+ * @returns {void}
+ *
+ * @example
+ * stopBiddingChannelCleanupSchedule();
+ */
 function stopBiddingChannelCleanupSchedule() {
   if (biddingChannelCleanupTimer) {
     clearInterval(biddingChannelCleanupTimer);
@@ -580,10 +931,40 @@ function stopBiddingChannelCleanupSchedule() {
   }
 }
 
-// ==========================================
-// CONSOLIDATED CONFIRMATION UTILITY
-// ==========================================
+// =====================================================================
+// SECTION 7: CONFIRMATION UTILITIES
+// =====================================================================
 
+/**
+ * Universal confirmation dialog with reaction-based user response.
+ *
+ * Flow:
+ * 1. Sends confirmation message (embed or text)
+ * 2. Adds ✅ and ❌ reaction buttons
+ * 3. Waits for user to react (30 second timeout)
+ * 4. Executes onConfirm or onCancel callback
+ * 5. Cleans up reactions after response
+ *
+ * This function centralizes all confirmation logic across the bot,
+ * ensuring consistent UX for destructive or important operations.
+ *
+ * @async
+ * @param {Message} message - Original message that triggered the confirmation
+ * @param {GuildMember} member - Member who must confirm (only their reactions count)
+ * @param {EmbedBuilder|string} embedOrText - Confirmation prompt (embed or plain text)
+ * @param {Function} onConfirm - Async callback when user confirms (✅)
+ * @param {Function} onCancel - Async callback when user cancels (❌)
+ * @returns {Promise<void>}
+ *
+ * @example
+ * await awaitConfirmation(
+ *   message,
+ *   member,
+ *   "Are you sure you want to delete this?",
+ *   async (confirmMsg) => { await performDeletion(); },
+ *   async (confirmMsg) => { await message.reply("Canceled"); }
+ * );
+ */
 async function awaitConfirmation(
   message,
   member,
@@ -624,12 +1005,30 @@ async function awaitConfirmation(
   }
 }
 
-// ==========================================
-// COMMAND HANDLERS
-// ==========================================
+// =====================================================================
+// SECTION 8: COMMAND HANDLERS
+// =====================================================================
 
-// REPLACE ALL COMMAND HANDLERS in index2.js with this corrected version:
-
+/**
+ * Command handler registry mapping command names to handler functions.
+ *
+ * This object centralizes all command logic, making the bot modular and
+ * maintainable. Each handler is an async function that receives:
+ * - message: The Discord message that triggered the command
+ * - member: The guild member who sent the command
+ * - args: Array of command arguments (optional)
+ *
+ * Command categories:
+ * - Help & Info: help, status, debugthread
+ * - Attendance Admin: clearstate, closeallthread, forcesubmit, resetpending
+ * - Auction System: startauction, (delegated to auctioneering module)
+ * - Loot System: loot
+ *
+ * All handlers include proper error handling and admin permission checks.
+ *
+ * @type {Object.<string, Function>}
+ * @constant
+ */
 const commandHandlers = {
   // Help command
   loot: async (message, member, args) => {
@@ -641,6 +1040,9 @@ const commandHandlers = {
     await helpSystem.handleHelp(message, args, member);
   },
 
+  // =========================================================================
+  // STATUS COMMAND - Displays bot health and active operations
+  // =========================================================================
   status: async (message, member) => {
     const guild = message.guild;
     const uptime = attendance.formatUptime(Date.now() - BOT_START_TIME);
@@ -649,13 +1051,17 @@ const commandHandlers = {
         ? `${Math.floor((Date.now() - lastSheetCall) / 1000)} seconds ago`
         : "Never";
 
+    // Sync state from attendance module to get latest data
     activeSpawns = attendance.getActiveSpawns();
     pendingVerifications = attendance.getPendingVerifications();
 
     const totalSpawns = Object.keys(activeSpawns).length;
 
+    // Sort spawns by timestamp (oldest first)
+    // This helps admins prioritize closing old spawns
     const activeSpawnEntries = Object.entries(activeSpawns);
     const sortedSpawns = activeSpawnEntries.sort((a, b) => {
+      // Parse timestamp format: "MM/DD/YY HH:MM"
       const parseTimestamp = (ts) => {
         const [date, time] = ts.split(" ");
         const [month, day, year] = date.split("/");
@@ -723,12 +1129,26 @@ const commandHandlers = {
             return;
           }
 
-          // Handle previous winner
+          // ===================================================================
+          // POINT LOCKING SYSTEM - Critical for auction integrity
+          // ===================================================================
+          // When a new bid is placed, we must:
+          // 1. Unlock the previous winner's points (if not self-overbid)
+          // 2. Lock the new bidder's points to prevent overspending
+          // 3. Notify the previous winner they were outbid
+          //
+          // Example flow:
+          // - User A bids 100pts -> 100pts locked for User A
+          // - User B bids 150pts -> User A's 100pts unlocked, User B's 150pts locked
+          // - User B overbids to 200pts -> Only lock ADDITIONAL 50pts (self-overbid)
+
+          // Handle previous winner (unlock their points if someone else outbid them)
           if (currentItem.curWin && !pendingBid.isSelf) {
             const prevWinner = currentItem.curWin;
             const prevAmount = currentItem.curBid;
 
-            // Unlock previous winner's points
+            // Unlock previous winner's locked points
+            // They can now use these points for other bids
             const biddingStateMod = bidding.getBiddingState();
             biddingStateMod.lp[prevWinner] = Math.max(
               0,
@@ -736,6 +1156,7 @@ const commandHandlers = {
             );
             bidding.saveBiddingState();
 
+            // Notify previous winner they've been outbid
             await msg.channel.send({
               content: `<@${currentItem.curWinId}>`,
               embeds: [
@@ -750,6 +1171,7 @@ const commandHandlers = {
           }
 
           // Lock new bidder's points
+          // For self-overbids, only lock the ADDITIONAL points needed
           const biddingStateMod = bidding.getBiddingState();
           biddingStateMod.lp[pendingBid.username] =
             (biddingStateMod.lp[pendingBid.username] || 0) + pendingBid.needed;
@@ -766,13 +1188,19 @@ const commandHandlers = {
             },
           ];
 
+          // ===================================================================
+          // AUCTION TIME EXTENSION LOGIC - Prevents last-second sniping
+          // ===================================================================
+          // If a bid comes in with less than 60 seconds remaining,
+          // extend the auction by 60 seconds (up to 60 extensions max).
+          // This gives other bidders a fair chance to respond.
           const timeLeft = currentItem.endTime - Date.now();
           let newEndTime = currentItem.endTime;
           let newExtCnt = currentItem.extCnt;
 
           if (timeLeft < 60000 && currentItem.extCnt < 60) {
-            newEndTime = currentItem.endTime + 60000;
-            newExtCnt = currentItem.extCnt + 1;
+            newEndTime = currentItem.endTime + 60000; // Add 1 minute
+            newExtCnt = currentItem.extCnt + 1;        // Increment extension counter
           }
 
           // Update auctioneering state
@@ -942,6 +1370,9 @@ const commandHandlers = {
     await message.reply({ embeds: [embed] });
   },
 
+  // =========================================================================
+  // CLEARSTATE COMMAND - Emergency state reset
+  // =========================================================================
   clearstate: async (message, member) => {
     await awaitConfirmation(
       message,
@@ -955,6 +1386,8 @@ const commandHandlers = {
         `• ${Object.keys(activeColumns).length} active column(s)\n\n` +
         `React ✅ to confirm or ❌ to cancel.`,
       async (confirmMsg) => {
+        // Reset all state variables to empty objects
+        // This is a nuclear option for when the bot gets stuck
         activeSpawns = {};
         activeColumns = {};
         pendingVerifications = {};
@@ -962,6 +1395,7 @@ const commandHandlers = {
         confirmationMessages = {};
 
         // Sync state back to attendance module
+        // This ensures both index2.js and attendance.js have consistent state
         attendance.setActiveSpawns(activeSpawns);
         attendance.setActiveColumns(activeColumns);
         attendance.setPendingVerifications(pendingVerifications);
@@ -979,6 +1413,9 @@ const commandHandlers = {
     );
   },
 
+  // =========================================================================
+  // CLOSEALLTHREAD COMMAND - Mass close all attendance threads
+  // =========================================================================
   closeallthread: async (message, member) => {
     const guild = message.guild;
     const attChannel = await guild.channels
@@ -1479,18 +1916,25 @@ const commandHandlers = {
     );
   },
 
+  // =========================================================================
+  // STARTAUCTION COMMAND - Initiates auction session with queue
+  // =========================================================================
   startauction: async (message, member) => {
+    // Prevent auction start during recovery to avoid data conflicts
     if (isRecovering) {
       return await message.reply(
         `⚠️ Bot is recovering from crash, please wait...`
       );
     }
 
+    // Check if auction is already running
     const auctState = auctioneering.getAuctionState();
     if (auctState.active) {
       return await message.reply(`❌ Auction session already running`);
     }
 
+    // Enforce 10-minute cooldown after auction ends
+    // This prevents rapid auction restarts and gives admins time to review results
     const now = Date.now();
     const timeSinceLast = now - lastAuctionEndTime;
     const cooldownRemaining = AUCTION_COOLDOWN - timeSinceLast;
@@ -1877,10 +2321,40 @@ const commandHandlers = {
   },
 };
 
-// ==========================================
-// BOT READY EVENT
-// ==========================================
-
+/**
+ * =========================================================================
+ * CLIENT READY EVENT HANDLER
+ * =========================================================================
+ *
+ * Triggered once when the bot successfully connects to Discord.
+ * Performs critical initialization sequence:
+ *
+ * 1. Configuration:
+ *    - Attaches config to client for module access
+ *    - Logs bot identity and version information
+ *
+ * 2. Module Initialization:
+ *    - Auction cache (ensures 100% uptime for point data)
+ *    - Attendance module (spawn tracking, verification system)
+ *    - Bidding module (point management, queue system)
+ *    - Auctioneering module (live auction state management)
+ *    - Leaderboard module (statistics and rankings)
+ *    - Emergency commands (backup and override tools)
+ *
+ * 3. Recovery Operations:
+ *    - Checks for crashed auction state
+ *    - Recovers unfinished items
+ *    - Restores point locks
+ *
+ * 4. Scheduled Tasks:
+ *    - Starts bidding channel cleanup (every 12 hours)
+ *    - Initializes garbage collection monitoring (every 10 minutes)
+ *
+ * Order is critical - modules depend on each other and must
+ * initialize in sequence to ensure proper dependency resolution.
+ *
+ * @event ClientReady
+ */
 client.once(Events.ClientReady, async () => {
   console.log(`✅ Bot logged in as ${client.user.tag}`);
   console.log(`📊 Tracking ${Object.keys(bossPoints).length} bosses`);
@@ -2124,10 +2598,44 @@ client.once(Events.ClientReady, async () => {
   }
 });
 
-// ==========================================
-// MESSAGE HANDLER
-// ==========================================
+// =====================================================================
+// SECTION 9: EVENT HANDLERS
+// =====================================================================
 
+/**
+ * =========================================================================
+ * MESSAGE CREATE EVENT HANDLER
+ * =========================================================================
+ *
+ * Main message processing pipeline. Handles:
+ *
+ * 1. Bidding Channel Protection:
+ *    - Deletes non-admin messages (except valid member commands)
+ *    - Preserves bot and admin messages
+ *    - Keeps channel clean for auction announcements
+ *
+ * 2. Command Routing:
+ *    - Resolves aliases (!b -> !bid, !st -> !status)
+ *    - Checks permissions (admin vs member commands)
+ *    - Routes to appropriate handler in commandHandlers
+ *    - Delegates to specialized modules (attendance, bidding, auctioneering)
+ *
+ * 3. Spawn Thread Management:
+ *    - Handles member check-ins in attendance threads
+ *    - Processes admin verification commands (!verify, !verifyall)
+ *    - Manages thread closure (close, !forceclose)
+ *
+ * 4. Auction Thread Handling:
+ *    - Processes !bid commands in auction threads
+ *    - Validates bid amounts and user points
+ *    - Creates confirmation dialogs
+ *
+ * Flow:
+ * Message -> Channel Check -> Permission Check -> Command Routing -> Handler Execution
+ *
+ * @event MessageCreate
+ * @param {Message} message - The Discord message object
+ */
 client.on(Events.MessageCreate, async (message) => {
   try {
     // 🧹 BIDDING CHANNEL PROTECTION: Delete non-admin messages immediately
@@ -2436,23 +2944,29 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
-    // Member check-in (spawn threads only)
+    // =========================================================================
+    // SPAWN THREAD CHECK-IN SYSTEM
+    // =========================================================================
+    // Handles member attendance in spawn threads
+    // Keywords: "present", "here", "join", "checkin", "check-in"
     if (
       message.channel.isThread() &&
       message.channel.parentId === config.attendance_channel_id
     ) {
-      // Sync state
+      // Sync state from attendance module to get latest data
       activeSpawns = attendance.getActiveSpawns();
       pendingVerifications = attendance.getPendingVerifications();
 
       const content = message.content.trim().toLowerCase();
       const keyword = content.split(/\s+/)[0];
 
+      // Check if message is a check-in keyword
       if (
         ["present", "here", "join", "checkin", "check-in"].includes(keyword)
       ) {
         const spawnInfo = activeSpawns[message.channel.id];
 
+        // Validate spawn is still open
         if (!spawnInfo || spawnInfo.closed) {
           await message.reply(
             "⚠️ This spawn is closed. No more check-ins accepted."
@@ -2460,6 +2974,8 @@ client.on(Events.MessageCreate, async (message) => {
           return;
         }
 
+        // Non-admin members MUST attach screenshot as proof
+        // Admins can fast-track without screenshot
         if (
           !userIsAdmin &&
           (!message.attachments || message.attachments.size === 0)
@@ -2470,6 +2986,7 @@ client.on(Events.MessageCreate, async (message) => {
           return;
         }
 
+        // Check for duplicate check-in (case-insensitive)
         const username = member.nickname || message.author.username;
         const isDuplicate = spawnInfo.members.some(
           (m) => m.toLowerCase() === username.toLowerCase()
@@ -2480,8 +2997,10 @@ client.on(Events.MessageCreate, async (message) => {
           return;
         }
 
+        // Add reaction buttons for admin to approve/deny
         await Promise.all([message.react("✅"), message.react("❌")]);
 
+        // Track pending verification in state
         pendingVerifications[message.id] = {
           author: username,
           authorId: message.author.id,
@@ -3037,10 +3556,48 @@ client.on(Events.MessageCreate, async (message) => {
   }
 });
 
-// ==========================================
-// REACTION HANDLER
-// ==========================================
-
+/**
+ * =========================================================================
+ * MESSAGE REACTION ADD EVENT HANDLER
+ * =========================================================================
+ *
+ * Handles reaction-based interactions throughout the bot. Primary uses:
+ *
+ * 1. Attendance Verification:
+ *    - Admin reacts ✅ to approve member check-in
+ *    - Admin reacts ❌ to deny check-in
+ *    - Updates spawn member list and notifies user
+ *
+ * 2. Spawn Closure Confirmations:
+ *    - Admin confirms spawn closure with ✅
+ *    - Submits attendance to Google Sheets
+ *    - Archives thread and cleans up state
+ *
+ * 3. Bid Confirmations:
+ *    - User confirms bid placement with ✅
+ *    - User cancels bid with ❌
+ *    - Handles both regular bidding and auctioneering modes
+ *    - Manages point locking/unlocking
+ *    - Handles outbid notifications
+ *
+ * 4. State Management:
+ *    - Tracks pending operations in pendingVerifications
+ *    - Manages bid state in bidding module
+ *    - Cleans up confirmation messages after response
+ *
+ * Safety features:
+ * - Ignores bot reactions
+ * - Fetches partial data (uncached entities)
+ * - Validates user permissions
+ * - Error handling with detailed logging
+ *
+ * Flow:
+ * Reaction -> Partial Fetch -> State Lookup -> Permission Check -> Action Execution
+ *
+ * @event MessageReactionAdd
+ * @param {MessageReaction} reaction - The reaction object
+ * @param {User} user - User who added the reaction
+ */
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
   try {
     if (user.bot) return;
@@ -3304,16 +3861,29 @@ process.on("SIGINT", () => {
   });
 });
 
-// ==========================================
-// EXPORT FUNCTIONS TO AUCTIONEERING MODULE
-// ==========================================
+// =====================================================================
+// SECTION 10: MODULE EXPORTS & BOT INITIALIZATION
+// =====================================================================
 
+/**
+ * Global function exports for cross-module access.
+ * Enables auctioneering module to submit data to Google Sheets.
+ */
 global.postToSheet = attendance.postToSheet;
 
-// ==========================================
-// LOGIN
-// ==========================================
-
+/**
+ * =========================================================================
+ * BOT LOGIN & STARTUP
+ * =========================================================================
+ *
+ * Final step: Authenticates bot with Discord using token.
+ *
+ * The DISCORD_TOKEN must be set as an environment variable.
+ * Without it, the bot cannot connect to Discord and will exit.
+ *
+ * After successful login, the ClientReady event fires and
+ * triggers the full initialization sequence.
+ */
 if (!process.env.DISCORD_TOKEN) {
   console.error("❌ DISCORD_TOKEN environment variable not set!");
   process.exit(1);
