@@ -737,8 +737,11 @@ async function handleLootCommand(message, args, client) {
       `⏱️ 30 second timeout`,
   });
 
-  await confirmMsg.react(EMOJI.SUCCESS);
-  await confirmMsg.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
+  await Promise.all([
+    confirmMsg.react(EMOJI.SUCCESS),
+    confirmMsg.react(EMOJI.ERROR)
+  ]);
 
   // Filter to only accept reactions from the command user
   const filter = (reaction, user) =>

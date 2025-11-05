@@ -2134,8 +2134,11 @@ async function procBid(msg, amt, cfg) {
     content: `<@${uid}> **CONFIRM YOUR BID - React below within 10 seconds**`,
     embeds: [confEmbed],
   });
-  await conf.react(EMOJI.SUCCESS);
-  await conf.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
+  await Promise.all([
+    conf.react(EMOJI.SUCCESS),
+    conf.react(EMOJI.ERROR)
+  ]);
 
   st.pc[conf.id] = {
     userId: uid,
@@ -2364,8 +2367,11 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             }),
         ],
       });
-      await rstMsg.react(EMOJI.SUCCESS);
-      await rstMsg.react(EMOJI.ERROR);
+      // OPTIMIZATION v6.8: Parallel reactions
+      await Promise.all([
+        rstMsg.react(EMOJI.SUCCESS),
+        rstMsg.react(EMOJI.ERROR)
+      ]);
       try {
         const col = await rstMsg.awaitReactions({
           filter: (r, u) =>
@@ -2424,8 +2430,11 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             }),
         ],
       });
-      await fsMsg.react(EMOJI.SUCCESS);
-      await fsMsg.react(EMOJI.ERROR);
+      // OPTIMIZATION v6.8: Parallel reactions
+      await Promise.all([
+        fsMsg.react(EMOJI.SUCCESS),
+        fsMsg.react(EMOJI.ERROR)
+      ]);
       try {
         const fsCol = await fsMsg.awaitReactions({
           filter: (r, u) =>
@@ -2534,8 +2543,11 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             .setFooter({ text: `${EMOJI.SUCCESS} yes / ${EMOJI.ERROR} no` }),
         ],
       });
-      await canMsg.react(EMOJI.SUCCESS);
-      await canMsg.react(EMOJI.ERROR);
+      // OPTIMIZATION v6.8: Parallel reactions
+      await Promise.all([
+        canMsg.react(EMOJI.SUCCESS),
+        canMsg.react(EMOJI.ERROR)
+      ]);
       try {
         const canCol = await canMsg.awaitReactions({
           filter: (r, u) =>
@@ -2591,8 +2603,11 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             .setFooter({ text: `${EMOJI.SUCCESS} yes / ${EMOJI.ERROR} no` }),
         ],
       });
-      await skpMsg.react(EMOJI.SUCCESS);
-      await skpMsg.react(EMOJI.ERROR);
+      // OPTIMIZATION v6.8: Parallel reactions
+      await Promise.all([
+        skpMsg.react(EMOJI.SUCCESS),
+        skpMsg.react(EMOJI.ERROR)
+      ]);
       try {
         const skpCol = await skpMsg.awaitReactions({
           filter: (r, u) =>
@@ -2750,8 +2765,11 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         ],
       });
 
-      await fixMsg.react(EMOJI.SUCCESS);
-      await fixMsg.react(EMOJI.ERROR);
+      // OPTIMIZATION v6.8: Parallel reactions
+      await Promise.all([
+        fixMsg.react(EMOJI.SUCCESS),
+        fixMsg.react(EMOJI.ERROR)
+      ]);
 
       try {
         const fixCol = await fixMsg.awaitReactions({
@@ -2912,8 +2930,11 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         });
 
       const resetConfirmMsg = await msg.reply({ embeds: [resetAuditEmbed] });
-      await resetConfirmMsg.react(EMOJI.SUCCESS);
-      await resetConfirmMsg.react(EMOJI.ERROR);
+      // OPTIMIZATION v6.8: Parallel reactions
+      await Promise.all([
+        resetConfirmMsg.react(EMOJI.SUCCESS),
+        resetConfirmMsg.react(EMOJI.ERROR)
+      ]);
 
       try {
         const resetCol = await resetConfirmMsg.awaitReactions({
@@ -3039,9 +3060,12 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         .setFooter({ text: "React: 1️⃣ Clear | 2️⃣ Finalize | ❌ Cancel" });
 
       const recoveryMsg = await msg.reply({ embeds: [recoveryEmbed] });
-      await recoveryMsg.react("1️⃣");
-      await recoveryMsg.react("2️⃣");
-      await recoveryMsg.react(EMOJI.ERROR);
+      // OPTIMIZATION v6.8: Parallel reactions (3x faster)
+      await Promise.all([
+        recoveryMsg.react("1️⃣"),
+        recoveryMsg.react("2️⃣"),
+        recoveryMsg.react(EMOJI.ERROR)
+      ]);
 
       try {
         const recoveryCol = await recoveryMsg.awaitReactions({

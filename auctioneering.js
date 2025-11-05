@@ -2731,8 +2731,11 @@ async function handleCancelItem(message) {
     ],
   });
 
-  await canMsg.react(EMOJI.SUCCESS);
-  await canMsg.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
+  await Promise.all([
+    canMsg.react(EMOJI.SUCCESS),
+    canMsg.react(EMOJI.ERROR)
+  ]);
 
   try {
     const canCol = await canMsg.awaitReactions({
@@ -2860,8 +2863,11 @@ async function handleSkipItem(message) {
     ],
   });
 
-  await skpMsg.react(EMOJI.SUCCESS);
-  await skpMsg.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
+  await Promise.all([
+    skpMsg.react(EMOJI.SUCCESS),
+    skpMsg.react(EMOJI.ERROR)
+  ]);
 
   try {
     const skpCol = await skpMsg.awaitReactions({
@@ -2993,8 +2999,11 @@ async function handleForceSubmitResults(message, config, biddingModule) {
     ],
   });
 
-  await fsMsg.react(EMOJI.SUCCESS);
-  await fsMsg.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
+  await Promise.all([
+    fsMsg.react(EMOJI.SUCCESS),
+    fsMsg.react(EMOJI.ERROR)
+  ]);
 
   try {
     const fsCol = await fsMsg.awaitReactions({

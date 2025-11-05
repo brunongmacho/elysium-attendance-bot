@@ -997,8 +997,11 @@ async function awaitConfirmation(
     ? await message.reply({ embeds: [embedOrText] })
     : await message.reply(embedOrText);
 
-  await confirmMsg.react("✅");
-  await confirmMsg.react("❌");
+  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
+  await Promise.all([
+    confirmMsg.react("✅"),
+    confirmMsg.react("❌")
+  ]);
 
   const filter = (reaction, user) =>
     ["✅", "❌"].includes(reaction.emoji.name) && user.id === member.user.id;
@@ -2070,10 +2073,12 @@ const commandHandlers = {
 
     const confirmMsg = await message.reply({ embeds: [confirmEmbed] });
 
-    // Add reactions
+    // OPTIMIZATION v6.8: Parallel reactions
     try {
-      await confirmMsg.react("✅");
-      await confirmMsg.react("❌");
+      await Promise.all([
+        confirmMsg.react("✅"),
+        confirmMsg.react("❌")
+      ]);
     } catch (err) {
       console.error("Failed to add reactions:", err);
       return await message.reply("❌ Failed to create confirmation prompt");
