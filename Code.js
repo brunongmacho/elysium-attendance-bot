@@ -1514,20 +1514,21 @@ function updateBiddingPoints() {
     });
   });
 
-  // --- Step 3: Check for new members and log warnings (CHANGED: no longer auto-adds) ---
+  // --- Step 3: Check for new members and auto-add to BiddingPoints ---
   const newMembers = Object.keys(attendancePoints).filter(m => !memberMap[m]);
   if (newMembers.length > 0) {
-    Logger.log(`⚠️ WARNING: Found ${newMembers.length} members in weekly sheets but NOT in BiddingPoints:`);
-    Logger.log(`⚠️ Members: ${newMembers.join(', ')}`);
-    Logger.log(`⚠️ Please manually add these members to the BiddingPoints sheet to track their points.`);
+    Logger.log(`ℹ️ Found ${newMembers.length} new members in weekly sheets, adding to BiddingPoints:`);
+    Logger.log(`ℹ️ Members: ${newMembers.join(', ')}`);
 
-    // OPTIONAL: Auto-add members (uncomment if you want automatic addition)
-    // const insertStart = bpSheet.getLastRow() + 1;
-    // const newRows = newMembers.map(m => [m, attendancePoints[m], 0]);
-    // bpSheet.getRange(insertStart, 1, newRows.length, 3).setValues(newRows);
-    // newMembers.forEach((m, i) => {
-    //   memberMap[m] = { row: insertStart + i, consumed: 0 };
-    // });
+    // Auto-add new members to BiddingPoints sheet
+    const insertStart = bpSheet.getLastRow() + 1;
+    const newRows = newMembers.map(m => [m, attendancePoints[m], 0]);
+    bpSheet.getRange(insertStart, 1, newRows.length, 3).setValues(newRows);
+    newMembers.forEach((m, i) => {
+      memberMap[m] = { row: insertStart + i, consumed: 0 };
+    });
+
+    Logger.log(`✅ Successfully added ${newMembers.length} new members to BiddingPoints`);
   }
 
     // --- Step 4: Update Column 3 (Points Consumed) and Column 2 (Points Left) for all members ---
