@@ -2007,7 +2007,7 @@ function pauseSession() {
 
   // Store remaining time for accurate display during pause
   if (auctionState.currentItem) {
-    auctionState.currentItem.remainingTime = auctionState.currentItem.endTime - Date.now();
+    auctionState.currentItem.remainingTime = Math.max(0, auctionState.currentItem.endTime - Date.now());
   }
 
   clearAllAuctionTimers();
