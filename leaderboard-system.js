@@ -43,7 +43,7 @@
 // ============================================================================
 
 const { EmbedBuilder } = require('discord.js');
-const fetch = require('node-fetch');
+const { SheetAPI } = require('./utils/sheet-api');
 
 // ============================================================================
 // MODULE STATE
@@ -54,6 +54,8 @@ const fetch = require('node-fetch');
  */
 let config = null;  // Bot configuration from config.json
 let client = null;  // Discord.js client instance
+let sheetAPI = null;  // Unified Google Sheets API client
+let discordCache = null;  // Discord channel cache
 
 // ============================================================================
 // INITIALIZATION
@@ -70,9 +72,11 @@ let client = null;  // Discord.js client instance
  * @example
  * init(client, config);
  */
-function init(discordClient, botConfig) {
+function init(discordClient, botConfig, cache = null) {
   client = discordClient;
   config = botConfig;
+  sheetAPI = new SheetAPI(botConfig.sheet_webhook_url);
+  discordCache = cache;
 }
 
 // ============================================================================
@@ -108,18 +112,7 @@ function init(discordClient, botConfig) {
  */
 async function fetchAttendanceLeaderboard() {
   try {
-    const response = await fetch(config.sheet_webhook_url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'getAttendanceLeaderboard' })
-    });
-
-    const result = await response.json();
-
-    if (result.status !== 'ok') {
-      throw new Error(result.message || 'Failed to fetch attendance leaderboard');
-    }
-
+    const result = await sheetAPI.call('getAttendanceLeaderboard');
     return result;
   } catch (error) {
     console.error('❌ Error fetching attendance leaderboard:', error);
@@ -155,18 +148,7 @@ async function fetchAttendanceLeaderboard() {
  */
 async function fetchBiddingLeaderboard() {
   try {
-    const response = await fetch(config.sheet_webhook_url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'getBiddingLeaderboard' })
-    });
-
-    const result = await response.json();
-
-    if (result.status !== 'ok') {
-      throw new Error(result.message || 'Failed to fetch bidding leaderboard');
-    }
-
+    const result = await sheetAPI.call('getBiddingLeaderboard');
     return result;
   } catch (error) {
     console.error('❌ Error fetching bidding leaderboard:', error);
@@ -209,18 +191,7 @@ async function fetchBiddingLeaderboard() {
  */
 async function fetchWeeklySummary() {
   try {
-    const response = await fetch(config.sheet_webhook_url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'getWeeklySummary' })
-    });
-
-    const result = await response.json();
-
-    if (result.status !== 'ok') {
-      throw new Error(result.message || 'Failed to fetch weekly summary');
-    }
-
+    const result = await sheetAPI.call('getWeeklySummary');
     return result;
   } catch (error) {
     console.error('❌ Error fetching weekly summary:', error);
@@ -567,10 +538,9 @@ async function sendWeeklyReport() {
     }
 
     // Get admin-logs channel and ELYSIUM commands channel
-    const guild = await client.guilds.fetch(config.main_guild_id);
-    const adminLogsChannel = await guild.channels.fetch(config.admin_logs_channel_id);
+    const adminLogsChannel = await discordCache.getChannel('admin_logs_channel_id');
     const elysiumCommandsChannel = config.elysium_commands_channel_id
-      ? await guild.channels.fetch(config.elysium_commands_channel_id).catch(() => null)
+      ? await discordCache.getChannel('elysium_commands_channel_id').catch(() => null)
       : null;
 
     if (!adminLogsChannel) {

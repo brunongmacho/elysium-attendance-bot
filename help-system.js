@@ -575,7 +575,7 @@ const COMMAND_HELP = {
 
   close: {
     usage: "close",
-    description: "Admin command in spawn threads to close and submit attendance",
+    description: "Admin command in spawn threads to close and submit attendance (threads auto-close after 20 minutes)",
     category: "Attendance",
     adminOnly: true,
     example: "close",
@@ -585,7 +585,8 @@ const COMMAND_HELP = {
       "Submits to Google Sheets",
       "Archives thread",
       "Cleans up confirmation thread",
-      "Requires ✅ confirmation"
+      "Requires ✅ confirmation",
+      "⏰ Threads auto-close after 20 min to prevent cheating"
     ]
   },
 
@@ -626,7 +627,7 @@ const CATEGORIES = {
 const CATEGORY_DESCRIPTIONS = {
   Attendance: "Manage boss spawn check-ins, verifications, and Google Sheets submission",
   Leaderboard: "View attendance and bidding leaderboards, automatic weekly reports (Saturday 11:59pm)",
-  Auctioneering: "Auction system open to all ELYSIUM members",
+  Auctioneering: "Auction system open to all ELYSIUM members (auto-start every Saturday 12:00 PM GMT+8)",
   Bidding: "Point-based auction management with queue and item tracking",
   Loot: "OCR-powered loot screenshot processing and automatic logging",
   Member: "Commands available to all ELYSIUM members",
@@ -745,6 +746,7 @@ async function handleHelp(message, args, member) {
         `${EMOJI.SUCCESS} No attendance restrictions on auctions\n` +
         `${EMOJI.SUCCESS} Improved leaderboards with percentage bars\n` +
         `${EMOJI.SUCCESS} Weekly reports on Saturday 11:59pm\n` +
+        `${EMOJI.SUCCESS} Automatic auction every Saturday 12:00 PM GMT+8\n` +
         `${EMOJI.SUCCESS} OCR-powered loot logging\n` +
         `${EMOJI.SUCCESS} State persistence to Google Sheets\n` +
         `${EMOJI.SUCCESS} 10-minute auction cooldown\n` +

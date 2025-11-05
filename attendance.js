@@ -55,7 +55,7 @@
  */
 
 const { EmbedBuilder } = require("discord.js");
-const fetch = require("node-fetch");
+const { SheetAPI } = require('./utils/sheet-api');
 const {
   getCurrentTimestamp,
   getSundayOfWeek,
@@ -78,6 +78,8 @@ const {
 let config = null;              // Bot configuration loaded at initialization
 let bossPoints = null;          // Boss name to points value mapping
 let isAdminFunc = null;         // Function to check admin privileges
+let sheetAPI = null;            // Unified Google Sheets API client
+let discordCache = null;        // Discord channel cache
 let activeSpawns = {};          // Active spawn threads and their data
 let activeColumns = {};         // Boss|timestamp to threadId mapping for deduplication
 let pendingVerifications = {};  // Message IDs awaiting admin verification
@@ -95,6 +97,8 @@ const TIMING = {
   MASS_CLOSE_DELAY: 3000,             // Delay between mass close operations (ms)
   REACTION_RETRY_ATTEMPTS: 3,         // Number of attempts for adding/removing reactions
   REACTION_RETRY_DELAY: 1000,         // Delay between reaction retry attempts (ms)
+  THREAD_AUTO_CLOSE_MINUTES: 20,      // Auto-close threads after this many minutes (prevents cheating)
+  THREAD_AGE_CHECK_INTERVAL: 60000,   // Check thread age every 60 seconds (1 minute)
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -113,10 +117,12 @@ const TIMING = {
  * @example
  * initialize(config, { "VALAKAS": { points: 100 } }, (userId) => checkAdmin(userId));
  */
-function initialize(cfg, bossPointsData, isAdmin) {
+function initialize(cfg, bossPointsData, isAdmin, cache = null) {
   config = cfg;
   bossPoints = bossPointsData;
   isAdminFunc = isAdmin;
+  sheetAPI = new SheetAPI(cfg.sheet_webhook_url);
+  discordCache = cache;
   console.log("✅ Attendance module initialized");
 }
 
@@ -160,8 +166,6 @@ function findBossMatch(input) {
  * });
  */
 async function postToSheet(payload, retryCount = 0) {
-  const MAX_RETRIES = 3;
-
   try {
     // Rate limiting: ensure minimum delay between API calls
     const now = Date.now();
@@ -173,28 +177,11 @@ async function postToSheet(payload, retryCount = 0) {
 
     lastSheetCall = Date.now();
 
-    // Make the API call
-    const res = await fetch(config.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    // Make the API call using SheetAPI (handles retries automatically)
+    const { action, ...data } = payload;
+    const result = await sheetAPI.call(action, data);
 
-    const text = await res.text();
-
-    // Handle rate limiting with retry logic
-    if (res.status === 429) {
-      if (retryCount < MAX_RETRIES) {
-        console.log(`⚠️ Rate limit hit, retry ${retryCount + 1}/${MAX_RETRIES}`);
-        await new Promise((resolve) => setTimeout(resolve, TIMING.RETRY_DELAY));
-        return postToSheet(payload, retryCount + 1);
-      } else {
-        console.error(`❌ Rate limit: Max retries (${MAX_RETRIES}) exceeded`);
-        return { ok: false, status: 429, text: "Max retries exceeded" };
-      }
-    }
-
-    return { ok: res.ok, status: res.status, text };
+    return { ok: true, status: 200, text: JSON.stringify(result) };
   } catch (err) {
     console.error("❌ Webhook error:", err);
     return { ok: false, err: err.toString() };
@@ -413,6 +400,7 @@ async function createSpawnThreads(
     members: [],
     confirmThreadId: confirmThread ? confirmThread.id : null,
     closed: false,
+    createdAt: Date.now(), // Track when thread was created for auto-close
   };
 
   // Register in activeColumns for duplicate prevention
@@ -422,7 +410,7 @@ async function createSpawnThreads(
   const embed = new EmbedBuilder()
     .setColor(0xffd700)
     .setTitle(`🎯 ${bossName}`)
-    .setDescription(`Boss detected! Please check in below.`)
+    .setDescription(`Boss detected! Please check in below.\n\n⏰ **Auto-closes in 20 minutes** to prevent cheating.`)
     .addFields(
       {
         name: "📸 How to Check In",
@@ -435,9 +423,14 @@ async function createSpawnThreads(
         inline: true,
       },
       { name: "🕐 Time", value: timeStr, inline: true },
-      { name: "📅 Date", value: dateStr, inline: true }
+      { name: "📅 Date", value: dateStr, inline: true },
+      {
+        name: "⏱️ Attendance Window",
+        value: "20 minutes (then auto-closes)",
+        inline: false,
+      }
     )
-    .setFooter({ text: 'Admins: type "close" to finalize' })
+    .setFooter({ text: 'Admins: type "close" to finalize early' })
     .setTimestamp();
 
   // Notify all members in attendance channel
@@ -616,14 +609,10 @@ async function recoverStateFromThreads(client) {
   console.log("═══════════════════════════════════════════════════════");
 
   try {
-    const mainGuild = await client.guilds.fetch(config.main_guild_id).catch(() => null);
-    if (!mainGuild) {
-      console.log("❌ Could not fetch main guild");
-      return { success: false, recovered: 0, pending: 0 };
-    }
-
-    const attChannel = await mainGuild.channels.fetch(config.attendance_channel_id).catch(() => null);
-    const adminLogs = await mainGuild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
+    const [attChannel, adminLogs] = await Promise.all([
+      discordCache.getChannel('attendance_channel_id').catch(() => null),
+      discordCache.getChannel('admin_logs_channel_id').catch(() => null)
+    ]);
 
     if (!attChannel || !adminLogs) {
       console.log("❌ Could not fetch required channels");
@@ -690,6 +679,7 @@ async function recoverStateFromThreads(client) {
           members: scanResult.members,
           confirmThreadId: confirmThreadId,
           closed: false,
+          createdAt: thread.createdTimestamp || Date.now(), // Use actual creation time for auto-close
         };
 
         activeColumns[`${bossName}|${parsed.timestamp}`] = threadId;
@@ -787,25 +777,14 @@ async function validateStateConsistency(client) {
     console.log(`📊 Checking consistency with sheet: ${sheetName}`);
 
     // Fetch sheet columns
-    const payload = {
-      action: "getAllSpawnColumns",
-      weekSheet: sheetName
-    };
-
-    const resp = await fetch(config.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
     let sheetColumns = [];
-    if (resp.ok) {
-      try {
-        const data = await resp.json();
-        sheetColumns = data.columns || [];
-      } catch (e) {
-        console.log("⚠️ Could not parse sheet columns");
-      }
+    try {
+      const data = await sheetAPI.call('getAllSpawnColumns', {
+        weekSheet: sheetName
+      });
+      sheetColumns = data.columns || [];
+    } catch (e) {
+      console.log("⚠️ Could not fetch sheet columns:", e.message);
     }
 
     console.log(`📋 Found ${sheetColumns.length} columns in sheet`);
@@ -990,18 +969,9 @@ async function saveAttendanceStateToSheet(forceSync = false) {
       confirmationMessages,
     };
 
-    const response = await fetch(config.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "saveAttendanceState",
-        state: stateToSave,
-      }),
+    await sheetAPI.call('saveAttendanceState', {
+      state: stateToSave,
     });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
 
     lastAttendanceStateSyncTime = now;
     return true;
@@ -1041,17 +1011,8 @@ async function loadAttendanceStateFromSheet() {
   }
 
   try {
-    const response = await fetch(config.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "getAttendanceState" }),
-    });
+    const data = await sheetAPI.call('getAttendanceState');
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
     if (!data.state) {
       console.log("ℹ️ No saved attendance state found");
       return false;
@@ -1166,15 +1127,227 @@ function cleanupStaleEntries() {
 function schedulePeriodicStateSync() {
   // Sync state to sheets every 10 minutes for crash recovery
   setInterval(async () => {
-    await saveAttendanceStateToSheet(false);
+    try {
+      await saveAttendanceStateToSheet(false);
+    } catch (error) {
+      console.error("❌ Error in periodic state sync:", error.message);
+      // Continue interval, don't break it
+    }
   }, ATTENDANCE_STATE_SYNC_INTERVAL);
 
   // Clean up stale entries every 30 minutes to prevent memory bloat
   setInterval(() => {
-    cleanupStaleEntries();
+    try {
+      cleanupStaleEntries();
+    } catch (error) {
+      console.error("❌ Error in cleanup:", error.message);
+      // Continue interval, don't break it
+    }
   }, STATE_CLEANUP_INTERVAL);
 
   console.log("✅ Scheduled periodic state sync (10min) and cleanup (30min)");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AUTO-CLOSE SCHEDULER (PREVENTS CHEATING)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Auto-closes boss threads that are older than 20 minutes to prevent cheating.
+ *
+ * This function is called periodically (every 1 minute) to check all active spawn threads.
+ * For threads older than 20 minutes:
+ * 1. Auto-verifies ALL pending check-ins (no admin approval needed)
+ * 2. Submits attendance to Google Sheets
+ * 3. Archives the thread
+ * 4. Cleans up state
+ *
+ * This prevents members from marking attendance long after the boss spawn,
+ * ensuring attendance is only counted for those present during the actual spawn.
+ *
+ * @param {Client} client - Discord.js client instance
+ * @returns {Promise<Object>} Statistics about closed threads
+ * @returns {number} return.checked - Number of threads checked
+ * @returns {number} return.closed - Number of threads auto-closed
+ * @returns {Array<string>} return.closedBosses - List of closed boss names
+ *
+ * @example
+ * const result = await checkAndAutoCloseThreads(client);
+ * console.log(`Auto-closed ${result.closed} threads: ${result.closedBosses.join(', ')}`);
+ */
+async function checkAndAutoCloseThreads(client) {
+  if (!client || !config) return { checked: 0, closed: 0, closedBosses: [] };
+
+  const now = Date.now();
+  const autoCloseThreshold = TIMING.THREAD_AUTO_CLOSE_MINUTES * 60 * 1000; // 20 minutes in ms
+
+  let checked = 0;
+  let closed = 0;
+  const closedBosses = [];
+
+  try {
+    const guild = await client.guilds.fetch(config.main_guild_id).catch(() => null);
+    if (!guild) return { checked, closed, closedBosses };
+
+    // Check each active spawn for age
+    for (const [threadId, spawnInfo] of Object.entries(activeSpawns)) {
+      checked++;
+
+      // Skip if already closed or no creation timestamp
+      if (spawnInfo.closed || !spawnInfo.createdAt) continue;
+
+      const threadAge = now - spawnInfo.createdAt;
+
+      // Check if thread is older than 20 minutes
+      if (threadAge >= autoCloseThreshold) {
+        console.log(`\n⏰ AUTO-CLOSING thread: ${spawnInfo.boss} (${spawnInfo.timestamp})`);
+        console.log(`   Thread age: ${Math.floor(threadAge / 60000)} minutes`);
+
+        // Get the thread
+        const thread = await guild.channels.fetch(threadId).catch(() => null);
+        if (!thread) {
+          console.log(`   ⚠️ Thread not found, cleaning up state`);
+          delete activeSpawns[threadId];
+          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+          continue;
+        }
+
+        // AUTO-VERIFY all pending check-ins for this thread
+        const pendingInThread = Object.entries(pendingVerifications).filter(
+          ([msgId, p]) => p.threadId === threadId
+        );
+
+        if (pendingInThread.length > 0) {
+          console.log(`   ✅ Auto-verifying ${pendingInThread.length} pending member(s)`);
+
+          for (const [msgId, pending] of pendingInThread) {
+            // Check for duplicates before adding
+            const isDuplicate = spawnInfo.members.some(
+              (m) => m.toLowerCase() === pending.author.toLowerCase()
+            );
+
+            if (!isDuplicate) {
+              spawnInfo.members.push(pending.author);
+              console.log(`      ├─ ✅ ${pending.author}`);
+            } else {
+              console.log(`      ├─ ⚠️ ${pending.author} (duplicate, skipped)`);
+            }
+
+            // Remove from pending
+            delete pendingVerifications[msgId];
+          }
+        }
+
+        // Mark as closed
+        spawnInfo.closed = true;
+
+        // Notify in thread
+        await thread.send(
+          `⏰ **AUTO-CLOSED (20 minutes elapsed)**\n\n` +
+          `Attendance window closed to prevent cheating.\n` +
+          `${spawnInfo.members.length} member(s) verified and submitting to Google Sheets...`
+        ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
+
+        // Submit to Google Sheets
+        const payload = {
+          action: "submitAttendance",
+          boss: spawnInfo.boss,
+          date: spawnInfo.date,
+          time: spawnInfo.time,
+          timestamp: spawnInfo.timestamp,
+          members: spawnInfo.members,
+        };
+
+        const resp = await postToSheet(payload);
+
+        if (resp.ok) {
+          console.log(`   ✅ Submitted ${spawnInfo.members.length} members to Google Sheets`);
+
+          await thread.send(
+            `✅ Attendance submitted! (${spawnInfo.members.length} members)\n` +
+            `Thread will be archived now.`
+          ).catch(() => {});
+
+          // Clean up reactions
+          await cleanupAllThreadReactions(thread);
+
+          // Close confirmation thread if it exists
+          if (spawnInfo.confirmThreadId) {
+            const confirmThread = await guild.channels
+              .fetch(spawnInfo.confirmThreadId)
+              .catch(() => null);
+            if (confirmThread) {
+              await confirmThread.send(
+                `⏰ **AUTO-CLOSED**: ${spawnInfo.boss} (${spawnInfo.timestamp})\n` +
+                `${spawnInfo.members.length} members submitted after 20-minute window`
+              ).catch(() => {});
+              await confirmThread.delete().catch(() => {});
+            }
+          }
+
+          // Archive the thread
+          await thread.setArchived(true, "Auto-closed after 20 minutes").catch(() => {});
+
+          // Clean up state
+          delete activeSpawns[threadId];
+          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+          delete confirmationMessages[threadId];
+
+          closed++;
+          closedBosses.push(spawnInfo.boss);
+
+          console.log(`   ✅ Auto-close complete: ${spawnInfo.boss}`);
+        } else {
+          console.log(`   ❌ Failed to submit attendance: ${resp.text || resp.err}`);
+
+          await thread.send(
+            `⚠️ **AUTO-CLOSE FAILED**\n\n` +
+            `Could not submit to Google Sheets.\n` +
+            `Error: ${resp.text || resp.err}\n\n` +
+            `**Members (${spawnInfo.members.length}):** ${spawnInfo.members.join(", ")}\n\n` +
+            `Please manually update the sheet.`
+          ).catch(() => {});
+
+          // Don't delete state if submission failed, so admin can retry
+        }
+      }
+    }
+
+    if (closed > 0) {
+      console.log(`\n⏰ Auto-close summary: ${closed} thread(s) closed`);
+    }
+
+    return { checked, closed, closedBosses };
+  } catch (err) {
+    console.error("❌ Error in auto-close checker:", err);
+    return { checked, closed, closedBosses };
+  }
+}
+
+/**
+ * Starts the periodic thread age checker that auto-closes threads after 20 minutes.
+ * Should be called once during bot initialization.
+ *
+ * @param {Client} client - Discord.js client instance
+ * @returns {NodeJS.Timer} The interval timer (for stopping if needed)
+ *
+ * @example
+ * // Called once during bot startup
+ * const autoCloseTimer = startAutoCloseScheduler(client);
+ */
+function startAutoCloseScheduler(client) {
+  console.log(`✅ Started auto-close scheduler (checks every ${TIMING.THREAD_AGE_CHECK_INTERVAL / 1000}s, closes after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes)`);
+
+  const timer = setInterval(async () => {
+    try {
+      await checkAndAutoCloseThreads(client);
+    } catch (error) {
+      console.error("❌ Error in auto-close scheduler:", error.message);
+      // Continue interval, don't break it
+    }
+  }, TIMING.THREAD_AGE_CHECK_INTERVAL);
+
+  return timer;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1245,6 +1418,10 @@ module.exports = {
   loadAttendanceStateFromSheet,
   schedulePeriodicStateSync,
   cleanupStaleEntries,
+
+  // Auto-close scheduler (prevents cheating)
+  checkAndAutoCloseThreads,
+  startAutoCloseScheduler,
 
   // State getters (read-only access)
   getActiveSpawns: () => activeSpawns,

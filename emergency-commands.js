@@ -90,6 +90,7 @@ let attendance = null;       // Attendance module reference
 let bidding = null;          // Bidding module reference
 let auctioneering = null;    // Auctioneering module reference
 let isAdminFunc = null;      // Admin check function
+let discordCache = null;     // Discord channel cache
 
 // ============================================================================
 // INITIALIZATION
@@ -108,12 +109,13 @@ let isAdminFunc = null;      // Admin check function
  * initialize(config, attendance, bidding, auctioneering, isAdmin);
  * // Output: 🚨 Emergency commands module initialized
  */
-function initialize(cfg, attModule, bidModule, auctModule, isAdmin) {
+function initialize(cfg, attModule, bidModule, auctModule, isAdmin, cache = null) {
   config = cfg;
   attendance = attModule;
   bidding = bidModule;
   auctioneering = auctModule;
   isAdminFunc = isAdmin;
+  discordCache = cache;
   console.log("🚨 Emergency commands module initialized");
 }
 
@@ -167,8 +169,11 @@ async function forceCloseAllAttendance(message) {
     .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 15s timeout` });
 
   const conf = await message.reply({ embeds: [confirmEmbed] });
-  await conf.react(EMOJI.SUCCESS);
-  await conf.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.2: Batch reactions in parallel instead of sequential
+  await Promise.all([
+    conf.react(EMOJI.SUCCESS),
+    conf.react(EMOJI.ERROR)
+  ]);
 
   try {
     const collected = await conf.awaitReactions({
@@ -186,9 +191,11 @@ async function forceCloseAllAttendance(message) {
 
     await errorHandler.safeRemoveReactions(conf, 'reaction removal');
 
-    const guild = await message.client.guilds.fetch(config.main_guild_id);
-    const attChannel = await guild.channels.fetch(config.attendance_channel_id);
-    const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id);
+    // OPTIMIZATION v6.4: Use cached channels for instant access
+    const [attChannel, adminLogs] = await Promise.all([
+      discordCache.getChannel('attendance_channel_id'),
+      discordCache.getChannel('admin_logs_channel_id')
+    ]);
 
     const threads = await attChannel.threads.fetchActive();
     let closedCount = 0;
@@ -372,8 +379,11 @@ async function forceEndAuction(message) {
     .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 15s timeout` });
 
   const conf = await message.reply({ embeds: [confirmEmbed] });
-  await conf.react(EMOJI.SUCCESS);
-  await conf.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.2: Batch reactions in parallel instead of sequential
+  await Promise.all([
+    conf.react(EMOJI.SUCCESS),
+    conf.react(EMOJI.ERROR)
+  ]);
 
   try {
     const collected = await conf.awaitReactions({
@@ -395,8 +405,7 @@ async function forceEndAuction(message) {
     if (auctioneering) {
       const auctState = auctioneering.getAuctionState();
       if (auctState && auctState.active) {
-        const guild = await message.client.guilds.fetch(config.main_guild_id);
-        const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+        const biddingChannel = await discordCache.getChannel('bidding_channel_id');
 
         await auctioneering.endAuctionSession(message.client, config, biddingChannel);
 
@@ -501,8 +510,11 @@ async function unlockAllPoints(message) {
     .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 15s timeout` });
 
   const conf = await message.reply({ embeds: [confirmEmbed] });
-  await conf.react(EMOJI.SUCCESS);
-  await conf.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.2: Batch reactions in parallel instead of sequential
+  await Promise.all([
+    conf.react(EMOJI.SUCCESS),
+    conf.react(EMOJI.ERROR)
+  ]);
 
   try {
     const collected = await conf.awaitReactions({
@@ -598,8 +610,11 @@ async function clearPendingConfirmations(message) {
     .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 15s timeout` });
 
   const conf = await message.reply({ embeds: [confirmEmbed] });
-  await conf.react(EMOJI.SUCCESS);
-  await conf.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.2: Batch reactions in parallel instead of sequential
+  await Promise.all([
+    conf.react(EMOJI.SUCCESS),
+    conf.react(EMOJI.ERROR)
+  ]);
 
   try {
     const collected = await conf.awaitReactions({

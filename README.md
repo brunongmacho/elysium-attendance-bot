@@ -33,6 +33,7 @@
 - **Boss spawn check-ins** with screenshot verification for non-admins
 - **Automated verification workflow** using Discord reactions (✅/❌)
 - **Points system** with automatic assignment on verification
+- **20-minute auto-close** - threads automatically close to prevent attendance cheating
 - **Multi-thread management** with spawn tracking and closure automation
 - **Google Sheets integration** for persistent data storage
 - **State recovery** on bot restart with full crash recovery
@@ -46,6 +47,7 @@
 - Point-based bidding system with real-time balance tracking
 
 **Advanced Features:**
+- **Automatic scheduler** - auctions start every Saturday at 12:00 PM GMT+8
 - **30-second preview** with @everyone ping before each item
 - **Auto-pause system** - auction pauses if bid placed in last 10 seconds
 - **Dynamic extensions** - +1 minute added on confirmed bids
@@ -134,6 +136,131 @@ node index2.js
 
 ---
 
+## 🐳 Docker Deployment (Koyeb)
+
+The bot is optimized for deployment on **Koyeb** using Docker with 256MB RAM.
+
+### Prerequisites
+- Docker installed (if building locally)
+- Koyeb account ([koyeb.com](https://www.koyeb.com))
+- GitHub repository (for automatic deployments)
+- `config.json` and environment variables configured
+
+### Deployment Steps
+
+#### 1. Prepare Configuration Files
+
+Ensure you have:
+- `config.json` with Discord IDs and webhook URL
+- `.env` file with `DISCORD_TOKEN` (add via Koyeb secrets)
+
+#### 2. Deploy to Koyeb
+
+**Option A: GitHub Integration (Recommended)**
+1. Push your code to GitHub
+2. Log in to Koyeb dashboard
+3. Create new service → GitHub repository
+4. Select repository: `elysium-attendance-bot`
+5. Set build type: **Dockerfile**
+6. Configure environment:
+   - Add secret: `DISCORD_TOKEN` (from Discord Developer Portal)
+   - Set memory: **256MB**
+   - Set port: **3000** (for health checks)
+7. Deploy
+
+**Option B: Docker Registry**
+1. Build image locally:
+   ```bash
+   docker build -t elysium-bot:latest .
+   ```
+2. Push to Docker Hub or GitHub Container Registry
+3. Deploy from registry in Koyeb
+
+#### 3. Configure Health Checks
+
+Koyeb will automatically use the health check endpoint:
+- **URL**: `/health` or `/`
+- **Port**: `3000`
+- **Returns**: JSON with bot status and metrics
+
+### Docker Configuration
+
+The included `Dockerfile` uses:
+- **Multi-stage build** for optimized image size
+- **Distroless runtime** for security (nodejs18)
+- **Memory limit**: 220MB (leaves 36MB for system)
+- **GC flags**: `--expose-gc --max-old-space-size=220`
+- **Health check server** on port 3000
+
+### Environment Variables
+
+Required environment variables for Koyeb:
+```bash
+DISCORD_TOKEN=your_discord_bot_token
+PORT=3000  # Optional, defaults to 3000
+NODE_ENV=production  # Set automatically in Dockerfile
+```
+
+### Memory Management
+
+The bot is optimized for 256MB RAM:
+- **Heap size**: 220MB limit
+- **Automatic GC**: Runs every 10 minutes
+- **Cache sweepers**: Discord cache cleanup
+  - Messages: 15-minute lifetime
+  - Users: 1 hour (filters bots)
+  - Members: 1 hour
+- **State persistence**: Syncs to Google Sheets every 5 minutes
+
+### Monitoring
+
+**Health Check Response:**
+```json
+{
+  "status": "healthy",
+  "version": "8.1",
+  "uptime": 123456,
+  "bot": "BotName#1234",
+  "activeSpawns": 2,
+  "pendingVerifications": 5,
+  "timestamp": "2025-11-05T12:00:00.000Z"
+}
+```
+
+**Access health endpoint:**
+```bash
+curl https://your-koyeb-app.koyeb.app/health
+```
+
+### Automatic Features
+
+When deployed, the bot automatically:
+- **Recovers state** from Google Sheets on startup
+- **Starts weekly auction scheduler** (Saturday 12:00 PM GMT+8)
+- **Enables bidding channel cleanup** (every 12 hours)
+- **Sends weekly leaderboard reports** (Saturday 11:59 PM)
+- **Syncs state to Sheets** every 5 minutes
+- **Auto-closes attendance threads** after 20 minutes to prevent cheating
+
+### Troubleshooting
+
+**Bot not responding:**
+- Check Koyeb logs for errors
+- Verify `DISCORD_TOKEN` is set correctly
+- Ensure health check is passing (`/health` endpoint)
+
+**Memory issues:**
+- Monitor memory usage in Koyeb dashboard
+- Check if heap limit is appropriate (currently 220MB)
+- Review GC logs for memory pressure
+
+**State loss after restart:**
+- Verify Google Sheets webhook URL is correct
+- Check Apps Script deployment is active
+- Review state sync logs every 5 minutes
+
+---
+
 ## ⚙️ Configuration
 
 ### config.json
@@ -218,7 +345,7 @@ PORT=8000  # Optional, defaults to 8000
 | `!clearstate` | `!clear` | Reset all bot memory and state |
 | `!maintenance` | `!maint` | Bulk create threads for maintenance bosses |
 | `!removemember <name>` | `!removemem`, `!rmmember`, `!delmember` | Remove member from ALL sheets (excludes ForDistribution) |
-| `close` | - | Close spawn thread (text command in threads) |
+| `close` | - | Close spawn thread manually (threads auto-close after 20 min) |
 
 ### Leaderboard Commands (Admin)
 
@@ -501,6 +628,7 @@ The bot sends POST requests with the following actions:
 1. Boss Spawn Detected (or manually created with !addthread)
    ↓
 2. Attendance Thread + Confirmation Thread Created
+   Thread shows: "⏰ Auto-closes in 20 minutes"
    ↓
 3. Member Types "present" or "here"
    ↓
@@ -512,9 +640,12 @@ The bot sends POST requests with the following actions:
 6. Member Added to Verified List
    Confirmation Thread Updated
    ↓
-7. Admin Types "close" in Thread
+7. Admin Types "close" in Thread (Manual Option)
+   OR
+   Thread Auto-Closes After 20 Minutes
    ↓
 8. Validation: No Pending Verifications?
+   (Auto-close: All pending members auto-verified)
    ↓
 9. Submit Attendance to Google Sheets
    ↓
