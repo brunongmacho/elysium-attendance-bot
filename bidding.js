@@ -763,6 +763,20 @@ function getColor(color) {
   return color;
 }
 
+/**
+ * Clears all active timers from the bidding state
+ * Optimization: Consolidates repeated timer clearing logic (5+ occurrences)
+ *
+ * @returns {number} Number of timers cleared
+ */
+function clearAllTimers() {
+  if (!st.th || typeof st.th !== 'object') return 0;
+  const count = Object.keys(st.th).length;
+  clearAllTimers();
+  st.th = {};
+  return count;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // GOOGLE SHEETS API - Points & State Management
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2362,7 +2376,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           errors: ["time"],
         });
         if (col.first().emoji.name === EMOJI.SUCCESS) {
-          Object.values(st.th).forEach((h) => clearTimeout(h));
+          clearAllTimers();
           stopCacheAutoRefresh();
           st = {
             a: null,
@@ -2532,7 +2546,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           errors: ["time"],
         });
         if (canCol.first().emoji.name === EMOJI.SUCCESS) {
-          Object.values(st.th).forEach((h) => clearTimeout(h));
+          clearAllTimers();
           if (st.a.curWin) unlock(st.a.curWin, st.a.curBid);
 
           // Send messages before locking/archiving
@@ -2589,7 +2603,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           errors: ["time"],
         });
         if (skpCol.first().emoji.name === EMOJI.SUCCESS) {
-          Object.values(st.th).forEach((h) => clearTimeout(h));
+          clearAllTimers();
           if (st.a.curWin) unlock(st.a.curWin, st.a.curBid);
 
           // Send messages before locking/archiving
@@ -2915,7 +2929,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           await errorHandler.safeRemoveReactions(resetConfirmMsg, 'reaction removal');
 
           // Stop all timers
-          Object.values(st.th).forEach((h) => clearTimeout(h));
+          clearAllTimers();
           stopCacheAutoRefresh();
 
           // Reset auctioneering module
@@ -3044,7 +3058,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
         if (choice === "1️⃣") {
           // Clear stuck state
-          Object.values(st.th).forEach((h) => clearTimeout(h));
+          clearAllTimers();
           st.lp = {};
           st.pc = {};
           st.th = {};

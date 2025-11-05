@@ -324,6 +324,20 @@ function initialize(config, isAdminFunc, biddingModuleRef, cache = null) {
 }
 
 /**
+ * Clears all active timers from the auction state
+ * Optimization: Consolidates timer clearing logic
+ *
+ * @returns {number} Number of timers cleared
+ */
+function clearAllAuctionTimers() {
+  if (!auctionState.timers || typeof auctionState.timers !== 'object') return 0;
+  const count = Object.keys(auctionState.timers).length;
+  Object.values(auctionState.timers).forEach((t) => clearTimeout(t));
+  auctionState.timers = {};
+  return count;
+}
+
+/**
  * Gets the current timestamp formatted for Manila timezone (GMT+8).
  * Format: MM/DD/YYYY HH:MM
  *
@@ -1988,7 +2002,7 @@ function pauseSession() {
   auctionState.paused = true;
   auctionState.pausedTime = Date.now();
 
-  Object.values(auctionState.timers).forEach((t) => clearTimeout(t));
+  clearAllAuctionTimers();
   console.log(`${EMOJI.PAUSE} Session paused`);
 
   // ADD THIS LINE:
