@@ -220,14 +220,16 @@ const COMMAND_HELP = {
 
   removemember: {
     usage: "!removemember <member_name>",
-    description: "Remove a member from the BiddingPoints sheet (for kicked/banned members)",
+    description: "Remove a member from ALL sheets - BiddingPoints and all attendance sheets (for kicked/banned members)",
     category: "Member Management",
     adminOnly: true,
     example: "!removemember PlayerName",
     aliases: ["!removemem", "!rmmember", "!delmember"],
     features: [
       "Removes member from BiddingPoints sheet",
-      "Deletes all point history",
+      "Removes member from ALL attendance week sheets",
+      "Deletes all point and attendance history",
+      "Shows detailed removal statistics",
       "Uses fuzzy name matching",
       "Logs to admin-logs channel",
       "Confirmation required",

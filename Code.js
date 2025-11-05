@@ -1007,7 +1007,7 @@ function handleGetBiddingPoints(data) {
 }
 
 /**
- * Removes a member from the BiddingPoints sheet
+ * Removes a member from ALL sheets (BiddingPoints and all attendance sheets)
  * Used when members are kicked or banned from the guild
  *
  * @param {Object} data - Request data containing memberName
@@ -1022,54 +1022,132 @@ function handleRemoveMember(data) {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
-
-  if (!sheet) {
-    return createResponse('error', `Sheet not found: ${CONFIG.BIDDING_SHEET}`);
-  }
-
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) {
-    return createResponse('error', 'No members found in sheet', {found: false});
-  }
-
-  // Get all member names from column 1
-  const memberNames = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-
-  // Find the member using normalized username matching
   const normalizedTarget = normalizeUsername(memberName);
-  let rowIndex = -1;
 
-  for (let i = 0; i < memberNames.length; i++) {
-    const currentMember = (memberNames[i][0] || '').toString().trim();
-    const normalizedCurrent = normalizeUsername(currentMember);
+  let actualMemberName = memberName;
+  let pointsLeft = 0;
+  let biddingSheetRemoved = false;
+  let attendanceSheetsRemoved = 0;
+  const attendanceSheetsDetails = [];
 
-    if (normalizedCurrent === normalizedTarget) {
-      rowIndex = i + 2; // +2 because array is 0-indexed and we start from row 2
-      break;
+  // ==========================================
+  // STEP 1: Remove from BiddingPoints sheet
+  // ==========================================
+  const biddingSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
+
+  if (biddingSheet) {
+    const lastRow = biddingSheet.getLastRow();
+
+    if (lastRow >= 2) {
+      const memberNames = biddingSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      let rowIndex = -1;
+
+      for (let i = 0; i < memberNames.length; i++) {
+        const currentMember = (memberNames[i][0] || '').toString().trim();
+        const normalizedCurrent = normalizeUsername(currentMember);
+
+        if (normalizedCurrent === normalizedTarget) {
+          rowIndex = i + 2; // +2 because array is 0-indexed and we start from row 2
+          break;
+        }
+      }
+
+      if (rowIndex !== -1) {
+        // Get member data before deletion for logging
+        const memberRow = biddingSheet.getRange(rowIndex, 1, 1, Math.min(biddingSheet.getLastColumn(), 4)).getValues()[0];
+        actualMemberName = memberRow[0];
+        pointsLeft = memberRow[1] || 0;
+
+        // Delete the row
+        biddingSheet.deleteRow(rowIndex);
+        biddingSheetRemoved = true;
+
+        Logger.log(`✅ Removed member: ${actualMemberName} from ${CONFIG.BIDDING_SHEET} (had ${pointsLeft} points)`);
+      }
     }
   }
 
-  if (rowIndex === -1) {
-    return createResponse('error', `Member "${memberName}" not found in sheet`, {found: false});
+  // ==========================================
+  // STEP 2: Remove from all attendance sheets (ELYSIUM_WEEK_*)
+  // ==========================================
+  const allSheets = ss.getSheets();
+  const attendanceSheets = allSheets.filter(s => s.getName().startsWith(CONFIG.SHEET_NAME_PREFIX));
+
+  Logger.log(`🔍 Found ${attendanceSheets.length} attendance sheets to check`);
+
+  attendanceSheets.forEach(sheet => {
+    const sheetName = sheet.getName();
+    const lastRow = sheet.getLastRow();
+
+    if (lastRow < 3) {
+      return; // Skip sheets with no member data (only headers)
+    }
+
+    try {
+      // Get all member names from column A (starting from row 3)
+      const memberNames = sheet.getRange(3, COLUMNS.MEMBERS, lastRow - 2, 1).getValues();
+      let rowIndex = -1;
+
+      for (let i = 0; i < memberNames.length; i++) {
+        const currentMember = (memberNames[i][0] || '').toString().trim();
+        const normalizedCurrent = normalizeUsername(currentMember);
+
+        if (normalizedCurrent === normalizedTarget) {
+          rowIndex = i + 3; // +3 because array is 0-indexed and we start from row 3
+          break;
+        }
+      }
+
+      if (rowIndex !== -1) {
+        // Get attendance points before deletion
+        let attendancePoints = 0;
+        const memberRow = sheet.getRange(rowIndex, 1, 1, Math.min(sheet.getLastColumn(), COLUMNS.ATTENDANCE_POINTS)).getValues()[0];
+        if (memberRow.length >= COLUMNS.ATTENDANCE_POINTS) {
+          attendancePoints = memberRow[COLUMNS.ATTENDANCE_POINTS - 1] || 0;
+        }
+
+        // Delete the row
+        sheet.deleteRow(rowIndex);
+        attendanceSheetsRemoved++;
+
+        attendanceSheetsDetails.push({
+          sheet: sheetName,
+          attendancePoints: attendancePoints
+        });
+
+        Logger.log(`✅ Removed member from ${sheetName} (had ${attendancePoints} attendance points)`);
+      }
+    } catch (err) {
+      Logger.log(`⚠️ Error removing from ${sheetName}: ${err.message}`);
+    }
+  });
+
+  // ==========================================
+  // STEP 3: Return detailed results
+  // ==========================================
+  if (!biddingSheetRemoved && attendanceSheetsRemoved === 0) {
+    return createResponse('error', `Member "${memberName}" not found in any sheets`, {
+      found: false,
+      biddingSheetRemoved: false,
+      attendanceSheetsRemoved: 0
+    });
   }
 
-  // Get member data before deletion for logging
-  const memberRow = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const actualMemberName = memberRow[0];
-  const pointsLeft = memberRow[1];
+  const totalSheetsRemoved = (biddingSheetRemoved ? 1 : 0) + attendanceSheetsRemoved;
+  const totalAttendancePoints = attendanceSheetsDetails.reduce((sum, detail) => sum + detail.attendancePoints, 0);
 
-  // Delete the row
-  sheet.deleteRow(rowIndex);
+  Logger.log(`✅ COMPLETE: Removed ${actualMemberName} from ${totalSheetsRemoved} sheet(s)`);
 
-  Logger.log(`✅ Removed member: ${actualMemberName} (had ${pointsLeft} points) from ${CONFIG.BIDDING_SHEET}`);
-
-  return createResponse('ok', `Member "${actualMemberName}" removed successfully`, {
+  return createResponse('ok', `Member "${actualMemberName}" removed from ${totalSheetsRemoved} sheet(s)`, {
     found: true,
     removed: true,
     memberName: actualMemberName,
     pointsLeft: pointsLeft,
-    rowIndex: rowIndex
+    biddingSheetRemoved: biddingSheetRemoved,
+    attendanceSheetsRemoved: attendanceSheetsRemoved,
+    attendanceSheetsDetails: attendanceSheetsDetails,
+    totalSheetsAffected: totalSheetsRemoved,
+    totalAttendancePoints: totalAttendancePoints
   });
 }
 

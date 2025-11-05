@@ -217,7 +217,7 @@ PORT=8000  # Optional, defaults to 8000
 | `!closeallthread` | `!closeall` | Mass close all open spawn threads |
 | `!clearstate` | `!clear` | Reset all bot memory and state |
 | `!maintenance` | `!maint` | Bulk create threads for maintenance bosses |
-| `!removemember <name>` | `!removemem`, `!rmmember`, `!delmember` | Remove member from BiddingPoints sheet |
+| `!removemember <name>` | `!removemem`, `!rmmember`, `!delmember` | Remove member from ALL sheets (BiddingPoints + attendance) |
 | `close` | - | Close spawn thread (text command in threads) |
 
 ### Leaderboard Commands (Admin)

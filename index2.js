@@ -2320,11 +2320,12 @@ const commandHandlers = {
     await awaitConfirmation(
       message,
       member,
-      `⚠️ **Remove member from BiddingPoints sheet?**\n\n` +
+      `⚠️ **Remove member from ALL sheets?**\n\n` +
         `**Member:** ${memberName}\n\n` +
         `This will:\n` +
         `• Remove the member from BiddingPoints sheet\n` +
-        `• Delete all their point history\n` +
+        `• Remove the member from ALL attendance week sheets\n` +
+        `• Delete all their point and attendance history\n` +
         `• This action cannot be undone\n\n` +
         `React ✅ to confirm or ❌ to cancel.`,
       async (confirmMsg) => {
@@ -2348,15 +2349,45 @@ const commandHandlers = {
           if (result.status === "ok" && result.data?.removed) {
             const actualName = result.data.memberName;
             const pointsLost = result.data.pointsLeft || 0;
+            const biddingRemoved = result.data.biddingSheetRemoved || false;
+            const attendanceRemoved = result.data.attendanceSheetsRemoved || 0;
+            const totalSheets = result.data.totalSheetsAffected || 0;
+            const totalAttendance = result.data.totalAttendancePoints || 0;
+            const attendanceDetails = result.data.attendanceSheetsDetails || [];
+
+            // Build detailed description
+            let description = `**Member:** ${actualName}\n\n`;
+
+            if (biddingRemoved) {
+              description += `**BiddingPoints Sheet:**\n`;
+              description += `• Removed (had ${pointsLost} points)\n\n`;
+            }
+
+            if (attendanceRemoved > 0) {
+              description += `**Attendance Sheets:**\n`;
+              description += `• Removed from ${attendanceRemoved} week sheet(s)\n`;
+              description += `• Total attendance points: ${totalAttendance}\n\n`;
+
+              if (attendanceDetails.length > 0 && attendanceDetails.length <= 5) {
+                description += `**Details:**\n`;
+                attendanceDetails.forEach(detail => {
+                  description += `• ${detail.sheet}: ${detail.attendancePoints} pts\n`;
+                });
+              } else if (attendanceDetails.length > 5) {
+                description += `**Recent sheets:**\n`;
+                attendanceDetails.slice(0, 5).forEach(detail => {
+                  description += `• ${detail.sheet}: ${detail.attendancePoints} pts\n`;
+                });
+                description += `• ... and ${attendanceDetails.length - 5} more\n`;
+              }
+            }
+
+            description += `\n**Total sheets affected:** ${totalSheets}`;
 
             const embed = new EmbedBuilder()
               .setColor(0x00ff00)
               .setTitle(`✅ Member Removed Successfully`)
-              .setDescription(
-                `**Member:** ${actualName}\n` +
-                  `**Points Lost:** ${pointsLost}\n\n` +
-                  `The member has been removed from the BiddingPoints sheet.`
-              )
+              .setDescription(description)
               .setFooter({ text: `Removed by ${member.user.username}` })
               .setTimestamp();
 
@@ -2371,10 +2402,13 @@ const commandHandlers = {
             if (adminLogsChannel) {
               const logEmbed = new EmbedBuilder()
                 .setColor(0xff9900)
-                .setTitle(`🗑️ Member Removed from Sheet`)
+                .setTitle(`🗑️ Member Removed from All Sheets`)
                 .setDescription(
                   `**Removed Member:** ${actualName}\n` +
-                    `**Points Lost:** ${pointsLost}\n` +
+                    `**Bidding Points Lost:** ${pointsLost}\n` +
+                    `**Attendance Points Lost:** ${totalAttendance}\n` +
+                    `**Attendance Sheets:** ${attendanceRemoved}\n` +
+                    `**Total Sheets:** ${totalSheets}\n` +
                     `**Removed By:** ${member.user.username}`
                 )
                 .setTimestamp();
@@ -2383,7 +2417,7 @@ const commandHandlers = {
             }
 
             console.log(
-              `🗑️ Removed member: ${actualName} (${pointsLost} points) by ${member.user.username}`
+              `🗑️ Removed member: ${actualName} from ${totalSheets} sheet(s) (${pointsLost} bidding pts, ${totalAttendance} attendance pts) by ${member.user.username}`
             );
           } else {
             throw new Error(
