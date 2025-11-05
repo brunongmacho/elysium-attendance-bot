@@ -53,12 +53,9 @@ const COMMAND_ALIASES = {
   "!leadbid": "!leaderboardbidding",
 
   // Bidding commands (admin)
-  "!auc": "!auction",
   "!ql": "!queuelist",
   "!queue": "!queuelist",
-  "!rm": "!removeitem",
   "!start": "!startauction",
-  "!clearq": "!clearqueue",
   "!resetb": "!resetbids",
   "!forcesubmit": "!forcesubmitresults",
 
@@ -1689,15 +1686,6 @@ const commandHandlers = {
     await auctioneering.handleQueueList(message, bidding.getBiddingState());
   },
 
-  removeitem: async (message, member, args) => {
-    await auctioneering.handleRemoveItem(message, args, bidding);
-  },
-
-  clearqueue: async (message, member) => {
-    // Manual queue deprecated - just show deprecation message
-    await auctioneering.handleClearQueue(message);
-  },
-
   mypoints: async (message, member) => {
     await auctioneering.handleMyPoints(message, bidding, config);
   },
@@ -2902,10 +2890,7 @@ client.on(Events.MessageCreate, async (message) => {
       // NOTE: !pause, !resume, !stop, !extend are thread-only commands now
       if (
         [
-          "!auction",
           "!queuelist",
-          "!removeitem",
-          "!clearqueue",
           "!startauction",
           "!startauctionnow",
           "!resetbids",
@@ -2932,8 +2917,6 @@ client.on(Events.MessageCreate, async (message) => {
         else if (
           [
             "!queuelist",
-            "!removeitem",
-            "!clearqueue",
             "!forcesubmitresults",
             "!cancelitem",
             "!skipitem",
@@ -2947,11 +2930,6 @@ client.on(Events.MessageCreate, async (message) => {
               message,
               bidding.getBiddingState()
             );
-          } else if (handler === "removeitem") {
-            await auctioneering.handleRemoveItem(message, args, bidding);
-          } else if (handler === "clearqueue") {
-            // Manual queue deprecated - just show deprecation message
-            await auctioneering.handleClearQueue(message);
           } else if (handler === "forcesubmitresults") {
             await auctioneering.handleForceSubmitResults(
               message,
@@ -2966,7 +2944,7 @@ client.on(Events.MessageCreate, async (message) => {
             await auctioneering.handleMoveToDistribution(message, config, client);
           }
         }
-        // Everything else (!auction, !resetbids) goes to bidding.handleCommand
+        // Everything else (!resetbids, etc.) goes to bidding.handleCommand
         else {
           await bidding.handleCommand(adminCmd, message, args, client, config);
         }

@@ -1936,52 +1936,6 @@ async function handleQueueList(message, biddingState) {
   await message.reply({ embeds: [embed] });
 }
 
-async function handleRemoveItem(message, args, biddingModule) {
-  if (args.length === 0) {
-    return await message.reply(`${EMOJI.ERROR} Usage: \`!removeitem <name>\``);
-  }
-
-  const itemName = args.join(" ");
-
-  // No manual queue anymore - all items come from sheet
-  // This command is now deprecated but kept for compatibility
-  const biddingState = biddingModule.getBiddingState();
-  const bidIdx = biddingState.q.findIndex(
-    (a) => a.item.toLowerCase() === itemName.toLowerCase()
-  );
-
-  if (bidIdx !== -1) {
-    const removed = biddingState.q.splice(bidIdx, 1)[0];
-    biddingModule.saveBiddingState();
-    return await message.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(0xffa500)
-          .setTitle(`${EMOJI.SUCCESS} Removed`)
-          .setDescription(
-            `**${removed.item}**${
-              removed.quantity > 1 ? ` x${removed.quantity}` : ""
-            }`
-          )
-          .addFields({
-            name: `${EMOJI.LIST} Remaining in Queue`,
-            value: `${biddingState.q.length}`,
-            inline: true,
-          }),
-      ],
-    });
-  }
-
-  await message.reply(`${EMOJI.ERROR} Item not found in queue`);
-}
-
-async function handleClearQueue(message, onConfirm, onCancel) {
-  // No manual queue anymore - this command is deprecated
-  return await message.reply(
-    `${EMOJI.ERROR} Manual queue has been removed. All items must be added to the BiddingItems Google Sheet with proper boss data.`
-  );
-}
-
 async function handleMyPoints(message, biddingModule, config) {
   if (auctionState.active) {
     return await message.channel.send(
@@ -2138,7 +2092,7 @@ async function handleBidStatus(message, config) {
     }
   }
 
-  statEmbed.setFooter({ text: "Use !auction to add items" }).setTimestamp();
+  statEmbed.setFooter({ text: "Items managed via Google Sheets" }).setTimestamp();
 
   await message.reply({ embeds: [statEmbed] });
 }
@@ -2741,8 +2695,6 @@ module.exports = {
   rescheduleItemTimers, // Reschedule timers after bid extension
   safelyClearItemTimers, // Clear item timers immediately (prevents race condition)
   handleQueueList,
-  handleRemoveItem,
-  handleClearQueue,
   handleMyPoints,
   handleBidStatus,
   handleCancelItem,

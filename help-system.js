@@ -366,33 +366,6 @@ const COMMAND_HELP = {
     ]
   },
 
-  removeitem: {
-    usage: "!removeitem <itemName>",
-    description: "Remove specific item from auction queue",
-    category: "Bidding",
-    adminOnly: true,
-    example: "!removeitem Dragon Sword",
-    aliases: ["!rm"],
-    features: [
-      "Case-insensitive search",
-      "Shows remaining count",
-      "Confirmation of removal"
-    ]
-  },
-
-  clearqueue: {
-    usage: "!clearqueue",
-    description: "Manual queue has been deprecated - items must be added via Google Sheets",
-    category: "Bidding",
-    adminOnly: true,
-    example: "!clearqueue",
-    aliases: ["!clearq"],
-    features: [
-      "Shows deprecation message",
-      "All items must be added to BiddingItems sheet"
-    ]
-  },
-
   resetbids: {
     usage: "!resetbids",
     description: "Reset entire bidding system (queue, cache, locked points, history)",

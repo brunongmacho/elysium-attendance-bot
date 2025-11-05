@@ -77,7 +77,6 @@ node index2.js
 
 **Auctions:**
 - `!startauction` - Start auction session
-- `!auction <item> <price> <duration>` - Add manual item
 - `!pause` / `!resume` - Control auction
 - `!stop` - End current item
 

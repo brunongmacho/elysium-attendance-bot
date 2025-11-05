@@ -92,7 +92,6 @@ const COMMAND_ALIASES = {
   "!b": "!bid",
   "!ql": "!queuelist",
   "!queue": "!queuelist",
-  "!rm": "!removeitem",
   "!start": "!startauction",
   "!bstatus": "!bidstatus",
   "!pts": "!mypoints",
@@ -1483,85 +1482,6 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
   const actualCmd = COMMAND_ALIASES[cmd] || cmd;
 
   switch (actualCmd) {
-    case "!auction":
-      // ❌ MANUAL QUEUE REMOVED - All items must come from Google Sheets
-      return await msg.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(getColor(COLORS.ERROR))
-            .setTitle(`${EMOJI.ERROR} Manual Queue Removed`)
-            .setDescription(
-              `The \`!auction\` command has been **removed**.\n\n` +
-              `**All auction items must now be added to the Google Sheets "BiddingItems" tab.**\n\n` +
-              `This ensures:\n` +
-              `✅ Better item tracking\n` +
-              `✅ Automated boss association\n` +
-              `✅ Consistent data management\n` +
-              `✅ No manual queue conflicts`
-            )
-            .addFields({
-              name: "📋 How to Add Items",
-              value:
-                `1. Open the Google Sheet\n` +
-                `2. Go to **BiddingItems** tab\n` +
-                `3. Add: Item Name | Boss | Start Price | Duration | Quantity\n` +
-                `4. Run \`!startauction\` to begin`,
-              inline: false,
-            })
-            .setFooter({ text: "Contact admin if you need help" })
-            .setTimestamp(),
-        ],
-      });
-
-    case "!queuelist":
-      // Show Google Sheets preview instead of manual queue
-      return await msg.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(COLORS.INFO)
-            .setTitle(`${EMOJI.INFO} Queue Preview`)
-            .setDescription(
-              `Manual queue has been removed.\n\n` +
-              `Use \`!queuelist\` from **auctioneering module** to preview Google Sheets items.`
-            ),
-        ],
-      });
-
-    case "!removeitem":
-      // ❌ MANUAL QUEUE REMOVED
-      return await msg.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(getColor(COLORS.ERROR))
-            .setTitle(`${EMOJI.ERROR} Command Removed`)
-            .setDescription(
-              `The \`!removeitem\` command has been **removed**.\n\n` +
-              `To manage items:\n` +
-              `1. Edit the **BiddingItems** tab in Google Sheets\n` +
-              `2. Delete rows or clear the Winner column to re-auction items`
-            )
-            .setFooter({ text: "Manual queue is no longer supported" })
-            .setTimestamp(),
-        ],
-      });
-
-    case "!startauction":
-      // ❌ MANUAL QUEUE REMOVED - This command now only works through auctioneering module
-      return await msg.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(getColor(COLORS.ERROR))
-            .setTitle(`${EMOJI.ERROR} Wrong Module`)
-            .setDescription(
-              `This command is handled by the **auctioneering module**.\n\n` +
-              `Manual queue has been removed - all auctions now run from Google Sheets.`
-            )
-            .setFooter({ text: "Admins: Use !startauction in bidding channel" })
-            .setTimestamp(),
-        ],
-      });
-      break;
-
     case "!bid":
       if (args.length === 0) {
         try {
@@ -1643,25 +1563,9 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           { name: `${EMOJI.TIME} Time`, value: tLeft, inline: true }
         );
       }
-      statEmbed.setFooter({ text: "Use !auction to add" }).setTimestamp();
+      statEmbed.setFooter({ text: "Items managed via Google Sheets" }).setTimestamp();
       await msg.reply({ embeds: [statEmbed] });
       break;
-
-    case "!clearqueue":
-      // ❌ MANUAL QUEUE REMOVED
-      return await msg.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(getColor(COLORS.ERROR))
-            .setTitle(`${EMOJI.ERROR} Command Removed`)
-            .setDescription(
-              `The \`!clearqueue\` command has been **removed**.\n\n` +
-              `Manual queue is no longer supported. All items come from Google Sheets.`
-            )
-            .setFooter({ text: "Use !resetauction to reset all auction state" })
-            .setTimestamp(),
-        ],
-      });
 
     case "!resetbids":
       const rstMsg = await msg.reply({
