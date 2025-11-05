@@ -3648,8 +3648,14 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
 
-      // !addthread
+      // !addthread - Admin only command for manual spawn thread creation
       if (adminCmd === "!addthread") {
+        // Explicit admin check (redundant with line 3526, but provides clear error message)
+        if (!isAdmin(member, config)) {
+          await message.reply("❌ **Admin only command**\n\nOnly admins can create spawn threads manually.");
+          return;
+        }
+
         const fullText = message.content.substring("!addthread".length).trim();
 
         const timestampMatch = fullText.match(
