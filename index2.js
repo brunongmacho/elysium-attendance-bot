@@ -63,7 +63,6 @@ const {
 } = require("discord.js");
 
 // External dependencies
-const fetch = require("node-fetch");  // HTTP client for API requests
 const fs = require("fs");             // File system operations
 const http = require("http");         // HTTP server for health checks
 
@@ -76,6 +75,7 @@ const lootSystem = require("./loot-system.js");             // Loot distribution
 const emergencyCommands = require("./emergency-commands.js"); // Emergency overrides
 const leaderboardSystem = require("./leaderboard-system.js"); // Leaderboards
 const errorHandler = require('./utils/error-handler');      // Centralized error handling
+const { SheetAPI } = require('./utils/sheet-api');          // Unified Google Sheets API
 
 /**
  * Command alias mapping for shorthand commands.
@@ -168,6 +168,13 @@ const COMMAND_ALIASES = {
  * @type {Object}
  */
 const config = JSON.parse(fs.readFileSync("./config.json"));
+
+/**
+ * Unified Google Sheets API client instance
+ * Provides centralized access to Google Sheets with retry logic
+ * @type {SheetAPI}
+ */
+const sheetAPI = new SheetAPI(config.sheet_webhook_url);
 
 /**
  * Boss point values loaded from boss_points.json
@@ -540,15 +547,8 @@ async function recoverBotStateOnStartup(client, config) {
  */
 async function moveQueueItemsToSheet(config, queueItems) {
   try {
-    const payload = {
-      action: "moveQueueItemsToSheet",
+    await sheetAPI.call('moveQueueItemsToSheet', {
       items: queueItems,
-    };
-
-    await fetch(config.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
     });
 
     console.log(`✅ Queue items moved to sheet`);
@@ -2345,20 +2345,9 @@ const commandHandlers = {
       async (confirmMsg) => {
         try {
           // Call Google Sheets to remove the member
-          const response = await fetch(config.sheet_webhook_url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "removeMember",
-              memberName: memberName,
-            }),
+          const result = await sheetAPI.call('removeMember', {
+            memberName: memberName,
           });
-
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-
-          const result = await response.json();
 
           if (result.status === "ok" && result.removed) {
             const actualName = result.memberName;

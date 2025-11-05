@@ -55,7 +55,7 @@
  */
 
 const { EmbedBuilder } = require("discord.js");
-const fetch = require("node-fetch");
+const { SheetAPI } = require('./utils/sheet-api');
 const {
   getCurrentTimestamp,
   getSundayOfWeek,
@@ -78,6 +78,7 @@ const {
 let config = null;              // Bot configuration loaded at initialization
 let bossPoints = null;          // Boss name to points value mapping
 let isAdminFunc = null;         // Function to check admin privileges
+let sheetAPI = null;            // Unified Google Sheets API client
 let activeSpawns = {};          // Active spawn threads and their data
 let activeColumns = {};         // Boss|timestamp to threadId mapping for deduplication
 let pendingVerifications = {};  // Message IDs awaiting admin verification
@@ -117,6 +118,7 @@ function initialize(cfg, bossPointsData, isAdmin) {
   config = cfg;
   bossPoints = bossPointsData;
   isAdminFunc = isAdmin;
+  sheetAPI = new SheetAPI(cfg.sheet_webhook_url);
   console.log("✅ Attendance module initialized");
 }
 
@@ -160,8 +162,6 @@ function findBossMatch(input) {
  * });
  */
 async function postToSheet(payload, retryCount = 0) {
-  const MAX_RETRIES = 3;
-
   try {
     // Rate limiting: ensure minimum delay between API calls
     const now = Date.now();
@@ -173,28 +173,11 @@ async function postToSheet(payload, retryCount = 0) {
 
     lastSheetCall = Date.now();
 
-    // Make the API call
-    const res = await fetch(config.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    // Make the API call using SheetAPI (handles retries automatically)
+    const { action, ...data } = payload;
+    const result = await sheetAPI.call(action, data);
 
-    const text = await res.text();
-
-    // Handle rate limiting with retry logic
-    if (res.status === 429) {
-      if (retryCount < MAX_RETRIES) {
-        console.log(`⚠️ Rate limit hit, retry ${retryCount + 1}/${MAX_RETRIES}`);
-        await new Promise((resolve) => setTimeout(resolve, TIMING.RETRY_DELAY));
-        return postToSheet(payload, retryCount + 1);
-      } else {
-        console.error(`❌ Rate limit: Max retries (${MAX_RETRIES}) exceeded`);
-        return { ok: false, status: 429, text: "Max retries exceeded" };
-      }
-    }
-
-    return { ok: res.ok, status: res.status, text };
+    return { ok: true, status: 200, text: JSON.stringify(result) };
   } catch (err) {
     console.error("❌ Webhook error:", err);
     return { ok: false, err: err.toString() };
@@ -787,25 +770,14 @@ async function validateStateConsistency(client) {
     console.log(`📊 Checking consistency with sheet: ${sheetName}`);
 
     // Fetch sheet columns
-    const payload = {
-      action: "getAllSpawnColumns",
-      weekSheet: sheetName
-    };
-
-    const resp = await fetch(config.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
     let sheetColumns = [];
-    if (resp.ok) {
-      try {
-        const data = await resp.json();
-        sheetColumns = data.columns || [];
-      } catch (e) {
-        console.log("⚠️ Could not parse sheet columns");
-      }
+    try {
+      const data = await sheetAPI.call('getAllSpawnColumns', {
+        weekSheet: sheetName
+      });
+      sheetColumns = data.columns || [];
+    } catch (e) {
+      console.log("⚠️ Could not fetch sheet columns:", e.message);
     }
 
     console.log(`📋 Found ${sheetColumns.length} columns in sheet`);
@@ -990,18 +962,9 @@ async function saveAttendanceStateToSheet(forceSync = false) {
       confirmationMessages,
     };
 
-    const response = await fetch(config.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "saveAttendanceState",
-        state: stateToSave,
-      }),
+    await sheetAPI.call('saveAttendanceState', {
+      state: stateToSave,
     });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
 
     lastAttendanceStateSyncTime = now;
     return true;
@@ -1041,17 +1004,8 @@ async function loadAttendanceStateFromSheet() {
   }
 
   try {
-    const response = await fetch(config.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "getAttendanceState" }),
-    });
+    const data = await sheetAPI.call('getAttendanceState');
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
     if (!data.state) {
       console.log("ℹ️ No saved attendance state found");
       return false;

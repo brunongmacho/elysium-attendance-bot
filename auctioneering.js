@@ -109,10 +109,10 @@
  */
 
 const { EmbedBuilder } = require("discord.js");
-const fetch = require("node-fetch");
 const { Timeout } = require("timers");
 const errorHandler = require('./utils/error-handler');
 const { PointsCache } = require('./utils/points-cache');
+const { SheetAPI } = require('./utils/sheet-api');
 const {
   getCurrentTimestamp,
   getSundayOfWeek,
@@ -204,6 +204,12 @@ let isAdmFunc = null;
  * @type {Object|null}
  */
 let cfg = null;
+
+/**
+ * Unified Google Sheets API client.
+ * @type {SheetAPI|null}
+ */
+let sheetAPI = null;
 
 /**
  * Reference to the bidding module for point validation.
@@ -306,6 +312,7 @@ function initialize(config, isAdminFunc, biddingModuleRef) {
   cfg = config;
   isAdmFunc = isAdminFunc;
   biddingModule = biddingModuleRef;
+  sheetAPI = new SheetAPI(config.sheet_webhook_url);
   console.log(`${EMOJI.SUCCESS} Auctioneering system initialized`);
 }
 
@@ -381,16 +388,7 @@ async function fetchSheetItems(url, retries = 3, allowCache = true) {
   // Attempt to fetch from Google Sheets
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const r = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "getBiddingItems" }),
-        timeout: TIMEOUTS.FETCH_TIMEOUT,
-      });
-
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-
-      const data = await r.json();
+      const data = await sheetAPI.call('getBiddingItems');
       const items = data.items || [];
 
       console.log(
@@ -471,21 +469,15 @@ async function logAuctionResult(
   timestamp
 ) {
   try {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "logAuctionResult",
-        itemIndex,
-        winner,
-        winningBid,
-        totalBids,
-        bidCount,
-        itemSource,
-        timestamp,
-      }),
+    await sheetAPI.call('logAuctionResult', {
+      itemIndex,
+      winner,
+      winningBid,
+      totalBids,
+      bidCount,
+      itemSource,
+      timestamp,
     });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     console.log(
       `${EMOJI.SUCCESS} Result logged: ${
         winner || "No winner"
@@ -554,16 +546,7 @@ async function saveAuctionState(url) {
       timestamp: getTimestamp(),
     };
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: safeStringify({
-        action: "saveBotState",
-        state: stateToSave,
-      }),
-    });
-
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    await sheetAPI.call('saveBotState', { state: stateToSave });
     console.log(`${EMOJI.SUCCESS} Auction state saved`);
     return true;
   } catch (e) {
@@ -656,18 +639,7 @@ async function startAuctioneering(client, config, channel) {
 
   // Load points cache
   try {
-    const pointsResponse = await fetch(config.sheet_webhook_url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'getBiddingPoints' }),
-    });
-    
-    if (!pointsResponse.ok) {
-      await channel.send(`❌ Failed to load points from server (HTTP ${pointsResponse.status})`);
-      return;
-    }
-    
-    const pointsData = await pointsResponse.json();
+    const pointsData = await sheetAPI.call('getBiddingPoints');
     if (!pointsData.points) {
       await channel.send(`❌ No points data received`);
       return;
@@ -1728,19 +1700,10 @@ async function finalizeSession(client, config, channel) {
         JSON.stringify(submitPayload, null, 2)
       );
     } else {
-      const response = await fetch(config.sheet_webhook_url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(submitPayload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (data.status !== "ok") {
-        throw new Error(data.message || "Unknown error from sheets");
+      const { action, ...data } = submitPayload;
+      const result = await sheetAPI.call(action, data);
+      if (result.status !== "ok") {
+        throw new Error(result.message || "Unknown error from sheets");
       }
 
       console.log(`${EMOJI.SUCCESS} Session results submitted successfully`);
@@ -1791,16 +1754,16 @@ async function finalizeSession(client, config, channel) {
     try {
       console.log(`📦 Move attempt ${attempt}/${maxRetries}...`);
 
-      const moveResponse = await fetch(config.sheet_webhook_url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "moveAuctionedItemsToForDistribution" }),
-      });
-
-      if (moveResponse.ok) {
-        moveData = await moveResponse.json();
+      try {
+        moveData = await sheetAPI.call('moveAuctionedItemsToForDistribution');
         console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution`);
         moveSuccess = true;
+      } catch (err) {
+        console.error(`❌ Move failed:`, err);
+        moveData = null;
+      }
+
+      if (moveSuccess) {
 
         // Get admin logs channel
         const mainGuild = await client.guilds.fetch(config.main_guild_id);
@@ -1961,21 +1924,14 @@ async function finalizeSession(client, config, channel) {
  */
 async function buildCombinedResults(config) {
   // Fetch fresh points from sheet
-  const response = await fetch(config.sheet_webhook_url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "getBiddingPoints" }),
-  });
-
-  if (!response.ok) {
-    console.error(
-      `${EMOJI.ERROR} Failed to fetch bidding points: HTTP ${response.status}`
-    );
+  let allPoints = {};
+  try {
+    const data = await sheetAPI.call('getBiddingPoints');
+    allPoints = data.points || {};
+  } catch (err) {
+    console.error(`${EMOJI.ERROR} Failed to fetch bidding points:`, err);
     return [];
   }
-
-  const data = await response.json();
-  const allPoints = data.points || {};
   // Use PointsCache for efficient operations
   const pointsCache = new PointsCache(allPoints);
   const allMembers = pointsCache.getAllUsernames();
@@ -2543,17 +2499,13 @@ async function handleMyPoints(message, biddingModule, config) {
 
   const u = (message.member?.nickname || message.author?.username || 'Unknown User');
 
-  const freshPts = await fetch(config.sheet_webhook_url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "getBiddingPoints" }),
-  })
-    .then((r) => r.json())
-    .then((d) => d.points || {})
-    .catch((err) => {
-      console.error(`❌ Failed to fetch points for !mypoints:`, err.message);
-      return {};
-    });
+  let freshPts = {};
+  try {
+    const data = await sheetAPI.call('getBiddingPoints');
+    freshPts = data.points || {};
+  } catch (err) {
+    console.error(`❌ Failed to fetch points for !mypoints:`, err.message);
+  }
 
   // Use PointsCache for efficient O(1) lookup
   const ptsCache = new PointsCache(freshPts);
@@ -3172,31 +3124,13 @@ async function handleMoveToDistribution(message, config, client) {
       try {
         console.log(`📦 Move attempt ${attempt}/${maxRetries}...`);
 
-        const moveResponse = await fetch(config.sheet_webhook_url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "moveAuctionedItemsToForDistribution" }),
-        });
-
-        if (moveResponse.ok) {
-          moveData = await moveResponse.json();
-          console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution`);
-          moveSuccess = true;
-          break; // Success - exit retry loop
-        } else {
-          lastError = `HTTP ${moveResponse.status}`;
-          console.error(`⚠️ Move attempt ${attempt} failed: ${lastError}`);
-
-          // Retry with exponential backoff (2s, 4s, 8s)
-          if (attempt < maxRetries) {
-            const delay = Math.pow(2, attempt) * 1000;
-            console.log(`⏳ Retrying in ${delay/1000}s...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-          }
-        }
+        moveData = await sheetAPI.call('moveAuctionedItemsToForDistribution');
+        console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution`);
+        moveSuccess = true;
+        break; // Success - exit retry loop
       } catch (err) {
         lastError = err.message;
-        console.error(`⚠️ Move attempt ${attempt} error:`, err);
+        console.error(`⚠️ Move attempt ${attempt} failed:`, err);
 
         // Retry with exponential backoff (2s, 4s, 8s)
         if (attempt < maxRetries) {

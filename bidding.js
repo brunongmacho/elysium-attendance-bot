@@ -177,11 +177,11 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 const { EmbedBuilder } = require("discord.js");
-const fetch = require("node-fetch");
 const fs = require("fs");
 const { normalizeUsername } = require("./utils/common");
 const errorHandler = require('./utils/error-handler');
 const { PointsCache } = require('./utils/points-cache');
+const { SheetAPI } = require('./utils/sheet-api');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MODULE REFERENCES
@@ -198,6 +198,12 @@ let auctioneering = null;
  * @type {Object|null}
  */
 let cfg = null;
+
+/**
+ * Unified Google Sheets API client
+ * @type {SheetAPI|null}
+ */
+let sheetAPI = null;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SYSTEM CONSTANTS
@@ -733,6 +739,7 @@ function initializeBidding(config, isAdminFunc, auctioneeringRef) {
   isAdmFunc = isAdminFunc;
   cfg = config;
   auctioneering = auctioneeringRef;
+  sheetAPI = new SheetAPI(config.sheet_webhook_url);
 
   // Start cleanup schedule for pending confirmations
   startCleanupSchedule();
@@ -768,13 +775,8 @@ function getColor(color) {
  */
 async function fetchPts(url) {
   try {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "getBiddingPoints" }),
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return (await r.json()).points || {};
+    const result = await sheetAPI.call('getBiddingPoints');
+    return result.points || {};
   } catch (e) {
     console.error("❌ Fetch pts:", e);
     return null;
@@ -804,29 +806,19 @@ async function fetchPts(url) {
 async function submitRes(url, res, time) {
   if (!time || !res || res.length === 0)
     return { ok: false, err: "Missing data" };
-  for (let i = 1; i <= 3; i++) {
-    try {
-      const r = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "submitBiddingResults",
-          results: res,
-          timestamp: time,
-        }),
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const d = await r.json();
-      if (d.status === "ok") {
-        console.log("✅ Submitted");
-        return { ok: true, d };
-      }
-      throw new Error(d.message || "Unknown");
-    } catch (e) {
-      console.error(`❌ Submit ${i}:`, e.message);
-      if (i < 3) await new Promise((x) => setTimeout(x, i * 2000));
-      else return { ok: false, err: e.message, res };
+  try {
+    const d = await sheetAPI.call('submitBiddingResults', {
+      results: res,
+      timestamp: time,
+    });
+    if (d.status === "ok") {
+      console.log("✅ Submitted");
+      return { ok: true, d };
     }
+    throw new Error(d.message || "Unknown");
+  } catch (e) {
+    console.error(`❌ Submit error:`, e.message);
+    return { ok: false, err: e.message, res };
   }
 }
 
@@ -1525,13 +1517,8 @@ async function saveBiddingStateToSheet() {
       history: st.h,
     };
 
-    await fetch(cfg.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "saveBotState",
-        state: stateToSave,
-      }),
+    await sheetAPI.call('saveBotState', {
+      state: stateToSave,
     });
 
     console.log(`✅ Bot state saved to sheet`);
@@ -1542,13 +1529,7 @@ async function saveBiddingStateToSheet() {
 
 async function loadBiddingStateFromSheet(url) {
   try {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "getBotState" }),
-    });
-    if (!r.ok) return null;
-    const data = await r.json();
+    const data = await sheetAPI.call('getBotState');
     return data.state || null;
   } catch (e) {
     console.error(`❌ Load state:`, e);
@@ -2979,13 +2960,8 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           // Also try to save auctioneering state if available
           if (cfg && cfg.sheet_webhook_url) {
             try {
-              await fetch(cfg.sheet_webhook_url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  action: "saveBotState",
-                  state: { auctionState: auctState, timestamp: new Date().toISOString() },
-                }),
+              await sheetAPI.call('saveBotState', {
+                state: { auctionState: auctState, timestamp: new Date().toISOString() },
               });
             } catch (err) {
               console.warn("⚠️ Failed to save auctioneering state:", err.message);
