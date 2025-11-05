@@ -93,8 +93,8 @@ function normalizeUsername(username) {
     .toString()
     .toLowerCase()
     .trim()
-    .replace(/\s+/g, ' ')           // Replace multiple spaces with single space
-    .replace(/[^\w\s]/g, '');       // Remove special characters (keep alphanumeric and spaces)
+    .replace(/\s+/g, '')            // Remove all spaces
+    .replace(/[^\w]/g, '');         // Remove special characters (keep alphanumeric only)
 }
 
 // MAIN WEBHOOK HANDLER - COMPLETE VERSION
@@ -1083,8 +1083,9 @@ function invalidateBiddingPointsCache() {
  * Uses a simple character overlap algorithm
  */
 function calculateSimilarity(str1, str2) {
-  const s1 = str1.toLowerCase();
-  const s2 = str2.toLowerCase();
+  // Normalize both strings for consistent comparison
+  const s1 = normalizeUsername(str1);
+  const s2 = normalizeUsername(str2);
 
   if (s1 === s2) return 1.0;
   if (s1.length === 0 || s2.length === 0) return 0.0;
