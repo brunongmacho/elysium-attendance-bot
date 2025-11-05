@@ -1061,10 +1061,12 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     return { ok: false, msg: "Too large" };
   }
 
-  // Require strictly higher bids to prevent race condition with simultaneous identical bids
-  // Standard auction rules: you must OUTBID, not MATCH
-  if (bid <= currentItem.curBid) {
-    await msg.reply(`${EMOJI.ERROR} Must be > ${currentItem.curBid}pts (current: ${currentItem.curBid}pts)`);
+  // Bid validation: First bid can match starting price, subsequent bids must exceed current bid
+  // This prevents race conditions while allowing the starting bid to be placed
+  const hasWinner = currentItem.curWin !== null && currentItem.curWin !== undefined;
+  if (hasWinner ? (bid <= currentItem.curBid) : (bid < currentItem.curBid)) {
+    const minBid = hasWinner ? currentItem.curBid + 1 : currentItem.curBid;
+    await msg.reply(`${EMOJI.ERROR} Must be >= ${minBid}pts (current: ${currentItem.curBid}pts${hasWinner ? ', outbid required' : ', starting bid'})`);
     return { ok: false, msg: "Too low" };
   }
 
@@ -1322,10 +1324,12 @@ async function procBid(msg, amt, cfg) {
     return { ok: false, msg: "Invalid" };
   }
 
-  // Require strictly higher bids to prevent race condition with simultaneous identical bids
-  // Standard auction rules: you must OUTBID, not MATCH
-  if (bid <= a.curBid) {
-    await msg.reply(`${EMOJI.ERROR} Must be > ${a.curBid}pts (current: ${a.curBid}pts)`);
+  // Bid validation: First bid can match starting price, subsequent bids must exceed current bid
+  // This prevents race conditions while allowing the starting bid to be placed
+  const hasWinner = a.curWin !== null && a.curWin !== undefined;
+  if (hasWinner ? (bid <= a.curBid) : (bid < a.curBid)) {
+    const minBid = hasWinner ? a.curBid + 1 : a.curBid;
+    await msg.reply(`${EMOJI.ERROR} Must be >= ${minBid}pts (current: ${a.curBid}pts${hasWinner ? ', outbid required' : ', starting bid'})`);
     return { ok: false, msg: "Too low" };
   }
 
