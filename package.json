@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node --expose-gc --max-old-space-size=200 index2.js",
     "deploy": "clasp push",
-    "deploy:new": "clasp deploy --description \"Deployment $(date +'%Y-%m-%d %H:%M:%S')\""
+    "deploy:new": "clasp deploy --description \"Deployment $(date +'%Y-%m-%d %H:%M:%S')\"",
+    "test": "jest --verbose",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "discord.js": "^14.11.0",
@@ -15,5 +18,21 @@
     "node-fetch": "^2.6.7",
     "sharp": "^0.34.4",
     "tesseract.js": "^6.0.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+      "**/*.js",
+      "!node_modules/**",
+      "!coverage/**",
+      "!Code.js"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.test.js"
+    ]
   }
 }
