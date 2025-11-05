@@ -458,23 +458,14 @@ const isAdm = (m, c) =>
 /**
  * Generates timestamp string in Manila timezone (MM/DD/YYYY HH:MM)
  *
- * Used for session tracking and Google Sheets submissions
+ * Uses optimized cached Manila time conversion from timestamp-cache utility.
  *
  * @returns {string} Formatted timestamp string
  * @example
  * ts() // "12/25/2024 14:30"
  */
-const ts = () => {
-  // Use cached Manila time conversion for performance (v6.2 optimization)
-  const { getManilaTime } = require('./utils/timestamp-cache');
-  const manilaTime = getManilaTime();
-
-  return `${String(manilaTime.getMonth() + 1).padStart(2, "0")}/${String(
-    manilaTime.getDate()
-  ).padStart(2, "0")}/${manilaTime.getFullYear()} ${String(
-    manilaTime.getHours()
-  ).padStart(2, "0")}:${String(manilaTime.getMinutes()).padStart(2, "0")}`;
-};
+const { getFormattedManilaTime } = require('./utils/timestamp-cache');
+const ts = getFormattedManilaTime;
 
 /**
  * Formats duration in minutes to human-readable string
@@ -496,6 +487,8 @@ const fmtDur = (m) =>
 /**
  * Formats time in milliseconds to human-readable string
  *
+ * Uses shared formatUptime utility from utils/common.js
+ *
  * @param {number} ms - Time in milliseconds
  * @returns {string} Formatted time string
  * @example
@@ -503,15 +496,7 @@ const fmtDur = (m) =>
  * fmtTime(90000)    // "1m 30s"
  * fmtTime(3600000)  // "1h"
  */
-const fmtTime = (ms) => {
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60),
-    sec = s % 60;
-  if (m < 60) return sec > 0 ? `${m}m ${sec}s` : `${m}m`;
-  const h = Math.floor(m / 60);
-  return m % 60 > 0 ? `${h}h ${m % 60}m` : `${h}h`;
-};
+const { formatUptime: fmtTime } = require('./utils/common');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // POINTS LOCKING SYSTEM - Race Condition Prevention

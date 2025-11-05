@@ -341,36 +341,22 @@ function clearAllAuctionTimers() {
  * Gets the current timestamp formatted for Manila timezone (GMT+8).
  * Format: MM/DD/YYYY HH:MM
  *
+ * Uses optimized cached Manila time conversion from timestamp-cache utility.
+ *
  * @returns {string} Formatted timestamp string
  */
-function getTimestamp() {
-  // Use cached Manila time conversion for performance (v6.2 optimization)
-  const { getManilaTime } = require('./utils/timestamp-cache');
-  const manilaTime = getManilaTime();
-
-  return `${String(manilaTime.getMonth() + 1).padStart(2, "0")}/${String(
-    manilaTime.getDate()
-  ).padStart(2, "0")}/${manilaTime.getFullYear()} ${String(
-    manilaTime.getHours()
-  ).padStart(2, "0")}:${String(manilaTime.getMinutes()).padStart(2, "0")}`;
-}
+const { getFormattedManilaTime: getTimestamp } = require('./utils/timestamp-cache');
 
 /**
  * Formats milliseconds into a human-readable time string.
  * Examples: "45s", "2m 30s", "1h 15m"
  *
+ * Uses shared formatUptime utility from utils/common.js
+ *
  * @param {number} ms - Time duration in milliseconds
  * @returns {string} Formatted time string
  */
-function fmtTime(ms) {
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60),
-    sec = s % 60;
-  if (m < 60) return sec > 0 ? `${m}m ${sec}s` : `${m}m`;
-  const h = Math.floor(m / 60);
-  return m % 60 > 0 ? `${h}h ${m % 60}m` : `${h}h`;
-}
+const { formatUptime: fmtTime } = require('./utils/common');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SECTION 4: DATA ACCESS & PERSISTENCE
