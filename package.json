@@ -4,7 +4,9 @@
   "description": "Boss attendance + points bot for ELYSIUM guild",
   "main": "index2.js",
   "scripts": {
-    "start": "node --expose-gc --max-old-space-size=200 index2.js"
+    "start": "node --expose-gc --max-old-space-size=200 index2.js",
+    "deploy": "clasp push",
+    "deploy:new": "clasp deploy --description \"Deployment $(date +'%Y-%m-%d %H:%M:%S')\""
   },
   "dependencies": {
     "discord.js": "^14.11.0",
