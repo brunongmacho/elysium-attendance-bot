@@ -109,9 +109,10 @@
  */
 
 const { EmbedBuilder } = require("discord.js");
-const fetch = require("node-fetch");
 const { Timeout } = require("timers");
 const errorHandler = require('./utils/error-handler');
+const { PointsCache } = require('./utils/points-cache');
+const { SheetAPI } = require('./utils/sheet-api');
 const {
   getCurrentTimestamp,
   getSundayOfWeek,
@@ -203,6 +204,18 @@ let isAdmFunc = null;
  * @type {Object|null}
  */
 let cfg = null;
+
+/**
+ * Unified Google Sheets API client.
+ * @type {SheetAPI|null}
+ */
+let sheetAPI = null;
+
+/**
+ * Discord channel cache for reducing API calls.
+ * @type {Object|null}
+ */
+let discordCache = null;
 
 /**
  * Reference to the bidding module for point validation.
@@ -301,11 +314,27 @@ const TIMEOUTS = {
  * @param {Function} isAdminFunc - Function to check if a user is an admin
  * @param {Object} biddingModuleRef - Reference to the bidding module for point management
  */
-function initialize(config, isAdminFunc, biddingModuleRef) {
+function initialize(config, isAdminFunc, biddingModuleRef, cache = null) {
   cfg = config;
   isAdmFunc = isAdminFunc;
   biddingModule = biddingModuleRef;
+  sheetAPI = new SheetAPI(config.sheet_webhook_url);
+  discordCache = cache;
   console.log(`${EMOJI.SUCCESS} Auctioneering system initialized`);
+}
+
+/**
+ * Clears all active timers from the auction state
+ * Optimization: Consolidates timer clearing logic
+ *
+ * @returns {number} Number of timers cleared
+ */
+function clearAllAuctionTimers() {
+  if (!auctionState.timers || typeof auctionState.timers !== 'object') return 0;
+  const count = Object.keys(auctionState.timers).length;
+  Object.values(auctionState.timers).forEach((t) => clearTimeout(t));
+  auctionState.timers = {};
+  return count;
 }
 
 /**
@@ -315,10 +344,10 @@ function initialize(config, isAdminFunc, biddingModuleRef) {
  * @returns {string} Formatted timestamp string
  */
 function getTimestamp() {
-  const d = new Date();
-  const manilaTime = new Date(
-    d.toLocaleString("en-US", { timeZone: "Asia/Manila" })
-  );
+  // Use cached Manila time conversion for performance (v6.2 optimization)
+  const { getManilaTime } = require('./utils/timestamp-cache');
+  const manilaTime = getManilaTime();
+
   return `${String(manilaTime.getMonth() + 1).padStart(2, "0")}/${String(
     manilaTime.getDate()
   ).padStart(2, "0")}/${manilaTime.getFullYear()} ${String(
@@ -380,16 +409,7 @@ async function fetchSheetItems(url, retries = 3, allowCache = true) {
   // Attempt to fetch from Google Sheets
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const r = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "getBiddingItems" }),
-        timeout: TIMEOUTS.FETCH_TIMEOUT,
-      });
-
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-
-      const data = await r.json();
+      const data = await sheetAPI.call('getBiddingItems');
       const items = data.items || [];
 
       console.log(
@@ -412,8 +432,14 @@ async function fetchSheetItems(url, retries = 3, allowCache = true) {
       }
 
       if (attempt < retries) {
-        const backoff = 2000 * attempt; // Exponential backoff: 2s, 4s, 6s
-        console.log(`${EMOJI.WARNING} Retrying in ${backoff / 1000}s...`);
+        // OPTIMIZATION v6.7: True exponential backoff with jitter
+        // Formula: min(baseDelay * 2^attempt + jitter, maxDelay)
+        // Result: 2s, 4s, 8s, 16s (+0-1s jitter) instead of linear 2s, 4s, 6s
+        const backoff = Math.min(
+          2000 * Math.pow(2, attempt) + Math.random() * 1000,
+          30000 // Max 30s
+        );
+        console.log(`${EMOJI.WARNING} Retrying in ${Math.round(backoff / 1000)}s...`);
         await new Promise((resolve) => setTimeout(resolve, backoff));
       }
     }
@@ -470,21 +496,15 @@ async function logAuctionResult(
   timestamp
 ) {
   try {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "logAuctionResult",
-        itemIndex,
-        winner,
-        winningBid,
-        totalBids,
-        bidCount,
-        itemSource,
-        timestamp,
-      }),
+    await sheetAPI.call('logAuctionResult', {
+      itemIndex,
+      winner,
+      winningBid,
+      totalBids,
+      bidCount,
+      itemSource,
+      timestamp,
     });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     console.log(
       `${EMOJI.SUCCESS} Result logged: ${
         winner || "No winner"
@@ -553,16 +573,7 @@ async function saveAuctionState(url) {
       timestamp: getTimestamp(),
     };
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: safeStringify({
-        action: "saveBotState",
-        state: stateToSave,
-      }),
-    });
-
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    await sheetAPI.call('saveBotState', { state: stateToSave });
     console.log(`${EMOJI.SUCCESS} Auction state saved`);
     return true;
   } catch (e) {
@@ -612,8 +623,7 @@ async function startAuctioneering(client, config, channel) {
 
   // ✅ FIX: Always fetch the correct bidding channel from config
   try {
-    const guild = await client.guilds.fetch(config.main_guild_id);
-    const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+    const biddingChannel = await discordCache.getChannel('bidding_channel_id');
 
     if (!biddingChannel) {
       console.error(`❌ Could not fetch bidding channel with ID: ${config.bidding_channel_id}`);
@@ -655,30 +665,19 @@ async function startAuctioneering(client, config, channel) {
 
   // Load points cache
   try {
-    const pointsResponse = await fetch(config.sheet_webhook_url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'getBiddingPoints' }),
-    });
-    
-    if (!pointsResponse.ok) {
-      await channel.send(`❌ Failed to load points from server (HTTP ${pointsResponse.status})`);
-      return;
-    }
-    
-    const pointsData = await pointsResponse.json();
+    const pointsData = await sheetAPI.call('getBiddingPoints');
     if (!pointsData.points) {
       await channel.send(`❌ No points data received`);
       return;
     }
     
-    // Store in bidding module's cache
+    // Store in bidding module's cache with PointsCache for O(1) lookups
     const biddingState = biddingModule.getBiddingState();
-    biddingState.cp = pointsData.points;
+    biddingState.cp = new PointsCache(pointsData.points);
     biddingState.ct = Date.now();
     biddingModule.saveBiddingState();
-    
-    console.log(`✅ Loaded ${Object.keys(pointsData.points).length} members' points`);
+
+    console.log(`✅ Loaded ${biddingState.cp.size()} members' points`);
   } catch (err) {
     console.error(`❌ Failed to load points:`, err);
     await channel.send(`❌ Failed to load points: ${err.message}`);
@@ -815,16 +814,21 @@ async function startAuctioneering(client, config, channel) {
   // Countdown feedback every 5 seconds
   let countdown = 30;
   const countdownInterval = setInterval(async () => {
-    countdown -= 5;
-    if (countdown > 0) {
-      countdownEmbed.setFooter({
-        text: `Starting first item in ${countdown}s...`,
-      });
-      await feedbackMsg
-        .edit({ embeds: [countdownEmbed] })
-        .catch((err) =>
-          console.warn(`⚠️ Failed to update countdown:`, err.message)
-        );
+    try {
+      countdown -= 5;
+      if (countdown > 0) {
+        countdownEmbed.setFooter({
+          text: `Starting first item in ${countdown}s...`,
+        });
+        await feedbackMsg
+          .edit({ embeds: [countdownEmbed] })
+          .catch((err) =>
+            console.warn(`⚠️ Failed to update countdown:`, err.message)
+          );
+      }
+    } catch (error) {
+      console.error("❌ Error in countdown interval:", error.message);
+      // Continue interval, don't break it
     }
   }, 5000);
 
@@ -836,10 +840,7 @@ async function startAuctioneering(client, config, channel) {
     delete auctionState.timers.sessionStartCountdown;
     try {
       // Always use the configured bidding channel
-      const guild = await client.guilds.fetch(config.main_guild_id);
-      const biddingChannel = await guild.channels.fetch(
-        config.bidding_channel_id
-      );
+      const biddingChannel = await discordCache.getChannel('bidding_channel_id');
 
       console.log(
         `✅ Using bidding channel: ${biddingChannel.name} (${biddingChannel.id})`
@@ -998,8 +999,7 @@ async function auctionNextItem(client, config, channel) {
       `⚠️ Channel type ${channel.type} invalid – refetching bidding channel...`
     );
     try {
-      const guild = await client.guilds.fetch(config.main_guild_id);
-      channel = await guild.channels.fetch(config.bidding_channel_id);
+      channel = await discordCache.getChannel('bidding_channel_id');
       console.log(
         `✅ Corrected to bidding channel: ${channel.name} (${channel.id})`
       );
@@ -1013,8 +1013,7 @@ async function auctionNextItem(client, config, channel) {
   if (!channel) {
     console.warn("⚠️ Channel is undefined, attempting to refetch...");
     try {
-      const guild = await client.guilds.fetch(config.main_guild_id);
-      channel = await guild.channels.fetch(config.bidding_channel_id);
+      channel = await discordCache.getChannel('bidding_channel_id');
       if (!channel) {
         console.error("❌ Failed to refetch bidding channel.");
         return;
@@ -1727,19 +1726,10 @@ async function finalizeSession(client, config, channel) {
         JSON.stringify(submitPayload, null, 2)
       );
     } else {
-      const response = await fetch(config.sheet_webhook_url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(submitPayload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (data.status !== "ok") {
-        throw new Error(data.message || "Unknown error from sheets");
+      const { action, ...data } = submitPayload;
+      const result = await sheetAPI.call(action, data);
+      if (result.status !== "ok") {
+        throw new Error(result.message || "Unknown error from sheets");
       }
 
       console.log(`${EMOJI.SUCCESS} Session results submitted successfully`);
@@ -1790,16 +1780,16 @@ async function finalizeSession(client, config, channel) {
     try {
       console.log(`📦 Move attempt ${attempt}/${maxRetries}...`);
 
-      const moveResponse = await fetch(config.sheet_webhook_url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "moveAuctionedItemsToForDistribution" }),
-      });
-
-      if (moveResponse.ok) {
-        moveData = await moveResponse.json();
+      try {
+        moveData = await sheetAPI.call('moveAuctionedItemsToForDistribution');
         console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution`);
         moveSuccess = true;
+      } catch (err) {
+        console.error(`❌ Move failed:`, err);
+        moveData = null;
+      }
+
+      if (moveSuccess) {
 
         // Get admin logs channel
         const mainGuild = await client.guilds.fetch(config.main_guild_id);
@@ -1819,10 +1809,13 @@ async function finalizeSession(client, config, channel) {
         lastError = `HTTP ${moveResponse.status}`;
         console.error(`⚠️ Move attempt ${attempt} failed: ${lastError}`);
 
-        // Retry with exponential backoff (2s, 4s, 8s)
+        // OPTIMIZATION v6.7: Exponential backoff with jitter
         if (attempt < maxRetries) {
-          const delay = Math.pow(2, attempt) * 1000;
-          console.log(`⏳ Retrying in ${delay/1000}s...`);
+          const delay = Math.min(
+            Math.pow(2, attempt) * 1000 + Math.random() * 1000,
+            30000 // Max 30s
+          );
+          console.log(`⏳ Retrying in ${Math.round(delay/1000)}s...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
@@ -1960,22 +1953,17 @@ async function finalizeSession(client, config, channel) {
  */
 async function buildCombinedResults(config) {
   // Fetch fresh points from sheet
-  const response = await fetch(config.sheet_webhook_url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "getBiddingPoints" }),
-  });
-
-  if (!response.ok) {
-    console.error(
-      `${EMOJI.ERROR} Failed to fetch bidding points: HTTP ${response.status}`
-    );
+  let allPoints = {};
+  try {
+    const data = await sheetAPI.call('getBiddingPoints');
+    allPoints = data.points || {};
+  } catch (err) {
+    console.error(`${EMOJI.ERROR} Failed to fetch bidding points:`, err);
     return [];
   }
-
-  const data = await response.json();
-  const allPoints = data.points || {};
-  const allMembers = Object.keys(allPoints);
+  // Use PointsCache for efficient operations
+  const pointsCache = new PointsCache(allPoints);
+  const allMembers = pointsCache.getAllUsernames();
 
   // Combine all winners from session
   const winners = {};
@@ -2028,7 +2016,7 @@ function pauseSession() {
   auctionState.paused = true;
   auctionState.pausedTime = Date.now();
 
-  Object.values(auctionState.timers).forEach((t) => clearTimeout(t));
+  clearAllAuctionTimers();
   console.log(`${EMOJI.PAUSE} Session paused`);
 
   // ADD THIS LINE:
@@ -2540,24 +2528,20 @@ async function handleMyPoints(message, biddingModule, config) {
 
   const u = (message.member?.nickname || message.author?.username || 'Unknown User');
 
-  const freshPts = await fetch(config.sheet_webhook_url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "getBiddingPoints" }),
-  })
-    .then((r) => r.json())
-    .then((d) => d.points || {})
-    .catch((err) => {
-      console.error(`❌ Failed to fetch points for !mypoints:`, err.message);
-      return {};
-    });
+  let freshPts = {};
+  try {
+    const data = await sheetAPI.call('getBiddingPoints');
+    freshPts = data.points || {};
+  } catch (err) {
+    console.error(`❌ Failed to fetch points for !mypoints:`, err.message);
+  }
 
-  let userPts = freshPts[u];
-  if (userPts === undefined) {
-    const match = Object.keys(freshPts).find(
-      (n) => n.toLowerCase() === u.toLowerCase()
-    );
-    userPts = match ? freshPts[match] : null;
+  // Use PointsCache for efficient O(1) lookup
+  const ptsCache = new PointsCache(freshPts);
+  let userPts = ptsCache.getPoints(u);
+  if (userPts === 0 && !ptsCache.hasUser(u)) {
+    // User not found in system
+    userPts = null;
   }
 
   let ptsMsg;
@@ -2752,8 +2736,11 @@ async function handleCancelItem(message) {
     ],
   });
 
-  await canMsg.react(EMOJI.SUCCESS);
-  await canMsg.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
+  await Promise.all([
+    canMsg.react(EMOJI.SUCCESS),
+    canMsg.react(EMOJI.ERROR)
+  ]);
 
   try {
     const canCol = await canMsg.awaitReactions({
@@ -2881,8 +2868,11 @@ async function handleSkipItem(message) {
     ],
   });
 
-  await skpMsg.react(EMOJI.SUCCESS);
-  await skpMsg.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
+  await Promise.all([
+    skpMsg.react(EMOJI.SUCCESS),
+    skpMsg.react(EMOJI.ERROR)
+  ]);
 
   try {
     const skpCol = await skpMsg.awaitReactions({
@@ -3014,8 +3004,11 @@ async function handleForceSubmitResults(message, config, biddingModule) {
     ],
   });
 
-  await fsMsg.react(EMOJI.SUCCESS);
-  await fsMsg.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
+  await Promise.all([
+    fsMsg.react(EMOJI.SUCCESS),
+    fsMsg.react(EMOJI.ERROR)
+  ]);
 
   try {
     const fsCol = await fsMsg.awaitReactions({
@@ -3169,36 +3162,21 @@ async function handleMoveToDistribution(message, config, client) {
       try {
         console.log(`📦 Move attempt ${attempt}/${maxRetries}...`);
 
-        const moveResponse = await fetch(config.sheet_webhook_url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "moveAuctionedItemsToForDistribution" }),
-        });
-
-        if (moveResponse.ok) {
-          moveData = await moveResponse.json();
-          console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution`);
-          moveSuccess = true;
-          break; // Success - exit retry loop
-        } else {
-          lastError = `HTTP ${moveResponse.status}`;
-          console.error(`⚠️ Move attempt ${attempt} failed: ${lastError}`);
-
-          // Retry with exponential backoff (2s, 4s, 8s)
-          if (attempt < maxRetries) {
-            const delay = Math.pow(2, attempt) * 1000;
-            console.log(`⏳ Retrying in ${delay/1000}s...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-          }
-        }
+        moveData = await sheetAPI.call('moveAuctionedItemsToForDistribution');
+        console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution`);
+        moveSuccess = true;
+        break; // Success - exit retry loop
       } catch (err) {
         lastError = err.message;
-        console.error(`⚠️ Move attempt ${attempt} error:`, err);
+        console.error(`⚠️ Move attempt ${attempt} failed:`, err);
 
-        // Retry with exponential backoff (2s, 4s, 8s)
+        // OPTIMIZATION v6.7: Exponential backoff with jitter
         if (attempt < maxRetries) {
-          const delay = Math.pow(2, attempt) * 1000;
-          console.log(`⏳ Retrying in ${delay/1000}s...`);
+          const delay = Math.min(
+            Math.pow(2, attempt) * 1000 + Math.random() * 1000,
+            30000 // Max 30s
+          );
+          console.log(`⏳ Retrying in ${Math.round(delay/1000)}s...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
@@ -3385,8 +3363,7 @@ function scheduleDailyAuction(client, config) {
         }
 
         // Fetch the bidding channel
-        const guild = await client.guilds.fetch(config.main_guild_id);
-        const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+        const biddingChannel = await discordCache.getChannel('bidding_channel_id');
 
         if (!biddingChannel) {
           console.error(`${EMOJI.ERROR} Could not fetch bidding channel for scheduled auction`);
@@ -3402,8 +3379,7 @@ function scheduleDailyAuction(client, config) {
 
         // Try to notify admin logs
         try {
-          const guild = await client.guilds.fetch(config.main_guild_id);
-          const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
+          const adminLogs = await discordCache.getChannel('admin_logs_channel_id').catch(() => null);
 
           if (adminLogs) {
             await adminLogs.send(

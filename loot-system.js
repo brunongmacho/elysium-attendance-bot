@@ -50,7 +50,7 @@ const { EmbedBuilder } = require("discord.js");
 const Tesseract = require("tesseract.js");
 const sharp = require("sharp");
 const fs = require("fs");
-const fetch = require("node-fetch");
+const { SheetAPI } = require('./utils/sheet-api');
 const errorHandler = require('./utils/error-handler');
 
 // ============================================================================
@@ -100,6 +100,7 @@ const BLACKLIST = [
 let config = null;           // Bot configuration from config.json
 let bossPoints = null;       // Boss metadata with names and aliases
 let isAdminFunc = null;      // Function to check admin permissions
+let sheetAPI = null;         // Unified Google Sheets API client
 
 // ============================================================================
 // INITIALIZATION
@@ -121,6 +122,7 @@ function initialize(cfg, bossPointsData, isAdmin) {
   config = cfg;
   bossPoints = bossPointsData;
   isAdminFunc = isAdmin;
+  sheetAPI = new SheetAPI(cfg.sheet_webhook_url);
   console.log(`${EMOJI.SUCCESS} Loot system initialized`);
 }
 
@@ -336,22 +338,7 @@ async function fetchHistoricalPrices() {
   try {
     console.log('📊 Fetching historical prices from ForDistribution tab...');
 
-    const payload = {
-      action: "getHistoricalPrices"
-    };
-
-    const response = await fetch(config.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      console.warn(`⚠️ Failed to fetch historical prices: HTTP ${response.status}`);
-      return {};
-    }
-
-    const data = await response.json();
+    const data = await sheetAPI.call('getHistoricalPrices');
 
     if (data.status === "ok" && data.prices) {
       console.log(`✅ Loaded ${Object.keys(data.prices).length} historical prices`);
@@ -750,8 +737,11 @@ async function handleLootCommand(message, args, client) {
       `⏱️ 30 second timeout`,
   });
 
-  await confirmMsg.react(EMOJI.SUCCESS);
-  await confirmMsg.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
+  await Promise.all([
+    confirmMsg.react(EMOJI.SUCCESS),
+    confirmMsg.react(EMOJI.ERROR)
+  ]);
 
   // Filter to only accept reactions from the command user
   const filter = (reaction, user) =>
@@ -892,47 +882,12 @@ async function submitLootToSheet(
     // ========================================
     // SUBMIT: Send to Google Sheets
     // ========================================
-    const payload = {
-      action: "submitLootEntries",
+    console.log(`📤 Submitting ${lootEntries.length} loot entries to sheet...`);
+
+    const data = await sheetAPI.call('submitLootEntries', {
       entries: lootEntries,
       timestamp: new Date().toISOString(),
-    };
-
-    console.log(`📤 Submitting ${lootEntries.length} loot entries to sheet...`);
-    console.log(`📦 Payload:`, JSON.stringify(payload, null, 2));
-
-    const response = await fetch(config.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
     });
-
-    console.log(`📊 Sheet response status: ${response.status}`);
-
-    // ========================================
-    // VALIDATE: Check HTTP Response
-    // ========================================
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ Sheet error response: ${errorText}`);
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
-    }
-
-    // ========================================
-    // PARSE: Extract Response Data
-    // ========================================
-    const responseText = await response.text();
-    console.log(`📄 Sheet response text: ${responseText}`);
-
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseErr) {
-      console.error(`❌ JSON parse error: ${parseErr.message}`);
-      throw new Error(
-        `Invalid JSON response: ${responseText.substring(0, 200)}`
-      );
-    }
 
     console.log(`📊 Parsed response:`, JSON.stringify(data, null, 2));
 

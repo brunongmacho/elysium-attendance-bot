@@ -177,10 +177,11 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 const { EmbedBuilder } = require("discord.js");
-const fetch = require("node-fetch");
 const fs = require("fs");
 const { normalizeUsername } = require("./utils/common");
 const errorHandler = require('./utils/error-handler');
+const { PointsCache } = require('./utils/points-cache');
+const { SheetAPI } = require('./utils/sheet-api');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MODULE REFERENCES
@@ -197,6 +198,18 @@ let auctioneering = null;
  * @type {Object|null}
  */
 let cfg = null;
+
+/**
+ * Unified Google Sheets API client
+ * @type {SheetAPI|null}
+ */
+let sheetAPI = null;
+
+/**
+ * Discord channel cache for reducing API calls
+ * @type {Object|null}
+ */
+let discordCache = null;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SYSTEM CONSTANTS
@@ -452,10 +465,9 @@ const isAdm = (m, c) =>
  * ts() // "12/25/2024 14:30"
  */
 const ts = () => {
-  const d = new Date();
-  const manilaTime = new Date(
-    d.toLocaleString("en-US", { timeZone: "Asia/Manila" })
-  );
+  // Use cached Manila time conversion for performance (v6.2 optimization)
+  const { getManilaTime } = require('./utils/timestamp-cache');
+  const manilaTime = getManilaTime();
 
   return `${String(manilaTime.getMonth() + 1).padStart(2, "0")}/${String(
     manilaTime.getDate()
@@ -612,6 +624,8 @@ function save(forceSync = false) {
           return [key, cleanVal];
         })
       ),
+      // Convert PointsCache instance to plain object for JSON serialization
+      cp: s.cp && s.cp.toObject ? s.cp.toObject() : s.cp,
     };
 
     // Always save to local file for quick access (works even on ephemeral Koyeb FS)
@@ -666,6 +680,8 @@ async function load() {
       st = {
         ...st,
         ...d,
+        // Wrap points cache back in PointsCache for efficient lookups
+        cp: d.cp ? new PointsCache(d.cp) : null,
         th: {},
         lb: {},
         pause: false,
@@ -724,11 +740,14 @@ async function load() {
  * @param {Object} config - Bot configuration object
  * @param {Function} isAdminFunc - Function to check if user has admin privileges
  * @param {Object} auctioneeringRef - Reference to auctioneering.js module
+ * @param {Object} cache - Discord channel cache instance
  */
-function initializeBidding(config, isAdminFunc, auctioneeringRef) {
+function initializeBidding(config, isAdminFunc, auctioneeringRef, cache = null) {
   isAdmFunc = isAdminFunc;
   cfg = config;
   auctioneering = auctioneeringRef;
+  sheetAPI = new SheetAPI(config.sheet_webhook_url);
+  discordCache = cache;
 
   // Start cleanup schedule for pending confirmations
   startCleanupSchedule();
@@ -742,6 +761,20 @@ function initializeBidding(config, isAdminFunc, auctioneeringRef) {
  */
 function getColor(color) {
   return color;
+}
+
+/**
+ * Clears all active timers from the bidding state
+ * Optimization: Consolidates repeated timer clearing logic (5+ occurrences)
+ *
+ * @returns {number} Number of timers cleared
+ */
+function clearAllTimers() {
+  if (!st.th || typeof st.th !== 'object') return 0;
+  const count = Object.keys(st.th).length;
+  Object.values(st.th).forEach((h) => clearTimeout(h));
+  st.th = {};
+  return count;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -764,13 +797,8 @@ function getColor(color) {
  */
 async function fetchPts(url) {
   try {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "getBiddingPoints" }),
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return (await r.json()).points || {};
+    const result = await sheetAPI.call('getBiddingPoints');
+    return result.points || {};
   } catch (e) {
     console.error("❌ Fetch pts:", e);
     return null;
@@ -800,29 +828,19 @@ async function fetchPts(url) {
 async function submitRes(url, res, time) {
   if (!time || !res || res.length === 0)
     return { ok: false, err: "Missing data" };
-  for (let i = 1; i <= 3; i++) {
-    try {
-      const r = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "submitBiddingResults",
-          results: res,
-          timestamp: time,
-        }),
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const d = await r.json();
-      if (d.status === "ok") {
-        console.log("✅ Submitted");
-        return { ok: true, d };
-      }
-      throw new Error(d.message || "Unknown");
-    } catch (e) {
-      console.error(`❌ Submit ${i}:`, e.message);
-      if (i < 3) await new Promise((x) => setTimeout(x, i * 2000));
-      else return { ok: false, err: e.message, res };
+  try {
+    const d = await sheetAPI.call('submitBiddingResults', {
+      results: res,
+      timestamp: time,
+    });
+    if (d.status === "ok") {
+      console.log("✅ Submitted");
+      return { ok: true, d };
     }
+    throw new Error(d.message || "Unknown");
+  } catch (e) {
+    console.error(`❌ Submit error:`, e.message);
+    return { ok: false, err: e.message, res };
   }
 }
 
@@ -860,7 +878,8 @@ async function loadCache(url) {
     console.error("❌ Cache fail");
     return false;
   }
-  st.cp = p;
+  // Wrap points data in PointsCache for O(1) lookups
+  st.cp = new PointsCache(p);
   st.ct = Date.now();
   save();
   console.log(
@@ -893,12 +912,17 @@ function startCacheAutoRefresh(url) {
 
   // Set up auto-refresh every 30 minutes
   st.cacheRefreshTimer = setInterval(async () => {
-    if (st.a && st.a.status === "active") {
-      console.log("🔄 Auto-refreshing cache...");
-      await loadCache(url);
-    } else {
-      // Stop refreshing if no active auction
-      stopCacheAutoRefresh();
+    try {
+      if (st.a && st.a.status === "active") {
+        console.log("🔄 Auto-refreshing cache...");
+        await loadCache(url);
+      } else {
+        // Stop refreshing if no active auction
+        stopCacheAutoRefresh();
+      }
+    } catch (error) {
+      console.error("❌ Error in cache auto-refresh:", error.message);
+      // Continue interval, don't break it
     }
   }, CACHE_REFRESH_INTERVAL);
 
@@ -936,14 +960,8 @@ function stopCacheAutoRefresh() {
  */
 function getPts(u) {
   if (!st.cp) return null;
-  let p = st.cp[u];
-  if (p === undefined) {
-    const m = Object.keys(st.cp).find(
-      (n) => n.toLowerCase() === u.toLowerCase()
-    );
-    p = m ? st.cp[m] : 0;
-  }
-  return p || 0;
+  // Use PointsCache for efficient O(1) lookup
+  return st.cp.getPoints(u);
 }
 
 /**
@@ -986,10 +1004,7 @@ async function logBidRejection(client, config, details) {
     // Send to admin logs asynchronously (don't block bid processing)
     setTimeout(async () => {
       try {
-        const guild = await client.guilds.fetch(config.main_guild_id).catch(() => null);
-        if (!guild) return;
-
-        const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
+        const adminLogs = await discordCache?.getChannel('admin_logs_channel_id').catch(() => null);
         if (!adminLogs) return;
 
         const embed = new EmbedBuilder()
@@ -1145,8 +1160,7 @@ async function startNext(cli, cfg) {
   }
 
   const d = st.q[0];
-  const g = await cli.guilds.fetch(cfg.main_guild_id);
-  const ch = await g.channels.fetch(cfg.bidding_channel_id);
+  const ch = await discordCache.getChannel('bidding_channel_id');
 
   const isBatch = d.quantity > 1;
   const threadName = isBatch
@@ -1280,8 +1294,7 @@ function schedTimers(cli, cfg) {
 async function ann1(cli, cfg) {
   const a = st.a;
   if (!a || a.status !== "active" || st.pause) return;
-  const g = await cli.guilds.fetch(cfg.main_guild_id),
-    th = await g.channels.fetch(a.threadId);
+  const th = await cli.channels.fetch(a.threadId);
   await th.send({
     content: "@everyone",
     embeds: [
@@ -1305,8 +1318,7 @@ async function ann1(cli, cfg) {
 async function ann2(cli, cfg) {
   const a = st.a;
   if (!a || a.status !== "active" || st.pause) return;
-  const g = await cli.guilds.fetch(cfg.main_guild_id),
-    th = await g.channels.fetch(a.threadId);
+  const th = await cli.channels.fetch(a.threadId);
   await th.send({
     content: "@everyone",
     embeds: [
@@ -1330,8 +1342,7 @@ async function ann2(cli, cfg) {
 async function ann3(cli, cfg) {
   const a = st.a;
   if (!a || a.status !== "active" || st.pause) return;
-  const g = await cli.guilds.fetch(cfg.main_guild_id),
-    th = await g.channels.fetch(a.threadId);
+  const th = await cli.channels.fetch(a.threadId);
   await th.send({
     content: "@everyone",
     embeds: [
@@ -1355,8 +1366,7 @@ async function endAuc(cli, cfg) {
   const a = st.a;
   if (!a) return;
   a.status = "ended";
-  const g = await cli.guilds.fetch(cfg.main_guild_id),
-    th = await g.channels.fetch(a.threadId);
+  const th = await cli.channels.fetch(a.threadId);
 
   const isBatch = a.quantity > 1;
 
@@ -1488,7 +1498,7 @@ async function submitSessionTally(config, sessionItems) {
 
   if (!st.sd) st.sd = ts();
 
-  const allMembers = Object.keys(st.cp);
+  const allMembers = st.cp.getAllUsernames();
   const winners = {};
 
   sessionItems.forEach((item) => {
@@ -1526,13 +1536,8 @@ async function saveBiddingStateToSheet() {
       history: st.h,
     };
 
-    await fetch(cfg.sheet_webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "saveBotState",
-        state: stateToSave,
-      }),
+    await sheetAPI.call('saveBotState', {
+      state: stateToSave,
     });
 
     console.log(`✅ Bot state saved to sheet`);
@@ -1543,13 +1548,7 @@ async function saveBiddingStateToSheet() {
 
 async function loadBiddingStateFromSheet(url) {
   try {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "getBotState" }),
-    });
-    if (!r.ok) return null;
-    const data = await r.json();
+    const data = await sheetAPI.call('getBotState');
     return data.state || null;
   } catch (e) {
     console.error(`❌ Load state:`, e);
@@ -1558,9 +1557,10 @@ async function loadBiddingStateFromSheet(url) {
 }
 
 async function finalize(cli, cfg) {
-  const g = await cli.guilds.fetch(cfg.main_guild_id);
-  const adm = await g.channels.fetch(cfg.admin_logs_channel_id);
-  const bch = await g.channels.fetch(cfg.bidding_channel_id);
+  const [adm, bch] = await Promise.all([
+    discordCache.getChannel('admin_logs_channel_id'),
+    discordCache.getChannel('bidding_channel_id')
+  ]);
 
   // Stop cache auto-refresh
   stopCacheAutoRefresh();
@@ -1576,7 +1576,7 @@ async function finalize(cli, cfg) {
 
   if (!st.sd) st.sd = ts();
 
-  const allMembers = Object.keys(st.cp || {});
+  const allMembers = st.cp ? st.cp.getAllUsernames() : [];
 
   const winners = {};
   st.h.forEach((a) => {
@@ -2139,8 +2139,11 @@ async function procBid(msg, amt, cfg) {
     content: `<@${uid}> **CONFIRM YOUR BID - React below within 10 seconds**`,
     embeds: [confEmbed],
   });
-  await conf.react(EMOJI.SUCCESS);
-  await conf.react(EMOJI.ERROR);
+  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
+  await Promise.all([
+    conf.react(EMOJI.SUCCESS),
+    conf.react(EMOJI.ERROR)
+  ]);
 
   st.pc[conf.id] = {
     userId: uid,
@@ -2301,7 +2304,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         statEmbed.addFields({
           name: `${EMOJI.CHART} Cache`,
           value: `${EMOJI.SUCCESS} Loaded (${
-            Object.keys(st.cp).length
+            st.cp.size()
           } members)\n${EMOJI.TIME} Age: ${age}m\n${autoRefreshStatus}`,
           inline: false,
         });
@@ -2369,8 +2372,11 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             }),
         ],
       });
-      await rstMsg.react(EMOJI.SUCCESS);
-      await rstMsg.react(EMOJI.ERROR);
+      // OPTIMIZATION v6.8: Parallel reactions
+      await Promise.all([
+        rstMsg.react(EMOJI.SUCCESS),
+        rstMsg.react(EMOJI.ERROR)
+      ]);
       try {
         const col = await rstMsg.awaitReactions({
           filter: (r, u) =>
@@ -2381,7 +2387,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           errors: ["time"],
         });
         if (col.first().emoji.name === EMOJI.SUCCESS) {
-          Object.values(st.th).forEach((h) => clearTimeout(h));
+          clearAllTimers();
           stopCacheAutoRefresh();
           st = {
             a: null,
@@ -2429,8 +2435,11 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             }),
         ],
       });
-      await fsMsg.react(EMOJI.SUCCESS);
-      await fsMsg.react(EMOJI.ERROR);
+      // OPTIMIZATION v6.8: Parallel reactions
+      await Promise.all([
+        fsMsg.react(EMOJI.SUCCESS),
+        fsMsg.react(EMOJI.ERROR)
+      ]);
       try {
         const fsCol = await fsMsg.awaitReactions({
           filter: (r, u) =>
@@ -2450,7 +2459,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
               (winners[normalizedWinner] || 0) + a.amount;
           });
 
-          const allMembers = Object.keys(st.cp || {});
+          const allMembers = st.cp ? st.cp.getAllUsernames() : [];
           const res = allMembers.map((m) => {
             const normalizedMember = normalizeUsername(m);
             return {
@@ -2539,8 +2548,11 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             .setFooter({ text: `${EMOJI.SUCCESS} yes / ${EMOJI.ERROR} no` }),
         ],
       });
-      await canMsg.react(EMOJI.SUCCESS);
-      await canMsg.react(EMOJI.ERROR);
+      // OPTIMIZATION v6.8: Parallel reactions
+      await Promise.all([
+        canMsg.react(EMOJI.SUCCESS),
+        canMsg.react(EMOJI.ERROR)
+      ]);
       try {
         const canCol = await canMsg.awaitReactions({
           filter: (r, u) =>
@@ -2551,7 +2563,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           errors: ["time"],
         });
         if (canCol.first().emoji.name === EMOJI.SUCCESS) {
-          Object.values(st.th).forEach((h) => clearTimeout(h));
+          clearAllTimers();
           if (st.a.curWin) unlock(st.a.curWin, st.a.curBid);
 
           // Send messages before locking/archiving
@@ -2596,8 +2608,11 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             .setFooter({ text: `${EMOJI.SUCCESS} yes / ${EMOJI.ERROR} no` }),
         ],
       });
-      await skpMsg.react(EMOJI.SUCCESS);
-      await skpMsg.react(EMOJI.ERROR);
+      // OPTIMIZATION v6.8: Parallel reactions
+      await Promise.all([
+        skpMsg.react(EMOJI.SUCCESS),
+        skpMsg.react(EMOJI.ERROR)
+      ]);
       try {
         const skpCol = await skpMsg.awaitReactions({
           filter: (r, u) =>
@@ -2608,7 +2623,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           errors: ["time"],
         });
         if (skpCol.first().emoji.name === EMOJI.SUCCESS) {
-          Object.values(st.th).forEach((h) => clearTimeout(h));
+          clearAllTimers();
           if (st.a.curWin) unlock(st.a.curWin, st.a.curBid);
 
           // Send messages before locking/archiving
@@ -2661,12 +2676,12 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         );
       }
 
-      let userPts = freshPts[u];
-      if (userPts === undefined) {
-        const match = Object.keys(freshPts).find(
-          (n) => n.toLowerCase() === u.toLowerCase()
-        );
-        userPts = match ? freshPts[match] : null;
+      // Use PointsCache for efficient O(1) lookup
+      const ptsCache = new PointsCache(freshPts);
+      let userPts = ptsCache.getPoints(u);
+      if (userPts === 0 && !ptsCache.hasUser(u)) {
+        // User not found in system
+        userPts = null;
       }
 
       let ptsMsg;
@@ -2755,8 +2770,11 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         ],
       });
 
-      await fixMsg.react(EMOJI.SUCCESS);
-      await fixMsg.react(EMOJI.ERROR);
+      // OPTIMIZATION v6.8: Parallel reactions
+      await Promise.all([
+        fixMsg.react(EMOJI.SUCCESS),
+        fixMsg.react(EMOJI.ERROR)
+      ]);
 
       try {
         const fixCol = await fixMsg.awaitReactions({
@@ -2816,7 +2834,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           ).reduce((sum, pts) => sum + pts, 0)}pts total)\n` +
           `**Pending Confirmations:** ${Object.keys(st.pc).length}\n` +
           `**History:** ${st.h.length} items\n` +
-          `**Cache:** ${st.cp ? Object.keys(st.cp).length : 0} members\n` +
+          `**Cache:** ${st.cp ? st.cp.size() : 0} members\n` +
           `**Paused:** ${st.pause ? "Yes" : "No"}`,
         inline: false,
       });
@@ -2899,7 +2917,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             `• Active auction: ${st.a ? st.a.item : "None"}\n` +
             `• Locked points: ${Object.keys(st.lp).length} members\n` +
             `• History: ${st.h.length} items\n` +
-            `• Cache: ${st.cp ? Object.keys(st.cp).length : 0} members\n\n` +
+            `• Cache: ${st.cp ? st.cp.size() : 0} members\n\n` +
             `**Auctioneering Module:**\n` +
             `• Session items: ${require("./auctioneering.js").getAuctionState().sessionItems.length}\n\n` +
             `**State Files:**\n` +
@@ -2917,8 +2935,11 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         });
 
       const resetConfirmMsg = await msg.reply({ embeds: [resetAuditEmbed] });
-      await resetConfirmMsg.react(EMOJI.SUCCESS);
-      await resetConfirmMsg.react(EMOJI.ERROR);
+      // OPTIMIZATION v6.8: Parallel reactions
+      await Promise.all([
+        resetConfirmMsg.react(EMOJI.SUCCESS),
+        resetConfirmMsg.react(EMOJI.ERROR)
+      ]);
 
       try {
         const resetCol = await resetConfirmMsg.awaitReactions({
@@ -2934,7 +2955,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           await errorHandler.safeRemoveReactions(resetConfirmMsg, 'reaction removal');
 
           // Stop all timers
-          Object.values(st.th).forEach((h) => clearTimeout(h));
+          clearAllTimers();
           stopCacheAutoRefresh();
 
           // Reset auctioneering module
@@ -2980,13 +3001,8 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           // Also try to save auctioneering state if available
           if (cfg && cfg.sheet_webhook_url) {
             try {
-              await fetch(cfg.sheet_webhook_url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  action: "saveBotState",
-                  state: { auctionState: auctState, timestamp: new Date().toISOString() },
-                }),
+              await sheetAPI.call('saveBotState', {
+                state: { auctionState: auctState, timestamp: new Date().toISOString() },
               });
             } catch (err) {
               console.warn("⚠️ Failed to save auctioneering state:", err.message);
@@ -3049,9 +3065,12 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         .setFooter({ text: "React: 1️⃣ Clear | 2️⃣ Finalize | ❌ Cancel" });
 
       const recoveryMsg = await msg.reply({ embeds: [recoveryEmbed] });
-      await recoveryMsg.react("1️⃣");
-      await recoveryMsg.react("2️⃣");
-      await recoveryMsg.react(EMOJI.ERROR);
+      // OPTIMIZATION v6.8: Parallel reactions (3x faster)
+      await Promise.all([
+        recoveryMsg.react("1️⃣"),
+        recoveryMsg.react("2️⃣"),
+        recoveryMsg.react(EMOJI.ERROR)
+      ]);
 
       try {
         const recoveryCol = await recoveryMsg.awaitReactions({
@@ -3068,7 +3087,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
         if (choice === "1️⃣") {
           // Clear stuck state
-          Object.values(st.th).forEach((h) => clearTimeout(h));
+          clearAllTimers();
           st.lp = {};
           st.pc = {};
           st.th = {};
@@ -3100,8 +3119,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
           try {
             // Get the channel
-            const guild = await cli.guilds.fetch(cfg.main_guild_id);
-            const channel = await guild.channels.fetch(cfg.bidding_channel_id);
+            const channel = await discordCache.getChannel('bidding_channel_id');
 
             // Call finalize from auctioneering module (need to check if this exists)
             await msg.reply(
@@ -3208,16 +3226,102 @@ function cleanupPendingConfirmations() {
 }
 
 /**
+ * Prunes stuck locked points that should have been released (v6.2 optimization)
+ *
+ * CLEANUP LOGIC:
+ * - Checks if any auction is currently active
+ * - If no active auction and locked points exist, they're likely stuck
+ * - Logs warning for manual review
+ * - Does NOT auto-clear (requires manual !fixlockedpoints command for safety)
+ *
+ * MEMORY MANAGEMENT:
+ * - Prevents locked points from accumulating indefinitely
+ * - Detects orphaned locks from crashed auctions
+ * - Provides visibility into potential issues
+ *
+ * SAFETY:
+ * - Only reports issues, doesn't auto-fix
+ * - Admin must manually clear using !fixlockedpoints
+ * - Prevents accidental point loss
+ *
+ * @returns {Object} Pruning statistics
+ */
+function checkLockedPoints() {
+  const lockedCount = Object.keys(st.lp).length;
+  const totalLocked = Object.values(st.lp).reduce((sum, pts) => sum + pts, 0);
+
+  // Check if there's an active auction
+  const hasActiveAuction = st.a && st.a.status === 'active';
+
+  // Check auctioneering module too
+  let auctioneeringActive = false;
+  try {
+    const auctModule = require('./auctioneering.js');
+    const auctState = auctModule.getAuctionState();
+    auctioneeringActive = auctState && auctState.active;
+  } catch (e) {
+    // Auctioneering module might not be loaded yet
+  }
+
+  const anyActiveAuction = hasActiveAuction || auctioneeringActive;
+
+  // Report stuck points if no auction is running
+  if (lockedCount > 0 && !anyActiveAuction) {
+    console.log(
+      `⚠️ MEMORY WARNING: ${lockedCount} members have ${totalLocked}pts locked but no auction is active. ` +
+      `Run !fixlockedpoints to clear.`
+    );
+    return { stuck: true, count: lockedCount, total: totalLocked };
+  }
+
+  return { stuck: false, count: lockedCount, total: totalLocked };
+}
+
+/**
+ * Get memory usage statistics (v6.2 monitoring)
+ *
+ * METRICS:
+ * - Heap memory usage (used, total, limit)
+ * - State object sizes (pending confirmations, locked points, history)
+ * - Cache status
+ *
+ * @returns {Object} Memory statistics
+ */
+function getMemoryStats() {
+  const mem = process.memoryUsage();
+  const memMB = {
+    rss: Math.round(mem.rss / 1024 / 1024),
+    heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
+    heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
+    external: Math.round(mem.external / 1024 / 1024),
+  };
+
+  return {
+    memory: memMB,
+    state: {
+      pendingConfirmations: Object.keys(st.pc).length,
+      lockedPointsMembers: Object.keys(st.lp).length,
+      lockedPointsTotal: Object.values(st.lp).reduce((sum, pts) => sum + pts, 0),
+      historySize: st.h.length,
+      queueSize: st.q.length,
+      cacheSize: st.cp ? st.cp.size() : 0,
+    }
+  };
+}
+
+/**
  * Global cleanup interval reference
  * @type {NodeJS.Timeout|null}
  */
 let cleanupInterval = null;
 
 /**
- * Starts periodic cleanup schedule for pending confirmations
+ * Starts periodic cleanup schedule for pending confirmations and memory checks (v6.2 enhanced)
  *
  * SCHEDULE:
  * - Runs cleanupPendingConfirmations every 2 minutes
+ * - Runs checkLockedPoints every 5 minutes
+ * - Logs memory stats every 30 minutes
  * - Continues indefinitely until bot restart
  * - Prevents multiple schedules (checks if already running)
  *
@@ -3228,12 +3332,32 @@ let cleanupInterval = null;
  * MEMORY MANAGEMENT:
  * - Essential for long-running bot instances
  * - Prevents memory leaks from orphaned confirmations
+ * - Detects stuck locked points
+ * - Monitors overall memory usage
  * - Keeps state object clean and bounded
  */
 function startCleanupSchedule() {
   if (!cleanupInterval) {
-    cleanupInterval = setInterval(cleanupPendingConfirmations, 120000); // 2 minutes
-    console.log("🧹 Started pending confirmations cleanup schedule");
+    // Main cleanup: every 2 minutes
+    cleanupInterval = setInterval(() => {
+      cleanupPendingConfirmations();
+    }, 120000); // 2 minutes
+
+    // Locked points check: every 5 minutes
+    setInterval(() => {
+      checkLockedPoints();
+    }, 300000); // 5 minutes
+
+    // Memory stats: every 30 minutes
+    setInterval(() => {
+      const stats = getMemoryStats();
+      console.log(`📊 Memory: ${stats.memory.heapUsed}MB / ${stats.memory.heapTotal}MB heap, ` +
+                  `${stats.state.pendingConfirmations} pending, ` +
+                  `${stats.state.lockedPointsMembers} locked, ` +
+                  `${stats.state.historySize} history`);
+    }, 1800000); // 30 minutes
+
+    console.log("🧹 Started cleanup schedule (confirmations, locked points, memory monitoring)");
   }
 }
 
@@ -3937,7 +4061,7 @@ module.exports = {
         const age = Math.floor((Date.now() - st.ct) / 60000);
         console.log(
           `${EMOJI.CHART} Cache: ${
-            Object.keys(st.cp).length
+            st.cp.size()
           } members (${age}m old)`
         );
         if (age > 60) {

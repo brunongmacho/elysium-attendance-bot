@@ -289,6 +289,26 @@ function debug(message, metadata = {}) {
   }
 }
 
+/**
+ * Silent error logger for non-critical operations.
+ *
+ * Logs errors that occur during non-critical operations (like Discord API
+ * cleanup operations) without throwing or causing process interruption.
+ * Useful for operations where failure is acceptable but should be logged.
+ *
+ * @function silentError
+ * @param {Error|string} error - Error object or error message
+ * @param {string} context - Context where error occurred
+ *
+ * @example
+ * await message.delete().catch((err) => silentError(err, 'message cleanup'));
+ * await reaction.users.remove(userId).catch((err) => silentError(err, 'reaction removal'));
+ */
+function silentError(error, context = 'operation') {
+  const errorMsg = error?.message || error || 'Unknown error';
+  console.warn(`⚠️ [${context}] ${errorMsg}`);
+}
+
 // ============================================================================
 // SAFE DISCORD OPERATIONS
 // ============================================================================
@@ -522,6 +542,7 @@ module.exports = {
   handleError,
   safeCatch,
   wrapAsync,
+  silentError,
 
   // Logging Functions
   warn,
