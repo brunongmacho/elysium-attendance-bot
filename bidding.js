@@ -593,7 +593,7 @@ const SHEET_SYNC_INTERVAL = 5 * 60 * 1000;
  *
  * @param {boolean} [forceSync=false] - Force immediate Google Sheets sync
  */
-function save(forceSync = false) {
+async function save(forceSync = false) {
   try {
     const { th, pauseTimer, cacheRefreshTimer, ...s } = st;
 
@@ -628,11 +628,16 @@ function save(forceSync = false) {
 
     if (cfg && cfg.sheet_webhook_url && shouldSync) {
       lastSheetSyncTime = now;
-      saveBiddingStateToSheet().catch((err) => {
-        console.error("❌ Background sheet sync failed:", err.message);
-      });
       if (forceSync) {
-        console.log("📊 Forced state sync to Google Sheets");
+        // When forceSync is true, await the sync to ensure it completes
+        console.log("📊 Forcing immediate state sync to Google Sheets...");
+        await saveBiddingStateToSheet();
+        console.log("✅ State successfully synced to Google Sheets");
+      } else {
+        // Background sync (fire-and-forget for periodic saves)
+        saveBiddingStateToSheet().catch((err) => {
+          console.error("❌ Background sheet sync failed:", err.message);
+        });
       }
     }
   } catch (e) {
@@ -1552,7 +1557,7 @@ async function finalize(cli, cfg) {
     clearCache();
     st.sd = null;
     st.lp = {};
-    save();
+    await save(true); // Force immediate sync to persist session completion
     return;
   }
 
@@ -1635,7 +1640,7 @@ async function finalize(cli, cfg) {
   st.sd = null;
   st.lp = {};
   clearCache();
-  save();
+  await save(true); // Force immediate sync to persist session finalization
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2386,7 +2391,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             auctionLock: false,
             cacheRefreshTimer: null,
           };
-          save();
+          await save(true); // Force immediate sync to persist the reset
           await msg.reply(`${EMOJI.SUCCESS} Reset (cache cleared)`);
         } else {
           await errorHandler.safeRemoveReactions(rstMsg, 'reaction removal');
@@ -2564,7 +2569,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
           await msg.channel.setArchived(true, "Canceled").catch(errorHandler.safeCatch('thread archive'));
           st.a = null;
-          save();
+          await save(true); // Force immediate sync to persist the cancellation
         } else {
           await errorHandler.safeRemoveReactions(canMsg, 'reaction removal');
         }
@@ -2624,7 +2629,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
           await msg.channel.setArchived(true, "Skipped").catch(errorHandler.safeCatch('thread archive'));
           st.a = null;
-          save();
+          await save(true); // Force immediate sync to persist the skip
         } else {
           await errorHandler.safeRemoveReactions(skpMsg, 'reaction removal');
         }
@@ -2775,7 +2780,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             0
           );
           st.lp = {};
-          save(true); // Force immediate sync to Google Sheets to persist the change
+          await save(true); // Force immediate sync to Google Sheets to persist the change
           await errorHandler.safeRemoveReactions(fixMsg, 'reaction removal');
           await msg.reply({
             embeds: [
@@ -2978,7 +2983,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             cacheRefreshTimer: null,
           };
 
-          save();
+          await save(true); // Force immediate sync to persist the complete reset
 
           // Also try to save auctioneering state if available
           if (cfg && cfg.sheet_webhook_url) {
@@ -3074,7 +3079,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           st.pc = {};
           st.th = {};
           st.pause = false;
-          save();
+          await save(true); // Force immediate sync to persist recovery state
 
           await msg.reply({
             embeds: [
