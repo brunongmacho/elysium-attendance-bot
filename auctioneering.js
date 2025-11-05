@@ -466,6 +466,25 @@ async function startAuctioneering(client, config, channel) {
     } already have winners)`
   );
 
+  // Warn about large datasets (potential performance/memory issues)
+  const LARGE_DATASET_WARNING = 1000;
+  const CRITICAL_DATASET_SIZE = 5000;
+  if (availableItems.length >= CRITICAL_DATASET_SIZE) {
+    console.error(`${EMOJI.ERROR} CRITICAL: ${availableItems.length} items exceeds safe limit (${CRITICAL_DATASET_SIZE})!`);
+    await channel.send(
+      `${EMOJI.ERROR} **Too many items!** (${availableItems.length})\n` +
+      `The bot can safely handle up to ${CRITICAL_DATASET_SIZE} items.\n` +
+      `Please auction items in batches or archive completed items.`
+    );
+    return;
+  } else if (availableItems.length >= LARGE_DATASET_WARNING) {
+    console.warn(`${EMOJI.WARNING} Large dataset: ${availableItems.length} items (may impact performance)`);
+    await channel.send(
+      `${EMOJI.WARNING} **Large auction session** (${availableItems.length} items)\n` +
+      `Consider splitting into multiple sessions for better performance.`
+    );
+  }
+
   // 🎯 SIMPLIFIED: Treat all items as ONE session (no boss grouping)
   const allItems = [];
 
@@ -1682,7 +1701,8 @@ function rescheduleItemTimers(client, config, channel) {
     return false;
   }
 
-  // Clear existing item timers
+  // CRITICAL: Clear existing item timers FIRST to prevent race condition
+  // Old timers must be cleared before resetting flags to prevent duplicate announcements
   const timerKeys = ['go1', 'go2', 'go3', 'itemEnd'];
   timerKeys.forEach(key => {
     if (auctionState.timers[key]) {
@@ -1690,6 +1710,13 @@ function rescheduleItemTimers(client, config, channel) {
       delete auctionState.timers[key];
     }
   });
+
+  // Reset announcement flags AFTER clearing timers (prevents race condition)
+  // This allows announcements to fire again on the extended time
+  const item = auctionState.currentItem;
+  item.go1 = false;
+  item.go2 = false;
+  // Note: go3 is not reset as it should only fire once per item
 
   // Reschedule based on new endTime
   scheduleItemTimers(client, config, channel);

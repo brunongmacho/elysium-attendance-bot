@@ -393,6 +393,56 @@ function getPts(u) {
   return p || 0;
 }
 
+/**
+ * Log critical bid rejections to admin channel for visibility
+ * This helps admins monitor bid failures and identify potential issues
+ */
+async function logBidRejection(client, config, details) {
+  try {
+    if (!client || !config || !config.admin_logs_channel_id) return;
+
+    // Debounce: Only log every 30 seconds per user to avoid spam
+    const now = Date.now();
+    const key = `${details.userId}_bid_rejection`;
+    if (st.lastBidRejectionLog && st.lastBidRejectionLog[key]) {
+      const timeSinceLastLog = now - st.lastBidRejectionLog[key];
+      if (timeSinceLastLog < 30000) return; // Skip if logged recently
+    }
+
+    if (!st.lastBidRejectionLog) st.lastBidRejectionLog = {};
+    st.lastBidRejectionLog[key] = now;
+
+    // Send to admin logs asynchronously (don't block bid processing)
+    setTimeout(async () => {
+      try {
+        const guild = await client.guilds.fetch(config.main_guild_id).catch(() => null);
+        if (!guild) return;
+
+        const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
+        if (!adminLogs) return;
+
+        const embed = new EmbedBuilder()
+          .setColor(0xFFA500) // Orange for warning
+          .setTitle(`${EMOJI.WARNING} Bid Rejected`)
+          .setDescription(`**User:** ${details.user} (<@${details.userId}>)\n**Item:** ${details.item}\n**Bid:** ${details.bidAmount}pts\n**Reason:** ${details.reason}`)
+          .setTimestamp();
+
+        if (details.totalPoints !== undefined) embed.addFields({ name: 'Total Points', value: `${details.totalPoints}pts`, inline: true });
+        if (details.availablePoints !== undefined) embed.addFields({ name: 'Available', value: `${details.availablePoints}pts`, inline: true });
+        if (details.neededPoints !== undefined) embed.addFields({ name: 'Needed', value: `${details.neededPoints}pts`, inline: true });
+
+        await adminLogs.send({ embeds: [embed] });
+      } catch (err) {
+        // Silent fail - don't block bidding if admin logging fails
+        console.error('Failed to log bid rejection to admin channel:', err.message);
+      }
+    }, 0);
+  } catch (err) {
+    // Silent fail
+    console.error('logBidRejection error:', err.message);
+  }
+}
+
 function clearCache() {
   console.log("🧹 Clear cache");
   stopCacheAutoRefresh();
@@ -1026,6 +1076,15 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 
   if (tot === 0) {
     await msg.reply(`${EMOJI.ERROR} No points`);
+    // Log to admin channel (critical: user has no points but trying to bid)
+    logBidRejection(msg.client, config, {
+      user: u,
+      userId: uid,
+      item: currentItem.item,
+      bidAmount: bid,
+      reason: 'No points available',
+      totalPoints: tot
+    });
     return { ok: false, msg: "No pts" };
   }
 
@@ -1041,6 +1100,18 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     await msg.reply(
       `${EMOJI.ERROR} **Insufficient!**\n${EMOJI.BID} Total: ${tot}\n${EMOJI.LOCK} Locked: ${curLocked}\n${EMOJI.CHART} Available: ${av}\n${EMOJI.WARNING} Need: ${needed}`
     );
+    // Log to admin channel (critical: insufficient points)
+    logBidRejection(msg.client, config, {
+      user: u,
+      userId: uid,
+      item: currentItem.item,
+      bidAmount: bid,
+      reason: 'Insufficient points',
+      totalPoints: tot,
+      lockedPoints: curLocked,
+      availablePoints: av,
+      neededPoints: needed
+    });
     return { ok: false, msg: "Insufficient" };
   }
 
@@ -1087,15 +1158,12 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     currentItem.extCnt++;
     timeExtended = true;
 
-    // Reset announcement flags so they can fire again
-    currentItem.go1 = false;
-    currentItem.go2 = false;
-
     console.log(
       `⏰ Time extended for ${currentItem.item} by 1 minute (bid in final minute, ext #${currentItem.extCnt}/${ME})`
     );
 
     // CRITICAL: Reschedule timers to reflect new endTime
+    // Note: rescheduleItemTimers now handles flag reset to prevent race condition
     if (auctRef && typeof auctRef.rescheduleItemTimers === "function") {
       auctRef.rescheduleItemTimers(
         msg.client,
