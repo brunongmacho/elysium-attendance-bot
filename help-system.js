@@ -273,6 +273,22 @@ const COMMAND_HELP = {
     ]
   },
 
+  leaderboards: {
+    usage: "!leaderboards",
+    description: "Display BOTH attendance and bidding leaderboards in one combined view",
+    category: "Leaderboard",
+    adminOnly: true,
+    example: "!leaderboards",
+    aliases: ["!leaderboards"],
+    features: [
+      "Shows both attendance AND bidding leaderboards",
+      "Top 10 members in each category",
+      "Complete guild ranking overview",
+      "Visual progress bars for both",
+      "One-stop view of all rankings"
+    ]
+  },
+
   weeklyreport: {
     usage: "!weeklyreport",
     description: "Manually trigger the weekly leaderboard report (normally auto-sent Saturday 11:59pm)",

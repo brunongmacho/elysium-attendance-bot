@@ -264,7 +264,7 @@ async function displayAttendanceLeaderboard(message) {
 
     // Check if data exists
     if (!data || !data.leaderboard || data.leaderboard.length === 0) {
-      await message.reply('📊 No attendance data available yet.');
+      await message.reply({ content: '📊 No attendance data available yet.', failIfNotExists: false });
       return;
     }
 
@@ -313,10 +313,10 @@ async function displayAttendanceLeaderboard(message) {
       });
     }
 
-    await message.reply({ embeds: [embed] });
+    await message.reply({ embeds: [embed], failIfNotExists: false });
   } catch (error) {
     console.error('❌ Error displaying attendance leaderboard:', error);
-    await message.reply('❌ Failed to fetch attendance leaderboard. Please try again later.');
+    await message.reply({ content: '❌ Failed to fetch attendance leaderboard. Please try again later.', failIfNotExists: false });
   }
 }
 
@@ -351,7 +351,7 @@ async function displayBiddingLeaderboard(message) {
     const data = await fetchBiddingLeaderboard();
 
     if (!data || !data.leaderboard || data.leaderboard.length === 0) {
-      await message.reply('📊 No bidding points data available yet.');
+      await message.reply({ content: '📊 No bidding points data available yet.', failIfNotExists: false });
       return;
     }
 
@@ -396,10 +396,111 @@ async function displayBiddingLeaderboard(message) {
       });
     }
 
-    await message.reply({ embeds: [embed] });
+    await message.reply({ embeds: [embed], failIfNotExists: false });
   } catch (error) {
     console.error('❌ Error displaying bidding leaderboard:', error);
-    await message.reply('❌ Failed to fetch bidding points leaderboard. Please try again later.');
+    await message.reply({ content: '❌ Failed to fetch bidding points leaderboard. Please try again later.', failIfNotExists: false });
+  }
+}
+
+/**
+ * Displays both attendance and bidding leaderboards in Discord
+ *
+ * VISUAL FEATURES:
+ * - Combined view of both leaderboards
+ * - Top 10 members for each category
+ * - Medal emojis for top 3 (🥇🥈🥉)
+ * - Progress bars and statistics
+ *
+ * WORKFLOW:
+ * 1. Fetch both attendance and bidding data
+ * 2. Build combined embed with both leaderboards
+ * 3. Send to channel where command was issued
+ *
+ * @param {Message} message - Discord message that triggered the command
+ * @returns {Promise<void>}
+ *
+ * @example
+ * // User command: !leaderboards
+ * await displayCombinedLeaderboards(message);
+ */
+async function displayCombinedLeaderboards(message) {
+  try {
+    // Fetch both leaderboards
+    const [attData, bidData] = await Promise.all([
+      fetchAttendanceLeaderboard(),
+      fetchBiddingLeaderboard()
+    ]);
+
+    // Build combined embed
+    const embed = new EmbedBuilder()
+      .setColor('#9b59b6')
+      .setTitle('🏆 ELYSIUM Leaderboards')
+      .setDescription('**Combined Attendance & Bidding Rankings**')
+      .setTimestamp();
+
+    // Add Attendance Leaderboard
+    if (attData && attData.leaderboard && attData.leaderboard.length > 0) {
+      const topMembers = attData.leaderboard.slice(0, 10);
+      let leaderboardText = '';
+      const maxPoints = topMembers.length > 0 ? topMembers[0].points : 1;
+
+      topMembers.forEach((member, index) => {
+        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+        const percentage = maxPoints > 0 ? (member.points / maxPoints) * 100 : 0;
+        const filledLength = Math.round((percentage / 100) * 20);
+        const emptyLength = 20 - filledLength;
+        const bar = '█'.repeat(filledLength) + '░'.repeat(emptyLength);
+        leaderboardText += `${medal} **${member.name}** - ${member.points} pts\n${bar} ${percentage.toFixed(1)}%\n`;
+      });
+
+      embed.addFields({
+        name: '📈 Attendance Top 10',
+        value: leaderboardText || 'No data',
+        inline: false
+      });
+    } else {
+      embed.addFields({
+        name: '📈 Attendance Top 10',
+        value: 'No attendance data available yet.',
+        inline: false
+      });
+    }
+
+    // Add Bidding Leaderboard
+    if (bidData && bidData.leaderboard && bidData.leaderboard.length > 0) {
+      const topMembers = bidData.leaderboard.slice(0, 10);
+      let leaderboardText = '';
+      const maxPointsLeft = topMembers.length > 0 ? topMembers[0].pointsLeft : 1;
+
+      topMembers.forEach((member, index) => {
+        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+        const percentage = maxPointsLeft > 0 ? (member.pointsLeft / maxPointsLeft) * 100 : 0;
+        const filledLength = Math.round((percentage / 100) * 20);
+        const emptyLength = 20 - filledLength;
+        const bar = '█'.repeat(filledLength) + '░'.repeat(emptyLength);
+        leaderboardText += `${medal} **${member.name}**\n`;
+        leaderboardText += `   💰 Left: **${member.pointsLeft}** | 💸 Used: **${member.pointsConsumed}**\n`;
+        leaderboardText += `   ${bar} ${percentage.toFixed(1)}%\n`;
+      });
+
+      embed.addFields({
+        name: '💎 Bidding Points Top 10',
+        value: leaderboardText || 'No data',
+        inline: false
+      });
+    } else {
+      embed.addFields({
+        name: '💎 Bidding Points Top 10',
+        value: 'No bidding data available yet.',
+        inline: false
+      });
+    }
+
+    await message.reply({ embeds: [embed], failIfNotExists: false });
+  } catch (error) {
+    console.error('❌ Error displaying combined leaderboards:', error);
+    await message.reply({ content: '❌ Failed to fetch leaderboards. Please try again later.', failIfNotExists: false });
   }
 }
 
@@ -685,6 +786,7 @@ module.exports = {
   init,
   displayAttendanceLeaderboard,
   displayBiddingLeaderboard,
+  displayCombinedLeaderboards,
   sendWeeklyReport,
   scheduleWeeklyReport
 };
