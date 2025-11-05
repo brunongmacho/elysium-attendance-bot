@@ -1691,6 +1691,21 @@ function clearAllTimers() {
 }
 
 /**
+ * Safely clear only item-specific timers (for time extensions)
+ * This prevents the race condition where itemEnd fires during bid processing
+ */
+function safelyClearItemTimers() {
+  const timerKeys = ['go1', 'go2', 'go3', 'itemEnd'];
+  timerKeys.forEach(key => {
+    if (auctionState.timers[key]) {
+      clearTimeout(auctionState.timers[key]);
+      delete auctionState.timers[key];
+      console.log(`🛑 Cleared timer: ${key}`);
+    }
+  });
+}
+
+/**
  * Reschedule item timers after time extension
  * This is critical when bids extend the auction time - we need to clear
  * old timers and create new ones based on the updated endTime
@@ -1736,53 +1751,57 @@ async function handleQueueList(message, biddingState) {
   const auctQueue = auctionState.sessions || [];
   const biddingQueue = biddingState.q || [];
 
-  // Active auction - show sessions
-  if (auctionState.active) {
-    if (auctQueue.length === 0) {
-      return await message.reply(`${EMOJI.LIST} No sessions active`);
+  // Active auction - show current session items
+  if (auctionState.active && auctionState.sessionItems && auctionState.sessionItems.length > 0) {
+    const currentIndex = auctionState.currentItemIndex || 0;
+    const remainingItems = auctionState.sessionItems.slice(currentIndex);
+    const completedCount = currentIndex;
+    const totalCount = auctionState.sessionItems.length;
+
+    if (remainingItems.length === 0) {
+      return await message.reply(
+        `${EMOJI.SUCCESS} **All items in current session completed!**\n` +
+        `${completedCount}/${totalCount} items auctioned.\n\n` +
+        `Waiting for session finalization...`
+      );
     }
 
     let queueText = "";
-    let itemNumber = 1;
-
-    auctQueue.forEach((session, sessionIdx) => {
-      const sessionTitle = `🔥 SESSION ${sessionIdx + 1} - ${
-        session.bossName
-      } (${session.bossKey.split(" ").slice(1).join(" ")})`;
-
-      const attendeeInfo = `👥 Attendees: ${session.attendees.length} members`;
-
-      queueText += `\n**${sessionTitle}**\n`;
-
-      session.items.forEach((item) => {
-        const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
-        queueText += `${itemNumber}. ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
-        itemNumber++;
-      });
-
-      queueText += `${attendeeInfo}\n`;
+    remainingItems.slice(0, 20).forEach((item, idx) => {
+      const position = currentIndex + idx + 1;
+      const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
+      const status = idx === 0 && auctionState.currentItem ? " **(ACTIVE NOW)**" : "";
+      queueText += `${position}. ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m${status}\n`;
     });
 
-    const totalItems = auctQueue.reduce((sum, s) => sum + s.items.length, 0);
+    if (remainingItems.length > 20) {
+      queueText += `\n*...and ${remainingItems.length - 20} more items*\n`;
+    }
 
     const embed = new EmbedBuilder()
-      .setColor(0x4a90e2)
-      .setTitle(`${EMOJI.LIST} Auction Sessions (Active)`)
-      .setDescription(queueText)
-      .addFields({
-        name: `${EMOJI.CHART} Total`,
-        value: `${auctQueue.length} session(s), ${totalItems} item(s)`,
-        inline: true,
-      })
+      .setColor(COLORS.AUCTION)
+      .setTitle(`${EMOJI.LIST} Current Session Queue`)
+      .setDescription(
+        `**Progress:** ${completedCount}/${totalCount} items completed\n` +
+        `**Remaining:** ${remainingItems.length} items\n\n` +
+        queueText
+      )
+      .setFooter({ text: `Session active • ${remainingItems.length} items remaining` })
       .setTimestamp();
 
     return await message.reply({ embeds: [embed] });
   }
 
-  // Preview mode
+  // No active auction - preview mode (fetch from sheet)
+  const cfg = message.client.config;
   const loadingMsg = await message.reply(
     `${EMOJI.CLOCK} Loading items from Google Sheet...`
   );
+
+  if (!cfg || !cfg.sheet_webhook_url) {
+    await errorHandler.safeEdit(loadingMsg, `${EMOJI.ERROR} Missing sheet webhook URL in config.`);
+    return;
+  }
 
   const sheetItems = await fetchSheetItems(cfg.sheet_webhook_url);
 
@@ -2717,6 +2736,7 @@ module.exports = {
   extendCurrentItem,
   updateCurrentItemState,
   rescheduleItemTimers, // Reschedule timers after bid extension
+  safelyClearItemTimers, // Clear item timers immediately (prevents race condition)
   handleQueueList,
   handleRemoveItem,
   handleClearQueue,

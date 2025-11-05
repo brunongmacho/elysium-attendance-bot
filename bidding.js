@@ -1149,13 +1149,22 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     timestamp: now,
   });
 
-  // Check if bid is in last minute - extend time by 1 minute
+  // CRITICAL: Check if bid is in last minute - extend time by 1 minute
+  // MUST clear timers BEFORE checking to prevent race condition where timer fires during processing
   const timeLeft = currentItem.endTime - Date.now();
   if (!currentItem.extCnt) currentItem.extCnt = 0;
 
   let timeExtended = false;
   if (timeLeft < 60000 && timeLeft > 0 && currentItem.extCnt < ME) {
+    // STEP 1: Clear ALL timers IMMEDIATELY to prevent old itemEnd from firing
+    if (auctRef && typeof auctRef.safelyClearItemTimers === "function") {
+      auctRef.safelyClearItemTimers();
+      console.log(`🛑 Cleared timers to prevent race condition`);
+    }
+
+    // STEP 2: Update endTime (now safe since timers are cleared)
     const extensionTime = 60000; // 1 minute
+    const oldEndTime = currentItem.endTime;
     currentItem.endTime += extensionTime;
     currentItem.extCnt++;
     timeExtended = true;
@@ -1163,15 +1172,18 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     console.log(
       `⏰ Time extended for ${currentItem.item} by 1 minute (bid in final minute, ext #${currentItem.extCnt}/${ME})`
     );
+    console.log(`📊 Old end time: ${new Date(oldEndTime).toLocaleTimeString()}`);
+    console.log(`📊 New end time: ${new Date(currentItem.endTime).toLocaleTimeString()}`);
+    console.log(`📊 New time left: ${Math.floor((currentItem.endTime - Date.now()) / 1000)}s`);
 
-    // CRITICAL: Reschedule timers to reflect new endTime
-    // Note: rescheduleItemTimers now handles flag reset to prevent race condition
+    // STEP 3: Reschedule timers with new endTime
     if (auctRef && typeof auctRef.rescheduleItemTimers === "function") {
       auctRef.rescheduleItemTimers(
         msg.client,
         config,
         msg.channel
       );
+      console.log(`✅ Timers rescheduled with new endTime`);
     }
   }
 
