@@ -601,6 +601,7 @@ const COMMAND_HELP = {
     adminOnly: true,
     example: "!emergency diag\n!emergency closeall\n!emergency endauction",
     aliases: ["!emerg"],
+    location: "Admin Logs Channel",
     features: [
       "Force close all attendance threads",
       "Force close specific thread by ID",
@@ -613,6 +614,123 @@ const COMMAND_HELP = {
       "Use when normal commands fail"
     ]
   },
+
+  // ========================================
+  // INTELLIGENCE ENGINE COMMANDS (AI/ML)
+  // ========================================
+  predictprice: {
+    usage: "!predictprice <item name>",
+    description: "🤖 AI-powered price prediction based on historical auction data with ML algorithms",
+    category: "Intelligence",
+    adminOnly: true,
+    example: "!predictprice Crimson Pendant\n!predict Ancient Scroll",
+    aliases: ["!predict", "!suggestprice"],
+    location: "Admin Logs Channel or ELYSIUM Commands Channel",
+    features: [
+      "Machine learning price estimation with confidence intervals",
+      "Trend analysis (increasing/decreasing/stable)",
+      "Statistical analysis with outlier detection",
+      "Similar item recommendations when data insufficient",
+      "95% confidence intervals for predictions",
+      "Analyzes all historical auctions",
+      "Suggests optimal starting bid"
+    ]
+  },
+
+  engagement: {
+    usage: "!engagement <username>",
+    description: "🤖 Analyze member engagement patterns and predict attendance likelihood",
+    category: "Intelligence",
+    adminOnly: true,
+    example: "!engagement PlayerName\n!engage JohnDoe",
+    aliases: ["!engage"],
+    location: "Admin Logs Channel or ELYSIUM Commands Channel",
+    features: [
+      "Engagement scoring (0-100) based on multiple factors",
+      "Attendance score (spawns attended, consistency)",
+      "Bidding activity score (points usage, auction wins)",
+      "Recent activity score (last 7 days)",
+      "Next event attendance prediction with confidence",
+      "Personalized recommendations for improvement",
+      "Identifies at-risk members (low engagement)"
+    ]
+  },
+
+  analyzeengagement: {
+    usage: "!analyzeengagement",
+    description: "🤖 Guild-wide engagement analysis for ALL members with insights",
+    category: "Intelligence",
+    adminOnly: true,
+    example: "!analyzeengagement\n!analyze",
+    aliases: ["!analyze"],
+    location: "Admin Logs Channel or ELYSIUM Commands Channel",
+    features: [
+      "Analyzes ALL guild members",
+      "Average engagement score calculation",
+      "Top 5 performers identification",
+      "At-risk members identification (top 10)",
+      "Active vs at-risk member statistics",
+      "Personalized recommendations for each member",
+      "Guild health overview"
+    ]
+  },
+
+  detectanomalies: {
+    usage: "!detectanomalies",
+    description: "🤖 Scan for suspicious patterns, fraud, and statistical anomalies",
+    category: "Intelligence",
+    adminOnly: true,
+    example: "!detectanomalies\n!fraud\n!anomaly",
+    aliases: ["!anomaly", "!fraud"],
+    location: "Admin Logs Channel or ELYSIUM Commands Channel",
+    features: [
+      "Bidding anomaly detection (collusion, price fixing)",
+      "Attendance pattern anomaly detection",
+      "Statistical outlier identification (Z-score analysis)",
+      "Item duplication/frequency monitoring",
+      "Unusual bid amount detection",
+      "Automated severity classification (HIGH/MEDIUM/LOW)",
+      "Actionable recommendations for each anomaly"
+    ]
+  },
+
+  recommendations: {
+    usage: "!recommendations",
+    description: "🤖 Smart AI-powered recommendations for optimal guild management",
+    category: "Intelligence",
+    adminOnly: true,
+    example: "!recommendations\n!suggest\n!recommend",
+    aliases: ["!recommend", "!suggest"],
+    location: "Admin Logs Channel or ELYSIUM Commands Channel",
+    features: [
+      "Optimal auction timing based on member activity",
+      "Expected participation forecast",
+      "Member readiness assessment (points available)",
+      "Best day/time recommendations with confidence",
+      "Personalized attendance reminders for at-risk members",
+      "Priority-based reminder suggestions",
+      "Member engagement improvement suggestions"
+    ]
+  },
+
+  performance: {
+    usage: "!performance",
+    description: "🤖 System performance monitoring, health check, and optimization insights",
+    category: "Intelligence",
+    adminOnly: true,
+    example: "!performance\n!perf",
+    aliases: ["!perf"],
+    location: "Admin Logs Channel or ELYSIUM Commands Channel",
+    features: [
+      "Real-time memory usage (512MB limit)",
+      "System uptime tracking",
+      "Intelligence cache statistics",
+      "Memory percentage and status indicators",
+      "Performance recommendations",
+      "Auto-optimization suggestions",
+      "Cache health monitoring"
+    ]
+  },
 };
 
 const CATEGORIES = {
@@ -622,6 +740,7 @@ const CATEGORIES = {
   Bidding: `${EMOJI.BID} Bidding System`,
   Loot: `${EMOJI.LOOT} Loot Recognition`,
   Member: `${EMOJI.MEMBER} Member Commands`,
+  Intelligence: `🤖 AI/ML Intelligence Engine`,
   Emergency: `🚨 Emergency Recovery`,
 };
 
@@ -632,6 +751,7 @@ const CATEGORY_DESCRIPTIONS = {
   Bidding: "Point-based auction management with queue and item tracking",
   Loot: "OCR-powered loot screenshot processing and automatic logging",
   Member: "Commands available to all ELYSIUM members",
+  Intelligence: "🤖 AI-powered predictive analytics, engagement analysis, anomaly detection, and smart recommendations",
   Emergency: "⚠️ ADMIN ONLY: Force recovery from stuck states (requires confirmation)",
 };
 
@@ -703,6 +823,15 @@ async function handleHelp(message, args, member) {
           inline: true,
         }
       );
+
+    // Add location field if specified
+    if (cmdInfo.location) {
+      embed.addFields({
+        name: `📍 Where to Use`,
+        value: cmdInfo.location,
+        inline: false,
+      });
+    }
 
     if (cmdInfo.aliases && cmdInfo.aliases.length > 0) {
       embed.addFields({

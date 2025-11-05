@@ -91,13 +91,44 @@ Complete toolkit for handling stuck states (all require confirmation):
 - **Diagnostics** - comprehensive state inspection
 - **Force sync** - manually save state to Google Sheets
 
+### 🤖 AI/ML Intelligence Engine (NEW!)
+**Predictive Analytics & Smart Automation:**
+- **Price Prediction** - Auto-suggest starting bids based on historical auction data
+  - Machine learning price estimation with confidence intervals
+  - Trend analysis for item value changes over time
+  - Similar item recommendations when data is insufficient
+  - Statistical analysis with outlier detection
+
+- **Member Engagement Analytics** - Predict attendance likelihood and identify at-risk members
+  - Engagement scoring (attendance + bidding activity + consistency)
+  - Next event attendance prediction with confidence levels
+  - Personalized recommendations for each member
+  - Guild-wide engagement analysis with top performers & at-risk identification
+
+- **Anomaly Detection & Fraud Prevention** - Automatically flag suspicious patterns
+  - Collusion detection in bidding patterns
+  - Unusual bid amount identification (statistical outliers)
+  - Attendance pattern anomaly detection
+  - Item duplication/frequency monitoring
+
+- **Smart Recommendations** - AI-powered insights for guild management
+  - Optimal auction timing based on member activity patterns
+  - Personalized attendance reminders for at-risk members
+  - Item ordering optimization for maximum engagement
+
+- **Performance Monitoring** - Real-time system health and optimization
+  - Memory usage tracking and auto-optimization
+  - Cache management with intelligent cleanup
+  - Performance recommendations based on system metrics
+  - Supports up to 512MB RAM deployment
+
 ### 🛡️ Security & Reliability
 - **Admin role verification** on all privileged commands
 - **Confirmation prompts** for destructive operations
 - **Rate limiting** - 3-second cooldown on bids
 - **Screenshot verification** required for check-ins (non-admins)
 - **Race condition protection** with thread locking
-- **Memory optimization** with cache sweeping (256MB RAM limit)
+- **Memory optimization** with cache sweeping (512MB RAM optimized)
 - **State persistence** to Google Sheets every 5 minutes
 - **Automatic crash recovery** on startup
 - **Error handling** with detailed logging
@@ -401,6 +432,35 @@ PORT=8000  # Optional, defaults to 8000
 | | `clearbids` | Clear pending bid confirmations |
 | | `diag` | Show diagnostics |
 | | `sync` | Force sync to Google Sheets |
+
+### Intelligence Engine Commands (Admin) 🤖
+
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `!predictprice <item name>` | `!predict`, `!suggestprice` | AI-powered price prediction with historical analysis |
+| `!engagement <username>` | `!engage` | Analyze member engagement and predict attendance |
+| `!analyzeengagement` | `!analyze` | Guild-wide engagement analysis (all members) |
+| `!detectanomalies` | `!anomaly`, `!fraud` | Scan for suspicious patterns and fraud |
+| `!recommendations` | `!recommend`, `!suggest` | Smart recommendations for optimal guild management |
+| `!performance` | `!perf` | System performance report and optimization insights |
+
+**Examples:**
+```
+!predictprice Crimson Pendant
+→ Suggests starting bid based on 10+ historical auctions with 85% confidence
+
+!engagement PlayerName
+→ Shows 75/100 engagement score, 80% likelihood to attend next event
+
+!analyzeengagement
+→ Guild average: 68/100, identifies 5 at-risk members
+
+!detectanomalies
+→ Scans 500+ auctions, flags 2 suspicious bidding patterns
+
+!recommendations
+→ Optimal auction time: Saturday 8PM, 15 members need reminders
+```
 
 ### Help Commands
 
