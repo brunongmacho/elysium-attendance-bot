@@ -149,14 +149,16 @@ const fmtTime = (ms) => {
   const h = Math.floor(m / 60);
   return m % 60 > 0 ? `${h}h ${m % 60}m` : `${h}h`;
 };
-const avail = (u, tot) => Math.max(0, tot - (st.lp[u] || 0));
+const avail = (u, tot) => Math.max(0, tot - (st.lp[normalizeUsername(u)] || 0));
 const lock = (u, amt) => {
-  st.lp[u] = (st.lp[u] || 0) + amt;
+  const key = normalizeUsername(u);
+  st.lp[key] = (st.lp[key] || 0) + amt;
   save();
 };
 const unlock = (u, amt) => {
-  st.lp[u] = Math.max(0, (st.lp[u] || 0) - amt);
-  if (st.lp[u] === 0) delete st.lp[u];
+  const key = normalizeUsername(u);
+  st.lp[key] = Math.max(0, (st.lp[key] || 0) - amt);
+  if (st.lp[key] === 0) delete st.lp[key];
   save();
 };
 
@@ -389,6 +391,56 @@ function getPts(u) {
     p = m ? st.cp[m] : 0;
   }
   return p || 0;
+}
+
+/**
+ * Log critical bid rejections to admin channel for visibility
+ * This helps admins monitor bid failures and identify potential issues
+ */
+async function logBidRejection(client, config, details) {
+  try {
+    if (!client || !config || !config.admin_logs_channel_id) return;
+
+    // Debounce: Only log every 30 seconds per user to avoid spam
+    const now = Date.now();
+    const key = `${details.userId}_bid_rejection`;
+    if (st.lastBidRejectionLog && st.lastBidRejectionLog[key]) {
+      const timeSinceLastLog = now - st.lastBidRejectionLog[key];
+      if (timeSinceLastLog < 30000) return; // Skip if logged recently
+    }
+
+    if (!st.lastBidRejectionLog) st.lastBidRejectionLog = {};
+    st.lastBidRejectionLog[key] = now;
+
+    // Send to admin logs asynchronously (don't block bid processing)
+    setTimeout(async () => {
+      try {
+        const guild = await client.guilds.fetch(config.main_guild_id).catch(() => null);
+        if (!guild) return;
+
+        const adminLogs = await guild.channels.fetch(config.admin_logs_channel_id).catch(() => null);
+        if (!adminLogs) return;
+
+        const embed = new EmbedBuilder()
+          .setColor(0xFFA500) // Orange for warning
+          .setTitle(`${EMOJI.WARNING} Bid Rejected`)
+          .setDescription(`**User:** ${details.user} (<@${details.userId}>)\n**Item:** ${details.item}\n**Bid:** ${details.bidAmount}pts\n**Reason:** ${details.reason}`)
+          .setTimestamp();
+
+        if (details.totalPoints !== undefined) embed.addFields({ name: 'Total Points', value: `${details.totalPoints}pts`, inline: true });
+        if (details.availablePoints !== undefined) embed.addFields({ name: 'Available', value: `${details.availablePoints}pts`, inline: true });
+        if (details.neededPoints !== undefined) embed.addFields({ name: 'Needed', value: `${details.neededPoints}pts`, inline: true });
+
+        await adminLogs.send({ embeds: [embed] });
+      } catch (err) {
+        // Silent fail - don't block bidding if admin logging fails
+        console.error('Failed to log bid rejection to admin channel:', err.message);
+      }
+    }, 0);
+  } catch (err) {
+    // Silent fail
+    console.error('logBidRejection error:', err.message);
+  }
 }
 
 function clearCache() {
@@ -973,6 +1025,12 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     return { ok: false, msg: "No session" };
   }
 
+  // Check if item has already ended (force-stopped)
+  if (currentItem.status === "ended") {
+    await msg.reply(`${EMOJI.ERROR} **Auction Ended** - This item is no longer accepting bids.`);
+    return { ok: false, msg: "Ended" };
+  }
+
   const m = msg.member,
     u = m.nickname || msg.author.username,
     uid = msg.author.id;
@@ -1004,8 +1062,10 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     return { ok: false, msg: "Too large" };
   }
 
-  if (bid < currentItem.curBid) {
-    await msg.reply(`${EMOJI.ERROR} Must be >= ${currentItem.curBid}pts`);
+  // Require strictly higher bids to prevent race condition with simultaneous identical bids
+  // Standard auction rules: you must OUTBID, not MATCH
+  if (bid <= currentItem.curBid) {
+    await msg.reply(`${EMOJI.ERROR} Must be > ${currentItem.curBid}pts (current: ${currentItem.curBid}pts)`);
     return { ok: false, msg: "Too low" };
   }
 
@@ -1018,11 +1078,20 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 
   if (tot === 0) {
     await msg.reply(`${EMOJI.ERROR} No points`);
+    // Log to admin channel (critical: user has no points but trying to bid)
+    logBidRejection(msg.client, config, {
+      user: u,
+      userId: uid,
+      item: currentItem.item,
+      bidAmount: bid,
+      reason: 'No points available',
+      totalPoints: tot
+    });
     return { ok: false, msg: "No pts" };
   }
 
   // Calculate locked points ACROSS ALL SYSTEMS (auctioneering uses st.lp from bidding.js)
-  const curLocked = st.lp[u] || 0;
+  const curLocked = st.lp[normalizeUsername(u)] || 0;
   const av = tot - curLocked;
 
   const isSelf =
@@ -1033,6 +1102,18 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     await msg.reply(
       `${EMOJI.ERROR} **Insufficient!**\n${EMOJI.BID} Total: ${tot}\n${EMOJI.LOCK} Locked: ${curLocked}\n${EMOJI.CHART} Available: ${av}\n${EMOJI.WARNING} Need: ${needed}`
     );
+    // Log to admin channel (critical: insufficient points)
+    logBidRejection(msg.client, config, {
+      user: u,
+      userId: uid,
+      item: currentItem.item,
+      bidAmount: bid,
+      reason: 'Insufficient points',
+      totalPoints: tot,
+      lockedPoints: curLocked,
+      availablePoints: av,
+      neededPoints: needed
+    });
     return { ok: false, msg: "Insufficient" };
   }
 
@@ -1068,32 +1149,41 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     timestamp: now,
   });
 
-  // Check if bid is in last minute - extend time by 1 minute
+  // CRITICAL: Check if bid is in last minute - extend time by 1 minute
+  // MUST clear timers BEFORE checking to prevent race condition where timer fires during processing
   const timeLeft = currentItem.endTime - Date.now();
   if (!currentItem.extCnt) currentItem.extCnt = 0;
 
   let timeExtended = false;
   if (timeLeft < 60000 && timeLeft > 0 && currentItem.extCnt < ME) {
+    // STEP 1: Clear ALL timers IMMEDIATELY to prevent old itemEnd from firing
+    if (auctRef && typeof auctRef.safelyClearItemTimers === "function") {
+      auctRef.safelyClearItemTimers();
+      console.log(`🛑 Cleared timers to prevent race condition`);
+    }
+
+    // STEP 2: Update endTime (now safe since timers are cleared)
     const extensionTime = 60000; // 1 minute
+    const oldEndTime = currentItem.endTime;
     currentItem.endTime += extensionTime;
     currentItem.extCnt++;
     timeExtended = true;
 
-    // Reset announcement flags so they can fire again
-    currentItem.go1 = false;
-    currentItem.go2 = false;
-
     console.log(
       `⏰ Time extended for ${currentItem.item} by 1 minute (bid in final minute, ext #${currentItem.extCnt}/${ME})`
     );
+    console.log(`📊 Old end time: ${new Date(oldEndTime).toLocaleTimeString()}`);
+    console.log(`📊 New end time: ${new Date(currentItem.endTime).toLocaleTimeString()}`);
+    console.log(`📊 New time left: ${Math.floor((currentItem.endTime - Date.now()) / 1000)}s`);
 
-    // CRITICAL: Reschedule timers to reflect new endTime
+    // STEP 3: Reschedule timers with new endTime
     if (auctRef && typeof auctRef.rescheduleItemTimers === "function") {
       auctRef.rescheduleItemTimers(
         msg.client,
         config,
         msg.channel
       );
+      console.log(`✅ Timers rescheduled with new endTime`);
     }
   }
 
@@ -1233,8 +1323,10 @@ async function procBid(msg, amt, cfg) {
     return { ok: false, msg: "Invalid" };
   }
 
-  if (bid < a.curBid) {
-    await msg.reply(`${EMOJI.ERROR} Must be >= ${a.curBid}pts`);
+  // Require strictly higher bids to prevent race condition with simultaneous identical bids
+  // Standard auction rules: you must OUTBID, not MATCH
+  if (bid <= a.curBid) {
+    await msg.reply(`${EMOJI.ERROR} Must be > ${a.curBid}pts (current: ${a.curBid}pts)`);
     return { ok: false, msg: "Too low" };
   }
 
@@ -1254,7 +1346,7 @@ async function procBid(msg, amt, cfg) {
 
   // Check if self-overbidding
   const isSelf = a.curWin && a.curWin.toLowerCase() === u.toLowerCase();
-  const curLocked = st.lp[u] || 0;
+  const curLocked = st.lp[normalizeUsername(u)] || 0;
   const needed = isSelf ? Math.max(0, bid - curLocked) : bid;
 
   if (needed > av) {

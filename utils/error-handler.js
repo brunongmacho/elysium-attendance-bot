@@ -160,10 +160,19 @@ async function safeDelete(message, context = 'message deletion') {
     }
     return false;
   } catch (error) {
-    handleError(error, context, {
-      silent: true,
-      metadata: { messageId: message?.id }
-    });
+    // Silently ignore archived thread and unknown message errors (expected during cleanup)
+    const isExpectedError =
+      error?.code === 10008 || // Unknown Message
+      error?.code === 50083 || // Thread is archived
+      error?.message?.includes('archived') ||
+      error?.message?.includes('Unknown Message');
+
+    if (!isExpectedError) {
+      handleError(error, context, {
+        silent: true,
+        metadata: { messageId: message?.id }
+      });
+    }
     return false;
   }
 }
@@ -226,10 +235,19 @@ async function safeEdit(message, content, context = 'message edit') {
     }
     return null;
   } catch (error) {
-    handleError(error, context, {
-      silent: true,
-      metadata: { messageId: message?.id }
-    });
+    // Silently ignore archived thread and unknown message errors (expected during cleanup)
+    const isExpectedError =
+      error?.code === 10008 || // Unknown Message
+      error?.code === 50083 || // Thread is archived
+      error?.message?.includes('archived') ||
+      error?.message?.includes('Unknown Message');
+
+    if (!isExpectedError) {
+      handleError(error, context, {
+        silent: true,
+        metadata: { messageId: message?.id }
+      });
+    }
     return null;
   }
 }

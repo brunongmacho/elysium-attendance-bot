@@ -73,6 +73,22 @@ function normalizeTimestamp(timestamp) {
   }
 }
 
+/**
+ * Normalize username for consistent matching
+ * Matches the normalization in bidding.js utils/common.js
+ * @param {string} username - Username to normalize
+ * @returns {string} Normalized username
+ */
+function normalizeUsername(username) {
+  if (!username) return '';
+  return username
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')           // Replace multiple spaces with single space
+    .replace(/[^\w\s]/g, '');       // Remove special characters (keep alphanumeric and spaces)
+}
+
 // MAIN WEBHOOK HANDLER - COMPLETE VERSION
 function doPost(e) {
   try {
@@ -1121,13 +1137,20 @@ function handleSubmitBiddingResults(data) {
 
   // Process results (includes all members with 0 for non-winners)
   const updates = [];
+  const unmappedBidders = [];
   if (results && results.length > 0) {
     results.forEach(r => {
       const member = r.member.trim();
       const total = r.totalSpent || 0;
-      let rowIndex = memberNames.findIndex(m => (m||'').toString().trim().toLowerCase() === member.toLowerCase());
+      // Use normalizeUsername for consistent matching (removes special chars, normalizes spacing)
+      const normalizedMember = normalizeUsername(member);
+      let rowIndex = memberNames.findIndex(m => normalizeUsername((m||'').toString()) === normalizedMember);
       if (rowIndex !== -1) {
         updates.push({row: rowIndex + 2, amount: total});
+      } else if (total > 0) {
+        // CRITICAL: Log when bidder not found in sheet (accounting mismatch!)
+        unmappedBidders.push({member: member, amount: total});
+        Logger.log(`⚠️ WARNING: Bidder "${member}" not found in BiddingPoints sheet. ${total}pts not recorded!`);
       }
     });
 
@@ -1138,19 +1161,38 @@ function handleSubmitBiddingResults(data) {
   // STEP 3: Update BiddingPoints (left side columns) with manual update flag
   // Set flag to prevent onEdit() from triggering again (prevents double execution)
   isManualUpdate = true;
+  let pointsUpdateFailed = false;
   try {
     updateBiddingPoints();
+  } catch (updateError) {
+    pointsUpdateFailed = true;
+    Logger.log(`❌ CRITICAL: updateBiddingPoints failed: ${updateError.toString()}`);
   } finally {
     isManualUpdate = false;
   }
 
   Logger.log(`✅ Session tally submitted: ${columnHeader}`);
 
-  return createResponse('ok', `Submitted: Session ${columnHeader} with ${updates.length} members`, {
+  // Build response with warnings
+  let warnings = [];
+  if (unmappedBidders.length > 0) {
+    Logger.log(`⚠️ ACCOUNTING WARNING: ${unmappedBidders.length} bidder(s) not found in sheet!`);
+    warnings.push(`${unmappedBidders.length} bidder(s) not found in sheet`);
+  }
+  if (pointsUpdateFailed) {
+    warnings.push('Points update failed (lock timeout)');
+  }
+
+  const baseMsg = `Submitted: Session ${columnHeader} with ${updates.length} members`;
+  const warningMsg = warnings.length > 0 ? `${baseMsg} | ⚠️ WARNING: ${warnings.join(', ')} - check logs!` : baseMsg;
+
+  return createResponse('ok', warningMsg, {
     timestampColumn,
     membersUpdated: updates.length,
     sessionHeader: columnHeader,
-    manualItemsAdded: manualItems ? manualItems.length : 0
+    manualItemsAdded: manualItems ? manualItems.length : 0,
+    unmappedBidders: unmappedBidders.length > 0 ? unmappedBidders : undefined,
+    pointsUpdateFailed: pointsUpdateFailed
   });
 }
 
@@ -1268,8 +1310,11 @@ function updateBiddingPoints() {
     lock.waitLock(30000);
     lockAcquired = true;
   } catch (e) {
-    Logger.log('❌ Lock timeout in updateBiddingPoints: ' + e.toString());
-    return;
+    const errorMsg = '❌ Lock timeout in updateBiddingPoints: ' + e.toString();
+    Logger.log(errorMsg);
+    Logger.log('⚠️ WARNING: BiddingPoints update skipped due to lock timeout. Manual verification recommended.');
+    // Throw error so calling code knows update failed
+    throw new Error('updateBiddingPoints lock timeout - points may not be updated');
   }
 
   try {
