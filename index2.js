@@ -2744,7 +2744,7 @@ client.once(Events.ClientReady, async () => {
   console.log("📅 Starting weekly report scheduler...");
   leaderboardSystem.scheduleWeeklyReport();
 
-  // START WEEKLY SATURDAY AUCTION SCHEDULER (8:30 PM GMT+8)
+  // START WEEKLY SATURDAY AUCTION SCHEDULER (12:00 PM GMT+8)
   console.log("🔨 Starting weekly Saturday auction scheduler...");
   auctioneering.scheduleWeeklySaturdayAuction(client, config);
 

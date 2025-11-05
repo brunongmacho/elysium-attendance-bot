@@ -1,10 +1,10 @@
 /**
- * Test script to verify Saturday 8:30 PM GMT+8 calculation
+ * Test script to verify Saturday 12:00 PM GMT+8 calculation
  *
  * Usage: node tests/test-saturday-scheduler.js
  */
 
-function calculateNextSaturday830PM() {
+function calculateNextSaturday12PM() {
   const now = new Date();
 
   // GMT+8 offset in milliseconds
@@ -13,9 +13,9 @@ function calculateNextSaturday830PM() {
   // Get current time in GMT+8
   const nowGMT8 = new Date(now.getTime() + GMT8_OFFSET);
 
-  // Set to 8:30 PM today in GMT+8
+  // Set to 12:00 PM (noon) today in GMT+8
   const targetGMT8 = new Date(nowGMT8);
-  targetGMT8.setUTCHours(20, 30, 0, 0);
+  targetGMT8.setUTCHours(12, 0, 0, 0);
 
   // Get current day of week (0 = Sunday, 6 = Saturday)
   const currentDay = targetGMT8.getUTCDay();
@@ -25,10 +25,10 @@ function calculateNextSaturday830PM() {
   if (currentDay === 6) {
     // Today is Saturday
     if (targetGMT8.getTime() > nowGMT8.getTime()) {
-      // Haven't reached 8:30 PM yet today
+      // Haven't reached 12:00 PM yet today
       daysUntilSaturday = 0;
     } else {
-      // Already past 8:30 PM, schedule for next Saturday
+      // Already past 12:00 PM, schedule for next Saturday
       daysUntilSaturday = 7;
     }
   } else {
@@ -47,7 +47,7 @@ function calculateNextSaturday830PM() {
 }
 
 // Run test
-console.log('🧪 Testing Saturday 8:30 PM GMT+8 Scheduler\n');
+console.log('🧪 Testing Saturday 12:00 PM GMT+8 Scheduler\n');
 
 const now = new Date();
 const GMT8_OFFSET = 8 * 60 * 60 * 1000;
@@ -60,7 +60,7 @@ const currentTime = nowGMT8.toISOString().replace('T', ' ').substring(0, 19);
 console.log(`📅 Current Time: ${currentDay}, ${currentTime} GMT+8`);
 console.log('');
 
-const nextAuction = calculateNextSaturday830PM();
+const nextAuction = calculateNextSaturday12PM();
 const nextAuctionGMT8 = new Date(nextAuction.getTime() + GMT8_OFFSET);
 const nextDay = dayNames[nextAuctionGMT8.getUTCDay()];
 const nextTime = nextAuctionGMT8.toISOString().replace('T', ' ').substring(0, 19);
@@ -81,11 +81,11 @@ if (nextAuctionGMT8.getUTCDay() !== 6) {
   process.exit(1);
 }
 
-// Verify it's at 8:30 PM
+// Verify it's at 12:00 PM
 const hour = nextAuctionGMT8.getUTCHours();
 const minute = nextAuctionGMT8.getUTCMinutes();
-if (hour !== 20 || minute !== 30) {
-  console.error(`❌ ERROR: Next auction is not at 8:30 PM (got ${hour}:${minute})`);
+if (hour !== 12 || minute !== 0) {
+  console.error(`❌ ERROR: Next auction is not at 12:00 PM (got ${hour}:${minute})`);
   process.exit(1);
 }
 
@@ -96,4 +96,4 @@ if (nextAuction.getTime() <= now.getTime()) {
 }
 
 console.log('✅ All checks passed!');
-console.log('✅ Scheduler will correctly trigger on Saturday at 8:30 PM GMT+8');
+console.log('✅ Scheduler will correctly trigger on Saturday at 12:00 PM GMT+8');
