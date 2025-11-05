@@ -36,6 +36,10 @@ const DEFAULT_OPTIONS = {
   maxDelay: 30000, // 30 seconds
   timeout: 30000,  // 30 seconds
   enableCircuitBreaker: true,
+  // Rate limit specific settings
+  rateLimitMaxRetries: 5, // More retries for rate limits
+  rateLimitBaseDelay: 10000, // 10 seconds for rate limits
+  rateLimitMaxDelay: 120000, // 2 minutes max for rate limits
 };
 
 // ============================================================================
@@ -75,12 +79,21 @@ const metrics = {
  * @param {number} attempt - Retry attempt number (0-based)
  * @param {number} baseDelay - Base delay in milliseconds
  * @param {number} maxDelay - Maximum delay in milliseconds
+ * @param {boolean} isRateLimit - Whether this is a rate limit error
  * @returns {number} Delay in milliseconds
  */
-function calculateBackoff(attempt, baseDelay, maxDelay) {
+function calculateBackoff(attempt, baseDelay, maxDelay, isRateLimit = false) {
   const exponentialDelay = baseDelay * Math.pow(2, attempt);
   const jitter = Math.random() * 1000; // 0-1000ms random jitter
-  return Math.min(exponentialDelay + jitter, maxDelay);
+  const delay = Math.min(exponentialDelay + jitter, maxDelay);
+
+  // For rate limits, add extra jitter to spread out requests
+  if (isRateLimit) {
+    const extraJitter = Math.random() * 5000; // 0-5s extra jitter
+    return Math.min(delay + extraJitter, maxDelay);
+  }
+
+  return delay;
 }
 
 /**
@@ -204,15 +217,38 @@ class SheetAPI {
 
     metrics.totalRequests++;
 
-    // Retry loop
-    for (let attempt = 0; attempt < options.maxRetries; attempt++) {
+    // Track if we've hit rate limits
+    let isRateLimited = false;
+    let rateLimitAttempts = 0;
+    let normalAttempts = 0;
+
+    // Retry loop - use different max retries for rate limits
+    while (true) {
+      const currentAttempt = isRateLimited ? rateLimitAttempts : normalAttempts;
+      const maxRetries = isRateLimited ? options.rateLimitMaxRetries : options.maxRetries;
+
+      // Check if we've exceeded max retries
+      if (currentAttempt >= maxRetries) {
+        recordFailure();
+        const errorType = isRateLimited ? ' (rate limit)' : '';
+        throw new Error(`API call failed after ${maxRetries} attempts${errorType}: Last error was a retry limit`);
+      }
+
       try {
         // Log request
-        if (attempt === 0) {
+        if (normalAttempts === 0 && rateLimitAttempts === 0) {
           console.log(`📤 API call: ${action}`);
         } else {
-          console.log(`🔄 Retry ${attempt}/${options.maxRetries - 1}: ${action}`);
+          const retryNum = isRateLimited ? rateLimitAttempts : normalAttempts;
+          console.log(`🔄 Retry ${retryNum}/${maxRetries}: ${action}`);
           metrics.totalRetries++;
+        }
+
+        // Increment attempt counter
+        if (isRateLimited) {
+          rateLimitAttempts++;
+        } else {
+          normalAttempts++;
         }
 
         // Make request with timeout
@@ -255,7 +291,22 @@ class SheetAPI {
         return result;
 
       } catch (error) {
-        const isLastAttempt = attempt === options.maxRetries - 1;
+        // Check if this is a rate limit error (HTTP 429)
+        const isRateLimitError = error.message.includes('HTTP 429') ||
+                                  error.message.includes('rate limit') ||
+                                  error.message.includes('Too Many Requests');
+
+        // If we hit a rate limit, switch to rate limit mode
+        if (isRateLimitError && !isRateLimited) {
+          isRateLimited = true;
+          rateLimitAttempts = 0;
+          console.log(`⚠️ Rate limit detected (HTTP 429). Switching to extended retry strategy...`);
+          console.log(`📊 Will retry up to ${options.rateLimitMaxRetries} times with longer delays (${options.rateLimitBaseDelay / 1000}s base)`);
+        }
+
+        const currentAttempt = isRateLimited ? rateLimitAttempts : normalAttempts;
+        const maxRetries = isRateLimited ? options.rateLimitMaxRetries : options.maxRetries;
+        const isLastAttempt = currentAttempt >= maxRetries;
 
         // Handle abort/timeout
         if (error.name === 'AbortError') {
@@ -269,17 +320,24 @@ class SheetAPI {
         // If last attempt, fail
         if (isLastAttempt) {
           recordFailure();
-          throw new Error(`API call failed after ${options.maxRetries} attempts: ${error.message}`);
+          const errorType = isRateLimited ? ' (rate limit)' : '';
+          throw new Error(`API call failed after ${maxRetries} attempts${errorType}: ${error.message}`);
         }
 
-        // Calculate backoff delay
+        // Calculate backoff delay - use rate limit settings if applicable
+        const baseDelay = isRateLimited ? options.rateLimitBaseDelay : options.baseDelay;
+        const maxDelay = isRateLimited ? options.rateLimitMaxDelay : options.maxDelay;
+        const attemptForBackoff = isRateLimited ? rateLimitAttempts : normalAttempts;
+
         const delay = calculateBackoff(
-          attempt,
-          options.baseDelay,
-          options.maxDelay
+          attemptForBackoff,
+          baseDelay,
+          maxDelay,
+          isRateLimited
         );
 
-        console.log(`⏳ Waiting ${Math.round(delay / 1000)}s before retry...`);
+        const nextAttempt = currentAttempt + 1;
+        console.log(`⏳ Waiting ${Math.round(delay / 1000)}s before retry (attempt ${nextAttempt}/${maxRetries})...`);
         await sleep(delay);
       }
     }
