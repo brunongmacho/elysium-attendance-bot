@@ -432,8 +432,14 @@ async function fetchSheetItems(url, retries = 3, allowCache = true) {
       }
 
       if (attempt < retries) {
-        const backoff = 2000 * attempt; // Exponential backoff: 2s, 4s, 6s
-        console.log(`${EMOJI.WARNING} Retrying in ${backoff / 1000}s...`);
+        // OPTIMIZATION v6.7: True exponential backoff with jitter
+        // Formula: min(baseDelay * 2^attempt + jitter, maxDelay)
+        // Result: 2s, 4s, 8s, 16s (+0-1s jitter) instead of linear 2s, 4s, 6s
+        const backoff = Math.min(
+          2000 * Math.pow(2, attempt) + Math.random() * 1000,
+          30000 // Max 30s
+        );
+        console.log(`${EMOJI.WARNING} Retrying in ${Math.round(backoff / 1000)}s...`);
         await new Promise((resolve) => setTimeout(resolve, backoff));
       }
     }
@@ -1798,10 +1804,13 @@ async function finalizeSession(client, config, channel) {
         lastError = `HTTP ${moveResponse.status}`;
         console.error(`⚠️ Move attempt ${attempt} failed: ${lastError}`);
 
-        // Retry with exponential backoff (2s, 4s, 8s)
+        // OPTIMIZATION v6.7: Exponential backoff with jitter
         if (attempt < maxRetries) {
-          const delay = Math.pow(2, attempt) * 1000;
-          console.log(`⏳ Retrying in ${delay/1000}s...`);
+          const delay = Math.min(
+            Math.pow(2, attempt) * 1000 + Math.random() * 1000,
+            30000 // Max 30s
+          );
+          console.log(`⏳ Retrying in ${Math.round(delay/1000)}s...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
@@ -3147,10 +3156,13 @@ async function handleMoveToDistribution(message, config, client) {
         lastError = err.message;
         console.error(`⚠️ Move attempt ${attempt} failed:`, err);
 
-        // Retry with exponential backoff (2s, 4s, 8s)
+        // OPTIMIZATION v6.7: Exponential backoff with jitter
         if (attempt < maxRetries) {
-          const delay = Math.pow(2, attempt) * 1000;
-          console.log(`⏳ Retrying in ${delay/1000}s...`);
+          const delay = Math.min(
+            Math.pow(2, attempt) * 1000 + Math.random() * 1000,
+            30000 // Max 30s
+          );
+          console.log(`⏳ Retrying in ${Math.round(delay/1000)}s...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
