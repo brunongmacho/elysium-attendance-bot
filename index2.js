@@ -97,6 +97,7 @@ const COMMAND_ALIASES = {
   // Leaderboard commands
   "!leadatt": "!leaderboardattendance",
   "!leadbid": "!leaderboardbidding",
+  "!leaderboards": "!leaderboards",
   "!week": "!weeklyreport",
 
   // Attendance commands (admin)
@@ -2468,10 +2469,16 @@ const commandHandlers = {
     await leaderboardSystem.displayBiddingLeaderboard(message);
   },
 
+  leaderboards: async (message, member) => {
+    // Permission check is done in routing logic
+    console.log(`📊 ${member.user.username} requested combined leaderboards`);
+    await leaderboardSystem.displayCombinedLeaderboards(message);
+  },
+
   weeklyreport: async (message, member) => {
     // Permission check is done in routing logic
     console.log(`📅 ${member.user.username} manually triggered weekly report`);
-    await message.reply("📊 Generating weekly report...");
+    await message.reply({ content: "📊 Generating weekly report...", failIfNotExists: false });
     await leaderboardSystem.sendWeeklyReport();
   },
 };
@@ -3076,6 +3083,7 @@ client.on(Events.MessageCreate, async (message) => {
     if (
       resolvedCmd === "!leaderboardattendance" ||
       resolvedCmd === "!leaderboardbidding" ||
+      resolvedCmd === "!leaderboards" ||
       resolvedCmd === "!weeklyreport"
     ) {
       // Check permissions: either admin OR ELYSIUM role in ELYSIUM commands channel
@@ -3100,6 +3108,8 @@ client.on(Events.MessageCreate, async (message) => {
         await commandHandlers.leaderboardattendance(message, member);
       } else if (resolvedCmd === "!leaderboardbidding") {
         await commandHandlers.leaderboardbidding(message, member);
+      } else if (resolvedCmd === "!leaderboards") {
+        await commandHandlers.leaderboards(message, member);
       } else if (resolvedCmd === "!weeklyreport") {
         await commandHandlers.weeklyreport(message, member);
       }
