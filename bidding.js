@@ -1062,8 +1062,10 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     return { ok: false, msg: "Too large" };
   }
 
-  if (bid < currentItem.curBid) {
-    await msg.reply(`${EMOJI.ERROR} Must be >= ${currentItem.curBid}pts`);
+  // Require strictly higher bids to prevent race condition with simultaneous identical bids
+  // Standard auction rules: you must OUTBID, not MATCH
+  if (bid <= currentItem.curBid) {
+    await msg.reply(`${EMOJI.ERROR} Must be > ${currentItem.curBid}pts (current: ${currentItem.curBid}pts)`);
     return { ok: false, msg: "Too low" };
   }
 
@@ -1309,8 +1311,10 @@ async function procBid(msg, amt, cfg) {
     return { ok: false, msg: "Invalid" };
   }
 
-  if (bid < a.curBid) {
-    await msg.reply(`${EMOJI.ERROR} Must be >= ${a.curBid}pts`);
+  // Require strictly higher bids to prevent race condition with simultaneous identical bids
+  // Standard auction rules: you must OUTBID, not MATCH
+  if (bid <= a.curBid) {
+    await msg.reply(`${EMOJI.ERROR} Must be > ${a.curBid}pts (current: ${a.curBid}pts)`);
     return { ok: false, msg: "Too low" };
   }
 
