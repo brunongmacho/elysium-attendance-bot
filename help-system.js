@@ -183,6 +183,59 @@ const COMMANDS = {
         "• Requires ✅ confirmation",
         "• ⏰ Auto-closes after 20 min"
       ]
+    },
+    debugthread: {
+      usage: "!debugthread",
+      description: "Debug current spawn thread state",
+      aliases: ["!debug"],
+      adminOnly: true,
+      details: [
+        "• Shows thread info",
+        "• Lists verified members",
+        "• Shows pending verifications",
+        "• Displays confirmation thread link",
+        "• Useful for troubleshooting"
+      ]
+    },
+    closeallthread: {
+      usage: "!closeallthread",
+      description: "Close and submit ALL open spawn threads at once",
+      aliases: ["!closeall"],
+      adminOnly: true,
+      details: [
+        "• Closes all active spawns",
+        "• Auto-verifies pending members",
+        "• Submits each to Google Sheets",
+        "• Progress tracking",
+        "• Requires confirmation",
+        "• **Use with caution**"
+      ]
+    },
+    maintenance: {
+      usage: "!maintenance",
+      description: "Create spawn threads for all maintenance bosses",
+      aliases: ["!maint"],
+      adminOnly: true,
+      details: [
+        "• Creates threads for 22 maintenance bosses",
+        "• Sets spawn time to 5 minutes from now",
+        "• Batch processing with progress tracking",
+        "• Requires confirmation"
+      ]
+    },
+    clearstate: {
+      usage: "!clearstate",
+      description: "Clear ALL attendance state (nuclear option)",
+      aliases: ["!clear"],
+      adminOnly: true,
+      details: [
+        "• ⚠️ **DANGEROUS**: Clears everything",
+        "• Removes all active spawns",
+        "• Clears pending verifications",
+        "• State reset",
+        "• Requires confirmation",
+        "• Use only if state is corrupted"
+      ]
     }
   },
 
@@ -193,7 +246,7 @@ const COMMANDS = {
     auction: {
       usage: "!auction",
       description: "Start auction session (loads from BiddingItems sheet)",
-      aliases: ["!startauction"],
+      aliases: ["!startauction", "!start", "!auc-start", "!begin-auction", "!startauc"],
       adminOnly: true,
       details: [
         "• All ELYSIUM members can bid",
@@ -206,7 +259,7 @@ const COMMANDS = {
     pauseauction: {
       usage: "!pauseauction",
       description: "Pause active auction session (freezes all timers)",
-      aliases: ["!pause"],
+      aliases: ["!pause", "!auc-pause", "!hold"],
       adminOnly: true,
       details: [
         "• Freezes current item timer",
@@ -217,7 +270,7 @@ const COMMANDS = {
     resumeauction: {
       usage: "!resumeauction",
       description: "Resume paused auction session",
-      aliases: ["!resume"],
+      aliases: ["!resume", "!auc-resume", "!continue"],
       adminOnly: true,
       details: [
         "• Restores remaining time",
@@ -228,7 +281,7 @@ const COMMANDS = {
     extend: {
       usage: "!extend <minutes>",
       description: "Add extra time to current auction item",
-      aliases: ["!ext"],
+      aliases: ["!ext", "!auc-extend"],
       adminOnly: true,
       details: [
         "• Adds specified minutes",
@@ -259,6 +312,18 @@ const COMMANDS = {
         "• Unlocks points",
         "• Moves to next item",
         "• Requires confirmation"
+      ]
+    },
+    stop: {
+      usage: "!stop",
+      description: "Stop current auction item immediately",
+      aliases: ["!auc-stop", "!end-item"],
+      adminOnly: true,
+      details: [
+        "• Ends current item immediately",
+        "• Awards to highest bidder",
+        "• Moves to next item",
+        "• Use for quick auction end"
       ]
     },
     bid: {
@@ -300,6 +365,43 @@ const COMMANDS = {
         "• Queue preview",
         "• Remaining items count"
       ]
+    },
+    queuelist: {
+      usage: "!queuelist",
+      description: "View full auction queue before or during auction",
+      aliases: ["!ql", "!queue"],
+      adminOnly: true,
+      details: [
+        "• Shows all queued items",
+        "• Starting bids for each item",
+        "• Item order",
+        "• Total items count"
+      ]
+    },
+    endauction: {
+      usage: "!endauction",
+      description: "End current auction session immediately",
+      aliases: [],
+      adminOnly: true,
+      details: [
+        "• Ends entire auction session",
+        "• Stops current item",
+        "• Submits all completed items",
+        "• Requires confirmation",
+        "• Use when you want to end early"
+      ]
+    },
+    startauctionnow: {
+      usage: "!startauctionnow",
+      description: "Start auction immediately (bypass 10-min cooldown)",
+      aliases: ["!auc-now"],
+      adminOnly: true,
+      details: [
+        "• Bypasses cooldown timer",
+        "• Starts auction immediately",
+        "• Use for emergency starts",
+        "• Resets cooldown"
+      ]
     }
   },
 
@@ -323,7 +425,7 @@ const COMMANDS = {
     analyze: {
       usage: "!analyze @member",
       description: "Deep engagement analysis for specific member",
-      aliases: ["!engagement"],
+      aliases: ["!engagement", "!engage"],
       adminOnly: true,
       details: [
         "• Engagement scoring (attendance + bidding + consistency)",
@@ -335,7 +437,7 @@ const COMMANDS = {
     analyzeall: {
       usage: "!analyzeall",
       description: "Guild-wide engagement analysis with top performers",
-      aliases: ["!guildanalyze"],
+      aliases: ["!analyzeengagement", "!guildanalyze"],
       adminOnly: true,
       details: [
         "• Guild-wide statistics",
@@ -344,10 +446,58 @@ const COMMANDS = {
         "• Engagement trends"
       ]
     },
+    predictattendance: {
+      usage: "!predictattendance <username>",
+      description: "Predict member's likelihood to attend next spawn",
+      aliases: ["!predatt"],
+      adminOnly: true,
+      details: [
+        "• AI attendance prediction",
+        "• Based on historical patterns",
+        "• Confidence scoring",
+        "• Recent activity analysis"
+      ]
+    },
+    predictspawn: {
+      usage: "!predictspawn [boss name]",
+      description: "Predict next boss spawn time",
+      aliases: ["!nextspawn", "!whennext", "!spawntimer"],
+      adminOnly: true,
+      details: [
+        "• AI spawn time prediction",
+        "• Based on historical spawn patterns",
+        "• Confidence intervals",
+        "• Earliest/latest possible times"
+      ]
+    },
+    recommendations: {
+      usage: "!recommendations",
+      description: "Get AI recommendations for optimal guild management",
+      aliases: ["!recommend", "!suggest"],
+      adminOnly: true,
+      details: [
+        "• Optimal auction timing",
+        "• Participation forecasts",
+        "• Member reminder suggestions",
+        "• Smart guild management insights"
+      ]
+    },
+    performance: {
+      usage: "!performance",
+      description: "View system performance metrics and health",
+      aliases: ["!perf"],
+      adminOnly: true,
+      details: [
+        "• Memory usage statistics",
+        "• Bot uptime",
+        "• Intelligence cache status",
+        "• Performance recommendations"
+      ]
+    },
     suggestauction: {
       usage: "!suggestauction",
       description: "Analyze entire auction queue before starting",
-      aliases: ["!analyze-queue"],
+      aliases: ["!analyzequeue", "!aq", "!auctionqueue"],
       adminOnly: true,
       details: [
         "• AI price suggestions for all items",
@@ -359,7 +509,7 @@ const COMMANDS = {
     detectanomalies: {
       usage: "!detectanomalies",
       description: "Run fraud detection scan on recent activity",
-      aliases: ["!fraud"],
+      aliases: ["!fraud", "!anomaly"],
       adminOnly: true,
       details: [
         "• Collusion detection in bidding",
@@ -372,7 +522,7 @@ const COMMANDS = {
     bootstraplearning: {
       usage: "!bootstraplearning",
       description: "Re-bootstrap AI learning from ALL historical data",
-      aliases: ["!bootstrap"],
+      aliases: ["!bootstrap", "!learnhistory"],
       adminOnly: true,
       details: [
         "• Analyzes all historical auction data",
@@ -433,6 +583,26 @@ const COMMANDS = {
         "• Same format as automatic report",
         "• Posts to designated channel",
         "• **Scheduled**: Auto-runs Saturday 11:59 PM"
+      ]
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // MEMBER MANAGEMENT COMMANDS
+  // ─────────────────────────────────────────────────────────────────────────
+  management: {
+    removemember: {
+      usage: "!removemember <member_name>",
+      description: "Remove member from all sheets (bidding + attendance)",
+      aliases: ["!removemem", "!rmmember", "!delmember"],
+      adminOnly: true,
+      details: [
+        "• Removes from BiddingPoints sheet",
+        "• Removes from all attendance weeks",
+        "• Deletes point and attendance history",
+        "• ForDistribution NOT touched (historical log)",
+        "• ⚠️ Cannot be undone",
+        "• Requires confirmation"
       ]
     }
   },
@@ -588,6 +758,11 @@ function buildMainHelp() {
         inline: true
       },
       {
+        name: `${EMOJI.ADMIN} Member Management`,
+        value: `\`!help management\`\nRemove members, manage guild roster`,
+        inline: true
+      },
+      {
         name: `${EMOJI.EMERGENCY} Emergency`,
         value: `\`!help emergency\`\nRecovery tools, diagnostics, force commands`,
         inline: true
@@ -638,6 +813,11 @@ function buildCategoryHelp(category) {
       title: `${EMOJI.TROPHY} Leaderboard Commands`,
       description: "Rankings and weekly statistics",
       color: COLORS.SUCCESS
+    },
+    management: {
+      title: `${EMOJI.ADMIN} Member Management Commands`,
+      description: "Manage guild roster and member data",
+      color: COLORS.WARNING
     },
     emergency: {
       title: `${EMOJI.EMERGENCY} Emergency Recovery Commands`,

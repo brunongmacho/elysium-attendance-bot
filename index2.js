@@ -103,8 +103,13 @@ const COMMAND_ALIASES = {
   // Leaderboard commands
   "!leadatt": "!leaderboardattendance",
   "!leadbid": "!leaderboardbidding",
-  "!leaderboards": "!leaderboards",
+  "!lbattendance": "!leaderboardattendance",
+  "!lba": "!leaderboardattendance",
+  "!lbbidding": "!leaderboardbidding",
+  "!lbb": "!leaderboardbidding",
+  "!lb": "!leaderboards",
   "!week": "!weeklyreport",
+  "!weekly": "!weeklyreport",
 
   // Attendance commands (admin)
   "!st": "!status",
@@ -119,29 +124,44 @@ const COMMAND_ALIASES = {
   "!clear": "!clearstate",
   "!maint": "!maintenance",
 
-  // Leaderboard commands (admin)
-  "!leadatt": "!leaderboardattendance",
-  "!leadbid": "!leaderboardbidding",
-
   // Bidding commands (admin)
   "!ql": "!queuelist",
   "!queue": "!queuelist",
   "!start": "!startauction",
+  "!auction": "!startauction",  // FIX: Add !auction alias
+  "!startauc": "!startauction",
   "!resetb": "!resetbids",
   "!forcesubmit": "!forcesubmitresults",
 
-  // Emergency commands (admin)
+  // Emergency commands (admin) - Standalone commands
   "!emerg": "!emergency",
+  "!forceclosethread": "!forceclosethread",
+  "!fct": "!forceclosethread",
+  "!forcecloseallthreads": "!forcecloseallthreads",
+  "!fcat": "!forcecloseallthreads",
+  "!forceendauction": "!forceendauction",
+  "!fea": "!forceendauction",
+  "!unlockallpoints": "!unlockallpoints",
+  "!unlock": "!unlockallpoints",
+  "!clearallbids": "!clearallbids",
+  "!clearbids": "!clearallbids",
+  "!diagnostics": "!diagnostics",
+  "!diag": "!diagnostics",
+  "!forcesync": "!forcesync",
+  "!fsync": "!forcesync",
 
   // Intelligence engine commands (admin)
   "!predict": "!predictprice",
   "!suggestprice": "!predictprice",
   "!suggestauction": "!analyzequeue",
+  "!aq": "!analyzequeue",
+  "!auctionqueue": "!analyzequeue",
   "!bootstrap": "!bootstraplearning",
   "!learnhistory": "!bootstraplearning",
-  "!analyzequeue": "!analyzequeue",
   "!engage": "!engagement",
-  "!analyze": "!analyzeengagement",
+  "!analyze": "!engagement",  // FIX: Change from !analyzeengagement to !engagement (single member)
+  "!analyzeall": "!analyzeengagement",  // NEW: For all members analysis
+  "!guildanalyze": "!analyzeengagement",
   "!anomaly": "!detectanomalies",
   "!fraud": "!detectanomalies",
   "!recommend": "!recommendations",
@@ -150,6 +170,7 @@ const COMMAND_ALIASES = {
   "!nextspawn": "!predictspawn",
   "!whennext": "!predictspawn",
   "!spawntimer": "!predictspawn",
+  "!predatt": "!predictattendance",  // NEW: Short alias for predictattendance
 
   // Member management commands (admin)
   "!removemem": "!removemember",
@@ -168,8 +189,10 @@ const COMMAND_ALIASES = {
   "!auc-start": "!startauction",
   "!begin-auction": "!startauction",
   "!auc-pause": "!pause",
+  "!pauseauction": "!pause",  // FIX: Add !pauseauction alias
   "!hold": "!pause",
   "!auc-resume": "!resume",
+  "!resumeauction": "!resume",  // FIX: Add !resumeauction alias
   "!continue": "!resume",
   "!auc-stop": "!stop",
   "!end-item": "!stop",
@@ -179,7 +202,9 @@ const COMMAND_ALIASES = {
 
   // Auction control commands
   "!cancel": "!cancelitem",
+  "!cancelitem": "!cancelitem",
   "!skip": "!skipitem",
+  "!skipitem": "!skipitem",
 };
 
 // =====================================================================
@@ -3161,6 +3186,67 @@ const commandHandlers = {
       await message.reply(`❌ Error analyzing spawn data: ${error.message}`);
     }
   },
+
+  // =========================================================================
+  // STANDALONE EMERGENCY COMMAND HANDLERS
+  // =========================================================================
+  // These wrap the emergency-commands module for easier access
+
+  /**
+   * Force close a specific attendance thread
+   * Usage: !forceclosethread | !fct
+   */
+  forceclosethread: async (message, member) => {
+    await emergencyCommands.handleEmergencyCommand(message, ['close', message.channel.id]);
+  },
+
+  /**
+   * Force close ALL attendance threads
+   * Usage: !forcecloseallthreads | !fcat
+   */
+  forcecloseallthreads: async (message, member) => {
+    await emergencyCommands.handleEmergencyCommand(message, ['closeall']);
+  },
+
+  /**
+   * Force end stuck auction
+   * Usage: !forceendauction | !fea
+   */
+  forceendauction: async (message, member) => {
+    await emergencyCommands.handleEmergencyCommand(message, ['endauction']);
+  },
+
+  /**
+   * Unlock all locked bidding points
+   * Usage: !unlockallpoints | !unlock
+   */
+  unlockallpoints: async (message, member) => {
+    await emergencyCommands.handleEmergencyCommand(message, ['unlock']);
+  },
+
+  /**
+   * Clear all pending bid confirmations
+   * Usage: !clearallbids | !clearbids
+   */
+  clearallbids: async (message, member) => {
+    await emergencyCommands.handleEmergencyCommand(message, ['clearbids']);
+  },
+
+  /**
+   * Show comprehensive state diagnostics
+   * Usage: !diagnostics | !diag
+   */
+  diagnostics: async (message, member) => {
+    await emergencyCommands.handleEmergencyCommand(message, ['diag']);
+  },
+
+  /**
+   * Force sync state to Google Sheets
+   * Usage: !forcesync | !fsync
+   */
+  forcesync: async (message, member) => {
+    await emergencyCommands.handleEmergencyCommand(message, ['sync']);
+  },
 };
 
 /**
@@ -4442,6 +4528,13 @@ client.on(Events.MessageCreate, async (message) => {
           "!emergency",
           "!maintenance",
           "!removemember",
+          "!forceclosethread",
+          "!forcecloseallthreads",
+          "!forceendauction",
+          "!unlockallpoints",
+          "!clearallbids",
+          "!diagnostics",
+          "!forcesync",
         ].includes(adminCmd)
       ) {
         const now = Date.now();
@@ -4472,6 +4565,21 @@ client.on(Events.MessageCreate, async (message) => {
           await commandHandlers.maintenance(message, member);
         else if (adminCmd === "!removemember")
           await commandHandlers.removemember(message, member);
+        // Standalone emergency commands
+        else if (adminCmd === "!forceclosethread")
+          await commandHandlers.forceclosethread(message, member);
+        else if (adminCmd === "!forcecloseallthreads")
+          await commandHandlers.forcecloseallthreads(message, member);
+        else if (adminCmd === "!forceendauction")
+          await commandHandlers.forceendauction(message, member);
+        else if (adminCmd === "!unlockallpoints")
+          await commandHandlers.unlockallpoints(message, member);
+        else if (adminCmd === "!clearallbids")
+          await commandHandlers.clearallbids(message, member);
+        else if (adminCmd === "!diagnostics")
+          await commandHandlers.diagnostics(message, member);
+        else if (adminCmd === "!forcesync")
+          await commandHandlers.forcesync(message, member);
         return;
       }
 
