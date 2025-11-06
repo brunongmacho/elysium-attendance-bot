@@ -663,14 +663,14 @@ async function startAuctioneering(client, config, channel) {
   // Load points cache
   try {
     const pointsData = await sheetAPI.call('getBiddingPoints');
-    if (!pointsData.points) {
+    if (!pointsData.data?.members) {
       await channel.send(`❌ No points data received`);
       return;
     }
-    
+
     // Store in bidding module's cache with PointsCache for O(1) lookups
     const biddingState = biddingModule.getBiddingState();
-    biddingState.cp = new PointsCache(pointsData.points);
+    biddingState.cp = new PointsCache(pointsData.data.members);
     biddingState.ct = Date.now();
     biddingModule.saveBiddingState();
 
@@ -1182,7 +1182,14 @@ async function auctionNextItem(client, config, channel) {
     // Clean up partial state to prevent auction from being stuck
     auctionState.currentItem = null;
     auctionState.active = false;
-    saveState();
+
+    try {
+      if (cfg?.sheet_webhook_url) {
+        await saveAuctionState(cfg.sheet_webhook_url);
+      }
+    } catch (_) {
+      // ignore; best-effort
+    }
 
     try {
       await channel.send(
@@ -3513,6 +3520,6 @@ module.exports = {
   handleSkipItem,
   handleForceSubmitResults,
   handleMoveToDistribution,
-  scheduleWeeklySaturdayAuction, // Weekly Saturday 8:30 PM GMT+8 auction scheduler
+  scheduleWeeklySaturdayAuction, // Weekly Saturday 12:00 PM GMT+8 auction scheduler
   // getCurrentSessionBoss: () => currentSessionBoss - REMOVED: Not used anywhere
 };

@@ -141,12 +141,12 @@ class LearningSystem {
     if (LEARNING_CONFIG.INCLUDE_MARKET_STATE) {
       try {
         const biddingData = await this.sheetAPI.call('getBiddingPoints', {});
-        if (biddingData && biddingData.data) {
-          const points = biddingData.data.map(m => m.pointsLeft || 0);
-          const consumed = biddingData.data.map(m => m.pointsConsumed || 0);
+        if (biddingData && biddingData.data && biddingData.data.members) {
+          const points = biddingData.data.members.map(m => m.biddingPoints || 0);
+          const consumed = biddingData.data.members.map(m => m.totalSpent || 0);
 
           enriched.marketState = {
-            totalMembers: biddingData.data.length,
+            totalMembers: biddingData.data.members.length,
             avgPointsPerMember: points.reduce((a, b) => a + b, 0) / points.length,
             medianPoints: this.median(points),
             totalPointsInEconomy: points.reduce((a, b) => a + b, 0),

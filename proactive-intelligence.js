@@ -111,6 +111,12 @@ class ProactiveIntelligence {
   async initialize() {
     if (this.initialized) return;
 
+    // Guard: ensure intelligence engine is available
+    if (!this.intelligence) {
+      console.error('❌ [PROACTIVE] Cannot initialize: IntelligenceEngine dependency is missing');
+      throw new Error('ProactiveIntelligence requires a valid IntelligenceEngine instance');
+    }
+
     console.log('🤖 [PROACTIVE] Initializing proactive intelligence system...');
 
     // Schedule engagement digest (Monday 9 AM Manila time)

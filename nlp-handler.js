@@ -281,7 +281,22 @@ class NLPHandler {
       for (const pattern of patterns) {
         const match = content.match(pattern);
         if (match) {
-          const params = match.slice(1); // Extract captured groups
+          let params = match.slice(1); // Extract captured groups
+
+          // Special handling for extend command: normalize seconds to minutes
+          if (command === 'extend' && params.length >= 1) {
+            const amount = parseInt(params[0], 10);
+            const unit = params[1] ? params[1].toLowerCase() : 'minutes';
+            let minutes = amount;
+
+            // Convert seconds to minutes if needed
+            if (unit.startsWith('sec') || unit === 's') {
+              minutes = Math.max(1, Math.ceil(amount / 60));
+            }
+
+            params = [String(minutes)];
+          }
+
           return {
             command: `!${command}`,
             params,

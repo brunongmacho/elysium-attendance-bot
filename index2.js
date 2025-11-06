@@ -2779,7 +2779,8 @@ const commandHandlers = {
 
     try {
       // Get items from queue
-      const queueItems = await sheetAPI.getBiddingItems();
+      const queueResponse = await sheetAPI.call('getBiddingItems', {});
+      const queueItems = queueResponse && queueResponse.items ? queueResponse.items : [];
 
       if (!queueItems || queueItems.length === 0) {
         await message.reply(`⚠️ No items in auction queue. Use Google Sheets to add items to BiddingItems.`);

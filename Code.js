@@ -112,9 +112,9 @@ function doPost(e) {
     if (action === 'getAttendanceState') return getAttendanceState(data);
     if (action === 'saveAttendanceState') return saveAttendanceState(data);
     if (action === 'getAllSpawnColumns') return getAllSpawnColumns(data);
-    
+
     // Bidding actions
-    if (action === 'getBiddingPoints') return handleGetBiddingPoints(data);
+    if (action === 'getBiddingPointsSummary') return handleGetBiddingPoints(data);
     if (action === 'submitBiddingResults') return handleSubmitBiddingResults(data);
     if (action === 'removeMember') return handleRemoveMember(data);
     if (action === 'getBiddingItems') return getBiddingItems(data);
@@ -2308,24 +2308,32 @@ function getBiddingPoints(data) {
       return createResponse('ok', 'No data in BiddingPoints', { members: [] });
     }
 
-    // Get columns: Username (A), Attendance Points (B), Bidding Points (C), Total Spent (D)
-    const dataRange = sheet.getRange(2, 1, lastRow - 1, 4);
+    // Get all columns: Username (A), Points Left (B), Points Consumed (C), Session Spends (D+)
+    const lastCol = sheet.getLastColumn();
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
     const values = dataRange.getValues();
 
     const members = [];
     for (let i = 0; i < values.length; i++) {
       const row = values[i];
       const username = (row[0] || '').toString().trim();
-      const attendancePoints = parseInt(row[1]) || 0;
-      const biddingPoints = parseInt(row[2]) || 0;
-      const totalSpent = parseInt(row[3]) || 0;
+      const pointsLeft = parseInt(row[1]) || 0;
+      const pointsConsumed = parseInt(row[2]) || 0;
+
+      // Sum all session spend columns (D onward)
+      let totalSpent = 0;
+      for (let col = 3; col < row.length; col++) {
+        totalSpent += parseInt(row[col]) || 0;
+      }
 
       if (username) {
         members.push({
           username,
-          attendancePoints,
-          biddingPoints,
-          totalSpent
+          pointsLeft,           // Column B: Points remaining
+          pointsConsumed,       // Column C: Points already used
+          attendancePoints: pointsLeft,  // Alias for backwards compatibility
+          biddingPoints: pointsConsumed, // Alias for backwards compatibility
+          totalSpent            // Sum of columns D+: Total spent across all sessions
         });
       }
     }

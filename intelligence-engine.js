@@ -654,16 +654,21 @@ class IntelligenceEngine {
       const auctionHistory = await this.getAllAuctionHistory();
       const anomalies = [];
 
-      // 1. Detect collusion (same winner-loser pairs repeatedly)
+      // 1. Detect collusion (same winner repeatedly dominating item types)
       const bidPatterns = this.analyzeBidPairings(auctionHistory);
-      for (const [pair, frequency] of Object.entries(bidPatterns)) {
-        if (frequency > INTELLIGENCE_CONFIG.COLLUSION_PATTERN_THRESHOLD) {
-          anomalies.push({
-            type: 'COLLUSION_SUSPECTED',
-            severity: 'HIGH',
-            description: `${pair} appear together in ${(frequency * 100).toFixed(0)}% of auctions`,
-            recommendation: 'Review auction history for these members',
-          });
+      for (const [itemType, winnerCounts] of Object.entries(bidPatterns)) {
+        const total = Object.values(winnerCounts).reduce((a, b) => a + b, 0);
+
+        for (const [winner, count] of Object.entries(winnerCounts)) {
+          const frequency = count / total;
+          if (frequency > INTELLIGENCE_CONFIG.COLLUSION_PATTERN_THRESHOLD) {
+            anomalies.push({
+              type: 'COLLUSION_SUSPECTED',
+              severity: 'HIGH',
+              description: `${winner} is winning ${(frequency * 100).toFixed(0)}% of ${itemType} auctions`,
+              recommendation: 'Review auction history for this member',
+            });
+          }
         }
       }
 
@@ -672,7 +677,8 @@ class IntelligenceEngine {
       const mean = this.calculateMean(bidAmounts);
       const stdDev = this.calculateStdDev(bidAmounts);
 
-      const outliers = auctionHistory.filter(auction => {
+      // Guard: skip z-score calculation if stdDev is zero or near-zero (all bids identical)
+      const outliers = (Math.abs(stdDev) < Number.EPSILON) ? [] : auctionHistory.filter(auction => {
         const zScore = Math.abs((auction.winningBid - mean) / stdDev);
         return zScore > INTELLIGENCE_CONFIG.BID_PATTERN_STDEV;
       });
