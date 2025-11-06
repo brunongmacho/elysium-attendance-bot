@@ -2902,7 +2902,7 @@ const commandHandlers = {
       const bootstrapResult = await sheetAPI.call('bootstrapLearning', {});
 
       if (bootstrapResult.status === 'ok') {
-        const { predictionsCreated, uniqueItems, averageAccuracy, predictionsSkipped, totalAuctions } = bootstrapResult.data;
+        const { predictionsCreated, uniqueItems, averageAccuracy, predictionsSkipped, totalAuctions } = bootstrapResult;
 
         const embed = new EmbedBuilder()
           .setColor(0x00ff00)
@@ -3016,7 +3016,7 @@ client.once(Events.ClientReady, async () => {
   console.log('🔍 Checking if learning system needs bootstrap...');
   try {
     const needsCheck = await sheetAPI.call('needsBootstrap', {});
-    if (needsCheck.status === 'ok' && needsCheck.data && needsCheck.data.needsBootstrap) {
+    if (needsCheck.status === 'ok' && needsCheck.needsBootstrap) {
       console.log('🚀 [FIRST DEPLOYMENT] Bootstrapping learning from historical data...');
       console.log('   This will analyze ALL auction history and create predictions.');
       console.log('   The bot will start SMART instead of learning from scratch!');
@@ -3024,7 +3024,7 @@ client.once(Events.ClientReady, async () => {
       const bootstrapResult = await sheetAPI.call('bootstrapLearning', {});
 
       if (bootstrapResult.status === 'ok') {
-        const { predictionsCreated, uniqueItems, averageAccuracy } = bootstrapResult.data;
+        const { predictionsCreated, uniqueItems, averageAccuracy } = bootstrapResult;
         console.log(`✅ [BOOTSTRAP SUCCESS]`);
         console.log(`   📊 Predictions Created: ${predictionsCreated}`);
         console.log(`   🎯 Unique Items Learned: ${uniqueItems}`);
