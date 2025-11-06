@@ -111,8 +111,11 @@ function init(discordClient, botConfig, cache = null) {
  * // { status: "ok", weekName: "Week 45", leaderboard: [...], ... }
  */
 async function fetchAttendanceLeaderboard() {
+  const startTime = Date.now(); // Performance tracking
   try {
     const result = await sheetAPI.call('getAttendanceLeaderboard');
+    const duration = Date.now() - startTime;
+    console.log(`⚡ Fetched attendance leaderboard in ${duration}ms`);
     return result;
   } catch (error) {
     console.error('❌ Error fetching attendance leaderboard:', error);
@@ -147,8 +150,11 @@ async function fetchAttendanceLeaderboard() {
  * // { status: "ok", leaderboard: [...], totalPointsDistributed: 10000, ... }
  */
 async function fetchBiddingLeaderboard() {
+  const startTime = Date.now(); // Performance tracking
   try {
     const result = await sheetAPI.call('getBiddingLeaderboard');
+    const duration = Date.now() - startTime;
+    console.log(`⚡ Fetched bidding leaderboard in ${duration}ms`);
     return result;
   } catch (error) {
     console.error('❌ Error fetching bidding leaderboard:', error);
@@ -190,8 +196,11 @@ async function fetchBiddingLeaderboard() {
  * // { status: "ok", weekName: "Week 45", attendance: {...}, bidding: {...} }
  */
 async function fetchWeeklySummary() {
+  const startTime = Date.now(); // Performance tracking
   try {
     const result = await sheetAPI.call('getWeeklySummary');
+    const duration = Date.now() - startTime;
+    console.log(`⚡ Fetched weekly summary in ${duration}ms`);
     return result;
   } catch (error) {
     console.error('❌ Error fetching weekly summary:', error);
@@ -275,11 +284,35 @@ async function displayAttendanceLeaderboard(message) {
       inline: false
     });
 
-    // Add statistics if available
+    // Add overall statistics
     if (data.totalSpawns) {
+      let statsText = `**Total Spawns:** ${data.totalSpawns}\n`;
+      statsText += `**Average Attendance:** ${data.averageAttendance || 0} members\n`;
+      if (data.uniqueBosses) {
+        statsText += `**Unique Bosses:** ${data.uniqueBosses}`;
+      }
+
       embed.addFields({
-        name: '📊 Statistics',
-        value: `Total Spawns: **${data.totalSpawns}**\nAverage Attendance: **${data.averageAttendance || 0}** members`,
+        name: '📊 Overall Statistics',
+        value: statsText,
+        inline: false
+      });
+    }
+
+    // NEW: Add boss-specific spawn counts
+    if (data.bossStats && data.bossStats.length > 0) {
+      const top10Bosses = data.bossStats.slice(0, 10);
+      let bossText = '';
+
+      top10Bosses.forEach((boss, index) => {
+        const icon = index === 0 ? '👑' : index === 1 ? '⭐' : index === 2 ? '✨' : '▪️';
+        bossText += `${icon} **${boss.boss}**\n`;
+        bossText += `   Spawns: **${boss.spawnCount}** | Avg Members: **${boss.avgMembersPerSpawn}** | Participation: **${boss.participationRate || 0}%**\n`;
+      });
+
+      embed.addFields({
+        name: '🐲 Boss Spawn Statistics (Top 10)',
+        value: bossText || 'No boss data',
         inline: false
       });
     }
@@ -574,6 +607,27 @@ async function sendWeeklyReport() {
         value: attText,
         inline: false
       });
+
+      // NEW: Add boss spawn breakdown
+      if (att.bossStats && att.bossStats.length > 0) {
+        const top5Bosses = att.bossStats.slice(0, 5);
+        let bossText = '**Most Spawned Bosses:**\n';
+
+        top5Bosses.forEach((boss, index) => {
+          const icon = index === 0 ? '👑' : index === 1 ? '⭐' : index === 2 ? '✨' : '▪️';
+          bossText += `${icon} **${boss.boss}** - ${boss.spawnCount} spawns (avg ${boss.avgMembersPerSpawn} members)\n`;
+        });
+
+        if (att.bossStats.length > 5) {
+          bossText += `\n*...and ${att.bossStats.length - 5} more bosses*`;
+        }
+
+        embed.addFields({
+          name: '🐲 Boss Activity',
+          value: bossText,
+          inline: false
+        });
+      }
     }
 
     // Bidding Summary
