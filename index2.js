@@ -3265,7 +3265,7 @@ client.once(Events.ClientReady, async () => {
   }
 
   // INITIALIZE ALL MODULES IN CORRECT ORDER
-  attendance.initialize(config, bossPoints, isAdmin, discordCache); // NEW
+  attendance.initialize(config, bossPoints, isAdmin, discordCache, intelligenceEngine); // Pass intelligenceEngine for learning system
   helpSystem.initialize(config, isAdmin, BOT_VERSION);
   auctioneering.initialize(config, isAdmin, bidding, discordCache, intelligenceEngine); // Pass intelligenceEngine
   bidding.initializeBidding(config, isAdmin, auctioneering, discordCache);
