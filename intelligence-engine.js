@@ -812,16 +812,15 @@ class IntelligenceEngine {
       bossesByType[bossKey].spawns.push(spawn);
     }
 
-    // Predict next spawn for each boss type
-    const predictions = [];
-    for (const [bossKey, bossData] of Object.entries(bossesByType)) {
-      if (bossData.spawns.length >= 2) {
-        const prediction = await this.calculateBossSpawnPrediction(bossData.spawns, bossData.name);
-        if (!prediction.error) {
-          predictions.push(prediction);
-        }
-      }
-    }
+    // Predict next spawn for each boss type (in parallel for speed)
+    const predictionPromises = Object.entries(bossesByType)
+      .filter(([bossKey, bossData]) => bossData.spawns.length >= 2)
+      .map(([bossKey, bossData]) =>
+        this.calculateBossSpawnPrediction(bossData.spawns, bossData.name)
+      );
+
+    const allPredictions = await Promise.all(predictionPromises);
+    const predictions = allPredictions.filter(prediction => !prediction.error);
 
     if (predictions.length === 0) {
       return {
