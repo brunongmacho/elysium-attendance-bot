@@ -1125,29 +1125,32 @@ class IntelligenceEngine {
   async detectAttendanceAnomalies() {
     try {
       const attendanceResponse = await this.sheetAPI.call('getTotalAttendance', {});
-      const attendanceData = attendanceResponse?.data?.members ?? [];
+      const attendanceData = attendanceResponse?.members ?? [];
       const anomalies = [];
 
       // Calculate attendance statistics
-      const spawnCounts = attendanceData.map(m => m.spawnCount || 0);
+      // Note: attendancePoints is the spawn count field (Total Attendance Days)
+      const spawnCounts = attendanceData.map(m => m.attendancePoints || 0);
       const mean = this.calculateMean(spawnCounts);
       const stdDev = this.calculateStdDev(spawnCounts);
 
       // Detect statistical outliers
       // Guard: skip z-score calculation if stdDev is zero or near-zero (all spawn counts identical)
       const outliers = (Math.abs(stdDev) < Number.EPSILON) ? [] : attendanceData.filter(member => {
-        const zScore = Math.abs(((member.spawnCount || 0) - mean) / stdDev);
+        const memberSpawns = member.attendancePoints || 0;
+        const zScore = Math.abs((memberSpawns - mean) / stdDev);
         return zScore > INTELLIGENCE_CONFIG.ATTENDANCE_PATTERN_STDEV;
       });
 
       for (const member of outliers) {
+        const memberSpawns = member.attendancePoints || 0;
         anomalies.push({
           type: 'UNUSUAL_ATTENDANCE',
           severity: 'MEDIUM',
           username: member.username,
-          spawnCount: member.spawnCount,
-          deviation: `${(((member.spawnCount - mean) / stdDev)).toFixed(1)}σ`,
-          recommendation: member.spawnCount > mean
+          spawnCount: memberSpawns,
+          deviation: `${((memberSpawns - mean) / stdDev).toFixed(1)}σ`,
+          recommendation: memberSpawns > mean
             ? 'Exceptionally high attendance - verify legitimacy'
             : 'Unusually low attendance - possible inactive account',
         });
