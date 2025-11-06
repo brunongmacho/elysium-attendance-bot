@@ -1289,8 +1289,12 @@ async function activate(cli, cfg, th) {
 function schedTimers(cli, cfg) {
   const a = st.a,
     t = a.endTime - Date.now();
+  // Bug #15 fix: Delete timer keys after clearing to prevent orphaned references
   ["goingOnce", "goingTwice", "finalCall", "auctionEnd"].forEach((k) => {
-    if (st.th[k]) clearTimeout(st.th[k]);
+    if (st.th[k]) {
+      clearTimeout(st.th[k]);
+      delete st.th[k];
+    }
   });
   if (t > TIMEOUTS.GOING_ONCE && !a.go1)
     st.th.goingOnce = setTimeout(
@@ -1313,7 +1317,14 @@ function schedTimers(cli, cfg) {
 async function ann1(cli, cfg) {
   const a = st.a;
   if (!a || a.status !== "active" || st.pause) return;
-  const th = await cli.channels.fetch(a.threadId);
+
+  // Bug #26 fix: Check thread existence before sending
+  const th = await cli.channels.fetch(a.threadId).catch(() => null);
+  if (!th) {
+    console.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, skipping announcement`);
+    return;
+  }
+
   await th.send({
     content: "@everyone",
     embeds: [
@@ -1337,7 +1348,14 @@ async function ann1(cli, cfg) {
 async function ann2(cli, cfg) {
   const a = st.a;
   if (!a || a.status !== "active" || st.pause) return;
-  const th = await cli.channels.fetch(a.threadId);
+
+  // Bug #26 fix: Check thread existence before sending
+  const th = await cli.channels.fetch(a.threadId).catch(() => null);
+  if (!th) {
+    console.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, skipping announcement`);
+    return;
+  }
+
   await th.send({
     content: "@everyone",
     embeds: [
@@ -1361,7 +1379,14 @@ async function ann2(cli, cfg) {
 async function ann3(cli, cfg) {
   const a = st.a;
   if (!a || a.status !== "active" || st.pause) return;
-  const th = await cli.channels.fetch(a.threadId);
+
+  // Bug #26 fix: Check thread existence before sending
+  const th = await cli.channels.fetch(a.threadId).catch(() => null);
+  if (!th) {
+    console.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, skipping announcement`);
+    return;
+  }
+
   await th.send({
     content: "@everyone",
     embeds: [
@@ -1385,17 +1410,35 @@ async function endAuc(cli, cfg) {
   const a = st.a;
   if (!a) return;
   a.status = "ended";
-  const th = await cli.channels.fetch(a.threadId);
+
+  // Bug #26 fix: Check thread existence before sending
+  const th = await cli.channels.fetch(a.threadId).catch(() => null);
+  if (!th) {
+    console.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, cannot send auction results`);
+    // Still need to finalize to clear locked points and update state
+    await finalize(cli, cfg);
+    return;
+  }
 
   const isBatch = a.quantity > 1;
 
   if (isBatch && a.bids.length > 0) {
     // Batch auction - determine winners
-    const sortedBids = a.bids
+    // Bug #22 fix: Ensure each user can only win once (take their highest bid only)
+    const seenUsers = new Set();
+    const uniqueBids = a.bids
       .sort((x, y) => y.amount - x.amount)
+      .filter((b) => {
+        const userKey = normalizeUsername(b.user);
+        if (seenUsers.has(userKey)) {
+          return false; // Skip duplicate user
+        }
+        seenUsers.add(userKey);
+        return true;
+      })
       .slice(0, a.quantity);
 
-    a.winners = sortedBids.map((b) => ({
+    a.winners = uniqueBids.map((b) => ({
       username: b.user,
       userId: b.userId,
       amount: b.amount,
@@ -1431,6 +1474,14 @@ async function endAuc(cli, cfg) {
         timestamp: Date.now(),
       });
     });
+
+    // Bug #24 fix: Limit history to prevent unbounded growth (keep last 1000 entries)
+    const MAX_HISTORY_SIZE = 1000;
+    if (st.h.length > MAX_HISTORY_SIZE) {
+      const removed = st.h.length - MAX_HISTORY_SIZE;
+      st.h = st.h.slice(-MAX_HISTORY_SIZE);
+      console.log(`🧹 Trimmed auction history: removed ${removed} oldest entries, kept ${MAX_HISTORY_SIZE}`);
+    }
   } else if (a.curWin) {
     // Single item auction
     await th.send({
@@ -1462,6 +1513,14 @@ async function endAuc(cli, cfg) {
       amount: a.curBid,
       timestamp: Date.now(),
     });
+
+    // Bug #24 fix: Limit history to prevent unbounded growth (keep last 1000 entries)
+    const MAX_HISTORY_SIZE = 1000;
+    if (st.h.length > MAX_HISTORY_SIZE) {
+      const removed = st.h.length - MAX_HISTORY_SIZE;
+      st.h = st.h.slice(-MAX_HISTORY_SIZE);
+      console.log(`🧹 Trimmed auction history: removed ${removed} oldest entries, kept ${MAX_HISTORY_SIZE}`);
+    }
   } else {
     // No bids
     await th.send({
@@ -2221,6 +2280,14 @@ async function procBid(msg, amt, cfg) {
     conf.react(EMOJI.SUCCESS),
     conf.react(EMOJI.ERROR)
   ]);
+
+  // Bug #23 fix: Limit pending confirmations to prevent unbounded growth
+  const MAX_PENDING_CONFIRMATIONS = 100;
+  const pendingCount = Object.keys(st.pc).length;
+  if (pendingCount >= MAX_PENDING_CONFIRMATIONS) {
+    console.warn(`⚠️ Pending confirmations limit reached (${pendingCount}), cleaning up old entries`);
+    cleanupPendingConfirmations();
+  }
 
   st.pc[conf.id] = {
     userId: uid,
@@ -3394,10 +3461,14 @@ function getMemoryStats() {
 }
 
 /**
- * Global cleanup interval reference
- * @type {NodeJS.Timeout|null}
+ * Global cleanup interval references (Bug #5 fix - store all intervals)
+ * @type {Object}
  */
-let cleanupInterval = null;
+const cleanupIntervals = {
+  pendingConfirmations: null,
+  lockedPoints: null,
+  memoryStats: null
+};
 
 /**
  * Starts periodic cleanup schedule for pending confirmations and memory checks (v6.2 enhanced)
@@ -3421,19 +3492,20 @@ let cleanupInterval = null;
  * - Keeps state object clean and bounded
  */
 function startCleanupSchedule() {
-  if (!cleanupInterval) {
+  // Check if any intervals are already running
+  if (!cleanupIntervals.pendingConfirmations && !cleanupIntervals.lockedPoints && !cleanupIntervals.memoryStats) {
     // Main cleanup: every 2 minutes
-    cleanupInterval = setInterval(() => {
+    cleanupIntervals.pendingConfirmations = setInterval(() => {
       cleanupPendingConfirmations();
     }, 120000); // 2 minutes
 
     // Locked points check: every 5 minutes
-    setInterval(() => {
+    cleanupIntervals.lockedPoints = setInterval(() => {
       checkLockedPoints();
     }, 300000); // 5 minutes
 
     // Memory stats: every 30 minutes
-    setInterval(() => {
+    cleanupIntervals.memoryStats = setInterval(() => {
       const stats = getMemoryStats();
       console.log(`📊 Memory: ${stats.memory.heapUsed}MB / ${stats.memory.heapTotal}MB heap, ` +
                   `${stats.state.pendingConfirmations} pending, ` +
@@ -3445,7 +3517,25 @@ function startCleanupSchedule() {
   }
 }
 
-// stopCleanupSchedule removed - unused function
+/**
+ * Stops all cleanup intervals (Bug #5 fix - cleanup function)
+ * Used for testing or graceful shutdown
+ */
+function stopCleanupSchedule() {
+  if (cleanupIntervals.pendingConfirmations) {
+    clearInterval(cleanupIntervals.pendingConfirmations);
+    cleanupIntervals.pendingConfirmations = null;
+  }
+  if (cleanupIntervals.lockedPoints) {
+    clearInterval(cleanupIntervals.lockedPoints);
+    cleanupIntervals.lockedPoints = null;
+  }
+  if (cleanupIntervals.memoryStats) {
+    clearInterval(cleanupIntervals.memoryStats);
+    cleanupIntervals.memoryStats = null;
+  }
+  console.log("⏹️ Stopped all cleanup schedules");
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MODULE EXPORTS - Public API

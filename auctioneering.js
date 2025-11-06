@@ -822,15 +822,24 @@ async function startAuctioneering(client, config, channel) {
     embeds: [countdownEmbed],
   });
 
+  // Clear any existing countdown timer before creating new one (Bug #3 fix)
+  if (auctionState.timers.sessionStartCountdown) {
+    clearInterval(auctionState.timers.sessionStartCountdown);
+    delete auctionState.timers.sessionStartCountdown;
+  }
+
   // Countdown feedback every 5 seconds
   let countdown = 30;
   const countdownInterval = setInterval(async () => {
     try {
       countdown -= 5;
       if (countdown > 0) {
-        countdownEmbed.setFooter({
-          text: `Starting first item in ${countdown}s...`,
-        });
+        // Update both title and footer with countdown for better visibility
+        countdownEmbed
+          .setTitle(`${EMOJI.FIRE} Auctioneering Started! - Starting in ${countdown}s`)
+          .setFooter({
+            text: `Starting first item in ${countdown}s...`,
+          });
         await feedbackMsg
           .edit({ embeds: [countdownEmbed] })
           .catch((err) =>
