@@ -909,8 +909,20 @@ class NLPLearningSystem {
         }
       }
 
+      // Load negative patterns
+      const negativeResponse = await axios.get(`${sheetsUrl}?action=getNegativePatterns`, {
+        timeout: 10000,
+      });
+
+      if (negativeResponse.data && negativeResponse.data.negativePatterns) {
+        for (const neg of negativeResponse.data.negativePatterns) {
+          const key = `${neg.phrase}::${neg.command}`;
+          this.negativePatterns.set(key, neg);
+        }
+      }
+
       this.lastSync = new Date();
-      console.log('🧠 [NLP Learning] Loaded data from Google Sheets');
+      console.log(`🧠 [NLP Learning] Loaded from Google Sheets: ${this.learnedPatterns.size} patterns, ${this.userPreferences.size} users, ${this.negativePatterns.size} negative patterns`);
     } catch (error) {
       console.warn('🧠 [NLP Learning] Failed to load from Google Sheets:', error.message);
     }
@@ -932,11 +944,13 @@ class NLPLearningSystem {
         ...u,
         exampleUsers: Array.from(u.users).slice(0, 5).join(', '),
       }));
+      const negativePatterns = Array.from(this.negativePatterns.values());
 
       const payload = {
         patterns,
         preferences,
         unrecognized,
+        negativePatterns,
         recognitionRate: this.getRecognitionRate(),
       };
 
@@ -952,12 +966,15 @@ class NLPLearningSystem {
       }
 
       this.lastSync = new Date();
-      console.log(`🧠 [NLP Learning] Synced ${patterns.length} patterns, ${preferences.length} users to Google Sheets`);
+      console.log(`🧠 [NLP Learning] Synced ${patterns.length} patterns, ${preferences.length} users, ${negativePatterns.length} negative patterns to Google Sheets`);
 
       if (response.data && response.data.results) {
         const r = response.data.results;
         console.log(`🧠 [NLP Learning] Patterns: ${r.patterns.created} created, ${r.patterns.updated} updated`);
         console.log(`🧠 [NLP Learning] Preferences: ${r.preferences.created} created, ${r.preferences.updated} updated`);
+        if (r.negativePatterns) {
+          console.log(`🧠 [NLP Learning] Negative Patterns: ${r.negativePatterns.created} created, ${r.negativePatterns.updated} updated`);
+        }
       }
     } catch (error) {
       console.error('🧠 [NLP Learning] Sync failed:', error.message);
