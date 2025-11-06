@@ -115,6 +115,7 @@ const COMMAND_ALIASES = {
 
   // Attendance commands (admin)
   "!st": "!status",
+  "!attendancestatus": "!status",  // NLP: Map attendance status queries to general status
   "!addth": "!addthread",
   "!v": "!verify",
   "!vall": "!verifyall",
@@ -4045,6 +4046,24 @@ client.on(Events.MessageCreate, async (message) => {
         const contextMessage = nlpHandler.getContextMessage(nlpInterpretation.command, message);
         if (contextMessage) {
           await message.reply(contextMessage).catch(() => {});
+        }
+      }
+    } else {
+      // No command found - check if bot was mentioned for conversation
+      const botMentioned = message.mentions.users.has(client.user.id);
+
+      if (botMentioned && nlpLearningSystem && !message.content.trim().startsWith('!')) {
+        // Bot was tagged but no command recognized - engage in conversation
+        const conversationResponse = await nlpLearningSystem.handleConversation(message);
+
+        if (conversationResponse) {
+          console.log(`💬 [NLP Conversation] User: "${message.content.substring(0, 50)}..." → Responding`);
+          await message.reply(conversationResponse).catch((error) => {
+            console.error('❌ Error sending conversation response:', error);
+          });
+
+          // Return early - this was a conversation, not a command
+          return;
         }
       }
     }

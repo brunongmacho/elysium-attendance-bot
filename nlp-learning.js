@@ -54,6 +54,21 @@
 const axios = require('axios');
 const levenshtein = require('fast-levenshtein');
 const { NLPHandler, NLP_PATTERNS } = require('./nlp-handler.js');
+const { ConversationalAI } = require('./nlp-conversation.js');
+
+// Load comprehensive vocabularies (5000+ words each)
+let ENGLISH_VOCABULARY = [];
+let TAGALOG_VOCABULARY = [];
+let TAGLISH_VOCABULARY = [];
+
+try {
+  ENGLISH_VOCABULARY = require('./nlp-vocabulary').ENGLISH_WORDS || [];
+  TAGALOG_VOCABULARY = require('./nlp-vocabulary-tagalog').TAGALOG_WORDS || [];
+  TAGLISH_VOCABULARY = require('./nlp-vocabulary-taglish').TAGLISH_PHRASES || [];
+  console.log(`📚 [NLP] Loaded ${ENGLISH_VOCABULARY.length} English, ${TAGALOG_VOCABULARY.length} Tagalog, ${TAGLISH_VOCABULARY.length} Taglish terms`);
+} catch (error) {
+  console.log('📚 [NLP] Using built-in vocabulary (extended files not found)');
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -97,22 +112,34 @@ const LEARNING_CONFIG = {
   // Semantic synonym mapping (makes bot smarter at understanding intent)
   synonyms: {
     // Leaderboard synonyms
-    leaderboard: ['rankings', 'ranks', 'rank', 'top', 'leaders', 'scoreboard', 'standings', 'lb', 'board'],
+    leaderboard: ['rankings', 'ranks', 'rank', 'top', 'leaders', 'scoreboard', 'standings', 'lb', 'board', 'mvp', 'hall of fame', 'legends'],
 
-    // Points synonyms
-    mypoints: ['balance', 'points', 'pts', 'pnts', 'coins', 'credits', 'money', 'wallet', 'funds'],
+    // Points synonyms (gaming currency)
+    mypoints: ['balance', 'points', 'pts', 'pnts', 'coins', 'credits', 'money', 'wallet', 'funds', 'dkp', 'currency', 'gold', 'cash', 'adena'],
 
     // Status synonyms
-    bidstatus: ['status', 'stat', 'info', 'update', 'news', 'happening', 'current', 'active'],
+    bidstatus: ['status', 'stat', 'info', 'update', 'news', 'happening', 'current', 'active', 'ongoing'],
 
-    // Bid synonyms
-    bid: ['offer', 'bet', 'wager', 'taya', 'pusta'],
+    // Bid synonyms (gaming terms)
+    bid: ['offer', 'bet', 'wager', 'taya', 'pusta', 'put', 'throw in', 'go', 'call', 'raise', 'spend'],
 
     // Help synonyms
-    help: ['commands', 'cmds', 'info', 'guide', 'assist', 'support'],
+    help: ['commands', 'cmds', 'info', 'guide', 'assist', 'support', 'tutorial', 'instructions', 'noob', 'newbie', 'lost'],
 
-    // Present synonyms
-    present: ['here', 'attending', 'attend', 'join', 'checkin', 'check-in'],
+    // Present synonyms (gaming participation)
+    present: ['here', 'attending', 'attend', 'join', 'checkin', 'check-in', 'online', 'ready', 'available', 'in', 'coming', 'game'],
+
+    // Loot synonyms (gaming rewards)
+    loot: ['drops', 'rewards', 'items', 'prize', 'goodies', 'gear', 'equipment', 'treasure'],
+
+    // Queue synonyms (gaming lineup)
+    queuelist: ['queue', 'lineup', 'list', 'items', 'upcoming', 'next', 'pot', 'pool'],
+
+    // Spawn synonyms (boss/raid)
+    predictspawn: ['spawn', 'boss', 'raid', 'rb', 'epic', 'respawn', 'world boss', 'pop'],
+
+    // Weekly synonyms
+    weeklyreport: ['weekly', 'week', 'report', 'summary', 'stats', 'performance'],
   },
 
   // Language detection
@@ -127,6 +154,15 @@ const LEARNING_CONFIG = {
       'pera', 'pondo', 'tira', 'natira', 'naiwan',
       'aktibo', 'balita', 'update', 'nangunguna', 'nangungunang',
       'lagay', 'magtaya', 'maglagay', 'ibabayad',
+      // Gaming slang (Tagalog)
+      'sumama', 'sasama', 'sali', 'sama', 'laro', 'game',
+      'sipag', 'aktibo', 'bano', 'newbie', 'baguhan', 'bago',
+      'magkanu', 'gastos', 'gugulin', 'pwede', 'kaya',
+      'lalabas', 'lilitaw', 'kelan', 'kailan', 'susunod',
+      'mahusay', 'magaling', 'tanggalin', 'alisin', 'wag',
+      'laktawan', 'lumipat', 'lipat', 'ihinto', 'tigil',
+      'ipagpatuloy', 'ituloy', 'tapusin', 'tapos', 'wakasan',
+      'simulan', 'simula', 'ilista', 'listahan',
       // Pronouns and particles
       'siya', 'sila', 'kami', 'tayo', 'natin', 'namin',
       'pa', 'lang', 'lang', 'na', 'ba', 'nga', 'kasi', 'kaya',
@@ -135,12 +171,24 @@ const LEARNING_CONFIG = {
       'bid ko', 'points ko', 'ako bid', 'ako taya',
       'check ko', 'show ko', 'ilan na', 'how many pa',
       'status ba', 'update naman', 'pa lang', 'na lang',
+      // Gaming slang (Taglish)
+      'game na', 'ready ako', 'online ako', 'sali ako',
+      'bano ako', 'noob ako', 'bago ako', 'newbie ako',
+      'loot ba', 'items ba', 'boss ba', 'raid ba',
+      'spawn ba', 'kailan ba', 'next ba',
     ],
     english: [
       'bid', 'points', 'my', 'how', 'many', 'show', 'check',
       'what', 'display', 'view', 'tell', 'give', 'remaining',
       'status', 'info', 'update', 'auction', 'leaderboard',
       'ranking', 'top', 'balance', 'left', 'count',
+      // Gaming terms (English)
+      'loot', 'drops', 'rewards', 'items', 'gear', 'equipment',
+      'boss', 'raid', 'rb', 'epic', 'spawn', 'respawn',
+      'online', 'ready', 'available', 'afk', 'brb',
+      'guild', 'clan', 'team', 'party', 'roster',
+      'mvp', 'noob', 'newbie', 'pro', 'gg', 'ez',
+      'queue', 'lineup', 'next', 'upcoming', 'current',
     ],
   },
 };
@@ -161,6 +209,9 @@ class NLPLearningSystem {
     // Static NLP handler for fallback
     this.staticHandler = null;
 
+    // Conversational AI for tagged messages
+    this.conversationalAI = null;
+
     // Bot instance
     this.client = null;
     this.botUserId = null;
@@ -177,6 +228,7 @@ class NLPLearningSystem {
       successfulInterpretations: 0,
       failedInterpretations: 0,
       languageDistribution: { en: 0, tl: 0, taglish: 0 },
+      conversationsHandled: 0, // Track conversations
     };
   }
 
@@ -193,6 +245,9 @@ class NLPLearningSystem {
 
     // Initialize static NLP handler for fallback
     this.staticHandler = new NLPHandler(this.config);
+
+    // Initialize conversational AI
+    this.conversationalAI = new ConversationalAI(this);
 
     console.log('🧠 [NLP Learning] Initializing system...');
 
@@ -334,6 +389,33 @@ class NLPLearningSystem {
     // No interpretation found
     this.stats.failedInterpretations++;
     return null;
+  }
+
+  /**
+   * Handle conversational message (when bot is tagged but no command found)
+   * @param {Message} message - Discord message
+   * @returns {string|null} Conversational response or null
+   */
+  async handleConversation(message) {
+    if (!this.conversationalAI) return null;
+
+    try {
+      // Strip bot mentions
+      const content = message.content.replace(/^<@!?\d+>\s*/g, '').trim();
+
+      // Get conversational response
+      const response = await this.conversationalAI.handleConversation(message, content);
+
+      if (response) {
+        this.stats.conversationsHandled++;
+        return response;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('❌ Error in conversation handler:', error);
+      return null;
+    }
   }
 
   tryLearnedPatterns(content) {
@@ -747,6 +829,14 @@ class NLPLearningSystem {
           await reply.edit(`❌ Got it, **"${phrase}"** is NOT **${command}**. I'll be more careful next time.`);
           console.log(`🧠 [NLP Learning] User rejected: "${phrase}" ≠ ${command}`);
         }
+
+        // Remove all reactions after confirmation to avoid confusion
+        try {
+          await reply.reactions.removeAll();
+        } catch (error) {
+          console.log(`🧠 [NLP Learning] Could not remove reactions: ${error.message}`);
+        }
+
         this.pendingConfirmations.delete(key);
       });
 
@@ -770,20 +860,38 @@ class NLPLearningSystem {
 
     let scores = { en: 0, tl: 0, taglish: 0 };
 
-    // Count matches for each language
+    // Use comprehensive vocabularies if available, otherwise use built-in
+    const tagalogWords = TAGALOG_VOCABULARY.length > 0 ? TAGALOG_VOCABULARY : LEARNING_CONFIG.languages.tagalog;
+    const englishWords = ENGLISH_VOCABULARY.length > 0 ? ENGLISH_VOCABULARY : LEARNING_CONFIG.languages.english;
+    const taglishPhrases = TAGLISH_VOCABULARY.length > 0 ? TAGLISH_VOCABULARY : LEARNING_CONFIG.languages.taglish;
+
+    // Check for exact phrase matches in Taglish first (more specific)
+    for (const phrase of taglishPhrases) {
+      if (normalized.includes(phrase.toLowerCase())) {
+        scores.taglish += 3; // Higher weight for phrase matches
+      }
+    }
+
+    // Count word matches for each language
     for (const word of words) {
-      if (LEARNING_CONFIG.languages.tagalog.some((w) => word.includes(w))) {
+      if (word.length < 2) continue; // Skip very short words
+
+      // Check Tagalog
+      if (tagalogWords.some((w) => w.toLowerCase() === word || word.includes(w.toLowerCase()))) {
         scores.tl++;
       }
-      if (LEARNING_CONFIG.languages.english.some((w) => word.includes(w))) {
+
+      // Check English
+      if (englishWords.some((w) => w.toLowerCase() === word || word.includes(w.toLowerCase()))) {
         scores.en++;
       }
     }
 
-    // Check for Taglish patterns
+    // Check for Taglish (code-switching) - if both languages present or Taglish score high
     const hasTagalog = scores.tl > 0;
     const hasEnglish = scores.en > 0;
-    if (hasTagalog && hasEnglish) {
+
+    if (scores.taglish > 0 || (hasTagalog && hasEnglish)) {
       return 'taglish';
     }
 
