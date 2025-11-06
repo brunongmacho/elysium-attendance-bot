@@ -97,22 +97,34 @@ const LEARNING_CONFIG = {
   // Semantic synonym mapping (makes bot smarter at understanding intent)
   synonyms: {
     // Leaderboard synonyms
-    leaderboard: ['rankings', 'ranks', 'rank', 'top', 'leaders', 'scoreboard', 'standings', 'lb', 'board'],
+    leaderboard: ['rankings', 'ranks', 'rank', 'top', 'leaders', 'scoreboard', 'standings', 'lb', 'board', 'mvp', 'hall of fame', 'legends'],
 
-    // Points synonyms
-    mypoints: ['balance', 'points', 'pts', 'pnts', 'coins', 'credits', 'money', 'wallet', 'funds'],
+    // Points synonyms (gaming currency)
+    mypoints: ['balance', 'points', 'pts', 'pnts', 'coins', 'credits', 'money', 'wallet', 'funds', 'dkp', 'currency', 'gold', 'cash', 'adena'],
 
     // Status synonyms
-    bidstatus: ['status', 'stat', 'info', 'update', 'news', 'happening', 'current', 'active'],
+    bidstatus: ['status', 'stat', 'info', 'update', 'news', 'happening', 'current', 'active', 'ongoing'],
 
-    // Bid synonyms
-    bid: ['offer', 'bet', 'wager', 'taya', 'pusta'],
+    // Bid synonyms (gaming terms)
+    bid: ['offer', 'bet', 'wager', 'taya', 'pusta', 'put', 'throw in', 'go', 'call', 'raise', 'spend'],
 
     // Help synonyms
-    help: ['commands', 'cmds', 'info', 'guide', 'assist', 'support'],
+    help: ['commands', 'cmds', 'info', 'guide', 'assist', 'support', 'tutorial', 'instructions', 'noob', 'newbie', 'lost'],
 
-    // Present synonyms
-    present: ['here', 'attending', 'attend', 'join', 'checkin', 'check-in'],
+    // Present synonyms (gaming participation)
+    present: ['here', 'attending', 'attend', 'join', 'checkin', 'check-in', 'online', 'ready', 'available', 'in', 'coming', 'game'],
+
+    // Loot synonyms (gaming rewards)
+    loot: ['drops', 'rewards', 'items', 'prize', 'goodies', 'gear', 'equipment', 'treasure'],
+
+    // Queue synonyms (gaming lineup)
+    queuelist: ['queue', 'lineup', 'list', 'items', 'upcoming', 'next', 'pot', 'pool'],
+
+    // Spawn synonyms (boss/raid)
+    predictspawn: ['spawn', 'boss', 'raid', 'rb', 'epic', 'respawn', 'world boss', 'pop'],
+
+    // Weekly synonyms
+    weeklyreport: ['weekly', 'week', 'report', 'summary', 'stats', 'performance'],
   },
 
   // Language detection
@@ -127,6 +139,15 @@ const LEARNING_CONFIG = {
       'pera', 'pondo', 'tira', 'natira', 'naiwan',
       'aktibo', 'balita', 'update', 'nangunguna', 'nangungunang',
       'lagay', 'magtaya', 'maglagay', 'ibabayad',
+      // Gaming slang (Tagalog)
+      'sumama', 'sasama', 'sali', 'sama', 'laro', 'game',
+      'sipag', 'aktibo', 'bano', 'newbie', 'baguhan', 'bago',
+      'magkanu', 'gastos', 'gugulin', 'pwede', 'kaya',
+      'lalabas', 'lilitaw', 'kelan', 'kailan', 'susunod',
+      'mahusay', 'magaling', 'tanggalin', 'alisin', 'wag',
+      'laktawan', 'lumipat', 'lipat', 'ihinto', 'tigil',
+      'ipagpatuloy', 'ituloy', 'tapusin', 'tapos', 'wakasan',
+      'simulan', 'simula', 'ilista', 'listahan',
       // Pronouns and particles
       'siya', 'sila', 'kami', 'tayo', 'natin', 'namin',
       'pa', 'lang', 'lang', 'na', 'ba', 'nga', 'kasi', 'kaya',
@@ -135,12 +156,24 @@ const LEARNING_CONFIG = {
       'bid ko', 'points ko', 'ako bid', 'ako taya',
       'check ko', 'show ko', 'ilan na', 'how many pa',
       'status ba', 'update naman', 'pa lang', 'na lang',
+      // Gaming slang (Taglish)
+      'game na', 'ready ako', 'online ako', 'sali ako',
+      'bano ako', 'noob ako', 'bago ako', 'newbie ako',
+      'loot ba', 'items ba', 'boss ba', 'raid ba',
+      'spawn ba', 'kailan ba', 'next ba',
     ],
     english: [
       'bid', 'points', 'my', 'how', 'many', 'show', 'check',
       'what', 'display', 'view', 'tell', 'give', 'remaining',
       'status', 'info', 'update', 'auction', 'leaderboard',
       'ranking', 'top', 'balance', 'left', 'count',
+      // Gaming terms (English)
+      'loot', 'drops', 'rewards', 'items', 'gear', 'equipment',
+      'boss', 'raid', 'rb', 'epic', 'spawn', 'respawn',
+      'online', 'ready', 'available', 'afk', 'brb',
+      'guild', 'clan', 'team', 'party', 'roster',
+      'mvp', 'noob', 'newbie', 'pro', 'gg', 'ez',
+      'queue', 'lineup', 'next', 'upcoming', 'current',
     ],
   },
 };

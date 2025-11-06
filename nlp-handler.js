@@ -131,18 +131,26 @@ const NLP_PATTERNS = {
     /^(\d+)\s+(?:points?|pts?)/i,
     /^place\s+(?:a\s+)?bid\s+(?:of\s+)?(\d+)/i,
 
+    // Gaming terms
+    /^(?:i(?:'ll|\s+will)\s+)?(?:put|throw\s+in|go)\s+(\d+)/i,
+    /^(?:going|putting)\s+(\d+)\s+(?:on\s+(?:this|it))?/i,
+    /^(\d+)\s+(?:here|for\s+(?:this|it|me))/i,
+    /^(?:i\s+)?(?:call|raise)\s+(\d+)/i,
+    /^(?:spend|use|drop)\s+(\d+)/i,
+
     // Tagalog (TL)
     /^(?:taya|lagay)\s+(?:ko\s+)?(\d+)/i,    // "taya 500" / "taya ko 500"
     /^(?:pusta|pustahan)\s+(?:ng\s+)?(\d+)/i, // "pusta 500" / "pustahan ng 500"
     /^(?:magtaya|maglagay)\s+(?:ako\s+)?(?:ng\s+)?(\d+)/i, // "magtaya 500"
     /^(?:ibabayad|ibabayad ko)\s+(\d+)/i,    // "ibabayad 500"
     /^(\d+)\s+(?:taya|pusta)/i,              // "500 taya"
+    /^(?:gastos|gugulin)\s+(?:ko\s+)?(\d+)/i, // "gastos ko 500"
 
     // Taglish (code-switching)
     /^bid\s+(?:ko|na|ng)\s+(\d+)/i,          // "bid ko 500"
     /^(?:gusto|gusto kong)\s+(?:bid|mag-?bid)\s+(?:ng\s+)?(\d+)/i, // "gusto kong magbid ng 500"
     /^(?:ako|ako ay)\s+bid\s+(?:ng\s+)?(\d+)/i, // "ako bid 500"
-    /^(\d+)\s+(?:lang|lang ako)/i,           // "500 lang"
+    /^(\d+)\s+(?:lang|lang ako|muna)/i,      // "500 lang" / "500 muna"
   ],
 
   // Points queries
@@ -159,6 +167,13 @@ const NLP_PATTERNS = {
     /^(?:remaining|left|balance)(?:\s+points?)?$/i,
     /^(?:point|pint|pont|pnts)\s+(?:count|balance|left)/i, // Common typos
 
+    // Gaming currency terms
+    /^(?:how\s+much|what(?:'s|\s+is)\s+my)\s+(?:currency|dkp|credits?|coins?|gold)/i,
+    /^(?:my\s+)?(?:currency|dkp|credits?|coins?|gold|money|cash|wallet)$/i,
+    /^(?:check|show)\s+(?:my\s+)?(?:currency|dkp|credits?|balance|wallet)/i,
+    /^(?:what\s+)?(?:can\s+i|i\s+can)\s+(?:spend|afford|buy)/i,
+    /^(?:how\s+much|what)\s+(?:do\s+i|can\s+i)\s+(?:have|spend|afford)/i,
+
     // Tagalog (TL)
     /^(?:ilang|ilan|lng|ilng)\s+(?:ang\s+)?points?\s+(?:ko|namin|ko\s+pa)/i,
     /^(?:magkano|magkanu|mgkano)\s+(?:ang\s+)?points?\s+ko/i,
@@ -166,12 +181,13 @@ const NLP_PATTERNS = {
     /^(?:check|chek|cek)\s+points?\s+ko/i,
     /^points?\s+ko(?:\s+(?:ba|po|pls|please|naman))?/i,
     /^(?:pts?|balance)\s+ko/i,
-    /^(?:pera|pondo|money)\s+ko/i,
+    /^(?:pera|pondo|money|salapi)\s+ko/i,
     /^(?:natira|natitira|natitirang)\s+(?:points?|pts)/i, // "remaining points"
     /^(?:meron|may|mayroon)\s+(?:pa\s+)?(?:ako|akong)\s+(?:ilang|ilan)/i, // "meron pa ako ilang"
     /^(?:tira|titirang?)\s+(?:points?|ko)/i, // "tira ko"
     /^(?:ilan|ilang)\s+(?:pa|na|na\s+lang)/i, // "ilan pa"
     /^(?:pila|ilang)\s+(?:natira|naiwan)/i,  // "ilang natira"
+    /^(?:magkano|ilang)\s+(?:pwede|kaya)\s+(?:ko|kong)\s+(?:gastusin|bilhin)/i, // "how much can i spend"
 
     // Taglish (code-switching)
     /^(?:ano|anu|ano\s+ba)\s+(?:ang\s+)?points?\s+ko/i,
@@ -188,22 +204,50 @@ const NLP_PATTERNS = {
     // English
     /^(?:mark\s+)?(?:me\s+)?(?:as\s+)?present/i,
     /^(?:i(?:'m|\s+am)\s+)?(?:here|attending)/i,
-    /^(?:check\s+in|checkin)/i,
+    /^(?:check\s+in|checkin|checking\s+in)/i,
+
+    // Gaming terms
+    /^(?:i(?:'m|\s+am)\s+)?(?:online|ready|available)/i,
+    /^(?:i(?:'m|\s+am)\s+)?(?:in|at)\s+(?:the\s+)?(?:raid|spawn|boss)/i,
+    /^(?:count\s+me\s+)?in/i,
+    /^(?:i(?:'m|\s+am)\s+)?(?:joining|coming)/i,
+    /^(?:i\s+)?(?:can\s+)?(?:attend|make\s+it|participate)/i,
 
     // Tagalog (TL)
     /^(?:nandito|andito)\s+(?:ako|na ako)/i,  // "nandito ako"
     /^(?:dumating|dumating na)\s+ako/i,       // "dumating ako"
     /^(?:present|nandito)/i,                  // "present"
+    /^(?:sumama|sasama)\s+ako/i,              // "sumama ako" (join)
+    /^(?:online|ready)\s+(?:na\s+)?ako/i,     // "online ako"
 
     // Taglish
     /^(?:present|here)\s+(?:ako|na|po)/i,     // "present ako" / "here na"
+    /^(?:game|ready|online)\s+(?:na|ako)/i,   // "game na" / "ready ako"
+    /^(?:sali|sama)\s+ako/i,                  // "sali ako" (join me)
   ],
 
   // Loot commands
   loot: [
+    // Standard loot queries
     /^(?:show|check|view|display)\s+(?:the\s+)?loot/i,
     /^(?:what(?:'s|\s+is)\s+the\s+)?loot/i,
     /^loot\s+(?:list|info|details)/i,
+
+    // Gaming terminology
+    /^(?:show|check|view)\s+(?:the\s+)?(?:drops?|rewards?|items?)/i,
+    /^(?:what(?:'s|\s+is)|what\s+are)\s+(?:the\s+)?(?:drops?|rewards?)/i,
+    /^(?:what\s+)?(?:can\s+)?(?:i|we)\s+(?:get|win|obtain)/i,
+    /^(?:what(?:'s|\s+is)|show)\s+(?:the\s+)?(?:prize|rewards?|goodies)/i,
+    /^(?:show|list)\s+(?:available\s+)?(?:items?|gear|equipment)/i,
+
+    // Tagalog
+    /^(?:ano|anu)\s+(?:ang\s+)?(?:loot|drops?|rewards?)/i,
+    /^(?:tignan|tingnan)\s+(?:ang\s+)?(?:loot|items?)/i,
+    /^(?:ano|what)\s+(?:makukuha|nakuha)/i, // "what can get"
+
+    // Taglish
+    /^(?:show|pakita)\s+(?:yung|ang)\s+(?:loot|drops?|items?)/i,
+    /^(?:ano|what)\s+(?:yung|ang)\s+(?:loot|drops?)/i,
   ],
 
   // Status queries
@@ -218,6 +262,11 @@ const NLP_PATTERNS = {
     /^(?:auction|bidding)\s+(?:update|news)/i,
     /^(?:what's|whats)\s+(?:happening|going on)(?:\s+(?:with|in)\s+(?:the\s+)?(?:auction|bidding|bid))?$/i,
     /^(?:status|update)\s+(?:of|for)\s+(?:the\s+)?(?:auction|bidding|bid)/i,
+
+    // Gaming terminology
+    /^(?:what(?:'s|\s+is)|show)\s+(?:the\s+)?(?:current|active)\s+(?:item|loot|drop)/i,
+    /^(?:what\s+are\s+we\s+)?(?:bidding\s+on|raiding)/i,
+    /^(?:show|check)\s+(?:current|active)\s+(?:auction|bid|item)/i,
 
     // Tagalog (TL) - require auction/bid context
     /^(?:ano|anu|ano\s+ba)\s+(?:ang\s+)?(?:status|kalagayan|balita)(?:\s+(?:ng|sa)\s+)?(?:bid|auction)/i,
@@ -284,12 +333,22 @@ const NLP_PATTERNS = {
     /^(?:when(?:'s|\s+is)|what\s+time\s+is)\s+(?:the\s+)?spawn/i,
     /^(?:spawn\s+)?(?:timer|prediction|estimate)/i,
 
+    // Gaming terminology - boss/raid related
+    /^(?:when|what\s+time)\s+(?:is|will)\s+(?:the\s+)?(?:next|upcoming)\s+(?:boss|raid|rb|epic)/i,
+    /^(?:next|upcoming)\s+(?:boss|raid|rb|epic|world\s+boss)(?:\s+(?:spawn|time))?/i,
+    /^(?:when(?:'s|\s+is)|what\s+time)\s+(?:boss|raid|rb|epic)\s+(?:spawn|up|respawn)/i,
+    /^(?:boss|raid|rb|epic)\s+(?:timer|schedule|window|respawn)/i,
+    /^(?:when\s+)?(?:does|will)\s+(?:it|boss|rb)\s+(?:spawn|respawn|pop)/i,
+    /^(?:respawn|spawn)\s+(?:time|timer|window)/i,
+
     // Tagalog
-    /^(?:kailan|kalian)\s+(?:ang\s+)?(?:next|susunod)\s+spawn/i,
-    /^next\s+spawn\s+(?:ba|po|naman)/i,
+    /^(?:kailan|kalian)\s+(?:ang\s+)?(?:next|susunod)\s+(?:spawn|boss|raid)/i,
+    /^next\s+(?:spawn|boss|raid)\s+(?:ba|po|naman)/i,
+    /^(?:kelan|kailan)\s+(?:lalabas|lilitaw)\s+(?:ang\s+)?(?:boss|raid)/i,
 
     // Taglish
-    /^(?:when|kailan)\s+(?:ba|po)\s+(?:next|susunod)\s+spawn/i,
+    /^(?:when|kailan)\s+(?:ba|po)\s+(?:next|susunod)\s+(?:spawn|boss|raid)/i,
+    /^(?:spawn|boss|raid)\s+(?:time|timer)\s+(?:ba|naman)/i,
   ],
 
   // Predict attendance
@@ -313,13 +372,20 @@ const NLP_PATTERNS = {
     /^(?:top|best)\s+attendance(?:\s+(?:members?|players?|users?))?/i,
     /^(?:leaderboard|lb|rankings?)\s+(?:for\s+)?attendance/i,
 
+    // Gaming terms
+    /^(?:most|top)\s+(?:active|dedicated|consistent)\s+(?:players?|members?|raiders?)/i,
+    /^who\s+(?:shows\s+up|attends|participates)\s+(?:the\s+)?most/i,
+    /^(?:show|list)\s+(?:top|best)\s+(?:raiders?|participants?)/i,
+
     // Tagalog
     /^(?:sino|who)\s+(?:ang\s+)?(?:may\s+)?(?:pinakamaraming|maraming)\s+attendance/i,
     /^attendance\s+(?:top|leaders?)\s+(?:ba|po|naman)?/i,
+    /^(?:sino|who)\s+(?:ang\s+)?(?:pinaka-?sipag|sipag|aktibo)/i,
 
     // Taglish
     /^(?:show|pakita)\s+attendance\s+(?:leaderboard|top)/i,
     /^top\s+sa\s+attendance/i,
+    /^(?:sino|who)\s+(?:yung|ang)\s+(?:top|nangunguna)\s+(?:sa\s+)?attendance/i,
   ],
 
   // Bidding leaderboard (specific - must come before general)
@@ -349,14 +415,22 @@ const NLP_PATTERNS = {
     /^(?:rank|ranking|ranks)$/i,
     /^(?:show|display)\s+(?:all\s+)?(?:rankings?|stats?|scores?)/i,
 
+    // Gaming terms
+    /^(?:guild|clan)\s+(?:rankings?|stats?|leaderboard)/i,
+    /^(?:show|view)\s+(?:guild|clan|team)\s+(?:members?|players?|roster)/i,
+    /^(?:who(?:'s|\s+is)|show)\s+(?:the\s+)?(?:mvp|best|top\s+players?)/i,
+    /^(?:hall\s+of\s+)?(?:fame|legends?)/i,
+
     // Tagalog
     /^(?:sino|who)\s+(?:ang\s+)?(?:nangungunang|nangunguna|nasa\s+top)/i,
     /^(?:tignan|tingnan)\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:leaderboard|ranking)/i,
     /^(?:top|rank|ranking)(?:\s+(?:ba|naman|po))?$/i,
+    /^(?:sino|who)\s+(?:ang\s+)?(?:mga\s+)?(?:mahuhusay|magagaling)/i, // "who are the skilled ones"
 
     // Taglish
-    /^(?:sino|who)\s+(?:top|nangunguna)(?:\s+sa\s+lahat)?/i,
+    /^(?:sino|who)\s+(?:top|nangunguna|mvp)(?:\s+sa\s+lahat)?/i,
     /^(?:show|pakita)\s+(?:me\s+)?(?:the\s+)?(?:all\s+)?(?:ranking|leaderboards?)/i,
+    /^(?:guild|clan)\s+(?:members?|players?|rankings?)/i,
   ],
 
   // Queue list
@@ -368,14 +442,22 @@ const NLP_PATTERNS = {
     /^(?:list|show)\s+(?:all\s+)?(?:auction\s+)?items?/i,
     /^(?:what(?:'s|\s+is)|show)\s+(?:up\s+)?next/i,
 
+    // Gaming terminology
+    /^(?:show|list|check)\s+(?:all\s+)?(?:the\s+)?(?:loot|drops?|items?|rewards?)/i,
+    /^(?:what\s+)?(?:items?|loot|drops?)\s+(?:are\s+)?(?:available|up|coming)/i,
+    /^(?:show|view)\s+(?:the\s+)?(?:loot\s+)?(?:table|pool|list)/i,
+    /^(?:what(?:'s|\s+is)|show)\s+(?:in\s+)?(?:the\s+)?(?:pot|pool)/i,
+    /^(?:upcoming|next)\s+(?:items?|loot|auctions?)/i,
+
     // Tagalog
     /^(?:ano|anu)\s+(?:ang\s+)?(?:nasa\s+)?queue/i,
     /^(?:tignan|tingnan)\s+(?:ang\s+)?queue/i,
-    /^(?:ilista|listahan)\s+(?:ng\s+)?items?/i,
+    /^(?:ilista|listahan)\s+(?:ng\s+)?(?:items?|loot)/i,
+    /^(?:ano|anu)\s+(?:ang\s+)?(?:mga\s+)?(?:loot|items?)/i,
 
     // Taglish
-    /^(?:show|pakita)\s+(?:yung|ang)\s+queue/i,
-    /^(?:ano|what)\s+(?:ang\s+)?(?:next|susunod)/i,
+    /^(?:show|pakita)\s+(?:yung|ang)\s+(?:queue|loot|items?)/i,
+    /^(?:ano|what)\s+(?:ang\s+)?(?:next|susunod|nasa\s+queue)/i,
   ],
 
   // Admin auction commands
@@ -567,14 +649,21 @@ const NLP_PATTERNS = {
     /^(?:what\s+)?(?:commands?|features?)\s+(?:are\s+)?(?:available|do\s+you\s+have)/i,
     /^(?:i\s+need\s+)?help$/i,
 
+    // Gaming terms
+    /^(?:bot\s+)?(?:guide|tutorial|instructions?)/i,
+    /^(?:how\s+)?(?:does\s+)?(?:this|the\s+bot)\s+work/i,
+    /^(?:i(?:'m|\s+am)\s+)?(?:lost|confused|new|noob|newbie)/i,
+
     // Tagalog
     /^(?:tulong|help)\s+(?:po|naman|pls)?/i,
     /^(?:ano|anu)\s+(?:ang\s+)?(?:commands?|pwede)/i,
     /^(?:paano|how)\s+(?:ko\s+)?(?:gagamitin|to)/i,
+    /^(?:bago|baguhan|newbie)\s+(?:ako|po)/i, // "i'm new"
 
     // Taglish
     /^(?:help|tulong)\s+(?:naman|please|pls)/i,
     /^(?:ano|what)\s+(?:commands?|pwede)/i,
+    /^(?:bano|noob|newbie)\s+(?:ako|pa\s+ako)/i, // "i'm a noob"
   ],
 };
 
