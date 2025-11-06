@@ -170,6 +170,56 @@ In Admin Logs:
 "bot status" → !status
 ```
 
+### 🧠 Bot Learning System (NEW!)
+**The bot improves over time by learning from past predictions!**
+
+**How It Works:**
+1. Bot makes prediction (e.g., item price, member engagement)
+2. Prediction saved to `BotLearning` Google Sheet with confidence
+3. Event completes → actual outcome observed
+4. System calculates accuracy by comparing predicted vs actual
+5. Future predictions adjusted based on historical accuracy
+
+**What the Bot Learns:**
+- **Price Predictions** (Auctions): Learns optimal starting bids
+  - If 90%+ accurate → increases confidence on future predictions
+  - If <70% accurate → decreases confidence
+  - After 10+ predictions, bot knows when it's reliable
+
+- **Engagement Predictions** (Members): Predicts who will attend events
+  - Learns attendance patterns over time
+  - Identifies at-risk members before they leave
+  - Improves prediction accuracy week by week
+
+- **Anomaly Detection** (Fraud): Learns what "normal" looks like
+  - Better at catching suspicious bidding patterns
+  - Reduces false positives over time
+  - Learns from admin feedback on investigations
+
+**Commands:**
+```
+!learningmetrics    - View bot's learning stats and accuracy
+!updateprediction   - Manually update prediction with actual result
+!viewlearning       - See recent predictions and their accuracy
+!performance        - Includes learning metrics in system report
+```
+
+**Data Storage:**
+All learning data is stored in the `BotLearning` Google Sheet:
+- Timestamp, Type, Target, Predicted, Actual, Accuracy, Confidence, Features, Status
+- Admins can view/audit all predictions
+- Persistent across bot restarts (Koyeb-friendly)
+- Privacy-friendly (no sensitive personal data)
+
+**Benefits:**
+✅ Bot gets smarter the more it's used
+✅ Confidence scores calibrated to actual performance
+✅ Transparent learning (all data visible in Google Sheets)
+✅ Works for multiple prediction types (auctions, engagement, fraud)
+✅ Zero breaking changes to existing features
+
+> 📖 **Full documentation**: See `LEARNING_SYSTEM_DOCUMENTATION.md` for technical details
+
 ### 🛡️ Security & Reliability
 - **Admin role verification** on all privileged commands
 - **Confirmation prompts** for destructive operations
@@ -516,6 +566,48 @@ PORT=8000  # Optional, defaults to 8000
 !recommendations
 → Optimal auction time: Saturday 8PM, 15 members need reminders
 ```
+
+### Learning System Commands (Admin) 🧠
+
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `!learningmetrics` | `!learnstats` | View bot learning statistics and accuracy trends across all prediction types |
+| `!updateprediction <item> <actual price>` | | Manually update prediction accuracy when auction completes |
+| `!viewlearning [type] [limit]` | `!predictions` | View recent predictions with accuracy (filter by type, limit results) |
+| `!performance` | `!perf` | System performance + learning metrics (includes bot accuracy stats) |
+
+**Examples:**
+```
+!learningmetrics
+→ PRICE PREDICTION:
+→   • Total: 47 predictions
+→   • Average Accuracy: 87.3%
+→   • Recent Accuracy: 92.1% (📈 improving)
+→ ENGAGEMENT:
+→   • Total: 23 predictions
+→   • Average Accuracy: 78.5%
+
+!updateprediction Crimson Pendant 475
+→ ✅ Updated prediction accuracy for "Crimson Pendant" with actual price 475pts!
+→ 🧠 Bot is learning... Accuracy: 94.7%
+
+!viewlearning price_prediction 5
+→ Recent Price Predictions:
+→ 1. Crimson Pendant: 450 → 475 (94.7% ✅) completed
+→ 2. Ruby Ring: 300 → 295 (98.3% ✅) completed
+→ 3. Ancient Scroll: 320 → [pending]
+→ 4. Dragon Scale: 500 → 450 (90.0% ✅) completed
+→ 5. Mystic Orb: 400 → 420 (95.2% ✅) completed
+
+!performance
+→ [System stats...]
+→ 🧠 Learning Metrics:
+→   • 70 total predictions made
+→   • Price predictions: 92.1% recent accuracy (📈 +4.8%)
+→   • Bot confidence calibrated based on performance
+```
+
+> 💡 **Note**: The more the bot is used, the smarter it gets! Predictions improve over time as more data is collected in the BotLearning Google Sheet.
 
 ### Help Commands
 

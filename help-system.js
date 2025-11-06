@@ -715,7 +715,7 @@ const COMMAND_HELP = {
 
   performance: {
     usage: "!performance",
-    description: "🤖 System performance monitoring, health check, and optimization insights",
+    description: "🤖 System performance monitoring, health check, optimization insights, AND bot learning metrics",
     category: "Intelligence",
     adminOnly: true,
     example: "!performance\n!perf",
@@ -726,9 +726,76 @@ const COMMAND_HELP = {
       "System uptime tracking",
       "Intelligence cache statistics",
       "Memory percentage and status indicators",
+      "🧠 Bot Learning Metrics (NEW!):",
+      "  • Total predictions made by type",
+      "  • Average accuracy per prediction type",
+      "  • Recent accuracy (last 10 predictions)",
+      "  • Accuracy trends (improving/declining/stable)",
+      "  • Confidence adjustment status",
       "Performance recommendations",
       "Auto-optimization suggestions",
       "Cache health monitoring"
+    ]
+  },
+
+  learningmetrics: {
+    usage: "!learningmetrics",
+    description: "🧠 View detailed bot learning metrics and accuracy statistics",
+    category: "Learning",
+    adminOnly: true,
+    example: "!learningmetrics",
+    aliases: ["!learnstats"],
+    location: "Admin Logs Channel or ELYSIUM Commands Channel",
+    features: [
+      "Total predictions made across all types",
+      "Breakdown by prediction type:",
+      "  • Price Predictions (auction bids)",
+      "  • Engagement Predictions (member activity)",
+      "  • Anomaly Detection (fraud patterns)",
+      "Average accuracy % for each type",
+      "Recent accuracy (last 10 predictions)",
+      "Trend analysis (📈 improving, 📉 declining, ➡️ stable)",
+      "Shows how bot is learning over time",
+      "View data from BotLearning Google Sheet"
+    ]
+  },
+
+  updateprediction: {
+    usage: "!updateprediction <item name> <actual price>",
+    description: "🧠 Manually update prediction accuracy with actual auction result",
+    category: "Learning",
+    adminOnly: true,
+    example: "!updateprediction Crimson Pendant 475\n!updateprediction Ruby Ring 320",
+    aliases: [],
+    location: "Admin Logs Channel",
+    features: [
+      "Updates learning system with actual auction result",
+      "Calculates prediction accuracy automatically",
+      "Bot learns from the feedback",
+      "Adjusts future confidence scores",
+      "Updates BotLearning sheet in Google Sheets",
+      "Use after auction completes if auto-update didn't trigger",
+      "Item name must match prediction exactly"
+    ]
+  },
+
+  viewlearning: {
+    usage: "!viewlearning [type] [limit]",
+    description: "🧠 View recent predictions and their accuracy",
+    category: "Learning",
+    adminOnly: true,
+    example: "!viewlearning\n!viewlearning price_prediction 20\n!viewlearning engagement 10",
+    aliases: ["!predictions"],
+    location: "Admin Logs Channel or ELYSIUM Commands Channel",
+    features: [
+      "Shows recent predictions made by the bot",
+      "Filter by type: price_prediction, engagement, anomaly",
+      "Displays: Target, Predicted, Actual, Accuracy %",
+      "Shows status (pending or completed)",
+      "Limit results (default: 10, max: 50)",
+      "View confidence scores for each prediction",
+      "Useful for auditing bot learning",
+      "Data comes from BotLearning Google Sheet"
     ]
   },
 
@@ -760,6 +827,7 @@ const CATEGORIES = {
   Loot: `${EMOJI.LOOT} Loot Recognition`,
   Member: `${EMOJI.MEMBER} Member Commands`,
   Intelligence: `🤖 AI/ML Intelligence Engine`,
+  Learning: `🧠 Bot Learning System`,
   Emergency: `🚨 Emergency Recovery`,
 };
 
@@ -771,6 +839,7 @@ const CATEGORY_DESCRIPTIONS = {
   Loot: "OCR-powered loot screenshot processing and automatic logging",
   Member: "Commands available to all ELYSIUM members",
   Intelligence: "🤖 AI-powered predictive analytics, engagement analysis, anomaly detection, and smart recommendations",
+  Learning: "🧠 Bot learns and improves over time - tracks predictions, calculates accuracy, adjusts confidence. Works for auctions, engagement, and anomalies. Data stored in BotLearning Google Sheet.",
   Emergency: "⚠️ ADMIN ONLY: Force recovery from stuck states (requires confirmation)",
 };
 
