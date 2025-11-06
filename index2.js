@@ -4347,6 +4347,10 @@ client.on(Events.MessageCreate, async (message) => {
             }
           }
 
+          // Lock and archive the thread to prevent spam
+          await message.channel
+            .setLocked(true, `Force locked by ${message.author.username}`)
+            .catch(console.error);
           await message.channel
             .setArchived(true, `Force closed by ${message.author.username}`)
             .catch(console.error);
@@ -4859,6 +4863,10 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
             }
           }
 
+          // Lock and archive the thread to prevent spam
+          await msg.channel
+            .setLocked(true, `Locked by ${user.username}`)
+            .catch(() => {});
           await msg.channel
             .setArchived(true, `Closed by ${user.username}`)
             .catch(() => {});

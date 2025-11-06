@@ -1305,7 +1305,8 @@ async function checkAndAutoCloseThreads(client) {
             }
           }
 
-          // Archive the thread
+          // Lock and archive the thread to prevent spam
+          await thread.setLocked(true, "Auto-locked - duplicate prevented").catch(() => {});
           await thread.setArchived(true, "Auto-closed after 20 minutes - duplicate prevented").catch(() => {});
 
           // Clean up state
@@ -1365,7 +1366,8 @@ async function checkAndAutoCloseThreads(client) {
               }
             }
 
-            // Archive the thread
+            // Lock and archive the thread to prevent spam
+            await thread.setLocked(true, "Auto-locked after 20 minutes").catch(() => {});
             await thread.setArchived(true, "Auto-closed after 20 minutes").catch(() => {});
 
             // Clean up state
