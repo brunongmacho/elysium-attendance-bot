@@ -78,6 +78,9 @@ const errorHandler = require('./utils/error-handler');      // Centralized error
 const { SheetAPI } = require('./utils/sheet-api');          // Unified Google Sheets API
 const { DiscordCache } = require('./utils/discord-cache');  // Channel caching system
 const { normalizeUsername } = require('./utils/common');    // Username normalization
+const { IntelligenceEngine } = require('./intelligence-engine.js'); // AI/ML Intelligence Engine
+const { ProactiveIntelligence } = require('./proactive-intelligence.js'); // Proactive Monitoring
+const { NLPHandler } = require('./nlp-handler.js'); // Natural Language Processing
 
 /**
  * Command alias mapping for shorthand commands.
@@ -128,6 +131,21 @@ const COMMAND_ALIASES = {
 
   // Emergency commands (admin)
   "!emerg": "!emergency",
+
+  // Intelligence engine commands (admin)
+  "!predict": "!predictprice",
+  "!suggestprice": "!predictprice",
+  "!suggestauction": "!analyzequeue",
+  "!bootstrap": "!bootstraplearning",
+  "!learnhistory": "!bootstraplearning",
+  "!analyzequeue": "!analyzequeue",
+  "!engage": "!engagement",
+  "!analyze": "!analyzeengagement",
+  "!anomaly": "!detectanomalies",
+  "!fraud": "!detectanomalies",
+  "!recommend": "!recommendations",
+  "!suggest": "!recommendations",
+  "!perf": "!performance",
 
   // Member management commands (admin)
   "!removemem": "!removemember",
@@ -353,6 +371,27 @@ let lastOverrideTime = 0;
  * @type {number}
  */
 let lastAuctionEndTime = 0;
+
+/**
+ * Intelligence Engine instance for AI/ML features
+ * Provides predictive analytics, engagement analysis, anomaly detection, etc.
+ * @type {IntelligenceEngine}
+ */
+let intelligenceEngine = null;
+
+/**
+ * Proactive Intelligence instance for auto-notifications
+ * Monitors guild health and sends proactive alerts
+ * @type {ProactiveIntelligence}
+ */
+let proactiveIntelligence = null;
+
+/**
+ * NLP Handler for natural language command interpretation
+ * Allows flexible command syntax without strict ! prefix
+ * @type {NLPHandler}
+ */
+let nlpHandler = null;
 
 /**
  * Flag indicating bot is currently recovering from a crash
@@ -1803,9 +1842,23 @@ const commandHandlers = {
     if (args.length === 0) {
       return await message.reply(`❌ Usage: \`!extend <minutes>\``);
     }
-    const mins = parseInt(args[0]);
-    if (isNaN(mins) || mins <= 0) {
+    let value = parseInt(args[0]);
+    if (isNaN(value) || value <= 0) {
       return await message.reply(`❌ Must be positive number`);
+    }
+
+    // Check if unit is specified (from NLP: "30 seconds" vs "30 minutes")
+    const unit = args[1] ? args[1].toLowerCase() : '';
+    let mins = value;
+
+    // Convert seconds to minutes if needed
+    if (unit && (unit.startsWith('sec') || unit === 's')) {
+      mins = Math.ceil(value / 60); // Convert seconds to minutes, round up
+    }
+    // If unit is minutes or empty, treat as minutes (default)
+
+    if (mins <= 0) {
+      mins = 1; // Minimum 1 minute
     }
     const auctState = auctioneering.getAuctionState();
     if (!auctState.active || !auctState.currentItem) {
@@ -2249,6 +2302,658 @@ const commandHandlers = {
     await message.reply({ content: "📊 Generating weekly report...", failIfNotExists: false });
     await leaderboardSystem.sendWeeklyReport();
   },
+
+  // =========================================================================
+  // INTELLIGENCE ENGINE COMMANDS - AI/ML Powered Features
+  // =========================================================================
+
+  /**
+   * Predict optimal starting bid for an item based on historical data
+   * Usage: !predictprice <item name>
+   */
+  predictprice: async (message, member) => {
+    const args = message.content.trim().split(/\s+/).slice(1);
+
+    if (args.length === 0) {
+      await message.reply(
+        `❌ **Usage:** \`!predictprice <item name>\`\n\n` +
+        `**Example:** \`!predictprice Crimson Pendant\`\n\n` +
+        `I'll analyze historical auction data to suggest an optimal starting bid!`
+      );
+      return;
+    }
+
+    const itemName = args.join(' ');
+    await message.reply(`🤖 Analyzing historical data for **${itemName}**...`);
+
+    try {
+      const prediction = await intelligenceEngine.predictItemValue(itemName);
+
+      if (!prediction.success) {
+        const embed = new EmbedBuilder()
+          .setColor(0xff9900)
+          .setTitle(`📊 Price Prediction: ${itemName}`)
+          .setDescription(`⚠️ ${prediction.reason}`)
+          .setFooter({ text: `Requested by ${member.user.username}` })
+          .setTimestamp();
+
+        if (prediction.suggestion) {
+          embed.addFields({
+            name: '💡 Alternative Suggestion',
+            value: `Based on similar items: **${prediction.suggestion.suggestion} points**\n${prediction.suggestion.reason}`,
+            inline: false,
+          });
+
+          if (prediction.suggestion.similarItems && prediction.suggestion.similarItems.length > 0) {
+            const similarList = prediction.suggestion.similarItems
+              .map(s => `• ${s.name} - ${s.price}pts (${s.similarity} match)`)
+              .join('\n');
+            embed.addFields({
+              name: '🔍 Similar Items Found',
+              value: similarList,
+              inline: false,
+            });
+          }
+        }
+
+        await message.reply({ embeds: [embed] });
+        return;
+      }
+
+      // Success - display full prediction
+      const { suggestedStartingBid, confidence, statistics, trend, reasoning } = prediction;
+
+      const embed = new EmbedBuilder()
+        .setColor(confidence >= 70 ? 0x00ff00 : confidence >= 50 ? 0xffff00 : 0xff9900)
+        .setTitle(`📊 AI Price Prediction: ${itemName}`)
+        .setDescription(`🎯 **Suggested Starting Bid: ${suggestedStartingBid} points**`)
+        .addFields(
+          {
+            name: '📈 Confidence',
+            value: `${confidence}%` + (confidence >= 70 ? ' ✅' : confidence >= 50 ? ' ⚠️' : ' 🔴'),
+            inline: true,
+          },
+          {
+            name: '📊 Historical Auctions',
+            value: `${statistics.historicalAuctions} auctions`,
+            inline: true,
+          },
+          {
+            name: '📉 Trend',
+            value: `${trend.direction === 'increasing' ? '📈' : trend.direction === 'decreasing' ? '📉' : '➡️'} ${trend.direction.toUpperCase()}\n(${trend.percentage > 0 ? '+' : ''}${trend.percentage}%)`,
+            inline: true,
+          },
+          {
+            name: '💰 Price Statistics',
+            value:
+              `Average: **${statistics.averagePrice}pts**\n` +
+              `Median: **${statistics.medianPrice}pts**\n` +
+              `Range: ${statistics.priceRange.min}-${statistics.priceRange.max}pts\n` +
+              `Std Dev: ±${statistics.standardDeviation}pts`,
+            inline: true,
+          },
+          {
+            name: '🎯 95% Confidence Interval',
+            value: `${statistics.confidenceInterval.lower}-${statistics.confidenceInterval.upper} points`,
+            inline: true,
+          },
+          {
+            name: '🧠 AI Reasoning',
+            value: reasoning,
+            inline: false,
+          }
+        )
+        .setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
+        .setTimestamp();
+
+      if (statistics.outliers > 0) {
+        embed.addFields({
+          name: '🔍 Data Quality',
+          value: `Removed ${statistics.outliers} outlier(s) for accuracy`,
+          inline: false,
+        });
+      }
+
+      await message.reply({ embeds: [embed] });
+      console.log(`🤖 [INTELLIGENCE] Price prediction for ${itemName}: ${suggestedStartingBid}pts (${confidence}% confidence)`);
+    } catch (error) {
+      console.error('[INTELLIGENCE] Error predicting price:', error);
+      await message.reply(`❌ Error analyzing item data: ${error.message}`);
+    }
+  },
+
+  /**
+   * Analyze member engagement and predict attendance likelihood
+   * Usage: !engagement <username>
+   */
+  engagement: async (message, member) => {
+    const args = message.content.trim().split(/\s+/).slice(1);
+
+    if (args.length === 0) {
+      await message.reply(
+        `❌ **Usage:** \`!engagement <username>\`\n\n` +
+        `**Example:** \`!engagement PlayerName\`\n\n` +
+        `I'll analyze engagement patterns, predict attendance likelihood, and provide personalized recommendations!`
+      );
+      return;
+    }
+
+    const username = args.join(' ');
+    await message.reply(`🤖 Analyzing engagement for **${username}**...`);
+
+    try {
+      const analysis = await intelligenceEngine.analyzeMemberEngagement(username);
+
+      if (analysis.error) {
+        await message.reply(`❌ Error analyzing member: ${analysis.error}`);
+        return;
+      }
+
+      const { engagementScore, level, emoji, components, prediction, recommendations, profile } = analysis;
+
+      const embed = new EmbedBuilder()
+        .setColor(engagementScore >= 80 ? 0x00ff00 : engagementScore >= 60 ? 0xffff00 : engagementScore >= 40 ? 0xff9900 : 0xff0000)
+        .setTitle(`${emoji} Engagement Analysis: ${username}`)
+        .setDescription(`**Engagement Score: ${engagementScore}/100** (${level})`)
+        .addFields(
+          {
+            name: '📊 Score Breakdown',
+            value:
+              `Attendance: ${components.attendance.toFixed(0)}/100\n` +
+              `Bidding Activity: ${components.bidding.toFixed(0)}/100\n` +
+              `Consistency: ${components.consistency.toFixed(0)}/100\n` +
+              `Recent Activity: ${components.recentActivity.toFixed(0)}/100`,
+            inline: true,
+          },
+          {
+            name: '🎯 Next Event Prediction',
+            value:
+              `Likelihood: **${prediction.nextAttendanceLikelihood}**\n` +
+              `Confidence: ${prediction.confidence}`,
+            inline: true,
+          },
+          {
+            name: '📈 Member Profile',
+            value:
+              `Total Attendance: ${profile.attendance.total}pts\n` +
+              `Spawns Attended: ${profile.attendance.spawns}\n` +
+              `Avg per Spawn: ${profile.attendance.averagePerSpawn.toFixed(1)}pts`,
+            inline: false,
+          },
+          {
+            name: '💰 Bidding Stats',
+            value:
+              `Points Remaining: ${profile.bidding.pointsRemaining}pts\n` +
+              `Points Used: ${profile.bidding.pointsConsumed}pts\n` +
+              `Auctions Won: ${profile.bidding.auctionsWon}`,
+            inline: false,
+          },
+          {
+            name: '💡 Recommendations',
+            value: recommendations.join('\n'),
+            inline: false,
+          }
+        )
+        .setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
+        .setTimestamp();
+
+      await message.reply({ embeds: [embed] });
+      console.log(`🤖 [INTELLIGENCE] Engagement analysis for ${username}: ${engagementScore}/100`);
+    } catch (error) {
+      console.error('[INTELLIGENCE] Error analyzing engagement:', error);
+      await message.reply(`❌ Error analyzing engagement: ${error.message}`);
+    }
+  },
+
+  /**
+   * Analyze engagement for all members
+   * Usage: !analyzeengagement
+   */
+  analyzeengagement: async (message, member) => {
+    await message.reply(`🤖 Analyzing engagement for all members... This may take a moment.`);
+
+    try {
+      const analysis = await intelligenceEngine.analyzeAllMembersEngagement();
+
+      if (analysis.error) {
+        await message.reply(`❌ Error: ${analysis.error}`);
+        return;
+      }
+
+      const { total, active, atRisk, topPerformers, needsAttention, averageEngagement } = analysis;
+
+      // Top performers embed
+      const topPerformersText = topPerformers
+        .map((m, i) => `${i + 1}. **${m.username}** - ${m.engagementScore}/100 ${m.emoji}`)
+        .join('\n');
+
+      // At-risk members
+      const atRiskText = needsAttention.length > 0
+        ? needsAttention
+            .map((m) => `• ${m.username} (${m.engagementScore}/100) - ${m.recommendations[0]}`)
+            .slice(0, 5)
+            .join('\n')
+        : 'None';
+
+      const embed = new EmbedBuilder()
+        .setColor(0x00aaff)
+        .setTitle(`📊 Guild Engagement Analysis`)
+        .setDescription(`Average Engagement: **${averageEngagement}/100**`)
+        .addFields(
+          {
+            name: '📈 Overview',
+            value:
+              `Total Members: **${total}**\n` +
+              `Active: **${active}** (${((active/total)*100).toFixed(0)}%)\n` +
+              `At Risk: **${atRisk}** (${((atRisk/total)*100).toFixed(0)}%)`,
+            inline: false,
+          },
+          {
+            name: '🏆 Top Performers',
+            value: topPerformersText,
+            inline: false,
+          },
+          {
+            name: '⚠️ Needs Attention',
+            value: atRiskText,
+            inline: false,
+          }
+        )
+        .setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
+        .setTimestamp();
+
+      await message.reply({ embeds: [embed] });
+      console.log(`🤖 [INTELLIGENCE] Guild engagement analysis: ${averageEngagement}/100 avg, ${atRisk}/${total} at risk`);
+    } catch (error) {
+      console.error('[INTELLIGENCE] Error analyzing all members:', error);
+      await message.reply(`❌ Error analyzing members: ${error.message}`);
+    }
+  },
+
+  /**
+   * Detect anomalies and suspicious patterns
+   * Usage: !detectanomalies
+   */
+  detectanomalies: async (message, member) => {
+    await message.reply(`🔍 Scanning for anomalies and suspicious patterns...`);
+
+    try {
+      const [biddingAnomalies, attendanceAnomalies] = await Promise.all([
+        intelligenceEngine.detectBiddingAnomalies(),
+        intelligenceEngine.detectAttendanceAnomalies(),
+      ]);
+
+      if (biddingAnomalies.error || attendanceAnomalies.error) {
+        await message.reply(`❌ Error detecting anomalies`);
+        return;
+      }
+
+      const totalAnomalies = biddingAnomalies.anomaliesDetected + attendanceAnomalies.anomaliesDetected;
+
+      const embed = new EmbedBuilder()
+        .setColor(totalAnomalies > 0 ? 0xff0000 : 0x00ff00)
+        .setTitle(`🔍 Anomaly Detection Report`)
+        .setDescription(
+          totalAnomalies === 0
+            ? '✅ **No anomalies detected!** All patterns appear normal.'
+            : `⚠️ **${totalAnomalies} anomalies detected** - Review recommended.`
+        )
+        .addFields({
+          name: '💰 Bidding Analysis',
+          value:
+            `Analyzed: ${biddingAnomalies.analyzed} auctions\n` +
+            `Anomalies: ${biddingAnomalies.anomaliesDetected}`,
+          inline: true,
+        })
+        .addFields({
+          name: '📊 Attendance Analysis',
+          value:
+            `Analyzed: ${attendanceAnomalies.analyzed} members\n` +
+            `Anomalies: ${attendanceAnomalies.anomaliesDetected}`,
+          inline: true,
+        })
+        .setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
+        .setTimestamp();
+
+      // Add bidding anomalies
+      if (biddingAnomalies.anomaliesDetected > 0) {
+        const biddingDetails = biddingAnomalies.anomalies
+          .slice(0, 5)
+          .map((a) => `• **${a.type}** (${a.severity})\n  ${a.recommendation}`)
+          .join('\n');
+
+        embed.addFields({
+          name: '⚠️ Bidding Anomalies',
+          value: biddingDetails,
+          inline: false,
+        });
+      }
+
+      // Add attendance anomalies
+      if (attendanceAnomalies.anomaliesDetected > 0) {
+        const attendanceDetails = attendanceAnomalies.anomalies
+          .slice(0, 5)
+          .map((a) => `• **${a.username}** (${a.deviation})\n  ${a.recommendation}`)
+          .join('\n');
+
+        embed.addFields({
+          name: '⚠️ Attendance Anomalies',
+          value: attendanceDetails,
+          inline: false,
+        });
+      }
+
+      await message.reply({ embeds: [embed] });
+      console.log(`🤖 [INTELLIGENCE] Anomaly detection: ${totalAnomalies} anomalies found`);
+    } catch (error) {
+      console.error('[INTELLIGENCE] Error detecting anomalies:', error);
+      await message.reply(`❌ Error detecting anomalies: ${error.message}`);
+    }
+  },
+
+  /**
+   * Get smart recommendations for auction timing and member engagement
+   * Usage: !recommendations
+   */
+  recommendations: async (message, member) => {
+    await message.reply(`🤖 Generating smart recommendations...`);
+
+    try {
+      const [auctionTiming, reminders] = await Promise.all([
+        intelligenceEngine.recommendAuctionTiming(),
+        intelligenceEngine.generateAttendanceReminders(),
+      ]);
+
+      if (auctionTiming.error) {
+        await message.reply(`❌ Error generating recommendations: ${auctionTiming.error}`);
+        return;
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor(0x9b59b6)
+        .setTitle(`💡 Smart Recommendations`)
+        .setDescription(`AI-powered insights for optimal guild management`)
+        .addFields({
+          name: '⏰ Optimal Auction Timing',
+          value:
+            `Best Window: **${auctionTiming.optimalWindow}**\n` +
+            `Expected Participation: **${auctionTiming.participationForecast}**`,
+          inline: false,
+        })
+        .setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
+        .setTimestamp();
+
+      // Timing recommendations
+      const timingDetails = auctionTiming.recommendations
+        .map((r) => `• **${r.type}**: ${r.recommendation} (${r.confidence} confidence)`)
+        .join('\n');
+
+      embed.addFields({
+        name: '📅 Timing Analysis',
+        value: timingDetails,
+        inline: false,
+      });
+
+      // Member reminders
+      if (reminders.length > 0) {
+        const reminderSummary = reminders
+          .slice(0, 5)
+          .map((r) => `• **${r.username}** (${r.engagementScore}/100) - ${r.priority} priority`)
+          .join('\n');
+
+        embed.addFields({
+          name: `📢 Suggested Reminders (${reminders.length} members)`,
+          value: reminderSummary,
+          inline: false,
+        });
+      }
+
+      await message.reply({ embeds: [embed] });
+      console.log(`🤖 [INTELLIGENCE] Generated recommendations: ${reminders.length} reminders suggested`);
+    } catch (error) {
+      console.error('[INTELLIGENCE] Error generating recommendations:', error);
+      await message.reply(`❌ Error generating recommendations: ${error.message}`);
+    }
+  },
+
+  /**
+   * Display performance metrics and system health
+   * Usage: !performance
+   */
+  performance: async (message, member) => {
+    try {
+      const [metrics, report] = await Promise.all([
+        intelligenceEngine.monitorPerformance(),
+        intelligenceEngine.generatePerformanceReport(),
+      ]);
+
+      const embed = new EmbedBuilder()
+        .setColor(metrics.memoryPercent > 85 ? 0xff0000 : 0x00ff00)
+        .setTitle(`⚙️ System Performance Report`)
+        .setDescription(`Current system health and optimization status`)
+        .addFields(
+          {
+            name: '💾 Memory Usage',
+            value:
+              `Used: **${report.memory.used}** / 512MB\n` +
+              `Percentage: **${report.memory.percent}**\n` +
+              `Status: ${report.memory.status}`,
+            inline: true,
+          },
+          {
+            name: '⏱️ Uptime',
+            value: report.uptime,
+            inline: true,
+          },
+          {
+            name: '🗄️ Intelligence Caches',
+            value:
+              `Auction History: ${report.caches.auctionHistory}\n` +
+              `Attendance History: ${report.caches.attendanceHistory}\n` +
+              `Member Profiles: ${report.caches.memberProfiles}`,
+            inline: false,
+          },
+          {
+            name: '💡 Recommendations',
+            value: report.recommendations.join('\n'),
+            inline: false,
+          }
+        )
+        .setFooter({ text: `Requested by ${member.user.username}` })
+        .setTimestamp();
+
+      await message.reply({ embeds: [embed] });
+      console.log(`🤖 [INTELLIGENCE] Performance report generated - ${report.memory.percent} memory`);
+    } catch (error) {
+      console.error('[INTELLIGENCE] Error generating performance report:', error);
+      await message.reply(`❌ Error generating report: ${error.message}`);
+    }
+  },
+
+  /**
+   * Analyze auction queue and suggest prices for all items
+   * Usage: !suggestauction or !analyzequeue
+   */
+  analyzequeue: async (message, member) => {
+    await message.reply(`🤖 Analyzing auction queue... This may take a moment.`);
+
+    try {
+      // Get items from queue
+      const queueResponse = await sheetAPI.call('getBiddingItems', {});
+      const queueItems = queueResponse && queueResponse.items ? queueResponse.items : [];
+
+      if (!queueItems || queueItems.length === 0) {
+        await message.reply(`⚠️ No items in auction queue. Use Google Sheets to add items to BiddingItems.`);
+        return;
+      }
+
+      console.log(`🤖 [INTELLIGENCE] Analyzing ${queueItems.length} items in queue...`);
+
+      // Analyze each item
+      const analyses = [];
+      for (const item of queueItems.slice(0, 20)) { // Limit to 20 items to avoid timeout
+        const itemName = item.itemName || item.name || 'Unknown';
+        const currentPrice = parseInt(item.startingBid) || 0;
+
+        const prediction = await intelligenceEngine.predictItemValue(itemName);
+
+        analyses.push({
+          itemName,
+          currentPrice,
+          prediction,
+        });
+      }
+
+      // Create summary embed
+      const embed = new EmbedBuilder()
+        .setColor(0x9b59b6)
+        .setTitle(`💰 Auction Queue Analysis`)
+        .setDescription(
+          `AI price suggestions for **${analyses.length}** items in queue\n\n` +
+          `**How to use:** Manually adjust prices in Google Sheets > BiddingItems before starting auction`
+        )
+        .setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
+        .setTimestamp();
+
+      // Add items with suggestions
+      const itemsList = analyses.map((item, i) => {
+        if (!item.prediction.success) {
+          return `${i + 1}. **${item.itemName}**\n   Current: ${item.currentPrice}pts\n   ⚠️ ${item.prediction.reason}`;
+        }
+
+        const { suggestedStartingBid, confidence } = item.prediction;
+        const diff = suggestedStartingBid - item.currentPrice;
+        const diffText = diff > 0 ? `+${diff}` : diff < 0 ? `${diff}` : '±0';
+        const emoji = confidence >= 70 ? '✅' : confidence >= 50 ? '⚠️' : '🔴';
+
+        return `${i + 1}. **${item.itemName}** ${emoji}\n   Current: ${item.currentPrice}pts → AI: ${suggestedStartingBid}pts (${diffText})\n   Confidence: ${confidence}%`;
+      }).join('\n\n');
+
+      // Split into multiple fields if too long
+      if (itemsList.length < 1024) {
+        embed.addFields({
+          name: '📊 Price Suggestions',
+          value: itemsList,
+          inline: false,
+        });
+      } else {
+        // Split into chunks
+        const chunks = itemsList.match(/[\s\S]{1,1000}(?:\n|$)/g) || [itemsList];
+        chunks.forEach((chunk, i) => {
+          embed.addFields({
+            name: i === 0 ? '📊 Price Suggestions' : `📊 Price Suggestions (cont.)`,
+            value: chunk.trim(),
+            inline: false,
+          });
+        });
+      }
+
+      // Add summary statistics
+      const withPredictions = analyses.filter(a => a.prediction.success);
+      const avgConfidence = withPredictions.length > 0
+        ? Math.round(withPredictions.reduce((sum, a) => sum + a.prediction.confidence, 0) / withPredictions.length)
+        : 0;
+
+      embed.addFields({
+        name: '📈 Analysis Summary',
+        value:
+          `Total Items: ${analyses.length}\n` +
+          `With Predictions: ${withPredictions.length}\n` +
+          `Avg Confidence: ${avgConfidence}%`,
+        inline: false,
+      });
+
+      embed.addFields({
+        name: '💡 Next Steps',
+        value:
+          `1. Review AI suggestions above\n` +
+          `2. Open Google Sheets > BiddingItems\n` +
+          `3. Manually adjust "Starting Bid" column\n` +
+          `4. Start auction with \`!startauction\``,
+        inline: false,
+      });
+
+      await message.reply({ embeds: [embed] });
+      console.log(`✅ [INTELLIGENCE] Queue analysis complete: ${analyses.length} items analyzed`);
+
+    } catch (error) {
+      console.error('[INTELLIGENCE] Error analyzing queue:', error);
+      await message.reply(`❌ Error analyzing queue: ${error.message}`);
+    }
+  },
+
+  /**
+   * Bootstrap learning system from ALL historical data
+   * Usage: !bootstraplearning (admin only)
+   *
+   * This analyzes every auction in ForDistribution and creates completed predictions.
+   * The bot starts "smart" instead of learning from scratch!
+   */
+  bootstraplearning: async (message, member) => {
+    if (!isAdmin(message.member)) {
+      return message.reply(`${EMOJI.ERROR} Only admins can trigger bootstrap learning.`);
+    }
+
+    await message.reply(`🚀 Bootstrapping learning system from ALL historical data... This may take 30-60 seconds.`);
+
+    try {
+      console.log(`🚀 [BOOTSTRAP] Manual bootstrap requested by ${member.user.username}`);
+
+      const bootstrapResult = await sheetAPI.bootstrapLearning();
+
+      if (bootstrapResult.status === 'ok') {
+        const { predictionsCreated, uniqueItems, averageAccuracy, predictionsSkipped, totalAuctions } = bootstrapResult.data;
+
+        const embed = new EmbedBuilder()
+          .setColor(0x00ff00)
+          .setTitle('✅ Learning System Bootstrapped!')
+          .setDescription(
+            '**The bot has learned from ALL historical auction data!**\n\n' +
+            `Analyzed ${totalAuctions} historical auctions and created ${predictionsCreated} predictions.`
+          )
+          .addFields(
+            {
+              name: '📊 Results',
+              value:
+                `Total Auctions: **${totalAuctions}**\n` +
+                `Predictions Created: **${predictionsCreated}**\n` +
+                `Skipped (no prior data): **${predictionsSkipped}**\n` +
+                `Unique Items: **${uniqueItems}**\n` +
+                `Starting Accuracy: **${averageAccuracy}%**`,
+              inline: false,
+            },
+            {
+              name: '🎯 What This Means',
+              value:
+                '✅ Bot learned patterns from your entire history\n' +
+                '✅ Price predictions are now accurate immediately\n' +
+                '✅ Confidence adjusts based on historical accuracy\n' +
+                '✅ Bot will continue learning from new auctions',
+              inline: false,
+            },
+            {
+              name: '💡 Try It Out',
+              value:
+                '`!predictprice <item>` - Get AI price prediction\n' +
+                '`!learningmetrics` - View learning statistics\n' +
+                '`!suggestauction` - Analyze entire queue',
+              inline: false,
+            }
+          )
+          .setFooter({ text: `Bootstrapped by ${member.user.username} • ELYSIUM Learning System` })
+          .setTimestamp();
+
+        await message.reply({ embeds: [embed] });
+        console.log(`✅ [BOOTSTRAP] Successfully created ${predictionsCreated} predictions (${averageAccuracy}% accuracy)`);
+      } else {
+        await message.reply(`❌ Bootstrap failed: ${bootstrapResult.message}`);
+        console.error(`❌ [BOOTSTRAP] Failed: ${bootstrapResult.message}`);
+      }
+    } catch (error) {
+      console.error('[BOOTSTRAP] Error during bootstrap:', error);
+      await message.reply(`❌ Error during bootstrap: ${error.message}`);
+    }
+  },
 };
 
 /**
@@ -2303,10 +3008,87 @@ client.once(Events.ClientReady, async () => {
   const auctionCache = require('./utils/auction-cache');
   await auctionCache.init();
 
+  // INITIALIZE INTELLIGENCE ENGINE FIRST (needed by other modules)
+  intelligenceEngine = new IntelligenceEngine(client, config, sheetAPI);
+  console.log('🤖 Intelligence Engine initialized (AI/ML powered features enabled)');
+
+  // 🚀 AUTO-BOOTSTRAP LEARNING FROM HISTORY (First Deployment)
+  console.log('🔍 Checking if learning system needs bootstrap...');
+  try {
+    const needsCheck = await sheetAPI.needsBootstrap();
+    if (needsCheck.status === 'ok' && needsCheck.data.needsBootstrap) {
+      console.log('🚀 [FIRST DEPLOYMENT] Bootstrapping learning from historical data...');
+      console.log('   This will analyze ALL auction history and create predictions.');
+      console.log('   The bot will start SMART instead of learning from scratch!');
+
+      const bootstrapResult = await sheetAPI.bootstrapLearning();
+
+      if (bootstrapResult.status === 'ok') {
+        const { predictionsCreated, uniqueItems, averageAccuracy } = bootstrapResult.data;
+        console.log(`✅ [BOOTSTRAP SUCCESS]`);
+        console.log(`   📊 Predictions Created: ${predictionsCreated}`);
+        console.log(`   🎯 Unique Items Learned: ${uniqueItems}`);
+        console.log(`   🎓 Starting Accuracy: ${averageAccuracy}%`);
+        console.log(`   🧠 Bot is now SMART and ready to make accurate predictions!`);
+
+        // Send notification to admin logs
+        const adminLogsChannel = await discordCache.getChannel('admin_logs_channel_id');
+        if (adminLogsChannel) {
+          const embed = new EmbedBuilder()
+            .setColor(0x00ff00)
+            .setTitle('🚀 Learning System Bootstrapped!')
+            .setDescription(
+              '**The bot has learned from ALL historical auction data!**\n\n' +
+              `The learning system analyzed your entire auction history and created ` +
+              `${predictionsCreated} completed predictions across ${uniqueItems} unique items.`
+            )
+            .addFields(
+              {
+                name: '📊 Bootstrap Results',
+                value:
+                  `Predictions Created: **${predictionsCreated}**\n` +
+                  `Unique Items: **${uniqueItems}**\n` +
+                  `Starting Accuracy: **${averageAccuracy}%**`,
+                inline: false,
+              },
+              {
+                name: '🎯 What This Means',
+                value:
+                  '✅ Bot starts SMART (not from zero)\n' +
+                  '✅ Accurate price predictions immediately\n' +
+                  '✅ Learned patterns from your history\n' +
+                  '✅ Confidence adapts over time',
+                inline: false,
+              },
+              {
+                name: '💡 Next Steps',
+                value:
+                  'Use `!predictprice <item>` to see predictions!\n' +
+                  'Use `!learningmetrics` to view learning stats.\n' +
+                  'Bot will continue learning from new auctions automatically.',
+                inline: false,
+              }
+            )
+            .setFooter({ text: 'First Deployment • Learning System Active' })
+            .setTimestamp();
+
+          await adminLogsChannel.send({ embeds: [embed] });
+        }
+      } else {
+        console.log(`⚠️ [BOOTSTRAP FAILED] ${bootstrapResult.message}`);
+      }
+    } else {
+      console.log('✅ Learning system already bootstrapped (skipping)');
+    }
+  } catch (bootstrapError) {
+    console.error('❌ Error during bootstrap check:', bootstrapError);
+    console.log('   Bot will continue without bootstrap (learning from future auctions)');
+  }
+
   // INITIALIZE ALL MODULES IN CORRECT ORDER
   attendance.initialize(config, bossPoints, isAdmin, discordCache); // NEW
   helpSystem.initialize(config, isAdmin, BOT_VERSION);
-  auctioneering.initialize(config, isAdmin, bidding, discordCache);
+  auctioneering.initialize(config, isAdmin, bidding, discordCache, intelligenceEngine); // Pass intelligenceEngine
   bidding.initializeBidding(config, isAdmin, auctioneering, discordCache);
   auctioneering.setPostToSheet(attendance.postToSheet); // Use attendance module's postToSheet
   lootSystem.initialize(config, bossPoints, isAdmin);
@@ -2319,6 +3101,15 @@ client.once(Events.ClientReady, async () => {
     discordCache
   );
   leaderboardSystem.init(client, config, discordCache); // Initialize leaderboard system
+
+  // INITIALIZE PROACTIVE INTELLIGENCE (Auto-notifications & monitoring)
+  proactiveIntelligence = new ProactiveIntelligence(client, config, intelligenceEngine);
+  await proactiveIntelligence.initialize();
+  console.log('🔔 Proactive Intelligence initialized (5 scheduled monitoring tasks active)');
+
+  // INITIALIZE NLP HANDLER (Natural language processing)
+  nlpHandler = new NLPHandler(config);
+  console.log('💬 NLP Handler initialized (admin logs + auction threads)');
 
   console.log("\n╔═══════════════════════════════════════════════════════╗");
   console.log("║         🔄 BOT STATE RECOVERY (3-SWEEP SYSTEM)   ║");
@@ -2740,6 +3531,33 @@ client.on(Events.MessageCreate, async (message) => {
       (message.channel.isThread() &&
         message.channel.parentId === config.elysium_commands_channel_id);
 
+    // ═════════════════════════════════════════════════════════════════════
+    // NLP PROCESSING (Natural Language → Commands)
+    // ═════════════════════════════════════════════════════════════════════
+    // Intercepts natural language and converts to command format
+    // Only works in admin logs and auction threads (NOT guild chat)
+    // Does NOT interfere with existing ! commands
+
+    let nlpInterpretation = null;
+    if (nlpHandler && !message.content.trim().startsWith('!')) {
+      nlpInterpretation = nlpHandler.interpretMessage(message);
+
+      if (nlpInterpretation) {
+        console.log(`💬 [NLP] Interpreted: "${message.content}" → ${nlpInterpretation.command}`);
+
+        // Convert natural language to command format
+        // This allows the rest of the system to process it normally
+        const params = nlpInterpretation.params.join(' ');
+        message.content = `${nlpInterpretation.command}${params ? ' ' + params : ''}`;
+
+        // Optional: Send brief feedback for non-bid commands
+        const contextMessage = nlpHandler.getContextMessage(nlpInterpretation.command, message);
+        if (contextMessage) {
+          await message.reply(contextMessage).catch(() => {});
+        }
+      }
+    }
+
     // ✅ HANDLE !BID AND ALIASES IMMEDIATELY
     const rawCmd = message.content.trim().toLowerCase().split(/\s+/)[0];
     const resolvedCmd = resolveCommandAlias(rawCmd);
@@ -2891,6 +3709,54 @@ client.on(Events.MessageCreate, async (message) => {
         await commandHandlers.leaderboards(message, member);
       } else if (resolvedCmd === "!weeklyreport") {
         await commandHandlers.weeklyreport(message, member);
+      }
+      return;
+    }
+
+    // =========================================================================
+    // INTELLIGENCE ENGINE COMMANDS (Admin only)
+    // =========================================================================
+    if (
+      resolvedCmd === "!predictprice" ||
+      resolvedCmd === "!engagement" ||
+      resolvedCmd === "!analyzeengagement" ||
+      resolvedCmd === "!detectanomalies" ||
+      resolvedCmd === "!recommendations" ||
+      resolvedCmd === "!performance" ||
+      resolvedCmd === "!analyzequeue"
+    ) {
+      if (!userIsAdmin) {
+        await message.reply("❌ Intelligence commands are admin-only.");
+        return;
+      }
+
+      if (
+        message.channel.isThread() &&
+        message.channel.parentId === config.attendance_channel_id
+      ) {
+        await message.reply(
+          "⚠️ Please use intelligence commands in admin logs channel to avoid cluttering spawn threads."
+        );
+        return;
+      }
+
+      // Route to appropriate command handler
+      const handlerName = resolvedCmd.substring(1); // Remove ! prefix
+
+      if (resolvedCmd === "!predictprice") {
+        await commandHandlers.predictprice(message, member);
+      } else if (resolvedCmd === "!engagement") {
+        await commandHandlers.engagement(message, member);
+      } else if (resolvedCmd === "!analyzeengagement") {
+        await commandHandlers.analyzeengagement(message, member);
+      } else if (resolvedCmd === "!detectanomalies") {
+        await commandHandlers.detectanomalies(message, member);
+      } else if (resolvedCmd === "!recommendations") {
+        await commandHandlers.recommendations(message, member);
+      } else if (resolvedCmd === "!performance") {
+        await commandHandlers.performance(message, member);
+      } else if (resolvedCmd === "!analyzequeue") {
+        await commandHandlers.analyzequeue(message, member);
       }
       return;
     }

@@ -346,6 +346,106 @@ class SheetAPI {
     throw new Error('Unexpected error in API call');
   }
 
+  // ========================================================================
+  // LEARNING SYSTEM METHODS
+  // ========================================================================
+
+  /**
+   * Save a prediction for future learning
+   */
+  async savePredictionForLearning(data) {
+    return await this.call('savePredictionForLearning', data);
+  }
+
+  /**
+   * Update prediction with actual result
+   */
+  async updatePredictionAccuracy(data) {
+    return await this.call('updatePredictionAccuracy', data);
+  }
+
+  /**
+   * Get learning data
+   */
+  async getLearningData(data) {
+    return await this.call('getLearningData', data);
+  }
+
+  /**
+   * Get learning metrics
+   */
+  async getLearningMetrics(data) {
+    return await this.call('getLearningMetrics', data);
+  }
+
+  // ========================================================================
+  // GOOGLE DRIVE METHODS (Learning & Data Storage)
+  // ========================================================================
+
+  /**
+   * Initialize Google Drive folder structure
+   */
+  async initializeDriveFolders() {
+    return await this.call('initializeDriveFolders', {});
+  }
+
+  /**
+   * Upload screenshot to Google Drive
+   * @param {Object} data - { imageUrl, type, username, bossName, timestamp }
+   */
+  async uploadScreenshot(data) {
+    return await this.call('uploadScreenshot', data);
+  }
+
+  /**
+   * Export learning data to Google Drive
+   * @param {Object} filters - Optional filters { type, startDate, endDate }
+   */
+  async exportLearningData(filters = {}) {
+    return await this.call('exportLearningData', { filters });
+  }
+
+  /**
+   * Export prediction features for ML training
+   */
+  async exportPredictionFeatures() {
+    return await this.call('exportPredictionFeatures', {});
+  }
+
+  /**
+   * Create daily backup of all sheets
+   */
+  async createDailyBackup() {
+    return await this.call('createDailyBackup', {});
+  }
+
+  /**
+   * Log admin action to audit trail
+   * @param {Object} data - { action, username, details, timestamp }
+   */
+  async logAuditTrail(data) {
+    return await this.call('logAuditTrail', data);
+  }
+
+  /**
+   * Bootstrap learning system from historical data
+   * Analyzes all ForDistribution data and creates completed predictions
+   */
+  async bootstrapLearning() {
+    return await this.call('bootstrapLearning', {});
+  }
+
+  /**
+   * Check if bootstrap is needed
+   */
+  async needsBootstrap() {
+    return await this.call('needsBootstrap', {});
+  }
+
+  // ========================================================================
+  // METRICS & MONITORING
+  // ========================================================================
+
   /**
    * Get API metrics.
    *

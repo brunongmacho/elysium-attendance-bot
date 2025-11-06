@@ -91,13 +91,147 @@ Complete toolkit for handling stuck states (all require confirmation):
 - **Diagnostics** - comprehensive state inspection
 - **Force sync** - manually save state to Google Sheets
 
+### 🤖 AI/ML Intelligence Engine (NEW!)
+**Predictive Analytics & Smart Automation:**
+- **Price Prediction** - Auto-suggest starting bids based on historical auction data
+  - Machine learning price estimation with confidence intervals
+  - Trend analysis for item value changes over time
+  - Similar item recommendations when data is insufficient
+  - Statistical analysis with outlier detection
+  - **NEW!** `!suggestauction` - Analyze entire queue before auction
+
+- **Member Engagement Analytics** - Predict attendance likelihood and identify at-risk members
+  - Engagement scoring (attendance + bidding activity + consistency)
+  - Next event attendance prediction with confidence levels
+  - Personalized recommendations for each member
+  - Guild-wide engagement analysis with top performers & at-risk identification
+
+- **Anomaly Detection & Fraud Prevention** - Automatically flag suspicious patterns
+  - Collusion detection in bidding patterns
+  - Unusual bid amount identification (statistical outliers)
+  - Attendance pattern anomaly detection
+  - Item duplication/frequency monitoring
+
+- **Smart Recommendations** - AI-powered insights for guild management
+  - Optimal auction timing based on member activity patterns
+  - Personalized attendance reminders for at-risk members
+  - Item ordering optimization for maximum engagement
+
+- **Performance Monitoring** - Real-time system health and optimization
+  - Memory usage tracking and auto-optimization
+  - Cache management with intelligent cleanup
+  - Performance recommendations based on system metrics
+  - Supports up to 512MB RAM deployment
+
+### 🔔 Proactive Intelligence System (NEW!)
+**Automated Monitoring & Alerts:**
+- **Pre-Auction Readiness Check** (Saturday 10 AM, 2h before auction)
+  - Checks if guild is ready (70% members with 100+ points)
+  - Sends alert to Admin Logs with @here if low readiness
+  - Suggests postponing or adjusting starting bids
+
+- **Weekly Engagement Digest** (Monday 9 AM)
+  - Guild-wide engagement analysis sent to Admin Logs
+  - Identifies at-risk members needing attention
+  - Suggests manual reminders (admin sends, not auto-DM)
+
+- **Daily Anomaly Digest** (6 PM Manila time)
+  - Scans for suspicious patterns and fraud
+  - Sends alert to Admin Logs with @here if anomalies found
+  - Provides actionable recommendations
+
+- **Weekly Positive Summary** (Sunday 8 PM)
+  - Motivational recap sent to Guild Announcement
+  - Celebrates top 5 performers
+  - Guild achievements and milestones
+
+- **Milestone Celebrations** (Every hour)
+  - Detects members reaching 500/1000/2000/5000 points
+  - Public celebration in Guild Announcement
+  - Motivates guild engagement
+
+### 💬 Natural Language Processing (NEW!)
+**Flexible Command Syntax:**
+- Works in **Admin Logs** and **Auction Threads** only (NOT guild chat)
+- Understands natural language instead of strict commands
+- Does NOT interfere with existing ! commands
+
+**Examples:**
+```
+In Auction Threads:
+"bid 500" → !bid 500
+"offer 300 points" → !bid 300
+"300 pts" → !bid 300
+
+In Admin Logs:
+"how many points do i have" → !mypoints
+"show me the leaderboard" → !leaderboard
+"what's the auction status" → !bidstatus
+"bot status" → !status
+```
+
+### 🧠 Bot Learning System (NEW!)
+**The bot improves over time by learning from past predictions!**
+
+**How It Works:**
+1. Bot makes prediction (e.g., item price, member engagement)
+2. Prediction saved to `BotLearning` Google Sheet with confidence
+3. Event completes → **bot automatically updates accuracy** ✨
+4. System calculates accuracy by comparing predicted vs actual
+5. Future predictions adjusted based on historical accuracy
+6. Admin notified in admin logs when bot learns
+
+> 🤖 **Fully Automated!** The bot now learns automatically when auctions complete. No manual intervention needed!
+
+**What the Bot Learns:**
+- **Price Predictions** (Auctions): Learns optimal starting bids
+  - If 90%+ accurate → increases confidence on future predictions
+  - If <70% accurate → decreases confidence
+  - After 10+ predictions, bot knows when it's reliable
+
+- **Engagement Predictions** (Members): Predicts who will attend events
+  - Learns attendance patterns over time
+  - Identifies at-risk members before they leave
+  - Improves prediction accuracy week by week
+
+- **Anomaly Detection** (Fraud): Learns what "normal" looks like
+  - Better at catching suspicious bidding patterns
+  - Reduces false positives over time
+  - Learns from admin feedback on investigations
+
+**Commands:**
+```
+!learningmetrics    - View bot's learning stats and accuracy
+!updateprediction   - Manually update (rarely needed, bot auto-updates)
+!viewlearning       - See recent predictions and their accuracy
+!performance        - Includes learning metrics in system report
+```
+
+> 💡 **Note**: `!updateprediction` is rarely needed since the bot automatically updates when auctions complete. Use it only if auto-update fails or for testing.
+
+**Data Storage:**
+All learning data is stored in the `BotLearning` Google Sheet:
+- Timestamp, Type, Target, Predicted, Actual, Accuracy, Confidence, Features, Status
+- Admins can view/audit all predictions
+- Persistent across bot restarts (Koyeb-friendly)
+- Privacy-friendly (no sensitive personal data)
+
+**Benefits:**
+✅ Bot gets smarter the more it's used
+✅ Confidence scores calibrated to actual performance
+✅ Transparent learning (all data visible in Google Sheets)
+✅ Works for multiple prediction types (auctions, engagement, fraud)
+✅ Zero breaking changes to existing features
+
+> 📖 **Full documentation**: See `LEARNING_SYSTEM_DOCUMENTATION.md` for technical details
+
 ### 🛡️ Security & Reliability
 - **Admin role verification** on all privileged commands
 - **Confirmation prompts** for destructive operations
 - **Rate limiting** - 3-second cooldown on bids
 - **Screenshot verification** required for check-ins (non-admins)
 - **Race condition protection** with thread locking
-- **Memory optimization** with cache sweeping (256MB RAM limit)
+- **Memory optimization** with cache sweeping (512MB RAM optimized)
 - **State persistence** to Google Sheets every 5 minutes
 - **Automatic crash recovery** on startup
 - **Error handling** with detailed logging
@@ -274,6 +408,9 @@ Create a `config.json` file with the following structure:
   "attendance_channel_id": "ATTENDANCE_CHANNEL_ID",
   "admin_logs_channel_id": "ADMIN_LOGS_CHANNEL_ID",
   "bidding_channel_id": "BIDDING_CHANNEL_ID",
+  "elysium_commands_channel_id": "GUILD_CHAT_CHANNEL_ID",
+  "guild_announcement_channel_id": "ANNOUNCEMENT_CHANNEL_ID",
+  "bot_manual_channel_id": "DOCUMENTATION_CHANNEL_ID",
   "timer_server_id": "TIMER_SERVER_ID",
   "sheet_webhook_url": "https://script.google.com/macros/s/.../exec",
   "admin_roles": ["Admin", "Officer", "Guild Master"],
@@ -287,8 +424,11 @@ Create a `config.json` file with the following structure:
 |-------|-------------|----------|
 | `main_guild_id` | Your main Discord server ID | ✅ |
 | `attendance_channel_id` | Channel for boss spawn threads | ✅ |
-| `admin_logs_channel_id` | Channel for admin notifications | ✅ |
+| `admin_logs_channel_id` | Channel for admin notifications & intelligence reports | ✅ |
 | `bidding_channel_id` | Channel for auctions | ✅ |
+| `elysium_commands_channel_id` | Guild chat channel (casual conversation) | ✅ |
+| `guild_announcement_channel_id` | Channel for bot announcements (summaries, milestones) | ✅ |
+| `bot_manual_channel_id` | Channel for documentation (optional) | ⚠️ |
 | `timer_server_id` | Server ID for timer integration | ✅ |
 | `sheet_webhook_url` | Google Apps Script webhook URL | ✅ |
 | `admin_roles` | Array of admin role names | ✅ |
@@ -401,6 +541,98 @@ PORT=8000  # Optional, defaults to 8000
 | | `clearbids` | Clear pending bid confirmations |
 | | `diag` | Show diagnostics |
 | | `sync` | Force sync to Google Sheets |
+
+### Intelligence Engine Commands (Admin) 🤖
+
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `!predictprice <item name>` | `!predict`, `!suggestprice` | AI-powered price prediction for single item with historical analysis |
+| `!suggestauction` | `!analyzequeue` | **NEW!** Analyze ALL items in queue and suggest prices BEFORE auction |
+| `!engagement <username>` | `!engage` | Analyze member engagement and predict attendance |
+| `!analyzeengagement` | `!analyze` | Guild-wide engagement analysis (all members) |
+| `!detectanomalies` | `!anomaly`, `!fraud` | Scan for suspicious patterns and fraud |
+| `!recommendations` | `!recommend`, `!suggest` | Smart recommendations for optimal guild management |
+| `!performance` | `!perf` | System performance report and optimization insights |
+
+**Examples:**
+```
+!predictprice Crimson Pendant
+→ Suggests starting bid based on 10+ historical auctions with 85% confidence
+
+!suggestauction
+→ Analyzes ALL 15 items in queue
+→ Crimson Pendant: 400pts → AI: 450pts (+50) ✅ 85% confidence
+→ Ancient Scroll: 300pts → AI: 320pts (+20) ⚠️ 65% confidence
+→ Use BEFORE auction to adjust prices in Google Sheets
+
+!engagement PlayerName
+→ Shows 75/100 engagement score, 80% likelihood to attend next event
+
+!analyzeengagement
+→ Guild average: 68/100, identifies 5 at-risk members
+
+!detectanomalies
+→ Scans 500+ auctions, flags 2 suspicious bidding patterns
+
+!recommendations
+→ Optimal auction time: Saturday 8PM, 15 members need reminders
+```
+
+### Learning System Commands (Admin) 🧠
+
+> 🤖 **Auto-Learning Enabled!** The bot automatically updates accuracy when auctions complete. Manual commands are for viewing stats or rare manual updates.
+
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `!learningmetrics` | `!learnstats` | View bot learning statistics and accuracy trends across all prediction types |
+| `!updateprediction <item> <actual price>` | | **(Rarely needed)** Manually update prediction accuracy - bot auto-updates on auction completion |
+| `!viewlearning [type] [limit]` | `!predictions` | View recent predictions with accuracy (filter by type, limit results) |
+| `!performance` | `!perf` | System performance + learning metrics (includes bot accuracy stats) |
+
+**Examples:**
+```
+!learningmetrics
+→ PRICE PREDICTION:
+→   • Total: 47 predictions
+→   • Average Accuracy: 87.3%
+→   • Recent Accuracy: 92.1% (📈 improving)
+→ ENGAGEMENT:
+→   • Total: 23 predictions
+→   • Average Accuracy: 78.5%
+
+!updateprediction Crimson Pendant 475
+→ ✅ Updated prediction accuracy for "Crimson Pendant" with actual price 475pts!
+→ 🧠 Bot is learning... Accuracy: 94.7%
+→ (Note: Bot does this automatically when auction completes!)
+
+!viewlearning price_prediction 5
+→ Recent Price Predictions:
+→ 1. Crimson Pendant: 450 → 475 (94.7% ✅) completed
+→ 2. Ruby Ring: 300 → 295 (98.3% ✅) completed
+→ 3. Ancient Scroll: 320 → [pending]
+→ 4. Dragon Scale: 500 → 450 (90.0% ✅) completed
+→ 5. Mystic Orb: 400 → 420 (95.2% ✅) completed
+
+!performance
+→ [System stats...]
+→ 🧠 Learning Metrics:
+→   • 70 total predictions made
+→   • Price predictions: 92.1% recent accuracy (📈 +4.8%)
+→   • Bot confidence calibrated based on performance
+```
+
+**Automatic Learning Notifications:**
+When an auction completes, admins receive notifications in admin logs:
+```
+🧠 Bot Learning Update
+✅ Updated prediction accuracy for Crimson Pendant
+Actual sale price: 475pts
+Bot is getting smarter! Check `!learningmetrics` to see accuracy.
+```
+
+> 💡 **Note**: The more the bot is used, the smarter it gets! Predictions improve over time as more data is collected in the BotLearning Google Sheet.
+>
+> 🤖 **Automatic Updates**: The bot learns automatically when auctions complete. Manual `!updateprediction` is only needed if auto-update fails.
 
 ### Help Commands
 

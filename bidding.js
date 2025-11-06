@@ -787,7 +787,7 @@ function clearAllTimers() {
  */
 async function fetchPts(url) {
   try {
-    const result = await sheetAPI.call('getBiddingPoints');
+    const result = await sheetAPI.call('getBiddingPointsSummary');
     return result.points || {};
   } catch (e) {
     console.error("❌ Fetch pts:", e);

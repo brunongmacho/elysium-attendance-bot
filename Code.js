@@ -28,11 +28,12 @@
  * - Only triggers on data columns (attendance, member names, bidding points)
  *
  * SETUP INSTRUCTIONS:
- * 1. Configure DISCORD_WEBHOOK_URL in CONFIG (line 26)
- * 2. Set up Apps Script Triggers:
+ * 1. Set up Apps Script Triggers:
  *    - onEdit: Edit trigger > On edit
  *    - sundayWeeklySheetCreation: Time-driven > Week timer > Every Sunday > 12am-1am
- * 3. Review CODE_REVIEW_CONFLICTS.md for detailed analysis of fixes
+ * 2. Review CODE_REVIEW_CONFLICTS.md for detailed analysis of fixes
+ *
+ * NOTE: Discord notifications are now handled by the bot via Discord.js (no webhook needed)
  *
  * PREVIOUS FEATURES (v5.0):
  * - Auto-populate 0 for all members in bidding results
@@ -44,7 +45,6 @@ const CONFIG = {
   BOSS_POINTS_SHEET: 'BossPoints',
   BIDDING_SHEET: 'BiddingPoints',
   TIMEZONE: 'Asia/Manila',
-  DISCORD_WEBHOOK_URL: 'YOUR_DISCORD_WEBHOOK_URL', // To be configured by user
   CACHE_TTL_SECONDS: 300, // Cache duration: 5 minutes
 };
 
@@ -112,9 +112,9 @@ function doPost(e) {
     if (action === 'getAttendanceState') return getAttendanceState(data);
     if (action === 'saveAttendanceState') return saveAttendanceState(data);
     if (action === 'getAllSpawnColumns') return getAllSpawnColumns(data);
-    
+
     // Bidding actions
-    if (action === 'getBiddingPoints') return handleGetBiddingPoints(data);
+    if (action === 'getBiddingPointsSummary') return handleGetBiddingPoints(data);
     if (action === 'submitBiddingResults') return handleSubmitBiddingResults(data);
     if (action === 'removeMember') return handleRemoveMember(data);
     if (action === 'getBiddingItems') return getBiddingItems(data);
@@ -129,6 +129,27 @@ function doPost(e) {
     if (action === 'getLootState') return getLootState(data);
     if (action === 'saveLootState') return saveLootState(data);
     if (action === 'getHistoricalPrices') return getHistoricalPrices(data);
+    if (action === 'getForDistribution') return getForDistribution(data);
+    if (action === 'getTotalAttendance') return getTotalAttendance(data);
+    if (action === 'getBiddingPoints') return getBiddingPoints(data);
+
+    // Learning system actions
+    if (action === 'savePredictionForLearning') return savePredictionForLearning(data);
+    if (action === 'updatePredictionAccuracy') return updatePredictionAccuracy(data);
+    if (action === 'getLearningData') return getLearningData(data);
+    if (action === 'getLearningMetrics') return getLearningMetrics(data);
+
+    // Google Drive actions (Learning & Data Storage)
+    if (action === 'initializeDriveFolders') return initializeDriveFolders();
+    if (action === 'uploadScreenshot') return uploadScreenshot(data);
+    if (action === 'exportLearningData') return exportLearningData(data);
+    if (action === 'exportPredictionFeatures') return exportPredictionFeatures(data);
+    if (action === 'createDailyBackup') return createDailyBackup();
+    if (action === 'logAuditTrail') return logAuditTrail(data);
+
+    // Bootstrap learning system
+    if (action === 'bootstrapLearning') return bootstrapLearningFromHistory();
+    if (action === 'needsBootstrap') return createResponse('ok', 'Bootstrap check', { needsBootstrap: needsBootstrap() });
 
     // Leaderboard & Weekly Report actions
     if (action === 'getAttendanceLeaderboard') return getAttendanceLeaderboard(data);
@@ -1869,6 +1890,463 @@ function getHistoricalPrices(data) {
   }
 }
 
+// ===========================================================
+// LEARNING SYSTEM - PERSISTENT AI/ML STORAGE
+// ===========================================================
+
+/**
+ * Get or create BotLearning sheet
+ * Structure: Timestamp | Type | Target | Predicted | Actual | Accuracy | Confidence | Features | Status
+ */
+function getBotLearningSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('BotLearning');
+
+  if (!sheet) {
+    Logger.log('📚 Creating BotLearning sheet...');
+    sheet = ss.insertSheet('BotLearning');
+
+    // Set headers
+    const headers = [
+      'Timestamp', 'Type', 'Target', 'Predicted', 'Actual',
+      'Accuracy', 'Confidence', 'Features', 'Status', 'Notes'
+    ];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+
+    Logger.log('✅ BotLearning sheet created');
+  }
+
+  return sheet;
+}
+
+/**
+ * Save a prediction for future learning
+ * @param {Object} data - Prediction data
+ * @param {string} data.type - Type of prediction (price_prediction, engagement, anomaly)
+ * @param {string} data.target - What was predicted (item name, username, etc.)
+ * @param {number|string} data.predicted - The predicted value
+ * @param {number} data.confidence - Confidence score (0-100)
+ * @param {Object} data.features - Features used in prediction (stored as JSON)
+ * @returns {Object} Response with predictionId
+ */
+function savePredictionForLearning(data) {
+  try {
+    Logger.log('📚 Saving prediction for learning...');
+
+    const sheet = getBotLearningSheet();
+    const timestamp = new Date();
+
+    const type = data.type || 'unknown';
+    const target = data.target || '';
+    const predicted = data.predicted || '';
+    const confidence = data.confidence || 0;
+    const features = JSON.stringify(data.features || {});
+
+    const newRow = [
+      timestamp,
+      type,
+      target,
+      predicted,
+      '', // Actual (to be filled later)
+      '', // Accuracy (to be calculated later)
+      confidence,
+      features,
+      'pending',
+      '' // Notes
+    ];
+
+    sheet.appendRow(newRow);
+
+    const predictionId = sheet.getLastRow();
+
+    Logger.log(`✅ Prediction saved: ID=${predictionId}, Type=${type}, Target=${target}`);
+
+    return createResponse('ok', 'Prediction saved for learning', {
+      predictionId: predictionId,
+      timestamp: timestamp.toISOString()
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error saving prediction: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Update prediction with actual result for learning
+ * @param {Object} data - Update data
+ * @param {string} data.type - Type of prediction
+ * @param {string} data.target - Target that was predicted
+ * @param {number|string} data.actual - Actual value observed
+ * @returns {Object} Response with updated accuracy
+ */
+function updatePredictionAccuracy(data) {
+  try {
+    Logger.log('📊 Updating prediction accuracy...');
+
+    const sheet = getBotLearningSheet();
+    const lastRow = sheet.getLastRow();
+
+    if (lastRow < 2) {
+      return createResponse('ok', 'No predictions to update');
+    }
+
+    const type = data.type || '';
+    const target = data.target || '';
+    const actual = data.actual || '';
+
+    // Find most recent pending prediction matching type and target
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, 10);
+    const values = dataRange.getValues();
+
+    let updated = false;
+    for (let i = values.length - 1; i >= 0; i--) {
+      const row = values[i];
+      const rowType = row[1]; // Type column
+      const rowTarget = row[2]; // Target column
+      const rowStatus = row[8]; // Status column
+
+      if (rowType === type && rowTarget === target && rowStatus === 'pending') {
+        const predicted = row[3];
+        let accuracy = 0;
+
+        // Calculate accuracy based on type
+        if (type === 'price_prediction') {
+          const predictedNum = Number(predicted);
+          const actualNum = Number(actual);
+          if (!isNaN(predictedNum) && !isNaN(actualNum) && actualNum > 0) {
+            const diff = Math.abs(predictedNum - actualNum);
+            accuracy = Math.max(0, 100 - (diff / actualNum * 100));
+          }
+        } else if (type === 'engagement' || type === 'attendance') {
+          // For boolean predictions
+          accuracy = (predicted === actual) ? 100 : 0;
+        }
+
+        // Update the row
+        const rowIndex = i + 2; // +2 because i is 0-indexed and row 1 is headers
+        sheet.getRange(rowIndex, 5).setValue(actual); // Actual column
+        sheet.getRange(rowIndex, 6).setValue(accuracy.toFixed(2)); // Accuracy column
+        sheet.getRange(rowIndex, 9).setValue('completed'); // Status column
+
+        Logger.log(`✅ Updated prediction: Row=${rowIndex}, Accuracy=${accuracy.toFixed(2)}%`);
+        updated = true;
+        break;
+      }
+    }
+
+    if (!updated) {
+      Logger.log('⚠️ No matching pending prediction found');
+      return createResponse('ok', 'No matching pending prediction found');
+    }
+
+    return createResponse('ok', 'Prediction accuracy updated');
+
+  } catch (err) {
+    Logger.log('❌ Error updating prediction accuracy: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Get learning data for analysis
+ * @param {Object} data - Query parameters
+ * @param {string} data.type - Filter by prediction type (optional)
+ * @param {number} data.limit - Limit results (default 100)
+ * @returns {Object} Response with learning data
+ */
+function getLearningData(data) {
+  try {
+    Logger.log('📚 Fetching learning data...');
+
+    const sheet = getBotLearningSheet();
+    const lastRow = sheet.getLastRow();
+
+    if (lastRow < 2) {
+      return createResponse('ok', 'No learning data available', { predictions: [] });
+    }
+
+    const filterType = data.type || null;
+    const limit = data.limit || 100;
+
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, 10);
+    const values = dataRange.getValues();
+
+    const predictions = [];
+
+    for (let i = values.length - 1; i >= 0 && predictions.length < limit; i--) {
+      const row = values[i];
+      const type = row[1];
+
+      if (filterType && type !== filterType) continue;
+
+      predictions.push({
+        timestamp: row[0],
+        type: type,
+        target: row[2],
+        predicted: row[3],
+        actual: row[4],
+        accuracy: row[5],
+        confidence: row[6],
+        features: row[7],
+        status: row[8],
+        notes: row[9]
+      });
+    }
+
+    Logger.log(`✅ Fetched ${predictions.length} learning records`);
+
+    return createResponse('ok', 'Learning data fetched', { predictions });
+
+  } catch (err) {
+    Logger.log('❌ Error fetching learning data: ' + err.toString());
+    return createResponse('error', err.toString(), { predictions: [] });
+  }
+}
+
+/**
+ * Get learning metrics and statistics
+ * @returns {Object} Response with metrics
+ */
+function getLearningMetrics(data) {
+  try {
+    Logger.log('📊 Calculating learning metrics...');
+
+    const sheet = getBotLearningSheet();
+    const lastRow = sheet.getLastRow();
+
+    if (lastRow < 2) {
+      return createResponse('ok', 'No learning data available', { metrics: {} });
+    }
+
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, 10);
+    const values = dataRange.getValues();
+
+    const metrics = {
+      total: values.length,
+      byType: {},
+      averageAccuracy: {},
+      recentAccuracy: {}
+    };
+
+    const typeData = {};
+
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      const type = row[1];
+      const accuracy = parseFloat(row[5]) || 0;
+      const status = row[8];
+
+      if (!typeData[type]) {
+        typeData[type] = {
+          total: 0,
+          completed: 0,
+          accuracySum: 0,
+          recent: []
+        };
+      }
+
+      typeData[type].total++;
+
+      if (status === 'completed' && accuracy > 0) {
+        typeData[type].completed++;
+        typeData[type].accuracySum += accuracy;
+        typeData[type].recent.push(accuracy);
+      }
+    }
+
+    // Calculate averages
+    for (const type in typeData) {
+      const data = typeData[type];
+      metrics.byType[type] = {
+        total: data.total,
+        completed: data.completed
+      };
+
+      if (data.completed > 0) {
+        metrics.averageAccuracy[type] = (data.accuracySum / data.completed).toFixed(2);
+
+        // Last 10 predictions
+        const recent = data.recent.slice(-10);
+        const recentSum = recent.reduce((a, b) => a + b, 0);
+        metrics.recentAccuracy[type] = (recentSum / recent.length).toFixed(2);
+      }
+    }
+
+    Logger.log(`✅ Metrics calculated: ${Object.keys(metrics.byType).length} types`);
+
+    return createResponse('ok', 'Learning metrics calculated', { metrics });
+
+  } catch (err) {
+    Logger.log('❌ Error calculating metrics: ' + err.toString());
+    return createResponse('error', err.toString(), { metrics: {} });
+  }
+}
+
+// ===========================================================
+// DATA RETRIEVAL FOR INTELLIGENCE ENGINE
+// ===========================================================
+
+/**
+ * Get all ForDistribution data for intelligence analysis
+ * @returns {Object} Response with ForDistribution data
+ */
+function getForDistribution(data) {
+  try {
+    Logger.log('📊 Fetching ForDistribution data for intelligence...');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('ForDistribution');
+
+    if (!sheet) {
+      return createResponse('ok', 'ForDistribution sheet not found', { items: [] });
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return createResponse('ok', 'No data in ForDistribution', { items: [] });
+    }
+
+    // Get all data (columns: Item, StartPrice, Duration, Winner, WinningBid, AuctionStart, AuctionEnd, Timestamp, TotalBids, Source, Quantity, Boss)
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, 12);
+    const values = dataRange.getValues();
+
+    const items = [];
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      items.push({
+        itemName: row[0],
+        startPrice: row[1],
+        duration: row[2],
+        winner: row[3],
+        bidAmount: row[4],
+        auctionStart: row[5],
+        auctionEnd: row[6],
+        timestamp: row[7],
+        totalBids: row[8],
+        source: row[9],
+        quantity: row[10],
+        boss: row[11]
+      });
+    }
+
+    Logger.log(`✅ Fetched ${items.length} ForDistribution records`);
+    return createResponse('ok', 'ForDistribution data fetched', { items });
+
+  } catch (err) {
+    Logger.log('❌ Error fetching ForDistribution: ' + err.toString());
+    return createResponse('error', err.toString(), { items: [] });
+  }
+}
+
+/**
+ * Get total attendance data for all members
+ * @returns {Object} Response with attendance data
+ */
+function getTotalAttendance(data) {
+  try {
+    Logger.log('📊 Fetching total attendance data...');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('TOTAL ATTENDANCE');
+
+    if (!sheet) {
+      return createResponse('ok', 'TOTAL ATTENDANCE sheet not found', { members: [] });
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return createResponse('ok', 'No data in TOTAL ATTENDANCE', { members: [] });
+    }
+
+    // Get columns: Username (A), Total Attendance (B)
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, 2);
+    const values = dataRange.getValues();
+
+    const members = [];
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      const username = (row[0] || '').toString().trim();
+      const attendancePoints = parseInt(row[1]) || 0;
+
+      if (username) {
+        members.push({
+          username,
+          attendancePoints
+        });
+      }
+    }
+
+    Logger.log(`✅ Fetched attendance for ${members.length} members`);
+    return createResponse('ok', 'Attendance data fetched', { members });
+
+  } catch (err) {
+    Logger.log('❌ Error fetching attendance: ' + err.toString());
+    return createResponse('error', err.toString(), { members: [] });
+  }
+}
+
+/**
+ * Get bidding points data for all members
+ * @returns {Object} Response with bidding data
+ */
+function getBiddingPoints(data) {
+  try {
+    Logger.log('📊 Fetching bidding points data...');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('BiddingPoints');
+
+    if (!sheet) {
+      return createResponse('ok', 'BiddingPoints sheet not found', { members: [] });
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return createResponse('ok', 'No data in BiddingPoints', { members: [] });
+    }
+
+    // Get all columns: Username (A), Points Left (B), Points Consumed (C), Session Spends (D+)
+    const lastCol = sheet.getLastColumn();
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
+    const values = dataRange.getValues();
+
+    const members = [];
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      const username = (row[0] || '').toString().trim();
+      const pointsLeft = parseInt(row[1]) || 0;
+      const pointsConsumed = parseInt(row[2]) || 0;
+
+      // Sum all session spend columns (D onward)
+      let totalSpent = 0;
+      for (let col = 3; col < row.length; col++) {
+        totalSpent += parseInt(row[col]) || 0;
+      }
+
+      if (username) {
+        members.push({
+          username,
+          pointsLeft,           // Column B: Points remaining
+          pointsConsumed,       // Column C: Points already used
+          attendancePoints: pointsLeft,  // Alias for backwards compatibility
+          biddingPoints: pointsConsumed, // Alias for backwards compatibility
+          totalSpent            // Sum of columns D+: Total spent across all sessions
+        });
+      }
+    }
+
+    Logger.log(`✅ Fetched bidding data for ${members.length} members`);
+    return createResponse('ok', 'Bidding data fetched', { members });
+
+  } catch (err) {
+    Logger.log('❌ Error fetching bidding points: ' + err.toString());
+    return createResponse('error', err.toString(), { members: [] });
+  }
+}
+
 // ATTENDANCE STATE MANAGEMENT (Memory optimization for Koyeb)
 function getAttendanceState(data) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -2592,9 +3070,8 @@ function sundayWeeklySheetCreation() {
     const previousSheetName = copyMembersFromPreviousWeek(ss, sheet);
 
     Logger.log(`✅ New weekly sheet created: ${sheetName}`);
-
-    // Send notification to #admin-logs
-    sendAdminLogNotification(sheetName, previousSheetName);
+    Logger.log(`ℹ️ Format copied from previous week: ${previousSheetName || 'N/A'}`);
+    Logger.log(`ℹ️ Discord bot will handle notifications (no webhook needed)`);
 
   } catch (err) {
     Logger.log('❌ Error in sundayWeeklySheetCreation: ' + err.toString());
@@ -2609,49 +3086,861 @@ function sundayWeeklySheetCreation() {
 function testMoveItem() {
   // EDIT THIS: Change to the row number you want to test
   const testRow = 2; // Row 2 is the first data row (after headers)
-  
+
   Logger.log(`🧪 Testing move for row ${testRow}...`);
-  
+
   moveItemToForDistribution('BiddingItems', testRow);
-  
+
   Logger.log('🧪 Test completed. Check logs above for details.');
 }
 
+// ===========================================================
+// GOOGLE DRIVE INTEGRATION - LEARNING & DATA STORAGE
+// ===========================================================
+
 /**
- * Send notification to Discord #admin-logs channel
+ * Google Drive Configuration
+ * Folder ID: 1Kb5CFlzIDmv_p7FRYZ6XzVyte0Vvvf78
  */
-function sendAdminLogNotification(newSheetName, previousSheetName) {
+const DRIVE_CONFIG = {
+  ROOT_FOLDER_ID: '1Kb5CFlzIDmv_p7FRYZ6XzVyte0Vvvf78',
+  FOLDERS: {
+    SCREENSHOTS: 'Screenshots',
+    ATTENDANCE: 'Attendance',
+    LOOT: 'Loot',
+    LEARNING: 'Learning_Data',
+    PREDICTIONS: 'Predictions',
+    ANALYTICS: 'Analytics',
+    BACKUPS: 'Backups',
+    AUDIT: 'Audit_Logs'
+  }
+};
+
+/**
+ * Initialize Google Drive folder structure
+ * Creates organized folders for all bot data
+ * @returns {Object} Folder IDs
+ */
+function initializeDriveFolders() {
   try {
-    // Skip if webhook URL is not configured
-    if (!CONFIG.DISCORD_WEBHOOK_URL || CONFIG.DISCORD_WEBHOOK_URL === 'YOUR_DISCORD_WEBHOOK_URL') {
-      Logger.log('⚠️ Discord webhook URL not configured. Skipping notification.');
-      return;
-    }
+    const rootFolder = DriveApp.getFolderById(DRIVE_CONFIG.ROOT_FOLDER_ID);
+    const folderIds = {};
 
-    const message = {
-      content: `📄 **New weekly sheet created:** ${newSheetName}\n✅ Format copied from previous week: ${previousSheetName || 'N/A'}`
+    // Create main categories
+    const screenshotsFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.SCREENSHOTS);
+    const learningFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.LEARNING);
+    const backupsFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.BACKUPS);
+    const auditFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.AUDIT);
+
+    // Create subcategories
+    folderIds.screenshots = {
+      attendance: getOrCreateFolder(screenshotsFolder, DRIVE_CONFIG.FOLDERS.ATTENDANCE),
+      loot: getOrCreateFolder(screenshotsFolder, DRIVE_CONFIG.FOLDERS.LOOT)
     };
 
-    const options = {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify(message),
-      muteHttpExceptions: true
+    folderIds.learning = {
+      predictions: getOrCreateFolder(learningFolder, DRIVE_CONFIG.FOLDERS.PREDICTIONS),
+      analytics: getOrCreateFolder(learningFolder, DRIVE_CONFIG.FOLDERS.ANALYTICS)
     };
 
-    const response = UrlFetchApp.fetch(CONFIG.DISCORD_WEBHOOK_URL, options);
-    const responseCode = response.getResponseCode();
+    folderIds.backups = backupsFolder.getId();
+    folderIds.audit = auditFolder.getId();
 
-    if (responseCode === 200 || responseCode === 204) {
-      Logger.log('✅ Discord notification sent successfully');
-    } else {
-      Logger.log(`⚠️ Discord notification failed with code ${responseCode}: ${response.getContentText()}`);
-    }
+    Logger.log('✅ Drive folder structure initialized');
+    return createResponse('ok', 'Folders initialized', folderIds);
 
   } catch (err) {
-    Logger.log('❌ Error sending Discord notification: ' + err.toString());
+    Logger.log('❌ Error initializing Drive folders: ' + err.toString());
+    return createResponse('error', err.toString());
   }
 }
+
+/**
+ * Get or create a folder by name
+ * @param {Folder} parentFolder - Parent folder object
+ * @param {string} folderName - Name of folder to get/create
+ * @returns {Folder} Folder object
+ */
+function getOrCreateFolder(parentFolder, folderName) {
+  const folders = parentFolder.getFoldersByName(folderName);
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+  return parentFolder.createFolder(folderName);
+}
+
+/**
+ * Get date-based folder (creates if doesn't exist)
+ * @param {Folder} parentFolder - Parent folder
+ * @param {Date} date - Date for folder name
+ * @returns {Folder} Date folder
+ */
+function getDateFolder(parentFolder, date) {
+  const dateFolderName = Utilities.formatDate(date, CONFIG.TIMEZONE, 'yyyy-MM-dd');
+  return getOrCreateFolder(parentFolder, dateFolderName);
+}
+
+// ===========================================================
+// SCREENSHOT ARCHIVE SYSTEM
+// ===========================================================
+
+/**
+ * Upload screenshot to Google Drive
+ * Called when attendance or loot screenshots are submitted
+ * @param {Object} data - { imageUrl, type, username, bossName, timestamp }
+ * @returns {Object} Response with file ID
+ */
+function uploadScreenshot(data) {
+  try {
+    const { imageUrl, type, username, bossName, timestamp } = data;
+
+    // Initialize folder structure
+    const rootFolder = DriveApp.getFolderById(DRIVE_CONFIG.ROOT_FOLDER_ID);
+    const screenshotsFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.SCREENSHOTS);
+    const typeFolder = getOrCreateFolder(screenshotsFolder, type === 'attendance' ? DRIVE_CONFIG.FOLDERS.ATTENDANCE : DRIVE_CONFIG.FOLDERS.LOOT);
+    const dateFolder = getDateFolder(typeFolder, new Date(timestamp || Date.now()));
+
+    // Download image from Discord URL
+    const response = UrlFetchApp.fetch(imageUrl);
+    const blob = response.getBlob();
+
+    // Generate filename
+    const now = new Date(timestamp || Date.now());
+    const dateStr = Utilities.formatDate(now, CONFIG.TIMEZONE, 'yyyy-MM-dd_HH-mm-ss');
+    const filename = `${type}_${username}_${bossName || 'loot'}_${dateStr}.png`;
+
+    // Upload to Drive
+    const file = dateFolder.createFile(blob.setName(filename));
+
+    Logger.log(`📁 Screenshot uploaded: ${filename}`);
+
+    return createResponse('ok', 'Screenshot uploaded', {
+      fileId: file.getId(),
+      fileUrl: file.getUrl(),
+      filename: filename
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error uploading screenshot: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+// ===========================================================
+// LEARNING DATA EXPORTS (ENHANCED FOR ML)
+// ===========================================================
+
+/**
+ * Export detailed learning data to Google Drive
+ * Includes all predictions with features, confidence, and outcomes
+ * @param {Object} data - Optional filters
+ * @returns {Object} Response with export details
+ */
+function exportLearningData(data) {
+  try {
+    const learningSheet = getBotLearningSheet();
+    const allData = learningSheet.getDataRange().getValues();
+    const headers = allData[0];
+    const rows = allData.slice(1);
+
+    // Parse filters
+    const filters = data.filters || {};
+    const type = filters.type || 'all';
+    const startDate = filters.startDate ? new Date(filters.startDate) : null;
+    const endDate = filters.endDate ? new Date(filters.endDate) : null;
+
+    // Filter data
+    let filteredRows = rows;
+
+    if (type !== 'all') {
+      filteredRows = filteredRows.filter(row => row[1] === type); // Type column
+    }
+
+    if (startDate || endDate) {
+      filteredRows = filteredRows.filter(row => {
+        const rowDate = new Date(row[0]); // Timestamp column
+        if (startDate && rowDate < startDate) return false;
+        if (endDate && rowDate > endDate) return false;
+        return true;
+      });
+    }
+
+    // Create detailed JSON export
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      totalPredictions: filteredRows.length,
+      filters: filters,
+      predictions: filteredRows.map(row => ({
+        timestamp: row[0],
+        type: row[1],
+        target: row[2],
+        predicted: row[3],
+        actual: row[4],
+        accuracy: row[5],
+        confidence: row[6],
+        features: row[7] ? JSON.parse(row[7]) : {},
+        status: row[8],
+        notes: row[9]
+      })),
+      summary: {
+        completed: filteredRows.filter(r => r[8] === 'completed').length,
+        pending: filteredRows.filter(r => r[8] === 'pending').length,
+        averageAccuracy: calculateAverageAccuracy(filteredRows),
+        byType: groupByType(filteredRows)
+      }
+    };
+
+    // Save to Drive
+    const rootFolder = DriveApp.getFolderById(DRIVE_CONFIG.ROOT_FOLDER_ID);
+    const learningFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.LEARNING);
+    const analyticsFolder = getOrCreateFolder(learningFolder, DRIVE_CONFIG.FOLDERS.ANALYTICS);
+    const dateFolder = getDateFolder(analyticsFolder, new Date());
+
+    const filename = `learning_export_${Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'yyyy-MM-dd_HH-mm-ss')}.json`;
+    const file = dateFolder.createFile(filename, JSON.stringify(exportData, null, 2), MimeType.PLAIN_TEXT);
+
+    Logger.log(`📊 Learning data exported: ${filteredRows.length} predictions`);
+
+    return createResponse('ok', 'Learning data exported', {
+      fileId: file.getId(),
+      fileUrl: file.getUrl(),
+      filename: filename,
+      recordCount: filteredRows.length
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error exporting learning data: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Calculate average accuracy from rows
+ */
+function calculateAverageAccuracy(rows) {
+  const completedRows = rows.filter(r => r[8] === 'completed' && r[5] !== '');
+  if (completedRows.length === 0) return 0;
+  const sum = completedRows.reduce((acc, r) => acc + (parseFloat(r[5]) || 0), 0);
+  return Math.round((sum / completedRows.length) * 100) / 100;
+}
+
+/**
+ * Group predictions by type with stats
+ */
+function groupByType(rows) {
+  const types = {};
+
+  rows.forEach(row => {
+    const type = row[1];
+    if (!types[type]) {
+      types[type] = { total: 0, completed: 0, pending: 0, accuracy: [] };
+    }
+    types[type].total++;
+    if (row[8] === 'completed') {
+      types[type].completed++;
+      if (row[5] !== '') types[type].accuracy.push(parseFloat(row[5]));
+    } else {
+      types[type].pending++;
+    }
+  });
+
+  // Calculate average accuracy per type
+  Object.keys(types).forEach(type => {
+    const accuracyArray = types[type].accuracy;
+    types[type].avgAccuracy = accuracyArray.length > 0
+      ? Math.round((accuracyArray.reduce((a, b) => a + b, 0) / accuracyArray.length) * 100) / 100
+      : 0;
+    delete types[type].accuracy; // Remove raw array
+  });
+
+  return types;
+}
+
+/**
+ * Export prediction features for ML training
+ * Exports features in format suitable for ML analysis
+ */
+function exportPredictionFeatures(data) {
+  try {
+    const learningSheet = getBotLearningSheet();
+    const allData = learningSheet.getDataRange().getValues();
+    const rows = allData.slice(1);
+
+    // Extract completed predictions with features
+    const trainingData = rows
+      .filter(row => row[8] === 'completed' && row[7]) // Has features and completed
+      .map(row => {
+        const features = JSON.parse(row[7]);
+        return {
+          type: row[1],
+          target: row[2],
+          predicted: row[3],
+          actual: row[4],
+          accuracy: row[5],
+          confidence: row[6],
+          features: features,
+          // Flatten features for easier ML processing
+          flatFeatures: {
+            ...features,
+            label: row[4], // Actual value is the label
+            prediction: row[3]
+          }
+        };
+      });
+
+    // Save to Drive
+    const rootFolder = DriveApp.getFolderById(DRIVE_CONFIG.ROOT_FOLDER_ID);
+    const learningFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.LEARNING);
+    const analyticsFolder = getOrCreateFolder(learningFolder, DRIVE_CONFIG.FOLDERS.ANALYTICS);
+    const filename = `ml_training_data_${Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'yyyy-MM-dd')}.json`;
+
+    const file = analyticsFolder.createFile(filename, JSON.stringify(trainingData, null, 2), MimeType.PLAIN_TEXT);
+
+    Logger.log(`🤖 ML training data exported: ${trainingData.length} samples`);
+
+    return createResponse('ok', 'ML training data exported', {
+      fileId: file.getId(),
+      fileUrl: file.getUrl(),
+      sampleCount: trainingData.length
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error exporting ML training data: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+// ===========================================================
+// AUTOMATED BACKUP SYSTEM
+// ===========================================================
+
+/**
+ * Create daily backup of all important sheets
+ * Should be triggered daily via time-driven trigger
+ */
+function createDailyBackup() {
+  try {
+    Logger.log('💾 Starting daily backup...');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const rootFolder = DriveApp.getFolderById(DRIVE_CONFIG.ROOT_FOLDER_ID);
+    const backupsFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.BACKUPS);
+    const dateFolder = getDateFolder(backupsFolder, new Date());
+
+    const sheetsToBackup = [
+      'BiddingPoints',
+      'TOTAL ATTENDANCE',
+      'ForDistribution',
+      'BiddingItems',
+      'BotLearning',
+      'Queue'
+    ];
+
+    const backupData = {
+      timestamp: new Date().toISOString(),
+      sheets: {}
+    };
+
+    sheetsToBackup.forEach(sheetName => {
+      const sheet = ss.getSheetByName(sheetName);
+      if (sheet) {
+        const data = sheet.getDataRange().getValues();
+        backupData.sheets[sheetName] = data;
+        Logger.log(`  ✓ Backed up ${sheetName} (${data.length} rows)`);
+      }
+    });
+
+    // Also backup current week sheet
+    const currentWeekSheet = getCurrentWeekSheetName();
+    const weekSheet = ss.getSheetByName(currentWeekSheet);
+    if (weekSheet) {
+      backupData.sheets[currentWeekSheet] = weekSheet.getDataRange().getValues();
+      Logger.log(`  ✓ Backed up ${currentWeekSheet}`);
+    }
+
+    // Save to Drive
+    const filename = `backup_${Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'yyyy-MM-dd_HH-mm-ss')}.json`;
+    const file = dateFolder.createFile(filename, JSON.stringify(backupData, null, 2), MimeType.PLAIN_TEXT);
+
+    Logger.log(`✅ Daily backup completed: ${filename}`);
+    Logger.log(`📁 File: ${file.getUrl()}`);
+
+    // Cleanup old backups (keep last 30 days)
+    cleanupOldBackups(backupsFolder);
+
+    return createResponse('ok', 'Backup completed', {
+      fileId: file.getId(),
+      fileUrl: file.getUrl(),
+      sheetsCount: Object.keys(backupData.sheets).length
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error creating backup: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Cleanup backups older than 30 days
+ */
+function cleanupOldBackups(backupsFolder) {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const folders = backupsFolder.getFolders();
+    let deletedCount = 0;
+
+    while (folders.hasNext()) {
+      const folder = folders.next();
+      const folderDate = new Date(folder.getName()); // Assumes YYYY-MM-DD format
+
+      if (folderDate < thirtyDaysAgo) {
+        folder.setTrashed(true);
+        deletedCount++;
+      }
+    }
+
+    if (deletedCount > 0) {
+      Logger.log(`🗑️ Cleaned up ${deletedCount} old backup folders`);
+    }
+  } catch (err) {
+    Logger.log('⚠️ Error cleaning old backups: ' + err.toString());
+  }
+}
+
+// ===========================================================
+// AUDIT TRAIL SYSTEM
+// ===========================================================
+
+/**
+ * Log admin action to audit trail
+ * @param {Object} data - { action, username, details, timestamp }
+ */
+function logAuditTrail(data) {
+  try {
+    const { action, username, details, timestamp } = data;
+
+    const rootFolder = DriveApp.getFolderById(DRIVE_CONFIG.ROOT_FOLDER_ID);
+    const auditFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.AUDIT);
+    const dateFolder = getDateFolder(auditFolder, new Date(timestamp || Date.now()));
+
+    // Get or create today's audit log file
+    const dateStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'yyyy-MM-dd');
+    const filename = `audit_${dateStr}.jsonl`; // JSON Lines format
+
+    const files = dateFolder.getFilesByName(filename);
+    let file;
+
+    if (files.hasNext()) {
+      file = files.next();
+      const existingContent = file.getBlob().getDataAsString();
+      const newEntry = JSON.stringify({
+        timestamp: timestamp || new Date().toISOString(),
+        action: action,
+        username: username,
+        details: details
+      });
+      file.setContent(existingContent + '\n' + newEntry);
+    } else {
+      const newEntry = JSON.stringify({
+        timestamp: timestamp || new Date().toISOString(),
+        action: action,
+        username: username,
+        details: details
+      });
+      file = dateFolder.createFile(filename, newEntry, MimeType.PLAIN_TEXT);
+    }
+
+    Logger.log(`📝 Audit logged: ${action} by ${username}`);
+
+    return createResponse('ok', 'Audit logged');
+
+  } catch (err) {
+    Logger.log('❌ Error logging audit: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Get current week sheet name
+ */
+function getCurrentWeekSheetName() {
+  const now = new Date();
+  const sunday = new Date(now);
+  sunday.setDate(sunday.getDate() - sunday.getDay());
+  return CONFIG.SHEET_NAME_PREFIX + Utilities.formatDate(sunday, CONFIG.TIMEZONE, 'yyyyMMdd');
+}
+
+// ===========================================================
+// DRIVE API ACTIONS (Add to doPost handler)
+// ===========================================================
+
+// ===========================================================
+// BOOTSTRAP LEARNING SYSTEM - LEARN FROM ALL HISTORY
+// ===========================================================
+
+/**
+ * BOOTSTRAP LEARNING FROM HISTORICAL DATA
+ *
+ * This function analyzes ALL historical auction data from ForDistribution
+ * and populates the BotLearning sheet with completed predictions.
+ *
+ * The bot will start "smart" instead of learning from scratch!
+ *
+ * Call this ONCE on first deployment to give the bot instant intelligence.
+ * It's safe to run multiple times (skips existing predictions).
+ *
+ * @returns {Object} Response with bootstrap results
+ */
+function bootstrapLearningFromHistory() {
+  try {
+    Logger.log('🚀 [BOOTSTRAP] Starting historical learning bootstrap...');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const forDistSheet = ss.getSheetByName('ForDistribution');
+    const learningSheet = getBotLearningSheet();
+
+    if (!forDistSheet) {
+      return createResponse('error', 'ForDistribution sheet not found');
+    }
+
+    // Get all historical auction data
+    const lastRow = forDistSheet.getLastRow();
+    if (lastRow < 2) {
+      return createResponse('ok', 'No historical data to learn from', { learned: 0 });
+    }
+
+    const dataRange = forDistSheet.getRange(2, 1, lastRow - 1, 12);
+    const auctions = dataRange.getValues();
+
+    Logger.log(`📚 [BOOTSTRAP] Found ${auctions.length} historical auctions`);
+
+    // Group auctions by item to calculate predictions
+    const itemHistory = {};
+
+    // First pass: collect all historical prices
+    auctions.forEach(row => {
+      const itemName = row[0];
+      const winningBid = row[4];
+      const timestamp = row[7];
+      const winner = row[3];
+
+      if (!itemName || !winningBid || !winner || winner === 'No Winner') {
+        return; // Skip invalid or unsold items
+      }
+
+      if (!itemHistory[itemName]) {
+        itemHistory[itemName] = [];
+      }
+
+      itemHistory[itemName].push({
+        price: winningBid,
+        timestamp: timestamp,
+        winner: winner
+      });
+    });
+
+    Logger.log(`📊 [BOOTSTRAP] Grouped into ${Object.keys(itemHistory).length} unique items`);
+
+    // Second pass: For each auction, predict based on data BEFORE that auction
+    let predictionsCreated = 0;
+    let predictionsSkipped = 0;
+
+    auctions.forEach((row, index) => {
+      const itemName = row[0];
+      const actualPrice = row[4];
+      const timestamp = row[7];
+      const winner = row[3];
+
+      if (!itemName || !actualPrice || !winner || winner === 'No Winner') {
+        predictionsSkipped++;
+        return;
+      }
+
+      // Get historical data BEFORE this auction
+      const priorAuctions = itemHistory[itemName]
+        .filter(a => new Date(a.timestamp) < new Date(timestamp))
+        .map(a => a.price);
+
+      if (priorAuctions.length === 0) {
+        // First auction of this item - skip (no data to predict from)
+        predictionsSkipped++;
+        return;
+      }
+
+      // Calculate prediction based on historical data
+      const avgPrice = priorAuctions.reduce((a, b) => a + b, 0) / priorAuctions.length;
+      const sortedPrices = [...priorAuctions].sort((a, b) => a - b);
+      const medianPrice = sortedPrices[Math.floor(sortedPrices.length / 2)];
+
+      // Calculate standard deviation
+      const variance = priorAuctions.reduce((sum, price) => sum + Math.pow(price - avgPrice, 2), 0) / priorAuctions.length;
+      const stdDev = Math.sqrt(variance);
+
+      // Prediction: use median if available, otherwise average
+      const predicted = priorAuctions.length >= 3 ? Math.round(medianPrice) : Math.round(avgPrice);
+
+      // Calculate confidence based on data quantity and consistency
+      let confidence = 50; // Base confidence
+      if (priorAuctions.length >= 10) confidence += 20;
+      else if (priorAuctions.length >= 5) confidence += 10;
+
+      // Lower confidence if high volatility
+      const coefficientOfVariation = (stdDev / avgPrice) * 100;
+      if (coefficientOfVariation < 20) confidence += 15;
+      else if (coefficientOfVariation > 50) confidence -= 15;
+
+      confidence = Math.min(100, Math.max(20, confidence));
+
+      // Calculate accuracy
+      const error = Math.abs(predicted - actualPrice);
+      const errorPercent = (error / actualPrice) * 100;
+      const accuracy = Math.max(0, Math.min(100, 100 - errorPercent));
+
+      // Build features object
+      const features = {
+        historicalAuctions: priorAuctions.length,
+        averagePrice: Math.round(avgPrice),
+        medianPrice: Math.round(medianPrice),
+        stdDev: Math.round(stdDev),
+        minPrice: Math.min(...priorAuctions),
+        maxPrice: Math.max(...priorAuctions),
+        priceRange: Math.max(...priorAuctions) - Math.min(...priorAuctions),
+        coefficientOfVariation: Math.round(coefficientOfVariation * 100) / 100,
+
+        // Recent trend (if enough data)
+        trend: priorAuctions.length >= 5 ? calculateTrend(priorAuctions) : 'insufficient_data',
+
+        // Bootstrap metadata
+        bootstrapped: true,
+        bootstrapIndex: index + 1,
+        bootstrapTotal: auctions.length
+      };
+
+      // Add to BotLearning sheet
+      const newRow = [
+        new Date(timestamp), // Timestamp
+        'price_prediction', // Type
+        itemName, // Target
+        predicted, // Predicted
+        actualPrice, // Actual
+        Math.round(accuracy * 100) / 100, // Accuracy
+        confidence, // Confidence
+        JSON.stringify(features), // Features
+        'completed', // Status
+        `Bootstrapped from historical data (${priorAuctions.length} prior auctions)` // Notes
+      ];
+
+      learningSheet.appendRow(newRow);
+      predictionsCreated++;
+
+      // Log progress every 50 predictions
+      if (predictionsCreated % 50 === 0) {
+        Logger.log(`📈 [BOOTSTRAP] Progress: ${predictionsCreated} predictions created...`);
+      }
+    });
+
+    Logger.log(`✅ [BOOTSTRAP] Bootstrap complete!`);
+    Logger.log(`   Created: ${predictionsCreated} predictions`);
+    Logger.log(`   Skipped: ${predictionsSkipped} (no prior data or invalid)`);
+    Logger.log(`   Total: ${auctions.length} historical auctions analyzed`);
+
+    // Calculate final metrics
+    const avgAccuracy = calculateBootstrapAccuracy(learningSheet);
+
+    return createResponse('ok', 'Bootstrap learning completed', {
+      totalAuctions: auctions.length,
+      predictionsCreated: predictionsCreated,
+      predictionsSkipped: predictionsSkipped,
+      uniqueItems: Object.keys(itemHistory).length,
+      averageAccuracy: avgAccuracy,
+      message: `Bot learned from ${predictionsCreated} historical auctions! Starting accuracy: ${avgAccuracy}%`
+    });
+
+  } catch (err) {
+    Logger.log('❌ [BOOTSTRAP] Error during bootstrap: ' + err.toString());
+    Logger.log(err.stack);
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Calculate trend from price history
+ */
+function calculateTrend(prices) {
+  if (prices.length < 5) return 'insufficient_data';
+
+  const recent = prices.slice(-3);
+  const historical = prices.slice(0, -3);
+
+  const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
+  const historicalAvg = historical.reduce((a, b) => a + b, 0) / historical.length;
+
+  const percentChange = ((recentAvg - historicalAvg) / historicalAvg) * 100;
+
+  if (percentChange > 10) return 'increasing';
+  if (percentChange < -10) return 'decreasing';
+  return 'stable';
+}
+
+/**
+ * Calculate average accuracy from bootstrap
+ */
+function calculateBootstrapAccuracy(learningSheet) {
+  try {
+    const data = learningSheet.getDataRange().getValues();
+    const rows = data.slice(1); // Skip header
+
+    const bootstrapRows = rows.filter(r => {
+      try {
+        const features = JSON.parse(r[7] || '{}');
+        return features.bootstrapped === true && r[5] !== ''; // Has accuracy
+      } catch (e) {
+        return false;
+      }
+    });
+
+    if (bootstrapRows.length === 0) return 0;
+
+    const totalAccuracy = bootstrapRows.reduce((sum, r) => sum + parseFloat(r[5]), 0);
+    return Math.round((totalAccuracy / bootstrapRows.length) * 100) / 100;
+  } catch (e) {
+    return 0;
+  }
+}
+
+/**
+ * Check if bootstrap is needed (BotLearning sheet is empty or has no bootstrapped data)
+ */
+function needsBootstrap() {
+  try {
+    const learningSheet = getBotLearningSheet();
+    const lastRow = learningSheet.getLastRow();
+
+    if (lastRow < 2) {
+      return true; // Empty sheet
+    }
+
+    // Check if we have any bootstrapped predictions
+    const data = learningSheet.getDataRange().getValues();
+    const rows = data.slice(1);
+
+    const hasBootstrap = rows.some(r => {
+      try {
+        const features = JSON.parse(r[7] || '{}');
+        return features.bootstrapped === true;
+      } catch (e) {
+        return false;
+      }
+    });
+
+    return !hasBootstrap; // Need bootstrap if no bootstrapped data found
+  } catch (e) {
+    return true; // On error, assume we need bootstrap
+  }
+}
+
+// ===========================================================
+// AUTOMATED TIME-DRIVEN TRIGGERS
+// ===========================================================
+
+/**
+ * AUTOMATED DAILY BACKUP
+ * Trigger: Time-driven > Day timer > 12am-1am (Manila time)
+ *
+ * This runs automatically every day at midnight to backup all sheets.
+ * Survives Discord bot restarts/crashes since it runs from Apps Script.
+ */
+function dailyAutomatedBackup() {
+  try {
+    Logger.log('🔄 [AUTOMATED] Running daily backup...');
+    const rawResult = createDailyBackup();
+    const result = JSON.parse(rawResult.getContent());
+
+    if (result.status === 'ok') {
+      Logger.log(`✅ [AUTOMATED] Backup completed: ${result.sheetsCount} sheets`);
+    } else {
+      Logger.log(`❌ [AUTOMATED] Backup failed: ${result.message}`);
+    }
+  } catch (err) {
+    Logger.log('❌ [AUTOMATED] Error in daily backup: ' + err.toString());
+  }
+}
+
+/**
+ * AUTOMATED WEEKLY LEARNING DATA EXPORT
+ * Trigger: Time-driven > Week timer > Every Monday > 2am-3am (Manila time)
+ *
+ * Exports all learning data for the previous week for analysis.
+ * Runs automatically regardless of bot status.
+ */
+function weeklyLearningExport() {
+  try {
+    Logger.log('🔄 [AUTOMATED] Running weekly learning export...');
+
+    // Export all learning data from past 7 days
+    const filters = {
+      startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      endDate: new Date().toISOString()
+    };
+
+    const rawLearningResult = exportLearningData({ filters });
+    const rawMlResult = exportPredictionFeatures({});
+
+    const learningResult = JSON.parse(rawLearningResult.getContent());
+    const mlResult = JSON.parse(rawMlResult.getContent());
+
+    if (learningResult.status === 'ok') {
+      Logger.log(`✅ [AUTOMATED] Learning export completed: ${learningResult.recordCount} records`);
+    }
+
+    if (mlResult.status === 'ok') {
+      Logger.log(`✅ [AUTOMATED] ML export completed: ${mlResult.sampleCount} samples`);
+    }
+  } catch (err) {
+    Logger.log('❌ [AUTOMATED] Error in weekly export: ' + err.toString());
+  }
+}
+
+/**
+ * SETUP INSTRUCTIONS FOR TIME-DRIVEN TRIGGERS
+ *
+ * In Apps Script Editor:
+ * 1. Click on clock icon (Triggers) in left sidebar
+ * 2. Click "+ Add Trigger" button
+ *
+ * CREATE THESE TRIGGERS:
+ *
+ * Trigger 1: Sunday Weekly Sheet Creation (ALREADY EXISTS)
+ * - Function: sundayWeeklySheetCreation
+ * - Event source: Time-driven
+ * - Type: Week timer
+ * - Day of week: Sunday
+ * - Time of day: 12am-1am
+ *
+ * Trigger 2: Daily Automated Backup (NEW!)
+ * - Function: dailyAutomatedBackup
+ * - Event source: Time-driven
+ * - Type: Day timer
+ * - Time of day: 12am-1am
+ *
+ * Trigger 3: Weekly Learning Export (NEW!)
+ * - Function: weeklyLearningExport
+ * - Event source: Time-driven
+ * - Type: Week timer
+ * - Day of week: Monday
+ * - Time of day: 2am-3am
+ *
+ * Trigger 4: onEdit (ALREADY EXISTS)
+ * - Function: onEdit
+ * - Event source: From spreadsheet
+ * - Event type: On edit
+ *
+ * All triggers run in Manila timezone (Asia/Manila) and operate
+ * independently of Discord bot status - they run from Google's
+ * servers, so they survive Koyeb restarts/crashes.
+ */
 
 // ===========================================================
 // OPTIMIZED SHEET CREATION WITH AUTO-LOGGING
