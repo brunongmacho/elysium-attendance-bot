@@ -1,32 +1,40 @@
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
  * ║                    ELYSIUM NLP COMMAND HANDLER                            ║
- * ║                  Natural Language Processing System                       ║
+ * ║          Natural Language Processing System (Multilingual)                ║
  * ╚═══════════════════════════════════════════════════════════════════════════╝
  *
  * @fileoverview Natural Language Processing for flexible command interpretation
  * Allows users to use natural language instead of strict command syntax.
+ * Supports English, Tagalog, and Taglish (code-switching).
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * FEATURES
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * 1. FLEXIBLE COMMAND SYNTAX
- *    - "bid 500" → !bid 500
+ * 1. MULTILINGUAL SUPPORT (English, Tagalog, Taglish)
+ *    - English: "bid 500" → !bid 500
+ *    - Tagalog: "taya 500" → !bid 500
+ *    - Taglish: "bid ko 500" → !bid 500
+ *    - "ilang points ko?" → !mypoints
+ *    - "pusta 1000" → !bid 1000
+ *
+ * 2. FLEXIBLE COMMAND SYNTAX
  *    - "how many points do i have" → !mypoints
  *    - "show me the leaderboard" → !leaderboard
+ *    - "nandito ako" → present
  *
- * 2. SMART INTENT DETECTION
+ * 3. SMART INTENT DETECTION
  *    - Understands context and variations
  *    - Works without exact command syntax
- *    - Supports multiple phrasings
+ *    - Supports multiple phrasings in all languages
  *
- * 3. SAFE INTEGRATION
+ * 4. SAFE INTEGRATION
  *    - Does NOT interfere with existing ! commands
  *    - Only works in specific channels (admin logs, auction threads)
  *    - Does NOT respond to casual conversation in guild chat
  *
- * 4. CONTEXTUAL AWARENESS
+ * 5. CONTEXTUAL AWARENESS
  *    - Understands auction context (in auction threads)
  *    - Understands admin context (in admin logs)
  *    - Provides appropriate responses based on location
@@ -58,30 +66,74 @@ const NLP_CONFIG = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// NLP PATTERNS
+// NLP PATTERNS - MULTILINGUAL (English, Tagalog, Taglish)
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Multilingual NLP support for Filipino community
+ * - English: Standard English phrases
+ * - Tagalog (TL): Pure Filipino language
+ * - Taglish: Code-switching between English and Tagalog
+ */
 
 const NLP_PATTERNS = {
   // Bidding commands (auction threads)
   bid: [
+    // English
     /^(?:i\s+)?(?:want\s+to\s+)?bid\s+(\d+)/i,
     /^(?:offer|bidding)\s+(\d+)/i,
     /^(\d+)\s+(?:points?|pts?)/i,
     /^place\s+(?:a\s+)?bid\s+(?:of\s+)?(\d+)/i,
+
+    // Tagalog (TL)
+    /^(?:taya|lagay)\s+(?:ko\s+)?(\d+)/i,    // "taya 500" / "taya ko 500"
+    /^(?:pusta|pustahan)\s+(?:ng\s+)?(\d+)/i, // "pusta 500" / "pustahan ng 500"
+    /^(?:magtaya|maglagay)\s+(?:ako\s+)?(?:ng\s+)?(\d+)/i, // "magtaya 500"
+    /^(?:ibabayad|ibabayad ko)\s+(\d+)/i,    // "ibabayad 500"
+    /^(\d+)\s+(?:taya|pusta)/i,              // "500 taya"
+
+    // Taglish (code-switching)
+    /^bid\s+(?:ko|na|ng)\s+(\d+)/i,          // "bid ko 500"
+    /^(?:gusto|gusto kong)\s+(?:bid|mag-?bid)\s+(?:ng\s+)?(\d+)/i, // "gusto kong magbid ng 500"
+    /^(?:ako|ako ay)\s+bid\s+(?:ng\s+)?(\d+)/i, // "ako bid 500"
+    /^(\d+)\s+(?:lang|lang ako)/i,           // "500 lang"
   ],
 
   // Points queries
   mypoints: [
+    // English
     /^(?:how\s+many|what(?:'s|\s+is)\s+my|check\s+my|show\s+my)\s+points?/i,
     /^(?:my\s+)?(?:points?|balance)/i,
     /^(?:what|how)\s+(?:are|is)\s+my\s+(?:points?|balance)/i,
+
+    // Tagalog (TL)
+    /^(?:ilang|ilan)\s+(?:ang\s+)?points?\s+(?:ko|namin)/i,  // "ilang points ko?"
+    /^(?:magkano|magkano ang)\s+points?\s+ko/i,  // "magkano points ko?"
+    /^(?:tignan|tingnan)\s+(?:ang\s+)?points?\s+ko/i, // "tingnan points ko"
+    /^(?:check|chek)\s+points?\s+ko/i,       // "check points ko"
+    /^points?\s+ko(?:\s+ba)?/i,              // "points ko" / "points ko ba"
+    /^balance\s+ko/i,                        // "balance ko"
+    /^(?:pera|pondo)\s+ko/i,                 // "pera ko"
+
+    // Taglish (code-switching)
+    /^(?:ano|ano ang)\s+points?\s+ko/i,      // "ano points ko?"
+    /^(?:ilan|ilang)\s+(?:na\s+)?points?/i,  // "ilan na points"
+    /^(?:show|ipakita)\s+(?:ang\s+)?points?\s+ko/i, // "show points ko"
   ],
 
   // Attendance commands
   present: [
+    // English
     /^(?:mark\s+)?(?:me\s+)?(?:as\s+)?present/i,
     /^(?:i(?:'m|\s+am)\s+)?(?:here|attending)/i,
     /^(?:check\s+in|checkin)/i,
+
+    // Tagalog (TL)
+    /^(?:nandito|andito)\s+(?:ako|na ako)/i,  // "nandito ako"
+    /^(?:dumating|dumating na)\s+ako/i,       // "dumating ako"
+    /^(?:present|nandito)/i,                  // "present"
+
+    // Taglish
+    /^(?:present|here)\s+(?:ako|na|po)/i,     // "present ako" / "here na"
   ],
 
   // Loot commands
@@ -93,9 +145,19 @@ const NLP_PATTERNS = {
 
   // Status queries
   bidstatus: [
+    // English
     /^(?:what(?:'s|\s+is)\s+the\s+)?(?:auction\s+)?status/i,
     /^(?:show|check|view)\s+(?:auction\s+)?status/i,
     /^(?:current\s+)?(?:auction|bidding)\s+(?:status|info)/i,
+
+    // Tagalog (TL)
+    /^(?:ano|ano ang)\s+(?:status|kalagayan)/i,    // "ano status?"
+    /^(?:tignan|tingnan)\s+(?:ang\s+)?status/i,    // "tingnan status"
+    /^(?:kamusta|kumusta)\s+(?:na\s+)?(?:ang\s+)?bid/i, // "kumusta na ang bid?"
+
+    // Taglish
+    /^status\s+(?:na|ng\s+)?(?:auction|bidding)/i, // "status ng auction"
+    /^(?:ano|anu)\s+na\s+(?:sa\s+)?bid/i,          // "ano na sa bid?"
   ],
 
   // Attendance leaderboard (specific - must come first)
