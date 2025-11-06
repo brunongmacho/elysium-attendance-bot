@@ -178,10 +178,19 @@ class ProactiveIntelligence {
     try {
       console.log('🤖 [PROACTIVE] Checking auction readiness...');
 
-      const biddingResponse = await this.intelligence.sheetAPI.getBiddingPoints();
-      const biddingData = biddingResponse && biddingResponse.data && biddingResponse.data.members ? biddingResponse.data.members : [];
+      const biddingResponse = await this.intelligence.sheetAPI.call('getBiddingPoints', {});
+      // Handle both nested and top-level response shapes, plus legacy points map
+      const d = biddingResponse?.data ?? biddingResponse;
+      const members = Array.isArray(d?.members) ? d.members : [];
+      const pointsMap = d?.points && typeof d.points === 'object' ? d.points : {};
+      const biddingData = members.length
+        ? members
+        : Object.entries(pointsMap).map(([username, pointsLeft]) => ({
+            username,
+            pointsLeft: Number(pointsLeft) || 0,
+          }));
 
-      if (!biddingData || biddingData.length === 0) {
+      if (biddingData.length === 0) {
         console.log('⚠️ [PROACTIVE] No bidding data available');
         return;
       }
@@ -584,10 +593,11 @@ class ProactiveIntelligence {
 
       console.log('🤖 [PROACTIVE] Checking for milestones...');
 
-      const attendanceResponse = await this.intelligence.sheetAPI.getTotalAttendance();
-      const attendanceData = attendanceResponse && attendanceResponse.data && attendanceResponse.data.members ? attendanceResponse.data.members : [];
+      const attendanceResponse = await this.intelligence.sheetAPI.call('getTotalAttendance', {});
+      // Handle both nested and top-level members array
+      const attendanceData = attendanceResponse?.data?.members || attendanceResponse?.members || [];
 
-      if (!attendanceData || attendanceData.length === 0) return;
+      if (attendanceData.length === 0) return;
 
       // Get guild announcement channel
       const guildAnnouncementChannel = await getChannelById(

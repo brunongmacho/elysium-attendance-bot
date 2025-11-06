@@ -663,14 +663,28 @@ async function startAuctioneering(client, config, channel) {
   // Load points cache
   try {
     const pointsData = await sheetAPI.call('getBiddingPoints');
-    if (!pointsData.data?.members) {
+    // Get members array from response (could be top-level or nested)
+    const members = pointsData.members || pointsData.data?.members || [];
+    // Get points map from response (legacy field for backward compatibility)
+    const points = pointsData.points || pointsData.data?.points || {};
+
+    if (members.length === 0 && Object.keys(points).length === 0) {
       await channel.send(`❌ No points data received`);
       return;
     }
 
+    // Convert members array to points map if needed
+    // Guard against blank usernames and NaN values
+    const pointsMap = Object.keys(points).length > 0 ? points : members.reduce((acc, member) => {
+      const name = member?.username?.trim();
+      if (!name) return acc;
+      acc[name] = Number(member?.pointsLeft) || 0;
+      return acc;
+    }, {});
+
     // Store in bidding module's cache with PointsCache for O(1) lookups
     const biddingState = biddingModule.getBiddingState();
-    biddingState.cp = new PointsCache(pointsData.data.members);
+    biddingState.cp = new PointsCache(pointsMap);
     biddingState.ct = Date.now();
     biddingModule.saveBiddingState();
 
