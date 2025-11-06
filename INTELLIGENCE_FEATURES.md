@@ -34,8 +34,8 @@ The bot now **proactively monitors** your guild and sends automatic alerts to pr
 | **Pre-Auction Check** | Saturday 10 AM | Admin Logs (@here) | Checks if guild is ready for auction (2h before) |
 | **Engagement Digest** | Monday 9 AM | Admin Logs (@here if >5 at-risk) | Weekly member engagement analysis |
 | **Anomaly Digest** | Daily 6 PM | Admin Logs (@here) | Fraud detection and suspicious patterns |
-| **Weekly Summary** | Sunday 8 PM | Guild Chat | Positive weekly recap + top 5 performers |
-| **Milestone Check** | Every hour | Guild Chat | Celebrates members reaching 500/1000/2000/5000pts |
+| **Weekly Summary** | Sunday 8 PM | Guild Announcement | Positive weekly recap + top 5 performers |
+| **Milestone Check** | Every hour | Guild Announcement | Celebrates members reaching 500/1000/2000/5000pts |
 
 ### 📍 Channel Routing
 
@@ -45,11 +45,15 @@ The bot now **proactively monitors** your guild and sends automatic alerts to pr
 - Anomaly detection reports
 - Full auction price analysis with @here
 
-**Guild Chat** (positive/motivational):
+**Guild Announcement** (positive/motivational):
 - Weekly positive summary
 - Top 5 performers celebration
 - Member milestone achievements
 - Guild-wide accomplishments
+
+**Guild Chat** (casual conversation):
+- Regular member chat (bot doesn't post announcements here)
+- NLP is disabled to avoid spam
 
 **Auction Threads** (public):
 - Simple AI price suggestions
@@ -93,9 +97,10 @@ Located in `proactive-intelligence.js`:
 ```javascript
 const PROACTIVE_CONFIG = {
   channels: {
-    guildChat: 'elysium_commands_channel_id',    // Guild chat
-    adminLogs: 'admin_logs_channel_id',          // Admin logs
-    biddingChannel: 'bidding_channel_id',        // Auction threads
+    guildAnnouncement: 'guild_announcement_channel_id',  // Bot announcements
+    guildChat: 'elysium_commands_channel_id',            // Guild chat (casual)
+    adminLogs: 'admin_logs_channel_id',                  // Admin logs
+    biddingChannel: 'bidding_channel_id',                // Auction threads
   },
 
   schedules: {
@@ -306,7 +311,7 @@ Change: +10.5%
 
 **Member reaches 1000 points:**
 
-Guild Chat receives:
+Guild Announcement receives:
 ```
 🎉 Milestone Achievement!
 
@@ -323,7 +328,7 @@ Keep up the amazing work! 🌟
 
 **Sunday 8 PM:**
 
-Guild Chat receives:
+Guild Announcement receives:
 ```
 🏆 Weekly Guild Summary
 
@@ -356,10 +361,10 @@ All schedules are in **Manila timezone (Asia/Manila)**.
 ```
 Saturday 10:00 AM  → Pre-Auction Check (Admin Logs)
 Saturday 12:00 PM  → Auction Start (automatic)
-Sunday 8:00 PM     → Weekly Summary (Guild Chat)
+Sunday 8:00 PM     → Weekly Summary (Guild Announcement)
 Monday 9:00 AM     → Engagement Digest (Admin Logs)
 Daily 6:00 PM      → Anomaly Digest (Admin Logs, if anomalies found)
-Every Hour         → Milestone Check (Guild Chat, if milestone reached)
+Every Hour         → Milestone Check (Guild Announcement, if milestone reached)
 ```
 
 ### Monitoring Active Status

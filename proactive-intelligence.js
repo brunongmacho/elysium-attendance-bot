@@ -49,9 +49,10 @@ const { getTimestamp } = require('./utils/common');
 const PROACTIVE_CONFIG = {
   // Channel routing
   channels: {
-    guildChat: 'elysium_commands_channel_id',  // Positive/motivational only
-    adminLogs: 'admin_logs_channel_id',        // Sensitive data + detailed analysis
-    biddingChannel: 'bidding_channel_id',      // Auction threads
+    guildAnnouncement: 'guild_announcement_channel_id',  // Bot announcements (weekly summaries, milestones)
+    guildChat: 'elysium_commands_channel_id',            // Guild chat (casual conversation)
+    adminLogs: 'admin_logs_channel_id',                  // Sensitive data + detailed analysis
+    biddingChannel: 'bidding_channel_id',                // Auction threads
   },
 
   // Notification schedules (Manila timezone)
@@ -554,9 +555,9 @@ class ProactiveIntelligence {
       });
 
       // Send summary
-      await guildChatChannel.send({ embeds: [embed] });
+      await guildAnnouncementChannel.send({ embeds: [embed] });
 
-      console.log(`✅ [PROACTIVE] Weekly summary sent to guild chat`);
+      console.log(`✅ [PROACTIVE] Weekly summary sent to guild announcement`);
 
     } catch (error) {
       console.error('[PROACTIVE] Error sending weekly summary:', error);
@@ -582,14 +583,14 @@ class ProactiveIntelligence {
 
       if (!attendanceData || attendanceData.length === 0) return;
 
-      // Get guild chat channel
-      const guildChatChannel = await getChannelById(
+      // Get guild announcement channel
+      const guildAnnouncementChannel = await getChannelById(
         this.client,
-        this.config[PROACTIVE_CONFIG.channels.guildChat]
+        this.config[PROACTIVE_CONFIG.channels.guildAnnouncement]
       );
 
-      if (!guildChatChannel) {
-        console.error('❌ [PROACTIVE] Guild chat channel not found');
+      if (!guildAnnouncementChannel) {
+        console.error('❌ [PROACTIVE] Guild announcement channel not found');
         return;
       }
 
@@ -617,7 +618,7 @@ class ProactiveIntelligence {
               .setFooter({ text: 'Keep up the amazing work! 🌟' })
               .setTimestamp();
 
-            await guildChatChannel.send({ embeds: [embed] });
+            await guildAnnouncementChannel.send({ embeds: [embed] });
 
             // Mark as celebrated
             this.lastChecks.milestones.add(milestoneKey);

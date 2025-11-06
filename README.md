@@ -141,13 +141,13 @@ Complete toolkit for handling stuck states (all require confirmation):
   - Provides actionable recommendations
 
 - **Weekly Positive Summary** (Sunday 8 PM)
-  - Motivational recap sent to Guild Chat
+  - Motivational recap sent to Guild Announcement
   - Celebrates top 5 performers
   - Guild achievements and milestones
 
 - **Milestone Celebrations** (Every hour)
   - Detects members reaching 500/1000/2000/5000 points
-  - Public celebration in Guild Chat
+  - Public celebration in Guild Announcement
   - Motivates guild engagement
 
 ### 💬 Natural Language Processing (NEW!)
@@ -408,6 +408,9 @@ Create a `config.json` file with the following structure:
   "attendance_channel_id": "ATTENDANCE_CHANNEL_ID",
   "admin_logs_channel_id": "ADMIN_LOGS_CHANNEL_ID",
   "bidding_channel_id": "BIDDING_CHANNEL_ID",
+  "elysium_commands_channel_id": "GUILD_CHAT_CHANNEL_ID",
+  "guild_announcement_channel_id": "ANNOUNCEMENT_CHANNEL_ID",
+  "bot_manual_channel_id": "DOCUMENTATION_CHANNEL_ID",
   "timer_server_id": "TIMER_SERVER_ID",
   "sheet_webhook_url": "https://script.google.com/macros/s/.../exec",
   "admin_roles": ["Admin", "Officer", "Guild Master"],
@@ -421,8 +424,11 @@ Create a `config.json` file with the following structure:
 |-------|-------------|----------|
 | `main_guild_id` | Your main Discord server ID | ✅ |
 | `attendance_channel_id` | Channel for boss spawn threads | ✅ |
-| `admin_logs_channel_id` | Channel for admin notifications | ✅ |
+| `admin_logs_channel_id` | Channel for admin notifications & intelligence reports | ✅ |
 | `bidding_channel_id` | Channel for auctions | ✅ |
+| `elysium_commands_channel_id` | Guild chat channel (casual conversation) | ✅ |
+| `guild_announcement_channel_id` | Channel for bot announcements (summaries, milestones) | ✅ |
+| `bot_manual_channel_id` | Channel for documentation (optional) | ⚠️ |
 | `timer_server_id` | Server ID for timer integration | ✅ |
 | `sheet_webhook_url` | Google Apps Script webhook URL | ✅ |
 | `admin_roles` | Array of admin role names | ✅ |
