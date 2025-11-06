@@ -2792,28 +2792,48 @@ const commandHandlers = {
 
       console.log(`🤖 [INTELLIGENCE] Analyzing ${queueItems.length} items in queue...`);
 
-      // Analyze each item
-      const analyses = [];
-      for (const item of queueItems.slice(0, 20)) { // Limit to 20 items to avoid timeout
-        const itemName = item.item || 'Unknown';
-        const currentPrice = parseInt(item.startPrice) || 0;
+      // Get unique items (deduplicate by item name, case-insensitive)
+      const uniqueItemsMap = new Map();
+      for (const item of queueItems) {
+        const itemName = (item.item || 'Unknown').trim();
+        const itemNameLower = itemName.toLowerCase();
 
-        const prediction = await intelligenceEngine.predictItemValue(itemName);
+        // Keep the first occurrence of each unique item name
+        if (!uniqueItemsMap.has(itemNameLower)) {
+          uniqueItemsMap.set(itemNameLower, {
+            itemName,
+            currentPrice: parseInt(item.startPrice) || 0
+          });
+        }
+      }
+
+      const uniqueItems = Array.from(uniqueItemsMap.values()).slice(0, 20); // Limit to 20 unique items
+      console.log(`🤖 [INTELLIGENCE] Found ${uniqueItems.length} unique items (from ${queueItems.length} total)`);
+
+      // Analyze each unique item
+      const analyses = [];
+      for (const item of uniqueItems) {
+        const prediction = await intelligenceEngine.predictItemValue(item.itemName);
 
         analyses.push({
-          itemName,
-          currentPrice,
+          itemName: item.itemName,
+          currentPrice: item.currentPrice,
           prediction,
         });
       }
 
       // Create summary embed
+      const totalItemsInQueue = queueItems.length;
+      const uniqueItemsCount = uniqueItems.length;
+      const duplicatesCount = totalItemsInQueue - uniqueItemsCount;
+
       const embed = new EmbedBuilder()
         .setColor(0x9b59b6)
         .setTitle(`💰 Auction Queue Analysis`)
         .setDescription(
-          `AI price suggestions for **${analyses.length}** items in queue\n\n` +
-          `**How to use:** Manually adjust prices in Google Sheets > BiddingItems before starting auction`
+          `AI price suggestions for **${uniqueItemsCount} unique items** in queue` +
+          (duplicatesCount > 0 ? ` (${duplicatesCount} duplicates hidden)` : '') +
+          `\n\n**How to use:** Manually adjust prices in Google Sheets > BiddingItems before starting auction`
         )
         .setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
         .setTimestamp();
@@ -2860,7 +2880,8 @@ const commandHandlers = {
       embed.addFields({
         name: '📈 Analysis Summary',
         value:
-          `Total Items: ${analyses.length}\n` +
+          `Total Items in Queue: ${totalItemsInQueue}\n` +
+          `Unique Items Analyzed: ${uniqueItemsCount}\n` +
           `With Predictions: ${withPredictions.length}\n` +
           `Avg Confidence: ${avgConfidence}%`,
         inline: false,
