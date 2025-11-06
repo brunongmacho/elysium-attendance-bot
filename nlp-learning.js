@@ -455,7 +455,7 @@ class NLPLearningSystem {
 
   async loadFromGoogleSheets() {
     try {
-      const sheetsUrl = this.config.google_apps_script_url;
+      const sheetsUrl = this.config.sheet_webhook_url;
       if (!sheetsUrl) {
         console.warn('🧠 [NLP Learning] No Google Sheets URL configured');
         return;
@@ -492,7 +492,7 @@ class NLPLearningSystem {
 
   async syncToGoogleSheets() {
     try {
-      const sheetsUrl = this.config.google_apps_script_url;
+      const sheetsUrl = this.config.sheet_webhook_url;
       if (!sheetsUrl) return;
 
       // Prepare data
