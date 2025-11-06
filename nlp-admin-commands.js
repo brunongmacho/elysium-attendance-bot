@@ -69,6 +69,7 @@ async function showNLPStats(message, learningSystem) {
           value: [
             '• **Passive Learning:** Bot learns from all messages without responding',
             '• **Smart Activation:** Responds in admin-logs, auction threads, or when @mentioned',
+            '• **Fuzzy Matching:** Handles typos/shortcuts (max 2 chars, 75% similarity)',
             '• **Self-Improving:** Patterns improve with usage (confidence 0.7 → 0.95+)',
             '• **Persistent:** Syncs to Google Sheets every 5 minutes',
           ].join('\n'),

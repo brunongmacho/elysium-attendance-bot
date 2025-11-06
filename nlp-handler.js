@@ -102,25 +102,38 @@ const NLP_PATTERNS = {
   mypoints: [
     // English
     /^(?:how\s+many|what(?:'s|\s+is)\s+my|check\s+my|show\s+my)\s+points?/i,
-    /^(?:my\s+)?(?:points?|balance)/i,
+    /^(?:my\s+)?(?:points?|balance|pts?)/i,
     /^(?:what|how)\s+(?:are|is)\s+my\s+(?:points?|balance)/i,
-    /^how\s+much\s+(?:are|is)\s+my\s+(?:.*?\s+)?points?/i,  // "how much is my bidding points?"
-    /^how\s+many\s+(?:.*?\s+)?points?\s+(?:do\s+)?(?:i|we)\s+(?:have|got)/i,  // "how many points do i have?"
-    /^(?:check|show|tell|give)\s+(?:me\s+)?(?:my\s+)?(?:.*?\s+)?points?/i,  // "show me my bidding points"
+    /^how\s+much\s+(?:are|is)\s+my\s+(?:.*?\s+)?points?/i,
+    /^how\s+many\s+(?:.*?\s+)?points?\s+(?:do\s+)?(?:i|we)\s+(?:have|got)/i,
+    /^(?:check|show|tell|give|display)\s+(?:me\s+)?(?:my\s+)?(?:.*?\s+)?points?/i,
+    /^(?:pts|points|pnts|point)$/i,          // Shortcuts
+    /^(?:my\s+)?(?:pts?|bp|bidding\s+points?)$/i,
+    /^(?:remaining|left|balance)(?:\s+points?)?$/i,
+    /^(?:point|pint|pont|pnts)\s+(?:count|balance|left)/i, // Common typos
 
     // Tagalog (TL)
-    /^(?:ilang|ilan)\s+(?:ang\s+)?points?\s+(?:ko|namin)/i,  // "ilang points ko?"
-    /^(?:magkano|magkano ang)\s+points?\s+ko/i,  // "magkano points ko?"
-    /^(?:tignan|tingnan)\s+(?:ang\s+)?points?\s+ko/i, // "tingnan points ko"
-    /^(?:check|chek)\s+points?\s+ko/i,       // "check points ko"
-    /^points?\s+ko(?:\s+ba)?/i,              // "points ko" / "points ko ba"
-    /^balance\s+ko/i,                        // "balance ko"
-    /^(?:pera|pondo)\s+ko/i,                 // "pera ko"
+    /^(?:ilang|ilan|lng|ilng)\s+(?:ang\s+)?points?\s+(?:ko|namin|ko\s+pa)/i,
+    /^(?:magkano|magkanu|mgkano)\s+(?:ang\s+)?points?\s+ko/i,
+    /^(?:tignan|tingnan|tngin|tingen)\s+(?:ang\s+)?points?\s+ko/i,
+    /^(?:check|chek|cek)\s+points?\s+ko/i,
+    /^points?\s+ko(?:\s+(?:ba|po|pls|please|naman))?/i,
+    /^(?:pts?|balance)\s+ko/i,
+    /^(?:pera|pondo|money)\s+ko/i,
+    /^(?:natira|natitira|natitirang)\s+(?:points?|pts)/i, // "remaining points"
+    /^(?:meron|may|mayroon)\s+(?:pa\s+)?(?:ako|akong)\s+(?:ilang|ilan)/i, // "meron pa ako ilang"
+    /^(?:tira|titirang?)\s+(?:points?|ko)/i, // "tira ko"
+    /^(?:ilan|ilang)\s+(?:pa|na|na\s+lang)/i, // "ilan pa"
+    /^(?:pila|ilang)\s+(?:natira|naiwan)/i,  // "ilang natira"
 
     // Taglish (code-switching)
-    /^(?:ano|ano ang)\s+points?\s+ko/i,      // "ano points ko?"
-    /^(?:ilan|ilang)\s+(?:na\s+)?points?/i,  // "ilan na points"
-    /^(?:show|ipakita)\s+(?:ang\s+)?points?\s+ko/i, // "show points ko"
+    /^(?:ano|anu|ano\s+ba)\s+(?:ang\s+)?points?\s+ko/i,
+    /^(?:ilan|ilang|ilng)\s+(?:na\s+)?(?:points?|pts)/i,
+    /^(?:show|ipakita|pakita)\s+(?:ang\s+)?points?\s+ko/i,
+    /^(?:pts?|points?)\s+(?:ko|ko\s+ba|naman)/i,
+    /^(?:check|tingnan)\s+(?:ko|yung)\s+points?/i,
+    /^(?:remaining|left)\s+(?:ko|points?\s+ko)/i,
+    /^(?:how\s+many|ilan)\s+(?:pa|na)$/i,     // "how many pa"
   ],
 
   // Attendance commands
@@ -149,18 +162,30 @@ const NLP_PATTERNS = {
   // Status queries
   bidstatus: [
     // English
-    /^(?:what(?:'s|\s+is)\s+the\s+)?(?:auction\s+)?status/i,
-    /^(?:show|check|view)\s+(?:auction\s+)?status/i,
-    /^(?:current\s+)?(?:auction|bidding)\s+(?:status|info)/i,
+    /^(?:what(?:'s|\s+is)\s+the\s+)?(?:auction\s+)?(?:status|stat)/i,
+    /^(?:show|check|view|display)\s+(?:auction\s+)?(?:status|stat)/i,
+    /^(?:current\s+)?(?:auction|bidding|bid)\s+(?:status|info|details)/i,
+    /^(?:status|stat|info)$/i,               // Shortcuts
+    /^(?:bid\s+)?(?:info|details|update)$/i,
+    /^(?:auction|bidding)\s+(?:update|news)/i,
+    /^(?:what's|whats)\s+(?:happening|going on)/i,
+    /^(?:status|update)\s+(?:pls|please|plz)/i,
 
     // Tagalog (TL)
-    /^(?:ano|ano ang)\s+(?:status|kalagayan)/i,    // "ano status?"
-    /^(?:tignan|tingnan)\s+(?:ang\s+)?status/i,    // "tingnan status"
-    /^(?:kamusta|kumusta)\s+(?:na\s+)?(?:ang\s+)?bid/i, // "kumusta na ang bid?"
+    /^(?:ano|anu|ano\s+ba)\s+(?:ang\s+)?(?:status|kalagayan|balita)/i,
+    /^(?:tignan|tingnan|tngin)\s+(?:ang\s+)?(?:status|balita)/i,
+    /^(?:kamusta|kumusta|kmusta)\s+(?:na\s+)?(?:ang\s+)?(?:bid|auction)/i,
+    /^(?:anong|anu)\s+(?:nangyayari|nangyari|meron)/i, // "anong nangyayari"
+    /^(?:may|meron)\s+(?:bid|auction)\s+(?:ba|na)/i, // "may bid ba"
+    /^(?:aktibo|active)\s+(?:ba|pa)\s+(?:ang\s+)?(?:bid|auction)/i, // "aktibo ba ang bid"
+    /^(?:update|balita|news)(?:\s+(?:ba|po|naman))?$/i,
 
     // Taglish
-    /^status\s+(?:na|ng\s+)?(?:auction|bidding)/i, // "status ng auction"
-    /^(?:ano|anu)\s+na\s+(?:sa\s+)?bid/i,          // "ano na sa bid?"
+    /^status\s+(?:na|ng|ba)\s*(?:auction|bidding)?/i,
+    /^(?:ano|anu)\s+(?:na|nangyari)\s+(?:sa\s+)?(?:bid|auction)/i,
+    /^(?:update|balita)\s+(?:naman|please|pls)/i,
+    /^(?:kamusta|kumusta)\s+(?:bid|auction)/i,
+    /^(?:may|meron)\s+(?:bang\s+)?(?:auction|bid)/i,
   ],
 
   // Attendance leaderboard (specific - must come first)
@@ -179,9 +204,18 @@ const NLP_PATTERNS = {
 
   // General leaderboard (must come after specific leaderboards)
   leaderboard: [
-    /^(?:show|display|check|view)\s+(?:the\s+)?leaderboard$/i,
-    /^(?:top|rankings?|leaderboard)$/i,
-    /^who(?:'s|\s+is)\s+(?:on\s+)?top$/i,
+    /^(?:show|display|check|view)\s+(?:the\s+)?(?:leaderboard|lb|rankings?)$/i,
+    /^(?:top|rankings?|leaderboard|lb)$/i,
+    /^who(?:'s|\s+is)\s+(?:on\s+)?(?:top|leading)/i,
+    /^(?:top\s+)?(?:players?|members?|users?)$/i,
+    /^(?:rank|ranking|ranks)$/i,
+    // Tagalog
+    /^(?:sino|who)\s+(?:ang\s+)?(?:nangungunang|nangunguna|nasa\s+top)/i,
+    /^(?:tignan|tingnan)\s+(?:ang\s+)?(?:leaderboard|ranking)/i,
+    /^(?:top|rank|ranking)(?:\s+(?:ba|naman))?$/i,
+    // Taglish
+    /^(?:sino|who)\s+(?:top|nangunguna)/i,
+    /^(?:show|pakita)\s+(?:ranking|leaderboard)/i,
   ],
 
   // Queue list

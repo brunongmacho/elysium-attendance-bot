@@ -4015,7 +4015,10 @@ client.on(Events.MessageCreate, async (message) => {
         nlpInterpretation = await nlpLearningSystem.interpretMessage(message);
         if (nlpInterpretation) {
           usedLearningSystem = true;
-          console.log(`🧠 [NLP Learning] Interpreted: "${message.content}" → ${nlpInterpretation.command} (confidence: ${nlpInterpretation.confidence})`);
+          const fuzzyInfo = nlpInterpretation.fuzzyMatch
+            ? ` [fuzzy: "${nlpInterpretation.fuzzyMatch.matched}" ${nlpInterpretation.fuzzyMatch.similarity}]`
+            : '';
+          console.log(`🧠 [NLP Learning] Interpreted: "${message.content}" → ${nlpInterpretation.command} (confidence: ${nlpInterpretation.confidence.toFixed(2)})${fuzzyInfo}`);
         }
       }
     }
