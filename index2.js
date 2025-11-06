@@ -78,6 +78,7 @@ const errorHandler = require('./utils/error-handler');      // Centralized error
 const { SheetAPI } = require('./utils/sheet-api');          // Unified Google Sheets API
 const { DiscordCache } = require('./utils/discord-cache');  // Channel caching system
 const { normalizeUsername } = require('./utils/common');    // Username normalization
+const scheduler = require('./utils/maintenance-scheduler'); // Unified maintenance scheduler
 const { IntelligenceEngine } = require('./intelligence-engine.js'); // AI/ML Intelligence Engine
 const { ProactiveIntelligence } = require('./proactive-intelligence.js'); // Proactive Monitoring
 const { NLPHandler } = require('./nlp-handler.js'); // Natural Language Processing
@@ -3521,12 +3522,12 @@ client.once(Events.ClientReady, async () => {
   console.log("🔨 Starting weekly Saturday auction scheduler...");
   auctioneering.scheduleWeeklySaturdayAuction(client, config);
 
-  // START AGGRESSIVE MEMORY MANAGEMENT (Optimized for 512MB RAM on Koyeb)
-  if (global.gc) {
-    console.log("🧹 Starting aggressive memory management (every 5 minutes)");
+  // START UNIFIED MAINTENANCE SCHEDULER
+  console.log("🚀 Starting unified maintenance scheduler...");
 
-    // Enhanced garbage collection with memory pressure detection
-    setInterval(() => {
+  // Register GC task (every 5 minutes)
+  if (global.gc) {
+    scheduler.registerTask('gc-management', async () => {
       const memUsage = process.memoryUsage();
       const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
       const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
@@ -3552,10 +3553,13 @@ client.once(Events.ClientReady, async () => {
       if (rssMB > 400) {
         console.error(`🚨 MEMORY ALERT: ${rssMB}MB RSS (Limit: 512MB) - Consider restarting`);
       }
-    }, 5 * 60 * 1000); // Every 5 minutes (more aggressive than 10)
+    }, 5 * 60 * 1000); // Every 5 minutes
   } else {
     console.warn("⚠️ Garbage collection not available. Run with --expose-gc flag.");
   }
+
+  // Start the scheduler
+  scheduler.startScheduler();
 
   console.log("✅ Bot initialization complete and ready for operations!");
 });
@@ -3600,12 +3604,15 @@ client.once(Events.ClientReady, async () => {
  */
 client.on(Events.MessageCreate, async (message) => {
   try {
+    // ⚡ PERFORMANCE: Early returns for irrelevant messages
+    if (message.author.bot) return; // Skip bot messages immediately
+    if (!message.guild) return; // Skip DMs immediately
+    if (message.guild.id !== config.main_guild_id) return; // Skip wrong guild
+
     // 🧹 BIDDING CHANNEL PROTECTION: Delete non-admin messages immediately
     // EXCEPT for member commands (!mypoints, !bidstatus, etc.)
     if (
-      message.guild &&
-      message.channel.id === config.bidding_channel_id &&
-      !message.author.bot
+      message.channel.id === config.bidding_channel_id
     ) {
       const member = await message.guild.members
         .fetch(message.author.id)
@@ -4669,7 +4676,10 @@ client.on(Events.MessageCreate, async (message) => {
  */
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
   try {
-    if (user.bot) return;
+    // ⚡ PERFORMANCE: Early returns for irrelevant reactions
+    if (user.bot) return; // Skip bot reactions
+    if (!reaction.message.guild) return; // Skip DM reactions
+    if (reaction.message.guild.id !== config.main_guild_id) return; // Skip wrong guild
 
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();

@@ -217,14 +217,9 @@ async function checkColumnExists(boss, timestamp) {
   const normalizedTimestamp = normalizeTimestamp(timestamp);
   const cacheKey = `${boss.toUpperCase()}|${normalizedTimestamp}`;
 
-  // Check activeColumns cache with normalized timestamp comparison
-  for (const key of Object.keys(activeColumns)) {
-    const [keyBoss, keyTimestamp] = key.split('|');
-    const normalizedKeyTimestamp = normalizeTimestamp(keyTimestamp);
-    if (keyBoss.toUpperCase() === boss.toUpperCase() &&
-        normalizedKeyTimestamp === normalizedTimestamp) {
-      return true;
-    }
+  // O(1) lookup in activeColumns using normalized key
+  if (activeColumns[cacheKey]) {
+    return true;
   }
 
   // Check short-term API result cache (reduces duplicate API calls)
@@ -317,13 +312,30 @@ async function cleanupAllThreadReactions(thread) {
     let successCount = 0,
       failCount = 0;
 
-    // Process each message with reactions
-    for (const [msgId, msg] of messages) {
-      if (msg.reactions.cache.size === 0) continue;
-      const success = await removeAllReactionsWithRetry(msg);
-      success ? successCount++ : failCount++;
-      // Small delay to avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 200));
+    // Filter messages with reactions
+    const messagesWithReactions = Array.from(messages.values()).filter(
+      msg => msg.reactions.cache.size > 0
+    );
+
+    // Process in batches of 5 for parallel execution (4-5x faster)
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < messagesWithReactions.length; i += BATCH_SIZE) {
+      const batch = messagesWithReactions.slice(i, i + BATCH_SIZE);
+
+      // Process batch in parallel
+      const results = await Promise.all(
+        batch.map(msg => removeAllReactionsWithRetry(msg))
+      );
+
+      // Count successes/failures
+      results.forEach(success => {
+        success ? successCount++ : failCount++;
+      });
+
+      // Small delay between batches to avoid rate limiting
+      if (i + BATCH_SIZE < messagesWithReactions.length) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
     }
 
     return { success: successCount, failed: failCount };
@@ -382,12 +394,11 @@ async function createSpawnThreads(
     .catch(() => null);
   if (!mainGuild) return;
 
-  const attChannel = await mainGuild.channels
-    .fetch(config.attendance_channel_id)
-    .catch(() => null);
-  const adminLogs = await mainGuild.channels
-    .fetch(config.admin_logs_channel_id)
-    .catch(() => null);
+  // Batch fetch channels in parallel for faster execution
+  const [attChannel, adminLogs] = await Promise.all([
+    mainGuild.channels.fetch(config.attendance_channel_id).catch(() => null),
+    mainGuild.channels.fetch(config.admin_logs_channel_id).catch(() => null),
+  ]);
 
   if (!attChannel || !adminLogs) return;
 
@@ -430,8 +441,9 @@ async function createSpawnThreads(
     createdAt: Date.now(), // Track when thread was created for auto-close
   };
 
-  // Register in activeColumns for duplicate prevention
-  activeColumns[`${bossName}|${fullTimestamp}`] = attThread.id;
+  // Register in activeColumns for duplicate prevention (use normalized key for O(1) lookup)
+  const normalizedKey = `${bossName.toUpperCase()}|${normalizeTimestamp(fullTimestamp)}`;
+  activeColumns[normalizedKey] = attThread.id;
 
   // Create and send attendance instructions embed
   const embed = new EmbedBuilder()
@@ -460,15 +472,18 @@ async function createSpawnThreads(
     .setFooter({ text: 'Admins: type "close" to finalize early' })
     .setTimestamp();
 
-  // Notify all members in attendance channel
-  await attThread.send({ content: "@everyone", embeds: [embed] });
+  // Batch send notifications in parallel for faster execution
+  const notifications = [
+    attThread.send({ content: "@everyone", embeds: [embed] }),
+  ];
 
-  // Notify admins in confirmation thread
   if (confirmThread) {
-    await confirmThread.send(
-      `🟨 **${bossName}** spawn detected (${fullTimestamp}).`
+    notifications.push(
+      confirmThread.send(`🟨 **${bossName}** spawn detected (${fullTimestamp}).`)
     );
   }
+
+  await Promise.all(notifications);
 
   // 🧠 AUTO-UPDATE LEARNING SYSTEM (Bot learns from actual spawn time)
   try {
@@ -732,7 +747,9 @@ async function recoverStateFromThreads(client) {
           createdAt: thread.createdTimestamp || Date.now(), // Use actual creation time for auto-close
         };
 
-        activeColumns[`${bossName}|${parsed.timestamp}`] = threadId;
+        // Use normalized key for O(1) lookup consistency
+        const normalizedRecoveryKey = `${bossName.toUpperCase()}|${normalizeTimestamp(parsed.timestamp)}`;
+        activeColumns[normalizedRecoveryKey] = threadId;
 
         // Store pending verifications
         scanResult.pending.forEach(p => {
@@ -1258,7 +1275,8 @@ async function checkAndAutoCloseThreads(client) {
         if (!thread) {
           console.log(`   ⚠️ Thread not found, cleaning up state`);
           delete activeSpawns[threadId];
-          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+          const cleanupKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
+          delete activeColumns[cleanupKey];
           continue;
         }
 
@@ -1293,7 +1311,7 @@ async function checkAndAutoCloseThreads(client) {
 
         // Remove from activeColumns cache BEFORE checking Google Sheets
         // This prevents false positives where the thread exists but was never submitted
-        const cacheKey = `${spawnInfo.boss}|${spawnInfo.timestamp}`;
+        const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
         delete activeColumns[cacheKey];
 
         // Check if column already exists to prevent duplicate submissions
@@ -1333,7 +1351,8 @@ async function checkAndAutoCloseThreads(client) {
 
           // Clean up state
           delete activeSpawns[threadId];
-          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+          const dupKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
+          delete activeColumns[dupKey];
           delete confirmationMessages[threadId];
 
           closed++;
@@ -1394,7 +1413,8 @@ async function checkAndAutoCloseThreads(client) {
 
             // Clean up state
             delete activeSpawns[threadId];
-            delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+            const successKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
+            delete activeColumns[successKey];
             delete confirmationMessages[threadId];
 
             closed++;

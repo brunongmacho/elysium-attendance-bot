@@ -18,12 +18,56 @@
  * - AUCTION_STATES: Auction state machine values
  * - COMMON_ALIASES: Command alias mappings
  * - MESSAGES: Predefined message templates
+ * - LOGGING: Production logging configuration
  *
  * @module utils/constants
  * @author Elysium Attendance Bot Team
  * @version 2.0
  * ============================================================================
  */
+
+// ============================================================================
+// LOGGING CONFIGURATION
+// ============================================================================
+
+/**
+ * Production mode check - set NODE_ENV=production to reduce verbose logging
+ * @constant {boolean} PRODUCTION_MODE
+ */
+const PRODUCTION_MODE = process.env.NODE_ENV === 'production';
+
+/**
+ * Optimized logging functions that respect production mode
+ * console.error and console.warn always execute (critical messages)
+ * console.log only executes in development mode
+ *
+ * @constant {Object} LOGGING
+ */
+const LOGGING = {
+  PRODUCTION_MODE,
+
+  /**
+   * Debug/info logging - disabled in production
+   * @param {...any} args - Arguments to log
+   */
+  log: (...args) => {
+    if (!PRODUCTION_MODE) {
+      console.log(...args);
+    }
+  },
+
+  /**
+   * Error logging - always enabled
+   * @param {...any} args - Arguments to log
+   */
+  error: (...args) => console.error(...args),
+
+  /**
+   * Warning logging - always enabled
+   * @param {...any} args - Arguments to log
+   */
+  warn: (...args) => console.warn(...args),
+};
 
 // ============================================================================
 // DISCORD EMBED COLORS
@@ -411,6 +455,7 @@ const MESSAGES = {
  * @exports MESSAGES - Predefined message templates
  */
 module.exports = {
+  LOGGING, // Production logging configuration (add this to reduce I/O in production)
   COLORS,
   EMOJIS,
   TIMING,
