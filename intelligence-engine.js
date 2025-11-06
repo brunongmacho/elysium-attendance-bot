@@ -812,16 +812,15 @@ class IntelligenceEngine {
       bossesByType[bossKey].spawns.push(spawn);
     }
 
-    // Predict next spawn for each boss type
-    const predictions = [];
-    for (const [bossKey, bossData] of Object.entries(bossesByType)) {
-      if (bossData.spawns.length >= 2) {
-        const prediction = await this.calculateBossSpawnPrediction(bossData.spawns, bossData.name);
-        if (!prediction.error) {
-          predictions.push(prediction);
-        }
-      }
-    }
+    // Predict next spawn for each boss type (in parallel for speed)
+    const predictionPromises = Object.entries(bossesByType)
+      .filter(([bossKey, bossData]) => bossData.spawns.length >= 2)
+      .map(([bossKey, bossData]) =>
+        this.calculateBossSpawnPrediction(bossData.spawns, bossData.name)
+      );
+
+    const allPredictions = await Promise.all(predictionPromises);
+    const predictions = allPredictions.filter(prediction => !prediction.error);
 
     if (predictions.length === 0) {
       return {
@@ -886,21 +885,38 @@ class IntelligenceEngine {
     // Filter outlier intervals using IQR method to remove anomalies
     // (e.g., long gaps between spawn "seasons")
     const sortedIntervals = [...intervals].sort((a, b) => a - b);
-    const q1Index = Math.floor(sortedIntervals.length * 0.25);
-    const q3Index = Math.floor(sortedIntervals.length * 0.75);
-    const q1 = sortedIntervals[q1Index];
-    const q3 = sortedIntervals[q3Index];
+
+    // Improved quartile calculation using linear interpolation
+    const getQuartile = (arr, q) => {
+      const pos = (arr.length - 1) * q;
+      const base = Math.floor(pos);
+      const rest = pos - base;
+      if (arr[base + 1] !== undefined) {
+        return arr[base] + rest * (arr[base + 1] - arr[base]);
+      } else {
+        return arr[base];
+      }
+    };
+
+    const q1 = getQuartile(sortedIntervals, 0.25);
+    const q3 = getQuartile(sortedIntervals, 0.75);
     const iqr = q3 - q1;
 
-    // Filter out intervals beyond 1.5 * IQR (standard outlier detection)
-    const lowerBound = q1 - (1.5 * iqr);
-    const upperBound = q3 + (1.5 * iqr);
-    const filteredIntervals = intervals.filter(interval =>
-      interval >= lowerBound && interval <= upperBound
-    );
+    // Only apply outlier filtering if we have enough data and significant IQR
+    let intervalsToUse = intervals;
+    if (intervals.length >= 5 && iqr > 0) {
+      // Filter out intervals beyond 1.5 * IQR (standard outlier detection)
+      const lowerBound = q1 - (1.5 * iqr);
+      const upperBound = q3 + (1.5 * iqr);
+      const filteredIntervals = intervals.filter(interval =>
+        interval >= lowerBound && interval <= upperBound
+      );
 
-    // If filtering removed too many intervals, fall back to using all intervals
-    const intervalsToUse = filteredIntervals.length >= 3 ? filteredIntervals : intervals;
+      // Only use filtered if we kept at least 60% of data
+      if (filteredIntervals.length >= Math.ceil(intervals.length * 0.6)) {
+        intervalsToUse = filteredIntervals;
+      }
+    }
 
     // Use median interval for more robust prediction (less affected by outliers)
     const medianInterval = this.calculateMedian(intervalsToUse);
@@ -908,14 +924,16 @@ class IntelligenceEngine {
     // Also calculate mean for comparison
     const avgInterval = intervalsToUse.reduce((a, b) => a + b, 0) / intervalsToUse.length;
 
-    // Weight recent intervals more heavily (70% median, 30% recent)
-    // Use filtered intervals to ensure recent average is also outlier-free
-    const recentCount = Math.min(5, Math.floor(intervalsToUse.length * 0.3));
-    const recentIntervals = intervalsToUse.slice(-recentCount);
+    // Get the most recent CHRONOLOGICAL intervals (not from filtered set)
+    // This ensures we're actually looking at recent behavior
+    const recentCount = Math.max(1, Math.min(5, Math.ceil(intervals.length * 0.3)));
+    const recentIntervals = intervals.slice(-recentCount);
     const recentAvg = recentIntervals.reduce((a, b) => a + b, 0) / recentIntervals.length;
 
-    // Combine median with recent trend
-    const predictedInterval = (medianInterval * 0.7) + (recentAvg * 0.3);
+    // Adaptive weighting: use more recent data if sample size is small
+    const medianWeight = intervals.length >= 10 ? 0.7 : 0.5;
+    const recentWeight = 1 - medianWeight;
+    const predictedInterval = (medianInterval * medianWeight) + (recentAvg * recentWeight);
 
     // Calculate standard deviation on filtered intervals
     const variance = intervalsToUse.reduce((sum, interval) =>
@@ -927,7 +945,25 @@ class IntelligenceEngine {
     const predictedNextSpawn = new Date(lastSpawn.getTime() + (predictedInterval * 60 * 60 * 1000));
 
     // Calculate confidence based on consistency of intervals
-    const baseConfidence = this.calculateSpawnConfidence(intervalsToUse.length, stdDev, medianInterval);
+    let baseConfidence = this.calculateSpawnConfidence(intervalsToUse.length, stdDev, medianInterval);
+
+    // Adjust confidence based on time since last spawn (recency penalty)
+    const now = new Date();
+    const timeSinceLastSpawn = (now - lastSpawn) / (1000 * 60 * 60); // hours
+    const percentOfInterval = timeSinceLastSpawn / predictedInterval;
+
+    // If last spawn was VERY recent (< 10% of interval), reduce confidence
+    if (percentOfInterval < 0.1) {
+      baseConfidence *= 0.7; // Reduce by 30%
+    }
+    // If we're way past the predicted spawn time (> 150% of interval), reduce confidence
+    else if (percentOfInterval > 1.5) {
+      baseConfidence *= 0.6; // Reduce by 40% - pattern may have changed
+    }
+    // If we're significantly past (> 120% of interval), slight reduction
+    else if (percentOfInterval > 1.2) {
+      baseConfidence *= 0.85; // Reduce by 15%
+    }
 
     // Adjust confidence based on historical accuracy (learning system)
     const adjustedConfidence = await this.learningSystem.adjustConfidence('spawn_prediction', baseConfidence);
@@ -951,10 +987,20 @@ class IntelligenceEngine {
       features
     );
 
-    // Calculate prediction range using filtered stdDev, capped at reasonable bounds
-    // Cap the range at ±50% of predicted interval to avoid absurdly wide ranges
-    const maxRange = predictedInterval * 0.5;
-    const rangeHours = Math.min(stdDev, maxRange);
+    // Calculate prediction range using filtered stdDev, scaled by confidence
+    // Higher confidence = tighter range, lower confidence = wider range
+    const confidenceScale = adjustedConfidence / 100;
+
+    // Base range on standard deviation, but scale inversely with confidence
+    // Low confidence (20%) -> use 2.5 * stdDev, High confidence (85%) -> use 1.0 * stdDev
+    const rangeFactor = 2.5 - (1.5 * confidenceScale);
+    let rangeHours = stdDev * rangeFactor;
+
+    // Cap the range at reasonable bounds (min 5% to max 60% of predicted interval)
+    const minRange = predictedInterval * 0.05;
+    const maxRange = predictedInterval * 0.6;
+    rangeHours = Math.max(minRange, Math.min(rangeHours, maxRange));
+
     const earliestTime = new Date(predictedNextSpawn.getTime() - (rangeHours * 60 * 60 * 1000));
     const latestTime = new Date(predictedNextSpawn.getTime() + (rangeHours * 60 * 60 * 1000));
 
@@ -978,21 +1024,30 @@ class IntelligenceEngine {
    * @returns {number} Confidence score (0-100)
    */
   calculateSpawnConfidence(sampleSize, stdDev, mean) {
-    let confidence = 30; // Base confidence
+    // Start with lower base confidence for more realistic predictions
+    let confidence = 20;
 
-    // More samples = higher confidence
-    if (sampleSize >= 20) confidence += 30;
-    else if (sampleSize >= 10) confidence += 20;
-    else if (sampleSize >= 5) confidence += 10;
+    // Sample size contribution (max +35)
+    if (sampleSize >= 30) confidence += 35;
+    else if (sampleSize >= 20) confidence += 28;
+    else if (sampleSize >= 15) confidence += 22;
+    else if (sampleSize >= 10) confidence += 16;
+    else if (sampleSize >= 7) confidence += 10;
+    else if (sampleSize >= 5) confidence += 6;
+    else if (sampleSize >= 3) confidence += 3;
 
-    // Lower variability = higher confidence
+    // Consistency contribution (max +45)
     const coefficientOfVariation = stdDev / mean;
-    if (coefficientOfVariation < 0.1) confidence += 40; // Very consistent
-    else if (coefficientOfVariation < 0.2) confidence += 30; // Consistent
-    else if (coefficientOfVariation < 0.3) confidence += 20; // Moderately consistent
-    else if (coefficientOfVariation < 0.5) confidence += 10; // Somewhat consistent
+    if (coefficientOfVariation < 0.05) confidence += 45; // Extremely consistent
+    else if (coefficientOfVariation < 0.10) confidence += 38; // Very consistent
+    else if (coefficientOfVariation < 0.15) confidence += 30; // Consistent
+    else if (coefficientOfVariation < 0.25) confidence += 20; // Moderately consistent
+    else if (coefficientOfVariation < 0.35) confidence += 12; // Somewhat consistent
+    else if (coefficientOfVariation < 0.50) confidence += 6;  // Low consistency
+    // else: very high variation, no bonus
 
-    return Math.min(confidence, 100);
+    // Cap maximum confidence at 85% (never claim perfect prediction)
+    return Math.min(confidence, 85);
   }
 
   /**
