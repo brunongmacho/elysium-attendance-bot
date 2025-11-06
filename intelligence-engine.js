@@ -132,10 +132,11 @@ class IntelligenceEngine {
       const historicalData = await this.getItemAuctionHistory(itemName);
 
       if (historicalData.length < INTELLIGENCE_CONFIG.MIN_HISTORICAL_SAMPLES) {
+        const suggestion = await this.suggestSimilarItemPrice(itemName);
         return {
           success: false,
           reason: `Insufficient data (${historicalData.length} auctions). Need at least ${INTELLIGENCE_CONFIG.MIN_HISTORICAL_SAMPLES}.`,
-          suggestion: this.suggestSimilarItemPrice(itemName),
+          suggestion,
         };
       }
 
@@ -446,9 +447,9 @@ class IntelligenceEngine {
       return {
         username,
         attendance: {
-          total: memberAttendance?.totalPoints || 0,
+          total: memberAttendance?.attendancePoints || 0,
           spawns: memberAttendance?.spawnCount || 0,
-          averagePerSpawn: memberAttendance?.totalPoints / (memberAttendance?.spawnCount || 1),
+          averagePerSpawn: memberAttendance?.attendancePoints / (memberAttendance?.spawnCount || 1),
         },
         bidding: {
           pointsRemaining: memberBidding?.pointsLeft || 0,

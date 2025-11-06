@@ -140,7 +140,7 @@ class LearningSystem {
     // MARKET STATE (current guild economy)
     if (LEARNING_CONFIG.INCLUDE_MARKET_STATE) {
       try {
-        const biddingData = await this.sheetAPI.getBiddingPoints();
+        const biddingData = await this.sheetAPI.call('getBiddingPoints', {});
         if (biddingData && biddingData.data) {
           const points = biddingData.data.map(m => m.pointsLeft || 0);
           const consumed = biddingData.data.map(m => m.pointsConsumed || 0);
@@ -162,7 +162,7 @@ class LearningSystem {
     // BEHAVIORAL PATTERNS (recent activity)
     if (LEARNING_CONFIG.INCLUDE_BEHAVIORAL_PATTERNS && type === 'price_prediction') {
       try {
-        const forDist = await this.sheetAPI.getForDistribution();
+        const forDist = await this.sheetAPI.call('getForDistribution', {});
         if (forDist && forDist.data) {
           const recent = forDist.data.slice(-20); // Last 20 auctions
           const itemAuctions = recent.filter(a => a.item === target);

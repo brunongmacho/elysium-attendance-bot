@@ -596,7 +596,7 @@ class ProactiveIntelligence {
 
       // Check each member for milestones
       for (const member of attendanceData) {
-        const totalPoints = member.totalPoints || 0;
+        const totalPoints = member.attendancePoints || 0;
 
         // Check if member crossed any milestone
         for (const milestone of PROACTIVE_CONFIG.thresholds.milestonePoints) {
