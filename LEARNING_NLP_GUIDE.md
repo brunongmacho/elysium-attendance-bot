@@ -261,7 +261,7 @@ activationModes: {
 - 📈 Check confidence score in !learned
 
 ### Google Sheets not syncing?
-- ✅ Verify google_apps_script_url is configured in config.json
+- ✅ Verify sheet_webhook_url is configured in config.json
 - ✅ Check Apps Script deployment is set to "Anyone can access"
 - ✅ Run manualInitializeNLP() in Apps Script editor
 - ✅ Check Apps Script logs for errors

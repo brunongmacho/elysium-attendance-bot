@@ -17,23 +17,30 @@
  *    - Records unrecognized phrases for review
  *    - No spam, no unwanted responses
  *
- * 2. MENTION-BASED ACTIVATION
- *    - Only responds when bot is @mentioned
+ * 2. SMART ACTIVATION
+ *    - Responds when bot is @mentioned (any channel)
+ *    - Auto-responds in admin-logs channel/threads
  *    - Auto-responds in auction threads (for bids)
  *    - Prevents interference with normal chat
  *
- * 3. SELF-IMPROVING PATTERNS
+ * 3. FUZZY MATCHING (Typo Tolerance)
+ *    - Handles spelling mistakes (max 2 character difference)
+ *    - Recognizes shortcuts and variations
+ *    - 75% similarity threshold for matches
+ *    - Examples: "pints" → "points", "ilng" → "ilang"
+ *
+ * 4. SELF-IMPROVING PATTERNS
  *    - Learns patterns from user confirmations (✅ reactions)
  *    - Confidence scores improve over time (0.7 → 0.95+)
  *    - Patterns sync to Google Sheets every 5 minutes
  *    - Survives bot restarts (persistent storage)
  *
- * 4. MULTILINGUAL SUPPORT
+ * 5. MULTILINGUAL SUPPORT
  *    - Detects language per message (EN, TL, Taglish)
  *    - Learns user language preferences
  *    - Adapts to code-switching behavior
  *
- * 5. GOOGLE SHEETS PERSISTENCE
+ * 6. GOOGLE SHEETS PERSISTENCE
  *    - Syncs learned patterns every 5 minutes
  *    - Stores user preferences
  *    - Tracks unrecognized phrases
@@ -41,6 +48,7 @@
  */
 
 const axios = require('axios');
+const levenshtein = require('fast-levenshtein');
 const { NLPHandler } = require('./nlp-handler.js');
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -51,6 +59,7 @@ const LEARNING_CONFIG = {
   // Activation modes
   activationModes: {
     respondOnMention: true,        // Respond when bot is @mentioned
+    respondInAdminLogs: true,      // Respond to all commands in admin-logs channel/threads
     respondInAuctionThreads: true, // Auto-respond to bids in auction threads
     passiveLearning: true,         // Learn from all messages (always on)
   },
@@ -64,6 +73,14 @@ const LEARNING_CONFIG = {
     decayRate: 0.02,               // Confidence decrease per failed interpretation
   },
 
+  // Fuzzy matching (handles typos and shortcuts)
+  fuzzyMatching: {
+    enabled: true,                 // Enable fuzzy string matching
+    maxDistance: 2,                // Max Levenshtein distance (typos allowed)
+    minLength: 4,                  // Min phrase length for fuzzy matching
+    similarityThreshold: 0.75,     // Min similarity score (0-1) for fuzzy match
+  },
+
   // Storage
   storage: {
     syncInterval: 5 * 60 * 1000,   // Sync to Google Sheets every 5 minutes
@@ -73,9 +90,31 @@ const LEARNING_CONFIG = {
 
   // Language detection
   languages: {
-    tagalog: ['taya', 'pusta', 'ako', 'ko', 'ang', 'na', 'ng', 'points'],
-    taglish: ['bid ko', 'points ko', 'ako', 'na', 'lang'],
-    english: ['bid', 'points', 'my', 'how', 'many', 'show', 'check'],
+    tagalog: [
+      // Common Tagalog words
+      'taya', 'pusta', 'ako', 'ko', 'ang', 'na', 'ng', 'ba', 'po',
+      'ilang', 'ilan', 'magkano', 'tignan', 'tingnan', 'naman',
+      'kumusta', 'kamusta', 'ano', 'anu', 'sino', 'saan',
+      'natira', 'natitirang', 'meron', 'may', 'mayroon',
+      'nandito', 'andito', 'dumating', 'nangyari', 'nangyayari',
+      'pera', 'pondo', 'tira', 'natira', 'naiwan',
+      'aktibo', 'balita', 'update', 'nangunguna', 'nangungunang',
+      'lagay', 'magtaya', 'maglagay', 'ibabayad',
+      // Pronouns and particles
+      'siya', 'sila', 'kami', 'tayo', 'natin', 'namin',
+      'pa', 'lang', 'lang', 'na', 'ba', 'nga', 'kasi', 'kaya',
+    ],
+    taglish: [
+      'bid ko', 'points ko', 'ako bid', 'ako taya',
+      'check ko', 'show ko', 'ilan na', 'how many pa',
+      'status ba', 'update naman', 'pa lang', 'na lang',
+    ],
+    english: [
+      'bid', 'points', 'my', 'how', 'many', 'show', 'check',
+      'what', 'display', 'view', 'tell', 'give', 'remaining',
+      'status', 'info', 'update', 'auction', 'leaderboard',
+      'ranking', 'top', 'balance', 'left', 'count',
+    ],
   },
 };
 
@@ -137,7 +176,7 @@ class NLPLearningSystem {
 
     console.log(`🧠 [NLP Learning] Loaded ${this.learnedPatterns.size} patterns, ${this.userPreferences.size} user profiles`);
     console.log('🧠 [NLP Learning] Passive learning enabled (learns from all messages)');
-    console.log('🧠 [NLP Learning] Mention-based activation enabled (responds only when @mentioned)');
+    console.log('🧠 [NLP Learning] Active in: admin-logs, auction threads, @mentions');
 
     return this;
   }
@@ -153,6 +192,14 @@ class NLPLearningSystem {
       if (botMentioned) {
         return true;
       }
+    }
+
+    // In admin-logs channel or thread (respond to all natural language commands)
+    const isAdminLogs = message.channel.id === this.config.admin_logs_channel_id ||
+                        (message.channel.isThread() && message.channel.parentId === this.config.admin_logs_channel_id);
+
+    if (isAdminLogs) {
+      return true;
     }
 
     // In auction thread (auto-respond for bids)
@@ -257,6 +304,8 @@ class NLPLearningSystem {
 
   tryLearnedPatterns(content) {
     const normalized = content.toLowerCase().trim();
+    let bestFuzzyMatch = null;
+    let highestSimilarity = 0;
 
     for (const [phrase, pattern] of this.learnedPatterns.entries()) {
       // Skip low-confidence patterns
@@ -270,7 +319,7 @@ class NLPLearningSystem {
           command: pattern.command,
           params: pattern.params || [],
           confidence: pattern.confidence,
-          source: 'learned',
+          source: 'learned-exact',
         };
       }
 
@@ -286,13 +335,60 @@ class NLPLearningSystem {
               command: pattern.command,
               params: match.slice(1), // Extract captured groups
               confidence: pattern.confidence,
-              source: 'learned',
+              source: 'learned-regex',
             };
           }
         } catch (e) {
           console.warn(`Invalid regex pattern: ${pattern.paramPattern}`);
         }
       }
+
+      // Try fuzzy match (for typos and shortcuts)
+      if (LEARNING_CONFIG.fuzzyMatching.enabled && normalized.length >= LEARNING_CONFIG.fuzzyMatching.minLength) {
+        const phraseNormalized = phrase.toLowerCase();
+        const distance = levenshtein.get(normalized, phraseNormalized);
+
+        // Calculate similarity score (0-1)
+        const maxLen = Math.max(normalized.length, phraseNormalized.length);
+        const similarity = 1 - (distance / maxLen);
+
+        // Check if within distance threshold and similarity threshold
+        if (distance <= LEARNING_CONFIG.fuzzyMatching.maxDistance &&
+            similarity >= LEARNING_CONFIG.fuzzyMatching.similarityThreshold) {
+
+          // Track best fuzzy match
+          if (similarity > highestSimilarity) {
+            highestSimilarity = similarity;
+            bestFuzzyMatch = {
+              pattern,
+              similarity,
+              phrase: phraseNormalized,
+            };
+          }
+        }
+      }
+    }
+
+    // Return best fuzzy match if found
+    if (bestFuzzyMatch) {
+      const pattern = bestFuzzyMatch.pattern;
+      pattern.usageCount++;
+      pattern.lastUsed = new Date().toISOString();
+
+      // Reduce confidence slightly for fuzzy matches
+      const fuzzyConfidence = pattern.confidence * bestFuzzyMatch.similarity;
+
+      return {
+        command: pattern.command,
+        params: pattern.params || [],
+        confidence: fuzzyConfidence,
+        source: 'learned-fuzzy',
+        fuzzyMatch: {
+          original: content,
+          matched: bestFuzzyMatch.phrase,
+          similarity: (bestFuzzyMatch.similarity * 100).toFixed(1) + '%',
+        },
+      };
     }
 
     return null;
@@ -455,7 +551,7 @@ class NLPLearningSystem {
 
   async loadFromGoogleSheets() {
     try {
-      const sheetsUrl = this.config.google_apps_script_url;
+      const sheetsUrl = this.config.sheet_webhook_url;
       if (!sheetsUrl) {
         console.warn('🧠 [NLP Learning] No Google Sheets URL configured');
         return;
@@ -492,7 +588,7 @@ class NLPLearningSystem {
 
   async syncToGoogleSheets() {
     try {
-      const sheetsUrl = this.config.google_apps_script_url;
+      const sheetsUrl = this.config.sheet_webhook_url;
       if (!sheetsUrl) return;
 
       // Prepare data
