@@ -3127,9 +3127,14 @@ const commandHandlers = {
       const daysUntil = Math.floor(hoursUntil / 24);
       const remainingHours = Math.floor(hoursUntil % 24);
 
+      // Build title based on whether specific boss or "next boss"
+      const title = bossName
+        ? `🔮 Boss Spawn Prediction: ${bossName}`
+        : `🔮 Next Boss Spawn: ${prediction.bossName}`;
+
       const embed = new EmbedBuilder()
         .setColor(confidence >= 70 ? 0x00ff00 : confidence >= 50 ? 0xffff00 : 0xff9900)
-        .setTitle(`🔮 Boss Spawn Prediction${bossName ? `: ${bossName}` : ''}`)
+        .setTitle(title)
         .setDescription(
           `🎯 **Predicted Next Spawn:** <t:${Math.floor(prediction.predictedTime.getTime() / 1000)}:F>\n` +
           `⏰ **Time Until Spawn:** ${daysUntil > 0 ? `${daysUntil}d ` : ''}${remainingHours}h`
@@ -3168,18 +3173,39 @@ const commandHandlers = {
           {
             name: '🧠 AI Insight',
             value:
-              `Based on ${prediction.basedOnSpawns} historical spawns, the bot predicts the next ` +
-              `${prediction.bossName} will spawn in approximately **${daysUntil > 0 ? `${daysUntil} days and ` : ''}${remainingHours} hours**.`,
+              `Based on ${prediction.basedOnSpawns} historical spawns, the bot predicts **${prediction.bossName}** ` +
+              `will spawn in approximately **${daysUntil > 0 ? `${daysUntil} days and ` : ''}${remainingHours} hours**.`,
             inline: false,
           }
-        )
-        .setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
+        );
+
+      // Add upcoming bosses info if available (only when no specific boss requested)
+      if (!bossName && prediction.upcomingBosses && prediction.upcomingBosses.length > 0) {
+        const upcomingText = prediction.upcomingBosses
+          .map(boss => {
+            const bossTime = new Date(boss.predictedTime);
+            const hoursUntilBoss = (bossTime - now) / (1000 * 60 * 60);
+            const daysUntilBoss = Math.floor(hoursUntilBoss / 24);
+            const remainingHoursBoss = Math.floor(hoursUntilBoss % 24);
+            const timeText = daysUntilBoss > 0 ? `${daysUntilBoss}d ${remainingHoursBoss}h` : `${remainingHoursBoss}h`;
+            return `• **${boss.boss}** - in ~${timeText} (${boss.confidence.toFixed(0)}% confidence)`;
+          })
+          .join('\n');
+
+        embed.addFields({
+          name: '📅 Other Upcoming Bosses',
+          value: upcomingText,
+          inline: false,
+        });
+      }
+
+      embed.setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
         .setTimestamp();
 
       await message.reply({ embeds: [embed] });
       console.log(
         `🤖 [INTELLIGENCE] Spawn prediction for ${bossName || 'any boss'}: ` +
-        `${prediction.predictedTime.toISOString()} (${confidence.toFixed(1)}% confidence)`
+        `${prediction.bossName} at ${prediction.predictedTime.toISOString()} (${confidence.toFixed(1)}% confidence)`
       );
     } catch (error) {
       console.error('[INTELLIGENCE] Error predicting spawn:', error);

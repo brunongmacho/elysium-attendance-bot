@@ -736,6 +736,7 @@ class IntelligenceEngine {
   /**
    * Predict next boss spawn time based on historical patterns
    * ENHANCED: Integrated with learning system for continuous improvement
+   * SMART: When no boss specified, analyzes all bosses and predicts which spawns next
    * @param {string} bossName - Optional: predict for specific boss
    * @returns {Promise<Object>} Prediction with estimated time and confidence
    */
@@ -776,110 +777,13 @@ class IntelligenceEngine {
       // Sort by timestamp
       spawnHistory.sort((a, b) => a.timestamp - b.timestamp);
 
-      // Filter by boss if specified
-      const relevantSpawns = bossName
-        ? spawnHistory.filter(s => s.boss.toLowerCase() === bossName.toLowerCase())
-        : spawnHistory;
-
-      if (relevantSpawns.length < 2) {
-        return {
-          error: bossName ? `Not enough data for ${bossName}` : 'Not enough spawn data',
-          confidence: 0,
-        };
+      // If boss name specified, predict that specific boss
+      if (bossName) {
+        return await this.predictSpecificBoss(spawnHistory, bossName);
       }
 
-      // Calculate intervals between spawns
-      const intervals = [];
-      for (let i = 1; i < relevantSpawns.length; i++) {
-        const interval = relevantSpawns[i].timestamp - relevantSpawns[i - 1].timestamp;
-        intervals.push(interval / (1000 * 60 * 60)); // Convert to hours
-      }
-
-      // Filter outlier intervals using IQR method to remove anomalies
-      // (e.g., long gaps between spawn "seasons")
-      const sortedIntervals = [...intervals].sort((a, b) => a - b);
-      const q1Index = Math.floor(sortedIntervals.length * 0.25);
-      const q3Index = Math.floor(sortedIntervals.length * 0.75);
-      const q1 = sortedIntervals[q1Index];
-      const q3 = sortedIntervals[q3Index];
-      const iqr = q3 - q1;
-
-      // Filter out intervals beyond 1.5 * IQR (standard outlier detection)
-      const lowerBound = q1 - (1.5 * iqr);
-      const upperBound = q3 + (1.5 * iqr);
-      const filteredIntervals = intervals.filter(interval =>
-        interval >= lowerBound && interval <= upperBound
-      );
-
-      // If filtering removed too many intervals, fall back to using all intervals
-      const intervalsToUse = filteredIntervals.length >= 3 ? filteredIntervals : intervals;
-
-      // Use median interval for more robust prediction (less affected by outliers)
-      const medianInterval = this.calculateMedian(intervalsToUse);
-
-      // Also calculate mean for comparison
-      const avgInterval = intervalsToUse.reduce((a, b) => a + b, 0) / intervalsToUse.length;
-
-      // Weight recent intervals more heavily (70% median, 30% recent)
-      // Use filtered intervals to ensure recent average is also outlier-free
-      const recentCount = Math.min(5, Math.floor(intervalsToUse.length * 0.3));
-      const recentIntervals = intervalsToUse.slice(-recentCount);
-      const recentAvg = recentIntervals.reduce((a, b) => a + b, 0) / recentIntervals.length;
-
-      // Combine median with recent trend
-      const predictedInterval = (medianInterval * 0.7) + (recentAvg * 0.3);
-
-      // Calculate standard deviation on filtered intervals
-      const variance = intervalsToUse.reduce((sum, interval) =>
-        sum + Math.pow(interval - avgInterval, 2), 0) / intervalsToUse.length;
-      const stdDev = Math.sqrt(variance);
-
-      // Predict next spawn time
-      const lastSpawn = relevantSpawns[relevantSpawns.length - 1].timestamp;
-      const predictedNextSpawn = new Date(lastSpawn.getTime() + (predictedInterval * 60 * 60 * 1000));
-
-      // Calculate confidence based on consistency of intervals
-      const baseConfidence = this.calculateSpawnConfidence(intervalsToUse.length, stdDev, medianInterval);
-
-      // Adjust confidence based on historical accuracy (learning system)
-      const adjustedConfidence = await this.learningSystem.adjustConfidence('spawn_prediction', baseConfidence);
-
-      // Save prediction for future learning
-      const features = {
-        bossName: bossName || 'any',
-        historicalSpawns: relevantSpawns.length,
-        avgIntervalHours: predictedInterval,
-        medianIntervalHours: medianInterval,
-        stdDevHours: stdDev,
-        consistency: stdDev / medianInterval, // Lower = more consistent
-        outliersRemoved: intervals.length - intervalsToUse.length,
-      };
-
-      await this.learningSystem.savePrediction(
-        'spawn_prediction',
-        bossName || 'next_boss',
-        predictedNextSpawn.toISOString(),
-        adjustedConfidence,
-        features
-      );
-
-      // Calculate prediction range using filtered stdDev, capped at reasonable bounds
-      // Cap the range at ±50% of predicted interval to avoid absurdly wide ranges
-      const maxRange = predictedInterval * 0.5;
-      const rangeHours = Math.min(stdDev, maxRange);
-      const earliestTime = new Date(predictedNextSpawn.getTime() - (rangeHours * 60 * 60 * 1000));
-      const latestTime = new Date(predictedNextSpawn.getTime() + (rangeHours * 60 * 60 * 1000));
-
-      return {
-        predictedTime: predictedNextSpawn,
-        earliestTime,
-        latestTime,
-        confidence: adjustedConfidence,
-        avgIntervalHours: predictedInterval, // Use predicted interval (median + recent trend)
-        lastSpawnTime: lastSpawn,
-        basedOnSpawns: relevantSpawns.length,
-        bossName: bossName || 'any boss',
-      };
+      // NEW SMART LOGIC: Predict which boss spawns next
+      return await this.predictNextAnyBoss(spawnHistory);
     } catch (error) {
       console.error('[INTELLIGENCE] Error predicting spawn time:', error);
       return {
@@ -887,6 +791,183 @@ class IntelligenceEngine {
         confidence: 0,
       };
     }
+  }
+
+  /**
+   * Predict next spawn for ANY boss (analyzes all bosses, returns soonest)
+   * @param {Array} spawnHistory - All historical spawns
+   * @returns {Promise<Object>} Prediction for the boss that will spawn next
+   */
+  async predictNextAnyBoss(spawnHistory) {
+    // Group spawns by boss type
+    const bossesByType = {};
+    for (const spawn of spawnHistory) {
+      const bossKey = spawn.boss.toLowerCase();
+      if (!bossesByType[bossKey]) {
+        bossesByType[bossKey] = {
+          name: spawn.boss,
+          spawns: [],
+        };
+      }
+      bossesByType[bossKey].spawns.push(spawn);
+    }
+
+    // Predict next spawn for each boss type
+    const predictions = [];
+    for (const [bossKey, bossData] of Object.entries(bossesByType)) {
+      if (bossData.spawns.length >= 2) {
+        const prediction = await this.calculateBossSpawnPrediction(bossData.spawns, bossData.name);
+        if (!prediction.error) {
+          predictions.push(prediction);
+        }
+      }
+    }
+
+    if (predictions.length === 0) {
+      return {
+        error: 'Not enough data to predict any boss spawn (each boss needs at least 2 historical spawns)',
+        confidence: 0,
+      };
+    }
+
+    // Sort by predicted time (earliest first)
+    predictions.sort((a, b) => a.predictedTime - b.predictedTime);
+
+    // Return the boss that will spawn soonest
+    const nextBoss = predictions[0];
+
+    // Add info about other upcoming bosses
+    nextBoss.upcomingBosses = predictions.slice(1, 4).map(p => ({
+      boss: p.bossName,
+      predictedTime: p.predictedTime,
+      confidence: p.confidence,
+    }));
+
+    console.log(`[INTELLIGENCE] Predicted next boss: ${nextBoss.bossName} at ${nextBoss.predictedTime.toISOString()}`);
+
+    return nextBoss;
+  }
+
+  /**
+   * Predict spawn time for a specific boss
+   * @param {Array} spawnHistory - All historical spawns
+   * @param {string} bossName - Specific boss to predict
+   * @returns {Promise<Object>} Prediction for specific boss
+   */
+  async predictSpecificBoss(spawnHistory, bossName) {
+    const relevantSpawns = spawnHistory.filter(s =>
+      s.boss.toLowerCase() === bossName.toLowerCase()
+    );
+
+    if (relevantSpawns.length < 2) {
+      return {
+        error: `Not enough data for ${bossName} (found ${relevantSpawns.length} spawns, need at least 2)`,
+        confidence: 0,
+      };
+    }
+
+    return await this.calculateBossSpawnPrediction(relevantSpawns, bossName);
+  }
+
+  /**
+   * Calculate spawn prediction for a boss based on its spawn history
+   * @param {Array} spawns - Historical spawns for this boss (already filtered)
+   * @param {string} bossName - Name of the boss
+   * @returns {Promise<Object>} Prediction with time, confidence, and stats
+   */
+  async calculateBossSpawnPrediction(spawns, bossName) {
+    // Calculate intervals between spawns
+    const intervals = [];
+    for (let i = 1; i < spawns.length; i++) {
+      const interval = spawns[i].timestamp - spawns[i - 1].timestamp;
+      intervals.push(interval / (1000 * 60 * 60)); // Convert to hours
+    }
+
+    // Filter outlier intervals using IQR method to remove anomalies
+    // (e.g., long gaps between spawn "seasons")
+    const sortedIntervals = [...intervals].sort((a, b) => a - b);
+    const q1Index = Math.floor(sortedIntervals.length * 0.25);
+    const q3Index = Math.floor(sortedIntervals.length * 0.75);
+    const q1 = sortedIntervals[q1Index];
+    const q3 = sortedIntervals[q3Index];
+    const iqr = q3 - q1;
+
+    // Filter out intervals beyond 1.5 * IQR (standard outlier detection)
+    const lowerBound = q1 - (1.5 * iqr);
+    const upperBound = q3 + (1.5 * iqr);
+    const filteredIntervals = intervals.filter(interval =>
+      interval >= lowerBound && interval <= upperBound
+    );
+
+    // If filtering removed too many intervals, fall back to using all intervals
+    const intervalsToUse = filteredIntervals.length >= 3 ? filteredIntervals : intervals;
+
+    // Use median interval for more robust prediction (less affected by outliers)
+    const medianInterval = this.calculateMedian(intervalsToUse);
+
+    // Also calculate mean for comparison
+    const avgInterval = intervalsToUse.reduce((a, b) => a + b, 0) / intervalsToUse.length;
+
+    // Weight recent intervals more heavily (70% median, 30% recent)
+    // Use filtered intervals to ensure recent average is also outlier-free
+    const recentCount = Math.min(5, Math.floor(intervalsToUse.length * 0.3));
+    const recentIntervals = intervalsToUse.slice(-recentCount);
+    const recentAvg = recentIntervals.reduce((a, b) => a + b, 0) / recentIntervals.length;
+
+    // Combine median with recent trend
+    const predictedInterval = (medianInterval * 0.7) + (recentAvg * 0.3);
+
+    // Calculate standard deviation on filtered intervals
+    const variance = intervalsToUse.reduce((sum, interval) =>
+      sum + Math.pow(interval - avgInterval, 2), 0) / intervalsToUse.length;
+    const stdDev = Math.sqrt(variance);
+
+    // Predict next spawn time
+    const lastSpawn = spawns[spawns.length - 1].timestamp;
+    const predictedNextSpawn = new Date(lastSpawn.getTime() + (predictedInterval * 60 * 60 * 1000));
+
+    // Calculate confidence based on consistency of intervals
+    const baseConfidence = this.calculateSpawnConfidence(intervalsToUse.length, stdDev, medianInterval);
+
+    // Adjust confidence based on historical accuracy (learning system)
+    const adjustedConfidence = await this.learningSystem.adjustConfidence('spawn_prediction', baseConfidence);
+
+    // Save prediction for future learning
+    const features = {
+      bossName: bossName,
+      historicalSpawns: spawns.length,
+      avgIntervalHours: predictedInterval,
+      medianIntervalHours: medianInterval,
+      stdDevHours: stdDev,
+      consistency: stdDev / medianInterval, // Lower = more consistent
+      outliersRemoved: intervals.length - intervalsToUse.length,
+    };
+
+    await this.learningSystem.savePrediction(
+      'spawn_prediction',
+      bossName,
+      predictedNextSpawn.toISOString(),
+      adjustedConfidence,
+      features
+    );
+
+    // Calculate prediction range using filtered stdDev, capped at reasonable bounds
+    // Cap the range at ±50% of predicted interval to avoid absurdly wide ranges
+    const maxRange = predictedInterval * 0.5;
+    const rangeHours = Math.min(stdDev, maxRange);
+    const earliestTime = new Date(predictedNextSpawn.getTime() - (rangeHours * 60 * 60 * 1000));
+    const latestTime = new Date(predictedNextSpawn.getTime() + (rangeHours * 60 * 60 * 1000));
+
+    return {
+      predictedTime: predictedNextSpawn,
+      earliestTime,
+      latestTime,
+      confidence: adjustedConfidence,
+      avgIntervalHours: predictedInterval, // Use predicted interval (median + recent trend)
+      lastSpawnTime: lastSpawn,
+      basedOnSpawns: spawns.length,
+      bossName: bossName,
+    };
   }
 
   /**
