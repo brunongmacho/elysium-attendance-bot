@@ -40,7 +40,6 @@
 const { EmbedBuilder } = require('discord.js');
 const cron = require('node-cron');
 const { getChannelById } = require('./utils/discord-cache');
-const { getTimestamp } = require('./utils/common');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
