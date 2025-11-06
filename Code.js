@@ -120,7 +120,9 @@ function doGet(e) {
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents || '{}');
-    const action = data.action || 'unknown';
+    // Check query parameters first (for compatibility with axios.post calls using ?action=X)
+    // then fall back to POST body action field
+    const action = (e.parameter && e.parameter.action) || data.action || 'unknown';
 
     Logger.log(`🔥 Action: ${action}`);
 

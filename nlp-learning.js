@@ -607,15 +607,30 @@ class NLPLearningSystem {
         recognitionRate: this.getRecognitionRate(),
       };
 
-      await axios.post(`${sheetsUrl}?action=syncNLPLearning`, payload, {
+      const response = await axios.post(`${sheetsUrl}?action=syncNLPLearning`, payload, {
         timeout: 15000,
         headers: { 'Content-Type': 'application/json' },
       });
 
+      // Check if sync was actually successful
+      if (response.data && response.data.success === false) {
+        console.error('🧠 [NLP Learning] Sync returned error:', response.data.message);
+        return;
+      }
+
       this.lastSync = new Date();
       console.log(`🧠 [NLP Learning] Synced ${patterns.length} patterns, ${preferences.length} users to Google Sheets`);
+
+      if (response.data && response.data.results) {
+        const r = response.data.results;
+        console.log(`🧠 [NLP Learning] Patterns: ${r.patterns.created} created, ${r.patterns.updated} updated`);
+        console.log(`🧠 [NLP Learning] Preferences: ${r.preferences.created} created, ${r.preferences.updated} updated`);
+      }
     } catch (error) {
       console.error('🧠 [NLP Learning] Sync failed:', error.message);
+      if (error.response) {
+        console.error('🧠 [NLP Learning] Response:', error.response.data);
+      }
     }
   }
 
