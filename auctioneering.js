@@ -1193,10 +1193,28 @@ async function auctionNextItem(client, config, channel) {
       "→ Check: Bot needs 'Create Public Threads' & 'Send Messages in Threads' in the bidding channel."
     );
 
-    // Clean up partial state to prevent auction from being stuck
+    // COMPREHENSIVE cleanup to prevent auction from being stuck
+    // Clear all timers first
+    clearAllTimers();
+
+    // Clear current item and deactivate
     auctionState.currentItem = null;
     auctionState.active = false;
 
+    // CRITICAL: Clear locked points from failed auction
+    try {
+      if (!biddingModule) {
+        biddingModule = require("./bidding.js");
+      }
+      const biddingState = biddingModule.getBiddingState();
+      biddingState.lp = {};
+      biddingModule.saveBiddingState();
+      console.log(`${EMOJI.SUCCESS} Cleared locked points after thread creation failure`);
+    } catch (unlockErr) {
+      console.error(`${EMOJI.ERROR} Failed to clear locked points:`, unlockErr);
+    }
+
+    // Save state
     try {
       if (cfg?.sheet_webhook_url) {
         await saveAuctionState(cfg.sheet_webhook_url);
