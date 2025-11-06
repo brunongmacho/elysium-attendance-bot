@@ -178,7 +178,7 @@ class ProactiveIntelligence {
     try {
       console.log('🤖 [PROACTIVE] Checking auction readiness...');
 
-      const biddingResponse = await this.intelligence.sheetAPI.getBiddingPoints();
+      const biddingResponse = await this.intelligence.sheetAPI.call('getBiddingPoints', {});
       const biddingData = biddingResponse && biddingResponse.data && biddingResponse.data.members ? biddingResponse.data.members : [];
 
       if (!biddingData || biddingData.length === 0) {
@@ -584,7 +584,7 @@ class ProactiveIntelligence {
 
       console.log('🤖 [PROACTIVE] Checking for milestones...');
 
-      const attendanceResponse = await this.intelligence.sheetAPI.getTotalAttendance();
+      const attendanceResponse = await this.intelligence.sheetAPI.call('getTotalAttendance', {});
       const attendanceData = attendanceResponse && attendanceResponse.data && attendanceResponse.data.members ? attendanceResponse.data.members : [];
 
       if (!attendanceData || attendanceData.length === 0) return;

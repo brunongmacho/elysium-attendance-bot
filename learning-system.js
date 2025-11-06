@@ -145,13 +145,16 @@ class LearningSystem {
           const points = biddingData.data.members.map(m => m.biddingPoints || 0);
           const consumed = biddingData.data.members.map(m => m.totalSpent || 0);
 
+          const pointsSum = points.reduce((a, b) => a + b, 0);
+          const consumedSum = consumed.reduce((a, b) => a + b, 0);
+
           enriched.marketState = {
             totalMembers: biddingData.data.members.length,
-            avgPointsPerMember: points.reduce((a, b) => a + b, 0) / points.length,
+            avgPointsPerMember: points.length ? pointsSum / points.length : 0,
             medianPoints: this.median(points),
-            totalPointsInEconomy: points.reduce((a, b) => a + b, 0),
-            avgPointsConsumed: consumed.reduce((a, b) => a + b, 0) / consumed.length,
-            economyActivity: consumed.reduce((a, b) => a + b, 0) / (points.reduce((a, b) => a + b, 0) + consumed.reduce((a, b) => a + b, 0)),
+            totalPointsInEconomy: pointsSum,
+            avgPointsConsumed: consumed.length ? consumedSum / consumed.length : 0,
+            economyActivity: (pointsSum + consumedSum) ? (consumedSum / (pointsSum + consumedSum)) : 0,
           };
         }
       } catch (e) {
@@ -165,12 +168,12 @@ class LearningSystem {
         const forDist = await this.sheetAPI.call('getForDistribution', {});
         if (forDist && forDist.data) {
           const recent = forDist.data.slice(-20); // Last 20 auctions
-          const itemAuctions = recent.filter(a => a.item === target);
+          const itemAuctions = recent.filter(a => (a.itemName || a.item) === target);
 
           enriched.behavioral = {
             recentAuctions: recent.length,
             targetItemFrequency: itemAuctions.length,
-            avgRecentPrice: recent.reduce((a, b) => a + (b.price || 0), 0) / recent.length,
+            avgRecentPrice: recent.length ? recent.reduce((a, b) => a + (b.price || 0), 0) / recent.length : 0,
             priceVolatility: this.calculateVolatility(recent.map(a => a.price || 0)),
             daysSinceLast: itemAuctions.length > 0
               ? Math.floor((Date.now() - new Date(itemAuctions[itemAuctions.length - 1].timestamp).getTime()) / (1000 * 60 * 60 * 24))

@@ -2314,6 +2314,7 @@ function getBiddingPoints(data) {
     const values = dataRange.getValues();
 
     const members = [];
+    const points = {}; // Legacy map for backward compatibility
     for (let i = 0; i < values.length; i++) {
       const row = values[i];
       const username = (row[0] || '').toString().trim();
@@ -2335,11 +2336,14 @@ function getBiddingPoints(data) {
           biddingPoints: pointsConsumed, // Alias for backwards compatibility
           totalSpent            // Sum of columns D+: Total spent across all sessions
         });
+
+        // Populate legacy points map
+        points[username] = pointsLeft;
       }
     }
 
     Logger.log(`✅ Fetched bidding data for ${members.length} members`);
-    return createResponse('ok', 'Bidding data fetched', { members });
+    return createResponse('ok', 'Bidding data fetched', { members, points });
 
   } catch (err) {
     Logger.log('❌ Error fetching bidding points: ' + err.toString());

@@ -307,9 +307,10 @@ class IntelligenceEngine {
    */
   async getAllAuctionHistory() {
     try {
-      const response = await this.sheetAPI.getForDistribution();
-      const data = response && response.data ? response.data : [];
-      return data.map(row => ({
+      const response = await this.sheetAPI.call('getForDistribution', {});
+      // Normalize response shape: try items first, fallback to data array
+      const items = response?.data?.items ?? response?.data ?? [];
+      return items.map(row => ({
         itemName: row.itemName,
         winningBid: parseInt(row.bidAmount) || 0,
         winner: row.winner,
@@ -428,14 +429,14 @@ class IntelligenceEngine {
   async getMemberProfile(username) {
     try {
       // Fetch attendance data
-      const attendanceResponse = await this.sheetAPI.getTotalAttendance();
+      const attendanceResponse = await this.sheetAPI.call('getTotalAttendance', {});
       const attendanceData = attendanceResponse && attendanceResponse.data && attendanceResponse.data.members ? attendanceResponse.data.members : [];
       const memberAttendance = attendanceData.find(row =>
         row.username && row.username.toLowerCase() === username.toLowerCase()
       );
 
       // Fetch bidding data
-      const biddingResponse = await this.sheetAPI.getBiddingPoints();
+      const biddingResponse = await this.sheetAPI.call('getBiddingPoints', {});
       const biddingData = biddingResponse && biddingResponse.data && biddingResponse.data.members ? biddingResponse.data.members : [];
       const memberBidding = biddingData.find(row =>
         row.username && row.username.toLowerCase() === username.toLowerCase()
@@ -593,9 +594,10 @@ class IntelligenceEngine {
    */
   async getAuctionWinsForMember(username) {
     try {
-      const response = await this.sheetAPI.getForDistribution();
-      const forDistData = response && response.data ? response.data : [];
-      const wins = forDistData.filter(row =>
+      const response = await this.sheetAPI.call('getForDistribution', {});
+      // Normalize response shape: try items first, fallback to data array
+      const items = response?.data?.items ?? response?.data ?? [];
+      const wins = items.filter(row =>
         row.winner && row.winner.toLowerCase() === username.toLowerCase()
       );
       return wins.length;
@@ -609,7 +611,7 @@ class IntelligenceEngine {
    */
   async analyzeAllMembersEngagement() {
     try {
-      const response = await this.sheetAPI.getBiddingPoints();
+      const response = await this.sheetAPI.call('getBiddingPoints', {});
       const biddingData = response && response.data && response.data.members ? response.data.members : [];
       const analyses = [];
 
@@ -738,7 +740,8 @@ class IntelligenceEngine {
       const stdDev = this.calculateStdDev(spawnCounts);
 
       // Detect statistical outliers
-      const outliers = attendanceData.filter(member => {
+      // Guard: skip z-score calculation if stdDev is zero or near-zero (all spawn counts identical)
+      const outliers = (Math.abs(stdDev) < Number.EPSILON) ? [] : attendanceData.filter(member => {
         const zScore = Math.abs(((member.spawnCount || 0) - mean) / stdDev);
         return zScore > INTELLIGENCE_CONFIG.ATTENDANCE_PATTERN_STDEV;
       });
@@ -815,7 +818,7 @@ class IntelligenceEngine {
    */
   async recommendAuctionTiming() {
     try {
-      const biddingResponse = await this.sheetAPI.getBiddingPoints();
+      const biddingResponse = await this.sheetAPI.call('getBiddingPoints', {});
       const biddingData = biddingResponse && biddingResponse.data && biddingResponse.data.members ? biddingResponse.data.members : [];
       const activeMemberCount = biddingData.filter(m => m.pointsLeft > 0).length;
 
@@ -1187,7 +1190,7 @@ class IntelligenceEngine {
     // Higher sample size = more confidence
     // Lower standard deviation = more confidence
     const sampleFactor = Math.min(sampleSize / 10, 1); // Max at 10 samples
-    const varianceFactor = stdDev > 0 ? Math.max(1 - (stdDev / mean), 0) : 1;
+    const varianceFactor = (stdDev > 0 && mean > 0) ? Math.max(1 - (stdDev / mean), 0) : 1;
 
     return Math.round((sampleFactor * 0.6 + varianceFactor * 0.4) * 100);
   }
