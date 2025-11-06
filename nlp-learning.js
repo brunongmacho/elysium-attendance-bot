@@ -92,6 +92,27 @@ const LEARNING_CONFIG = {
     maxUnrecognizedPhrases: 50,    // Track top 50 unrecognized phrases
   },
 
+  // Semantic synonym mapping (makes bot smarter at understanding intent)
+  synonyms: {
+    // Leaderboard synonyms
+    leaderboard: ['rankings', 'ranks', 'rank', 'top', 'leaders', 'scoreboard', 'standings', 'lb', 'board'],
+
+    // Points synonyms
+    mypoints: ['balance', 'points', 'pts', 'pnts', 'coins', 'credits', 'money', 'wallet', 'funds'],
+
+    // Status synonyms
+    bidstatus: ['status', 'stat', 'info', 'update', 'news', 'happening', 'current', 'active'],
+
+    // Bid synonyms
+    bid: ['offer', 'bet', 'wager', 'taya', 'pusta'],
+
+    // Help synonyms
+    help: ['commands', 'cmds', 'info', 'guide', 'assist', 'support'],
+
+    // Present synonyms
+    present: ['here', 'attending', 'attend', 'join', 'checkin', 'check-in'],
+  },
+
   // Language detection
   languages: {
     tagalog: [
@@ -133,6 +154,7 @@ class NLPLearningSystem {
     this.userPreferences = new Map();      // userId → { language, shortcuts, stats }
     this.unrecognizedPhrases = new Map();  // phrase → { count, users, lastSeen }
     this.recentMessages = [];              // Circular buffer of recent messages
+    this.negativePatterns = new Map();     // phrase + command → { count, reason } - patterns that DON'T match
 
     // Static NLP handler for fallback
     this.staticHandler = null;
@@ -445,47 +467,144 @@ class NLPLearningSystem {
   // ═════════════════════════════════════════════════════════════════════════
 
   /**
-   * Suggest what command a phrase might mean using fuzzy matching
+   * Suggest what command a phrase might mean using fuzzy matching + semantic understanding
    */
   suggestCommandForPhrase(phrase) {
     const normalized = phrase.toLowerCase().trim();
+    const words = normalized.split(/\s+/);
 
     // Get all known commands from static patterns
     const allCommands = Object.keys(NLP_PATTERNS);
 
     let bestMatch = null;
     let highestScore = 0;
+    let matchReason = '';
 
-    // Try fuzzy matching against command names and known patterns
+    // PRIORITY 1: Check semantic synonyms (exact match = high confidence)
+    for (const [command, synonyms] of Object.entries(LEARNING_CONFIG.synonyms)) {
+      for (const synonym of synonyms) {
+        // Check if any word in phrase matches synonym
+        if (words.includes(synonym)) {
+          // Apply negative learning penalty if this combo was rejected
+          const penalty = this.getNegativePenalty(normalized, `!${command}`);
+          const penalizedScore = 0.95 * penalty;
+
+          if (penalizedScore > highestScore) {
+            highestScore = penalizedScore;
+            bestMatch = `!${command}`;
+            matchReason = penalty < 1
+              ? `semantic match (with caution - rejected ${(1-penalty)*100}%)`
+              : `semantic match: "${synonym}" → ${command}`;
+          }
+        }
+      }
+    }
+
+    // PRIORITY 2: Fuzzy matching against command names and learned patterns
     for (const command of allCommands) {
       // Check similarity to command name itself
       const commandSimilarity = this.calculatePhraseSimilarity(normalized, command);
-      if (commandSimilarity > highestScore) {
-        highestScore = commandSimilarity;
+      const penalty = this.getNegativePenalty(normalized, `!${command}`);
+      const penalizedScore = commandSimilarity * penalty;
+
+      if (penalizedScore > highestScore) {
+        highestScore = penalizedScore;
         bestMatch = `!${command}`;
+        matchReason = `phrase similar to command name`;
       }
 
       // Check if any learned patterns for this command are similar
       for (const [learnedPhrase, pattern] of this.learnedPatterns.entries()) {
         if (pattern.command === `!${command}`) {
           const phraseSimilarity = this.calculatePhraseSimilarity(normalized, learnedPhrase);
-          if (phraseSimilarity > highestScore) {
-            highestScore = phraseSimilarity;
+          const penalizedSimilarity = phraseSimilarity * penalty;
+
+          if (penalizedSimilarity > highestScore) {
+            highestScore = penalizedSimilarity;
             bestMatch = `!${command}`;
+            matchReason = `similar to learned pattern`;
           }
         }
       }
     }
 
-    if (bestMatch && highestScore >= 0.5) {
+    // PRIORITY 3: Ultra-short shortcuts (single words that are extremely common)
+    const ultraShorts = {
+      'pts': '!mypoints',
+      'lb': '!leaderboard',
+      'stat': '!bidstatus',
+      'status': '!bidstatus',
+      'points': '!mypoints',
+      'ranks': '!leaderboard',
+      'ranking': '!leaderboard',
+      'balance': '!mypoints',
+    };
+
+    if (ultraShorts[normalized]) {
+      const penalty = this.getNegativePenalty(normalized, ultraShorts[normalized]);
+      const penalizedScore = 0.98 * penalty;
+
+      if (penalizedScore > highestScore) {
+        highestScore = penalizedScore;
+        bestMatch = ultraShorts[normalized];
+        matchReason = `ultra-short shortcut`;
+      }
+    }
+
+    if (bestMatch && highestScore >= LEARNING_CONFIG.learning.suggestionThreshold) {
       return {
         command: bestMatch,
         confidence: highestScore,
-        reasoning: `${(highestScore * 100).toFixed(0)}% similar to known patterns`,
+        reasoning: matchReason || `${(highestScore * 100).toFixed(0)}% similar`,
       };
     }
 
     return null;
+  }
+
+  /**
+   * Check if a phrase+command combination was rejected by users (negative learning)
+   * Returns penalty multiplier (0-1) to reduce confidence
+   */
+  getNegativePenalty(phrase, command) {
+    const key = `${phrase}::${command}`;
+    const negative = this.negativePatterns.get(key);
+
+    if (!negative) return 1.0; // No penalty
+
+    // Forgiving approach: Allow mistakes
+    // 1 rejection: 50% confidence penalty (still might suggest if base confidence is high)
+    // 2+ rejections: Block completely (0% confidence)
+    if (negative.count === 1) {
+      return 0.5; // Reduce confidence by half - gives users second chance
+    } else if (negative.count >= 2) {
+      return 0.0; // Block completely after 2 rejections
+    }
+
+    return 1.0;
+  }
+
+  /**
+   * Record that a phrase does NOT mean a specific command (negative learning)
+   */
+  recordNegativePattern(phrase, command) {
+    const key = `${phrase.toLowerCase().trim()}::${command}`;
+
+    if (!this.negativePatterns.has(key)) {
+      this.negativePatterns.set(key, {
+        phrase: phrase.toLowerCase().trim(),
+        command,
+        count: 0,
+        firstRejected: new Date().toISOString(),
+        lastRejected: new Date().toISOString(),
+      });
+    }
+
+    const negative = this.negativePatterns.get(key);
+    negative.count++;
+    negative.lastRejected = new Date().toISOString();
+
+    console.log(`🧠 [NLP Learning] Negative pattern recorded: "${phrase}" ≠ ${command} (${negative.count} rejections)`);
   }
 
   /**
@@ -561,10 +680,21 @@ class NLPLearningSystem {
         if (reaction.emoji.name === '✅') {
           // Learn this pattern!
           this.teachPattern(phrase, command, user.id);
+
+          // Clear any negative learning for this combination (user confirmed it's correct!)
+          const negKey = `${phrase.toLowerCase().trim()}::${command}`;
+          if (this.negativePatterns.has(negKey)) {
+            this.negativePatterns.delete(negKey);
+            console.log(`🧠 [NLP Learning] Cleared negative pattern (user confirmed): "${phrase}" → ${command}`);
+          }
+
           await reply.edit(`✅ Got it! I'll remember that **"${phrase}"** means **${command}**`);
           console.log(`🧠 [NLP Learning] User confirmed: "${phrase}" → ${command}`);
         } else {
-          await reply.edit(`❌ Okay, I won't learn that.`);
+          // NEGATIVE LEARNING: Remember this is NOT the right command
+          this.recordNegativePattern(phrase, command);
+          await reply.edit(`❌ Got it, **"${phrase}"** is NOT **${command}**. I'll be more careful next time.`);
+          console.log(`🧠 [NLP Learning] User rejected: "${phrase}" ≠ ${command}`);
         }
         this.pendingConfirmations.delete(key);
       });
