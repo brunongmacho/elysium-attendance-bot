@@ -134,6 +134,13 @@ const attendance = require("./attendance");
 let postToSheetFunc = null;
 
 /**
+ * Intelligence Engine reference for AI/ML features.
+ * Initialized via initialize() during bot startup.
+ * @type {IntelligenceEngine|null}
+ */
+let intelligenceEngine = null;
+
+/**
  * Cache for attendance records (legacy, kept for backwards compatibility).
  * @type {Object.<string, Array<string>>}
  */
@@ -314,13 +321,17 @@ const TIMEOUTS = {
  * @param {Function} isAdminFunc - Function to check if a user is an admin
  * @param {Object} biddingModuleRef - Reference to the bidding module for point management
  */
-function initialize(config, isAdminFunc, biddingModuleRef, cache = null) {
+function initialize(config, isAdminFunc, biddingModuleRef, cache = null, intelligenceEngineRef = null) {
   cfg = config;
   isAdmFunc = isAdminFunc;
   biddingModule = biddingModuleRef;
   sheetAPI = new SheetAPI(config.sheet_webhook_url);
   discordCache = cache;
+  intelligenceEngine = intelligenceEngineRef;
   console.log(`${EMOJI.SUCCESS} Auctioneering system initialized`);
+  if (intelligenceEngine) {
+    console.log(`${EMOJI.SUCCESS} Intelligence Engine linked to auctioneering (auto-learning enabled)`);
+  }
 }
 
 /**
@@ -1521,6 +1532,43 @@ async function itemEnd(client, config, channel) {
       }
     } catch (err) {
       console.error(`${EMOJI.ERROR} Failed to log auction result:`, err);
+    }
+
+    // 🧠 AUTO-UPDATE LEARNING SYSTEM (Bot learns from auction result)
+    try {
+      if (intelligenceEngine && intelligenceEngine.learningSystem) {
+        const updated = await intelligenceEngine.learningSystem.updatePredictionAccuracy(
+          'price_prediction',
+          item.item,
+          item.curBid
+        );
+
+        if (updated) {
+          console.log(`🧠 [LEARNING] Auto-updated prediction accuracy for "${item.item}" (actual: ${item.curBid}pts)`);
+
+          // Optional: Send notification to admin logs
+          try {
+            const adminChannel = await discordCache?.getChannelById(cfg.admin_logs_channel_id);
+            if (adminChannel) {
+              await adminChannel.send(
+                `🧠 **Bot Learning Update**\n` +
+                `✅ Updated prediction accuracy for **${item.item}**\n` +
+                `Actual sale price: ${item.curBid}pts\n` +
+                `Bot is getting smarter! Check \`!learningmetrics\` to see accuracy.`
+              );
+            }
+          } catch (notifyErr) {
+            // Silent fail on notification (not critical)
+            console.log(`[LEARNING] Could not send admin notification: ${notifyErr.message}`);
+          }
+        } else {
+          // No matching prediction found (item wasn't predicted, or already updated)
+          console.log(`[LEARNING] No pending prediction found for "${item.item}" (may not have been predicted)`);
+        }
+      }
+    } catch (learnErr) {
+      console.error(`${EMOJI.ERROR} Failed to update learning system:`, learnErr);
+      // Continue auction even if learning fails (non-critical)
     }
 
     // 🧩 Update item in queue array with winner info (don't push, or it loops forever!)

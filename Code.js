@@ -28,11 +28,12 @@
  * - Only triggers on data columns (attendance, member names, bidding points)
  *
  * SETUP INSTRUCTIONS:
- * 1. Configure DISCORD_WEBHOOK_URL in CONFIG (line 26)
- * 2. Set up Apps Script Triggers:
+ * 1. Set up Apps Script Triggers:
  *    - onEdit: Edit trigger > On edit
  *    - sundayWeeklySheetCreation: Time-driven > Week timer > Every Sunday > 12am-1am
- * 3. Review CODE_REVIEW_CONFLICTS.md for detailed analysis of fixes
+ * 2. Review CODE_REVIEW_CONFLICTS.md for detailed analysis of fixes
+ *
+ * NOTE: Discord notifications are now handled by the bot via Discord.js (no webhook needed)
  *
  * PREVIOUS FEATURES (v5.0):
  * - Auto-populate 0 for all members in bidding results
@@ -44,7 +45,6 @@ const CONFIG = {
   BOSS_POINTS_SHEET: 'BossPoints',
   BIDDING_SHEET: 'BiddingPoints',
   TIMEZONE: 'Asia/Manila',
-  DISCORD_WEBHOOK_URL: 'YOUR_DISCORD_WEBHOOK_URL', // To be configured by user
   CACHE_TTL_SECONDS: 300, // Cache duration: 5 minutes
 };
 
@@ -3050,9 +3050,8 @@ function sundayWeeklySheetCreation() {
     const previousSheetName = copyMembersFromPreviousWeek(ss, sheet);
 
     Logger.log(`✅ New weekly sheet created: ${sheetName}`);
-
-    // Send notification to #admin-logs
-    sendAdminLogNotification(sheetName, previousSheetName);
+    Logger.log(`ℹ️ Format copied from previous week: ${previousSheetName || 'N/A'}`);
+    Logger.log(`ℹ️ Discord bot will handle notifications (no webhook needed)`);
 
   } catch (err) {
     Logger.log('❌ Error in sundayWeeklySheetCreation: ' + err.toString());
@@ -3067,48 +3066,12 @@ function sundayWeeklySheetCreation() {
 function testMoveItem() {
   // EDIT THIS: Change to the row number you want to test
   const testRow = 2; // Row 2 is the first data row (after headers)
-  
+
   Logger.log(`🧪 Testing move for row ${testRow}...`);
-  
+
   moveItemToForDistribution('BiddingItems', testRow);
-  
+
   Logger.log('🧪 Test completed. Check logs above for details.');
-}
-
-/**
- * Send notification to Discord #admin-logs channel
- */
-function sendAdminLogNotification(newSheetName, previousSheetName) {
-  try {
-    // Skip if webhook URL is not configured
-    if (!CONFIG.DISCORD_WEBHOOK_URL || CONFIG.DISCORD_WEBHOOK_URL === 'YOUR_DISCORD_WEBHOOK_URL') {
-      Logger.log('⚠️ Discord webhook URL not configured. Skipping notification.');
-      return;
-    }
-
-    const message = {
-      content: `📄 **New weekly sheet created:** ${newSheetName}\n✅ Format copied from previous week: ${previousSheetName || 'N/A'}`
-    };
-
-    const options = {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify(message),
-      muteHttpExceptions: true
-    };
-
-    const response = UrlFetchApp.fetch(CONFIG.DISCORD_WEBHOOK_URL, options);
-    const responseCode = response.getResponseCode();
-
-    if (responseCode === 200 || responseCode === 204) {
-      Logger.log('✅ Discord notification sent successfully');
-    } else {
-      Logger.log(`⚠️ Discord notification failed with code ${responseCode}: ${response.getContentText()}`);
-    }
-
-  } catch (err) {
-    Logger.log('❌ Error sending Discord notification: ' + err.toString());
-  }
 }
 
 // ===========================================================

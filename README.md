@@ -176,9 +176,12 @@ In Admin Logs:
 **How It Works:**
 1. Bot makes prediction (e.g., item price, member engagement)
 2. Prediction saved to `BotLearning` Google Sheet with confidence
-3. Event completes → actual outcome observed
+3. Event completes → **bot automatically updates accuracy** ✨
 4. System calculates accuracy by comparing predicted vs actual
 5. Future predictions adjusted based on historical accuracy
+6. Admin notified in admin logs when bot learns
+
+> 🤖 **Fully Automated!** The bot now learns automatically when auctions complete. No manual intervention needed!
 
 **What the Bot Learns:**
 - **Price Predictions** (Auctions): Learns optimal starting bids
@@ -199,10 +202,12 @@ In Admin Logs:
 **Commands:**
 ```
 !learningmetrics    - View bot's learning stats and accuracy
-!updateprediction   - Manually update prediction with actual result
+!updateprediction   - Manually update (rarely needed, bot auto-updates)
 !viewlearning       - See recent predictions and their accuracy
 !performance        - Includes learning metrics in system report
 ```
+
+> 💡 **Note**: `!updateprediction` is rarely needed since the bot automatically updates when auctions complete. Use it only if auto-update fails or for testing.
 
 **Data Storage:**
 All learning data is stored in the `BotLearning` Google Sheet:
@@ -569,10 +574,12 @@ PORT=8000  # Optional, defaults to 8000
 
 ### Learning System Commands (Admin) 🧠
 
+> 🤖 **Auto-Learning Enabled!** The bot automatically updates accuracy when auctions complete. Manual commands are for viewing stats or rare manual updates.
+
 | Command | Aliases | Description |
 |---------|---------|-------------|
 | `!learningmetrics` | `!learnstats` | View bot learning statistics and accuracy trends across all prediction types |
-| `!updateprediction <item> <actual price>` | | Manually update prediction accuracy when auction completes |
+| `!updateprediction <item> <actual price>` | | **(Rarely needed)** Manually update prediction accuracy - bot auto-updates on auction completion |
 | `!viewlearning [type] [limit]` | `!predictions` | View recent predictions with accuracy (filter by type, limit results) |
 | `!performance` | `!perf` | System performance + learning metrics (includes bot accuracy stats) |
 
@@ -590,6 +597,7 @@ PORT=8000  # Optional, defaults to 8000
 !updateprediction Crimson Pendant 475
 → ✅ Updated prediction accuracy for "Crimson Pendant" with actual price 475pts!
 → 🧠 Bot is learning... Accuracy: 94.7%
+→ (Note: Bot does this automatically when auction completes!)
 
 !viewlearning price_prediction 5
 → Recent Price Predictions:
@@ -607,7 +615,18 @@ PORT=8000  # Optional, defaults to 8000
 →   • Bot confidence calibrated based on performance
 ```
 
+**Automatic Learning Notifications:**
+When an auction completes, admins receive notifications in admin logs:
+```
+🧠 Bot Learning Update
+✅ Updated prediction accuracy for Crimson Pendant
+Actual sale price: 475pts
+Bot is getting smarter! Check `!learningmetrics` to see accuracy.
+```
+
 > 💡 **Note**: The more the bot is used, the smarter it gets! Predictions improve over time as more data is collected in the BotLearning Google Sheet.
+>
+> 🤖 **Automatic Updates**: The bot learns automatically when auctions complete. Manual `!updateprediction` is only needed if auto-update fails.
 
 ### Help Commands
 

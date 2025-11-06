@@ -2919,10 +2919,14 @@ client.once(Events.ClientReady, async () => {
   const auctionCache = require('./utils/auction-cache');
   await auctionCache.init();
 
+  // INITIALIZE INTELLIGENCE ENGINE FIRST (needed by other modules)
+  intelligenceEngine = new IntelligenceEngine(client, config, sheetAPI);
+  console.log('🤖 Intelligence Engine initialized (AI/ML powered features enabled)');
+
   // INITIALIZE ALL MODULES IN CORRECT ORDER
   attendance.initialize(config, bossPoints, isAdmin, discordCache); // NEW
   helpSystem.initialize(config, isAdmin, BOT_VERSION);
-  auctioneering.initialize(config, isAdmin, bidding, discordCache);
+  auctioneering.initialize(config, isAdmin, bidding, discordCache, intelligenceEngine); // Pass intelligenceEngine
   bidding.initializeBidding(config, isAdmin, auctioneering, discordCache);
   auctioneering.setPostToSheet(attendance.postToSheet); // Use attendance module's postToSheet
   lootSystem.initialize(config, bossPoints, isAdmin);
@@ -2935,10 +2939,6 @@ client.once(Events.ClientReady, async () => {
     discordCache
   );
   leaderboardSystem.init(client, config, discordCache); // Initialize leaderboard system
-
-  // INITIALIZE INTELLIGENCE ENGINE (AI/ML features)
-  intelligenceEngine = new IntelligenceEngine(client, config, sheetAPI);
-  console.log('🤖 Intelligence Engine initialized (AI/ML powered features enabled)');
 
   // INITIALIZE PROACTIVE INTELLIGENCE (Auto-notifications & monitoring)
   proactiveIntelligence = new ProactiveIntelligence(client, config, intelligenceEngine);
