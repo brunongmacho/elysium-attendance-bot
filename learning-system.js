@@ -98,7 +98,7 @@ class LearningSystem {
 
       if (response.status === 'ok') {
         console.log(`[LEARNING] 📚 Saved ${type} prediction for ${target} (${Object.keys(enrichedFeatures).length} features)`);
-        return response.data;
+        return response.data || null;
       } else {
         console.error('[LEARNING] ❌ Failed to save prediction:', response.message);
         return null;
@@ -286,8 +286,8 @@ class LearningSystem {
 
       const response = await this.sheetAPI.call('getLearningMetrics', {});
 
-      if (response.status === 'ok') {
-        const metrics = response.data.metrics;
+      if (response.status === 'ok' && response.data) {
+        const metrics = response.data.metrics || {};
 
         // Update cache
         this.cache.metrics = metrics;
@@ -295,7 +295,7 @@ class LearningSystem {
 
         return metrics;
       } else {
-        console.error('[LEARNING] ⚠️ Failed to get metrics:', response.message);
+        console.error('[LEARNING] ⚠️ Failed to get metrics:', response.message || 'No data returned');
         return {};
       }
     } catch (error) {
@@ -314,10 +314,10 @@ class LearningSystem {
     try {
       const response = await this.sheetAPI.call('getLearningData', { type, limit });
 
-      if (response.status === 'ok') {
+      if (response.status === 'ok' && response.data) {
         return response.data.predictions || [];
       } else {
-        console.error('[LEARNING] ⚠️ Failed to get learning data:', response.message);
+        console.error('[LEARNING] ⚠️ Failed to get learning data:', response.message || 'No data returned');
         return [];
       }
     } catch (error) {
