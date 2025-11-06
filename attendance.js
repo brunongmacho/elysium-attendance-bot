@@ -81,6 +81,7 @@ let bossPoints = null;          // Boss name to points value mapping
 let isAdminFunc = null;         // Function to check admin privileges
 let sheetAPI = null;            // Unified Google Sheets API client
 let discordCache = null;        // Discord channel cache
+let intelligenceEngine = null;  // Intelligence engine for learning system
 let activeSpawns = {};          // Active spawn threads and their data
 let activeColumns = {};         // Boss|timestamp to threadId mapping for deduplication
 let pendingVerifications = {};  // Message IDs awaiting admin verification
@@ -113,17 +114,20 @@ const TIMING = {
  * @param {Object} cfg - Bot configuration object containing guild IDs, channel IDs, and webhook URLs
  * @param {Object} bossPointsData - Mapping of boss names to their point values
  * @param {Function} isAdmin - Function that checks if a user has admin privileges
+ * @param {Object} cache - Discord cache for channel lookups
+ * @param {Object} intelligence - Intelligence engine for learning system (optional)
  * @returns {void}
  *
  * @example
- * initialize(config, { "VALAKAS": { points: 100 } }, (userId) => checkAdmin(userId));
+ * initialize(config, { "VALAKAS": { points: 100 } }, (userId) => checkAdmin(userId), cache, intelligenceEngine);
  */
-function initialize(cfg, bossPointsData, isAdmin, cache = null) {
+function initialize(cfg, bossPointsData, isAdmin, cache = null, intelligence = null) {
   config = cfg;
   bossPoints = bossPointsData;
   isAdminFunc = isAdmin;
   sheetAPI = new SheetAPI(cfg.sheet_webhook_url);
   discordCache = cache;
+  intelligenceEngine = intelligence;
   console.log("✅ Attendance module initialized");
 }
 
@@ -442,6 +446,29 @@ async function createSpawnThreads(
     await confirmThread.send(
       `🟨 **${bossName}** spawn detected (${fullTimestamp}).`
     );
+  }
+
+  // 🧠 AUTO-UPDATE LEARNING SYSTEM (Bot learns from actual spawn time)
+  try {
+    if (intelligenceEngine && intelligenceEngine.learningSystem) {
+      // Create ISO timestamp for the actual spawn time
+      const actualSpawnTime = new Date().toISOString();
+
+      const updated = await intelligenceEngine.learningSystem.updatePredictionAccuracy(
+        'spawn_prediction',
+        bossName,
+        actualSpawnTime
+      );
+
+      if (updated) {
+        console.log(`🧠 [LEARNING] Auto-updated spawn prediction accuracy for "${bossName}" (actual: ${actualSpawnTime})`);
+      } else {
+        console.log(`[LEARNING] No pending spawn prediction found for "${bossName}" (may not have been predicted)`);
+      }
+    }
+  } catch (learningErr) {
+    // Silent fail on learning updates (not critical to spawn creation)
+    console.log(`[LEARNING] Error updating spawn prediction: ${learningErr.message}`);
   }
 }
 

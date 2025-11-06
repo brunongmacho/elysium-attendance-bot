@@ -755,6 +755,24 @@ function handleSubmitAttendance(data) {
     }
     
     logAttendance(SpreadsheetApp.openById(CONFIG.SSHEET_ID), boss, timestamp, members);
+
+    // 🧠 AUTO-UPDATE LEARNING SYSTEM (Bot learns from member attendance)
+    try {
+      for (let i = 0; i < members.length; i++) {
+        const username = members[i];
+        // Update prediction for this member (they attended, so actual = 'yes')
+        updatePredictionAccuracy({
+          type: 'engagement',
+          target: username,
+          actual: 'yes'
+        });
+      }
+      Logger.log(`🧠 [LEARNING] Updated engagement predictions for ${members.length} members`);
+    } catch (learningErr) {
+      // Silent fail - learning updates are not critical to attendance submission
+      Logger.log(`[LEARNING] Error updating engagement predictions: ${learningErr.toString()}`);
+    }
+
     return createResponse('ok', `Submitted: ${members.length}`, {column: newCol, boss, timestamp, membersCount: members.length});
   } finally { lock.releaseLock(); }
 }
@@ -2097,8 +2115,37 @@ function updatePredictionAccuracy(data) {
             accuracy = Math.max(0, 100 - (diff / actualNum * 100));
           }
         } else if (type === 'engagement' || type === 'attendance') {
-          // For boolean predictions
-          accuracy = (predicted === actual) ? 100 : 0;
+          // For boolean predictions (attended = 'yes', did not attend = 'no')
+          // Predicted value is a likelihood number (0-1), actual is 'yes' or 'no'
+          const predictedLikelihood = Number(predicted);
+          if (!isNaN(predictedLikelihood)) {
+            // If actual is 'yes' (attended), accuracy = likelihood * 100
+            // If actual is 'no' (didn't attend), accuracy = (1 - likelihood) * 100
+            if (actual === 'yes') {
+              accuracy = predictedLikelihood * 100;
+            } else if (actual === 'no') {
+              accuracy = (1 - predictedLikelihood) * 100;
+            } else {
+              // Fallback for exact match (backward compatibility)
+              accuracy = (predicted === actual) ? 100 : 0;
+            }
+          }
+        } else if (type === 'spawn_prediction') {
+          // For timestamp predictions
+          // Calculate accuracy based on how close predicted time was to actual time
+          const predictedTime = new Date(predicted);
+          const actualTime = new Date(actual);
+
+          if (!isNaN(predictedTime.getTime()) && !isNaN(actualTime.getTime())) {
+            // Calculate difference in hours
+            const diffMs = Math.abs(predictedTime.getTime() - actualTime.getTime());
+            const diffHours = diffMs / (1000 * 60 * 60);
+
+            // Accuracy decreases as time difference increases
+            // Within 1 hour = 100%, 6 hours = 50%, 12+ hours = 0%
+            // Using exponential decay: accuracy = 100 * e^(-diffHours/3)
+            accuracy = Math.max(0, 100 * Math.exp(-diffHours / 3));
+          }
         }
 
         // Update the row
