@@ -108,6 +108,7 @@ const COMMAND_ALIASES = {
   "!lba": "!leaderboardattendance",
   "!lbbidding": "!leaderboardbidding",
   "!lbb": "!leaderboardbidding",
+  "!leaderboard": "!leaderboards",  // FIX: Map singular to plural for NLP compatibility
   "!lb": "!leaderboards",
   "!week": "!weeklyreport",
   "!weekly": "!weeklyreport",
