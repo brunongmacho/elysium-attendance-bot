@@ -187,9 +187,48 @@ class DiscordCache {
 }
 
 // ============================================================================
+// STANDALONE UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Get a channel by ID (standalone utility function).
+ *
+ * This is a simple utility function that fetches a channel directly from Discord.
+ * For better performance with repeated calls, consider using the DiscordCache class.
+ *
+ * @param {Client} client - Discord.js client instance
+ * @param {string} channelId - Channel ID to fetch
+ * @returns {Promise<Channel>} Discord channel object
+ * @throws {Error} If channel not found
+ *
+ * @example
+ * const channel = await getChannelById(client, '123456789');
+ */
+async function getChannelById(client, channelId) {
+  try {
+    if (!channelId) {
+      throw new Error('Channel ID is required');
+    }
+
+    // Fetch the channel directly from the client
+    const channel = await client.channels.fetch(channelId);
+
+    if (!channel) {
+      throw new Error(`Channel not found: ${channelId}`);
+    }
+
+    return channel;
+  } catch (error) {
+    console.error(`❌ Error fetching channel ${channelId}:`, error.message);
+    throw error;
+  }
+}
+
+// ============================================================================
 // MODULE EXPORTS
 // ============================================================================
 
 module.exports = {
   DiscordCache,
+  getChannelById,
 };
