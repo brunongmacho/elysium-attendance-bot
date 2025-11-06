@@ -54,6 +54,21 @@
 const axios = require('axios');
 const levenshtein = require('fast-levenshtein');
 const { NLPHandler, NLP_PATTERNS } = require('./nlp-handler.js');
+const { ConversationalAI } = require('./nlp-conversation.js');
+
+// Load comprehensive vocabularies (5000+ words each)
+let ENGLISH_VOCABULARY = [];
+let TAGALOG_VOCABULARY = [];
+let TAGLISH_VOCABULARY = [];
+
+try {
+  ENGLISH_VOCABULARY = require('./nlp-vocabulary').ENGLISH_WORDS || [];
+  TAGALOG_VOCABULARY = require('./nlp-vocabulary-tagalog').TAGALOG_WORDS || [];
+  TAGLISH_VOCABULARY = require('./nlp-vocabulary-taglish').TAGLISH_PHRASES || [];
+  console.log(`📚 [NLP] Loaded ${ENGLISH_VOCABULARY.length} English, ${TAGALOG_VOCABULARY.length} Tagalog, ${TAGLISH_VOCABULARY.length} Taglish terms`);
+} catch (error) {
+  console.log('📚 [NLP] Using built-in vocabulary (extended files not found)');
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -194,6 +209,9 @@ class NLPLearningSystem {
     // Static NLP handler for fallback
     this.staticHandler = null;
 
+    // Conversational AI for tagged messages
+    this.conversationalAI = null;
+
     // Bot instance
     this.client = null;
     this.botUserId = null;
@@ -210,6 +228,7 @@ class NLPLearningSystem {
       successfulInterpretations: 0,
       failedInterpretations: 0,
       languageDistribution: { en: 0, tl: 0, taglish: 0 },
+      conversationsHandled: 0, // Track conversations
     };
   }
 
@@ -226,6 +245,9 @@ class NLPLearningSystem {
 
     // Initialize static NLP handler for fallback
     this.staticHandler = new NLPHandler(this.config);
+
+    // Initialize conversational AI
+    this.conversationalAI = new ConversationalAI(this);
 
     console.log('🧠 [NLP Learning] Initializing system...');
 
@@ -367,6 +389,33 @@ class NLPLearningSystem {
     // No interpretation found
     this.stats.failedInterpretations++;
     return null;
+  }
+
+  /**
+   * Handle conversational message (when bot is tagged but no command found)
+   * @param {Message} message - Discord message
+   * @returns {string|null} Conversational response or null
+   */
+  async handleConversation(message) {
+    if (!this.conversationalAI) return null;
+
+    try {
+      // Strip bot mentions
+      const content = message.content.replace(/^<@!?\d+>\s*/g, '').trim();
+
+      // Get conversational response
+      const response = await this.conversationalAI.handleConversation(message, content);
+
+      if (response) {
+        this.stats.conversationsHandled++;
+        return response;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('❌ Error in conversation handler:', error);
+      return null;
+    }
   }
 
   tryLearnedPatterns(content) {
@@ -811,20 +860,38 @@ class NLPLearningSystem {
 
     let scores = { en: 0, tl: 0, taglish: 0 };
 
-    // Count matches for each language
+    // Use comprehensive vocabularies if available, otherwise use built-in
+    const tagalogWords = TAGALOG_VOCABULARY.length > 0 ? TAGALOG_VOCABULARY : LEARNING_CONFIG.languages.tagalog;
+    const englishWords = ENGLISH_VOCABULARY.length > 0 ? ENGLISH_VOCABULARY : LEARNING_CONFIG.languages.english;
+    const taglishPhrases = TAGLISH_VOCABULARY.length > 0 ? TAGLISH_VOCABULARY : LEARNING_CONFIG.languages.taglish;
+
+    // Check for exact phrase matches in Taglish first (more specific)
+    for (const phrase of taglishPhrases) {
+      if (normalized.includes(phrase.toLowerCase())) {
+        scores.taglish += 3; // Higher weight for phrase matches
+      }
+    }
+
+    // Count word matches for each language
     for (const word of words) {
-      if (LEARNING_CONFIG.languages.tagalog.some((w) => word.includes(w))) {
+      if (word.length < 2) continue; // Skip very short words
+
+      // Check Tagalog
+      if (tagalogWords.some((w) => w.toLowerCase() === word || word.includes(w.toLowerCase()))) {
         scores.tl++;
       }
-      if (LEARNING_CONFIG.languages.english.some((w) => word.includes(w))) {
+
+      // Check English
+      if (englishWords.some((w) => w.toLowerCase() === word || word.includes(w.toLowerCase()))) {
         scores.en++;
       }
     }
 
-    // Check for Taglish patterns
+    // Check for Taglish (code-switching) - if both languages present or Taglish score high
     const hasTagalog = scores.tl > 0;
     const hasEnglish = scores.en > 0;
-    if (hasTagalog && hasEnglish) {
+
+    if (scores.taglish > 0 || (hasTagalog && hasEnglish)) {
       return 'taglish';
     }
 
