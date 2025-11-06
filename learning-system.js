@@ -150,7 +150,7 @@ class LearningSystem {
         const m = members.length ? members : fallbackFromMap;
 
         if (m.length > 0) {
-          const points = m.map(x => x.biddingPoints ?? 0);
+          const points = m.map(x => x.pointsLeft ?? 0);
           const consumed = m.map(x => x.totalSpent ?? 0);
 
           const pointsSum = points.reduce((a, b) => a + b, 0);

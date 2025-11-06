@@ -3723,7 +3723,8 @@ client.on(Events.MessageCreate, async (message) => {
       resolvedCmd === "!detectanomalies" ||
       resolvedCmd === "!recommendations" ||
       resolvedCmd === "!performance" ||
-      resolvedCmd === "!analyzequeue"
+      resolvedCmd === "!analyzequeue" ||
+      resolvedCmd === "!bootstraplearning"
     ) {
       if (!userIsAdmin) {
         await message.reply("❌ Intelligence commands are admin-only.");
@@ -3757,6 +3758,8 @@ client.on(Events.MessageCreate, async (message) => {
         await commandHandlers.performance(message, member);
       } else if (resolvedCmd === "!analyzequeue") {
         await commandHandlers.analyzequeue(message, member);
+      } else if (resolvedCmd === "!bootstraplearning") {
+        await commandHandlers.bootstraplearning(message, member);
       }
       return;
     }
