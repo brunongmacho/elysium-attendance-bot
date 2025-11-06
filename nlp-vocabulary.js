@@ -334,6 +334,13 @@ const ENGLISH_WORDS = [
   'important', 'significant', 'essential', 'crucial', 'vital', 'critical', 'necessary', 'required',
   'optional', 'voluntary', 'mandatory', 'compulsory', 'obligatory', 'forbidden', 'prohibited', 'allowed',
 
+  // Trash Talk & Bad Words (for playful banter detection - guild internal use only)
+  'gago', 'ulol', 'bobo', 'tanga', 'bano', 'putangina', 'tangina', 'leche', 'peste',
+  'tarantado', 'tite', 'puke', 'kantot', 'kupal', 'pakshet', 'pakyu', 'hayop', 'buwisit',
+  'hinayupak', 'walang kwenta', 'fuck', 'shit', 'damn', 'ass', 'bitch', 'bastard',
+  'stupid', 'idiot', 'moron', 'dumb', 'retard', 'trash', 'garbage', 'pathetic', 'loser',
+  'suck', 'sucks', 'useless', 'scrub', 'noob', 'toxic', 'salty', 'trash talk', 'roast',
+
   // Internet & Chat Slang (200+ words)
   'lol', 'lmao', 'rofl', 'lmfao', 'haha', 'hehe', 'hehe', 'lulz', 'kek',
   'omg', 'oh my god', 'omfg', 'wtf', 'what the fuck', 'wth', 'what the hell',

@@ -137,18 +137,66 @@ const CONVERSATION_PATTERNS = {
     ],
   },
 
-  // Insult/Criticism
+  // Insult/Criticism (Playful Trash Talk Back!)
   insult: {
     patterns: [
-      /^(?:bad|terrible|useless|stupid|sucks|bobo|bano|tanga)/i,
-      /^(?:you\s+(?:suck|are\s+bad|dont\s+work))/i,
-      /^(?:ang\s+(?:bano|bobo|tanga)\s+mo)/i,
+      // Filipino bad words & trash talk
+      /(?:putang\s*ina|tangina|gago|ulol|leche|peste|tarantado|bobo|tanga|bano|walang\s+kwenta)/i,
+      /(?:tite|puke|kantot|kupal|pakshet|pakyu|fuck\s+you|hayop|buwisit|hinayupak)/i,
+
+      // English bad words & trash talk
+      /(?:fuck|shit|damn|ass|bitch|bastard|stupid|idiot|moron|dumb|retard)/i,
+      /(?:useless|trash|garbage|suck|pathetic|loser|noob|scrub|bad)/i,
+      /(?:you\s+(?:suck|are\s+(?:bad|trash|garbage|useless|stupid|dumb)))/i,
+
+      // Tagalog insults
+      /(?:ang\s+(?:bano|bobo|tanga|gago|ulol)\s+mo)/i,
+      /(?:pakshet|pakyu|gago\s+ka|ulol\s+ka|bobo\s+ka)/i,
     ],
     responses: [
-      "Sorry if I didn't understand! Try asking differently, or type '!help' for commands.",
-      "My bad! I'm still learning. Can you rephrase that? Or try !help for command list.",
-      "Pasensya na! Learning pa ako. Try mo ulit or type !help for commands.",
-      "I apologize! Let me know what you need and I'll do my better! 🤖",
+      // Savage Filipino responses
+      "Hoy gago, balik ka sa tutorial! 😤 Try mo muna mag-!help bago ka magsalita!",
+      "Ulol! Mas mataas pa IQ ko sa points mo! Check mo nalang: !mypoints 💀",
+      "Tangina, mas late ka pa sa pag-intindi kaysa sa attendance mo! 📊",
+      "Bobo yarn? Ikaw nga di makapagtanda ng !bid eh! 💸",
+      "Gago spotted! Mag-git gud ka nalang! Try mo mag-!leaderboard para makita mo rank mo sa gitna ng mga champs! 🏆",
+      "Leche, mas magaling pa magbid yung AI kesa sa'yo! 🤖💯",
+      "Pakshet! Ikaw yung tipo ng tao na nag-bid ng 1 point eh! 😂",
+      "Bobo! Balik ka pag nag-improve na utak mo! Simulan mo sa !help! 📚",
+      "Putangina, sabi ng mama ko wag makipag-usap sa mga walang-kwenta... pero sige, eto !help mo 🖕",
+      "Gago energy detected! Redirect mo yang galit mo sa pagsagot ng attendance! 📊",
+
+      // Savage English responses
+      "Oh look, another noob trying to talk smack! 😏 Maybe try !help first?",
+      "Your trash talk is weaker than your bid game! 💀 Check !mypoints and cry!",
+      "Damn, you're late even in insulting me! 🕐 Just like your attendance!",
+      "Bruh, I've seen better roasts from my error logs! 🔥 Try !leaderboard to see where you REALLY stand!",
+      "Calling me useless? Rich coming from someone who can't even !bid properly! 💸",
+      "Your IQ is lower than your points balance! Go check with !mypoints! 📉",
+      "Talk shit get hit with facts: You're at the BOTTOM of !leaderboard! 🏆😂",
+      "You suck at trash talk AND at bidding! Stick to !help, kiddo! 🍼",
+      "Oof, that insult hit harder than your 0% attendance rate! 📊💀",
+      "Imagine being THIS bad at both gaming AND roasting! 😤 !help is your friend!",
+
+      // Taglish savage responses
+      "Hoy bobo, your trash talk game is as weak as your bid game! Try mo muna mag-!help! 😤",
+      "Gago yarn?! Mas mataas pa bot IQ ko kesa sa points mo! !mypoints nalang! 💯",
+      "Tangina, ikaw yung tipo na 'present' lang di mo pa masagot! 📊😂",
+      "Ulol! Git gud ka muna bago ka mang-trashtalk! !leaderboard mo tignan mo rank mo! 🏆",
+      "Putangina, mas toxic pa salita mo kesa sa rank mo sa bottom! Check !leaderboard! 💀",
+      "Pakyu! Sabi mo pangit ako pero ikaw pala yung walang points! !mypoints mo check! 🤡",
+      "Bobo spotted! Mas priority mo pa mang-bash kesa mag-attend! Attendance mo check: 0%! 📊",
+      "Gago! Your roast game weak AF! Try mo mag-practice sa !help muna! 😏",
+
+      // Playful clapbacks
+      "Aww, did the bot hurt your feelings? 🥺 Cry about it while checking !mypoints!",
+      "Keep talking trash while I keep tracking your TRASH attendance! 📊😂",
+      "Imagine losing an argument to a bot! 🤖💀 !help yourself out, buddy!",
+      "Your insults hit harder than... wait, no they don't! They're trash! 🗑️ Unlike your !mypoints... oh wait!",
+      "Damn, ang galing mo mag-trash talk! Too bad di ka galingan sa !bid! 💸😂",
+      "Salty much? 🧂 Maybe check !leaderboard to see why! 🏆",
+      "Toxic ka naman! Baka kailangan mo ng !help sa buhay! 😤",
+      "Your mouth: 💯 | Your game: 💀 | Your points: !mypoints 📉😂",
     ],
   },
 
