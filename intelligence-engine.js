@@ -43,9 +43,9 @@
  */
 
 const { EmbedBuilder } = require('discord.js');
-const sheetAPI = require('./utils/sheet-api');
 const { getChannelById } = require('./utils/discord-cache');
 const { getTimestamp } = require('./utils/common');
+const { LearningSystem } = require('./learning-system');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -84,9 +84,10 @@ const INTELLIGENCE_CONFIG = {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class IntelligenceEngine {
-  constructor(client, config) {
+  constructor(client, config, sheetAPIInstance) {
     this.client = client;
     this.config = config;
+    this.sheetAPI = sheetAPIInstance;
 
     // Analytics caches
     this.auctionHistory = [];           // Historical auction data
@@ -97,6 +98,9 @@ class IntelligenceEngine {
     // ML models (simple statistical models)
     this.priceModel = null;
     this.engagementModel = null;
+
+    // Learning system (persistent AI/ML improvement)
+    this.learningSystem = new LearningSystem(config, sheetAPIInstance);
 
     // Performance metrics
     this.performanceMetrics = {
@@ -162,11 +166,34 @@ class IntelligenceEngine {
       const trendAdjustment = trend === 'increasing' ? 1.1 : trend === 'decreasing' ? 0.9 : 1.0;
       const suggestedBid = Math.round(cleanMedian * trendAdjustment);
 
+      // Calculate base confidence
+      const baseConfidence = this.calculateConfidence(filteredPrices.length, stdDev, mean);
+
+      // Adjust confidence based on historical accuracy (learning system)
+      const adjustedConfidence = await this.learningSystem.adjustConfidence('price_prediction', baseConfidence);
+
+      // Save prediction for future learning
+      const features = {
+        historicalCount: historicalData.length,
+        stdDev: Math.round(stdDev),
+        trend: trend,
+        trendPercent: trendPercent,
+      };
+
+      await this.learningSystem.savePrediction(
+        'price_prediction',
+        itemName,
+        suggestedBid,
+        adjustedConfidence,
+        features
+      );
+
       return {
         success: true,
         itemName,
         suggestedStartingBid: suggestedBid,
-        confidence: this.calculateConfidence(filteredPrices.length, stdDev, mean),
+        confidence: adjustedConfidence,
+        baseConfidence: baseConfidence, // Include base confidence for reference
         statistics: {
           historicalAuctions: historicalData.length,
           averagePrice: Math.round(cleanMean),
@@ -204,7 +231,14 @@ class IntelligenceEngine {
   async getItemAuctionHistory(itemName) {
     try {
       // Fetch from ForDistribution sheet (historical loot with prices)
-      const forDistData = await sheetAPI.getForDistribution();
+      const response = await this.sheetAPI.call('getForDistribution', {});
+
+      if (response.status !== 'ok' || !response.data || !response.data.items) {
+        console.error('[INTELLIGENCE] Failed to fetch ForDistribution:', response.message);
+        return [];
+      }
+
+      const forDistData = response.data.items;
 
       // Normalize item name for matching
       const normalizedName = this.normalizeItemName(itemName);

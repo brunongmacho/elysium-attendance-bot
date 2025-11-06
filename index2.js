@@ -79,6 +79,8 @@ const { SheetAPI } = require('./utils/sheet-api');          // Unified Google Sh
 const { DiscordCache } = require('./utils/discord-cache');  // Channel caching system
 const { normalizeUsername } = require('./utils/common');    // Username normalization
 const { IntelligenceEngine } = require('./intelligence-engine.js'); // AI/ML Intelligence Engine
+const { ProactiveIntelligence } = require('./proactive-intelligence.js'); // Proactive Monitoring
+const { NLPHandler } = require('./nlp-handler.js'); // Natural Language Processing
 
 /**
  * Command alias mapping for shorthand commands.
@@ -133,6 +135,8 @@ const COMMAND_ALIASES = {
   // Intelligence engine commands (admin)
   "!predict": "!predictprice",
   "!suggestprice": "!predictprice",
+  "!suggestauction": "!analyzequeue",
+  "!analyzequeue": "!analyzequeue",
   "!engage": "!engagement",
   "!analyze": "!analyzeengagement",
   "!anomaly": "!detectanomalies",
@@ -372,6 +376,20 @@ let lastAuctionEndTime = 0;
  * @type {IntelligenceEngine}
  */
 let intelligenceEngine = null;
+
+/**
+ * Proactive Intelligence instance for auto-notifications
+ * Monitors guild health and sends proactive alerts
+ * @type {ProactiveIntelligence}
+ */
+let proactiveIntelligence = null;
+
+/**
+ * NLP Handler for natural language command interpretation
+ * Allows flexible command syntax without strict ! prefix
+ * @type {NLPHandler}
+ */
+let nlpHandler = null;
 
 /**
  * Flag indicating bot is currently recovering from a crash
@@ -2735,6 +2753,118 @@ const commandHandlers = {
       await message.reply(`❌ Error generating report: ${error.message}`);
     }
   },
+
+  /**
+   * Analyze auction queue and suggest prices for all items
+   * Usage: !suggestauction or !analyzequeue
+   */
+  analyzequeue: async (message, member) => {
+    await message.reply(`🤖 Analyzing auction queue... This may take a moment.`);
+
+    try {
+      // Get items from queue
+      const sheetAPI = require('./utils/sheet-api');
+      const queueItems = await sheetAPI.getBiddingItems();
+
+      if (!queueItems || queueItems.length === 0) {
+        await message.reply(`⚠️ No items in auction queue. Use Google Sheets to add items to BiddingItems.`);
+        return;
+      }
+
+      console.log(`🤖 [INTELLIGENCE] Analyzing ${queueItems.length} items in queue...`);
+
+      // Analyze each item
+      const analyses = [];
+      for (const item of queueItems.slice(0, 20)) { // Limit to 20 items to avoid timeout
+        const itemName = item.itemName || item.name || 'Unknown';
+        const currentPrice = parseInt(item.startingBid) || 0;
+
+        const prediction = await intelligenceEngine.predictItemValue(itemName);
+
+        analyses.push({
+          itemName,
+          currentPrice,
+          prediction,
+        });
+      }
+
+      // Create summary embed
+      const embed = new EmbedBuilder()
+        .setColor(0x9b59b6)
+        .setTitle(`💰 Auction Queue Analysis`)
+        .setDescription(
+          `AI price suggestions for **${analyses.length}** items in queue\n\n` +
+          `**How to use:** Manually adjust prices in Google Sheets > BiddingItems before starting auction`
+        )
+        .setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
+        .setTimestamp();
+
+      // Add items with suggestions
+      const itemsList = analyses.map((item, i) => {
+        if (!item.prediction.success) {
+          return `${i + 1}. **${item.itemName}**\n   Current: ${item.currentPrice}pts\n   ⚠️ ${item.prediction.reason}`;
+        }
+
+        const { suggestedStartingBid, confidence } = item.prediction;
+        const diff = suggestedStartingBid - item.currentPrice;
+        const diffText = diff > 0 ? `+${diff}` : diff < 0 ? `${diff}` : '±0';
+        const emoji = confidence >= 70 ? '✅' : confidence >= 50 ? '⚠️' : '🔴';
+
+        return `${i + 1}. **${item.itemName}** ${emoji}\n   Current: ${item.currentPrice}pts → AI: ${suggestedStartingBid}pts (${diffText})\n   Confidence: ${confidence}%`;
+      }).join('\n\n');
+
+      // Split into multiple fields if too long
+      if (itemsList.length < 1024) {
+        embed.addFields({
+          name: '📊 Price Suggestions',
+          value: itemsList,
+          inline: false,
+        });
+      } else {
+        // Split into chunks
+        const chunks = itemsList.match(/[\s\S]{1,1000}(?:\n|$)/g) || [itemsList];
+        chunks.forEach((chunk, i) => {
+          embed.addFields({
+            name: i === 0 ? '📊 Price Suggestions' : `📊 Price Suggestions (cont.)`,
+            value: chunk.trim(),
+            inline: false,
+          });
+        });
+      }
+
+      // Add summary statistics
+      const withPredictions = analyses.filter(a => a.prediction.success);
+      const avgConfidence = withPredictions.length > 0
+        ? Math.round(withPredictions.reduce((sum, a) => sum + a.prediction.confidence, 0) / withPredictions.length)
+        : 0;
+
+      embed.addFields({
+        name: '📈 Analysis Summary',
+        value:
+          `Total Items: ${analyses.length}\n` +
+          `With Predictions: ${withPredictions.length}\n` +
+          `Avg Confidence: ${avgConfidence}%`,
+        inline: false,
+      });
+
+      embed.addFields({
+        name: '💡 Next Steps',
+        value:
+          `1. Review AI suggestions above\n` +
+          `2. Open Google Sheets > BiddingItems\n` +
+          `3. Manually adjust "Starting Bid" column\n` +
+          `4. Start auction with \`!startauction\``,
+        inline: false,
+      });
+
+      await message.reply({ embeds: [embed] });
+      console.log(`✅ [INTELLIGENCE] Queue analysis complete: ${analyses.length} items analyzed`);
+
+    } catch (error) {
+      console.error('[INTELLIGENCE] Error analyzing queue:', error);
+      await message.reply(`❌ Error analyzing queue: ${error.message}`);
+    }
+  },
 };
 
 /**
@@ -2807,8 +2937,17 @@ client.once(Events.ClientReady, async () => {
   leaderboardSystem.init(client, config, discordCache); // Initialize leaderboard system
 
   // INITIALIZE INTELLIGENCE ENGINE (AI/ML features)
-  intelligenceEngine = new IntelligenceEngine(client, config);
+  intelligenceEngine = new IntelligenceEngine(client, config, sheetAPI);
   console.log('🤖 Intelligence Engine initialized (AI/ML powered features enabled)');
+
+  // INITIALIZE PROACTIVE INTELLIGENCE (Auto-notifications & monitoring)
+  proactiveIntelligence = new ProactiveIntelligence(client, config, intelligenceEngine);
+  await proactiveIntelligence.initialize();
+  console.log('🔔 Proactive Intelligence initialized (5 scheduled monitoring tasks active)');
+
+  // INITIALIZE NLP HANDLER (Natural language processing)
+  nlpHandler = new NLPHandler(config);
+  console.log('💬 NLP Handler initialized (admin logs + auction threads)');
 
   console.log("\n╔═══════════════════════════════════════════════════════╗");
   console.log("║         🔄 BOT STATE RECOVERY (3-SWEEP SYSTEM)   ║");
@@ -3230,6 +3369,33 @@ client.on(Events.MessageCreate, async (message) => {
       (message.channel.isThread() &&
         message.channel.parentId === config.elysium_commands_channel_id);
 
+    // ═════════════════════════════════════════════════════════════════════
+    // NLP PROCESSING (Natural Language → Commands)
+    // ═════════════════════════════════════════════════════════════════════
+    // Intercepts natural language and converts to command format
+    // Only works in admin logs and auction threads (NOT guild chat)
+    // Does NOT interfere with existing ! commands
+
+    let nlpInterpretation = null;
+    if (nlpHandler && !message.content.trim().startsWith('!')) {
+      nlpInterpretation = nlpHandler.interpretMessage(message);
+
+      if (nlpInterpretation) {
+        console.log(`💬 [NLP] Interpreted: "${message.content}" → ${nlpInterpretation.command}`);
+
+        // Convert natural language to command format
+        // This allows the rest of the system to process it normally
+        const params = nlpInterpretation.params.join(' ');
+        message.content = `${nlpInterpretation.command}${params ? ' ' + params : ''}`;
+
+        // Optional: Send brief feedback for non-bid commands
+        const contextMessage = nlpHandler.getContextMessage(nlpInterpretation.command, message);
+        if (contextMessage) {
+          await message.reply(contextMessage).catch(() => {});
+        }
+      }
+    }
+
     // ✅ HANDLE !BID AND ALIASES IMMEDIATELY
     const rawCmd = message.content.trim().toLowerCase().split(/\s+/)[0];
     const resolvedCmd = resolveCommandAlias(rawCmd);
@@ -3394,7 +3560,8 @@ client.on(Events.MessageCreate, async (message) => {
       resolvedCmd === "!analyzeengagement" ||
       resolvedCmd === "!detectanomalies" ||
       resolvedCmd === "!recommendations" ||
-      resolvedCmd === "!performance"
+      resolvedCmd === "!performance" ||
+      resolvedCmd === "!analyzequeue"
     ) {
       if (!userIsAdmin) {
         await message.reply("❌ Intelligence commands are admin-only.");
@@ -3426,6 +3593,8 @@ client.on(Events.MessageCreate, async (message) => {
         await commandHandlers.recommendations(message, member);
       } else if (resolvedCmd === "!performance") {
         await commandHandlers.performance(message, member);
+      } else if (resolvedCmd === "!analyzequeue") {
+        await commandHandlers.analyzequeue(message, member);
       }
       return;
     }

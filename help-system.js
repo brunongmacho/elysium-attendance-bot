@@ -731,6 +731,25 @@ const COMMAND_HELP = {
       "Cache health monitoring"
     ]
   },
+
+  analyzequeue: {
+    usage: "!suggestauction",
+    description: "🤖 Analyze ALL items in auction queue and suggest optimal starting bids for each",
+    category: "Intelligence",
+    adminOnly: true,
+    example: "!suggestauction\n!analyzequeue",
+    aliases: ["!suggestauction", "!analyzequeue"],
+    location: "Admin Logs Channel or ELYSIUM Commands Channel",
+    features: [
+      "Analyzes up to 20 items from BiddingItems sheet",
+      "AI price prediction for each item with confidence",
+      "Shows current price vs suggested price (+/- diff)",
+      "Summary statistics (avg confidence, success rate)",
+      "Step-by-step instructions for adjusting prices",
+      "Use BEFORE starting auction to set optimal prices",
+      "Helps maximize fairness and guild revenue"
+    ]
+  },
 };
 
 const CATEGORIES = {

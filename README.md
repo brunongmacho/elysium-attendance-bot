@@ -98,6 +98,7 @@ Complete toolkit for handling stuck states (all require confirmation):
   - Trend analysis for item value changes over time
   - Similar item recommendations when data is insufficient
   - Statistical analysis with outlier detection
+  - **NEW!** `!suggestauction` - Analyze entire queue before auction
 
 - **Member Engagement Analytics** - Predict attendance likelihood and identify at-risk members
   - Engagement scoring (attendance + bidding activity + consistency)
@@ -121,6 +122,53 @@ Complete toolkit for handling stuck states (all require confirmation):
   - Cache management with intelligent cleanup
   - Performance recommendations based on system metrics
   - Supports up to 512MB RAM deployment
+
+### 🔔 Proactive Intelligence System (NEW!)
+**Automated Monitoring & Alerts:**
+- **Pre-Auction Readiness Check** (Saturday 10 AM, 2h before auction)
+  - Checks if guild is ready (70% members with 100+ points)
+  - Sends alert to Admin Logs with @here if low readiness
+  - Suggests postponing or adjusting starting bids
+
+- **Weekly Engagement Digest** (Monday 9 AM)
+  - Guild-wide engagement analysis sent to Admin Logs
+  - Identifies at-risk members needing attention
+  - Suggests manual reminders (admin sends, not auto-DM)
+
+- **Daily Anomaly Digest** (6 PM Manila time)
+  - Scans for suspicious patterns and fraud
+  - Sends alert to Admin Logs with @here if anomalies found
+  - Provides actionable recommendations
+
+- **Weekly Positive Summary** (Sunday 8 PM)
+  - Motivational recap sent to Guild Chat
+  - Celebrates top 5 performers
+  - Guild achievements and milestones
+
+- **Milestone Celebrations** (Every hour)
+  - Detects members reaching 500/1000/2000/5000 points
+  - Public celebration in Guild Chat
+  - Motivates guild engagement
+
+### 💬 Natural Language Processing (NEW!)
+**Flexible Command Syntax:**
+- Works in **Admin Logs** and **Auction Threads** only (NOT guild chat)
+- Understands natural language instead of strict commands
+- Does NOT interfere with existing ! commands
+
+**Examples:**
+```
+In Auction Threads:
+"bid 500" → !bid 500
+"offer 300 points" → !bid 300
+"300 pts" → !bid 300
+
+In Admin Logs:
+"how many points do i have" → !mypoints
+"show me the leaderboard" → !leaderboard
+"what's the auction status" → !bidstatus
+"bot status" → !status
+```
 
 ### 🛡️ Security & Reliability
 - **Admin role verification** on all privileged commands
@@ -437,7 +485,8 @@ PORT=8000  # Optional, defaults to 8000
 
 | Command | Aliases | Description |
 |---------|---------|-------------|
-| `!predictprice <item name>` | `!predict`, `!suggestprice` | AI-powered price prediction with historical analysis |
+| `!predictprice <item name>` | `!predict`, `!suggestprice` | AI-powered price prediction for single item with historical analysis |
+| `!suggestauction` | `!analyzequeue` | **NEW!** Analyze ALL items in queue and suggest prices BEFORE auction |
 | `!engagement <username>` | `!engage` | Analyze member engagement and predict attendance |
 | `!analyzeengagement` | `!analyze` | Guild-wide engagement analysis (all members) |
 | `!detectanomalies` | `!anomaly`, `!fraud` | Scan for suspicious patterns and fraud |
@@ -448,6 +497,12 @@ PORT=8000  # Optional, defaults to 8000
 ```
 !predictprice Crimson Pendant
 → Suggests starting bid based on 10+ historical auctions with 85% confidence
+
+!suggestauction
+→ Analyzes ALL 15 items in queue
+→ Crimson Pendant: 400pts → AI: 450pts (+50) ✅ 85% confidence
+→ Ancient Scroll: 300pts → AI: 320pts (+20) ⚠️ 65% confidence
+→ Use BEFORE auction to adjust prices in Google Sheets
 
 !engagement PlayerName
 → Shows 75/100 engagement score, 80% likelihood to attend next event

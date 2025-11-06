@@ -346,6 +346,42 @@ class SheetAPI {
     throw new Error('Unexpected error in API call');
   }
 
+  // ========================================================================
+  // LEARNING SYSTEM METHODS
+  // ========================================================================
+
+  /**
+   * Save a prediction for future learning
+   */
+  async savePredictionForLearning(data) {
+    return await this.call('savePredictionForLearning', data);
+  }
+
+  /**
+   * Update prediction with actual result
+   */
+  async updatePredictionAccuracy(data) {
+    return await this.call('updatePredictionAccuracy', data);
+  }
+
+  /**
+   * Get learning data
+   */
+  async getLearningData(data) {
+    return await this.call('getLearningData', data);
+  }
+
+  /**
+   * Get learning metrics
+   */
+  async getLearningMetrics(data) {
+    return await this.call('getLearningMetrics', data);
+  }
+
+  // ========================================================================
+  // METRICS & MONITORING
+  // ========================================================================
+
   /**
    * Get API metrics.
    *

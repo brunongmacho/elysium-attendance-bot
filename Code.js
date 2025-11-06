@@ -129,6 +129,15 @@ function doPost(e) {
     if (action === 'getLootState') return getLootState(data);
     if (action === 'saveLootState') return saveLootState(data);
     if (action === 'getHistoricalPrices') return getHistoricalPrices(data);
+    if (action === 'getForDistribution') return getForDistribution(data);
+    if (action === 'getTotalAttendance') return getTotalAttendance(data);
+    if (action === 'getBiddingPoints') return getBiddingPoints(data);
+
+    // Learning system actions
+    if (action === 'savePredictionForLearning') return savePredictionForLearning(data);
+    if (action === 'updatePredictionAccuracy') return updatePredictionAccuracy(data);
+    if (action === 'getLearningData') return getLearningData(data);
+    if (action === 'getLearningMetrics') return getLearningMetrics(data);
 
     // Leaderboard & Weekly Report actions
     if (action === 'getAttendanceLeaderboard') return getAttendanceLeaderboard(data);
@@ -1866,6 +1875,455 @@ function getHistoricalPrices(data) {
   } catch (err) {
     Logger.log('❌ Error fetching historical prices: ' + err.toString());
     return createResponse('error', err.toString(), { prices: {} });
+  }
+}
+
+// ===========================================================
+// LEARNING SYSTEM - PERSISTENT AI/ML STORAGE
+// ===========================================================
+
+/**
+ * Get or create BotLearning sheet
+ * Structure: Timestamp | Type | Target | Predicted | Actual | Accuracy | Confidence | Features | Status
+ */
+function getBotLearningSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('BotLearning');
+
+  if (!sheet) {
+    Logger.log('📚 Creating BotLearning sheet...');
+    sheet = ss.insertSheet('BotLearning');
+
+    // Set headers
+    const headers = [
+      'Timestamp', 'Type', 'Target', 'Predicted', 'Actual',
+      'Accuracy', 'Confidence', 'Features', 'Status', 'Notes'
+    ];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+
+    Logger.log('✅ BotLearning sheet created');
+  }
+
+  return sheet;
+}
+
+/**
+ * Save a prediction for future learning
+ * @param {Object} data - Prediction data
+ * @param {string} data.type - Type of prediction (price_prediction, engagement, anomaly)
+ * @param {string} data.target - What was predicted (item name, username, etc.)
+ * @param {number|string} data.predicted - The predicted value
+ * @param {number} data.confidence - Confidence score (0-100)
+ * @param {Object} data.features - Features used in prediction (stored as JSON)
+ * @returns {Object} Response with predictionId
+ */
+function savePredictionForLearning(data) {
+  try {
+    Logger.log('📚 Saving prediction for learning...');
+
+    const sheet = getBotLearningSheet();
+    const timestamp = new Date();
+
+    const type = data.type || 'unknown';
+    const target = data.target || '';
+    const predicted = data.predicted || '';
+    const confidence = data.confidence || 0;
+    const features = JSON.stringify(data.features || {});
+
+    const newRow = [
+      timestamp,
+      type,
+      target,
+      predicted,
+      '', // Actual (to be filled later)
+      '', // Accuracy (to be calculated later)
+      confidence,
+      features,
+      'pending',
+      '' // Notes
+    ];
+
+    sheet.appendRow(newRow);
+
+    const predictionId = sheet.getLastRow();
+
+    Logger.log(`✅ Prediction saved: ID=${predictionId}, Type=${type}, Target=${target}`);
+
+    return createResponse('ok', 'Prediction saved for learning', {
+      predictionId: predictionId,
+      timestamp: timestamp.toISOString()
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error saving prediction: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Update prediction with actual result for learning
+ * @param {Object} data - Update data
+ * @param {string} data.type - Type of prediction
+ * @param {string} data.target - Target that was predicted
+ * @param {number|string} data.actual - Actual value observed
+ * @returns {Object} Response with updated accuracy
+ */
+function updatePredictionAccuracy(data) {
+  try {
+    Logger.log('📊 Updating prediction accuracy...');
+
+    const sheet = getBotLearningSheet();
+    const lastRow = sheet.getLastRow();
+
+    if (lastRow < 2) {
+      return createResponse('ok', 'No predictions to update');
+    }
+
+    const type = data.type || '';
+    const target = data.target || '';
+    const actual = data.actual || '';
+
+    // Find most recent pending prediction matching type and target
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, 10);
+    const values = dataRange.getValues();
+
+    let updated = false;
+    for (let i = values.length - 1; i >= 0; i--) {
+      const row = values[i];
+      const rowType = row[1]; // Type column
+      const rowTarget = row[2]; // Target column
+      const rowStatus = row[8]; // Status column
+
+      if (rowType === type && rowTarget === target && rowStatus === 'pending') {
+        const predicted = row[3];
+        let accuracy = 0;
+
+        // Calculate accuracy based on type
+        if (type === 'price_prediction') {
+          const predictedNum = Number(predicted);
+          const actualNum = Number(actual);
+          if (!isNaN(predictedNum) && !isNaN(actualNum) && actualNum > 0) {
+            const diff = Math.abs(predictedNum - actualNum);
+            accuracy = Math.max(0, 100 - (diff / actualNum * 100));
+          }
+        } else if (type === 'engagement' || type === 'attendance') {
+          // For boolean predictions
+          accuracy = (predicted === actual) ? 100 : 0;
+        }
+
+        // Update the row
+        const rowIndex = i + 2; // +2 because i is 0-indexed and row 1 is headers
+        sheet.getRange(rowIndex, 5).setValue(actual); // Actual column
+        sheet.getRange(rowIndex, 6).setValue(accuracy.toFixed(2)); // Accuracy column
+        sheet.getRange(rowIndex, 9).setValue('completed'); // Status column
+
+        Logger.log(`✅ Updated prediction: Row=${rowIndex}, Accuracy=${accuracy.toFixed(2)}%`);
+        updated = true;
+        break;
+      }
+    }
+
+    if (!updated) {
+      Logger.log('⚠️ No matching pending prediction found');
+      return createResponse('ok', 'No matching pending prediction found');
+    }
+
+    return createResponse('ok', 'Prediction accuracy updated');
+
+  } catch (err) {
+    Logger.log('❌ Error updating prediction accuracy: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Get learning data for analysis
+ * @param {Object} data - Query parameters
+ * @param {string} data.type - Filter by prediction type (optional)
+ * @param {number} data.limit - Limit results (default 100)
+ * @returns {Object} Response with learning data
+ */
+function getLearningData(data) {
+  try {
+    Logger.log('📚 Fetching learning data...');
+
+    const sheet = getBotLearningSheet();
+    const lastRow = sheet.getLastRow();
+
+    if (lastRow < 2) {
+      return createResponse('ok', 'No learning data available', { predictions: [] });
+    }
+
+    const filterType = data.type || null;
+    const limit = data.limit || 100;
+
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, 10);
+    const values = dataRange.getValues();
+
+    const predictions = [];
+
+    for (let i = values.length - 1; i >= 0 && predictions.length < limit; i--) {
+      const row = values[i];
+      const type = row[1];
+
+      if (filterType && type !== filterType) continue;
+
+      predictions.push({
+        timestamp: row[0],
+        type: type,
+        target: row[2],
+        predicted: row[3],
+        actual: row[4],
+        accuracy: row[5],
+        confidence: row[6],
+        features: row[7],
+        status: row[8],
+        notes: row[9]
+      });
+    }
+
+    Logger.log(`✅ Fetched ${predictions.length} learning records`);
+
+    return createResponse('ok', 'Learning data fetched', { predictions });
+
+  } catch (err) {
+    Logger.log('❌ Error fetching learning data: ' + err.toString());
+    return createResponse('error', err.toString(), { predictions: [] });
+  }
+}
+
+/**
+ * Get learning metrics and statistics
+ * @returns {Object} Response with metrics
+ */
+function getLearningMetrics(data) {
+  try {
+    Logger.log('📊 Calculating learning metrics...');
+
+    const sheet = getBotLearningSheet();
+    const lastRow = sheet.getLastRow();
+
+    if (lastRow < 2) {
+      return createResponse('ok', 'No learning data available', { metrics: {} });
+    }
+
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, 10);
+    const values = dataRange.getValues();
+
+    const metrics = {
+      total: values.length,
+      byType: {},
+      averageAccuracy: {},
+      recentAccuracy: {}
+    };
+
+    const typeData = {};
+
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      const type = row[1];
+      const accuracy = parseFloat(row[5]) || 0;
+      const status = row[8];
+
+      if (!typeData[type]) {
+        typeData[type] = {
+          total: 0,
+          completed: 0,
+          accuracySum: 0,
+          recent: []
+        };
+      }
+
+      typeData[type].total++;
+
+      if (status === 'completed' && accuracy > 0) {
+        typeData[type].completed++;
+        typeData[type].accuracySum += accuracy;
+        typeData[type].recent.push(accuracy);
+      }
+    }
+
+    // Calculate averages
+    for (const type in typeData) {
+      const data = typeData[type];
+      metrics.byType[type] = {
+        total: data.total,
+        completed: data.completed
+      };
+
+      if (data.completed > 0) {
+        metrics.averageAccuracy[type] = (data.accuracySum / data.completed).toFixed(2);
+
+        // Last 10 predictions
+        const recent = data.recent.slice(-10);
+        const recentSum = recent.reduce((a, b) => a + b, 0);
+        metrics.recentAccuracy[type] = (recentSum / recent.length).toFixed(2);
+      }
+    }
+
+    Logger.log(`✅ Metrics calculated: ${Object.keys(metrics.byType).length} types`);
+
+    return createResponse('ok', 'Learning metrics calculated', { metrics });
+
+  } catch (err) {
+    Logger.log('❌ Error calculating metrics: ' + err.toString());
+    return createResponse('error', err.toString(), { metrics: {} });
+  }
+}
+
+// ===========================================================
+// DATA RETRIEVAL FOR INTELLIGENCE ENGINE
+// ===========================================================
+
+/**
+ * Get all ForDistribution data for intelligence analysis
+ * @returns {Object} Response with ForDistribution data
+ */
+function getForDistribution(data) {
+  try {
+    Logger.log('📊 Fetching ForDistribution data for intelligence...');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('ForDistribution');
+
+    if (!sheet) {
+      return createResponse('ok', 'ForDistribution sheet not found', { items: [] });
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return createResponse('ok', 'No data in ForDistribution', { items: [] });
+    }
+
+    // Get all data (columns: Item, StartPrice, Duration, Winner, WinningBid, AuctionStart, AuctionEnd, Timestamp, TotalBids, Source, Quantity, Boss)
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, 12);
+    const values = dataRange.getValues();
+
+    const items = [];
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      items.push({
+        itemName: row[0],
+        startPrice: row[1],
+        duration: row[2],
+        winner: row[3],
+        bidAmount: row[4],
+        auctionStart: row[5],
+        auctionEnd: row[6],
+        timestamp: row[7],
+        totalBids: row[8],
+        source: row[9],
+        quantity: row[10],
+        boss: row[11]
+      });
+    }
+
+    Logger.log(`✅ Fetched ${items.length} ForDistribution records`);
+    return createResponse('ok', 'ForDistribution data fetched', { items });
+
+  } catch (err) {
+    Logger.log('❌ Error fetching ForDistribution: ' + err.toString());
+    return createResponse('error', err.toString(), { items: [] });
+  }
+}
+
+/**
+ * Get total attendance data for all members
+ * @returns {Object} Response with attendance data
+ */
+function getTotalAttendance(data) {
+  try {
+    Logger.log('📊 Fetching total attendance data...');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('BiddingPoints');
+
+    if (!sheet) {
+      return createResponse('ok', 'BiddingPoints sheet not found', { members: [] });
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return createResponse('ok', 'No data in BiddingPoints', { members: [] });
+    }
+
+    // Get columns: Username (A), Attendance Points (B)
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, 2);
+    const values = dataRange.getValues();
+
+    const members = [];
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      const username = (row[0] || '').toString().trim();
+      const attendancePoints = parseInt(row[1]) || 0;
+
+      if (username) {
+        members.push({
+          username,
+          attendancePoints
+        });
+      }
+    }
+
+    Logger.log(`✅ Fetched attendance for ${members.length} members`);
+    return createResponse('ok', 'Attendance data fetched', { members });
+
+  } catch (err) {
+    Logger.log('❌ Error fetching attendance: ' + err.toString());
+    return createResponse('error', err.toString(), { members: [] });
+  }
+}
+
+/**
+ * Get bidding points data for all members
+ * @returns {Object} Response with bidding data
+ */
+function getBiddingPoints(data) {
+  try {
+    Logger.log('📊 Fetching bidding points data...');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('BiddingPoints');
+
+    if (!sheet) {
+      return createResponse('ok', 'BiddingPoints sheet not found', { members: [] });
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return createResponse('ok', 'No data in BiddingPoints', { members: [] });
+    }
+
+    // Get columns: Username (A), Attendance Points (B), Bidding Points (C), Total Spent (D)
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, 4);
+    const values = dataRange.getValues();
+
+    const members = [];
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      const username = (row[0] || '').toString().trim();
+      const attendancePoints = parseInt(row[1]) || 0;
+      const biddingPoints = parseInt(row[2]) || 0;
+      const totalSpent = parseInt(row[3]) || 0;
+
+      if (username) {
+        members.push({
+          username,
+          attendancePoints,
+          biddingPoints,
+          totalSpent
+        });
+      }
+    }
+
+    Logger.log(`✅ Fetched bidding data for ${members.length} members`);
+    return createResponse('ok', 'Bidding data fetched', { members });
+
+  } catch (err) {
+    Logger.log('❌ Error fetching bidding points: ' + err.toString());
+    return createResponse('error', err.toString(), { members: [] });
   }
 }
 
