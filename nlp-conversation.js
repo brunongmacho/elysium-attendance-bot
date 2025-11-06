@@ -479,8 +479,8 @@ class ConversationalAI {
       return parts.join(' ');
     };
 
-    // Get nickname (guild nick > display name > username) and mention
-    const nickname = message.member?.displayName || message.author.displayName || message.author.username;
+    // Get nickname using same logic as !mp command: guild nickname or username
+    const nickname = message.member?.nickname || message.author.username;
     const mention = `<@${message.author.id}>`;
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -783,7 +783,8 @@ class ConversationalAI {
   async handleConversation(message, content) {
     try {
       const userId = message.author.id;
-      const username = message.author.username;
+      // Use same name resolution as !mp command: nickname first, then username
+      const username = message.member?.nickname || message.author.username;
 
       // Store conversation history for learning
       this.storeConversation(userId, content);
