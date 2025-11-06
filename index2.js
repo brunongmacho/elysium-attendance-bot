@@ -2899,7 +2899,7 @@ const commandHandlers = {
     try {
       console.log(`🚀 [BOOTSTRAP] Manual bootstrap requested by ${member.user.username}`);
 
-      const bootstrapResult = await sheetAPI.bootstrapLearning();
+      const bootstrapResult = await sheetAPI.call('bootstrapLearning', {});
 
       if (bootstrapResult.status === 'ok') {
         const { predictionsCreated, uniqueItems, averageAccuracy, predictionsSkipped, totalAuctions } = bootstrapResult.data;
@@ -3015,13 +3015,13 @@ client.once(Events.ClientReady, async () => {
   // 🚀 AUTO-BOOTSTRAP LEARNING FROM HISTORY (First Deployment)
   console.log('🔍 Checking if learning system needs bootstrap...');
   try {
-    const needsCheck = await sheetAPI.needsBootstrap();
-    if (needsCheck.status === 'ok' && needsCheck.data.needsBootstrap) {
+    const needsCheck = await sheetAPI.call('needsBootstrap', {});
+    if (needsCheck.status === 'ok' && needsCheck.data && needsCheck.data.needsBootstrap) {
       console.log('🚀 [FIRST DEPLOYMENT] Bootstrapping learning from historical data...');
       console.log('   This will analyze ALL auction history and create predictions.');
       console.log('   The bot will start SMART instead of learning from scratch!');
 
-      const bootstrapResult = await sheetAPI.bootstrapLearning();
+      const bootstrapResult = await sheetAPI.call('bootstrapLearning', {});
 
       if (bootstrapResult.status === 'ok') {
         const { predictionsCreated, uniqueItems, averageAccuracy } = bootstrapResult.data;

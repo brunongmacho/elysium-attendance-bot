@@ -88,7 +88,7 @@ class LearningSystem {
       // ENHANCED: With 60GB storage, enrich features with comprehensive context
       const enrichedFeatures = await this.enrichFeaturesWithContext(features, type, target);
 
-      const response = await this.sheetAPI.savePredictionForLearning({
+      const response = await this.sheetAPI.call('savePredictionForLearning', {
         type,
         target,
         predicted,
@@ -238,7 +238,7 @@ class LearningSystem {
    */
   async updatePredictionAccuracy(type, target, actual) {
     try {
-      const response = await this.sheetAPI.updatePredictionAccuracy({
+      const response = await this.sheetAPI.call('updatePredictionAccuracy', {
         type,
         target,
         actual,
@@ -272,7 +272,7 @@ class LearningSystem {
         return this.cache.metrics;
       }
 
-      const response = await this.sheetAPI.getLearningMetrics({});
+      const response = await this.sheetAPI.call('getLearningMetrics', {});
 
       if (response.status === 'ok') {
         const metrics = response.data.metrics;
@@ -300,7 +300,7 @@ class LearningSystem {
    */
   async getLearningData(type, limit = 100) {
     try {
-      const response = await this.sheetAPI.getLearningData({ type, limit });
+      const response = await this.sheetAPI.call('getLearningData', { type, limit });
 
       if (response.status === 'ok') {
         return response.data.predictions || [];
