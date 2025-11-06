@@ -139,6 +139,14 @@ function doPost(e) {
     if (action === 'getLearningData') return getLearningData(data);
     if (action === 'getLearningMetrics') return getLearningMetrics(data);
 
+    // Google Drive actions (Learning & Data Storage)
+    if (action === 'initializeDriveFolders') return initializeDriveFolders();
+    if (action === 'uploadScreenshot') return uploadScreenshot(data);
+    if (action === 'exportLearningData') return exportLearningData(data);
+    if (action === 'exportPredictionFeatures') return exportPredictionFeatures(data);
+    if (action === 'createDailyBackup') return createDailyBackup();
+    if (action === 'logAuditTrail') return logAuditTrail(data);
+
     // Leaderboard & Weekly Report actions
     if (action === 'getAttendanceLeaderboard') return getAttendanceLeaderboard(data);
     if (action === 'getBiddingLeaderboard') return getBiddingLeaderboard(data);
@@ -3073,6 +3081,585 @@ function testMoveItem() {
 
   Logger.log('🧪 Test completed. Check logs above for details.');
 }
+
+// ===========================================================
+// GOOGLE DRIVE INTEGRATION - LEARNING & DATA STORAGE
+// ===========================================================
+
+/**
+ * Google Drive Configuration
+ * Folder ID: 1Kb5CFlzIDmv_p7FRYZ6XzVyte0Vvvf78
+ */
+const DRIVE_CONFIG = {
+  ROOT_FOLDER_ID: '1Kb5CFlzIDmv_p7FRYZ6XzVyte0Vvvf78',
+  FOLDERS: {
+    SCREENSHOTS: 'Screenshots',
+    ATTENDANCE: 'Attendance',
+    LOOT: 'Loot',
+    LEARNING: 'Learning_Data',
+    PREDICTIONS: 'Predictions',
+    ANALYTICS: 'Analytics',
+    BACKUPS: 'Backups',
+    AUDIT: 'Audit_Logs'
+  }
+};
+
+/**
+ * Initialize Google Drive folder structure
+ * Creates organized folders for all bot data
+ * @returns {Object} Folder IDs
+ */
+function initializeDriveFolders() {
+  try {
+    const rootFolder = DriveApp.getFolderById(DRIVE_CONFIG.ROOT_FOLDER_ID);
+    const folderIds = {};
+
+    // Create main categories
+    const screenshotsFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.SCREENSHOTS);
+    const learningFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.LEARNING);
+    const backupsFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.BACKUPS);
+    const auditFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.AUDIT);
+
+    // Create subcategories
+    folderIds.screenshots = {
+      attendance: getOrCreateFolder(screenshotsFolder, DRIVE_CONFIG.FOLDERS.ATTENDANCE),
+      loot: getOrCreateFolder(screenshotsFolder, DRIVE_CONFIG.FOLDERS.LOOT)
+    };
+
+    folderIds.learning = {
+      predictions: getOrCreateFolder(learningFolder, DRIVE_CONFIG.FOLDERS.PREDICTIONS),
+      analytics: getOrCreateFolder(learningFolder, DRIVE_CONFIG.FOLDERS.ANALYTICS)
+    };
+
+    folderIds.backups = backupsFolder.getId();
+    folderIds.audit = auditFolder.getId();
+
+    Logger.log('✅ Drive folder structure initialized');
+    return createResponse('ok', 'Folders initialized', folderIds);
+
+  } catch (err) {
+    Logger.log('❌ Error initializing Drive folders: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Get or create a folder by name
+ * @param {Folder} parentFolder - Parent folder object
+ * @param {string} folderName - Name of folder to get/create
+ * @returns {Folder} Folder object
+ */
+function getOrCreateFolder(parentFolder, folderName) {
+  const folders = parentFolder.getFoldersByName(folderName);
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+  return parentFolder.createFolder(folderName);
+}
+
+/**
+ * Get date-based folder (creates if doesn't exist)
+ * @param {Folder} parentFolder - Parent folder
+ * @param {Date} date - Date for folder name
+ * @returns {Folder} Date folder
+ */
+function getDateFolder(parentFolder, date) {
+  const dateFolderName = Utilities.formatDate(date, CONFIG.TIMEZONE, 'yyyy-MM-dd');
+  return getOrCreateFolder(parentFolder, dateFolderName);
+}
+
+// ===========================================================
+// SCREENSHOT ARCHIVE SYSTEM
+// ===========================================================
+
+/**
+ * Upload screenshot to Google Drive
+ * Called when attendance or loot screenshots are submitted
+ * @param {Object} data - { imageUrl, type, username, bossName, timestamp }
+ * @returns {Object} Response with file ID
+ */
+function uploadScreenshot(data) {
+  try {
+    const { imageUrl, type, username, bossName, timestamp } = data;
+
+    // Initialize folder structure
+    const rootFolder = DriveApp.getFolderById(DRIVE_CONFIG.ROOT_FOLDER_ID);
+    const screenshotsFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.SCREENSHOTS);
+    const typeFolder = getOrCreateFolder(screenshotsFolder, type === 'attendance' ? DRIVE_CONFIG.FOLDERS.ATTENDANCE : DRIVE_CONFIG.FOLDERS.LOOT);
+    const dateFolder = getDateFolder(typeFolder, new Date(timestamp || Date.now()));
+
+    // Download image from Discord URL
+    const response = UrlFetchApp.fetch(imageUrl);
+    const blob = response.getBlob();
+
+    // Generate filename
+    const now = new Date(timestamp || Date.now());
+    const dateStr = Utilities.formatDate(now, CONFIG.TIMEZONE, 'yyyy-MM-dd_HH-mm-ss');
+    const filename = `${type}_${username}_${bossName || 'loot'}_${dateStr}.png`;
+
+    // Upload to Drive
+    const file = dateFolder.createFile(blob.setName(filename));
+
+    Logger.log(`📁 Screenshot uploaded: ${filename}`);
+
+    return createResponse('ok', 'Screenshot uploaded', {
+      fileId: file.getId(),
+      fileUrl: file.getUrl(),
+      filename: filename
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error uploading screenshot: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+// ===========================================================
+// LEARNING DATA EXPORTS (ENHANCED FOR ML)
+// ===========================================================
+
+/**
+ * Export detailed learning data to Google Drive
+ * Includes all predictions with features, confidence, and outcomes
+ * @param {Object} data - Optional filters
+ * @returns {Object} Response with export details
+ */
+function exportLearningData(data) {
+  try {
+    const learningSheet = getBotLearningSheet();
+    const allData = learningSheet.getDataRange().getValues();
+    const headers = allData[0];
+    const rows = allData.slice(1);
+
+    // Parse filters
+    const filters = data.filters || {};
+    const type = filters.type || 'all';
+    const startDate = filters.startDate ? new Date(filters.startDate) : null;
+    const endDate = filters.endDate ? new Date(filters.endDate) : null;
+
+    // Filter data
+    let filteredRows = rows;
+
+    if (type !== 'all') {
+      filteredRows = filteredRows.filter(row => row[1] === type); // Type column
+    }
+
+    if (startDate || endDate) {
+      filteredRows = filteredRows.filter(row => {
+        const rowDate = new Date(row[0]); // Timestamp column
+        if (startDate && rowDate < startDate) return false;
+        if (endDate && rowDate > endDate) return false;
+        return true;
+      });
+    }
+
+    // Create detailed JSON export
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      totalPredictions: filteredRows.length,
+      filters: filters,
+      predictions: filteredRows.map(row => ({
+        timestamp: row[0],
+        type: row[1],
+        target: row[2],
+        predicted: row[3],
+        actual: row[4],
+        accuracy: row[5],
+        confidence: row[6],
+        features: row[7] ? JSON.parse(row[7]) : {},
+        status: row[8],
+        notes: row[9]
+      })),
+      summary: {
+        completed: filteredRows.filter(r => r[8] === 'completed').length,
+        pending: filteredRows.filter(r => r[8] === 'pending').length,
+        averageAccuracy: calculateAverageAccuracy(filteredRows),
+        byType: groupByType(filteredRows)
+      }
+    };
+
+    // Save to Drive
+    const rootFolder = DriveApp.getFolderById(DRIVE_CONFIG.ROOT_FOLDER_ID);
+    const learningFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.LEARNING);
+    const analyticsFolder = getOrCreateFolder(learningFolder, DRIVE_CONFIG.FOLDERS.ANALYTICS);
+    const dateFolder = getDateFolder(analyticsFolder, new Date());
+
+    const filename = `learning_export_${Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'yyyy-MM-dd_HH-mm-ss')}.json`;
+    const file = dateFolder.createFile(filename, JSON.stringify(exportData, null, 2), MimeType.PLAIN_TEXT);
+
+    Logger.log(`📊 Learning data exported: ${filteredRows.length} predictions`);
+
+    return createResponse('ok', 'Learning data exported', {
+      fileId: file.getId(),
+      fileUrl: file.getUrl(),
+      filename: filename,
+      recordCount: filteredRows.length
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error exporting learning data: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Calculate average accuracy from rows
+ */
+function calculateAverageAccuracy(rows) {
+  const completedRows = rows.filter(r => r[8] === 'completed' && r[5] !== '');
+  if (completedRows.length === 0) return 0;
+  const sum = completedRows.reduce((acc, r) => acc + (parseFloat(r[5]) || 0), 0);
+  return Math.round((sum / completedRows.length) * 100) / 100;
+}
+
+/**
+ * Group predictions by type with stats
+ */
+function groupByType(rows) {
+  const types = {};
+
+  rows.forEach(row => {
+    const type = row[1];
+    if (!types[type]) {
+      types[type] = { total: 0, completed: 0, pending: 0, accuracy: [] };
+    }
+    types[type].total++;
+    if (row[8] === 'completed') {
+      types[type].completed++;
+      if (row[5] !== '') types[type].accuracy.push(parseFloat(row[5]));
+    } else {
+      types[type].pending++;
+    }
+  });
+
+  // Calculate average accuracy per type
+  Object.keys(types).forEach(type => {
+    const accuracyArray = types[type].accuracy;
+    types[type].avgAccuracy = accuracyArray.length > 0
+      ? Math.round((accuracyArray.reduce((a, b) => a + b, 0) / accuracyArray.length) * 100) / 100
+      : 0;
+    delete types[type].accuracy; // Remove raw array
+  });
+
+  return types;
+}
+
+/**
+ * Export prediction features for ML training
+ * Exports features in format suitable for ML analysis
+ */
+function exportPredictionFeatures(data) {
+  try {
+    const learningSheet = getBotLearningSheet();
+    const allData = learningSheet.getDataRange().getValues();
+    const rows = allData.slice(1);
+
+    // Extract completed predictions with features
+    const trainingData = rows
+      .filter(row => row[8] === 'completed' && row[7]) // Has features and completed
+      .map(row => {
+        const features = JSON.parse(row[7]);
+        return {
+          type: row[1],
+          target: row[2],
+          predicted: row[3],
+          actual: row[4],
+          accuracy: row[5],
+          confidence: row[6],
+          features: features,
+          // Flatten features for easier ML processing
+          flatFeatures: {
+            ...features,
+            label: row[4], // Actual value is the label
+            prediction: row[3]
+          }
+        };
+      });
+
+    // Save to Drive
+    const rootFolder = DriveApp.getFolderById(DRIVE_CONFIG.ROOT_FOLDER_ID);
+    const learningFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.LEARNING);
+    const analyticsFolder = getOrCreateFolder(learningFolder, DRIVE_CONFIG.FOLDERS.ANALYTICS);
+    const filename = `ml_training_data_${Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'yyyy-MM-dd')}.json`;
+
+    const file = analyticsFolder.createFile(filename, JSON.stringify(trainingData, null, 2), MimeType.PLAIN_TEXT);
+
+    Logger.log(`🤖 ML training data exported: ${trainingData.length} samples`);
+
+    return createResponse('ok', 'ML training data exported', {
+      fileId: file.getId(),
+      fileUrl: file.getUrl(),
+      sampleCount: trainingData.length
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error exporting ML training data: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+// ===========================================================
+// AUTOMATED BACKUP SYSTEM
+// ===========================================================
+
+/**
+ * Create daily backup of all important sheets
+ * Should be triggered daily via time-driven trigger
+ */
+function createDailyBackup() {
+  try {
+    Logger.log('💾 Starting daily backup...');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const rootFolder = DriveApp.getFolderById(DRIVE_CONFIG.ROOT_FOLDER_ID);
+    const backupsFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.BACKUPS);
+    const dateFolder = getDateFolder(backupsFolder, new Date());
+
+    const sheetsToBackup = [
+      'BiddingPoints',
+      'TotalAttendance',
+      'ForDistribution',
+      'BiddingItems',
+      'BotLearning',
+      'Queue'
+    ];
+
+    const backupData = {
+      timestamp: new Date().toISOString(),
+      sheets: {}
+    };
+
+    sheetsToBackup.forEach(sheetName => {
+      const sheet = ss.getSheetByName(sheetName);
+      if (sheet) {
+        const data = sheet.getDataRange().getValues();
+        backupData.sheets[sheetName] = data;
+        Logger.log(`  ✓ Backed up ${sheetName} (${data.length} rows)`);
+      }
+    });
+
+    // Also backup current week sheet
+    const currentWeekSheet = getCurrentWeekSheetName();
+    const weekSheet = ss.getSheetByName(currentWeekSheet);
+    if (weekSheet) {
+      backupData.sheets[currentWeekSheet] = weekSheet.getDataRange().getValues();
+      Logger.log(`  ✓ Backed up ${currentWeekSheet}`);
+    }
+
+    // Save to Drive
+    const filename = `backup_${Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'yyyy-MM-dd_HH-mm-ss')}.json`;
+    const file = dateFolder.createFile(filename, JSON.stringify(backupData, null, 2), MimeType.PLAIN_TEXT);
+
+    Logger.log(`✅ Daily backup completed: ${filename}`);
+    Logger.log(`📁 File: ${file.getUrl()}`);
+
+    // Cleanup old backups (keep last 30 days)
+    cleanupOldBackups(backupsFolder);
+
+    return createResponse('ok', 'Backup completed', {
+      fileId: file.getId(),
+      fileUrl: file.getUrl(),
+      sheetsCount: Object.keys(backupData.sheets).length
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error creating backup: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Cleanup backups older than 30 days
+ */
+function cleanupOldBackups(backupsFolder) {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const folders = backupsFolder.getFolders();
+    let deletedCount = 0;
+
+    while (folders.hasNext()) {
+      const folder = folders.next();
+      const folderDate = new Date(folder.getName()); // Assumes YYYY-MM-DD format
+
+      if (folderDate < thirtyDaysAgo) {
+        folder.setTrashed(true);
+        deletedCount++;
+      }
+    }
+
+    if (deletedCount > 0) {
+      Logger.log(`🗑️ Cleaned up ${deletedCount} old backup folders`);
+    }
+  } catch (err) {
+    Logger.log('⚠️ Error cleaning old backups: ' + err.toString());
+  }
+}
+
+// ===========================================================
+// AUDIT TRAIL SYSTEM
+// ===========================================================
+
+/**
+ * Log admin action to audit trail
+ * @param {Object} data - { action, username, details, timestamp }
+ */
+function logAuditTrail(data) {
+  try {
+    const { action, username, details, timestamp } = data;
+
+    const rootFolder = DriveApp.getFolderById(DRIVE_CONFIG.ROOT_FOLDER_ID);
+    const auditFolder = getOrCreateFolder(rootFolder, DRIVE_CONFIG.FOLDERS.AUDIT);
+    const dateFolder = getDateFolder(auditFolder, new Date(timestamp || Date.now()));
+
+    // Get or create today's audit log file
+    const dateStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'yyyy-MM-dd');
+    const filename = `audit_${dateStr}.jsonl`; // JSON Lines format
+
+    const files = dateFolder.getFilesByName(filename);
+    let file;
+
+    if (files.hasNext()) {
+      file = files.next();
+      const existingContent = file.getBlob().getDataAsString();
+      const newEntry = JSON.stringify({
+        timestamp: timestamp || new Date().toISOString(),
+        action: action,
+        username: username,
+        details: details
+      });
+      file.setContent(existingContent + '\n' + newEntry);
+    } else {
+      const newEntry = JSON.stringify({
+        timestamp: timestamp || new Date().toISOString(),
+        action: action,
+        username: username,
+        details: details
+      });
+      file = dateFolder.createFile(filename, newEntry, MimeType.PLAIN_TEXT);
+    }
+
+    Logger.log(`📝 Audit logged: ${action} by ${username}`);
+
+    return createResponse('ok', 'Audit logged');
+
+  } catch (err) {
+    Logger.log('❌ Error logging audit: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Get current week sheet name
+ */
+function getCurrentWeekSheetName() {
+  const now = new Date();
+  const sunday = new Date(now);
+  sunday.setDate(sunday.getDate() - sunday.getDay());
+  return CONFIG.SHEET_NAME_PREFIX + Utilities.formatDate(sunday, CONFIG.TIMEZONE, 'yyyyMMdd');
+}
+
+// ===========================================================
+// DRIVE API ACTIONS (Add to doPost handler)
+// ===========================================================
+
+// ===========================================================
+// AUTOMATED TIME-DRIVEN TRIGGERS
+// ===========================================================
+
+/**
+ * AUTOMATED DAILY BACKUP
+ * Trigger: Time-driven > Day timer > 12am-1am (Manila time)
+ *
+ * This runs automatically every day at midnight to backup all sheets.
+ * Survives Discord bot restarts/crashes since it runs from Apps Script.
+ */
+function dailyAutomatedBackup() {
+  try {
+    Logger.log('🔄 [AUTOMATED] Running daily backup...');
+    const result = createDailyBackup();
+
+    if (result.status === 'ok') {
+      Logger.log(`✅ [AUTOMATED] Backup completed: ${result.data.sheetsCount} sheets`);
+    } else {
+      Logger.log(`❌ [AUTOMATED] Backup failed: ${result.message}`);
+    }
+  } catch (err) {
+    Logger.log('❌ [AUTOMATED] Error in daily backup: ' + err.toString());
+  }
+}
+
+/**
+ * AUTOMATED WEEKLY LEARNING DATA EXPORT
+ * Trigger: Time-driven > Week timer > Every Monday > 2am-3am (Manila time)
+ *
+ * Exports all learning data for the previous week for analysis.
+ * Runs automatically regardless of bot status.
+ */
+function weeklyLearningExport() {
+  try {
+    Logger.log('🔄 [AUTOMATED] Running weekly learning export...');
+
+    // Export all learning data from past 7 days
+    const filters = {
+      startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      endDate: new Date().toISOString()
+    };
+
+    const learningResult = exportLearningData({ filters });
+    const mlResult = exportPredictionFeatures({});
+
+    if (learningResult.status === 'ok') {
+      Logger.log(`✅ [AUTOMATED] Learning export completed: ${learningResult.data.recordCount} records`);
+    }
+
+    if (mlResult.status === 'ok') {
+      Logger.log(`✅ [AUTOMATED] ML export completed: ${mlResult.data.sampleCount} samples`);
+    }
+  } catch (err) {
+    Logger.log('❌ [AUTOMATED] Error in weekly export: ' + err.toString());
+  }
+}
+
+/**
+ * SETUP INSTRUCTIONS FOR TIME-DRIVEN TRIGGERS
+ *
+ * In Apps Script Editor:
+ * 1. Click on clock icon (Triggers) in left sidebar
+ * 2. Click "+ Add Trigger" button
+ *
+ * CREATE THESE TRIGGERS:
+ *
+ * Trigger 1: Sunday Weekly Sheet Creation (ALREADY EXISTS)
+ * - Function: sundayWeeklySheetCreation
+ * - Event source: Time-driven
+ * - Type: Week timer
+ * - Day of week: Sunday
+ * - Time of day: 12am-1am
+ *
+ * Trigger 2: Daily Automated Backup (NEW!)
+ * - Function: dailyAutomatedBackup
+ * - Event source: Time-driven
+ * - Type: Day timer
+ * - Time of day: 12am-1am
+ *
+ * Trigger 3: Weekly Learning Export (NEW!)
+ * - Function: weeklyLearningExport
+ * - Event source: Time-driven
+ * - Type: Week timer
+ * - Day of week: Monday
+ * - Time of day: 2am-3am
+ *
+ * Trigger 4: onEdit (ALREADY EXISTS)
+ * - Function: onEdit
+ * - Event source: From spreadsheet
+ * - Event type: On edit
+ *
+ * All triggers run in Manila timezone (Asia/Manila) and operate
+ * independently of Discord bot status - they run from Google's
+ * servers, so they survive Koyeb restarts/crashes.
+ */
 
 // ===========================================================
 // OPTIMIZED SHEET CREATION WITH AUTO-LOGGING

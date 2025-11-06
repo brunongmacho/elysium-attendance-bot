@@ -379,6 +379,55 @@ class SheetAPI {
   }
 
   // ========================================================================
+  // GOOGLE DRIVE METHODS (Learning & Data Storage)
+  // ========================================================================
+
+  /**
+   * Initialize Google Drive folder structure
+   */
+  async initializeDriveFolders() {
+    return await this.call('initializeDriveFolders', {});
+  }
+
+  /**
+   * Upload screenshot to Google Drive
+   * @param {Object} data - { imageUrl, type, username, bossName, timestamp }
+   */
+  async uploadScreenshot(data) {
+    return await this.call('uploadScreenshot', data);
+  }
+
+  /**
+   * Export learning data to Google Drive
+   * @param {Object} filters - Optional filters { type, startDate, endDate }
+   */
+  async exportLearningData(filters = {}) {
+    return await this.call('exportLearningData', { filters });
+  }
+
+  /**
+   * Export prediction features for ML training
+   */
+  async exportPredictionFeatures() {
+    return await this.call('exportPredictionFeatures', {});
+  }
+
+  /**
+   * Create daily backup of all sheets
+   */
+  async createDailyBackup() {
+    return await this.call('createDailyBackup', {});
+  }
+
+  /**
+   * Log admin action to audit trail
+   * @param {Object} data - { action, username, details, timestamp }
+   */
+  async logAuditTrail(data) {
+    return await this.call('logAuditTrail', data);
+  }
+
+  // ========================================================================
   // METRICS & MONITORING
   // ========================================================================
 

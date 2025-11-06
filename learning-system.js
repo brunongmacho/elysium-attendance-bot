@@ -52,6 +52,12 @@ const LEARNING_CONFIG = {
 
   // Cache duration (5 minutes)
   CACHE_DURATION: 5 * 60 * 1000,
+
+  // ENHANCED: With 60GB storage, we can store MUCH more data
+  STORE_RICH_FEATURES: true,
+  INCLUDE_MARKET_STATE: true,
+  INCLUDE_TEMPORAL_CONTEXT: true,
+  INCLUDE_BEHAVIORAL_PATTERNS: true,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -79,16 +85,19 @@ class LearningSystem {
    */
   async savePrediction(type, target, predicted, confidence, features = {}) {
     try {
+      // ENHANCED: With 60GB storage, enrich features with comprehensive context
+      const enrichedFeatures = await this.enrichFeaturesWithContext(features, type, target);
+
       const response = await this.sheetAPI.savePredictionForLearning({
         type,
         target,
         predicted,
         confidence,
-        features,
+        features: enrichedFeatures,
       });
 
       if (response.status === 'ok') {
-        console.log(`[LEARNING] 📚 Saved ${type} prediction for ${target}`);
+        console.log(`[LEARNING] 📚 Saved ${type} prediction for ${target} (${Object.keys(enrichedFeatures).length} features)`);
         return response.data;
       } else {
         console.error('[LEARNING] ❌ Failed to save prediction:', response.message);
@@ -98,6 +107,123 @@ class LearningSystem {
       console.error('[LEARNING] ❌ Error saving prediction:', error);
       return null;
     }
+  }
+
+  /**
+   * ENHANCED: Enrich features with temporal, market, and behavioral context
+   * With 60GB storage, we can store comprehensive data for robust ML
+   * @param {Object} baseFeatures - Base features from prediction
+   * @param {string} type - Prediction type
+   * @param {string} target - Prediction target
+   * @returns {Promise<Object>} Enriched features
+   */
+  async enrichFeaturesWithContext(baseFeatures, type, target) {
+    const enriched = { ...baseFeatures };
+
+    // TEMPORAL CONTEXT (when prediction was made)
+    if (LEARNING_CONFIG.INCLUDE_TEMPORAL_CONTEXT) {
+      const now = new Date();
+      enriched.temporal = {
+        timestamp: now.toISOString(),
+        timestampUnix: now.getTime(),
+        dayOfWeek: now.getDay(), // 0 = Sunday, 6 = Saturday
+        dayName: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][now.getDay()],
+        hour: now.getHours(),
+        isWeekend: now.getDay() === 0 || now.getDay() === 6,
+        isAuctionDay: now.getDay() === 6, // Saturday
+        weekOfYear: this.getWeekNumber(now),
+        monthOfYear: now.getMonth() + 1,
+        quarterOfYear: Math.floor(now.getMonth() / 3) + 1,
+      };
+    }
+
+    // MARKET STATE (current guild economy)
+    if (LEARNING_CONFIG.INCLUDE_MARKET_STATE) {
+      try {
+        const biddingData = await this.sheetAPI.getBiddingPoints();
+        if (biddingData && biddingData.data) {
+          const points = biddingData.data.map(m => m.pointsLeft || 0);
+          const consumed = biddingData.data.map(m => m.pointsConsumed || 0);
+
+          enriched.marketState = {
+            totalMembers: biddingData.data.length,
+            avgPointsPerMember: points.reduce((a, b) => a + b, 0) / points.length,
+            medianPoints: this.median(points),
+            totalPointsInEconomy: points.reduce((a, b) => a + b, 0),
+            avgPointsConsumed: consumed.reduce((a, b) => a + b, 0) / consumed.length,
+            economyActivity: consumed.reduce((a, b) => a + b, 0) / (points.reduce((a, b) => a + b, 0) + consumed.reduce((a, b) => a + b, 0)),
+          };
+        }
+      } catch (e) {
+        // Silently skip if market state unavailable
+      }
+    }
+
+    // BEHAVIORAL PATTERNS (recent activity)
+    if (LEARNING_CONFIG.INCLUDE_BEHAVIORAL_PATTERNS && type === 'price_prediction') {
+      try {
+        const forDist = await this.sheetAPI.getForDistribution();
+        if (forDist && forDist.data) {
+          const recent = forDist.data.slice(-20); // Last 20 auctions
+          const itemAuctions = recent.filter(a => a.item === target);
+
+          enriched.behavioral = {
+            recentAuctions: recent.length,
+            targetItemFrequency: itemAuctions.length,
+            avgRecentPrice: recent.reduce((a, b) => a + (b.price || 0), 0) / recent.length,
+            priceVolatility: this.calculateVolatility(recent.map(a => a.price || 0)),
+            daysSinceLast: itemAuctions.length > 0
+              ? Math.floor((Date.now() - new Date(itemAuctions[itemAuctions.length - 1].timestamp).getTime()) / (1000 * 60 * 60 * 24))
+              : null,
+          };
+        }
+      } catch (e) {
+        // Silently skip if behavioral data unavailable
+      }
+    }
+
+    // Add metadata
+    enriched._meta = {
+      enrichmentVersion: '1.0',
+      baseFeatureCount: Object.keys(baseFeatures).length,
+      totalFeatureCount: Object.keys(enriched).length,
+      enrichedAt: new Date().toISOString(),
+    };
+
+    return enriched;
+  }
+
+  /**
+   * Helper: Calculate median of array
+   */
+  median(arr) {
+    if (arr.length === 0) return 0;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
+  }
+
+  /**
+   * Helper: Calculate price volatility (standard deviation)
+   */
+  calculateVolatility(prices) {
+    if (prices.length < 2) return 0;
+    const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+    const variance = prices.reduce((sum, price) => sum + Math.pow(price - avg, 2), 0) / prices.length;
+    return Math.sqrt(variance);
+  }
+
+  /**
+   * Helper: Get ISO week number
+   */
+  getWeekNumber(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   }
 
   /**
