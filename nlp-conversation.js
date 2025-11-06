@@ -723,31 +723,46 @@ class ConversationalAI {
     // ASSEMBLY LINE - Build the perfect roast!
     // ═══════════════════════════════════════════════════════════════════════
 
-    // If we have complete roasts, mix them in
-    if (completeRoasts.length > 0) {
-      return pick(completeRoasts);
-    }
-
     // Build a modular roast
     let opening = '';
     let statCall = '';
     let burn = '';
 
-    // Pick opening
+    // IMPROVED RANDOMIZATION: Mix complete roasts with modular roasts!
+    // 40% chance to use complete roast (if available)
+    // 60% chance to use mix-and-match system for more variety
+    const useCompleteRoast = completeRoasts.length > 0 && Math.random() < 0.4;
+
+    if (useCompleteRoast) {
+      return pick(completeRoasts);
+    }
+
+    // Pick opening (randomized across 4 types)
     const openingType = pick(['shock', 'question', 'sarcastic', 'direct']);
     opening = pick(openings[openingType]);
 
-    // Pick stat callout based on what we have
+    // IMPROVED: Collect ALL applicable stat callouts, then randomly pick one
+    // This creates much more variety instead of always using the first match
+    const availableStatCallouts = [];
+
     if (stats.points !== null && stats.points < 100) {
-      statCall = pick(lowPointsCallouts);
-    } else if (stats.points !== null && stats.points < 300) {
-      statCall = pick(medPointsCallouts);
-    } else if (stats.attendanceRank && stats.totalUsers > 0) {
-      statCall = pick(rankCallouts);
-    } else if (stats.attendancePoints !== null && stats.attendancePoints < 50) {
-      statCall = pick(attendanceCallouts);
+      availableStatCallouts.push(...lowPointsCallouts);
+    }
+    if (stats.points !== null && stats.points < 300) {
+      availableStatCallouts.push(...medPointsCallouts);
+    }
+    if (stats.attendanceRank && stats.totalUsers > 0) {
+      availableStatCallouts.push(...rankCallouts);
+    }
+    if (stats.attendancePoints !== null && stats.attendancePoints < 50) {
+      availableStatCallouts.push(...attendanceCallouts);
+    }
+
+    // Pick stat callout from all available options
+    if (availableStatCallouts.length > 0) {
+      statCall = pick(availableStatCallouts);
     } else if (!stats.points && !stats.attendanceRank) {
-      // No data
+      // No data - use dedicated roasts
       return pick([
         `${mention}? WHO?! 🤔 You're not even in my database! Bagong member ka lang at akala mo alam mo na lahat?! 👶`,
         `Can't find ${nickname}'s stats! 👻 Either you're SO bad the system deleted you OR you don't exist! 💀`,
@@ -756,6 +771,10 @@ class ConversationalAI {
         `${pick(openings.shock)} ${mention}, wala kang data pero ang lakas ng trash talk! Exist ka muna! 📊`,
       ]);
     } else {
+      // Decent stats - can still use mix-and-match OR complete roast
+      if (completeRoasts.length > 0 && Math.random() < 0.5) {
+        return pick(completeRoasts);
+      }
       // Decent stats but still trash talking
       return pick([
         `Oh wow! ${mention} got DECENT stats but TRASH personality! 😬 Money can't buy class! 💳`,
@@ -770,8 +789,26 @@ class ConversationalAI {
     // Pick a burn
     burn = pick(burns);
 
-    // Combine everything!
-    return combine(opening, statCall, burn);
+    // IMPROVED COMBINATION: Randomly decide which components to use
+    // 70% chance: Use all 3 components (opening + stat + burn)
+    // 20% chance: Use 2 components (opening + stat OR stat + burn)
+    // 10% chance: Use 1 component (just stat callout)
+    const combinationRoll = Math.random();
+
+    if (combinationRoll < 0.7) {
+      // Use all 3 components
+      return combine(opening, statCall, burn);
+    } else if (combinationRoll < 0.9) {
+      // Use 2 components (random choice)
+      if (Math.random() < 0.5) {
+        return combine(opening, statCall, ''); // opening + stat
+      } else {
+        return combine('', statCall, burn); // stat + burn
+      }
+    } else {
+      // Use just stat callout (bold and standalone)
+      return statCall;
+    }
   }
 
   /**
