@@ -3732,17 +3732,14 @@ client.once(Events.ClientReady, async () => {
 client.on(Events.MessageCreate, async (message) => {
   try {
     // ⚡ PERFORMANCE: Early returns for irrelevant messages
-    // Skip bot messages EXCEPT in attendance threads (other bots may post check-ins)
-    if (message.author.bot) {
-      const inAttendanceThread = message.channel.isThread() &&
-        message.channel.parentId === config.attendance_channel_id;
-      if (!inAttendanceThread) return;
-    }
+    // NOTE: Bot message filtering happens AFTER timer server check (line ~3888)
+    // This allows timer bot to create spawn threads before being blocked
     if (!message.guild) return; // Skip DMs immediately
-    if (message.guild.id !== config.main_guild_id) return; // Skip wrong guild
+    if (message.guild.id !== config.main_guild_id && message.guild.id !== config.timer_server_id) return; // Skip wrong guild (allow timer server)
 
     // 🧠 NLP LEARNING: Passive learning from all messages (learns without responding)
-    if (nlpLearningSystem) {
+    // Skip learning from bot messages
+    if (nlpLearningSystem && !message.author.bot) {
       try {
         await nlpLearningSystem.learnFromMessage(message);
       } catch (error) {
@@ -3752,8 +3749,10 @@ client.on(Events.MessageCreate, async (message) => {
 
     // 🧹 BIDDING CHANNEL PROTECTION: Delete non-admin messages immediately
     // EXCEPT for member commands (!mypoints, !bidstatus, etc.)
+    // Skip for bot messages (will be handled later)
     if (
-      message.channel.id === config.bidding_channel_id
+      message.channel.id === config.bidding_channel_id &&
+      !message.author.bot
     ) {
       const member = await message.guild.members
         .fetch(message.author.id)
@@ -3887,10 +3886,18 @@ client.on(Events.MessageCreate, async (message) => {
 
     // Second bot check after timer server handling
     // Allow bot messages in attendance threads (for other bots posting check-ins)
+    // BUT process them separately and exit early (don't allow NLP/command processing)
     if (message.author.bot) {
       const inAttendanceThread = message.channel.isThread() &&
         message.channel.parentId === config.attendance_channel_id;
-      if (!inAttendanceThread) return;
+      if (inAttendanceThread) {
+        // Bot messages in attendance threads are allowed for reading only
+        // Don't process them further (no NLP, no commands, no responses)
+        // Future: Add logic here to parse attendance data from bot messages
+        return;
+      }
+      // All other bot messages are blocked
+      return;
     }
 
     const guild = message.guild;
