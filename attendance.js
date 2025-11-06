@@ -1242,30 +1242,17 @@ async function checkAndAutoCloseThreads(client) {
         // Mark as closed
         spawnInfo.closed = true;
 
-        // Notify in thread
-        await thread.send(
-          `⏰ **AUTO-CLOSED (20 minutes elapsed)**\n\n` +
-          `Attendance window closed to prevent cheating.\n` +
-          `${spawnInfo.members.length} member(s) verified and submitting to Google Sheets...`
-        ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
+        // Check if column already exists to prevent duplicate submissions
+        console.log(`   🔍 Checking if column already exists for ${spawnInfo.boss} at ${spawnInfo.timestamp}...`);
+        const columnExists = await checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
 
-        // Submit to Google Sheets
-        const payload = {
-          action: "submitAttendance",
-          boss: spawnInfo.boss,
-          date: spawnInfo.date,
-          time: spawnInfo.time,
-          timestamp: spawnInfo.timestamp,
-          members: spawnInfo.members,
-        };
-
-        const resp = await postToSheet(payload);
-
-        if (resp.ok) {
-          console.log(`   ✅ Submitted ${spawnInfo.members.length} members to Google Sheets`);
+        if (columnExists) {
+          // Column already exists - skip submission but still clean up thread
+          console.log(`   ⚠️ Column already exists for ${spawnInfo.boss} at ${spawnInfo.timestamp}, skipping submission`);
 
           await thread.send(
-            `✅ Attendance submitted! (${spawnInfo.members.length} members)\n` +
+            `⏰ **AUTO-CLOSED (20 minutes elapsed)**\n\n` +
+            `Attendance already submitted for this spawn.\n` +
             `Thread will be archived now.`
           ).catch(() => {});
 
@@ -1280,14 +1267,14 @@ async function checkAndAutoCloseThreads(client) {
             if (confirmThread) {
               await confirmThread.send(
                 `⏰ **AUTO-CLOSED**: ${spawnInfo.boss} (${spawnInfo.timestamp})\n` +
-                `${spawnInfo.members.length} members submitted after 20-minute window`
+                `Attendance already submitted (duplicate prevented)`
               ).catch(() => {});
               await confirmThread.delete().catch(() => {});
             }
           }
 
           // Archive the thread
-          await thread.setArchived(true, "Auto-closed after 20 minutes").catch(() => {});
+          await thread.setArchived(true, "Auto-closed after 20 minutes - duplicate prevented").catch(() => {});
 
           // Clean up state
           delete activeSpawns[threadId];
@@ -1297,19 +1284,80 @@ async function checkAndAutoCloseThreads(client) {
           closed++;
           closedBosses.push(spawnInfo.boss);
 
-          console.log(`   ✅ Auto-close complete: ${spawnInfo.boss}`);
+          console.log(`   ✅ Auto-close complete (duplicate prevented): ${spawnInfo.boss}`);
         } else {
-          console.log(`   ❌ Failed to submit attendance: ${resp.text || resp.err}`);
+          // Column doesn't exist - proceed with submission
+          console.log(`   ✅ No existing column found, proceeding with submission`);
 
+          // Notify in thread
           await thread.send(
-            `⚠️ **AUTO-CLOSE FAILED**\n\n` +
-            `Could not submit to Google Sheets.\n` +
-            `Error: ${resp.text || resp.err}\n\n` +
-            `**Members (${spawnInfo.members.length}):** ${spawnInfo.members.join(", ")}\n\n` +
-            `Please manually update the sheet.`
-          ).catch(() => {});
+            `⏰ **AUTO-CLOSED (20 minutes elapsed)**\n\n` +
+            `Attendance window closed to prevent cheating.\n` +
+            `${spawnInfo.members.length} member(s) verified and submitting to Google Sheets...`
+          ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
 
-          // Don't delete state if submission failed, so admin can retry
+          // Submit to Google Sheets
+          const payload = {
+            action: "submitAttendance",
+            boss: spawnInfo.boss,
+            date: spawnInfo.date,
+            time: spawnInfo.time,
+            timestamp: spawnInfo.timestamp,
+            members: spawnInfo.members,
+          };
+
+          const resp = await postToSheet(payload);
+
+          if (resp.ok) {
+            console.log(`   ✅ Submitted ${spawnInfo.members.length} members to Google Sheets`);
+
+            await thread.send(
+              `✅ Attendance submitted! (${spawnInfo.members.length} members)\n` +
+              `Thread will be archived now.`
+            ).catch(() => {});
+
+            // Clean up reactions
+            await cleanupAllThreadReactions(thread);
+
+            // Close confirmation thread if it exists
+            if (spawnInfo.confirmThreadId) {
+              const confirmThread = await guild.channels
+                .fetch(spawnInfo.confirmThreadId)
+                .catch(() => null);
+              if (confirmThread) {
+                await confirmThread.send(
+                  `⏰ **AUTO-CLOSED**: ${spawnInfo.boss} (${spawnInfo.timestamp})\n` +
+                  `${spawnInfo.members.length} members submitted after 20-minute window`
+                ).catch(() => {});
+                await confirmThread.delete().catch(() => {});
+              }
+            }
+
+            // Archive the thread
+            await thread.setArchived(true, "Auto-closed after 20 minutes").catch(() => {});
+
+            // Clean up state
+            delete activeSpawns[threadId];
+            delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+            delete confirmationMessages[threadId];
+
+            closed++;
+            closedBosses.push(spawnInfo.boss);
+
+            console.log(`   ✅ Auto-close complete: ${spawnInfo.boss}`);
+          } else {
+            console.log(`   ❌ Failed to submit attendance: ${resp.text || resp.err}`);
+
+            await thread.send(
+              `⚠️ **AUTO-CLOSE FAILED**\n\n` +
+              `Could not submit to Google Sheets.\n` +
+              `Error: ${resp.text || resp.err}\n\n` +
+              `**Members (${spawnInfo.members.length}):** ${spawnInfo.members.join(", ")}\n\n` +
+              `Please manually update the sheet.`
+            ).catch(() => {});
+
+            // Don't delete state if submission failed, so admin can retry
+          }
         }
       }
     }

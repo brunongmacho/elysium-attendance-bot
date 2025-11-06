@@ -112,6 +112,7 @@ function doPost(e) {
     if (action === 'getAttendanceState') return getAttendanceState(data);
     if (action === 'saveAttendanceState') return saveAttendanceState(data);
     if (action === 'getAllSpawnColumns') return getAllSpawnColumns(data);
+    if (action === 'getAllWeeklyAttendance') return getAllWeeklyAttendance(data);
 
     // Bidding actions
     if (action === 'getBiddingPointsSummary') return handleGetBiddingPoints(data);
@@ -247,6 +248,81 @@ function getAllSpawnColumns(data) {
   
   Logger.log(`✅ Found ${columns.length} spawn columns in ${weekSheet}`);
   return createResponse('ok', 'Columns fetched', {columns: columns});
+}
+
+/**
+ * Get all spawn columns from ALL weekly attendance sheets
+ * Used for spawn prediction - analyzes historical patterns across all weeks
+ */
+function getAllWeeklyAttendance(data) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const allSheets = ss.getSheets();
+    const weeklySheets = [];
+
+    // Filter to only weekly attendance sheets (matching pattern ELYSIUM_WEEK_*)
+    for (const sheet of allSheets) {
+      const sheetName = sheet.getName();
+      if (sheetName.startsWith(CONFIG.SHEET_NAME_PREFIX)) {
+        weeklySheets.push(sheet);
+      }
+    }
+
+    if (weeklySheets.length === 0) {
+      Logger.log('⚠️ No weekly attendance sheets found');
+      return createResponse('ok', 'No weekly sheets found', { sheets: [] });
+    }
+
+    const allWeeklyData = [];
+
+    // Extract spawn columns from each weekly sheet
+    for (const sheet of weeklySheets) {
+      const sheetName = sheet.getName();
+      const lastCol = sheet.getLastColumn();
+
+      if (lastCol < COLUMNS.FIRST_SPAWN) {
+        // No spawn columns in this sheet
+        allWeeklyData.push({
+          weekSheet: sheetName,
+          columns: []
+        });
+        continue;
+      }
+
+      const spawnData = sheet.getRange(1, COLUMNS.FIRST_SPAWN, 2, lastCol - COLUMNS.FIRST_SPAWN + 1).getValues();
+      const row1 = spawnData[0]; // Timestamps
+      const row2 = spawnData[1]; // Boss names
+
+      const columns = [];
+
+      for (let i = 0; i < row1.length; i++) {
+        const timestamp = (row1[i] || '').toString().trim();
+        const boss = (row2[i] || '').toString().trim().toUpperCase();
+
+        if (timestamp && boss) {
+          columns.push({
+            timestamp: timestamp,
+            boss: boss,
+            column: i + COLUMNS.FIRST_SPAWN
+          });
+        }
+      }
+
+      allWeeklyData.push({
+        weekSheet: sheetName,
+        columns: columns
+      });
+    }
+
+    const totalSpawns = allWeeklyData.reduce((sum, week) => sum + week.columns.length, 0);
+    Logger.log(`✅ Found ${totalSpawns} total spawns across ${weeklySheets.length} weekly sheets`);
+
+    return createResponse('ok', 'All weekly attendance fetched', { sheets: allWeeklyData });
+
+  } catch (err) {
+    Logger.log('❌ Error in getAllWeeklyAttendance: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
 }
 
 // FUZZY MATCHING FUNCTIONS FOR LOOT NAME AUTO-CORRECTION

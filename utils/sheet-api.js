@@ -445,6 +445,14 @@ class SheetAPI {
     return await this.call('needsBootstrap', {});
   }
 
+  /**
+   * Get all weekly attendance data for spawn prediction
+   * Fetches all spawn columns from all weekly sheets
+   */
+  async getAllWeeklyAttendance() {
+    return await this.call('getAllWeeklyAttendance', {});
+  }
+
   // ========================================================================
   // METRICS & MONITORING
   // ========================================================================
