@@ -17,8 +17,9 @@
  *    - Records unrecognized phrases for review
  *    - No spam, no unwanted responses
  *
- * 2. MENTION-BASED ACTIVATION
- *    - Only responds when bot is @mentioned
+ * 2. SMART ACTIVATION
+ *    - Responds when bot is @mentioned (any channel)
+ *    - Auto-responds in admin-logs channel/threads
  *    - Auto-responds in auction threads (for bids)
  *    - Prevents interference with normal chat
  *
@@ -51,6 +52,7 @@ const LEARNING_CONFIG = {
   // Activation modes
   activationModes: {
     respondOnMention: true,        // Respond when bot is @mentioned
+    respondInAdminLogs: true,      // Respond to all commands in admin-logs channel/threads
     respondInAuctionThreads: true, // Auto-respond to bids in auction threads
     passiveLearning: true,         // Learn from all messages (always on)
   },
@@ -137,7 +139,7 @@ class NLPLearningSystem {
 
     console.log(`🧠 [NLP Learning] Loaded ${this.learnedPatterns.size} patterns, ${this.userPreferences.size} user profiles`);
     console.log('🧠 [NLP Learning] Passive learning enabled (learns from all messages)');
-    console.log('🧠 [NLP Learning] Mention-based activation enabled (responds only when @mentioned)');
+    console.log('🧠 [NLP Learning] Active in: admin-logs, auction threads, @mentions');
 
     return this;
   }
@@ -153,6 +155,14 @@ class NLPLearningSystem {
       if (botMentioned) {
         return true;
       }
+    }
+
+    // In admin-logs channel or thread (respond to all natural language commands)
+    const isAdminLogs = message.channel.id === this.config.admin_logs_channel_id ||
+                        (message.channel.isThread() && message.channel.parentId === this.config.admin_logs_channel_id);
+
+    if (isAdminLogs) {
+      return true;
     }
 
     // In auction thread (auto-respond for bids)
