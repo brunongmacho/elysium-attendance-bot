@@ -1869,6 +1869,8 @@ const commandHandlers = {
     }
     const success = auctioneering.extendCurrentItem(mins);
     if (success) {
+      // CRITICAL: Reschedule timers to reflect new endTime
+      auctioneering.rescheduleItemTimers(client, config, message.channel);
       await message.reply(`⏱️ Extended by ${mins} minute(s).`);
     }
   },

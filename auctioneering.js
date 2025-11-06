@@ -1730,8 +1730,9 @@ async function finalizeSession(client, config, channel) {
 
   if (!auctionState.active) return;
 
-  auctionState.active = false;
-  clearAllTimers();
+  try {
+    auctionState.active = false;
+    clearAllTimers();
 
   // Stop cache auto-refresh timer from bidding module
   if (
@@ -1961,28 +1962,38 @@ async function finalizeSession(client, config, channel) {
     await adminLogs.send({ embeds: [adminEmbed] });
   }
 
-  console.log("🧹 Clearing session data...");
-  auctionState.sessionItems = []; // Clear sold items history
+    console.log("🧹 Clearing session data...");
+    auctionState.sessionItems = []; // Clear sold items history
 
-  // Clear bidding module cache AND locked points
-  // Use existing module-level biddingModule (already required at module init)
-  if (!biddingModule) {
-    biddingModule = require("./bidding.js");
-  }
-  biddingModule.clearPointsCache();
+    // Clear bidding module cache
+    if (!biddingModule) {
+      biddingModule = require("./bidding.js");
+    }
+    biddingModule.clearPointsCache();
 
-  // CRITICAL: Clear all locked points after session
-  const biddingState = biddingModule.getBiddingState();
-  biddingState.lp = {};
-  biddingModule.saveBiddingState();
+    console.log("✅ Session data cleared");
 
-  console.log("✅ All session data cleared, locked points released");
-
-  // Save state if config is available
-  if (cfg && cfg.sheet_webhook_url) {
-    await saveAuctionState(cfg.sheet_webhook_url).catch((err) => {
-      console.error(`${EMOJI.ERROR} Failed to save state:`, err);
-    });
+    // Save state if config is available
+    if (cfg && cfg.sheet_webhook_url) {
+      await saveAuctionState(cfg.sheet_webhook_url).catch((err) => {
+        console.error(`${EMOJI.ERROR} Failed to save state:`, err);
+      });
+    }
+  } finally {
+    // CRITICAL: ALWAYS clear locked points, even if errors occurred
+    // This prevents users from being blocked in future auctions
+    try {
+      if (!biddingModule) {
+        biddingModule = require("./bidding.js");
+      }
+      const biddingState = biddingModule.getBiddingState();
+      biddingState.lp = {};
+      biddingModule.saveBiddingState();
+      console.log("✅ Locked points released");
+    } catch (err) {
+      console.error(`${EMOJI.ERROR} Failed to clear locked points:`, err);
+      // Don't throw - this is cleanup, continue anyway
+    }
   }
 }
 

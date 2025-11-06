@@ -903,7 +903,18 @@ function startCacheAutoRefresh(url) {
   // Set up auto-refresh every 30 minutes
   st.cacheRefreshTimer = setInterval(async () => {
     try {
-      if (st.a && st.a.status === "active") {
+      // Check both bidding mode (st.a) and auctioneering mode
+      const biddingActive = st.a && st.a.status === "active";
+      let auctioneeringActive = false;
+
+      try {
+        const auctioneering = require("./auctioneering.js");
+        auctioneeringActive = auctioneering.getAuctionState().active;
+      } catch (err) {
+        // Module not available or error getting state
+      }
+
+      if (biddingActive || auctioneeringActive) {
         console.log("🔄 Auto-refreshing cache...");
         await loadCache(url);
       } else {
