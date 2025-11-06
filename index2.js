@@ -71,7 +71,7 @@ const bidding = require("./bidding.js");                    // Auction bidding l
 const helpSystem = require("./help-system.js");             // Command help system
 const auctioneering = require("./auctioneering.js");        // Auction management
 const attendance = require("./attendance.js");              // Attendance tracking
-const lootSystem = require("./loot-system.js");             // Loot distribution
+// const lootSystem = require("./loot-system.js");          // Loot distribution (DISABLED: manual loot entry)
 const emergencyCommands = require("./emergency-commands.js"); // Emergency overrides
 const leaderboardSystem = require("./leaderboard-system.js"); // Leaderboards
 const errorHandler = require('./utils/error-handler');      // Centralized error handling
@@ -242,12 +242,12 @@ const client = new Client({
   // Partials - handle uncached entities
   partials: [Partials.Channel, Partials.Message, Partials.Reaction],
 
-  // Memory optimization: Sweep caches regularly to manage 256MB RAM limit
-  // This is critical for long-running bots in memory-constrained environments
+  // Memory optimization: Sweep caches regularly to manage 512MB RAM limit
+  // Optimized for fast message cleanup while maintaining reaction functionality
   sweepers: {
     messages: {
-      interval: 300, // Run every 5 minutes
-      lifetime: 600, // Remove messages older than 10 minutes
+      interval: 180, // Run every 3 minutes (optimized from 5)
+      lifetime: 300, // Remove messages older than 5 minutes (optimized from 10)
     },
     users: {
       interval: 600, // Run every 10 minutes
@@ -1101,10 +1101,10 @@ async function awaitConfirmation(
  * @constant
  */
 const commandHandlers = {
-  // Help command
-  loot: async (message, member, args) => {
-    await lootSystem.handleLootCommand(message, args, client);
-  },
+  // Loot command (DISABLED: manual entry now used)
+  // loot: async (message, member, args) => {
+  //   await lootSystem.handleLootCommand(message, args, client);
+  // },
 
   help: async (message, member) => {
     const args = message.content.trim().split(/\s+/).slice(1);
@@ -3297,7 +3297,7 @@ client.once(Events.ClientReady, async () => {
   auctioneering.initialize(config, isAdmin, bidding, discordCache, intelligenceEngine); // Pass intelligenceEngine
   bidding.initializeBidding(config, isAdmin, auctioneering, discordCache);
   auctioneering.setPostToSheet(attendance.postToSheet); // Use attendance module's postToSheet
-  lootSystem.initialize(config, bossPoints, isAdmin);
+  // lootSystem.initialize(config, bossPoints, isAdmin); // DISABLED: manual loot entry
   emergencyCommands.initialize(
     config,
     attendance,
@@ -4414,17 +4414,17 @@ client.on(Events.MessageCreate, async (message) => {
       const adminCmd = resolveCommandAlias(rawCmd);
       const args = message.content.trim().split(/\s+/).slice(1);
 
-      // LOOT COMMAND - Admin logs threads only
-      const lootCmd = resolveCommandAlias(rawCmd);
-      if (lootCmd === "!loot") {
-        console.log(`🎯 Loot command detected`);
-        await lootSystem.handleLootCommand(
-          message,
-          message.content.trim().split(/\s+/).slice(1),
-          client
-        );
-        return;
-      }
+      // LOOT COMMAND - DISABLED (manual loot entry now used)
+      // const lootCmd = resolveCommandAlias(rawCmd);
+      // if (lootCmd === "!loot") {
+      //   console.log(`🎯 Loot command detected`);
+      //   await lootSystem.handleLootCommand(
+      //     message,
+      //     message.content.trim().split(/\s+/).slice(1),
+      //     client
+      //   );
+      //   return;
+      // }
 
       // Admin logs override commands
       if (

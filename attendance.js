@@ -100,7 +100,7 @@ const TIMING = {
   REACTION_RETRY_ATTEMPTS: 3,         // Number of attempts for adding/removing reactions
   REACTION_RETRY_DELAY: 1000,         // Delay between reaction retry attempts (ms)
   THREAD_AUTO_CLOSE_MINUTES: 20,      // Auto-close threads after this many minutes (prevents cheating)
-  THREAD_AGE_CHECK_INTERVAL: 60000,   // Check thread age every 60 seconds (1 minute)
+  THREAD_AGE_CHECK_INTERVAL: 90000,   // Check thread age every 90 seconds (optimized from 60s)
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -193,10 +193,15 @@ async function postToSheet(payload, retryCount = 0) {
   }
 }
 
+// Column check cache: Reduces redundant Google Sheets API calls during attendance window
+// Cache format: Map<"boss|timestamp", {exists: boolean, cachedAt: timestamp}>
+const columnCheckCache = new Map();
+const COLUMN_CHECK_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 /**
  * Checks if a column already exists for a specific boss spawn to prevent duplicates.
- * First checks local cache (activeColumns), then queries Google Sheets if not found.
- * Uses normalized timestamps to handle format variations.
+ * First checks local cache (activeColumns), then short-term API result cache,
+ * then queries Google Sheets if needed. Uses normalized timestamps to handle format variations.
  *
  * @param {string} boss - Boss name to check
  * @param {string} timestamp - Spawn timestamp in "MM/DD/YY HH:MM" format
@@ -210,6 +215,7 @@ async function postToSheet(payload, retryCount = 0) {
  */
 async function checkColumnExists(boss, timestamp) {
   const normalizedTimestamp = normalizeTimestamp(timestamp);
+  const cacheKey = `${boss.toUpperCase()}|${normalizedTimestamp}`;
 
   // Check activeColumns cache with normalized timestamp comparison
   for (const key of Object.keys(activeColumns)) {
@@ -221,17 +227,33 @@ async function checkColumnExists(boss, timestamp) {
     }
   }
 
-  // Query Google Sheets if not found in cache
+  // Check short-term API result cache (reduces duplicate API calls)
+  if (columnCheckCache.has(cacheKey)) {
+    const cached = columnCheckCache.get(cacheKey);
+    if (Date.now() - cached.cachedAt < COLUMN_CHECK_CACHE_TTL) {
+      return cached.exists;
+    }
+    // Expired cache entry
+    columnCheckCache.delete(cacheKey);
+  }
+
+  // Query Google Sheets if not found in any cache
   const resp = await postToSheet({ action: "checkColumn", boss, timestamp });
+  let exists = false;
+
   if (resp.ok) {
     try {
       const data = JSON.parse(resp.text);
-      return data.exists === true;
+      exists = data.exists === true;
     } catch (e) {
-      return false;
+      exists = false;
     }
   }
-  return false;
+
+  // Cache the result for 5 minutes
+  columnCheckCache.set(cacheKey, { exists, cachedAt: Date.now() });
+
+  return exists;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -945,7 +967,7 @@ async function validateStateConsistency(client) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 let lastAttendanceStateSyncTime = 0;                     // Last sync timestamp
-const ATTENDANCE_STATE_SYNC_INTERVAL = 10 * 60 * 1000;   // 10 minutes
+const ATTENDANCE_STATE_SYNC_INTERVAL = 15 * 60 * 1000;   // 15 minutes (optimized from 10)
 const STATE_CLEANUP_INTERVAL = 30 * 60 * 1000;           // 30 minutes
 const STALE_ENTRY_AGE = 24 * 60 * 60 * 1000;             // 24 hours
 const MAX_PENDING_VERIFICATIONS = 100;                   // Prevent unbounded growth
@@ -1153,7 +1175,7 @@ function cleanupStaleEntries() {
  * console.log("Automatic state sync and cleanup enabled");
  */
 function schedulePeriodicStateSync() {
-  // Sync state to sheets every 10 minutes for crash recovery
+  // Sync state to sheets every 15 minutes for crash recovery (optimized)
   setInterval(async () => {
     try {
       await saveAttendanceStateToSheet(false);
@@ -1173,7 +1195,7 @@ function schedulePeriodicStateSync() {
     }
   }, STATE_CLEANUP_INTERVAL);
 
-  console.log("✅ Scheduled periodic state sync (10min) and cleanup (30min)");
+  console.log("✅ Scheduled periodic state sync (15min) and cleanup (30min)");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
