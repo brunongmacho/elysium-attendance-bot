@@ -445,11 +445,12 @@ class IntelligenceEngine {
    * @param {Array} cachedData.attendanceData - Pre-fetched attendance data
    * @param {Array} cachedData.biddingData - Pre-fetched bidding data
    * @param {Object} cachedData.weeklyAttendance - Pre-fetched weekly attendance data
+   * @param {Array} cachedData.auctionData - Pre-fetched auction/distribution data
    */
   async getMemberProfile(username, cachedData = {}) {
     try {
       // Use cached data if available, otherwise fetch
-      let attendanceData, biddingData;
+      let attendanceData, biddingData, auctionWins;
 
       if (cachedData.attendanceData) {
         attendanceData = cachedData.attendanceData;
@@ -463,6 +464,17 @@ class IntelligenceEngine {
       } else {
         const biddingResponse = await this.sheetAPI.call('getBiddingPoints', {});
         biddingData = biddingResponse?.members ?? [];
+      }
+
+      // Use cached auction data if available to avoid redundant API calls
+      if (cachedData.auctionData) {
+        // Count wins from cached auction data
+        auctionWins = cachedData.auctionData.filter(row =>
+          row.winner && row.winner.toLowerCase() === username.toLowerCase()
+        ).length;
+      } else {
+        // Fall back to individual API call if no cached data
+        auctionWins = await this.getAuctionWinsForMember(username);
       }
 
       const memberAttendance = attendanceData.find(row =>
@@ -490,7 +502,7 @@ class IntelligenceEngine {
           pointsRemaining: memberBidding?.pointsLeft || 0,
           pointsConsumed: memberBidding?.pointsConsumed || 0,
           totalAwarded: (memberBidding?.pointsLeft || 0) + (memberBidding?.pointsConsumed || 0),
-          auctionsWon: await this.getAuctionWinsForMember(username),
+          auctionsWon: auctionWins,
         },
         recentActivity: recentSpawns,
       };
@@ -980,22 +992,24 @@ class IntelligenceEngine {
 
   /**
    * Analyze engagement for all members and identify at-risk members
-   * OPTIMIZED: Fetches all data once instead of per-member to reduce API calls from N*3 to 3
+   * OPTIMIZED: Fetches all data once instead of per-member to reduce API calls from N*4 to 4
    */
   async analyzeAllMembersEngagement() {
     try {
       // Fetch all data ONCE instead of per-member (massive performance improvement)
       console.log('[INTELLIGENCE] Fetching data for all members (optimized batch fetch)...');
 
-      const [biddingResponse, attendanceResponse, weeklyAttendanceResponse] = await Promise.all([
+      const [biddingResponse, attendanceResponse, weeklyAttendanceResponse, auctionResponse] = await Promise.all([
         this.sheetAPI.call('getBiddingPoints', {}),
         this.sheetAPI.call('getTotalAttendance', {}),
         this.sheetAPI.call('getAllWeeklyAttendance', {}),
+        this.sheetAPI.call('getForDistribution', {}, { timeout: 60000 }),
       ]);
 
       const biddingData = biddingResponse?.members ?? [];
       const attendanceData = attendanceResponse?.members ?? [];
       const weeklyAttendance = weeklyAttendanceResponse || {};
+      const auctionData = auctionResponse?.items ?? [];
 
       console.log(`[INTELLIGENCE] Processing ${biddingData.length} members with cached data...`);
 
@@ -1004,6 +1018,7 @@ class IntelligenceEngine {
         attendanceData,
         biddingData,
         weeklyAttendance,
+        auctionData,
       };
 
       const analyses = [];
