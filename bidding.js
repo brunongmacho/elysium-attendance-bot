@@ -632,10 +632,28 @@ async function save(forceSync = false) {
     if (cfg && cfg.sheet_webhook_url && shouldSync) {
       lastSheetSyncTime = now;
       if (forceSync) {
-        // When forceSync is true, await the sync to ensure it completes
+        // When forceSync is true, await the sync with retry logic
         console.log("📊 Forcing immediate state sync to Google Sheets...");
-        await saveBiddingStateToSheet();
-        console.log("✅ State successfully synced to Google Sheets");
+        const maxRetries = 3;
+        let lastError;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            await saveBiddingStateToSheet();
+            console.log("✅ State successfully synced to Google Sheets");
+            break; // Success
+          } catch (err) {
+            lastError = err;
+            if (attempt < maxRetries) {
+              const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s
+              console.warn(`⚠️ Sync attempt ${attempt} failed, retrying in ${delay}ms...`);
+              await new Promise(r => setTimeout(r, delay));
+            }
+          }
+        }
+        if (lastError) {
+          console.error(`❌ All ${maxRetries} sync attempts failed:`, lastError.message);
+          throw new Error(`Failed to sync state after ${maxRetries} attempts`);
+        }
       } else {
         // Background sync (fire-and-forget for periodic saves)
         saveBiddingStateToSheet().catch((err) => {
@@ -1557,14 +1575,25 @@ async function loadBiddingStateFromSheet(url) {
   }
 }
 
-async function finalize(cli, cfg) {
-  const [adm, bch] = await Promise.all([
-    discordCache.getChannel('admin_logs_channel_id'),
-    discordCache.getChannel('bidding_channel_id')
-  ]);
+// CRITICAL: Finalization lock to prevent state corruption
+let finalizationInProgress = false;
 
-  // Stop cache auto-refresh
-  stopCacheAutoRefresh();
+async function finalize(cli, cfg) {
+  // Prevent concurrent finalization or bids during finalization
+  if (finalizationInProgress) {
+    console.warn("⚠️ Finalization already in progress, skipping duplicate call");
+    return;
+  }
+
+  finalizationInProgress = true;
+  try {
+    const [adm, bch] = await Promise.all([
+      discordCache.getChannel('admin_logs_channel_id'),
+      discordCache.getChannel('bidding_channel_id')
+    ]);
+
+    // Stop cache auto-refresh
+    stopCacheAutoRefresh();
 
   if (st.h.length === 0) {
     await bch.send(`${EMOJI.SUCCESS} **Session complete!** No sales.`);
@@ -1650,11 +1679,19 @@ async function finalize(cli, cfg) {
     await bch.send(`${EMOJI.ERROR} Submit failed. Admins notified.`);
   }
 
-  st.h = [];
-  st.sd = null;
-  st.lp = {};
-  clearCache();
-  await save(true); // Force immediate sync to persist session finalization
+    st.h = [];
+    st.sd = null;
+    st.lp = {};
+    clearCache();
+    await save(true); // Force immediate sync to persist session finalization
+  } finally {
+    finalizationInProgress = false;
+  }
+}
+
+// Export finalization status for bid processing checks
+function isFinalizingSession() {
+  return finalizationInProgress;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1739,6 +1776,12 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   if (!hasRole(m) && !isAdm(m, config)) {
     await msg.reply(ERROR_MESSAGES.NO_ROLE);
     return { ok: false, msg: "No role" };
+  }
+
+  // CRITICAL: Block bids during session finalization
+  if (finalizationInProgress) {
+    await msg.reply(`${EMOJI.CLOCK} Session finalizing... please wait`);
+    return { ok: false, msg: "Finalizing" };
   }
 
   // Attendance check removed - all ELYSIUM members can now bid freely
