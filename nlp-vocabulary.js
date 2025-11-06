@@ -335,11 +335,20 @@ const ENGLISH_WORDS = [
   'optional', 'voluntary', 'mandatory', 'compulsory', 'obligatory', 'forbidden', 'prohibited', 'allowed',
 
   // Trash Talk & Bad Words (for playful banter detection - guild internal use only)
+  // Filipino bad words & insults
   'gago', 'ulol', 'bobo', 'tanga', 'bano', 'putangina', 'tangina', 'leche', 'peste',
   'tarantado', 'tite', 'puke', 'kantot', 'kupal', 'pakshet', 'pakyu', 'hayop', 'buwisit',
-  'hinayupak', 'walang kwenta', 'fuck', 'shit', 'damn', 'ass', 'bitch', 'bastard',
-  'stupid', 'idiot', 'moron', 'dumb', 'retard', 'trash', 'garbage', 'pathetic', 'loser',
-  'suck', 'sucks', 'useless', 'scrub', 'noob', 'toxic', 'salty', 'trash talk', 'roast',
+  'hinayupak', 'walang kwenta', 'duwag', 'mahina', 'talo', 'bugbog', 'malas', 'walang laban',
+  'bugbog sarado', 'noob ka', 'newbie ka', 'baguhan ka', 'weak mo', 'ang weak mo',
+  // English bad words & insults
+  'fuck', 'shit', 'damn', 'ass', 'bitch', 'bastard', 'stupid', 'idiot', 'moron', 'dumb',
+  'retard', 'trash', 'garbage', 'pathetic', 'loser', 'suck', 'sucks', 'useless', 'scrub',
+  // Gaming/competitive taunts
+  'noob', 'nub', 'newb', 'toxic', 'salty', 'trash talk', 'roast', 'weak', 'bad', 'worst',
+  'easy', 'ez', 'rekt', 'pwned', 'owned', 'destroyed', 'demolished', 'wrecked', 'carried',
+  'mad', 'tilted', 'crying', 'cope', 'skill issue', 'git gud', 'get good', 'get rekt',
+  // Taglish gaming taunts
+  'ez lang', 'easy lang', 'noob naman', 'weak naman', 'talo na', 'panalo', 'mag practice',
 
   // Internet & Chat Slang (200+ words)
   'lol', 'lmao', 'rofl', 'lmfao', 'haha', 'hehe', 'hehe', 'lulz', 'kek',

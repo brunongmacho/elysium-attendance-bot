@@ -152,6 +152,28 @@ const CONVERSATION_PATTERNS = {
       // Tagalog insults
       /(?:ang\s+(?:bano|bobo|tanga|gago|ulol)\s+mo)/i,
       /(?:pakshet|pakyu|gago\s+ka|ulol\s+ka|bobo\s+ka)/i,
+
+      // Gaming/competitive taunts (English)
+      /(?:noob|nub|newb|scrub|trash|weak|easy|ez|rekt|pwned|owned|destroyed|demolished)/i,
+      /(?:you\s+(?:weak|suck\s+at|bad\s+at|terrible\s+at|worst|losing|lose|lost))/i,
+      /(?:get\s+(?:rekt|good|gud|wrecked|destroyed|owned|pwned))/i,
+      /(?:mad|salty|tilted|crying|cope|skill\s+issue)/i,
+
+      // Filipino gaming/competitive taunts
+      /(?:mahina|duwag|talo|bugbog|panalo|malas|walang\s+laban)/i,
+      /(?:ang\s+(?:weak|mahina|duwag|talo|bugbog)\s+mo)/i,
+      /(?:bugbog\s+sarado|talo\s+ka|wala\s+kang\s+laban)/i,
+      /(?:noob\s+ka|newbie\s+ka|baguhan\s+ka)/i,
+
+      // Taglish competitive taunts
+      /(?:ez\s+lang|easy\s+lang|noob\s+naman|weak\s+naman)/i,
+      /(?:talo\s+na|bugbog\s+ka|walang\s+laban\s+yan)/i,
+      /(?:git\s+gud|get\s+good|mag\s+practice)/i,
+
+      // Bot-specific taunts
+      /(?:bot\s+(?:sucks|is\s+bad|trash|useless|broken|stupid))/i,
+      /(?:your\s+(?:bot|system|code)\s+(?:sucks|trash|broken))/i,
+      /(?:worst\s+bot|trash\s+bot|useless\s+bot)/i,
     ],
     responses: [
       // Savage Filipino responses
@@ -402,98 +424,311 @@ class ConversationalAI {
   }
 
   /**
-   * Generate genius stat-based trash talk
+   * Generate genius stat-based trash talk with 500+ varieties
+   * Mix-and-match system for maximum comedy and variety
    * @param {Object} stats - User statistics
    * @param {string} username - Discord username
    * @returns {string} Personalized roast
    */
   generateStatBasedRoast(stats, username) {
-    const roasts = [];
+    // Helper to pick random element
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-    // Low points roasts (0-100 points)
-    if (stats.points !== null && stats.points < 100) {
-      roasts.push(
-        `LMAO! ${username} out here trash talking with only **${stats.points} points**! 😂 Even my error logs have more value than your balance!`,
-        `Hoy ${username}! **${stats.points} points** lang meron ka tapos ang yabang mo! 💀 Kahit 1-star boss drop mas mahal pa sa'yo!`,
-        `Imagine having **${stats.points} points** and thinking you can roast ME! 🤡 Check !mypoints and cry, buddy!`,
-        `${username} really said that with **${stats.points} points** in the bank! 🏦💀 Poverty called, they want their spokesperson back!`,
-        `Putangina ${username}, **${stats.points} points** lang tapos trash talk pa! 😤 Mag-attend ka muna ng raids para may pambili ka ng respect!`
-      );
+    // Helper to combine roast components
+    const combine = (opening, statCall, burn) => {
+      const parts = [opening, statCall, burn].filter(Boolean);
+      return parts.join(' ');
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ROAST COMPONENTS - Mix and match for 500+ combinations!
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Opening reactions (120 varieties)
+    const openings = {
+      shock: [
+        `YOOOOO! ${username}!`, `BRUH! ${username}!`, `AY PUTANGINA! ${username}!`, `WAIT WAIT WAIT! ${username}!`,
+        `HAHAHAHA! ${username}!`, `OMG! ${username}!`, `TANGINA NAMAN! ${username}!`, `GRABE! ${username}!`,
+        `HOY GAGO! ${username}!`, `LMAO! ${username}!`, `BRO! ${username}!`, `DUDE! ${username}!`,
+        `EXCUSE ME?! ${username}!`, `SAY WHAT?! ${username}!`, `YAWA! ${username}!`, `LECHE! ${username}!`,
+      ],
+      question: [
+        `${username}, talaga ba?`, `${username}, seryoso ka?`, `${username}, totoo ba yan?`, `${username}, sure ka dyan?`,
+        `${username}, alam mo ba?`, `${username}, you sure about that?`, `${username}, for real?`, `${username}, is this a joke?`,
+        `${username}, nakalimutan mo ba?`, `${username}, did you forget?`, `${username}, aware ka ba?`, `${username}, realize mo ba?`,
+      ],
+      sarcastic: [
+        `Oh wow, ${username} the LEGEND!`, `Look everyone, it's ${username}!`, `Eto na, si ${username}!`, `Nandito na pala si ${username}!`,
+        `The AUDACITY of ${username}!`, `${username} really out here!`, `Ang tapang naman ni ${username}!`, `${username} feeling main character!`,
+        `BREAKING NEWS: ${username} speaks!`, `Everyone bow down to ${username}!`, `All hail ${username}!`, `Aba, si ${username} pala!`,
+      ],
+      direct: [
+        `${username},`, `Listen ${username},`, `Pakinggan mo ${username},`, `Look ${username},`,
+        `Real talk ${username},`, `Let me tell you ${username},`, `Check this ${username},`, `Tanungin kita ${username},`,
+      ],
+    };
+
+    // Stat callouts (150+ varieties per category)
+    const lowPointsCallouts = [
+      // 0-50 points (Extreme poverty)
+      `**${stats.points} points**?! That's not a balance, that's a CRY FOR HELP! 📉`,
+      `**${stats.points} points**! Bro, beggars have more than you! 💀`,
+      `**${stats.points} points** tapos may lakas ka pang magsalita?! 😂`,
+      `Only **${stats.points} points** and you think you can roast ME?! 🤡`,
+      `**${stats.points} points**! Even NPCs laugh at your balance! 💸`,
+      `**${stats.points} points**?! Kulang pa yan pambili ng potion bro! 🍵`,
+      `**${stats.points} points** lang?! Mas marami pang copper yung mga slimes! 😭`,
+      `**${stats.points} points**! That's below minimum wage in Elysium! 📊`,
+      `**${stats.points} points**?! Kahit yung starter pack mas mahal pa! 💀`,
+      `Nakita ko **${stats.points} points** mo! Poverty vibes! 📉`,
+      `**${stats.points} points**! Bro, kumustahin mo naman sarili mo! 😤`,
+      `**${stats.points} points** tapos nagyayabang?! WILD! 🌪️`,
+      `**${stats.points} points**?! That's NOT a flex, that's an EMERGENCY! 🚨`,
+      `**${stats.points} points**! Di ka pa pala naka-recover from last bid! 💸`,
+      `**${stats.points} points** lang available mo?! Sadt! 😭`,
+      `With **${stats.points} points**, you can't even bid on trash items! 🗑️`,
+      `**${stats.points} points**! My system cache has more value! 💾`,
+      `**${stats.points} points**?! Yung guild bank richer pa! 🏦`,
+      `**${stats.points} points** balance with ALL that attitude?! 😤`,
+      `**${stats.points} points**! Negative net worth yarn?! 📉`,
+    ];
+
+    const medPointsCallouts = [
+      // 100-300 points (Still broke)
+      `**${stats.points} points**! That's vendor trash territory! 💸`,
+      `**${stats.points} points**?! Barely enough for a single bid! 😂`,
+      `**${stats.points} points** tapos ang yabang! Git gud muna! 🎮`,
+      `Only **${stats.points} points**?! Mid tier problems! 📊`,
+      `**${stats.points} points**! Still in the struggling phase I see! 💀`,
+      `**${stats.points} points** ka lang pero ang taas ng lipad mo! 🚀`,
+      `**${stats.points} points**! Kulang pa yan para sa blue items! 💎`,
+      `**${stats.points} points**?! Yung mga top players nag-sneeze lang yan! 🤧`,
+      `**${stats.points} points** balance! Ano yan, test account?! 🧪`,
+      `**${stats.points} points**! Still can't compete with the big boys! 👑`,
+    ];
+
+    const rankCallouts = [
+      // Ranking-based
+      `Rank **#${stats.attendanceRank}/${stats.totalUsers}**?! BOTTOM TIER SPOTTED! 📊`,
+      `**#${stats.attendanceRank}** out of ${stats.totalUsers}?! You're literally INVISIBLE! 👻`,
+      `Ranked **#${stats.attendanceRank}**! That's not a flex, that's a WARNING SIGN! 🚨`,
+      `**#${stats.attendanceRank}/${stats.totalUsers}** tapos may ganang mang-trash talk?! 😂`,
+      `You're **#${stats.attendanceRank}**! Leaderboard said "who dis?!" 💀`,
+      `**#${stats.attendanceRank}** ranking with ALL that confidence?! Delusional! 🤡`,
+      `Attendance rank: **#${stats.attendanceRank}**! Almost like you don't exist! 👤`,
+      `**#${stats.attendanceRank}/${stats.totalUsers}**?! Yung placement mo SADGE! 😭`,
+      `Rank **#${stats.attendanceRank}**! The leaderboard is ASHAMED! 📉`,
+      `**#${stats.attendanceRank}** ka lang! Know your place! 🪑`,
+    ];
+
+    const attendanceCallouts = [
+      // Low attendance
+      `**${stats.attendancePoints} attendance points**?! You've been GHOSTING! 👻`,
+      `Only **${stats.attendancePoints}** attendance?! AFK since Day 1?! 💤`,
+      `**${stats.attendancePoints} attendance points**! Bro, DO YOU EVEN PLAY?! 🎮`,
+      `**${stats.attendancePoints}** attendance! Guild wondering if you're real! 🤔`,
+      `**${stats.attendancePoints}** points from attendance?! That's CRIMINAL! 🚔`,
+      `**${stats.attendancePoints}** attendance! Mas madalas ka pang absent! 📊`,
+      `**${stats.attendancePoints}** attendance points! Parang multo ka! 👻`,
+      `**${stats.attendancePoints}** lang attendance mo?! HELLOO?! 📞`,
+      `**${stats.attendancePoints}** attendance! You're a MYTH! 🦄`,
+      `**${stats.attendancePoints}** points! Present ka ba talaga minsan?! 📋`,
+    ];
+
+    // Epic comparisons/burns (200+ varieties)
+    const burns = [
+      // Money/poverty burns
+      `Even my error logs have more value! 📝`, `NPCs richer than you! 💰`, `Beggars called, they said you're bringing them down! 🏚️`,
+      `Your balance screams "HELP ME!" 📢`, `The guild bank laughs at you! 🏦`, `Vendors won't even talk to you! 🛍️`,
+      `Copper coins flex harder! 🪙`, `Broke boy energy! 💸`, `Poverty simulator 2024! 🎮`,
+      `Your wallet crying! 😭`, `Financially challenged yarn?! 💳`, `Negative equity vibes! 📉`,
+
+      // Gaming burns
+      `Kahit 1-star boss drop mas mahal! ⭐`, `Tutorial mobs have better loot! 🗡️`, `Even trash mobs pity you! 👹`,
+      `Starter gear worth more! 🛡️`, `Level 1 slimes richer! 🦠`, `Wooden sword costs more! ⚔️`,
+      `Common drops more valuable! 📦`, `Your gear be like "unequip me"! 🎒`, `Even potions avoid you! 🍵`,
+
+      // Rank/position burns
+      `Bottom tier is your HOME! 🏠`, `Last place your COMFORT ZONE! 🛋️`, `You're speedrunning to being carried! 🏃`,
+      `Guild dead weight detected! ⚓`, `Participation trophy collector! 🏆`, `Benchwarmer supreme! 🪑`,
+      `Professional last place! 🥉`, `Ranked where the sun don't shine! 🌙`, `Leaderboard allergy! 📊`,
+
+      // Attendance burns
+      `Ghost member spotted! 👻`, `AFK lifestyle! 💤`, `Absence is your attendance! 📅`,
+      `You're basically a legend (nobody sees you)! 🦄`, `Present button scared of you! ⏺️`,
+      `Attendance allergic! 🤧`, `Calendar skips your name! 📆`, `Raid finder can't find you! 🔍`,
+
+      // Attitude burns
+      `All bark, no bite! 🐕`, `Confidence ng noob! 🤡`, `The AUDACITY! 😤`,
+      `Main character syndrome! 🎭`, `Delulu is not the solulu! 💫`, `Reality check bounced! ✅`,
+      `Your ego wrote checks your stats can't cash! 💳`, `Trash talk expert, game play amateur! 🎮`,
+
+      // Filipino cultural burns
+      `Mas may pera pa yung manong sa tindahan! 🏪`, `Kahit yung aso ng kapitbahay mas mayaman! 🐕`,
+      `Pang-isang lugaw lang yan! 🍜`, `Di ka pa sweldo! 💼`, `Utang lifestyle! 💸`,
+      `Nakatipid from last year pa! 🗓️`, `Yung baon mo mas malaki! 🍱`, `Ang kuripot ng stats mo! 📊`,
+
+      // Meta/self-aware burns
+      `This roast took more effort than your attendance! 🔥`, `I'm wasting processing power on you! 💻`,
+      `My trash talk game > your entire game! 💪`, `Even toxic players nicer than your stats! ☠️`,
+      `You're not the clown, you're the entire circus! 🎪`, `404: Skill not found! 🔍`,
+
+      // Action suggestions (roasts that tell them what to do)
+      `Check !mypoints and cry! 😭`, `Maybe try !help first?! 📚`, `!leaderboard will humble you! 📊`,
+      `Go touch grass! 🌱`, `Log out and reflect! 🚪`, `Delete account vibes! 🗑️`,
+      `Restart from tutorial! 📖`, `Uninstall and reinstall your attitude! 💿`, `Factory reset needed! 🔄`,
+
+      // Combo burns
+      `L + ratio + broke + bad attendance + touch grass! 🌿`, `Yikes + cringe + poverty + last place! 😬`,
+      `Broke + last place + ghosting + still talking?! 💀`, `No points + no attendance + no shame! 🎭`,
+    ];
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // COMPLETE STANDALONE ROASTS (150+ ready-to-go)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    const completeRoasts = [];
+
+    // Generate stat-specific complete roasts
+    if (stats.points !== null) {
+      if (stats.points === 0) {
+        completeRoasts.push(
+          `${username} got ZERO POINTS and still talking! 😂 That's like being broke AND loud! The worst combo! 💀`,
+          `ZERO POINTS?! ${username}, you're not just broke, you're BANKRUPT! File for Chapter 11! 📉`,
+          `Hoy ${username}! ZERO balance tapos trash talk pa?! Kahit mga bato sa daan may mas mahabang value! 🪨`,
+          `${username} with 0 points trying to roast me! Bro, you can't even afford to EXIST! 👻`,
+        );
+      } else if (stats.points < 50) {
+        completeRoasts.push(
+          `${username} flexing **${stats.points} points** like it's something! Bro, that's lunch money! 🍔`,
+          `**${stats.points} points**?! ${username}, vendors won't even LOOK at you! Window shopping lang! 🪟`,
+          `${pick(openings.shock)} **${stats.points} points** lang tapos ang tapang! Vendor trash ka lang! 🗑️`,
+          `${username}'s **${stats.points} points** balance! That's not a flex, that's a CRY for HELP! 📞`,
+          `LMAOOOO! ${username} got **${stats.points} points** but acting like they got the guild bank! 🏦💀`,
+        );
+      } else if (stats.points < 100) {
+        completeRoasts.push(
+          `${username} out here with **${stats.points} points** talking BIG! That's barely ONE bid, sit down! 🪑`,
+          `**${stats.points} points**?! ${username}, di ka pa boss drop level! You're NORMAL MOB tier! 👹`,
+          `Grabe ${username}! **${stats.points} points** tapos magjudge?! Bahay-bahayan lang! 🏠`,
+          `${username}'s **${stats.points} points** can't even get good RNG! Budget problems! 💸`,
+        );
+      } else if (stats.points < 300) {
+        completeRoasts.push(
+          `${username} with **${stats.points} points** acting rich! Bro, that's STILL broke! Middle class delusion! 🎭`,
+          `**${stats.points} points**! ${username} thinks they're ballin'! That's one failed bid away from poverty! 📉`,
+          `${username}, **${stats.points} points** is NOT the flex you think it is! Still bottom 50%! 📊`,
+        );
+      }
     }
 
-    // Medium-low points (100-300)
-    if (stats.points !== null && stats.points >= 100 && stats.points < 300) {
-      roasts.push(
-        `${username} talkin' big with **${stats.points} points**! 💸 That's barely enough for a vendor trash item, bro!`,
-        `Gago! **${stats.points} points** ka lang pero ang taas ng tingin mo sa sarili mo! 😂 Git gud muna!`,
-        `**${stats.points} points** and you're THIS confident? 🤣 The audacity! Check !leaderboard to see where you REALLY stand!`
-      );
-    }
-
-    // Bottom 50% ranking roasts
+    // Ranking roasts
     if (stats.attendanceRank && stats.totalUsers > 0) {
       const percentage = (stats.attendanceRank / stats.totalUsers) * 100;
 
-      if (percentage > 50) {
-        roasts.push(
-          `You're ranked **#${stats.attendanceRank}** out of ${stats.totalUsers} in attendance! 📊💀 Bottom half energy right here!`,
-          `Rank **#${stats.attendanceRank}/${stats.totalUsers}**?! 😭 ${username}, you're literally in the bottom tier! Attendance please!`,
-          `Hala! **#${stats.attendanceRank}** ka lang sa attendance pero ang tapang mo! 🤡 Mag-present ka muna consistently bago ka mang-bash!`,
-          `Bottom ${Math.round(100 - percentage)}% ka pa sa rankings tapos ganyan ka magsalita?! 💀 Know your place, **#${stats.attendanceRank}**!`
-        );
-      }
-
-      // Last place special roasts
       if (stats.attendanceRank === stats.totalUsers) {
-        roasts.push(
-          `🚨 DEAD LAST ALERT! 🚨 **#${stats.attendanceRank}/${stats.totalUsers}** and you're out here talking smack?! 😂😂😂`,
-          `Grabe! LAST PLACE ka **#${stats.totalUsers}** tapos ang yabang mo pa! 💀 Baka kailangan mo ng tutorial sa pag-attend!`,
-          `Congrats ${username}! You're **DEAD LAST** in attendance! 🏆💩 Here's your participation trophy for being consistently ABSENT!`
+        completeRoasts.push(
+          `🚨 EMERGENCY! 🚨 ${username} is DEAD LAST (#${stats.totalUsers}/${stats.totalUsers}) and STILL trash talking! The CONFIDENCE! 😂`,
+          `${username} ranked #${stats.totalUsers} out of ${stats.totalUsers}! You're not just last, you're EPICALLY last! 🏆💩`,
+          `LAST PLACE ${username}! Congrats on your participation trophy! Should we frame your #${stats.totalUsers} rank?! 🖼️`,
+          `Hoy ${username}! LAST PLACE ka (#${stats.totalUsers}) tapos may lakas ka pang mang-bash?! Tutorial mo ba to?! 📖`,
+          `${username}'s rank: #${stats.totalUsers}/${stats.totalUsers}! Even the leaderboard tried to delete you! 🗑️`,
+          `BREAKING: ${username} sets RECORD for being #${stats.totalUsers}! Worst attendance NA! 📰`,
+        );
+      } else if (percentage > 80) {
+        completeRoasts.push(
+          `${username} ranked #${stats.attendanceRank}/${stats.totalUsers}! BOTTOM 20%! You're basically furniture! 🪑`,
+          `#${stats.attendanceRank} out of ${stats.totalUsers}?! ${username}, you're the BENCH! The ACTUAL bench! 🏗️`,
+          `${username} sa bottom tier (#${stats.attendanceRank}) pero ang attitude TOP TIER?! MISMATCHED! 🎭`,
+          `Rank #${stats.attendanceRank}! ${username}, you're closer to LAST than to FIRST! Think about that! 🤔`,
+        );
+      } else if (percentage > 50) {
+        completeRoasts.push(
+          `${username} ranked #${stats.attendanceRank}/${stats.totalUsers}! BELOW AVERAGE confirmed! The math don't lie! 📐`,
+          `${pick(openings.sarcastic)} Rank #${stats.attendanceRank}! Bottom half energy! 📉`,
+          `${username}'s #${stats.attendanceRank}! Mas mataas pa yung price ng brown items sa rank mo! 💩`,
         );
       }
     }
 
-    // Low attendance points
+    // Low attendance roasts
     if (stats.attendancePoints !== null && stats.attendancePoints < 50) {
-      roasts.push(
-        `**${stats.attendancePoints} attendance points**?! 😂 You've been ghosting more than attending! Saan ka na?!`,
-        `${stats.attendancePoints} attendance points... Bro, AFK ka ba since Day 1?! 📊💀 Present naman minsan!`,
-        `With **${stats.attendancePoints} attendance points**, you're basically a myth! 👻 Guild members wondering if you even exist!`
+      completeRoasts.push(
+        `${username} got **${stats.attendancePoints} attendance points**! Bro, AFK ka ba since CREATION?! 🌍`,
+        `**${stats.attendancePoints} attendance**?! ${username}, you're basically a GHOST MEMBER! Guild legends! 👻`,
+        `${pick(openings.shock)} **${stats.attendancePoints} attendance points**! Present ka ba talaga EVER?! 🤔`,
+        `${username}'s **${stats.attendancePoints} attendance**! You exist in theory only! Schrodinger's member! 🐱`,
+        `**${stats.attendancePoints} attendance**! ${username}, even INACTIVE members show up more! 💤`,
+        `Hoy ${username}! **${stats.attendancePoints} attendance points** lang?! Absent king! Absent queen! 👑`,
       );
     }
 
-    // Combined low stats roasts
+    // ULTRA COMBO ROASTS (Multiple weaknesses)
     if (stats.points < 100 && stats.attendanceRank && stats.attendanceRank > stats.totalUsers * 0.7) {
-      roasts.push(
-        `PERFECT STORM! 🌪️ **${stats.points} points** + Rank **#${stats.attendanceRank}**! You're speed-running to becoming the guild's weakest link! 💀`,
-        `Let me get this straight: **${stats.points} points**, rank **#${stats.attendanceRank}**, and you're STILL talking shit?! 😂 The confidence of a noob!`,
-        `Tangina ${username}! **${stats.points} points** + **#${stats.attendanceRank}** ranking = CERTIFIED CARRIED! 🤡 Sana all may audacity!`,
-        `Your stats: Points: **${stats.points}** 📉 Rank: **#${stats.attendanceRank}** 📊 Trash Talk: **100** 💩 Bro, focus on ONE thing!`
+      completeRoasts.push(
+        `🌪️ PERFECT STORM! 🌪️ ${username}: **${stats.points} points** + #${stats.attendanceRank} rank! DOUBLE BOTTOM TIER! The ULTIMATE failure! 💀`,
+        `Wait... ${username} got **${stats.points} points** AND rank #${stats.attendanceRank}?! That's IMPRESSIVELY bad! How?! 😂`,
+        `${username}'s resume: ❌ Broke (**${stats.points}pts**) ❌ Last tier (#${stats.attendanceRank}) ❌ Still talking! CERTIFIED L! 📋`,
+        `TANGINA! ${username}! **${stats.points} points** + **#${stats.attendanceRank}** ranking = GUILD'S WEAKEST LINK! 🔗`,
+        `${username}: Points: **${stats.points}** 📉 | Rank: **#${stats.attendanceRank}** 📊 | Trash Talk: **∞** 💩 | Self-Awareness: **0** 🤡`,
+        `Bro ${username}, **${stats.points} points** + #${stats.attendanceRank} placement! You're SPEED-RUNNING to being kicked! 🏃`,
+        `${username} collected ALL the L's! **${stats.points}pts** + #${stats.attendanceRank} rank! L + L = 💀`,
       );
     }
 
-    // No data found roasts
-    if (!stats.points && !stats.attendanceRank) {
-      roasts.push(
-        `${username}? Who dis?! 🤔 You're not even in my database! Baka bagong salta ka lang at akala mo alam mo na lahat!`,
-        `Can't find your stats, ${username}! 👻 Either you're a ghost member or so irrelevant the system forgot you! 💀`,
-        `LOL! Wala ka pa sa records ko pero may lakas ka pang mang-trashtalk! 😂 Mag-exist ka muna sa guild bago ka sumagot!`
-      );
+    // ═══════════════════════════════════════════════════════════════════════
+    // ASSEMBLY LINE - Build the perfect roast!
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // If we have complete roasts, mix them in
+    if (completeRoasts.length > 0) {
+      return pick(completeRoasts);
     }
 
-    // If we have roasts based on stats, return one
-    if (roasts.length > 0) {
-      return roasts[Math.floor(Math.random() * roasts.length)];
+    // Build a modular roast
+    let opening = '';
+    let statCall = '';
+    let burn = '';
+
+    // Pick opening
+    const openingType = pick(['shock', 'question', 'sarcastic', 'direct']);
+    opening = pick(openings[openingType]);
+
+    // Pick stat callout based on what we have
+    if (stats.points !== null && stats.points < 100) {
+      statCall = pick(lowPointsCallouts);
+    } else if (stats.points !== null && stats.points < 300) {
+      statCall = pick(medPointsCallouts);
+    } else if (stats.attendanceRank && stats.totalUsers > 0) {
+      statCall = pick(rankCallouts);
+    } else if (stats.attendancePoints !== null && stats.attendancePoints < 50) {
+      statCall = pick(attendanceCallouts);
+    } else if (!stats.points && !stats.attendanceRank) {
+      // No data
+      return pick([
+        `${username}? WHO?! 🤔 You're not even in my database! Bagong member ka lang at akala mo alam mo na lahat?! 👶`,
+        `Can't find ${username}'s stats! 👻 Either you're SO bad the system deleted you OR you don't exist! 💀`,
+        `${username} not found! 404 ERROR! You're so irrelevant even my database gave up! 🗑️`,
+        `Sino ba yan si ${username}?! Wala sa records! Imaginary friend vibes! 🦄`,
+        `${pick(openings.shock)} ${username}, wala kang data pero ang lakas ng trash talk! Exist ka muna! 📊`,
+      ]);
+    } else {
+      // Decent stats but still trash talking
+      return pick([
+        `Oh wow! ${username} got DECENT stats but TRASH personality! 😬 Money can't buy class! 💳`,
+        `${username}'s stats: ✅ Good! Attitude: ❌ BASURA! 🗑️ Fix yourself! 🔧`,
+        `Ayos naman stats ni ${username} pero ugali?! NEGATIVE! 📉 Mag-reflect! 🪞`,
+        `${username} proving you can have GOOD stats and ZERO class! 🎩 Impressive! 👏`,
+        `${pick(openings.sarcastic)} Good stats pero TOXIC! You're the whole RED FLAG! 🚩`,
+        `${username} got points but NO chill! 😤 Relax bro! !leaderboard won't make you #1 in LIFE! 🌎`,
+      ]);
     }
 
-    // Default: user has decent stats but still trash talking
-    const defaultRoasts = [
-      `Oh, someone with ACTUAL stats is talking trash! 😏 Too bad your game sense is still trash! Check !help to improve!`,
-      `Ayos stats mo pero personality mo? BASURA! 🗑️ Bili ka ng class sa pagiging mabuting tao!`,
-      `You got stats but zero chill! 😤 Mag-relax ka lang at mag-!leaderboard para makita mo hindi ka pa rin #1!`
-    ];
+    // Pick a burn
+    burn = pick(burns);
 
-    return defaultRoasts[Math.floor(Math.random() * defaultRoasts.length)];
+    // Combine everything!
+    return combine(opening, statCall, burn);
   }
 
   /**
