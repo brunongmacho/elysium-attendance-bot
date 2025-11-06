@@ -44,7 +44,7 @@
 
 const { EmbedBuilder } = require('discord.js');
 const { getChannelById } = require('./utils/discord-cache');
-const { getTimestamp } = require('./utils/common');
+const { getCurrentTimestamp } = require('./utils/timestamp-cache');
 const { LearningSystem } = require('./learning-system');
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1065,7 +1065,7 @@ class IntelligenceEngine {
         anomaliesDetected: anomalies.length,
         anomalies,
         analyzed: auctionHistory.length,
-        timestamp: getTimestamp(),
+        timestamp: getCurrentTimestamp(),
       };
     } catch (error) {
       console.error('[INTELLIGENCE] Error detecting bidding anomalies:', error);
@@ -1115,7 +1115,7 @@ class IntelligenceEngine {
           averageSpawns: mean.toFixed(1),
           stdDev: stdDev.toFixed(1),
         },
-        timestamp: getTimestamp(),
+        timestamp: getCurrentTimestamp(),
       };
     } catch (error) {
       console.error('[INTELLIGENCE] Error detecting attendance anomalies:', error);
@@ -1401,7 +1401,7 @@ class IntelligenceEngine {
    */
   async monitorPerformance() {
     const metrics = {
-      timestamp: getTimestamp(),
+      timestamp: getCurrentTimestamp(),
       memory: process.memoryUsage(),
       memoryPercent: (process.memoryUsage().heapUsed / process.memoryUsage().heapTotal) * 100,
       uptime: process.uptime(),
