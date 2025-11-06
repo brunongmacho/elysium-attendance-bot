@@ -1037,57 +1037,86 @@ class NLPLearningSystem {
   }
 
   async syncToGoogleSheets() {
-    try {
-      const sheetsUrl = this.config.sheet_webhook_url;
-      if (!sheetsUrl) return;
+    const maxRetries = 4;
+    const baseDelay = 2000; // 2 seconds
 
-      // Prepare data
-      const patterns = Array.from(this.learnedPatterns.values());
-      const preferences = Array.from(this.userPreferences.values()).map(pref => ({
-        ...pref,
-        languageScores: pref.languageScores, // Already an object
-        shortcuts: pref.shortcuts,
-      }));
-      const unrecognized = Array.from(this.unrecognizedPhrases.values()).map(u => ({
-        ...u,
-        exampleUsers: Array.from(u.users).slice(0, 5).join(', '),
-      }));
-      const negativePatterns = Array.from(this.negativePatterns.values());
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const sheetsUrl = this.config.sheet_webhook_url;
+        if (!sheetsUrl) return;
 
-      const payload = {
-        patterns,
-        preferences,
-        unrecognized,
-        negativePatterns,
-        recognitionRate: this.getRecognitionRate(),
-      };
+        // Prepare data
+        const patterns = Array.from(this.learnedPatterns.values());
+        const preferences = Array.from(this.userPreferences.values()).map(pref => ({
+          ...pref,
+          languageScores: pref.languageScores, // Already an object
+          shortcuts: pref.shortcuts,
+        }));
+        const unrecognized = Array.from(this.unrecognizedPhrases.values()).map(u => ({
+          ...u,
+          exampleUsers: Array.from(u.users).slice(0, 5).join(', '),
+        }));
+        const negativePatterns = Array.from(this.negativePatterns.values());
 
-      const response = await axios.post(`${sheetsUrl}?action=syncNLPLearning`, payload, {
-        timeout: 15000,
-        headers: { 'Content-Type': 'application/json' },
-      });
+        const payload = {
+          patterns,
+          preferences,
+          unrecognized,
+          negativePatterns,
+          recognitionRate: this.getRecognitionRate(),
+        };
 
-      // Check if sync was actually successful
-      if (response.data && response.data.success === false) {
-        console.error('🧠 [NLP Learning] Sync returned error:', response.data.message);
-        return;
-      }
+        const response = await axios.post(`${sheetsUrl}?action=syncNLPLearning`, payload, {
+          timeout: 30000, // Increased timeout to 30s
+          headers: { 'Content-Type': 'application/json' },
+        });
 
-      this.lastSync = new Date();
-      console.log(`🧠 [NLP Learning] Synced ${patterns.length} patterns, ${preferences.length} users, ${negativePatterns.length} negative patterns to Google Sheets`);
-
-      if (response.data && response.data.results) {
-        const r = response.data.results;
-        console.log(`🧠 [NLP Learning] Patterns: ${r.patterns.created} created, ${r.patterns.updated} updated`);
-        console.log(`🧠 [NLP Learning] Preferences: ${r.preferences.created} created, ${r.preferences.updated} updated`);
-        if (r.negativePatterns) {
-          console.log(`🧠 [NLP Learning] Negative Patterns: ${r.negativePatterns.created} created, ${r.negativePatterns.updated} updated`);
+        // Check if sync was actually successful
+        if (response.data && response.data.success === false) {
+          console.error('🧠 [NLP Learning] Sync returned error:', response.data.message);
+          return;
         }
-      }
-    } catch (error) {
-      console.error('🧠 [NLP Learning] Sync failed:', error.message);
-      if (error.response) {
-        console.error('🧠 [NLP Learning] Response:', error.response.data);
+
+        this.lastSync = new Date();
+        console.log(`🧠 [NLP Learning] Synced ${patterns.length} patterns, ${preferences.length} users, ${negativePatterns.length} negative patterns to Google Sheets`);
+
+        if (response.data && response.data.results) {
+          const r = response.data.results;
+          console.log(`🧠 [NLP Learning] Patterns: ${r.patterns.created} created, ${r.patterns.updated} updated`);
+          console.log(`🧠 [NLP Learning] Preferences: ${r.preferences.created} created, ${r.preferences.updated} updated`);
+          if (r.negativePatterns) {
+            console.log(`🧠 [NLP Learning] Negative Patterns: ${r.negativePatterns.created} created, ${r.negativePatterns.updated} updated`);
+          }
+        }
+
+        // Success - break out of retry loop
+        return;
+
+      } catch (error) {
+        const isRateLimitError = error.response && error.response.status === 429;
+        const isLastAttempt = attempt === maxRetries;
+
+        if (isRateLimitError && !isLastAttempt) {
+          const delay = baseDelay * Math.pow(2, attempt); // Exponential backoff: 2s, 4s, 8s, 16s
+          console.warn(`🧠 [NLP Learning] Rate limit hit (429). Retrying in ${delay/1000}s... (Attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue; // Retry
+        }
+
+        // Log error and exit on last attempt or non-rate-limit errors
+        console.error('🧠 [NLP Learning] Sync failed:', error.message);
+        if (error.response) {
+          // Only log first 500 chars of response to avoid HTML spam
+          const responseData = typeof error.response.data === 'string'
+            ? error.response.data.substring(0, 500)
+            : JSON.stringify(error.response.data).substring(0, 500);
+          console.error('🧠 [NLP Learning] Response:', responseData);
+        }
+
+        if (isLastAttempt) {
+          console.error('🧠 [NLP Learning] Max retries reached. Will try again on next sync cycle.');
+        }
+        return;
       }
     }
   }

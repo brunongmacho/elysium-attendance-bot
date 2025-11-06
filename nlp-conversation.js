@@ -166,6 +166,118 @@ const CONVERSATION_PATTERNS = {
       "Nice! 👊",
     ],
   },
+
+  // Bot capabilities
+  capabilities: {
+    patterns: [
+      /^(?:what\s+can\s+you\s+do|what\s+do\s+you\s+do|your\s+(?:features|functions|capabilities))/i,
+      /^(?:ano\s+kaya\s+mo|ano\s+pwede\s+mo)/i,
+      /^(?:show\s+me\s+what\s+you\s+(?:can|got))/i,
+    ],
+    responses: [
+      "I'm a full-featured guild bot! 🤖 I can:\n\n" +
+      "📊 **Attendance** - Track guild member attendance\n" +
+      "💰 **Bidding** - Manage auction bidding system\n" +
+      "🏆 **Leaderboards** - Show rankings & statistics\n" +
+      "🔮 **Predictions** - Predict spawn times\n" +
+      "🎯 **Smart NLP** - Understand natural language!\n\n" +
+      "Just mention me and ask naturally, or use **!help** for all commands!",
+    ],
+  },
+
+  // Attendance queries
+  attendanceQueries: {
+    patterns: [
+      /^(?:how\s+(?:do\s+i|to)\s+(?:mark|check|record)\s+attendance)/i,
+      /^(?:paano\s+(?:mag|mag-)?attendance)/i,
+      /^(?:how\s+does\s+attendance\s+work)/i,
+    ],
+    responses: [
+      "Attendance tracking is easy! 📊\n\n" +
+      "When an attendance thread is created:\n" +
+      "• Reply with **\"present\"**, **\"here\"**, or **\"nandito\"**\n" +
+      "• I'll automatically mark your attendance!\n" +
+      "• Say **\"late\"** or **\"huli\"** if you're late\n" +
+      "• Say **\"absent\"** or **\"wala\"** if you can't attend\n\n" +
+      "Check status with **\"attendance status\"** or **\"@bot status\"** in admin-logs!",
+    ],
+  },
+
+  // Bidding help
+  biddingHelp: {
+    patterns: [
+      /^(?:how\s+(?:do\s+i|to)\s+bid)/i,
+      /^(?:paano\s+(?:mag|mag-)?bid)/i,
+      /^(?:how\s+does\s+(?:bidding|auction)\s+work)/i,
+    ],
+    responses: [
+      "Bidding is simple! 💰\n\n" +
+      "In auction threads:\n" +
+      "• Say **\"bid 500\"** or **\"taya 500\"**\n" +
+      "• Or just **\"500 points\"**\n" +
+      "• Check your balance: **\"my points\"**\n" +
+      "• See auction status: **\"bid status\"**\n\n" +
+      "I understand natural language, so just ask naturally!",
+    ],
+  },
+
+  // Troubleshooting
+  notWorking: {
+    patterns: [
+      /^(?:(?:you(?:'re|\s+are)\s+)?not\s+working|broken|bugged)/i,
+      /^(?:why\s+(?:don't|dont|not|wont|won't)\s+you\s+(?:work|respond))/i,
+      /^(?:sira|bakit\s+hindi\s+gumagana)/i,
+    ],
+    responses: [
+      "Sorry if I'm not responding correctly! 😔\n\n" +
+      "Let me help troubleshoot:\n" +
+      "• Make sure to **mention me** (@bot) in your message\n" +
+      "• Check if you're in the right channel/thread\n" +
+      "• Try using explicit commands like **!help**\n" +
+      "• Rephrase your question naturally\n\n" +
+      "I'm constantly learning, so your feedback helps! 🧠",
+    ],
+  },
+
+  // Learning & improvement
+  learning: {
+    patterns: [
+      /^(?:(?:are\s+you|can\s+you)\s+(?:learning|improving|getting\s+better))/i,
+      /^(?:do\s+you\s+learn)/i,
+      /^(?:nag-?(?:aaral|improve)\s+ka\s+ba)/i,
+    ],
+    responses: [
+      "Yes! I'm constantly learning! 🧠\n\n" +
+      "I use advanced NLP (Natural Language Processing) to:\n" +
+      "• Learn from every interaction\n" +
+      "• Understand new phrases and patterns\n" +
+      "• Adapt to how the guild communicates\n" +
+      "• Support multiple languages (English, Tagalog, Taglish)\n\n" +
+      "The more you interact with me, the smarter I become! 🤖✨",
+    ],
+  },
+
+  // Commands help
+  commandsList: {
+    patterns: [
+      /^(?:what\s+(?:are\s+)?(?:the\s+)?commands?)/i,
+      /^(?:list\s+(?:of\s+)?commands?)/i,
+      /^(?:show\s+(?:me\s+)?(?:all\s+)?commands?)/i,
+      /^(?:ano\s+(?:ang\s+)?(?:mga\s+)?commands?)/i,
+    ],
+    responses: [
+      "I support TONS of commands! 📋\n\n" +
+      "**Main Categories:**\n" +
+      "• 📊 Attendance - !status, !attendance, !present\n" +
+      "• 💰 Bidding - !bid, !mypoints, !bidstatus\n" +
+      "• 🏆 Rankings - !leaderboard, !top, !rankings\n" +
+      "• 🔮 Predictions - !predict, !spawn\n" +
+      "• 📈 Reports - !weeklyreport, !stats\n\n" +
+      "But here's the cool part: **I understand natural language!** 🧠\n" +
+      "Just mention me and ask naturally in English, Tagalog, or Taglish!\n\n" +
+      "Type **!help** for the complete command list!",
+    ],
+  },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -267,50 +379,143 @@ class ConversationalAI {
    * Fallback response when nothing matches
    */
   getFallbackResponse(content) {
-    // Analyze content for potential intent
-    const hasQuestion = /\?|what|how|when|where|who|why|ano|paano|kailan|saan|sino|bakit/i.test(content);
-    const hasPoints = /points?|pts?|balance|pera|money/i.test(content);
-    const hasStatus = /status|update|info|balita/i.test(content);
-    const hasBid = /bid|taya|pusta|auction/i.test(content);
+    // Analyze content for potential intent with more sophisticated detection
+    const hasQuestion = /\?|what|how|when|where|who|why|ano|paano|kailan|saan|sino|bakit|can\s+you|could\s+you|would\s+you/i.test(content);
+    const hasPoints = /points?|pts?|balance|pera|money|credits|currency|wallet/i.test(content);
+    const hasStatus = /status|update|info|balita|progress|current|now|state/i.test(content);
+    const hasBid = /bid|taya|pusta|auction|offer|wager/i.test(content);
+    const hasAttendance = /attendance|present|nandito|here|attend|late|absent|roll\s+call/i.test(content);
+    const hasLeaderboard = /leaderboard|top|rank|ranking|leader|best|standings|score/i.test(content);
+    const hasPrediction = /predict|spawn|when|next|timing|schedule/i.test(content);
+    const hasHelp = /help|guide|tutorial|how\s+to|paano|confused|lost|don't\s+(?:know|understand)/i.test(content);
+    const hasReport = /report|weekly|stats|statistics|summary|overview/i.test(content);
 
-    if (hasQuestion) {
-      return "I'm not sure what you're asking, but I can help with:\n" +
-             "• **Points & Balance** - \"my points\", \"balance ko\"\n" +
-             "• **Auction Status** - \"auction status\", \"ano status\"\n" +
-             "• **Leaderboards** - \"show leaderboards\", \"top rankings\"\n" +
-             "• **Attendance** - \"present\", \"nandito ako\"\n\n" +
-             "Try asking naturally or type **!help** for all commands!";
+    // Multi-intent detection (prioritize more specific intents)
+    if (hasHelp && (hasAttendance || hasBid || hasPoints)) {
+      // User needs help with a specific feature
+      if (hasAttendance) {
+        return "Need help with attendance? 📊\n\n" +
+               "**How to mark attendance:**\n" +
+               "• In attendance threads, say: **\"present\"**, **\"here\"**, or **\"nandito\"**\n" +
+               "• Late? Say: **\"late\"** or **\"huli\"**\n" +
+               "• Can't attend? Say: **\"absent\"** or **\"wala\"**\n\n" +
+               "Check active threads: **\"attendance status\"** or **\"@bot status\"** in admin-logs\n" +
+               "View your record: **\"my attendance\"** or **\"attendance ko\"**";
+      }
+      if (hasBid) {
+        return "Need help with bidding? 💰\n\n" +
+               "**How to bid:**\n" +
+               "• In auction threads: **\"bid 500\"** or **\"taya 500\"**\n" +
+               "• Check balance: **\"my points\"** or **\"pts ko\"**\n" +
+               "• Auction status: **\"bid status\"** or **\"ano status ng auction\"**\n\n" +
+               "I understand natural language - just mention me and ask!";
+      }
+      if (hasPoints) {
+        return "Need help with points? 💰\n\n" +
+               "**Check your points:**\n" +
+               "• Say: **\"my points\"**, **\"balance ko\"**, **\"ilang points ko\"**\n\n" +
+               "**Earn points:**\n" +
+               "• Attend guild events (tracked via attendance)\n" +
+               "• Participate in raids and activities\n\n" +
+               "**Use points:**\n" +
+               "• Bid on items in auction threads\n" +
+               "• The more you participate, the more you earn!";
+      }
+    }
+
+    if (hasQuestion && hasAttendance) {
+      return "Questions about attendance? 📊\n\n" +
+             "• **Mark attendance**: Say \"present\", \"here\", \"nandito\" in attendance threads\n" +
+             "• **Check status**: Say \"attendance status\" or \"@bot status\" in admin-logs\n" +
+             "• **View your record**: Say \"my attendance\" or \"attendance ko\"\n" +
+             "• **Late/Absent**: Say \"late\"/\"huli\" or \"absent\"/\"wala\"\n\n" +
+             "I track everything automatically! 🤖";
+    }
+
+    if (hasQuestion && hasLeaderboard) {
+      return "Want to see rankings? 🏆\n\n" +
+             "Try these commands:\n" +
+             "• **\"show leaderboards\"** or **\"top\"** - All rankings\n" +
+             "• **\"top points\"** - Points leaderboard\n" +
+             "• **\"top attendance\"** - Attendance rankings\n" +
+             "• **\"rankings\"** or **\"who's leading\"** - Current standings\n\n" +
+             "Compete with your guildmates! 🎮";
+    }
+
+    if (hasQuestion && hasPrediction) {
+      return "Want spawn predictions? 🔮\n\n" +
+             "I can predict boss spawn times! Try:\n" +
+             "• **\"predict spawn\"** or **\"next spawn\"**\n" +
+             "• **\"when is next boss\"** or **\"kailan spawn\"**\n" +
+             "• **\"spawn schedule\"** or **\"boss timing\"**\n\n" +
+             "I use historical data to predict spawn windows! 📊";
+    }
+
+    if (hasQuestion && hasReport) {
+      return "Want to see reports? 📈\n\n" +
+             "Available reports:\n" +
+             "• **\"weekly report\"** - This week's summary\n" +
+             "• **\"stats\"** - Guild statistics\n" +
+             "• **\"attendance report\"** - Attendance overview\n\n" +
+             "Stay informed about guild performance!";
     }
 
     if (hasPoints) {
-      return "Want to check your points? Try saying:\n" +
-             "• \"my points\" or \"balance ko\"\n" +
-             "• \"how many points\" or \"ilang points ko\"\n" +
-             "• \"show balance\" or \"check points\"";
+      return "Want to check your points? 💰\n\n" +
+             "Just say:\n" +
+             "• **\"my points\"** or **\"balance ko\"**\n" +
+             "• **\"how many points\"** or **\"ilang points ko\"**\n" +
+             "• **\"show balance\"** or **\"check points\"**\n\n" +
+             "Points are earned through attendance and participation!";
     }
 
     if (hasStatus) {
-      return "Want to check status? Try:\n" +
-             "• \"auction status\" - Current auction info\n" +
-             "• \"attendance status\" - Active threads\n" +
-             "• \"show leaderboards\" - Rankings";
+      return "Want to check status? 📊\n\n" +
+             "Available status commands:\n" +
+             "• **\"auction status\"** - Current auction info\n" +
+             "• **\"attendance status\"** - Active threads (use in admin-logs)\n" +
+             "• **\"bid status\"** - Your current bids\n" +
+             "• **\"show leaderboards\"** - Rankings\n\n" +
+             "Stay updated on guild activities!";
     }
 
     if (hasBid) {
-      return "Want to bid? In auction threads, just say:\n" +
-             "• \"bid 500\" or \"taya 500\"\n" +
-             "• \"offer 1000\"\n" +
-             "• Or just \"500 points\"";
+      return "Want to bid on items? 💰\n\n" +
+             "In auction threads, just say:\n" +
+             "• **\"bid 500\"** or **\"taya 500\"**\n" +
+             "• **\"offer 1000\"** or **\"1000 points\"**\n\n" +
+             "Check your balance first: **\"my points\"**\n" +
+             "See auction status: **\"bid status\"**";
     }
 
-    // Generic fallback
-    return "I'm here to help! 🤖\n\n" +
-           "Mention me and ask about:\n" +
-           "• **Points/Balance** - \"my points\", \"pts ko\"\n" +
-           "• **Leaderboards** - \"show top\", \"rankings\"\n" +
-           "• **Auction** - \"bid 500\", \"status\"\n" +
-           "• **Attendance** - \"present\", \"nandito\"\n\n" +
-           "Or type **!help** for full command list!";
+    if (hasAttendance) {
+      return "Attendance-related? 📊\n\n" +
+             "• **Mark present**: \"present\", \"here\", \"nandito\"\n" +
+             "• **Check status**: \"attendance status\" (in admin-logs)\n" +
+             "• **Your record**: \"my attendance\"\n\n" +
+             "Just say it naturally - I'll understand!";
+    }
+
+    if (hasLeaderboard) {
+      return "Check the leaderboards! 🏆\n\n" +
+             "Just say:\n" +
+             "• **\"show leaderboards\"** or **\"top\"**\n" +
+             "• **\"rankings\"** or **\"who's leading\"**\n" +
+             "• **\"top points\"** or **\"top attendance\"**\n\n" +
+             "See where you stand among guildmates!";
+    }
+
+    // Generic fallback - enhanced with more guidance
+    return "I'm your intelligent guild assistant! 🤖✨\n\n" +
+           "**I can help with:**\n" +
+           "• 📊 **Attendance** - \"present\", \"attendance status\", \"my attendance\"\n" +
+           "• 💰 **Points** - \"my points\", \"balance ko\"\n" +
+           "• 🎯 **Bidding** - \"bid 500\", \"bid status\"\n" +
+           "• 🏆 **Rankings** - \"show leaderboards\", \"top\"\n" +
+           "• 🔮 **Predictions** - \"predict spawn\", \"next boss\"\n" +
+           "• 📈 **Reports** - \"weekly report\", \"stats\"\n\n" +
+           "**Pro tip:** I understand natural language in English, Tagalog, and Taglish!\n" +
+           "Just mention me (@bot) and ask naturally. Or type **!help** for all commands!";
   }
 
   /**
