@@ -377,6 +377,8 @@ class ConversationalAI {
     if (!this.sheetAPI) return null;
 
     try {
+      console.log(`📊 [Stat Fetch] Looking up stats for username: "${username}"`);
+
       // Fetch points and leaderboard data
       const [pointsData, attendanceData, biddingData] = await Promise.all([
         this.sheetAPI.call('getBiddingPointsSummary').catch(() => null),
@@ -396,30 +398,63 @@ class ConversationalAI {
       if (pointsData && pointsData.points) {
         const pointsCache = new PointsCache(pointsData.points);
         stats.points = pointsCache.getPoints(username);
+        console.log(`💰 [Bidding Points] ${username}: ${stats.points} points`);
       }
 
-      // Get attendance rank and points
+      // Get attendance rank and points using PointsCache for reliable lookup
       if (attendanceData && attendanceData.leaderboard) {
-        const rank = attendanceData.leaderboard.findIndex(
-          entry => entry.name.toLowerCase() === username.toLowerCase()
-        );
-        if (rank >= 0) {
-          stats.attendanceRank = rank + 1;
-          stats.attendancePoints = attendanceData.leaderboard[rank].points;
-        }
         stats.totalUsers = attendanceData.leaderboard.length;
-      }
 
-      // Get bidding rank
-      if (biddingData && biddingData.leaderboard) {
-        const rank = biddingData.leaderboard.findIndex(
-          entry => entry.name.toLowerCase() === username.toLowerCase()
-        );
-        if (rank >= 0) {
-          stats.biddingRank = rank + 1;
+        // Convert leaderboard array to object for PointsCache
+        const attendancePointsObj = {};
+        attendanceData.leaderboard.forEach(entry => {
+          attendancePointsObj[entry.name] = entry.points || 0;
+        });
+
+        // Use PointsCache for reliable case-insensitive lookup
+        const attendanceCache = new PointsCache(attendancePointsObj);
+        stats.attendancePoints = attendanceCache.getPoints(username);
+
+        // Get the actual name used in the sheet for rank calculation
+        const actualName = attendanceCache.getActualUsername(username);
+
+        if (actualName) {
+          // Find rank using the actual name from the sheet
+          const rank = attendanceData.leaderboard.findIndex(
+            entry => entry.name === actualName
+          );
+          if (rank >= 0) {
+            stats.attendanceRank = rank + 1;
+          }
+          console.log(`📍 [Attendance] ${username} -> "${actualName}": Rank #${stats.attendanceRank || 'N/A'}, Points: ${stats.attendancePoints}`);
+        } else {
+          console.log(`⚠️ [Attendance] ${username} not found in leaderboard (checked ${stats.totalUsers} members)`);
         }
       }
 
+      // Get bidding rank using same approach
+      if (biddingData && biddingData.leaderboard) {
+        // Convert leaderboard to object for lookup
+        const biddingPointsObj = {};
+        biddingData.leaderboard.forEach(entry => {
+          biddingPointsObj[entry.name] = entry.pointsLeft || 0;
+        });
+
+        const biddingCache = new PointsCache(biddingPointsObj);
+        const actualName = biddingCache.getActualUsername(username);
+
+        if (actualName) {
+          const rank = biddingData.leaderboard.findIndex(
+            entry => entry.name === actualName
+          );
+          if (rank >= 0) {
+            stats.biddingRank = rank + 1;
+          }
+          console.log(`🎯 [Bidding Rank] ${username} -> "${actualName}": Rank #${stats.biddingRank || 'N/A'}`);
+        }
+      }
+
+      console.log(`✅ [Stats Complete] ${username}:`, stats);
       return stats;
     } catch (error) {
       console.error('❌ Error fetching user stats for trash talk:', error);
