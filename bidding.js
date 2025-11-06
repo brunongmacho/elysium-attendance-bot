@@ -632,10 +632,28 @@ async function save(forceSync = false) {
     if (cfg && cfg.sheet_webhook_url && shouldSync) {
       lastSheetSyncTime = now;
       if (forceSync) {
-        // When forceSync is true, await the sync to ensure it completes
+        // When forceSync is true, await the sync with retry logic
         console.log("📊 Forcing immediate state sync to Google Sheets...");
-        await saveBiddingStateToSheet();
-        console.log("✅ State successfully synced to Google Sheets");
+        const maxRetries = 3;
+        let lastError;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            await saveBiddingStateToSheet();
+            console.log("✅ State successfully synced to Google Sheets");
+            break; // Success
+          } catch (err) {
+            lastError = err;
+            if (attempt < maxRetries) {
+              const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s
+              console.warn(`⚠️ Sync attempt ${attempt} failed, retrying in ${delay}ms...`);
+              await new Promise(r => setTimeout(r, delay));
+            }
+          }
+        }
+        if (lastError) {
+          console.error(`❌ All ${maxRetries} sync attempts failed:`, lastError.message);
+          throw new Error(`Failed to sync state after ${maxRetries} attempts`);
+        }
       } else {
         // Background sync (fire-and-forget for periodic saves)
         saveBiddingStateToSheet().catch((err) => {
@@ -903,7 +921,18 @@ function startCacheAutoRefresh(url) {
   // Set up auto-refresh every 30 minutes
   st.cacheRefreshTimer = setInterval(async () => {
     try {
-      if (st.a && st.a.status === "active") {
+      // Check both bidding mode (st.a) and auctioneering mode
+      const biddingActive = st.a && st.a.status === "active";
+      let auctioneeringActive = false;
+
+      try {
+        const auctioneering = require("./auctioneering.js");
+        auctioneeringActive = auctioneering.getAuctionState().active;
+      } catch (err) {
+        // Module not available or error getting state
+      }
+
+      if (biddingActive || auctioneeringActive) {
         console.log("🔄 Auto-refreshing cache...");
         await loadCache(url);
       } else {
@@ -1260,8 +1289,12 @@ async function activate(cli, cfg, th) {
 function schedTimers(cli, cfg) {
   const a = st.a,
     t = a.endTime - Date.now();
+  // Bug #15 fix: Delete timer keys after clearing to prevent orphaned references
   ["goingOnce", "goingTwice", "finalCall", "auctionEnd"].forEach((k) => {
-    if (st.th[k]) clearTimeout(st.th[k]);
+    if (st.th[k]) {
+      clearTimeout(st.th[k]);
+      delete st.th[k];
+    }
   });
   if (t > TIMEOUTS.GOING_ONCE && !a.go1)
     st.th.goingOnce = setTimeout(
@@ -1284,7 +1317,14 @@ function schedTimers(cli, cfg) {
 async function ann1(cli, cfg) {
   const a = st.a;
   if (!a || a.status !== "active" || st.pause) return;
-  const th = await cli.channels.fetch(a.threadId);
+
+  // Bug #26 fix: Check thread existence before sending
+  const th = await cli.channels.fetch(a.threadId).catch(() => null);
+  if (!th) {
+    console.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, skipping announcement`);
+    return;
+  }
+
   await th.send({
     content: "@everyone",
     embeds: [
@@ -1308,7 +1348,14 @@ async function ann1(cli, cfg) {
 async function ann2(cli, cfg) {
   const a = st.a;
   if (!a || a.status !== "active" || st.pause) return;
-  const th = await cli.channels.fetch(a.threadId);
+
+  // Bug #26 fix: Check thread existence before sending
+  const th = await cli.channels.fetch(a.threadId).catch(() => null);
+  if (!th) {
+    console.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, skipping announcement`);
+    return;
+  }
+
   await th.send({
     content: "@everyone",
     embeds: [
@@ -1332,7 +1379,14 @@ async function ann2(cli, cfg) {
 async function ann3(cli, cfg) {
   const a = st.a;
   if (!a || a.status !== "active" || st.pause) return;
-  const th = await cli.channels.fetch(a.threadId);
+
+  // Bug #26 fix: Check thread existence before sending
+  const th = await cli.channels.fetch(a.threadId).catch(() => null);
+  if (!th) {
+    console.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, skipping announcement`);
+    return;
+  }
+
   await th.send({
     content: "@everyone",
     embeds: [
@@ -1356,17 +1410,35 @@ async function endAuc(cli, cfg) {
   const a = st.a;
   if (!a) return;
   a.status = "ended";
-  const th = await cli.channels.fetch(a.threadId);
+
+  // Bug #26 fix: Check thread existence before sending
+  const th = await cli.channels.fetch(a.threadId).catch(() => null);
+  if (!th) {
+    console.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, cannot send auction results`);
+    // Still need to finalize to clear locked points and update state
+    await finalize(cli, cfg);
+    return;
+  }
 
   const isBatch = a.quantity > 1;
 
   if (isBatch && a.bids.length > 0) {
     // Batch auction - determine winners
-    const sortedBids = a.bids
+    // Bug #22 fix: Ensure each user can only win once (take their highest bid only)
+    const seenUsers = new Set();
+    const uniqueBids = a.bids
       .sort((x, y) => y.amount - x.amount)
+      .filter((b) => {
+        const userKey = normalizeUsername(b.user);
+        if (seenUsers.has(userKey)) {
+          return false; // Skip duplicate user
+        }
+        seenUsers.add(userKey);
+        return true;
+      })
       .slice(0, a.quantity);
 
-    a.winners = sortedBids.map((b) => ({
+    a.winners = uniqueBids.map((b) => ({
       username: b.user,
       userId: b.userId,
       amount: b.amount,
@@ -1402,6 +1474,14 @@ async function endAuc(cli, cfg) {
         timestamp: Date.now(),
       });
     });
+
+    // Bug #24 fix: Limit history to prevent unbounded growth (keep last 1000 entries)
+    const MAX_HISTORY_SIZE = 1000;
+    if (st.h.length > MAX_HISTORY_SIZE) {
+      const removed = st.h.length - MAX_HISTORY_SIZE;
+      st.h = st.h.slice(-MAX_HISTORY_SIZE);
+      console.log(`🧹 Trimmed auction history: removed ${removed} oldest entries, kept ${MAX_HISTORY_SIZE}`);
+    }
   } else if (a.curWin) {
     // Single item auction
     await th.send({
@@ -1433,6 +1513,14 @@ async function endAuc(cli, cfg) {
       amount: a.curBid,
       timestamp: Date.now(),
     });
+
+    // Bug #24 fix: Limit history to prevent unbounded growth (keep last 1000 entries)
+    const MAX_HISTORY_SIZE = 1000;
+    if (st.h.length > MAX_HISTORY_SIZE) {
+      const removed = st.h.length - MAX_HISTORY_SIZE;
+      st.h = st.h.slice(-MAX_HISTORY_SIZE);
+      console.log(`🧹 Trimmed auction history: removed ${removed} oldest entries, kept ${MAX_HISTORY_SIZE}`);
+    }
   } else {
     // No bids
     await th.send({
@@ -1546,14 +1634,25 @@ async function loadBiddingStateFromSheet(url) {
   }
 }
 
-async function finalize(cli, cfg) {
-  const [adm, bch] = await Promise.all([
-    discordCache.getChannel('admin_logs_channel_id'),
-    discordCache.getChannel('bidding_channel_id')
-  ]);
+// CRITICAL: Finalization lock to prevent state corruption
+let finalizationInProgress = false;
 
-  // Stop cache auto-refresh
-  stopCacheAutoRefresh();
+async function finalize(cli, cfg) {
+  // Prevent concurrent finalization or bids during finalization
+  if (finalizationInProgress) {
+    console.warn("⚠️ Finalization already in progress, skipping duplicate call");
+    return;
+  }
+
+  finalizationInProgress = true;
+  try {
+    const [adm, bch] = await Promise.all([
+      discordCache.getChannel('admin_logs_channel_id'),
+      discordCache.getChannel('bidding_channel_id')
+    ]);
+
+    // Stop cache auto-refresh
+    stopCacheAutoRefresh();
 
   if (st.h.length === 0) {
     await bch.send(`${EMOJI.SUCCESS} **Session complete!** No sales.`);
@@ -1639,11 +1738,19 @@ async function finalize(cli, cfg) {
     await bch.send(`${EMOJI.ERROR} Submit failed. Admins notified.`);
   }
 
-  st.h = [];
-  st.sd = null;
-  st.lp = {};
-  clearCache();
-  await save(true); // Force immediate sync to persist session finalization
+    st.h = [];
+    st.sd = null;
+    st.lp = {};
+    clearCache();
+    await save(true); // Force immediate sync to persist session finalization
+  } finally {
+    finalizationInProgress = false;
+  }
+}
+
+// Export finalization status for bid processing checks
+function isFinalizingSession() {
+  return finalizationInProgress;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1728,6 +1835,12 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   if (!hasRole(m) && !isAdm(m, config)) {
     await msg.reply(ERROR_MESSAGES.NO_ROLE);
     return { ok: false, msg: "No role" };
+  }
+
+  // CRITICAL: Block bids during session finalization
+  if (finalizationInProgress) {
+    await msg.reply(`${EMOJI.CLOCK} Session finalizing... please wait`);
+    return { ok: false, msg: "Finalizing" };
   }
 
   // Attendance check removed - all ELYSIUM members can now bid freely
@@ -1819,11 +1932,33 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 
   // Handle previous winner (unlock their points)
   if (currentItem.curWin && !isSelf) {
-    unlock(currentItem.curWin, currentItem.curBid);
+    try {
+      unlock(currentItem.curWin, currentItem.curBid);
+    } catch (err) {
+      console.error(`❌ CRITICAL: Failed to unlock points for ${currentItem.curWin}:`, err);
+      // Log to admin but continue - don't block new bid
+      // This should be investigated as it may indicate state corruption
+    }
   }
 
   // Lock the new bid
-  lock(u, needed);
+  try {
+    lock(u, needed);
+  } catch (err) {
+    console.error(`❌ CRITICAL: Failed to lock points for ${u}:`, err);
+    // If we can't lock points, we MUST restore previous state
+    if (currentItem.curWin && !isSelf) {
+      try {
+        lock(currentItem.curWin, currentItem.curBid); // Re-lock previous winner
+      } catch (restoreErr) {
+        console.error(`❌ FATAL: Failed to restore previous state:`, restoreErr);
+      }
+    }
+    return {
+      status: "error",
+      msg: "⚠️ Failed to process bid - system error. Please contact admin.",
+    };
+  }
 
   // Store previous bid for display
   const prevBid = currentItem.curBid;
@@ -1848,11 +1983,20 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 
   let timeExtended = false;
   if (timeLeft < 60000 && timeLeft > 0 && currentItem.extCnt < ME) {
-    // STEP 1: Clear ALL timers IMMEDIATELY to prevent old itemEnd from firing
-    if (auctRef && typeof auctRef.safelyClearItemTimers === "function") {
-      auctRef.safelyClearItemTimers();
-      console.log(`🛑 Cleared timers to prevent race condition`);
+    // CRITICAL: Validate auctioneering module has required methods
+    if (!auctRef ||
+        typeof auctRef.safelyClearItemTimers !== "function" ||
+        typeof auctRef.rescheduleItemTimers !== "function") {
+      console.error("❌ Cannot extend time - auctioneering module missing critical timer methods");
+      return {
+        status: "error",
+        msg: "⚠️ Time extension failed - system error. Please contact admin.",
+      };
     }
+
+    // STEP 1: Clear ALL timers IMMEDIATELY to prevent old itemEnd from firing
+    auctRef.safelyClearItemTimers();
+    console.log(`🛑 Cleared timers to prevent race condition`);
 
     // STEP 2: Update endTime (now safe since timers are cleared)
     const extensionTime = 60000; // 1 minute
@@ -1869,18 +2013,20 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     console.log(`📊 New time left: ${Math.ceil((currentItem.endTime - Date.now()) / 1000)}s`);
 
     // STEP 3: Reschedule timers with new endTime
-    if (auctRef && typeof auctRef.rescheduleItemTimers === "function") {
-      auctRef.rescheduleItemTimers(
-        msg.client,
-        config,
-        msg.channel
-      );
-      console.log(`✅ Timers rescheduled with new endTime`);
-    }
+    auctRef.rescheduleItemTimers(
+      msg.client,
+      config,
+      msg.channel
+    );
+    console.log(`✅ Timers rescheduled with new endTime`);
   }
 
-  // Update via auctioneering module
-  if (auctRef && typeof auctRef.updateCurrentItemState === "function") {
+  // Update via auctioneering module - CRITICAL for state sync
+  if (!auctRef || typeof auctRef.updateCurrentItemState !== "function") {
+    console.error("❌ CRITICAL: Cannot sync state with auctioneering module");
+    // This is critical - if state doesn't sync, timers will use stale data
+    // Continue anyway but log the issue for investigation
+  } else {
     auctRef.updateCurrentItemState({
       curBid: bid,
       curWin: u,
@@ -2135,6 +2281,14 @@ async function procBid(msg, amt, cfg) {
     conf.react(EMOJI.ERROR)
   ]);
 
+  // Bug #23 fix: Limit pending confirmations to prevent unbounded growth
+  const MAX_PENDING_CONFIRMATIONS = 100;
+  const pendingCount = Object.keys(st.pc).length;
+  if (pendingCount >= MAX_PENDING_CONFIRMATIONS) {
+    console.warn(`⚠️ Pending confirmations limit reached (${pendingCount}), cleaning up old entries`);
+    cleanupPendingConfirmations();
+  }
+
   st.pc[conf.id] = {
     userId: uid,
     username: u,
@@ -2166,6 +2320,11 @@ async function procBid(msg, amt, cfg) {
       clearInterval(countdownInterval);
       if (st.th[`countdown_${conf.id}`]) {
         delete st.th[`countdown_${conf.id}`];
+      }
+      // CRITICAL: Also cleanup the pending confirmation to prevent stale processing
+      if (st.pc[conf.id]) {
+        delete st.pc[conf.id];
+        save(); // Persist state change
       }
     }
   }, 1000);
@@ -3302,10 +3461,14 @@ function getMemoryStats() {
 }
 
 /**
- * Global cleanup interval reference
- * @type {NodeJS.Timeout|null}
+ * Global cleanup interval references (Bug #5 fix - store all intervals)
+ * @type {Object}
  */
-let cleanupInterval = null;
+const cleanupIntervals = {
+  pendingConfirmations: null,
+  lockedPoints: null,
+  memoryStats: null
+};
 
 /**
  * Starts periodic cleanup schedule for pending confirmations and memory checks (v6.2 enhanced)
@@ -3329,19 +3492,20 @@ let cleanupInterval = null;
  * - Keeps state object clean and bounded
  */
 function startCleanupSchedule() {
-  if (!cleanupInterval) {
+  // Check if any intervals are already running
+  if (!cleanupIntervals.pendingConfirmations && !cleanupIntervals.lockedPoints && !cleanupIntervals.memoryStats) {
     // Main cleanup: every 2 minutes
-    cleanupInterval = setInterval(() => {
+    cleanupIntervals.pendingConfirmations = setInterval(() => {
       cleanupPendingConfirmations();
     }, 120000); // 2 minutes
 
     // Locked points check: every 5 minutes
-    setInterval(() => {
+    cleanupIntervals.lockedPoints = setInterval(() => {
       checkLockedPoints();
     }, 300000); // 5 minutes
 
     // Memory stats: every 30 minutes
-    setInterval(() => {
+    cleanupIntervals.memoryStats = setInterval(() => {
       const stats = getMemoryStats();
       console.log(`📊 Memory: ${stats.memory.heapUsed}MB / ${stats.memory.heapTotal}MB heap, ` +
                   `${stats.state.pendingConfirmations} pending, ` +
@@ -3353,7 +3517,25 @@ function startCleanupSchedule() {
   }
 }
 
-// stopCleanupSchedule removed - unused function
+/**
+ * Stops all cleanup intervals (Bug #5 fix - cleanup function)
+ * Used for testing or graceful shutdown
+ */
+function stopCleanupSchedule() {
+  if (cleanupIntervals.pendingConfirmations) {
+    clearInterval(cleanupIntervals.pendingConfirmations);
+    cleanupIntervals.pendingConfirmations = null;
+  }
+  if (cleanupIntervals.lockedPoints) {
+    clearInterval(cleanupIntervals.lockedPoints);
+    cleanupIntervals.lockedPoints = null;
+  }
+  if (cleanupIntervals.memoryStats) {
+    clearInterval(cleanupIntervals.memoryStats);
+    cleanupIntervals.memoryStats = null;
+  }
+  console.log("⏹️ Stopped all cleanup schedules");
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MODULE EXPORTS - Public API

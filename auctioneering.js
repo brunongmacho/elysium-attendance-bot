@@ -822,15 +822,24 @@ async function startAuctioneering(client, config, channel) {
     embeds: [countdownEmbed],
   });
 
+  // Clear any existing countdown timer before creating new one (Bug #3 fix)
+  if (auctionState.timers.sessionStartCountdown) {
+    clearInterval(auctionState.timers.sessionStartCountdown);
+    delete auctionState.timers.sessionStartCountdown;
+  }
+
   // Countdown feedback every 5 seconds
   let countdown = 30;
   const countdownInterval = setInterval(async () => {
     try {
       countdown -= 5;
       if (countdown > 0) {
-        countdownEmbed.setFooter({
-          text: `Starting first item in ${countdown}s...`,
-        });
+        // Update both title and footer with countdown for better visibility
+        countdownEmbed
+          .setTitle(`${EMOJI.FIRE} Auctioneering Started! - Starting in ${countdown}s`)
+          .setFooter({
+            text: `Starting first item in ${countdown}s...`,
+          });
         await feedbackMsg
           .edit({ embeds: [countdownEmbed] })
           .catch((err) =>
@@ -1193,10 +1202,28 @@ async function auctionNextItem(client, config, channel) {
       "→ Check: Bot needs 'Create Public Threads' & 'Send Messages in Threads' in the bidding channel."
     );
 
-    // Clean up partial state to prevent auction from being stuck
+    // COMPREHENSIVE cleanup to prevent auction from being stuck
+    // Clear all timers first
+    clearAllTimers();
+
+    // Clear current item and deactivate
     auctionState.currentItem = null;
     auctionState.active = false;
 
+    // CRITICAL: Clear locked points from failed auction
+    try {
+      if (!biddingModule) {
+        biddingModule = require("./bidding.js");
+      }
+      const biddingState = biddingModule.getBiddingState();
+      biddingState.lp = {};
+      biddingModule.saveBiddingState();
+      console.log(`${EMOJI.SUCCESS} Cleared locked points after thread creation failure`);
+    } catch (unlockErr) {
+      console.error(`${EMOJI.ERROR} Failed to clear locked points:`, unlockErr);
+    }
+
+    // Save state
     try {
       if (cfg?.sheet_webhook_url) {
         await saveAuctionState(cfg.sheet_webhook_url);
@@ -1730,8 +1757,9 @@ async function finalizeSession(client, config, channel) {
 
   if (!auctionState.active) return;
 
-  auctionState.active = false;
-  clearAllTimers();
+  try {
+    auctionState.active = false;
+    clearAllTimers();
 
   // Stop cache auto-refresh timer from bidding module
   if (
@@ -1961,28 +1989,38 @@ async function finalizeSession(client, config, channel) {
     await adminLogs.send({ embeds: [adminEmbed] });
   }
 
-  console.log("🧹 Clearing session data...");
-  auctionState.sessionItems = []; // Clear sold items history
+    console.log("🧹 Clearing session data...");
+    auctionState.sessionItems = []; // Clear sold items history
 
-  // Clear bidding module cache AND locked points
-  // Use existing module-level biddingModule (already required at module init)
-  if (!biddingModule) {
-    biddingModule = require("./bidding.js");
-  }
-  biddingModule.clearPointsCache();
+    // Clear bidding module cache
+    if (!biddingModule) {
+      biddingModule = require("./bidding.js");
+    }
+    biddingModule.clearPointsCache();
 
-  // CRITICAL: Clear all locked points after session
-  const biddingState = biddingModule.getBiddingState();
-  biddingState.lp = {};
-  biddingModule.saveBiddingState();
+    console.log("✅ Session data cleared");
 
-  console.log("✅ All session data cleared, locked points released");
-
-  // Save state if config is available
-  if (cfg && cfg.sheet_webhook_url) {
-    await saveAuctionState(cfg.sheet_webhook_url).catch((err) => {
-      console.error(`${EMOJI.ERROR} Failed to save state:`, err);
-    });
+    // Save state if config is available
+    if (cfg && cfg.sheet_webhook_url) {
+      await saveAuctionState(cfg.sheet_webhook_url).catch((err) => {
+        console.error(`${EMOJI.ERROR} Failed to save state:`, err);
+      });
+    }
+  } finally {
+    // CRITICAL: ALWAYS clear locked points, even if errors occurred
+    // This prevents users from being blocked in future auctions
+    try {
+      if (!biddingModule) {
+        biddingModule = require("./bidding.js");
+      }
+      const biddingState = biddingModule.getBiddingState();
+      biddingState.lp = {};
+      biddingModule.saveBiddingState();
+      console.log("✅ Locked points released");
+    } catch (err) {
+      console.error(`${EMOJI.ERROR} Failed to clear locked points:`, err);
+      // Don't throw - this is cleanup, continue anyway
+    }
   }
 }
 
@@ -3457,6 +3495,42 @@ function scheduleWeeklySaturdayAuction(client, config) {
     const dayName = dayNames[displayTime.getUTCDay()];
 
     console.log(`${EMOJI.CLOCK} Next Saturday auction scheduled for: ${dayName}, ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${days}d ${hours}h ${minutes}m)`);
+
+    // Schedule announcement 15 minutes before auction
+    const ANNOUNCEMENT_LEAD_TIME = 15 * 60 * 1000; // 15 minutes
+    const announcementDelay = delay - ANNOUNCEMENT_LEAD_TIME;
+
+    if (announcementDelay > 0) {
+      setTimeout(async () => {
+        try {
+          console.log(`${EMOJI.BELL} Sending 15-minute auction warning to announcement channel...`);
+          const announcementChannel = await discordCache.getChannel('guild_announcement_channel_id').catch(() => null);
+
+          if (announcementChannel) {
+            await announcementChannel.send({
+              content: '@everyone',
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(0xffa500) // Orange
+                  .setTitle(`${EMOJI.AUCTION} Auction Starting Soon!`)
+                  .setDescription('The weekly auction will begin in **15 minutes**!')
+                  .addFields(
+                    { name: '⏰ Start Time', value: '<t:' + Math.floor(nextUTC.getTime() / 1000) + ':R>', inline: true },
+                    { name: '📍 Location', value: '<#' + config.bidding_channel_id + '>', inline: true }
+                  )
+                  .setFooter({ text: 'Prepare your points and get ready to bid!' })
+                  .setTimestamp()
+              ]
+            });
+            console.log(`${EMOJI.SUCCESS} Auction announcement sent to announcement channel`);
+          } else {
+            console.warn(`${EMOJI.WARNING} Could not fetch announcement channel for pre-auction warning`);
+          }
+        } catch (err) {
+          console.error(`${EMOJI.ERROR} Failed to send auction announcement:`, err);
+        }
+      }, announcementDelay);
+    }
 
     weeklyAuctionTimer = setTimeout(async () => {
       console.log(`${EMOJI.AUCTION} Saturday auction time! Starting auction...`);

@@ -2609,20 +2609,37 @@ function getAttendanceLeaderboard(data) {
     const data_range = logSheet.getRange(2, 1, lastRow - 1, 5);
     const values = data_range.getValues();
 
-    // Count attendance per member
+    // Count attendance per member AND per boss
     const memberCounts = {};
+    const bossSpawnCounts = {}; // NEW: Track spawn count per boss
+    const bossMemberCounts = {}; // NEW: Track member participation per boss
     let totalSpawns = 0;
 
     for (let i = 0; i < values.length; i++) {
+      const boss = (values[i][1] || '').toString().trim(); // Column B: Boss
       const membersStr = (values[i][3] || '').toString().trim(); // Column D: Members (comma-separated)
 
       if (membersStr) {
         totalSpawns++;
+
+        // Track boss spawn count
+        if (boss) {
+          bossSpawnCounts[boss] = (bossSpawnCounts[boss] || 0) + 1;
+        }
+
         const members = membersStr.split(',').map(m => m.trim()).filter(m => m);
 
         members.forEach(member => {
           if (member) {
             memberCounts[member] = (memberCounts[member] || 0) + 1;
+
+            // Track per-boss participation
+            if (boss) {
+              if (!bossMemberCounts[boss]) {
+                bossMemberCounts[boss] = {};
+              }
+              bossMemberCounts[boss][member] = (bossMemberCounts[boss][member] || 0) + 1;
+            }
           }
         });
       }
@@ -2648,13 +2665,37 @@ function getAttendanceLeaderboard(data) {
     const totalPoints = leaderboard.reduce((sum, m) => sum + m.points, 0);
     const averageAttendance = leaderboard.length > 0 ? Math.round((totalPoints / leaderboard.length) * 10) / 10 : 0;
 
-    Logger.log(`✅ Fetched attendance leaderboard: ${leaderboard.length} members from ${totalSpawns} spawns`);
+    // Build boss statistics array with participation rate
+    const bossStats = [];
+    for (const [bossName, spawnCount] of Object.entries(bossSpawnCounts)) {
+      const uniqueMembers = bossMemberCounts[bossName] ? Object.keys(bossMemberCounts[bossName]).length : 0;
+      const totalParticipation = bossMemberCounts[bossName]
+        ? Object.values(bossMemberCounts[bossName]).reduce((sum, count) => sum + count, 0)
+        : 0;
+      const avgMembersPerSpawn = spawnCount > 0 ? Math.round((totalParticipation / spawnCount) * 10) / 10 : 0;
+
+      bossStats.push({
+        boss: bossName,
+        spawnCount: spawnCount,
+        uniqueMembers: uniqueMembers,
+        totalParticipation: totalParticipation,
+        avgMembersPerSpawn: avgMembersPerSpawn,
+        participationRate: leaderboard.length > 0 ? Math.round((uniqueMembers / leaderboard.length) * 100) : 0
+      });
+    }
+
+    // Sort boss stats by spawn count (descending)
+    bossStats.sort((a, b) => b.spawnCount - a.spawnCount);
+
+    Logger.log(`✅ Fetched attendance leaderboard: ${leaderboard.length} members, ${totalSpawns} spawns, ${bossStats.length} bosses`);
 
     return createResponse('ok', 'Attendance leaderboard fetched', {
       leaderboard: leaderboard,
       weekName: weekName,
       totalSpawns: totalSpawns,
-      averageAttendance: averageAttendance
+      averageAttendance: averageAttendance,
+      bossStats: bossStats, // NEW: Boss-specific statistics
+      uniqueBosses: bossStats.length // NEW: Total unique bosses
     });
 
   } catch (err) {
@@ -2739,13 +2780,65 @@ function getWeeklySummary(data) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
+    // NEW: Get boss statistics from AttendanceLog
+    const logSheet = ss.getSheetByName('AttendanceLog');
+    const bossStats = [];
+    let totalSpawnsFromLog = 0;
+
+    if (logSheet && logSheet.getLastRow() > 1) {
+      const lastRow = logSheet.getLastRow();
+      const logValues = logSheet.getRange(2, 1, lastRow - 1, 5).getValues();
+      const bossSpawnCounts = {};
+      const bossMemberCounts = {};
+
+      for (let i = 0; i < logValues.length; i++) {
+        const boss = (logValues[i][1] || '').toString().trim();
+        const membersStr = (logValues[i][3] || '').toString().trim();
+
+        if (membersStr) {
+          totalSpawnsFromLog++;
+
+          if (boss) {
+            bossSpawnCounts[boss] = (bossSpawnCounts[boss] || 0) + 1;
+            const members = membersStr.split(',').map(m => m.trim()).filter(m => m);
+
+            members.forEach(member => {
+              if (member) {
+                if (!bossMemberCounts[boss]) bossMemberCounts[boss] = {};
+                bossMemberCounts[boss][member] = (bossMemberCounts[boss][member] || 0) + 1;
+              }
+            });
+          }
+        }
+      }
+
+      // Build boss stats
+      for (const [bossName, spawnCount] of Object.entries(bossSpawnCounts)) {
+        const uniqueMembers = bossMemberCounts[bossName] ? Object.keys(bossMemberCounts[bossName]).length : 0;
+        const totalParticipation = bossMemberCounts[bossName]
+          ? Object.values(bossMemberCounts[bossName]).reduce((sum, count) => sum + count, 0)
+          : 0;
+        const avgMembersPerSpawn = spawnCount > 0 ? Math.round((totalParticipation / spawnCount) * 10) / 10 : 0;
+
+        bossStats.push({
+          boss: bossName,
+          spawnCount: spawnCount,
+          uniqueMembers: uniqueMembers,
+          avgMembersPerSpawn: avgMembersPerSpawn
+        });
+      }
+
+      bossStats.sort((a, b) => b.spawnCount - a.spawnCount);
+    }
+
     // Get attendance data
     const totalSheet = ss.getSheetByName('TOTAL ATTENDANCE');
     let attendanceData = {
       totalSpawns: 0,
       uniqueAttendees: 0,
       averagePerSpawn: 0,
-      topAttendees: []
+      topAttendees: [],
+      bossStats: bossStats // NEW: Include boss statistics
     };
 
     if (totalSheet && totalSheet.getLastRow() > 1) {
@@ -2767,13 +2860,14 @@ function getWeeklySummary(data) {
       members.sort((a, b) => b.points - a.points);
 
       const currentWeekSheet = getCurrentWeekSheet();
-      const totalSpawns = currentWeekSheet ? Math.max(0, currentWeekSheet.getLastColumn() - COLUMNS.FIRST_SPAWN + 1) : 0;
+      const totalSpawns = totalSpawnsFromLog > 0 ? totalSpawnsFromLog : (currentWeekSheet ? Math.max(0, currentWeekSheet.getLastColumn() - COLUMNS.FIRST_SPAWN + 1) : 0);
       const totalPoints = members.reduce((sum, m) => sum + m.points, 0);
 
       attendanceData = {
         totalSpawns: totalSpawns,
         uniqueAttendees: members.length,
         averagePerSpawn: totalSpawns > 0 ? Math.round((totalPoints / totalSpawns) * 10) / 10 : 0,
+        bossStats: bossStats, // NEW: Include boss statistics
         topAttendees: members.slice(0, 5)
       };
     }
