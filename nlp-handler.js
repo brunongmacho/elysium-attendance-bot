@@ -728,6 +728,23 @@ class NLPHandler {
       // Normalize content for better matching
       content = this.normalizeContent(content);
 
+      // Context-aware interpretation: "status" in admin-logs = attendance status
+      const isAdminLogs = message.channel.id === this.config.admin_logs_channel_id ||
+                          (message.channel.isThread() && message.channel.parentId === this.config.admin_logs_channel_id);
+
+      // If in admin-logs and user says just "status", map to attendance status
+      if (isAdminLogs && /^status$/i.test(content)) {
+        console.log('🧠 [NLP Context] "status" in admin-logs → attendancestatus');
+        return {
+          command: '!attendancestatus',
+          params: [],
+          originalMessage: content,
+          confidence: 1.0,
+          source: 'nlp-context',
+          matchedPattern: 'admin-logs context rule',
+        };
+      }
+
       // Use priority order for pattern matching (more specific first)
       const commandsToCheck = NLP_CONFIG.patternPriority.length > 0
         ? NLP_CONFIG.patternPriority
