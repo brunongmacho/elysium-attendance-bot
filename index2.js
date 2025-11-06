@@ -71,13 +71,14 @@ const bidding = require("./bidding.js");                    // Auction bidding l
 const helpSystem = require("./help-system.js");             // Command help system
 const auctioneering = require("./auctioneering.js");        // Auction management
 const attendance = require("./attendance.js");              // Attendance tracking
-const lootSystem = require("./loot-system.js");             // Loot distribution
+// const lootSystem = require("./loot-system.js");          // Loot distribution (DISABLED: manual loot entry)
 const emergencyCommands = require("./emergency-commands.js"); // Emergency overrides
 const leaderboardSystem = require("./leaderboard-system.js"); // Leaderboards
 const errorHandler = require('./utils/error-handler');      // Centralized error handling
 const { SheetAPI } = require('./utils/sheet-api');          // Unified Google Sheets API
 const { DiscordCache } = require('./utils/discord-cache');  // Channel caching system
 const { normalizeUsername } = require('./utils/common');    // Username normalization
+const scheduler = require('./utils/maintenance-scheduler'); // Unified maintenance scheduler
 const { IntelligenceEngine } = require('./intelligence-engine.js'); // AI/ML Intelligence Engine
 const { ProactiveIntelligence } = require('./proactive-intelligence.js'); // Proactive Monitoring
 const { NLPHandler } = require('./nlp-handler.js'); // Natural Language Processing
@@ -242,12 +243,12 @@ const client = new Client({
   // Partials - handle uncached entities
   partials: [Partials.Channel, Partials.Message, Partials.Reaction],
 
-  // Memory optimization: Sweep caches regularly to manage 256MB RAM limit
-  // This is critical for long-running bots in memory-constrained environments
+  // Memory optimization: Sweep caches regularly to manage 512MB RAM limit
+  // Optimized for fast message cleanup while maintaining reaction functionality
   sweepers: {
     messages: {
-      interval: 300, // Run every 5 minutes
-      lifetime: 600, // Remove messages older than 10 minutes
+      interval: 180, // Run every 3 minutes (optimized from 5)
+      lifetime: 300, // Remove messages older than 5 minutes (optimized from 10)
     },
     users: {
       interval: 600, // Run every 10 minutes
@@ -1101,10 +1102,10 @@ async function awaitConfirmation(
  * @constant
  */
 const commandHandlers = {
-  // Help command
-  loot: async (message, member, args) => {
-    await lootSystem.handleLootCommand(message, args, client);
-  },
+  // Loot command (DISABLED: manual entry now used)
+  // loot: async (message, member, args) => {
+  //   await lootSystem.handleLootCommand(message, args, client);
+  // },
 
   help: async (message, member) => {
     const args = message.content.trim().split(/\s+/).slice(1);
@@ -3297,7 +3298,7 @@ client.once(Events.ClientReady, async () => {
   auctioneering.initialize(config, isAdmin, bidding, discordCache, intelligenceEngine); // Pass intelligenceEngine
   bidding.initializeBidding(config, isAdmin, auctioneering, discordCache);
   auctioneering.setPostToSheet(attendance.postToSheet); // Use attendance module's postToSheet
-  lootSystem.initialize(config, bossPoints, isAdmin);
+  // lootSystem.initialize(config, bossPoints, isAdmin); // DISABLED: manual loot entry
   emergencyCommands.initialize(
     config,
     attendance,
@@ -3521,12 +3522,12 @@ client.once(Events.ClientReady, async () => {
   console.log("🔨 Starting weekly Saturday auction scheduler...");
   auctioneering.scheduleWeeklySaturdayAuction(client, config);
 
-  // START AGGRESSIVE MEMORY MANAGEMENT (Optimized for 512MB RAM on Koyeb)
-  if (global.gc) {
-    console.log("🧹 Starting aggressive memory management (every 5 minutes)");
+  // START UNIFIED MAINTENANCE SCHEDULER
+  console.log("🚀 Starting unified maintenance scheduler...");
 
-    // Enhanced garbage collection with memory pressure detection
-    setInterval(() => {
+  // Register GC task (every 5 minutes)
+  if (global.gc) {
+    scheduler.registerTask('gc-management', async () => {
       const memUsage = process.memoryUsage();
       const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
       const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
@@ -3552,10 +3553,13 @@ client.once(Events.ClientReady, async () => {
       if (rssMB > 400) {
         console.error(`🚨 MEMORY ALERT: ${rssMB}MB RSS (Limit: 512MB) - Consider restarting`);
       }
-    }, 5 * 60 * 1000); // Every 5 minutes (more aggressive than 10)
+    }, 5 * 60 * 1000); // Every 5 minutes
   } else {
     console.warn("⚠️ Garbage collection not available. Run with --expose-gc flag.");
   }
+
+  // Start the scheduler
+  scheduler.startScheduler();
 
   console.log("✅ Bot initialization complete and ready for operations!");
 });
@@ -3600,12 +3604,15 @@ client.once(Events.ClientReady, async () => {
  */
 client.on(Events.MessageCreate, async (message) => {
   try {
+    // ⚡ PERFORMANCE: Early returns for irrelevant messages
+    if (message.author.bot) return; // Skip bot messages immediately
+    if (!message.guild) return; // Skip DMs immediately
+    if (message.guild.id !== config.main_guild_id) return; // Skip wrong guild
+
     // 🧹 BIDDING CHANNEL PROTECTION: Delete non-admin messages immediately
     // EXCEPT for member commands (!mypoints, !bidstatus, etc.)
     if (
-      message.guild &&
-      message.channel.id === config.bidding_channel_id &&
-      !message.author.bot
+      message.channel.id === config.bidding_channel_id
     ) {
       const member = await message.guild.members
         .fetch(message.author.id)
@@ -4347,6 +4354,10 @@ client.on(Events.MessageCreate, async (message) => {
             }
           }
 
+          // Lock and archive the thread to prevent spam
+          await message.channel
+            .setLocked(true, `Force locked by ${message.author.username}`)
+            .catch(console.error);
           await message.channel
             .setArchived(true, `Force closed by ${message.author.username}`)
             .catch(console.error);
@@ -4410,17 +4421,17 @@ client.on(Events.MessageCreate, async (message) => {
       const adminCmd = resolveCommandAlias(rawCmd);
       const args = message.content.trim().split(/\s+/).slice(1);
 
-      // LOOT COMMAND - Admin logs threads only
-      const lootCmd = resolveCommandAlias(rawCmd);
-      if (lootCmd === "!loot") {
-        console.log(`🎯 Loot command detected`);
-        await lootSystem.handleLootCommand(
-          message,
-          message.content.trim().split(/\s+/).slice(1),
-          client
-        );
-        return;
-      }
+      // LOOT COMMAND - DISABLED (manual loot entry now used)
+      // const lootCmd = resolveCommandAlias(rawCmd);
+      // if (lootCmd === "!loot") {
+      //   console.log(`🎯 Loot command detected`);
+      //   await lootSystem.handleLootCommand(
+      //     message,
+      //     message.content.trim().split(/\s+/).slice(1),
+      //     client
+      //   );
+      //   return;
+      // }
 
       // Admin logs override commands
       if (
@@ -4665,7 +4676,10 @@ client.on(Events.MessageCreate, async (message) => {
  */
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
   try {
-    if (user.bot) return;
+    // ⚡ PERFORMANCE: Early returns for irrelevant reactions
+    if (user.bot) return; // Skip bot reactions
+    if (!reaction.message.guild) return; // Skip DM reactions
+    if (reaction.message.guild.id !== config.main_guild_id) return; // Skip wrong guild
 
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();
@@ -4859,6 +4873,10 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
             }
           }
 
+          // Lock and archive the thread to prevent spam
+          await msg.channel
+            .setLocked(true, `Locked by ${user.username}`)
+            .catch(() => {});
           await msg.channel
             .setArchived(true, `Closed by ${user.username}`)
             .catch(() => {});

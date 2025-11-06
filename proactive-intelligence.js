@@ -100,6 +100,11 @@ class ProactiveIntelligence {
       milestones: new Set(), // Track already celebrated milestones
     };
 
+    // Error tracking & rate limiting (optimization)
+    this.errorCount = {};
+    this.lastNotificationTime = {};
+    this.MIN_NOTIFICATION_INTERVAL = 3600000; // 1 hour minimum between similar notifications
+
     // Initialize
     this.initialized = false;
   }
@@ -118,43 +123,53 @@ class ProactiveIntelligence {
 
     console.log('🤖 [PROACTIVE] Initializing proactive intelligence system...');
 
-    // Schedule engagement digest (Monday 9 AM Manila time)
+    // Schedule engagement digest (Monday 9 AM Manila time) with error handling
     this.cronJobs.push(
-      cron.schedule('0 9 * * 1', () => this.sendEngagementDigest(), {
+      cron.schedule('0 9 * * 1', () => {
+        this.safeExecute('engagementDigest', () => this.sendEngagementDigest(), false);
+      }, {
         timezone: 'Asia/Manila'
       })
     );
 
-    // Schedule anomaly digest (Daily 6 PM Manila time)
+    // Schedule anomaly digest (Daily 6 PM Manila time) with error handling
     this.cronJobs.push(
-      cron.schedule('0 18 * * *', () => this.sendAnomalyDigest(), {
+      cron.schedule('0 18 * * *', () => {
+        this.safeExecute('anomalyDigest', () => this.sendAnomalyDigest(), false);
+      }, {
         timezone: 'Asia/Manila'
       })
     );
 
-    // Schedule weekly positive summary (Sunday 8 PM Manila time)
+    // Schedule weekly positive summary (Sunday 8 PM Manila time) with error handling
     this.cronJobs.push(
-      cron.schedule('0 20 * * 0', () => this.sendWeeklySummary(), {
+      cron.schedule('0 20 * * 0', () => {
+        this.safeExecute('weeklySummary', () => this.sendWeeklySummary(), false);
+      }, {
         timezone: 'Asia/Manila'
       })
     );
 
-    // Schedule pre-auction check (Saturday 10 AM Manila time - 2h before auction)
+    // Schedule pre-auction check (Saturday 10 AM Manila time) with error handling
     this.cronJobs.push(
-      cron.schedule('0 10 * * 6', () => this.checkAuctionReadiness(), {
+      cron.schedule('0 10 * * 6', () => {
+        this.safeExecute('auctionReadiness', () => this.checkAuctionReadiness(), false);
+      }, {
         timezone: 'Asia/Manila'
       })
     );
 
-    // Check for milestones every hour
+    // Check for milestones every hour with error handling and rate limiting
     this.cronJobs.push(
-      cron.schedule('0 * * * *', () => this.checkMilestones(), {
+      cron.schedule('0 * * * *', () => {
+        this.safeExecute('milestoneCheck', () => this.checkMilestones(), true);
+      }, {
         timezone: 'Asia/Manila'
       })
     );
 
     this.initialized = true;
-    console.log('✅ [PROACTIVE] Scheduled 5 monitoring tasks');
+    console.log('✅ [PROACTIVE] Scheduled 5 monitoring tasks with robust error handling');
   }
 
   /**
@@ -163,6 +178,76 @@ class ProactiveIntelligence {
   stop() {
     this.cronJobs.forEach(job => job.stop());
     console.log('⏹️ [PROACTIVE] Stopped all monitoring tasks');
+  }
+
+  /**
+   * Safe execution wrapper with error handling and rate limiting
+   * @param {string} taskName - Name of the task for logging
+   * @param {Function} taskFn - Async function to execute
+   * @param {boolean} rateLimit - Whether to enforce rate limiting
+   */
+  async safeExecute(taskName, taskFn, rateLimit = true) {
+    try {
+      // Rate limiting check
+      if (rateLimit) {
+        const lastRun = this.lastNotificationTime[taskName];
+        if (lastRun && (Date.now() - lastRun < this.MIN_NOTIFICATION_INTERVAL)) {
+          console.log(`⏭️ [PROACTIVE] Skipping ${taskName} (rate limited)`);
+          return;
+        }
+      }
+
+      // Execute task
+      await taskFn();
+
+      // Update last run time
+      this.lastNotificationTime[taskName] = Date.now();
+
+      // Reset error count on success
+      if (this.errorCount[taskName]) {
+        this.errorCount[taskName] = 0;
+      }
+
+    } catch (error) {
+      // Track consecutive errors
+      this.errorCount[taskName] = (this.errorCount[taskName] || 0) + 1;
+
+      console.error(`❌ [PROACTIVE] Error in ${taskName}:`, error.message);
+
+      // Alert admins if errors persist (3+ consecutive failures)
+      if (this.errorCount[taskName] >= 3) {
+        await this.sendErrorAlert(taskName, error);
+      }
+    }
+  }
+
+  /**
+   * Send error alert to admin logs
+   */
+  async sendErrorAlert(taskName, error) {
+    try {
+      const adminLogsChannel = await getChannelById(
+        this.client,
+        this.config[PROACTIVE_CONFIG.channels.adminLogs]
+      );
+
+      if (adminLogsChannel) {
+        const embed = new EmbedBuilder()
+          .setColor(0xff0000)
+          .setTitle('🚨 Proactive Intelligence Error')
+          .setDescription(
+            `**Task:** ${taskName}\n` +
+            `**Consecutive Failures:** ${this.errorCount[taskName]}\n` +
+            `**Error:** ${error.message}`
+          )
+          .setFooter({ text: 'Proactive Intelligence System' })
+          .setTimestamp();
+
+        await adminLogsChannel.send({ embeds: [embed] });
+      }
+    } catch (alertError) {
+      console.error('[PROACTIVE] Failed to send error alert:', alertError.message);
+    }
   }
 
   // ═════════════════════════════════════════════════════════════════════════
