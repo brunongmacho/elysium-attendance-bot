@@ -765,9 +765,10 @@ class IntelligenceEngine {
       // Also calculate mean for comparison
       const avgInterval = intervalsToUse.reduce((a, b) => a + b, 0) / intervalsToUse.length;
 
-      // Weight recent intervals more heavily (70% recent, 30% overall)
+      // Weight recent intervals more heavily (70% median, 30% recent)
+      // Use filtered intervals to ensure recent average is also outlier-free
       const recentCount = Math.min(5, Math.floor(intervalsToUse.length * 0.3));
-      const recentIntervals = intervals.slice(-recentCount);
+      const recentIntervals = intervalsToUse.slice(-recentCount);
       const recentAvg = recentIntervals.reduce((a, b) => a + b, 0) / recentIntervals.length;
 
       // Combine median with recent trend
