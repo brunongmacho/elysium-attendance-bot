@@ -637,6 +637,44 @@ const COMMAND_HELP = {
     ]
   },
 
+  predictattendance: {
+    usage: "!predictattendance <username>",
+    description: "🤖 Predict member's likelihood of attending next boss spawn using ML",
+    category: "Intelligence",
+    adminOnly: true,
+    example: "!predictattendance PlayerName",
+    aliases: [],
+    location: "Admin Logs Channel or ELYSIUM Commands Channel",
+    features: [
+      "Analyzes historical attendance patterns",
+      "Calculates attendance likelihood percentage",
+      "Confidence scoring based on data quality",
+      "Displays attendance and bidding statistics",
+      "Recent activity analysis (last 7 days)",
+      "Learning system integration for improved accuracy",
+      "Saves predictions to track performance over time"
+    ]
+  },
+
+  predictspawn: {
+    usage: "!predictspawn [boss name]",
+    description: "🔮 Predict next boss spawn time based on historical patterns using ML",
+    category: "Intelligence",
+    adminOnly: true,
+    example: "!predictspawn\n!predictspawn Archaeornis\n!nextspawn",
+    aliases: ["!nextspawn", "!whennext", "!spawntimer"],
+    location: "Admin Logs Channel or ELYSIUM Commands Channel",
+    features: [
+      "Predicts next spawn time with confidence intervals",
+      "Analyzes historical spawn intervals",
+      "Calculates average spawn frequency",
+      "Shows earliest and latest possible spawn times",
+      "Boss-specific predictions or general predictions",
+      "Learning system integration for improved accuracy",
+      "Displays time until next predicted spawn"
+    ]
+  },
+
   engagement: {
     usage: "!engagement <username>",
     description: "🤖 Analyze member engagement patterns and predict attendance likelihood",

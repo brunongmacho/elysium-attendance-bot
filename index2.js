@@ -146,6 +146,9 @@ const COMMAND_ALIASES = {
   "!recommend": "!recommendations",
   "!suggest": "!recommendations",
   "!perf": "!performance",
+  "!nextspawn": "!predictspawn",
+  "!whennext": "!predictspawn",
+  "!spawntimer": "!predictspawn",
 
   // Member management commands (admin)
   "!removemem": "!removemember",
@@ -2952,6 +2955,182 @@ const commandHandlers = {
     } catch (error) {
       console.error('[BOOTSTRAP] Error during bootstrap:', error);
       await message.reply(`❌ Error during bootstrap: ${error.message}`);
+    }
+  },
+
+  /**
+   * Predict member attendance likelihood for next event
+   * Usage: !predictattendance <username>
+   */
+  predictattendance: async (message, member) => {
+    const args = message.content.trim().split(/\s+/).slice(1);
+
+    if (args.length === 0) {
+      await message.reply(
+        `❌ **Usage:** \`!predictattendance <username>\`\n\n` +
+        `**Example:** \`!predictattendance JohnDoe\`\n\n` +
+        `I'll analyze historical data to predict attendance likelihood!`
+      );
+      return;
+    }
+
+    const username = args.join(' ');
+    await message.reply(`🤖 Analyzing attendance patterns for **${username}**...`);
+
+    try {
+      const profile = await intelligenceEngine.getMemberProfile(username);
+
+      if (!profile || profile.attendance.spawns === 0) {
+        await message.reply(`❌ No attendance data found for **${username}**.`);
+        return;
+      }
+
+      const prediction = await intelligenceEngine.predictAttendanceLikelihood(profile, true);
+
+      const likelihoodPercent = Math.round(prediction.likelihood * 100);
+      const confidence = prediction.confidence;
+
+      const embed = new EmbedBuilder()
+        .setColor(likelihoodPercent >= 70 ? 0x00ff00 : likelihoodPercent >= 40 ? 0xffff00 : 0xff0000)
+        .setTitle(`📊 Attendance Prediction: ${username}`)
+        .setDescription(`🎯 **Likelihood of Attendance: ${likelihoodPercent}%**`)
+        .addFields(
+          {
+            name: '📈 Confidence',
+            value: `${confidence.toFixed(1)}%` + (confidence >= 70 ? ' ✅' : confidence >= 50 ? ' ⚠️' : ' 🔴'),
+            inline: true,
+          },
+          {
+            name: '📊 Historical Data',
+            value: `${profile.attendance.spawns} spawns attended`,
+            inline: true,
+          },
+          {
+            name: '🎯 Prediction',
+            value: likelihoodPercent >= 70 ? '✅ Highly Likely' : likelihoodPercent >= 40 ? '⚠️ Moderate' : '🔴 Unlikely',
+            inline: true,
+          },
+          {
+            name: '📈 Attendance Stats',
+            value:
+              `Total Points: **${profile.attendance.total}pts**\n` +
+              `Spawns Attended: **${profile.attendance.spawns}**\n` +
+              `Avg Points/Spawn: **${profile.attendance.averagePerSpawn.toFixed(1)}pts**`,
+            inline: true,
+          },
+          {
+            name: '💰 Bidding Stats',
+            value:
+              `Points Remaining: **${profile.bidding.pointsRemaining}pts**\n` +
+              `Points Spent: **${profile.bidding.pointsConsumed}pts**\n` +
+              `Auctions Won: **${profile.bidding.auctionsWon}**`,
+            inline: true,
+          },
+          {
+            name: '🧠 AI Insight',
+            value:
+              `The bot predicts a **${likelihoodPercent}% chance** that ${username} will attend the next boss spawn ` +
+              `based on their historical attendance patterns and recent activity.`,
+            inline: false,
+          }
+        )
+        .setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
+        .setTimestamp();
+
+      await message.reply({ embeds: [embed] });
+      console.log(`🤖 [INTELLIGENCE] Attendance prediction for ${username}: ${likelihoodPercent}% (${confidence.toFixed(1)}% confidence)`);
+    } catch (error) {
+      console.error('[INTELLIGENCE] Error predicting attendance:', error);
+      await message.reply(`❌ Error analyzing attendance data: ${error.message}`);
+    }
+  },
+
+  /**
+   * Predict next boss spawn time based on historical patterns
+   * Usage: !predictspawn [boss name]
+   */
+  predictspawn: async (message, member) => {
+    const args = message.content.trim().split(/\s+/).slice(1);
+    const bossName = args.length > 0 ? args.join(' ') : null;
+
+    await message.reply(
+      bossName
+        ? `🤖 Analyzing spawn patterns for **${bossName}**...`
+        : `🤖 Analyzing general boss spawn patterns...`
+    );
+
+    try {
+      const prediction = await intelligenceEngine.predictNextSpawnTime(bossName);
+
+      if (prediction.error) {
+        await message.reply(`⚠️ ${prediction.error}`);
+        return;
+      }
+
+      const confidence = prediction.confidence;
+      const now = new Date();
+      const timeUntilSpawn = prediction.predictedTime - now;
+      const hoursUntil = timeUntilSpawn / (1000 * 60 * 60);
+      const daysUntil = Math.floor(hoursUntil / 24);
+      const remainingHours = Math.floor(hoursUntil % 24);
+
+      const embed = new EmbedBuilder()
+        .setColor(confidence >= 70 ? 0x00ff00 : confidence >= 50 ? 0xffff00 : 0xff9900)
+        .setTitle(`🔮 Boss Spawn Prediction${bossName ? `: ${bossName}` : ''}`)
+        .setDescription(
+          `🎯 **Predicted Next Spawn:** <t:${Math.floor(prediction.predictedTime.getTime() / 1000)}:F>\n` +
+          `⏰ **Time Until Spawn:** ${daysUntil > 0 ? `${daysUntil}d ` : ''}${remainingHours}h`
+        )
+        .addFields(
+          {
+            name: '📈 Confidence',
+            value: `${confidence.toFixed(1)}%` + (confidence >= 70 ? ' ✅' : confidence >= 50 ? ' ⚠️' : ' 🔴'),
+            inline: true,
+          },
+          {
+            name: '📊 Based On',
+            value: `${prediction.basedOnSpawns} historical spawns`,
+            inline: true,
+          },
+          {
+            name: '⏱️ Avg Interval',
+            value: `${prediction.avgIntervalHours.toFixed(1)} hours`,
+            inline: true,
+          },
+          {
+            name: '🕐 Earliest Possible',
+            value: `<t:${Math.floor(prediction.earliestTime.getTime() / 1000)}:F>`,
+            inline: true,
+          },
+          {
+            name: '🕐 Latest Possible',
+            value: `<t:${Math.floor(prediction.latestTime.getTime() / 1000)}:F>`,
+            inline: true,
+          },
+          {
+            name: '🕐 Last Spawn',
+            value: `<t:${Math.floor(prediction.lastSpawnTime.getTime() / 1000)}:R>`,
+            inline: true,
+          },
+          {
+            name: '🧠 AI Insight',
+            value:
+              `Based on ${prediction.basedOnSpawns} historical spawns, the bot predicts the next ` +
+              `${prediction.bossName} will spawn in approximately **${daysUntil > 0 ? `${daysUntil} days and ` : ''}${remainingHours} hours**.`,
+            inline: false,
+          }
+        )
+        .setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
+        .setTimestamp();
+
+      await message.reply({ embeds: [embed] });
+      console.log(
+        `🤖 [INTELLIGENCE] Spawn prediction for ${bossName || 'any boss'}: ` +
+        `${prediction.predictedTime.toISOString()} (${confidence.toFixed(1)}% confidence)`
+      );
+    } catch (error) {
+      console.error('[INTELLIGENCE] Error predicting spawn:', error);
+      await message.reply(`❌ Error analyzing spawn data: ${error.message}`);
     }
   },
 };
