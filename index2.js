@@ -2795,8 +2795,8 @@ const commandHandlers = {
       // Analyze each item
       const analyses = [];
       for (const item of queueItems.slice(0, 20)) { // Limit to 20 items to avoid timeout
-        const itemName = item.itemName || item.name || 'Unknown';
-        const currentPrice = parseInt(item.startingBid) || 0;
+        const itemName = item.item || 'Unknown';
+        const currentPrice = parseInt(item.startPrice) || 0;
 
         const prediction = await intelligenceEngine.predictItemValue(itemName);
 
