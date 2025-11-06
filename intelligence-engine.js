@@ -541,12 +541,21 @@ class IntelligenceEngine {
 
   /**
    * Predict likelihood of attendance at next event
+   * ENHANCED: Now integrated with learning system for continuous improvement
+   * @param {Object} profile - Member profile data
+   * @param {boolean} saveForLearning - Whether to save this prediction for tracking
+   * @returns {Promise<Object>|number} Prediction result with confidence, or just likelihood if not async
    */
-  predictAttendanceLikelihood(profile) {
+  async predictAttendanceLikelihood(profile, saveForLearning = false) {
     const { attendance, recentActivity } = profile;
 
     // Simple prediction model based on recent patterns
-    if (recentActivity.length === 0) return 0.1; // Very unlikely if no history
+    if (recentActivity.length === 0) {
+      if (saveForLearning) {
+        return { likelihood: 0.1, confidence: 10 }; // Very unlikely if no history, low confidence
+      }
+      return 0.1;
+    }
 
     // Recent attendance rate
     const last7Days = Date.now() - (7 * 24 * 60 * 60 * 1000);
@@ -561,8 +570,204 @@ class IntelligenceEngine {
 
     // Weighted prediction (60% recent, 40% overall)
     const prediction = (recentRate * 0.6) + (overallRate * 0.4);
+    const likelihood = Math.min(prediction, 1.0);
 
-    return Math.min(prediction, 1.0);
+    // Calculate base confidence based on data quality
+    const baseConfidence = this.calculateAttendanceConfidence(attendance.spawns, recentSpawns.length);
+
+    if (saveForLearning) {
+      // Adjust confidence based on historical accuracy (learning system)
+      const adjustedConfidence = await this.learningSystem.adjustConfidence('engagement', baseConfidence);
+
+      // Save prediction for future learning
+      const features = {
+        totalSpawns: attendance.spawns,
+        recentSpawns: recentSpawns.length,
+        recentRate: recentRate,
+        overallRate: overallRate,
+        avgPointsPerSpawn: attendance.averagePerSpawn,
+      };
+
+      await this.learningSystem.savePrediction(
+        'engagement',
+        profile.username,
+        likelihood,
+        adjustedConfidence,
+        features
+      );
+
+      return {
+        likelihood,
+        confidence: adjustedConfidence,
+      };
+    }
+
+    return likelihood;
+  }
+
+  /**
+   * Calculate confidence for attendance prediction
+   * @param {number} totalSpawns - Total spawns attended
+   * @param {number} recentSpawns - Recent spawns attended
+   * @returns {number} Confidence score (0-100)
+   */
+  calculateAttendanceConfidence(totalSpawns, recentSpawns) {
+    // More data = higher confidence
+    let confidence = 50; // Base confidence
+
+    // Add confidence based on total historical data
+    if (totalSpawns >= 20) confidence += 30;
+    else if (totalSpawns >= 10) confidence += 20;
+    else if (totalSpawns >= 5) confidence += 10;
+
+    // Add confidence based on recent data
+    if (recentSpawns >= 3) confidence += 20;
+    else if (recentSpawns >= 2) confidence += 10;
+    else if (recentSpawns >= 1) confidence += 5;
+
+    return Math.min(confidence, 100);
+  }
+
+  /**
+   * Predict next boss spawn time based on historical patterns
+   * ENHANCED: Integrated with learning system for continuous improvement
+   * @param {string} bossName - Optional: predict for specific boss
+   * @returns {Promise<Object>} Prediction with estimated time and confidence
+   */
+  async predictNextSpawnTime(bossName = null) {
+    try {
+      // Fetch historical spawn data from attendance sheets
+      const response = await this.sheetAPI.call('getAllWeeklyAttendance', {});
+      const allSheets = response?.data?.sheets || [];
+
+      if (allSheets.length === 0) {
+        return {
+          error: 'No historical spawn data available',
+          confidence: 0,
+        };
+      }
+
+      // Extract all spawn timestamps
+      const spawnHistory = [];
+      for (const sheet of allSheets) {
+        const columns = sheet.columns || [];
+        for (const col of columns) {
+          if (col.boss && col.timestamp) {
+            spawnHistory.push({
+              boss: col.boss,
+              timestamp: new Date(col.timestamp),
+            });
+          }
+        }
+      }
+
+      if (spawnHistory.length < 3) {
+        return {
+          error: 'Not enough historical data (need at least 3 spawns)',
+          confidence: 0,
+        };
+      }
+
+      // Sort by timestamp
+      spawnHistory.sort((a, b) => a.timestamp - b.timestamp);
+
+      // Filter by boss if specified
+      const relevantSpawns = bossName
+        ? spawnHistory.filter(s => s.boss.toLowerCase() === bossName.toLowerCase())
+        : spawnHistory;
+
+      if (relevantSpawns.length < 2) {
+        return {
+          error: bossName ? `Not enough data for ${bossName}` : 'Not enough spawn data',
+          confidence: 0,
+        };
+      }
+
+      // Calculate intervals between spawns
+      const intervals = [];
+      for (let i = 1; i < relevantSpawns.length; i++) {
+        const interval = relevantSpawns[i].timestamp - relevantSpawns[i - 1].timestamp;
+        intervals.push(interval / (1000 * 60 * 60)); // Convert to hours
+      }
+
+      // Calculate average interval and standard deviation
+      const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      const variance = intervals.reduce((sum, interval) => sum + Math.pow(interval - avgInterval, 2), 0) / intervals.length;
+      const stdDev = Math.sqrt(variance);
+
+      // Predict next spawn time
+      const lastSpawn = relevantSpawns[relevantSpawns.length - 1].timestamp;
+      const predictedNextSpawn = new Date(lastSpawn.getTime() + (avgInterval * 60 * 60 * 1000));
+
+      // Calculate confidence based on consistency of intervals
+      const baseConfidence = this.calculateSpawnConfidence(intervals.length, stdDev, avgInterval);
+
+      // Adjust confidence based on historical accuracy (learning system)
+      const adjustedConfidence = await this.learningSystem.adjustConfidence('spawn_prediction', baseConfidence);
+
+      // Save prediction for future learning
+      const features = {
+        bossName: bossName || 'any',
+        historicalSpawns: relevantSpawns.length,
+        avgIntervalHours: avgInterval,
+        stdDevHours: stdDev,
+        consistency: stdDev / avgInterval, // Lower = more consistent
+      };
+
+      await this.learningSystem.savePrediction(
+        'spawn_prediction',
+        bossName || 'next_boss',
+        predictedNextSpawn.toISOString(),
+        adjustedConfidence,
+        features
+      );
+
+      // Calculate prediction range (±1 standard deviation)
+      const earliestTime = new Date(predictedNextSpawn.getTime() - (stdDev * 60 * 60 * 1000));
+      const latestTime = new Date(predictedNextSpawn.getTime() + (stdDev * 60 * 60 * 1000));
+
+      return {
+        predictedTime: predictedNextSpawn,
+        earliestTime,
+        latestTime,
+        confidence: adjustedConfidence,
+        avgIntervalHours: avgInterval,
+        lastSpawnTime: lastSpawn,
+        basedOnSpawns: relevantSpawns.length,
+        bossName: bossName || 'any boss',
+      };
+    } catch (error) {
+      console.error('[INTELLIGENCE] Error predicting spawn time:', error);
+      return {
+        error: error.message,
+        confidence: 0,
+      };
+    }
+  }
+
+  /**
+   * Calculate confidence for spawn time prediction
+   * @param {number} sampleSize - Number of historical spawns
+   * @param {number} stdDev - Standard deviation of intervals
+   * @param {number} mean - Mean interval
+   * @returns {number} Confidence score (0-100)
+   */
+  calculateSpawnConfidence(sampleSize, stdDev, mean) {
+    let confidence = 30; // Base confidence
+
+    // More samples = higher confidence
+    if (sampleSize >= 20) confidence += 30;
+    else if (sampleSize >= 10) confidence += 20;
+    else if (sampleSize >= 5) confidence += 10;
+
+    // Lower variability = higher confidence
+    const coefficientOfVariation = stdDev / mean;
+    if (coefficientOfVariation < 0.1) confidence += 40; // Very consistent
+    else if (coefficientOfVariation < 0.2) confidence += 30; // Consistent
+    else if (coefficientOfVariation < 0.3) confidence += 20; // Moderately consistent
+    else if (coefficientOfVariation < 0.5) confidence += 10; // Somewhat consistent
+
+    return Math.min(confidence, 100);
   }
 
   /**
