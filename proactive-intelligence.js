@@ -172,8 +172,8 @@ class ProactiveIntelligence {
     try {
       console.log('🤖 [PROACTIVE] Checking auction readiness...');
 
-      const sheetAPI = require('./utils/sheet-api');
-      const biddingData = await sheetAPI.getBiddingPoints();
+      const biddingResponse = await this.intelligence.sheetAPI.getBiddingPoints();
+      const biddingData = biddingResponse && biddingResponse.data && biddingResponse.data.members ? biddingResponse.data.members : [];
 
       if (!biddingData || biddingData.length === 0) {
         console.log('⚠️ [PROACTIVE] No bidding data available');
@@ -494,13 +494,13 @@ class ProactiveIntelligence {
       const { topPerformers, averageEngagement } = analysis;
 
       // Get guild chat channel
-      const guildChatChannel = await getChannelById(
+      const guildAnnouncementChannel = await getChannelById(
         this.client,
-        this.config[PROACTIVE_CONFIG.channels.guildChat]
+        this.config[PROACTIVE_CONFIG.channels.guildAnnouncement]
       );
 
-      if (!guildChatChannel) {
-        console.error('❌ [PROACTIVE] Guild chat channel not found');
+      if (!guildAnnouncementChannel) {
+        console.error('❌ [PROACTIVE] Guild announcement channel not found');
         return;
       }
 
@@ -578,8 +578,8 @@ class ProactiveIntelligence {
 
       console.log('🤖 [PROACTIVE] Checking for milestones...');
 
-      const sheetAPI = require('./utils/sheet-api');
-      const attendanceData = await sheetAPI.getTotalAttendance();
+      const attendanceResponse = await this.intelligence.sheetAPI.getTotalAttendance();
+      const attendanceData = attendanceResponse && attendanceResponse.data && attendanceResponse.data.members ? attendanceResponse.data.members : [];
 
       if (!attendanceData || attendanceData.length === 0) return;
 

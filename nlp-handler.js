@@ -151,8 +151,8 @@ const NLP_PATTERNS = {
   ],
 
   extend: [
-    /^extend\s+(?:the\s+)?(?:auction\s+)?(?:timer\s+)?(?:by\s+)?(\d+)/i,
-    /^add\s+(\d+)\s+(?:seconds?|mins?|minutes?)\s+to\s+(?:the\s+)?auction/i,
+    /^extend\s+(?:the\s+)?(?:auction\s+)?(?:timer\s+)?(?:by\s+)?(\d+)\s*((?:seconds?|mins?|minutes?))?/i,
+    /^add\s+(\d+)\s+(seconds?|mins?|minutes?)\s+to\s+(?:the\s+)?auction/i,
   ],
 
   skipitem: [

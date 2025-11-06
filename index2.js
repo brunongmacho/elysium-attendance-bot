@@ -1842,9 +1842,23 @@ const commandHandlers = {
     if (args.length === 0) {
       return await message.reply(`❌ Usage: \`!extend <minutes>\``);
     }
-    const mins = parseInt(args[0]);
-    if (isNaN(mins) || mins <= 0) {
+    let value = parseInt(args[0]);
+    if (isNaN(value) || value <= 0) {
       return await message.reply(`❌ Must be positive number`);
+    }
+
+    // Check if unit is specified (from NLP: "30 seconds" vs "30 minutes")
+    const unit = args[1] ? args[1].toLowerCase() : '';
+    let mins = value;
+
+    // Convert seconds to minutes if needed
+    if (unit && (unit.startsWith('sec') || unit === 's')) {
+      mins = Math.ceil(value / 60); // Convert seconds to minutes, round up
+    }
+    // If unit is minutes or empty, treat as minutes (default)
+
+    if (mins <= 0) {
+      mins = 1; // Minimum 1 minute
     }
     const auctState = auctioneering.getAuctionState();
     if (!auctState.active || !auctState.currentItem) {
@@ -2765,7 +2779,6 @@ const commandHandlers = {
 
     try {
       // Get items from queue
-      const sheetAPI = require('./utils/sheet-api');
       const queueItems = await sheetAPI.getBiddingItems();
 
       if (!queueItems || queueItems.length === 0) {
@@ -3018,7 +3031,7 @@ client.once(Events.ClientReady, async () => {
         console.log(`   🧠 Bot is now SMART and ready to make accurate predictions!`);
 
         // Send notification to admin logs
-        const adminLogsChannel = await discordCache.getChannelById(config.admin_logs_channel_id);
+        const adminLogsChannel = await discordCache.getChannel('admin_logs_channel_id');
         if (adminLogsChannel) {
           const embed = new EmbedBuilder()
             .setColor(0x00ff00)

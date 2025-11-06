@@ -1548,7 +1548,7 @@ async function itemEnd(client, config, channel) {
 
           // Optional: Send notification to admin logs
           try {
-            const adminChannel = await discordCache?.getChannelById(cfg.admin_logs_channel_id);
+            const adminChannel = await discordCache?.getChannel('admin_logs_channel_id');
             if (adminChannel) {
               await adminChannel.send(
                 `🧠 **Bot Learning Update**\n` +

@@ -2250,18 +2250,18 @@ function getTotalAttendance(data) {
     Logger.log('📊 Fetching total attendance data...');
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName('BiddingPoints');
+    const sheet = ss.getSheetByName('TOTAL ATTENDANCE');
 
     if (!sheet) {
-      return createResponse('ok', 'BiddingPoints sheet not found', { members: [] });
+      return createResponse('ok', 'TOTAL ATTENDANCE sheet not found', { members: [] });
     }
 
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) {
-      return createResponse('ok', 'No data in BiddingPoints', { members: [] });
+      return createResponse('ok', 'No data in TOTAL ATTENDANCE', { members: [] });
     }
 
-    // Get columns: Username (A), Attendance Points (B)
+    // Get columns: Username (A), Total Attendance (B)
     const dataRange = sheet.getRange(2, 1, lastRow - 1, 2);
     const values = dataRange.getValues();
 
@@ -3421,7 +3421,7 @@ function createDailyBackup() {
 
     const sheetsToBackup = [
       'BiddingPoints',
-      'TotalAttendance',
+      'TOTAL ATTENDANCE',
       'ForDistribution',
       'BiddingItems',
       'BotLearning',
@@ -3847,10 +3847,11 @@ function needsBootstrap() {
 function dailyAutomatedBackup() {
   try {
     Logger.log('🔄 [AUTOMATED] Running daily backup...');
-    const result = createDailyBackup();
+    const rawResult = createDailyBackup();
+    const result = JSON.parse(rawResult.getContent());
 
     if (result.status === 'ok') {
-      Logger.log(`✅ [AUTOMATED] Backup completed: ${result.data.sheetsCount} sheets`);
+      Logger.log(`✅ [AUTOMATED] Backup completed: ${result.sheetsCount} sheets`);
     } else {
       Logger.log(`❌ [AUTOMATED] Backup failed: ${result.message}`);
     }
@@ -3876,15 +3877,18 @@ function weeklyLearningExport() {
       endDate: new Date().toISOString()
     };
 
-    const learningResult = exportLearningData({ filters });
-    const mlResult = exportPredictionFeatures({});
+    const rawLearningResult = exportLearningData({ filters });
+    const rawMlResult = exportPredictionFeatures({});
+
+    const learningResult = JSON.parse(rawLearningResult.getContent());
+    const mlResult = JSON.parse(rawMlResult.getContent());
 
     if (learningResult.status === 'ok') {
-      Logger.log(`✅ [AUTOMATED] Learning export completed: ${learningResult.data.recordCount} records`);
+      Logger.log(`✅ [AUTOMATED] Learning export completed: ${learningResult.recordCount} records`);
     }
 
     if (mlResult.status === 'ok') {
-      Logger.log(`✅ [AUTOMATED] ML export completed: ${mlResult.data.sampleCount} samples`);
+      Logger.log(`✅ [AUTOMATED] ML export completed: ${mlResult.sampleCount} samples`);
     }
   } catch (err) {
     Logger.log('❌ [AUTOMATED] Error in weekly export: ' + err.toString());

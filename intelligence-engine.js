@@ -306,7 +306,8 @@ class IntelligenceEngine {
    */
   async getAllAuctionHistory() {
     try {
-      const data = await sheetAPI.getForDistribution();
+      const response = await this.sheetAPI.getForDistribution();
+      const data = response && response.data ? response.data : [];
       return data.map(row => ({
         itemName: row.itemName,
         winningBid: parseInt(row.bidAmount) || 0,
@@ -426,15 +427,17 @@ class IntelligenceEngine {
   async getMemberProfile(username) {
     try {
       // Fetch attendance data
-      const attendanceData = await sheetAPI.getTotalAttendance();
+      const attendanceResponse = await this.sheetAPI.getTotalAttendance();
+      const attendanceData = attendanceResponse && attendanceResponse.data && attendanceResponse.data.members ? attendanceResponse.data.members : [];
       const memberAttendance = attendanceData.find(row =>
-        row.username.toLowerCase() === username.toLowerCase()
+        row.username && row.username.toLowerCase() === username.toLowerCase()
       );
 
       // Fetch bidding data
-      const biddingData = await sheetAPI.getBiddingPoints();
+      const biddingResponse = await this.sheetAPI.getBiddingPoints();
+      const biddingData = biddingResponse && biddingResponse.data && biddingResponse.data.members ? biddingResponse.data.members : [];
       const memberBidding = biddingData.find(row =>
-        row.username.toLowerCase() === username.toLowerCase()
+        row.username && row.username.toLowerCase() === username.toLowerCase()
       );
 
       // Fetch recent spawns
@@ -589,7 +592,8 @@ class IntelligenceEngine {
    */
   async getAuctionWinsForMember(username) {
     try {
-      const forDistData = await sheetAPI.getForDistribution();
+      const response = await this.sheetAPI.getForDistribution();
+      const forDistData = response && response.data ? response.data : [];
       const wins = forDistData.filter(row =>
         row.winner && row.winner.toLowerCase() === username.toLowerCase()
       );
@@ -604,7 +608,8 @@ class IntelligenceEngine {
    */
   async analyzeAllMembersEngagement() {
     try {
-      const biddingData = await sheetAPI.getBiddingPoints();
+      const response = await this.sheetAPI.getBiddingPoints();
+      const biddingData = response && response.data && response.data.members ? response.data.members : [];
       const analyses = [];
 
       for (const member of biddingData) {
@@ -716,7 +721,8 @@ class IntelligenceEngine {
    */
   async detectAttendanceAnomalies() {
     try {
-      const attendanceData = await sheetAPI.getTotalAttendance();
+      const attendanceResponse = await this.sheetAPI.getTotalAttendance();
+      const attendanceData = attendanceResponse && attendanceResponse.data && attendanceResponse.data.members ? attendanceResponse.data.members : [];
       const anomalies = [];
 
       // Calculate attendance statistics
@@ -802,7 +808,8 @@ class IntelligenceEngine {
    */
   async recommendAuctionTiming() {
     try {
-      const biddingData = await sheetAPI.getBiddingPoints();
+      const biddingResponse = await this.sheetAPI.getBiddingPoints();
+      const biddingData = biddingResponse && biddingResponse.data && biddingResponse.data.members ? biddingResponse.data.members : [];
       const activeMemberCount = biddingData.filter(m => m.pointsLeft > 0).length;
 
       // Analyze historical auction participation
