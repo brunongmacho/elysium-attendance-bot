@@ -444,14 +444,14 @@ class IntelligenceEngine {
     try {
       // Fetch attendance data
       const attendanceResponse = await this.sheetAPI.call('getTotalAttendance', {});
-      const attendanceData = attendanceResponse?.data?.members ?? [];
+      const attendanceData = attendanceResponse?.members ?? [];
       const memberAttendance = attendanceData.find(row =>
         row.username && row.username.toLowerCase() === username.toLowerCase()
       );
 
       // Fetch bidding data
       const biddingResponse = await this.sheetAPI.call('getBiddingPoints', {});
-      const biddingData = biddingResponse?.data?.members ?? [];
+      const biddingData = biddingResponse?.members ?? [];
       const memberBidding = biddingData.find(row =>
         row.username && row.username.toLowerCase() === username.toLowerCase()
       );
@@ -459,12 +459,15 @@ class IntelligenceEngine {
       // Fetch recent spawns
       const recentSpawns = await this.getRecentSpawnsForMember(username);
 
+      // Note: attendancePoints is actually the spawn count (Total Attendance Days)
+      const spawnCount = memberAttendance?.attendancePoints || 0;
+
       return {
         username,
         attendance: {
-          total: memberAttendance?.attendancePoints || 0,
-          spawns: memberAttendance?.spawnCount || 0,
-          averagePerSpawn: memberAttendance?.attendancePoints / (memberAttendance?.spawnCount || 1),
+          total: spawnCount * 4, // Each spawn gives 4 points
+          spawns: spawnCount,
+          averagePerSpawn: 4, // Fixed 4 points per spawn
         },
         bidding: {
           pointsRemaining: memberBidding?.pointsLeft || 0,
@@ -638,7 +641,7 @@ class IntelligenceEngine {
     try {
       // Fetch historical spawn data from attendance sheets
       const response = await this.sheetAPI.call('getAllWeeklyAttendance', {});
-      const allSheets = response?.data?.sheets || [];
+      const allSheets = response?.sheets || [];
 
       if (allSheets.length === 0) {
         return {
@@ -832,7 +835,7 @@ class IntelligenceEngine {
   async analyzeAllMembersEngagement() {
     try {
       const response = await this.sheetAPI.call('getBiddingPoints', {});
-      const biddingData = response?.data?.members ?? [];
+      const biddingData = response?.members ?? [];
       const analyses = [];
 
       for (const member of biddingData) {

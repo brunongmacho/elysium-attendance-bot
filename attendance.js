@@ -1242,6 +1242,11 @@ async function checkAndAutoCloseThreads(client) {
         // Mark as closed
         spawnInfo.closed = true;
 
+        // Remove from activeColumns cache BEFORE checking Google Sheets
+        // This prevents false positives where the thread exists but was never submitted
+        const cacheKey = `${spawnInfo.boss}|${spawnInfo.timestamp}`;
+        delete activeColumns[cacheKey];
+
         // Check if column already exists to prevent duplicate submissions
         console.log(`   🔍 Checking if column already exists for ${spawnInfo.boss} at ${spawnInfo.timestamp}...`);
         const columnExists = await checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
