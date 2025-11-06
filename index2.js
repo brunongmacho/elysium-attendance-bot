@@ -115,6 +115,7 @@ const COMMAND_ALIASES = {
 
   // Attendance commands (admin)
   "!st": "!status",
+  "!attendancestatus": "!status",  // NLP: Map attendance status queries to general status
   "!addth": "!addthread",
   "!v": "!verify",
   "!vall": "!verifyall",

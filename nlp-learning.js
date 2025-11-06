@@ -747,6 +747,14 @@ class NLPLearningSystem {
           await reply.edit(`❌ Got it, **"${phrase}"** is NOT **${command}**. I'll be more careful next time.`);
           console.log(`🧠 [NLP Learning] User rejected: "${phrase}" ≠ ${command}`);
         }
+
+        // Remove all reactions after confirmation to avoid confusion
+        try {
+          await reply.reactions.removeAll();
+        } catch (error) {
+          console.log(`🧠 [NLP Learning] Could not remove reactions: ${error.message}`);
+        }
+
         this.pendingConfirmations.delete(key);
       });
 
