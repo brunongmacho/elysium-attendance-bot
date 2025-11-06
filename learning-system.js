@@ -140,16 +140,24 @@ class LearningSystem {
     // MARKET STATE (current guild economy)
     if (LEARNING_CONFIG.INCLUDE_MARKET_STATE) {
       try {
-        const biddingData = await this.sheetAPI.call('getBiddingPoints', {});
-        if (biddingData && biddingData.data && biddingData.data.members) {
-          const points = biddingData.data.members.map(m => m.biddingPoints || 0);
-          const consumed = biddingData.data.members.map(m => m.totalSpent || 0);
+        const resp = await this.sheetAPI.call('getBiddingPoints', {});
+        // Handle both nested and top-level response shapes, plus legacy points map
+        const d = resp?.data ?? resp;
+        const members = Array.isArray(d?.members) ? d.members : [];
+        const fallbackFromMap = d?.points && typeof d.points === 'object'
+          ? Object.entries(d.points).map(([username, pointsLeft]) => ({ username, pointsLeft, biddingPoints: 0, totalSpent: 0 }))
+          : [];
+        const m = members.length ? members : fallbackFromMap;
+
+        if (m.length > 0) {
+          const points = m.map(x => x.biddingPoints ?? 0);
+          const consumed = m.map(x => x.totalSpent ?? 0);
 
           const pointsSum = points.reduce((a, b) => a + b, 0);
           const consumedSum = consumed.reduce((a, b) => a + b, 0);
 
           enriched.marketState = {
-            totalMembers: biddingData.data.members.length,
+            totalMembers: m.length,
             avgPointsPerMember: points.length ? pointsSum / points.length : 0,
             medianPoints: this.median(points),
             totalPointsInEconomy: pointsSum,
@@ -166,15 +174,18 @@ class LearningSystem {
     if (LEARNING_CONFIG.INCLUDE_BEHAVIORAL_PATTERNS && type === 'price_prediction') {
       try {
         const forDist = await this.sheetAPI.call('getForDistribution', {});
-        if (forDist && forDist.data) {
-          const recent = forDist.data.slice(-20); // Last 20 auctions
+        // Handle both nested items array and direct data array
+        const items = forDist?.data?.items || forDist?.data || [];
+        if (items.length > 0) {
+          const recent = items.slice(-20); // Last 20 auctions
           const itemAuctions = recent.filter(a => (a.itemName || a.item) === target);
 
           enriched.behavioral = {
             recentAuctions: recent.length,
             targetItemFrequency: itemAuctions.length,
-            avgRecentPrice: recent.length ? recent.reduce((a, b) => a + (b.price || 0), 0) / recent.length : 0,
-            priceVolatility: this.calculateVolatility(recent.map(a => a.price || 0)),
+            // Use bidAmount or winningBid field, not price
+            avgRecentPrice: recent.length ? recent.reduce((a, b) => a + (b.bidAmount || b.winningBid || 0), 0) / recent.length : 0,
+            priceVolatility: this.calculateVolatility(recent.map(a => a.bidAmount || a.winningBid || 0)),
             daysSinceLast: itemAuctions.length > 0
               ? Math.floor((Date.now() - new Date(itemAuctions[itemAuctions.length - 1].timestamp).getTime()) / (1000 * 60 * 60 * 24))
               : null,

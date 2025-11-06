@@ -308,6 +308,18 @@ class IntelligenceEngine {
   async getAllAuctionHistory() {
     try {
       const response = await this.sheetAPI.call('getForDistribution', {});
+
+      // Validate response before accessing data
+      if (!response) {
+        console.error('[INTELLIGENCE] No response from getForDistribution');
+        return [];
+      }
+
+      if (response.status === 'error') {
+        console.error('[INTELLIGENCE] Error response from getForDistribution:', response.message);
+        return [];
+      }
+
       // Normalize response shape: try items first, fallback to data array
       const items = response?.data?.items ?? response?.data ?? [];
       return items.map(row => ({
@@ -430,14 +442,14 @@ class IntelligenceEngine {
     try {
       // Fetch attendance data
       const attendanceResponse = await this.sheetAPI.call('getTotalAttendance', {});
-      const attendanceData = attendanceResponse && attendanceResponse.data && attendanceResponse.data.members ? attendanceResponse.data.members : [];
+      const attendanceData = attendanceResponse?.data?.members ?? [];
       const memberAttendance = attendanceData.find(row =>
         row.username && row.username.toLowerCase() === username.toLowerCase()
       );
 
       // Fetch bidding data
       const biddingResponse = await this.sheetAPI.call('getBiddingPoints', {});
-      const biddingData = biddingResponse && biddingResponse.data && biddingResponse.data.members ? biddingResponse.data.members : [];
+      const biddingData = biddingResponse?.data?.members ?? [];
       const memberBidding = biddingData.find(row =>
         row.username && row.username.toLowerCase() === username.toLowerCase()
       );
@@ -612,7 +624,7 @@ class IntelligenceEngine {
   async analyzeAllMembersEngagement() {
     try {
       const response = await this.sheetAPI.call('getBiddingPoints', {});
-      const biddingData = response && response.data && response.data.members ? response.data.members : [];
+      const biddingData = response?.data?.members ?? [];
       const analyses = [];
 
       for (const member of biddingData) {
@@ -731,7 +743,7 @@ class IntelligenceEngine {
   async detectAttendanceAnomalies() {
     try {
       const attendanceResponse = await this.sheetAPI.call('getTotalAttendance', {});
-      const attendanceData = attendanceResponse && attendanceResponse.data && attendanceResponse.data.members ? attendanceResponse.data.members : [];
+      const attendanceData = attendanceResponse?.data?.members ?? [];
       const anomalies = [];
 
       // Calculate attendance statistics
@@ -819,7 +831,7 @@ class IntelligenceEngine {
   async recommendAuctionTiming() {
     try {
       const biddingResponse = await this.sheetAPI.call('getBiddingPoints', {});
-      const biddingData = biddingResponse && biddingResponse.data && biddingResponse.data.members ? biddingResponse.data.members : [];
+      const biddingData = biddingResponse?.data?.members ?? [];
       const activeMemberCount = biddingData.filter(m => m.pointsLeft > 0).length;
 
       // Analyze historical auction participation

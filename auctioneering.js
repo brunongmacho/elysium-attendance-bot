@@ -674,8 +674,11 @@ async function startAuctioneering(client, config, channel) {
     }
 
     // Convert members array to points map if needed
+    // Guard against blank usernames and NaN values
     const pointsMap = Object.keys(points).length > 0 ? points : members.reduce((acc, member) => {
-      acc[member.username] = member.pointsLeft;
+      const name = member?.username?.trim();
+      if (!name) return acc;
+      acc[name] = Number(member?.pointsLeft) || 0;
       return acc;
     }, {});
 
