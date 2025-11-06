@@ -1363,26 +1363,69 @@ async function checkAndAutoCloseThreads(client) {
           // Column doesn't exist - proceed with submission
           console.log(`   ✅ No existing column found, proceeding with submission`);
 
-          // Notify in thread
-          await thread.send(
-            `⏰ **AUTO-CLOSED (20 minutes elapsed)**\n\n` +
-            `Attendance window closed to prevent cheating.\n` +
-            `${spawnInfo.members.length} member(s) verified and submitting to Google Sheets...`
-          ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
+          // Check if there are any members to submit
+          if (spawnInfo.members.length === 0) {
+            // No members - just close and archive without submission
+            console.log(`   ⚠️ No members to submit (0 verified). Skipping Google Sheets submission...`);
 
-          // Submit to Google Sheets
-          const payload = {
-            action: "submitAttendance",
-            boss: spawnInfo.boss,
-            date: spawnInfo.date,
-            time: spawnInfo.time,
-            timestamp: spawnInfo.timestamp,
-            members: spawnInfo.members,
-          };
+            await thread.send(
+              `⏰ **AUTO-CLOSED (20 minutes elapsed)**\n\n` +
+              `Attendance window closed. No members verified - no data submitted to Google Sheets.`
+            ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
 
-          const resp = await postToSheet(payload);
+            // Clean up reactions
+            await cleanupAllThreadReactions(thread);
 
-          if (resp.ok) {
+            // Close confirmation thread if it exists
+            if (spawnInfo.confirmThreadId) {
+              const confirmThread = await guild.channels
+                .fetch(spawnInfo.confirmThreadId)
+                .catch(() => null);
+              if (confirmThread) {
+                await confirmThread.send(
+                  `⏰ **AUTO-CLOSED**: ${spawnInfo.boss} (${spawnInfo.timestamp})\n` +
+                  `0 members (no submission - thread closed without data)`
+                ).catch(() => {});
+                await confirmThread.delete().catch(() => {});
+              }
+            }
+
+            // Lock and archive the thread
+            await thread.setLocked(true, "Auto-locked after 20 minutes - no members").catch(() => {});
+            await thread.setArchived(true, "Auto-closed after 20 minutes - no members").catch(() => {});
+
+            // Clean up state
+            delete activeSpawns[threadId];
+            const noMembersKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
+            delete activeColumns[noMembersKey];
+            delete confirmationMessages[threadId];
+
+            closed++;
+            closedBosses.push(spawnInfo.boss);
+
+            console.log(`   ✅ Auto-close complete (no members): ${spawnInfo.boss}`);
+          } else {
+            // Members exist - proceed with submission
+            // Notify in thread
+            await thread.send(
+              `⏰ **AUTO-CLOSED (20 minutes elapsed)**\n\n` +
+              `Attendance window closed to prevent cheating.\n` +
+              `${spawnInfo.members.length} member(s) verified and submitting to Google Sheets...`
+            ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
+
+            // Submit to Google Sheets
+            const payload = {
+              action: "submitAttendance",
+              boss: spawnInfo.boss,
+              date: spawnInfo.date,
+              time: spawnInfo.time,
+              timestamp: spawnInfo.timestamp,
+              members: spawnInfo.members,
+            };
+
+            const resp = await postToSheet(payload);
+
+            if (resp.ok) {
             console.log(`   ✅ Submitted ${spawnInfo.members.length} members to Google Sheets`);
 
             await thread.send(
@@ -1434,6 +1477,7 @@ async function checkAndAutoCloseThreads(client) {
 
             // Don't delete state if submission failed, so admin can retry
           }
+          } // End of members.length > 0 check
         }
       }
     }
