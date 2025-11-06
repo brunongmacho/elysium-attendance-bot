@@ -102,6 +102,14 @@ class IntelligenceEngine {
     // Learning system (persistent AI/ML improvement)
     this.learningSystem = new LearningSystem(config, sheetAPIInstance);
 
+    // Spawn prediction cache (reduces redundant calculations and API calls)
+    this.spawnPredictionCache = {
+      predictions: null,           // Cached predictions for all bosses
+      spawnCount: 0,              // Number of spawns when predictions were made
+      timestamp: 0,               // When predictions were cached
+      ttl: 30 * 60 * 1000,        // 30-minute cache TTL
+    };
+
     // Performance metrics
     this.performanceMetrics = {
       memoryUsage: [],
@@ -734,6 +742,16 @@ class IntelligenceEngine {
   }
 
   /**
+   * Invalidate spawn prediction cache (call when new spawn is detected)
+   */
+  invalidateSpawnPredictionCache() {
+    this.spawnPredictionCache.predictions = null;
+    this.spawnPredictionCache.spawnCount = 0;
+    this.spawnPredictionCache.timestamp = 0;
+    console.log('[INTELLIGENCE] Spawn prediction cache invalidated');
+  }
+
+  /**
    * Predict next boss spawn time based on historical patterns
    * ENHANCED: Integrated with learning system for continuous improvement
    * SMART: When no boss specified, analyzes all bosses and predicts which spawns next
@@ -799,6 +817,21 @@ class IntelligenceEngine {
    * @returns {Promise<Object>} Prediction for the boss that will spawn next
    */
   async predictNextAnyBoss(spawnHistory) {
+    // Check cache first to avoid redundant calculations
+    const now = Date.now();
+    const currentSpawnCount = spawnHistory.length;
+    const cacheValid =
+      this.spawnPredictionCache.predictions !== null &&
+      this.spawnPredictionCache.spawnCount === currentSpawnCount &&
+      (now - this.spawnPredictionCache.timestamp) < this.spawnPredictionCache.ttl;
+
+    if (cacheValid) {
+      console.log(`[INTELLIGENCE] Using cached predictions (${currentSpawnCount} spawns, age: ${Math.round((now - this.spawnPredictionCache.timestamp) / 1000)}s)`);
+      return this.spawnPredictionCache.predictions;
+    }
+
+    console.log(`[INTELLIGENCE] Cache miss - recalculating predictions for ${currentSpawnCount} spawns`);
+
     // Group spawns by boss type
     const bossesByType = {};
     for (const spawn of spawnHistory) {
@@ -850,6 +883,12 @@ class IntelligenceEngine {
     }));
 
     console.log(`[INTELLIGENCE] Predicted next boss: ${nextBoss.bossName} at ${nextBoss.predictedTime.toISOString()}`);
+
+    // Update cache to avoid redundant calculations
+    this.spawnPredictionCache.predictions = nextBoss;
+    this.spawnPredictionCache.spawnCount = currentSpawnCount;
+    this.spawnPredictionCache.timestamp = now;
+    console.log(`[INTELLIGENCE] Cached predictions for ${currentSpawnCount} spawns (TTL: 30min)`);
 
     return nextBoss;
   }
