@@ -2810,10 +2810,14 @@ const commandHandlers = {
       const uniqueItems = Array.from(uniqueItemsMap.values()).slice(0, 20); // Limit to 20 unique items
       console.log(`🤖 [INTELLIGENCE] Found ${uniqueItems.length} unique items (from ${queueItems.length} total)`);
 
-      // Analyze each unique item
+      // Fetch auction history once for all items (optimization to avoid redundant API calls)
+      console.log(`🤖 [INTELLIGENCE] Fetching auction history (1 API call for all items)...`);
+      const auctionHistory = await intelligenceEngine.getAllAuctionHistory();
+
+      // Analyze each unique item using cached auction history
       const analyses = [];
       for (const item of uniqueItems) {
-        const prediction = await intelligenceEngine.predictItemValue(item.itemName);
+        const prediction = await intelligenceEngine.predictItemValue(item.itemName, auctionHistory);
 
         analyses.push({
           itemName: item.itemName,

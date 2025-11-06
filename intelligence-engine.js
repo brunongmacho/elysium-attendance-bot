@@ -124,15 +124,18 @@ class IntelligenceEngine {
   /**
    * Predict optimal starting bid for an item based on historical data
    * @param {string} itemName - Name of the item
+   * @param {Array} cachedAuctionHistory - Optional pre-fetched auction history to avoid redundant API calls
    * @returns {Object} Prediction with confidence interval and reasoning
    */
-  async predictItemValue(itemName) {
+  async predictItemValue(itemName, cachedAuctionHistory = null) {
     try {
-      // Fetch historical auction data for this item
-      const historicalData = await this.getItemAuctionHistory(itemName);
+      // Fetch historical auction data for this item (use cache if available)
+      const historicalData = cachedAuctionHistory
+        ? this.filterAuctionHistoryByItem(itemName, cachedAuctionHistory)
+        : await this.getItemAuctionHistory(itemName);
 
       if (historicalData.length < INTELLIGENCE_CONFIG.MIN_HISTORICAL_SAMPLES) {
-        const suggestion = await this.suggestSimilarItemPrice(itemName);
+        const suggestion = await this.suggestSimilarItemPrice(itemName, cachedAuctionHistory);
         return {
           success: false,
           reason: `Insufficient data (${historicalData.length} auctions). Need at least ${INTELLIGENCE_CONFIG.MIN_HISTORICAL_SAMPLES}.`,
@@ -267,10 +270,33 @@ class IntelligenceEngine {
   }
 
   /**
-   * Suggest price based on similar items (when no direct history)
+   * Filter cached auction history for a specific item
+   * @param {string} itemName - Name of the item to filter for
+   * @param {Array} auctionHistory - Pre-fetched auction history data
+   * @returns {Array} Filtered auction data for this item
    */
-  async suggestSimilarItemPrice(itemName) {
-    const allHistory = await this.getAllAuctionHistory();
+  filterAuctionHistoryByItem(itemName, auctionHistory) {
+    // Normalize item name for matching
+    const normalizedName = this.normalizeItemName(itemName);
+
+    // Find all auctions for this item
+    const matches = auctionHistory.filter(row => {
+      const rowItemName = this.normalizeItemName(row.itemName || '');
+      return rowItemName === normalizedName ||
+             this.calculateStringSimilarity(rowItemName, normalizedName) > 0.8;
+    });
+
+    // Return filtered data (already in correct format from getAllAuctionHistory)
+    return matches.filter(a => a.winningBid > 0);
+  }
+
+  /**
+   * Suggest price based on similar items (when no direct history)
+   * @param {string} itemName - Name of the item
+   * @param {Array} cachedAuctionHistory - Optional pre-fetched auction history to avoid redundant API calls
+   */
+  async suggestSimilarItemPrice(itemName, cachedAuctionHistory = null) {
+    const allHistory = cachedAuctionHistory || await this.getAllAuctionHistory();
 
     // Find similar items by name
     const similarities = allHistory.map(item => ({
@@ -445,11 +471,12 @@ class IntelligenceEngine {
    * @param {Array} cachedData.attendanceData - Pre-fetched attendance data
    * @param {Array} cachedData.biddingData - Pre-fetched bidding data
    * @param {Object} cachedData.weeklyAttendance - Pre-fetched weekly attendance data
+   * @param {Array} cachedData.auctionData - Pre-fetched auction/distribution data
    */
   async getMemberProfile(username, cachedData = {}) {
     try {
       // Use cached data if available, otherwise fetch
-      let attendanceData, biddingData;
+      let attendanceData, biddingData, auctionWins;
 
       if (cachedData.attendanceData) {
         attendanceData = cachedData.attendanceData;
@@ -463,6 +490,17 @@ class IntelligenceEngine {
       } else {
         const biddingResponse = await this.sheetAPI.call('getBiddingPoints', {});
         biddingData = biddingResponse?.members ?? [];
+      }
+
+      // Use cached auction data if available to avoid redundant API calls
+      if (cachedData.auctionData) {
+        // Count wins from cached auction data
+        auctionWins = cachedData.auctionData.filter(row =>
+          row.winner && row.winner.toLowerCase() === username.toLowerCase()
+        ).length;
+      } else {
+        // Fall back to individual API call if no cached data
+        auctionWins = await this.getAuctionWinsForMember(username);
       }
 
       const memberAttendance = attendanceData.find(row =>
@@ -490,7 +528,7 @@ class IntelligenceEngine {
           pointsRemaining: memberBidding?.pointsLeft || 0,
           pointsConsumed: memberBidding?.pointsConsumed || 0,
           totalAwarded: (memberBidding?.pointsLeft || 0) + (memberBidding?.pointsConsumed || 0),
-          auctionsWon: await this.getAuctionWinsForMember(username),
+          auctionsWon: auctionWins,
         },
         recentActivity: recentSpawns,
       };
@@ -980,22 +1018,24 @@ class IntelligenceEngine {
 
   /**
    * Analyze engagement for all members and identify at-risk members
-   * OPTIMIZED: Fetches all data once instead of per-member to reduce API calls from N*3 to 3
+   * OPTIMIZED: Fetches all data once instead of per-member to reduce API calls from N*4 to 4
    */
   async analyzeAllMembersEngagement() {
     try {
       // Fetch all data ONCE instead of per-member (massive performance improvement)
       console.log('[INTELLIGENCE] Fetching data for all members (optimized batch fetch)...');
 
-      const [biddingResponse, attendanceResponse, weeklyAttendanceResponse] = await Promise.all([
+      const [biddingResponse, attendanceResponse, weeklyAttendanceResponse, auctionResponse] = await Promise.all([
         this.sheetAPI.call('getBiddingPoints', {}),
         this.sheetAPI.call('getTotalAttendance', {}),
         this.sheetAPI.call('getAllWeeklyAttendance', {}),
+        this.sheetAPI.call('getForDistribution', {}, { timeout: 60000 }),
       ]);
 
       const biddingData = biddingResponse?.members ?? [];
       const attendanceData = attendanceResponse?.members ?? [];
       const weeklyAttendance = weeklyAttendanceResponse || {};
+      const auctionData = auctionResponse?.items ?? [];
 
       console.log(`[INTELLIGENCE] Processing ${biddingData.length} members with cached data...`);
 
@@ -1004,6 +1044,7 @@ class IntelligenceEngine {
         attendanceData,
         biddingData,
         weeklyAttendance,
+        auctionData,
       };
 
       const analyses = [];
@@ -1125,29 +1166,32 @@ class IntelligenceEngine {
   async detectAttendanceAnomalies() {
     try {
       const attendanceResponse = await this.sheetAPI.call('getTotalAttendance', {});
-      const attendanceData = attendanceResponse?.data?.members ?? [];
+      const attendanceData = attendanceResponse?.members ?? [];
       const anomalies = [];
 
       // Calculate attendance statistics
-      const spawnCounts = attendanceData.map(m => m.spawnCount || 0);
+      // Note: attendancePoints is the spawn count field (Total Attendance Days)
+      const spawnCounts = attendanceData.map(m => m.attendancePoints || 0);
       const mean = this.calculateMean(spawnCounts);
       const stdDev = this.calculateStdDev(spawnCounts);
 
       // Detect statistical outliers
       // Guard: skip z-score calculation if stdDev is zero or near-zero (all spawn counts identical)
       const outliers = (Math.abs(stdDev) < Number.EPSILON) ? [] : attendanceData.filter(member => {
-        const zScore = Math.abs(((member.spawnCount || 0) - mean) / stdDev);
+        const memberSpawns = member.attendancePoints || 0;
+        const zScore = Math.abs((memberSpawns - mean) / stdDev);
         return zScore > INTELLIGENCE_CONFIG.ATTENDANCE_PATTERN_STDEV;
       });
 
       for (const member of outliers) {
+        const memberSpawns = member.attendancePoints || 0;
         anomalies.push({
           type: 'UNUSUAL_ATTENDANCE',
           severity: 'MEDIUM',
           username: member.username,
-          spawnCount: member.spawnCount,
-          deviation: `${(((member.spawnCount - mean) / stdDev)).toFixed(1)}σ`,
-          recommendation: member.spawnCount > mean
+          spawnCount: memberSpawns,
+          deviation: `${((memberSpawns - mean) / stdDev).toFixed(1)}σ`,
+          recommendation: memberSpawns > mean
             ? 'Exceptionally high attendance - verify legitimacy'
             : 'Unusually low attendance - possible inactive account',
         });
