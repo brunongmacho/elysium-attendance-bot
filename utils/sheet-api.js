@@ -427,6 +427,21 @@ class SheetAPI {
     return await this.call('logAuditTrail', data);
   }
 
+  /**
+   * Bootstrap learning system from historical data
+   * Analyzes all ForDistribution data and creates completed predictions
+   */
+  async bootstrapLearning() {
+    return await this.call('bootstrapLearning', {});
+  }
+
+  /**
+   * Check if bootstrap is needed
+   */
+  async needsBootstrap() {
+    return await this.call('needsBootstrap', {});
+  }
+
   // ========================================================================
   // METRICS & MONITORING
   // ========================================================================

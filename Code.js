@@ -147,6 +147,10 @@ function doPost(e) {
     if (action === 'createDailyBackup') return createDailyBackup();
     if (action === 'logAuditTrail') return logAuditTrail(data);
 
+    // Bootstrap learning system
+    if (action === 'bootstrapLearning') return bootstrapLearningFromHistory();
+    if (action === 'needsBootstrap') return createResponse('ok', 'Bootstrap check', { needsBootstrap: needsBootstrap() });
+
     // Leaderboard & Weekly Report actions
     if (action === 'getAttendanceLeaderboard') return getAttendanceLeaderboard(data);
     if (action === 'getBiddingLeaderboard') return getBiddingLeaderboard(data);
@@ -3563,6 +3567,271 @@ function getCurrentWeekSheetName() {
 // ===========================================================
 // DRIVE API ACTIONS (Add to doPost handler)
 // ===========================================================
+
+// ===========================================================
+// BOOTSTRAP LEARNING SYSTEM - LEARN FROM ALL HISTORY
+// ===========================================================
+
+/**
+ * BOOTSTRAP LEARNING FROM HISTORICAL DATA
+ *
+ * This function analyzes ALL historical auction data from ForDistribution
+ * and populates the BotLearning sheet with completed predictions.
+ *
+ * The bot will start "smart" instead of learning from scratch!
+ *
+ * Call this ONCE on first deployment to give the bot instant intelligence.
+ * It's safe to run multiple times (skips existing predictions).
+ *
+ * @returns {Object} Response with bootstrap results
+ */
+function bootstrapLearningFromHistory() {
+  try {
+    Logger.log('🚀 [BOOTSTRAP] Starting historical learning bootstrap...');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const forDistSheet = ss.getSheetByName('ForDistribution');
+    const learningSheet = getBotLearningSheet();
+
+    if (!forDistSheet) {
+      return createResponse('error', 'ForDistribution sheet not found');
+    }
+
+    // Get all historical auction data
+    const lastRow = forDistSheet.getLastRow();
+    if (lastRow < 2) {
+      return createResponse('ok', 'No historical data to learn from', { learned: 0 });
+    }
+
+    const dataRange = forDistSheet.getRange(2, 1, lastRow - 1, 12);
+    const auctions = dataRange.getValues();
+
+    Logger.log(`📚 [BOOTSTRAP] Found ${auctions.length} historical auctions`);
+
+    // Group auctions by item to calculate predictions
+    const itemHistory = {};
+
+    // First pass: collect all historical prices
+    auctions.forEach(row => {
+      const itemName = row[0];
+      const winningBid = row[4];
+      const timestamp = row[7];
+      const winner = row[3];
+
+      if (!itemName || !winningBid || !winner || winner === 'No Winner') {
+        return; // Skip invalid or unsold items
+      }
+
+      if (!itemHistory[itemName]) {
+        itemHistory[itemName] = [];
+      }
+
+      itemHistory[itemName].push({
+        price: winningBid,
+        timestamp: timestamp,
+        winner: winner
+      });
+    });
+
+    Logger.log(`📊 [BOOTSTRAP] Grouped into ${Object.keys(itemHistory).length} unique items`);
+
+    // Second pass: For each auction, predict based on data BEFORE that auction
+    let predictionsCreated = 0;
+    let predictionsSkipped = 0;
+
+    auctions.forEach((row, index) => {
+      const itemName = row[0];
+      const actualPrice = row[4];
+      const timestamp = row[7];
+      const winner = row[3];
+
+      if (!itemName || !actualPrice || !winner || winner === 'No Winner') {
+        predictionsSkipped++;
+        return;
+      }
+
+      // Get historical data BEFORE this auction
+      const priorAuctions = itemHistory[itemName]
+        .filter(a => new Date(a.timestamp) < new Date(timestamp))
+        .map(a => a.price);
+
+      if (priorAuctions.length === 0) {
+        // First auction of this item - skip (no data to predict from)
+        predictionsSkipped++;
+        return;
+      }
+
+      // Calculate prediction based on historical data
+      const avgPrice = priorAuctions.reduce((a, b) => a + b, 0) / priorAuctions.length;
+      const sortedPrices = [...priorAuctions].sort((a, b) => a - b);
+      const medianPrice = sortedPrices[Math.floor(sortedPrices.length / 2)];
+
+      // Calculate standard deviation
+      const variance = priorAuctions.reduce((sum, price) => sum + Math.pow(price - avgPrice, 2), 0) / priorAuctions.length;
+      const stdDev = Math.sqrt(variance);
+
+      // Prediction: use median if available, otherwise average
+      const predicted = priorAuctions.length >= 3 ? Math.round(medianPrice) : Math.round(avgPrice);
+
+      // Calculate confidence based on data quantity and consistency
+      let confidence = 50; // Base confidence
+      if (priorAuctions.length >= 10) confidence += 20;
+      else if (priorAuctions.length >= 5) confidence += 10;
+
+      // Lower confidence if high volatility
+      const coefficientOfVariation = (stdDev / avgPrice) * 100;
+      if (coefficientOfVariation < 20) confidence += 15;
+      else if (coefficientOfVariation > 50) confidence -= 15;
+
+      confidence = Math.min(100, Math.max(20, confidence));
+
+      // Calculate accuracy
+      const error = Math.abs(predicted - actualPrice);
+      const errorPercent = (error / actualPrice) * 100;
+      const accuracy = Math.max(0, Math.min(100, 100 - errorPercent));
+
+      // Build features object
+      const features = {
+        historicalAuctions: priorAuctions.length,
+        averagePrice: Math.round(avgPrice),
+        medianPrice: Math.round(medianPrice),
+        stdDev: Math.round(stdDev),
+        minPrice: Math.min(...priorAuctions),
+        maxPrice: Math.max(...priorAuctions),
+        priceRange: Math.max(...priorAuctions) - Math.min(...priorAuctions),
+        coefficientOfVariation: Math.round(coefficientOfVariation * 100) / 100,
+
+        // Recent trend (if enough data)
+        trend: priorAuctions.length >= 5 ? calculateTrend(priorAuctions) : 'insufficient_data',
+
+        // Bootstrap metadata
+        bootstrapped: true,
+        bootstrapIndex: index + 1,
+        bootstrapTotal: auctions.length
+      };
+
+      // Add to BotLearning sheet
+      const newRow = [
+        new Date(timestamp), // Timestamp
+        'price_prediction', // Type
+        itemName, // Target
+        predicted, // Predicted
+        actualPrice, // Actual
+        Math.round(accuracy * 100) / 100, // Accuracy
+        confidence, // Confidence
+        JSON.stringify(features), // Features
+        'completed', // Status
+        `Bootstrapped from historical data (${priorAuctions.length} prior auctions)` // Notes
+      ];
+
+      learningSheet.appendRow(newRow);
+      predictionsCreated++;
+
+      // Log progress every 50 predictions
+      if (predictionsCreated % 50 === 0) {
+        Logger.log(`📈 [BOOTSTRAP] Progress: ${predictionsCreated} predictions created...`);
+      }
+    });
+
+    Logger.log(`✅ [BOOTSTRAP] Bootstrap complete!`);
+    Logger.log(`   Created: ${predictionsCreated} predictions`);
+    Logger.log(`   Skipped: ${predictionsSkipped} (no prior data or invalid)`);
+    Logger.log(`   Total: ${auctions.length} historical auctions analyzed`);
+
+    // Calculate final metrics
+    const avgAccuracy = calculateBootstrapAccuracy(learningSheet);
+
+    return createResponse('ok', 'Bootstrap learning completed', {
+      totalAuctions: auctions.length,
+      predictionsCreated: predictionsCreated,
+      predictionsSkipped: predictionsSkipped,
+      uniqueItems: Object.keys(itemHistory).length,
+      averageAccuracy: avgAccuracy,
+      message: `Bot learned from ${predictionsCreated} historical auctions! Starting accuracy: ${avgAccuracy}%`
+    });
+
+  } catch (err) {
+    Logger.log('❌ [BOOTSTRAP] Error during bootstrap: ' + err.toString());
+    Logger.log(err.stack);
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Calculate trend from price history
+ */
+function calculateTrend(prices) {
+  if (prices.length < 5) return 'insufficient_data';
+
+  const recent = prices.slice(-3);
+  const historical = prices.slice(0, -3);
+
+  const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
+  const historicalAvg = historical.reduce((a, b) => a + b, 0) / historical.length;
+
+  const percentChange = ((recentAvg - historicalAvg) / historicalAvg) * 100;
+
+  if (percentChange > 10) return 'increasing';
+  if (percentChange < -10) return 'decreasing';
+  return 'stable';
+}
+
+/**
+ * Calculate average accuracy from bootstrap
+ */
+function calculateBootstrapAccuracy(learningSheet) {
+  try {
+    const data = learningSheet.getDataRange().getValues();
+    const rows = data.slice(1); // Skip header
+
+    const bootstrapRows = rows.filter(r => {
+      try {
+        const features = JSON.parse(r[7] || '{}');
+        return features.bootstrapped === true && r[5] !== ''; // Has accuracy
+      } catch (e) {
+        return false;
+      }
+    });
+
+    if (bootstrapRows.length === 0) return 0;
+
+    const totalAccuracy = bootstrapRows.reduce((sum, r) => sum + parseFloat(r[5]), 0);
+    return Math.round((totalAccuracy / bootstrapRows.length) * 100) / 100;
+  } catch (e) {
+    return 0;
+  }
+}
+
+/**
+ * Check if bootstrap is needed (BotLearning sheet is empty or has no bootstrapped data)
+ */
+function needsBootstrap() {
+  try {
+    const learningSheet = getBotLearningSheet();
+    const lastRow = learningSheet.getLastRow();
+
+    if (lastRow < 2) {
+      return true; // Empty sheet
+    }
+
+    // Check if we have any bootstrapped predictions
+    const data = learningSheet.getDataRange().getValues();
+    const rows = data.slice(1);
+
+    const hasBootstrap = rows.some(r => {
+      try {
+        const features = JSON.parse(r[7] || '{}');
+        return features.bootstrapped === true;
+      } catch (e) {
+        return false;
+      }
+    });
+
+    return !hasBootstrap; // Need bootstrap if no bootstrapped data found
+  } catch (e) {
+    return true; // On error, assume we need bootstrap
+  }
+}
 
 // ===========================================================
 // AUTOMATED TIME-DRIVEN TRIGGERS

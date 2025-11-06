@@ -136,6 +136,8 @@ const COMMAND_ALIASES = {
   "!predict": "!predictprice",
   "!suggestprice": "!predictprice",
   "!suggestauction": "!analyzequeue",
+  "!bootstrap": "!bootstraplearning",
+  "!learnhistory": "!bootstraplearning",
   "!analyzequeue": "!analyzequeue",
   "!engage": "!engagement",
   "!analyze": "!analyzeengagement",
@@ -2865,6 +2867,79 @@ const commandHandlers = {
       await message.reply(`❌ Error analyzing queue: ${error.message}`);
     }
   },
+
+  /**
+   * Bootstrap learning system from ALL historical data
+   * Usage: !bootstraplearning (admin only)
+   *
+   * This analyzes every auction in ForDistribution and creates completed predictions.
+   * The bot starts "smart" instead of learning from scratch!
+   */
+  bootstraplearning: async (message, member) => {
+    if (!isAdmin(message.member)) {
+      return message.reply(`${EMOJI.ERROR} Only admins can trigger bootstrap learning.`);
+    }
+
+    await message.reply(`🚀 Bootstrapping learning system from ALL historical data... This may take 30-60 seconds.`);
+
+    try {
+      console.log(`🚀 [BOOTSTRAP] Manual bootstrap requested by ${member.user.username}`);
+
+      const bootstrapResult = await sheetAPI.bootstrapLearning();
+
+      if (bootstrapResult.status === 'ok') {
+        const { predictionsCreated, uniqueItems, averageAccuracy, predictionsSkipped, totalAuctions } = bootstrapResult.data;
+
+        const embed = new EmbedBuilder()
+          .setColor(0x00ff00)
+          .setTitle('✅ Learning System Bootstrapped!')
+          .setDescription(
+            '**The bot has learned from ALL historical auction data!**\n\n' +
+            `Analyzed ${totalAuctions} historical auctions and created ${predictionsCreated} predictions.`
+          )
+          .addFields(
+            {
+              name: '📊 Results',
+              value:
+                `Total Auctions: **${totalAuctions}**\n` +
+                `Predictions Created: **${predictionsCreated}**\n` +
+                `Skipped (no prior data): **${predictionsSkipped}**\n` +
+                `Unique Items: **${uniqueItems}**\n` +
+                `Starting Accuracy: **${averageAccuracy}%**`,
+              inline: false,
+            },
+            {
+              name: '🎯 What This Means',
+              value:
+                '✅ Bot learned patterns from your entire history\n' +
+                '✅ Price predictions are now accurate immediately\n' +
+                '✅ Confidence adjusts based on historical accuracy\n' +
+                '✅ Bot will continue learning from new auctions',
+              inline: false,
+            },
+            {
+              name: '💡 Try It Out',
+              value:
+                '`!predictprice <item>` - Get AI price prediction\n' +
+                '`!learningmetrics` - View learning statistics\n' +
+                '`!suggestauction` - Analyze entire queue',
+              inline: false,
+            }
+          )
+          .setFooter({ text: `Bootstrapped by ${member.user.username} • ELYSIUM Learning System` })
+          .setTimestamp();
+
+        await message.reply({ embeds: [embed] });
+        console.log(`✅ [BOOTSTRAP] Successfully created ${predictionsCreated} predictions (${averageAccuracy}% accuracy)`);
+      } else {
+        await message.reply(`❌ Bootstrap failed: ${bootstrapResult.message}`);
+        console.error(`❌ [BOOTSTRAP] Failed: ${bootstrapResult.message}`);
+      }
+    } catch (error) {
+      console.error('[BOOTSTRAP] Error during bootstrap:', error);
+      await message.reply(`❌ Error during bootstrap: ${error.message}`);
+    }
+  },
 };
 
 /**
@@ -2922,6 +2997,79 @@ client.once(Events.ClientReady, async () => {
   // INITIALIZE INTELLIGENCE ENGINE FIRST (needed by other modules)
   intelligenceEngine = new IntelligenceEngine(client, config, sheetAPI);
   console.log('🤖 Intelligence Engine initialized (AI/ML powered features enabled)');
+
+  // 🚀 AUTO-BOOTSTRAP LEARNING FROM HISTORY (First Deployment)
+  console.log('🔍 Checking if learning system needs bootstrap...');
+  try {
+    const needsCheck = await sheetAPI.needsBootstrap();
+    if (needsCheck.status === 'ok' && needsCheck.data.needsBootstrap) {
+      console.log('🚀 [FIRST DEPLOYMENT] Bootstrapping learning from historical data...');
+      console.log('   This will analyze ALL auction history and create predictions.');
+      console.log('   The bot will start SMART instead of learning from scratch!');
+
+      const bootstrapResult = await sheetAPI.bootstrapLearning();
+
+      if (bootstrapResult.status === 'ok') {
+        const { predictionsCreated, uniqueItems, averageAccuracy } = bootstrapResult.data;
+        console.log(`✅ [BOOTSTRAP SUCCESS]`);
+        console.log(`   📊 Predictions Created: ${predictionsCreated}`);
+        console.log(`   🎯 Unique Items Learned: ${uniqueItems}`);
+        console.log(`   🎓 Starting Accuracy: ${averageAccuracy}%`);
+        console.log(`   🧠 Bot is now SMART and ready to make accurate predictions!`);
+
+        // Send notification to admin logs
+        const adminLogsChannel = await discordCache.getChannelById(config.admin_logs_channel_id);
+        if (adminLogsChannel) {
+          const embed = new EmbedBuilder()
+            .setColor(0x00ff00)
+            .setTitle('🚀 Learning System Bootstrapped!')
+            .setDescription(
+              '**The bot has learned from ALL historical auction data!**\n\n' +
+              `The learning system analyzed your entire auction history and created ` +
+              `${predictionsCreated} completed predictions across ${uniqueItems} unique items.`
+            )
+            .addFields(
+              {
+                name: '📊 Bootstrap Results',
+                value:
+                  `Predictions Created: **${predictionsCreated}**\n` +
+                  `Unique Items: **${uniqueItems}**\n` +
+                  `Starting Accuracy: **${averageAccuracy}%**`,
+                inline: false,
+              },
+              {
+                name: '🎯 What This Means',
+                value:
+                  '✅ Bot starts SMART (not from zero)\n' +
+                  '✅ Accurate price predictions immediately\n' +
+                  '✅ Learned patterns from your history\n' +
+                  '✅ Confidence adapts over time',
+                inline: false,
+              },
+              {
+                name: '💡 Next Steps',
+                value:
+                  'Use `!predictprice <item>` to see predictions!\n' +
+                  'Use `!learningmetrics` to view learning stats.\n' +
+                  'Bot will continue learning from new auctions automatically.',
+                inline: false,
+              }
+            )
+            .setFooter({ text: 'First Deployment • Learning System Active' })
+            .setTimestamp();
+
+          await adminLogsChannel.send({ embeds: [embed] });
+        }
+      } else {
+        console.log(`⚠️ [BOOTSTRAP FAILED] ${bootstrapResult.message}`);
+      }
+    } else {
+      console.log('✅ Learning system already bootstrapped (skipping)');
+    }
+  } catch (bootstrapError) {
+    console.error('❌ Error during bootstrap check:', bootstrapError);
+    console.log('   Bot will continue without bootstrap (learning from future auctions)');
+  }
 
   // INITIALIZE ALL MODULES IN CORRECT ORDER
   attendance.initialize(config, bossPoints, isAdmin, discordCache); // NEW
