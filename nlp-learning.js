@@ -202,19 +202,16 @@ class NLPLearningSystem {
       return true;
     }
 
-    // In auction thread (auto-respond for bids)
+    // In auction thread (auto-respond to all commands)
     if (LEARNING_CONFIG.activationModes.respondInAuctionThreads) {
       const isAuctionThread =
         message.channel.isThread() &&
         message.channel.parentId === this.config.bidding_channel_id;
 
       if (isAuctionThread) {
-        // Only respond to bid-like patterns
-        const content = message.content.trim().toLowerCase();
-        const looksLikeBid =
-          /^\d+/.test(content) ||
-          /\b(bid|taya|pusta|lagay)\b/i.test(content);
-        return looksLikeBid;
+        // Respond to all patterns in auction threads (bids, points, status, etc.)
+        // This allows the learning system to improve from all command usage
+        return true;
       }
     }
 

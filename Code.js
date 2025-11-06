@@ -97,6 +97,25 @@ function normalizeUsername(username) {
     .replace(/[^\w]/g, '');         // Remove special characters (keep alphanumeric only)
 }
 
+// GET REQUEST HANDLER - For read-only operations
+function doGet(e) {
+  try {
+    const action = e.parameter.action || 'unknown';
+    Logger.log(`🔍 GET Action: ${action}`);
+
+    // NLP Learning System - Read operations
+    if (action === 'getLearnedPatterns') return ContentService.createTextOutput(JSON.stringify(getLearnedPatterns())).setMimeType(ContentService.MimeType.JSON);
+    if (action === 'getUserPreferences') return ContentService.createTextOutput(JSON.stringify(getUserPreferences())).setMimeType(ContentService.MimeType.JSON);
+
+    Logger.log(`❌ Unknown GET action: ${action}`);
+    return ContentService.createTextOutput(JSON.stringify(createResponse('error', 'Unknown action: ' + action))).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    Logger.log('❌ GET Error: ' + err.toString());
+    return ContentService.createTextOutput(JSON.stringify(createResponse('error', err.toString()))).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
 // MAIN WEBHOOK HANDLER - COMPLETE VERSION
 function doPost(e) {
   try {
@@ -151,6 +170,11 @@ function doPost(e) {
     // Bootstrap learning system
     if (action === 'bootstrapLearning') return bootstrapLearningFromHistory();
     if (action === 'needsBootstrap') return createResponse('ok', 'Bootstrap check', { needsBootstrap: needsBootstrap() });
+
+    // NLP Learning System actions
+    if (action === 'getLearnedPatterns') return getLearnedPatterns();
+    if (action === 'getUserPreferences') return getUserPreferences();
+    if (action === 'syncNLPLearning') return syncNLPLearning(data);
 
     // Leaderboard & Weekly Report actions
     if (action === 'getAttendanceLeaderboard') return getAttendanceLeaderboard(data);
