@@ -174,8 +174,8 @@ class LearningSystem {
     if (LEARNING_CONFIG.INCLUDE_BEHAVIORAL_PATTERNS && type === 'price_prediction') {
       try {
         const forDist = await this.sheetAPI.call('getForDistribution', {});
-        // Handle both nested items array and direct data array
-        const items = forDist?.data?.items || forDist?.data || [];
+        // Response structure has items at top level
+        const items = forDist?.items || [];
         if (items.length > 0) {
           const recent = items.slice(-20); // Last 20 auctions
           const itemAuctions = recent.filter(a => (a.itemName || a.item) === target);

@@ -234,12 +234,12 @@ class IntelligenceEngine {
       // Fetch from ForDistribution sheet (historical loot with prices)
       const response = await this.sheetAPI.call('getForDistribution', {});
 
-      if (response.status !== 'ok' || !response.data || !response.data.items) {
-        console.error('[INTELLIGENCE] Failed to fetch ForDistribution:', response.message);
+      if (!response || !response.items) {
+        console.error('[INTELLIGENCE] Failed to fetch ForDistribution:', response?.message || 'No response');
         return [];
       }
 
-      const forDistData = response.data.items;
+      const forDistData = response.items;
 
       // Normalize item name for matching
       const normalizedName = this.normalizeItemName(itemName);
@@ -320,8 +320,8 @@ class IntelligenceEngine {
         return [];
       }
 
-      // Normalize response shape: try items first, fallback to data array
-      const items = response?.data?.items ?? response?.data ?? [];
+      // Response structure has items at top level
+      const items = response?.items ?? [];
       return items.map(row => ({
         itemName: row.itemName,
         winningBid: parseInt(row.bidAmount) || 0,
@@ -607,8 +607,8 @@ class IntelligenceEngine {
   async getAuctionWinsForMember(username) {
     try {
       const response = await this.sheetAPI.call('getForDistribution', {});
-      // Normalize response shape: try items first, fallback to data array
-      const items = response?.data?.items ?? response?.data ?? [];
+      // Response structure has items at top level
+      const items = response?.items ?? [];
       const wins = items.filter(row =>
         row.winner && row.winner.toLowerCase() === username.toLowerCase()
       );
