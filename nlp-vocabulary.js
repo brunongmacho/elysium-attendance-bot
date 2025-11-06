@@ -20,6 +20,22 @@ const ENGLISH_WORDS = [
   'game', 'gaming', 'gamer', 'player', 'players', 'team', 'party', 'squad', 'clan', 'guild',
   'raid', 'raiding', 'raider', 'raiders', 'boss', 'bosses', 'epic', 'epics', 'spawn', 'spawns',
   'respawn', 'respawns', 'loot', 'looting', 'drop', 'drops', 'item', 'items', 'gear', 'equipment',
+
+  // Boss Names (from Tesseract OCR system - boss_points.json)
+  'venatus', 'viorent', 'ego', 'clemantis', 'livera', 'araneo', 'undomiel', 'saphirus', 'neutro',
+  'dalia', 'lady dalia', 'aqueleus', 'aquleus', 'general aquleus', 'general', 'thymele', 'amentis',
+  'baron braudmore', 'baron', 'braudmore', 'milavy', 'wannitas', 'metus', 'duplican', 'shuliar',
+  'ringor', 'roderick', 'gareth', 'titore', 'larba', 'catena', 'auraq', 'secreta', 'ordo',
+  'asta', 'supore', 'chaiflock', 'benji', 'guildboss', 'guild boss',
+
+  // Item Categories (from Tesseract OCR loot system)
+  'stone', 'stones', 'refining stone', 'enhancement stone', 'accessory stone',
+  'heart', 'hearts', 'violet heart', 'blue heart', 'red heart', 'green heart',
+  'core', 'cores', 'soul', 'souls', 'essence', 'essences', 'homun',
+  'feather', 'feathers', 'blue feather', 'crystal', 'crystals', 'ore', 'ores',
+  'fragment', 'fragments', 'shard', 'shards', 'powder', 'powders',
+  'scroll', 'scrolls', 'potion', 'potions', 'elixir', 'elixirs',
+  'acquired', 'obtained', 'received', 'got', 'looted',
   'weapon', 'weapons', 'armor', 'armors', 'shield', 'shields', 'helmet', 'helmets', 'boots',
   'gloves', 'ring', 'rings', 'necklace', 'earring', 'earrings', 'jewel', 'jewels', 'accessory',
   'buff', 'buffs', 'debuff', 'debuffs', 'skill', 'skills', 'spell', 'spells', 'ability', 'abilities',
@@ -207,7 +223,7 @@ const ENGLISH_WORDS = [
   'clutch', 'carry', 'feeding', 'throw', 'throwing', 'int', 'inting',
   'pog', 'poggers', 'pogchamp', 'kappa', 'kekw', 'pepega', 'monkas', 'omegalul',
   'yeet', 'yolo', 'swag', 'hype', 'hyped', 'pls', 'plz', 'thx', 'tho',
-  'gonna', 'wanna', 'gotta', 'dunno', 'kinda', 'sorta', 'ain',t',
+  'gonna', 'wanna', 'gotta', 'dunno', 'kinda', 'sorta', 'aint',
   'yeah', 'yep', 'nope', 'nah', 'meh', 'uh', 'um', 'hmm', 'uhh', 'err',
 ];
 

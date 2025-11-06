@@ -14,6 +14,23 @@ const TAGLISH_PHRASES = [
   'spawn ba', 'may spawn', 'lalabas na ba', 'kelan spawn',
   'loot ba', 'may loot', 'ano loot', 'anong drops',
   'items ba', 'may items', 'ano items', 'whats the items',
+
+  // Boss-specific Taglish phrases (from Tesseract OCR system)
+  'venatus ba', 'may venatus', 'viorent na', 'ego spawn', 'ego boss',
+  'lady dalia ba', 'dalia spawn', 'may dalia', 'dalia na',
+  'general aquleus', 'aquleus ba', 'may aquleus',
+  'baron ba', 'braudmore spawn', 'baron braudmore na',
+  'milavy ba', 'wannitas spawn', 'metus na', 'duplican boss',
+  'shuliar ba', 'ringor spawn', 'roderick na', 'gareth boss',
+  'catena ba', 'auraq spawn', 'secreta na', 'ordo boss',
+  'guild boss ba', 'gb na', 'may gb', 'guildboss spawn',
+
+  // Item/Loot Taglish phrases (from loot system)
+  'nakuha ko', 'got ko', 'na-loot ko', 'na-drop ko',
+  'violet heart ba', 'blue feather na', 'may heart', 'ano heart',
+  'refining stone lang', 'enhancement stone ba', 'stone lang yan',
+  'core ba yan', 'essence ba', 'soul lang', 'homun lang',
+  'maganda loot', 'pangit drops', 'walang maganda', 'okay drops',
   'online ka ba', 'online na', 'naka-online', 'online ako',
   'ready ka ba', 'ready na', 'naka-ready', 'ready ako',
   'available ka', 'pwede ka', 'free ka ba', 'busy ka ba',

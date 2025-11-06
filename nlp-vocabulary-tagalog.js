@@ -67,6 +67,19 @@ const TAGALOG_WORDS = [
   'koponan', 'grupo', 'samahan', 'pangkat',
   'boss', 'kalaban', 'kaaway', 'kontra',
   'loot', 'premyo', 'gantimpala', 'pabuya',
+
+  // Boss Names (Tagalog pronunciation - from Tesseract OCR)
+  'venatus', 'viorent', 'ego', 'clemantis', 'livera', 'araneo', 'undomiel', 'saphirus', 'neutro',
+  'dalia', 'lady dalia', 'aqueleus', 'aquleus', 'heneral', 'thymele', 'amentis',
+  'baron', 'braudmore', 'milavy', 'wannitas', 'metus', 'duplican', 'shuliar',
+  'ringor', 'roderick', 'gareth', 'titore', 'larba', 'catena', 'auraq', 'secreta', 'ordo',
+  'asta', 'supore', 'chaiflock', 'benji', 'guild boss',
+
+  // Item Terms (Tagalog - from loot system)
+  'bato', 'mga bato', 'puso', 'mga puso', 'core', 'kaluluwa', 'essence',
+  'feather', 'balahibo', 'kristal', 'mineral', 'piraso', 'putik', 'powder',
+  'nakuha', 'natanggap', 'nakatanggap', 'nakakuha',
+
   'gamit', 'kagamitan', 'sandata', 'armas',
   'baluti', 'kalasag', 'proteksyon',
   'mahika', 'salamangka', 'espiritu',
