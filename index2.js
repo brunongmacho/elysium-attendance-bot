@@ -4270,6 +4270,7 @@ client.on(Events.MessageCreate, async (message) => {
       resolvedCmd === "!learned" ||
       resolvedCmd === "!teachbot" ||
       resolvedCmd === "!clearlearned" ||
+      resolvedCmd === "!nlpunhide" ||
       resolvedCmd === "!myprofile"
     ) {
       if (!userIsAdmin && resolvedCmd !== "!myprofile") {
@@ -4306,6 +4307,8 @@ client.on(Events.MessageCreate, async (message) => {
         await nlpAdminCommands.teachBot(message, args, nlpLearningSystem);
       } else if (resolvedCmd === "!clearlearned") {
         await nlpAdminCommands.clearLearned(message, args, nlpLearningSystem);
+      } else if (resolvedCmd === "!nlpunhide") {
+        await nlpAdminCommands.unhideNLPTabs(message, sheetAPI);
       } else if (resolvedCmd === "!myprofile") {
         await nlpAdminCommands.showMyProfile(message, nlpLearningSystem);
       }

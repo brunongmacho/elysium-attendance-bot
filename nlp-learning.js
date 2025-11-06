@@ -29,8 +29,12 @@
  *    - 75% similarity threshold for matches
  *    - Examples: "pints" → "points", "ilng" → "ilang"
  *
- * 4. SELF-IMPROVING PATTERNS
+ * 4. SELF-IMPROVING PATTERNS (Auto-Learning with Popularity Tracking)
  *    - Learns patterns from user confirmations (✅ reactions)
+ *    - Auto-suggests commands for unrecognized phrases
+ *    - Uses fuzzy matching to guess intent (50%+ similarity)
+ *    - SMART PIPELINE: Guild chat (passive) → Tracks phrase → Active channel → Prioritized suggestion
+ *    - Popularity boost: Phrases seen multiple times get +5-25% confidence
  *    - Confidence scores improve over time (0.7 → 0.95+)
  *    - Patterns sync to Google Sheets every 5 minutes
  *    - Survives bot restarts (persistent storage)
@@ -49,7 +53,7 @@
 
 const axios = require('axios');
 const levenshtein = require('fast-levenshtein');
-const { NLPHandler } = require('./nlp-handler.js');
+const { NLPHandler, NLP_PATTERNS } = require('./nlp-handler.js');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -71,6 +75,8 @@ const LEARNING_CONFIG = {
     maxConfidence: 0.98,           // Maximum confidence cap
     minUsageForLearning: 2,        // Min times pattern used before learning
     decayRate: 0.02,               // Confidence decrease per failed interpretation
+    autoSuggest: true,             // Auto-suggest commands for unrecognized phrases
+    suggestionThreshold: 0.5,      // Min similarity (0-1) to suggest a command
   },
 
   // Fuzzy matching (handles typos and shortcuts)
@@ -86,6 +92,27 @@ const LEARNING_CONFIG = {
     syncInterval: 5 * 60 * 1000,   // Sync to Google Sheets every 5 minutes
     maxRecentMessages: 100,        // Keep last 100 messages for context
     maxUnrecognizedPhrases: 50,    // Track top 50 unrecognized phrases
+  },
+
+  // Semantic synonym mapping (makes bot smarter at understanding intent)
+  synonyms: {
+    // Leaderboard synonyms
+    leaderboard: ['rankings', 'ranks', 'rank', 'top', 'leaders', 'scoreboard', 'standings', 'lb', 'board'],
+
+    // Points synonyms
+    mypoints: ['balance', 'points', 'pts', 'pnts', 'coins', 'credits', 'money', 'wallet', 'funds'],
+
+    // Status synonyms
+    bidstatus: ['status', 'stat', 'info', 'update', 'news', 'happening', 'current', 'active'],
+
+    // Bid synonyms
+    bid: ['offer', 'bet', 'wager', 'taya', 'pusta'],
+
+    // Help synonyms
+    help: ['commands', 'cmds', 'info', 'guide', 'assist', 'support'],
+
+    // Present synonyms
+    present: ['here', 'attending', 'attend', 'join', 'checkin', 'check-in'],
   },
 
   // Language detection
@@ -129,6 +156,7 @@ class NLPLearningSystem {
     this.userPreferences = new Map();      // userId → { language, shortcuts, stats }
     this.unrecognizedPhrases = new Map();  // phrase → { count, users, lastSeen }
     this.recentMessages = [];              // Circular buffer of recent messages
+    this.negativePatterns = new Map();     // phrase + command → { count, reason } - patterns that DON'T match
 
     // Static NLP handler for fallback
     this.staticHandler = null;
@@ -294,6 +322,15 @@ class NLPLearningSystem {
       };
     }
 
+    // No interpretation found - try fuzzy matching to suggest commands (if enabled)
+    if (LEARNING_CONFIG.learning.autoSuggest && shouldRespond && this.shouldRespond(message)) {
+      const suggestion = this.suggestCommandForPhrase(content);
+      if (suggestion && suggestion.confidence >= LEARNING_CONFIG.learning.suggestionThreshold) {
+        // Offer to learn this pattern with user confirmation
+        await this.offerToLearnPattern(message, content, suggestion.command, suggestion.confidence, suggestion.wasUnrecognized);
+      }
+    }
+
     // No interpretation found
     this.stats.failedInterpretations++;
     return null;
@@ -425,6 +462,302 @@ class NLPLearningSystem {
 
     this.stats.patternsLearned++;
     console.log(`🧠 [NLP Learning] New pattern: "${key}" → ${command}`);
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // AUTO-LEARNING WITH USER CONFIRMATION
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Suggest what command a phrase might mean using fuzzy matching + semantic understanding
+   */
+  suggestCommandForPhrase(phrase) {
+    const normalized = phrase.toLowerCase().trim();
+    const words = normalized.split(/\s+/);
+
+    // Get all known commands from static patterns
+    const allCommands = Object.keys(NLP_PATTERNS);
+
+    let bestMatch = null;
+    let highestScore = 0;
+    let matchReason = '';
+
+    // Check if this phrase was seen before in passive learning (unrecognized phrases)
+    const unrecognizedEntry = this.unrecognizedPhrases.get(normalized);
+    const popularityBoost = unrecognizedEntry ? this.calculatePopularityBoost(unrecognizedEntry) : 0;
+
+    // PRIORITY 1: Check semantic synonyms (exact match = high confidence)
+    for (const [command, synonyms] of Object.entries(LEARNING_CONFIG.synonyms)) {
+      for (const synonym of synonyms) {
+        // Check if any word in phrase matches synonym
+        if (words.includes(synonym)) {
+          // Apply negative learning penalty if this combo was rejected
+          const penalty = this.getNegativePenalty(normalized, `!${command}`);
+          const penalizedScore = 0.95 * penalty;
+
+          if (penalizedScore > highestScore) {
+            highestScore = penalizedScore;
+            bestMatch = `!${command}`;
+            matchReason = penalty < 1
+              ? `semantic match (with caution - rejected ${(1-penalty)*100}%)`
+              : `semantic match: "${synonym}" → ${command}`;
+          }
+        }
+      }
+    }
+
+    // PRIORITY 2: Fuzzy matching against command names and learned patterns
+    for (const command of allCommands) {
+      // Check similarity to command name itself
+      const commandSimilarity = this.calculatePhraseSimilarity(normalized, command);
+      const penalty = this.getNegativePenalty(normalized, `!${command}`);
+      const penalizedScore = commandSimilarity * penalty;
+
+      if (penalizedScore > highestScore) {
+        highestScore = penalizedScore;
+        bestMatch = `!${command}`;
+        matchReason = `phrase similar to command name`;
+      }
+
+      // Check if any learned patterns for this command are similar
+      for (const [learnedPhrase, pattern] of this.learnedPatterns.entries()) {
+        if (pattern.command === `!${command}`) {
+          const phraseSimilarity = this.calculatePhraseSimilarity(normalized, learnedPhrase);
+          const penalizedSimilarity = phraseSimilarity * penalty;
+
+          if (penalizedSimilarity > highestScore) {
+            highestScore = penalizedSimilarity;
+            bestMatch = `!${command}`;
+            matchReason = `similar to learned pattern`;
+          }
+        }
+      }
+    }
+
+    // PRIORITY 3: Ultra-short shortcuts (single words that are extremely common)
+    const ultraShorts = {
+      'pts': '!mypoints',
+      'lb': '!leaderboard',
+      'stat': '!bidstatus',
+      'status': '!bidstatus',
+      'points': '!mypoints',
+      'ranks': '!leaderboard',
+      'ranking': '!leaderboard',
+      'balance': '!mypoints',
+    };
+
+    if (ultraShorts[normalized]) {
+      const penalty = this.getNegativePenalty(normalized, ultraShorts[normalized]);
+      const penalizedScore = 0.98 * penalty;
+
+      if (penalizedScore > highestScore) {
+        highestScore = penalizedScore;
+        bestMatch = ultraShorts[normalized];
+        matchReason = `ultra-short shortcut`;
+      }
+    }
+
+    // Apply popularity boost (phrases seen frequently get higher confidence)
+    if (popularityBoost > 0 && bestMatch) {
+      const boostedScore = Math.min(highestScore + popularityBoost, 0.99);
+
+      if (boostedScore >= LEARNING_CONFIG.learning.suggestionThreshold) {
+        const seenCount = unrecognizedEntry ? unrecognizedEntry.count : 0;
+        const userCount = unrecognizedEntry ? unrecognizedEntry.userCount : 0;
+
+        return {
+          command: bestMatch,
+          confidence: boostedScore,
+          reasoning: `${matchReason} + popularity (${seenCount} times, ${userCount} users) = ${(boostedScore * 100).toFixed(0)}%`,
+          wasUnrecognized: true,
+        };
+      }
+    }
+
+    if (bestMatch && highestScore >= LEARNING_CONFIG.learning.suggestionThreshold) {
+      return {
+        command: bestMatch,
+        confidence: highestScore,
+        reasoning: matchReason || `${(highestScore * 100).toFixed(0)}% similar`,
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Calculate confidence boost based on how popular an unrecognized phrase is
+   * More usage = higher boost (shows it's an important phrase to learn)
+   */
+  calculatePopularityBoost(unrecognizedEntry) {
+    // Boost based on frequency
+    const frequencyBoost = Math.min(unrecognizedEntry.count * 0.05, 0.15); // Max +15% (3+ uses)
+
+    // Boost based on unique users (shows it's not just one person)
+    const userBoost = Math.min(unrecognizedEntry.userCount * 0.05, 0.10); // Max +10% (2+ users)
+
+    return frequencyBoost + userBoost;
+  }
+
+  /**
+   * Check if a phrase+command combination was rejected by users (negative learning)
+   * Returns penalty multiplier (0-1) to reduce confidence
+   */
+  getNegativePenalty(phrase, command) {
+    const key = `${phrase}::${command}`;
+    const negative = this.negativePatterns.get(key);
+
+    if (!negative) return 1.0; // No penalty
+
+    // Forgiving approach: Allow mistakes
+    // 1 rejection: 50% confidence penalty (still might suggest if base confidence is high)
+    // 2+ rejections: Block completely (0% confidence)
+    if (negative.count === 1) {
+      return 0.5; // Reduce confidence by half - gives users second chance
+    } else if (negative.count >= 2) {
+      return 0.0; // Block completely after 2 rejections
+    }
+
+    return 1.0;
+  }
+
+  /**
+   * Record that a phrase does NOT mean a specific command (negative learning)
+   */
+  recordNegativePattern(phrase, command) {
+    const key = `${phrase.toLowerCase().trim()}::${command}`;
+
+    if (!this.negativePatterns.has(key)) {
+      this.negativePatterns.set(key, {
+        phrase: phrase.toLowerCase().trim(),
+        command,
+        count: 0,
+        firstRejected: new Date().toISOString(),
+        lastRejected: new Date().toISOString(),
+      });
+    }
+
+    const negative = this.negativePatterns.get(key);
+    negative.count++;
+    negative.lastRejected = new Date().toISOString();
+
+    console.log(`🧠 [NLP Learning] Negative pattern recorded: "${phrase}" ≠ ${command} (${negative.count} rejections)`);
+  }
+
+  /**
+   * Calculate similarity between two phrases (word-level fuzzy matching)
+   */
+  calculatePhraseSimilarity(phrase1, phrase2) {
+    const words1 = phrase1.split(/\s+/);
+    const words2 = phrase2.split(/\s+/);
+
+    // Check for word overlap
+    let matches = 0;
+    for (const word1 of words1) {
+      for (const word2 of words2) {
+        const distance = levenshtein.get(word1, word2);
+        const maxLen = Math.max(word1.length, word2.length);
+        const similarity = 1 - (distance / maxLen);
+        if (similarity >= 0.7) {
+          matches++;
+          break;
+        }
+      }
+    }
+
+    // Similarity score based on word overlap
+    const totalWords = Math.max(words1.length, words2.length);
+    return matches / totalWords;
+  }
+
+  /**
+   * Offer to learn a pattern with user confirmation
+   */
+  async offerToLearnPattern(message, phrase, command, confidence, wasUnrecognized = false) {
+    try {
+      // Don't offer to learn if we've already offered recently for this phrase
+      const key = phrase.toLowerCase().trim();
+      if (this.pendingConfirmations && this.pendingConfirmations.has(key)) {
+        return; // Already waiting for confirmation
+      }
+
+      // Send confirmation message
+      const confidencePercent = (confidence * 100).toFixed(0);
+
+      // Check if this was a popular phrase from passive learning
+      const unrecognizedEntry = this.unrecognizedPhrases.get(key);
+      const popularityNote = unrecognizedEntry
+        ? `\n💡 *I've seen this ${unrecognizedEntry.count} times from ${unrecognizedEntry.userCount} users - seems popular!*`
+        : '';
+
+      const reply = await message.reply(
+        `🤔 I'm not sure what you mean, but maybe you want **${command}**? (${confidencePercent}% confident)${popularityNote}\n` +
+        `React with ✅ to teach me this, or ❌ to ignore.`
+      );
+
+      // Add reactions
+      await reply.react('✅');
+      await reply.react('❌');
+
+      // Track pending confirmation
+      if (!this.pendingConfirmations) {
+        this.pendingConfirmations = new Map();
+      }
+
+      this.pendingConfirmations.set(key, {
+        phrase,
+        command,
+        confidence,
+        messageId: reply.id,
+        userId: message.author.id,
+        timestamp: Date.now(),
+      });
+
+      // Set up reaction collector
+      const filter = (reaction, user) => {
+        return ['✅', '❌'].includes(reaction.emoji.name) && user.id === message.author.id;
+      };
+
+      const collector = reply.createReactionCollector({ filter, time: 60000, max: 1 });
+
+      collector.on('collect', async (reaction, user) => {
+        if (reaction.emoji.name === '✅') {
+          // Learn this pattern!
+          this.teachPattern(phrase, command, user.id);
+
+          // Remove from unrecognized phrases (now it's learned!)
+          const normalizedKey = phrase.toLowerCase().trim();
+          if (this.unrecognizedPhrases.has(normalizedKey)) {
+            this.unrecognizedPhrases.delete(normalizedKey);
+            console.log(`🧠 [NLP Learning] Removed from unrecognized (now learned): "${phrase}"`);
+          }
+
+          // Clear any negative learning for this combination (user confirmed it's correct!)
+          const negKey = `${normalizedKey}::${command}`;
+          if (this.negativePatterns.has(negKey)) {
+            this.negativePatterns.delete(negKey);
+            console.log(`🧠 [NLP Learning] Cleared negative pattern (user confirmed): "${phrase}" → ${command}`);
+          }
+
+          await reply.edit(`✅ Got it! I'll remember that **"${phrase}"** means **${command}**`);
+          console.log(`🧠 [NLP Learning] User confirmed: "${phrase}" → ${command}`);
+        } else {
+          // NEGATIVE LEARNING: Remember this is NOT the right command
+          this.recordNegativePattern(phrase, command);
+          await reply.edit(`❌ Got it, **"${phrase}"** is NOT **${command}**. I'll be more careful next time.`);
+          console.log(`🧠 [NLP Learning] User rejected: "${phrase}" ≠ ${command}`);
+        }
+        this.pendingConfirmations.delete(key);
+      });
+
+      collector.on('end', () => {
+        // Clean up if no reaction
+        this.pendingConfirmations.delete(key);
+      });
+
+    } catch (error) {
+      console.error('🧠 [NLP Learning] Error offering pattern:', error);
+    }
   }
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -576,8 +909,20 @@ class NLPLearningSystem {
         }
       }
 
+      // Load negative patterns
+      const negativeResponse = await axios.get(`${sheetsUrl}?action=getNegativePatterns`, {
+        timeout: 10000,
+      });
+
+      if (negativeResponse.data && negativeResponse.data.negativePatterns) {
+        for (const neg of negativeResponse.data.negativePatterns) {
+          const key = `${neg.phrase}::${neg.command}`;
+          this.negativePatterns.set(key, neg);
+        }
+      }
+
       this.lastSync = new Date();
-      console.log('🧠 [NLP Learning] Loaded data from Google Sheets');
+      console.log(`🧠 [NLP Learning] Loaded from Google Sheets: ${this.learnedPatterns.size} patterns, ${this.userPreferences.size} users, ${this.negativePatterns.size} negative patterns`);
     } catch (error) {
       console.warn('🧠 [NLP Learning] Failed to load from Google Sheets:', error.message);
     }
@@ -599,23 +944,43 @@ class NLPLearningSystem {
         ...u,
         exampleUsers: Array.from(u.users).slice(0, 5).join(', '),
       }));
+      const negativePatterns = Array.from(this.negativePatterns.values());
 
       const payload = {
         patterns,
         preferences,
         unrecognized,
+        negativePatterns,
         recognitionRate: this.getRecognitionRate(),
       };
 
-      await axios.post(`${sheetsUrl}?action=syncNLPLearning`, payload, {
+      const response = await axios.post(`${sheetsUrl}?action=syncNLPLearning`, payload, {
         timeout: 15000,
         headers: { 'Content-Type': 'application/json' },
       });
 
+      // Check if sync was actually successful
+      if (response.data && response.data.success === false) {
+        console.error('🧠 [NLP Learning] Sync returned error:', response.data.message);
+        return;
+      }
+
       this.lastSync = new Date();
-      console.log(`🧠 [NLP Learning] Synced ${patterns.length} patterns, ${preferences.length} users to Google Sheets`);
+      console.log(`🧠 [NLP Learning] Synced ${patterns.length} patterns, ${preferences.length} users, ${negativePatterns.length} negative patterns to Google Sheets`);
+
+      if (response.data && response.data.results) {
+        const r = response.data.results;
+        console.log(`🧠 [NLP Learning] Patterns: ${r.patterns.created} created, ${r.patterns.updated} updated`);
+        console.log(`🧠 [NLP Learning] Preferences: ${r.preferences.created} created, ${r.preferences.updated} updated`);
+        if (r.negativePatterns) {
+          console.log(`🧠 [NLP Learning] Negative Patterns: ${r.negativePatterns.created} created, ${r.negativePatterns.updated} updated`);
+        }
+      }
     } catch (error) {
       console.error('🧠 [NLP Learning] Sync failed:', error.message);
+      if (error.response) {
+        console.error('🧠 [NLP Learning] Response:', error.response.data);
+      }
     }
   }
 

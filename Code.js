@@ -106,6 +106,7 @@ function doGet(e) {
     // NLP Learning System - Read operations
     if (action === 'getLearnedPatterns') return ContentService.createTextOutput(JSON.stringify(getLearnedPatterns())).setMimeType(ContentService.MimeType.JSON);
     if (action === 'getUserPreferences') return ContentService.createTextOutput(JSON.stringify(getUserPreferences())).setMimeType(ContentService.MimeType.JSON);
+    if (action === 'getNegativePatterns') return ContentService.createTextOutput(JSON.stringify(getNegativePatterns())).setMimeType(ContentService.MimeType.JSON);
 
     Logger.log(`❌ Unknown GET action: ${action}`);
     return ContentService.createTextOutput(JSON.stringify(createResponse('error', 'Unknown action: ' + action))).setMimeType(ContentService.MimeType.JSON);
@@ -120,7 +121,9 @@ function doGet(e) {
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents || '{}');
-    const action = data.action || 'unknown';
+    // Check query parameters first (for compatibility with axios.post calls using ?action=X)
+    // then fall back to POST body action field
+    const action = (e.parameter && e.parameter.action) || data.action || 'unknown';
 
     Logger.log(`🔥 Action: ${action}`);
 
@@ -174,6 +177,7 @@ function doPost(e) {
     // NLP Learning System actions
     if (action === 'getLearnedPatterns') return getLearnedPatterns();
     if (action === 'getUserPreferences') return getUserPreferences();
+    if (action === 'getNegativePatterns') return getNegativePatterns();
     if (action === 'syncNLPLearning') return syncNLPLearning(data);
 
     // Leaderboard & Weekly Report actions
@@ -4205,6 +4209,7 @@ function weeklyLearningExport() {
  * 2. NLP_UserPreferences (Purple) - Each member's language preferences
  * 3. NLP_UnrecognizedPhrases (Orange) - Phrases bot doesn't understand yet
  * 4. NLP_Analytics (Green) - Daily learning progress snapshots
+ * 5. NLP_NegativePatterns (Red) - Rejected suggestions (anti-spam)
  *
  * USAGE:
  * - Tabs auto-create when bot first calls getLearnedPatterns() or syncNLPLearning()
@@ -4237,6 +4242,12 @@ const NLP_TABS_CONFIG = {
     columnWidths: [120, 150, 150, 150, 120, 200, 200, 250, 250],
     sampleData: [[new Date(), 42, 15, 1247, 0.94, 'pusta → !bid', 'bawi ko', '{"en": 5, "tl": 8, "taglish": 2}', 'Weekly snapshot (Sample data)']],
     color: '#e8f5e9'
+  },
+  'NLP_NegativePatterns': {
+    headers: ['Phrase', 'Command', 'Rejection Count', 'First Rejected', 'Last Rejected', 'Status', 'Notes'],
+    columnWidths: [200, 120, 120, 150, 150, 100, 300],
+    sampleData: [['show points', '!leaderboard', 2, new Date('2025-01-01'), new Date(), 'Blocked', 'User rejected this suggestion twice - will not suggest again (Sample data)']],
+    color: '#ffebee'
   }
 };
 
@@ -4342,10 +4353,23 @@ function getUserPreferences() {
   return { preferences };
 }
 
+function getNegativePatterns() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('NLP_NegativePatterns');
+  if (!sheet) { initializeNLPTabs(); sheet = ss.getSheetByName('NLP_NegativePatterns'); }
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return { negativePatterns: [] };
+  const data = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+  const negativePatterns = data.filter(row => row[0] && (!row[6] || row[6].indexOf('Sample data') === -1)).map(row => ({
+    phrase: row[0], command: row[1], count: row[2], firstRejected: row[3], lastRejected: row[4], status: row[5], notes: row[6]
+  }));
+  return { negativePatterns };
+}
+
 function syncNLPLearning(data) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss.getSheetByName('NLP_LearnedPatterns')) initializeNLPTabs();
-  const results = { patterns: { updated: 0, created: 0 }, preferences: { updated: 0, created: 0 }, unrecognized: { updated: 0, created: 0 }, timestamp: new Date() };
+  const results = { patterns: { updated: 0, created: 0 }, preferences: { updated: 0, created: 0 }, unrecognized: { updated: 0, created: 0 }, negativePatterns: { updated: 0, created: 0 }, timestamp: new Date() };
 
   if (data.patterns && data.patterns.length > 0) {
     for (let i = 0; i < data.patterns.length; i++) {
@@ -4379,6 +4403,24 @@ function syncNLPLearning(data) {
       for (let j = 0; j < phrases.length; j++) { if (phrases[j][0] === phrase.phrase) { rowIndex = j + 2; break; } }
       if (rowIndex > 0) { sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]); results.unrecognized.updated++; }
       else { sheet.appendRow(rowData); results.unrecognized.created++; }
+    }
+  }
+
+  if (data.negativePatterns && data.negativePatterns.length > 0) {
+    const sheet = ss.getSheetByName('NLP_NegativePatterns');
+    for (let i = 0; i < data.negativePatterns.length; i++) {
+      const neg = data.negativePatterns[i];
+      const status = neg.count >= 2 ? 'Blocked' : 'Caution (1 rejection)';
+      const notes = neg.count >= 2 ? 'Blocked after 2+ rejections - will not suggest again' : 'Single rejection - reduced confidence by 50%';
+      const rowData = [neg.phrase, neg.command, neg.count, new Date(neg.firstRejected), new Date(neg.lastRejected), status, notes];
+      const lastRow = sheet.getLastRow();
+      const existingData = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+      let rowIndex = -1;
+      for (let j = 0; j < existingData.length; j++) {
+        if (existingData[j][0] === neg.phrase && existingData[j][1] === neg.command) { rowIndex = j + 2; break; }
+      }
+      if (rowIndex > 0) { sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]); results.negativePatterns.updated++; }
+      else { sheet.appendRow(rowData); results.negativePatterns.created++; }
     }
   }
 

@@ -16,6 +16,7 @@
  * !unrecognized     - Show phrases bot doesn't understand yet
  * !teachbot "phrase" → !command - Manually teach a new pattern
  * !clearlearned [phrase] - Remove specific or all learned patterns
+ * !nlpunhide        - Unhide NLP tabs in Google Sheets for viewing
  * !myprofile        - View your personal learning profile (member accessible)
  */
 
@@ -284,6 +285,57 @@ async function clearLearned(message, args, learningSystem) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// COMMAND: !nlpunhide
+// Unhide NLP tabs in Google Sheets so they can be viewed
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function unhideNLPTabs(message, sheetAPI) {
+  try {
+    const result = await sheetAPI.call('unhideNLPTabs', {});
+
+    if (result.success) {
+      const embed = new EmbedBuilder()
+        .setTitle('✅ NLP Tabs Unhidden')
+        .setColor(0x57f287)
+        .setDescription('The NLP learning tabs are now visible in your Google Sheet!')
+        .addFields(
+          {
+            name: '📊 Unhidden Tabs',
+            value: result.unhidden && result.unhidden.length > 0
+              ? result.unhidden.map(tab => `• **${tab}**`).join('\n')
+              : '_All tabs were already visible_',
+            inline: false,
+          },
+          {
+            name: '📝 Where to Find Them',
+            value: [
+              'Open your [Google Sheet](<https://docs.google.com/spreadsheets/>) and look for these tabs:',
+              '• **NLP_LearnedPatterns** - Patterns the bot has learned',
+              '• **NLP_UserPreferences** - User language preferences',
+              '• **NLP_UnrecognizedPhrases** - Phrases to teach',
+              '• **NLP_Analytics** - Learning statistics',
+            ].join('\n'),
+            inline: false,
+          },
+          {
+            name: '💡 Tip',
+            value: 'These tabs are normally hidden to keep your sheet organized. You can hide them again manually if needed.',
+            inline: false,
+          }
+        )
+        .setTimestamp();
+
+      await message.reply({ embeds: [embed] });
+    } else {
+      await message.reply(`❌ Failed to unhide tabs: ${result.message || 'Unknown error'}`);
+    }
+  } catch (error) {
+    console.error('Error unhiding NLP tabs:', error);
+    await message.reply('❌ Error unhiding NLP tabs. Please try again or check Google Sheets manually.');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // COMMAND: !myprofile
 // Show user's personal learning profile (member accessible)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -351,5 +403,6 @@ module.exports = {
   showUnrecognized,
   teachBot,
   clearLearned,
+  unhideNLPTabs,
   showMyProfile,
 };

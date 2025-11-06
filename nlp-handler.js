@@ -204,8 +204,8 @@ const NLP_PATTERNS = {
 
   // General leaderboard (must come after specific leaderboards)
   leaderboard: [
-    /^(?:show|display|check|view)\s+(?:the\s+)?(?:leaderboard|lb|rankings?)$/i,
-    /^(?:top|rankings?|leaderboard|lb)$/i,
+    /^(?:show|display|check|view)\s+(?:me\s+)?(?:the\s+)?(?:leaderboards?|lb|rankings?)$/i,
+    /^(?:top|rankings?|leaderboards?|lb)$/i,
     /^who(?:'s|\s+is)\s+(?:on\s+)?(?:top|leading)/i,
     /^(?:top\s+)?(?:players?|members?|users?)$/i,
     /^(?:rank|ranking|ranks)$/i,
@@ -215,7 +215,7 @@ const NLP_PATTERNS = {
     /^(?:top|rank|ranking)(?:\s+(?:ba|naman))?$/i,
     // Taglish
     /^(?:sino|who)\s+(?:top|nangunguna)/i,
-    /^(?:show|pakita)\s+(?:ranking|leaderboard)/i,
+    /^(?:show|pakita)\s+(?:me\s+)?(?:the\s+)?(?:ranking|leaderboards?)/i,
   ],
 
   // Queue list
@@ -323,7 +323,9 @@ const NLP_PATTERNS = {
   // Help queries
   help: [
     /^(?:help|commands?|what\s+can\s+you\s+do)/i,
-    /^(?:how\s+do\s+i|show\s+me)/i,
+    /^(?:how\s+do\s+i)/i,
+    /^show\s+me\s+(?:how|commands?|help)/i,
+    /^show\s+me$/i,
   ],
 };
 
