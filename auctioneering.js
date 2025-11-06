@@ -314,12 +314,15 @@ const TIMEOUTS = {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Initializes the auctioneering module with required dependencies.
- * Must be called during bot startup before any auctions can run.
+ * Configure module dependencies and initialize internal clients used by auctioneering.
  *
- * @param {Object} config - Bot configuration object with channel IDs and settings
- * @param {Function} isAdminFunc - Function to check if a user is an admin
- * @param {Object} biddingModuleRef - Reference to the bidding module for point management
+ * Must be called before any auction operations (startup time).
+ *
+ * @param {Object} config - Bot configuration containing sheet webhook URL, channel IDs, and other settings.
+ * @param {Function} isAdminFunc - Function that returns whether a given user ID is an administrator.
+ * @param {Object} biddingModuleRef - Reference to the bidding module used for point management and validation.
+ * @param {Object|null} [cache=null] - Optional Discord/cache helper used for channel/thread lookups and caching.
+ * @param {Object|null} [intelligenceEngineRef=null] - Optional intelligence/learning engine used for prediction updates and auto-learning.
  */
 function initialize(config, isAdminFunc, biddingModuleRef, cache = null, intelligenceEngineRef = null) {
   cfg = config;
@@ -1431,30 +1434,14 @@ function safelyCleanupTimers(...timerKeys) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Ends the current auction item and processes the winner.
+ * Concludes the active auction item, records and announces its outcome, and advances the session.
  *
- * PROCESS:
- * 1. Validates auction state and prevents duplicate calls
- * 2. Marks item as ended
- * 3. Announces winner in thread (or "No bids" if none)
- * 4. Logs results to Google Sheets
- * 5. Locks and archives the auction thread
- * 6. Updates session items with winner/amount
- * 7. Moves to next item or finalizes session
+ * Performs outcome handling and observable side effects: announces the winner or "no bids", records results to Google Sheets, updates the optional intelligence learning system with the final price (if available), locks and archives the auction thread, updates the session item entry with winner/timestamp/amount, and moves to the next item or finalizes the session.
  *
- * WINNER ANNOUNCEMENT:
- * - With bids: Shows winner, winning bid, total bids, bid count
- * - No bids: Announces no winner, item goes back to pool
- *
- * THREAD CLEANUP:
- * - Locks thread to prevent further bids
- * - Archives thread after 5 seconds
- * - Rate-limited to avoid Discord API throttling
- *
- * @param {Discord.Client} client - Discord bot client
- * @param {Object} config - Bot configuration
- * @param {Discord.ThreadChannel} channel - Auction thread channel
- * @returns {Promise<void>}
+ * @param {Discord.Client} client - Discord bot client.
+ * @param {Object} config - Bot configuration object.
+ * @param {Discord.ThreadChannel|Discord.TextChannel} channel - The auction thread or parent bidding channel for the item being closed.
+ * @returns {Promise<void>} Resolves when processing and cleanup are complete.
  */
 async function itemEnd(client, config, channel) {
   if (!client || !config || !channel) {

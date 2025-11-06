@@ -97,7 +97,15 @@ function normalizeUsername(username) {
     .replace(/[^\w]/g, '');         // Remove special characters (keep alphanumeric only)
 }
 
-// MAIN WEBHOOK HANDLER - COMPLETE VERSION
+/**
+ * HTTP POST entrypoint that routes incoming webhook actions to their corresponding handlers.
+ *
+ * Parses JSON from e.postData.contents, dispatches to the appropriate action handler, and returns
+ * the handler's response. If the action is unknown an error response is returned. Any thrown
+ * error during processing is caught and returned as an error response.
+ *
+ * @param {Object} e - Web Apps POST event object. Expected to include postData.contents with a JSON payload containing an `action` field and any action-specific fields.
+ * @returns {Object} A response object with `status`, `message`, `timestamp`, and optional `data` describing the result or error.
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents || '{}');
@@ -1832,9 +1840,13 @@ function getLootState() {
 }
 
 /**
- * Get historical prices from ForDistribution sheet
- * Returns a map of item names to their starting prices
- * Used for auto-pricing loot items based on past auctions
+ * Builds a map of the most-recent starting prices for items found in the ForDistribution sheet.
+ *
+ * Reads rows from ForDistribution (columns A = item name, B = start price) and returns the last observed
+ * positive numeric start price for each item name. Ignores rows with empty/short names or invalid prices.
+ *
+ * @returns {{prices: Object.<string, number>, totalItems: number}} An object containing `prices`, a mapping
+ *          from item name to its most-recent numeric start price, and `totalItems`, the count of unique items.
  */
 function getHistoricalPrices(data) {
   try {
@@ -1895,8 +1907,11 @@ function getHistoricalPrices(data) {
 // ===========================================================
 
 /**
- * Get or create BotLearning sheet
- * Structure: Timestamp | Type | Target | Predicted | Actual | Accuracy | Confidence | Features | Status
+ * Ensure a "BotLearning" sheet exists and return it.
+ *
+ * Creates the sheet if missing and initializes the header row:
+ * Timestamp, Type, Target, Predicted, Actual, Accuracy, Confidence, Features, Status, Notes.
+ * @return {GoogleAppsScript.Spreadsheet.Sheet} The existing or newly created BotLearning sheet.
  */
 function getBotLearningSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1922,14 +1937,15 @@ function getBotLearningSheet() {
 }
 
 /**
- * Save a prediction for future learning
- * @param {Object} data - Prediction data
- * @param {string} data.type - Type of prediction (price_prediction, engagement, anomaly)
- * @param {string} data.target - What was predicted (item name, username, etc.)
- * @param {number|string} data.predicted - The predicted value
- * @param {number} data.confidence - Confidence score (0-100)
- * @param {Object} data.features - Features used in prediction (stored as JSON)
- * @returns {Object} Response with predictionId
+ * Persist a prediction record to the BotLearning sheet for later evaluation and tracking.
+ *
+ * @param {Object} data - Prediction payload.
+ * @param {string} data.type - Prediction category (e.g., `price_prediction`, `engagement`, `anomaly`).
+ * @param {string} data.target - Target identifier for the prediction (item name, username, etc.).
+ * @param {number|string} data.predicted - Predicted value.
+ * @param {number} data.confidence - Confidence score from 0 to 100.
+ * @param {Object} data.features - Feature set used to generate the prediction; will be stored as JSON.
+ * @returns {Object} Response object containing status, message, and `data` with `predictionId` (row number) and ISO `timestamp` when saved.
  */
 function savePredictionForLearning(data) {
   try {
@@ -1975,13 +1991,12 @@ function savePredictionForLearning(data) {
 }
 
 /**
- * Update prediction with actual result for learning
- * @param {Object} data - Update data
- * @param {string} data.type - Type of prediction
- * @param {string} data.target - Target that was predicted
- * @param {number|string} data.actual - Actual value observed
- * @returns {Object} Response with updated accuracy
- */
+ * Update the most recent pending prediction for a given type and target with an actual result and record its accuracy.
+ * @param {Object} data - Update payload.
+ * @param {string} data.type - Prediction type (e.g., "price_prediction", "engagement", "attendance").
+ * @param {string} data.target - Identifier of the prediction target.
+ * @param {number|string} data.actual - Observed actual value to evaluate the prediction against.
+ * @returns {Object} Response object with `status` and `message`; message indicates whether a pending prediction was found and updated.
 function updatePredictionAccuracy(data) {
   try {
     Logger.log('📊 Updating prediction accuracy...');
@@ -2051,12 +2066,15 @@ function updatePredictionAccuracy(data) {
 }
 
 /**
- * Get learning data for analysis
- * @param {Object} data - Query parameters
- * @param {string} data.type - Filter by prediction type (optional)
- * @param {number} data.limit - Limit results (default 100)
- * @returns {Object} Response with learning data
- */
+ * Retrieve recent bot learning predictions, optionally filtered by type.
+ *
+ * Returns a response object containing a `predictions` array of records (newest-first). Each record includes:
+ * `{ timestamp, type, target, predicted, actual, accuracy, confidence, features, status, notes }`.
+ *
+ * @param {Object} data - Query parameters.
+ * @param {string} [data.type] - If provided, only include predictions matching this type.
+ * @param {number} [data.limit=100] - Maximum number of prediction records to return.
+ * @returns {Object} Response object with a `predictions` array of prediction records.
 function getLearningData(data) {
   try {
     Logger.log('📚 Fetching learning data...');
@@ -2107,8 +2125,16 @@ function getLearningData(data) {
 }
 
 /**
- * Get learning metrics and statistics
- * @returns {Object} Response with metrics
+ * Compute aggregated metrics for stored learning predictions.
+ *
+ * Returns counts and accuracy statistics grouped by prediction type.
+ *
+ * @returns {Object} Response containing a `metrics` object with:
+ *  - `total` {number}: total number of prediction records processed.
+ *  - `byType` {Object}: mapping of type -> `{ total: number, completed: number }`.
+ *  - `averageAccuracy` {Object}: mapping of type -> average accuracy (string, two decimals) for completed predictions.
+ *  - `recentAccuracy` {Object}: mapping of type -> average accuracy (string, two decimals) computed from up to the last 10 completed predictions.
+ * When no learning data exists, `metrics` will be an empty object.
  */
 function getLearningMetrics(data) {
   try {
@@ -2190,8 +2216,12 @@ function getLearningMetrics(data) {
 // ===========================================================
 
 /**
- * Get all ForDistribution data for intelligence analysis
- * @returns {Object} Response with ForDistribution data
+ * Retrieve all records from the "ForDistribution" sheet and map each row to a structured item object.
+ *
+ * Each item object contains: `itemName`, `startPrice`, `duration`, `winner`, `bidAmount`,
+ * `auctionStart`, `auctionEnd`, `timestamp`, `totalBids`, `source`, `quantity`, and `boss`.
+ *
+ * @returns {{status: string, message: string, timestamp: string, data: {items: Array<Object>}}} Response object whose `data.items` is an array of mapped ForDistribution records; empty array if the sheet is missing or has no data.
  */
 function getForDistribution(data) {
   try {
@@ -2242,8 +2272,21 @@ function getForDistribution(data) {
 }
 
 /**
- * Get total attendance data for all members
- * @returns {Object} Response with attendance data
+ * Retrieve total attendance points for each member from the BiddingPoints sheet.
+ *
+ * Reads username and attendance points from the BiddingPoints sheet and returns a response
+ * containing an array of members with their attendance points. If the sheet or data is missing,
+ * the members array will be empty.
+ *
+ * @returns {Object} Response object with the following shape:
+ *   {
+ *     status: string,
+ *     message: string,
+ *     timestamp: string,
+ *     data: {
+ *       members: Array<{ username: string, attendancePoints: number }>
+ *     }
+ *   }
  */
 function getTotalAttendance(data) {
   try {
@@ -2289,8 +2332,15 @@ function getTotalAttendance(data) {
 }
 
 /**
- * Get bidding points data for all members
- * @returns {Object} Response with bidding data
+ * Retrieve bidding points and spending summary for all members from the BiddingPoints sheet.
+ *
+ * Reads rows from the "BiddingPoints" sheet and returns a response containing a `members`
+ * array where each entry includes `username`, `attendancePoints`, `biddingPoints`, and `totalSpent`.
+ *
+ * @param {Object} [data] - Optional request payload (not used by this function).
+ * @returns {Object} Response object with the shape { status, message, timestamp, data } where
+ *                   `data.members` is an array of member records:
+ *                   [{ username: string, attendancePoints: number, biddingPoints: number, totalSpent: number }].
  */
 function getBiddingPoints(data) {
   try {
@@ -2339,7 +2389,11 @@ function getBiddingPoints(data) {
   }
 }
 
-// ATTENDANCE STATE MANAGEMENT (Memory optimization for Koyeb)
+/**
+ * Retrieve the persisted attendance state stored in the `_AttendanceState` sheet.
+ *
+ * Reads key/value rows from `_AttendanceState` (columns A/B, starting at row 2), parses JSON values when possible, and returns a map of state keys to their parsed values. If the sheet is missing or empty, the returned state's value is `null`.
+ * @returns {Object} A response object with `{ state: { [key: string]: any } | null }` under the `data` payload: the parsed state map when present, or `null` when no state exists. */
 function getAttendanceState(data) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName('_AttendanceState');
@@ -3021,9 +3075,11 @@ function moveAllItemsWithWinnersToForDistribution() {
 // ===========================================================
 
 /**
- * Creates new weekly sheet every Sunday at midnight (Manila time)
- * This should be set up as a time-driven trigger in Apps Script
- * Trigger: Weekly > Every Sunday > 12am-1am
+ * Creates the weekly attendance sheet for the upcoming Sunday (Manila time).
+ *
+ * Intended to be run as a time-driven trigger (e.g., Weekly → Every Sunday → 12am-1am).
+ * The function creates a new sheet named CONFIG.SHEET_NAME_PREFIX + YYYYMMDD, initializes
+ * header row and column formatting, and copies member rows from the most recent previous week.
  */
 function sundayWeeklySheetCreation() {
   try {
@@ -3109,9 +3165,18 @@ const DRIVE_CONFIG = {
 };
 
 /**
- * Initialize Google Drive folder structure
- * Creates organized folders for all bot data
- * @returns {Object} Folder IDs
+ * Ensure the Drive folder tree for bot data exists and return identifiers for each folder.
+ *
+ * Creates or fetches top-level folders (Screenshots, Learning, Backups, Audit) and key subfolders,
+ * then returns their IDs grouped by category.
+ *
+ * @returns {Object} Response object containing a data payload with folder IDs structured as:
+ *                   {
+ *                     screenshots: { attendance: string, loot: string },
+ *                     learning: { predictions: string, analytics: string },
+ *                     backups: string,
+ *                     audit: string
+ *                   }
  */
 function initializeDriveFolders() {
   try {
@@ -3148,10 +3213,10 @@ function initializeDriveFolders() {
 }
 
 /**
- * Get or create a folder by name
- * @param {Folder} parentFolder - Parent folder object
- * @param {string} folderName - Name of folder to get/create
- * @returns {Folder} Folder object
+ * Return the folder with the given name inside a parent folder, creating it if missing.
+ * @param {Folder} parentFolder - Drive folder to search within.
+ * @param {string} folderName - Name of the folder to find or create.
+ * @returns {Folder} The existing folder with that name if found, otherwise a newly created folder.
  */
 function getOrCreateFolder(parentFolder, folderName) {
   const folders = parentFolder.getFoldersByName(folderName);
@@ -3162,10 +3227,12 @@ function getOrCreateFolder(parentFolder, folderName) {
 }
 
 /**
- * Get date-based folder (creates if doesn't exist)
- * @param {Folder} parentFolder - Parent folder
- * @param {Date} date - Date for folder name
- * @returns {Folder} Date folder
+ * Return (or create) a subfolder named for the given date in yyyy-MM-dd format.
+ *
+ * The function ensures a folder with the formatted date exists under the provided parent and returns it.
+ * @param {Folder} parentFolder - Parent Drive folder to search/create the date folder in.
+ * @param {Date} date - Date used to name the folder (formatted as `yyyy-MM-dd` in the configured timezone).
+ * @returns {Folder} The existing or newly created date-named folder.
  */
 function getDateFolder(parentFolder, date) {
   const dateFolderName = Utilities.formatDate(date, CONFIG.TIMEZONE, 'yyyy-MM-dd');
@@ -3177,10 +3244,15 @@ function getDateFolder(parentFolder, date) {
 // ===========================================================
 
 /**
- * Upload screenshot to Google Drive
- * Called when attendance or loot screenshots are submitted
- * @param {Object} data - { imageUrl, type, username, bossName, timestamp }
- * @returns {Object} Response with file ID
+ * Store a screenshot in the Drive folder tree and return its file metadata.
+ *
+ * @param {Object} data - Upload parameters.
+ * @param {string} data.imageUrl - Public URL of the image to download and store.
+ * @param {'attendance'|'loot'} data.type - Top-level screenshots category; determines subfolder.
+ * @param {string} data.username - Username used in the generated filename.
+ * @param {string} [data.bossName] - Boss or source name used in the generated filename; defaults to "loot" when absent.
+ * @param {string|number|Date} [data.timestamp] - Timestamp used for organizing and naming the file; if omitted, current time is used.
+ * @returns {Object} Response object containing `fileId`, `fileUrl`, and `filename` when successful; error message otherwise.
  */
 function uploadScreenshot(data) {
   try {
@@ -3223,11 +3295,17 @@ function uploadScreenshot(data) {
 // ===========================================================
 
 /**
- * Export detailed learning data to Google Drive
- * Includes all predictions with features, confidence, and outcomes
- * @param {Object} data - Optional filters
- * @returns {Object} Response with export details
- */
+ * Export learning predictions and associated features to a timestamped JSON file in Google Drive.
+ *
+ * Creates a detailed export including prediction rows, filters used, summary statistics, and per-type aggregation,
+ * then writes the JSON to Drive under the configured learning/analytics folder and returns file metadata.
+ *
+ * @param {Object} data - Optional parameters.
+ * @param {Object} [data.filters] - Filter object to limit exported rows.
+ * @param {string} [data.filters.type] - Prediction type to include (use 'all' to include every type).
+ * @param {string|Date} [data.filters.startDate] - Inclusive start timestamp to filter predictions.
+ * @param {string|Date} [data.filters.endDate] - Inclusive end timestamp to filter predictions.
+ * @returns {Object} Response object containing export details: `fileId`, `fileUrl`, `filename`, and `recordCount`.
 function exportLearningData(data) {
   try {
     const learningSheet = getBotLearningSheet();
@@ -3307,7 +3385,13 @@ function exportLearningData(data) {
 }
 
 /**
- * Calculate average accuracy from rows
+ * Compute the average accuracy for completed prediction rows.
+ *
+ * Only rows whose status column (index 8) equals `'completed'` and that have a non-empty
+ * accuracy value in column index 5 are included in the calculation.
+ *
+ * @param {Array<Array>} rows - Spreadsheet-style rows where column 5 contains accuracy and column 8 contains status.
+ * @returns {number} The average accuracy across included rows, rounded to two decimal places; `0` if no completed rows.
  */
 function calculateAverageAccuracy(rows) {
   const completedRows = rows.filter(r => r[8] === 'completed' && r[5] !== '');
@@ -3317,7 +3401,13 @@ function calculateAverageAccuracy(rows) {
 }
 
 /**
- * Group predictions by type with stats
+ * Aggregate prediction rows into per-type statistics.
+ *
+ * Processes a list of BotLearning rows and returns an object keyed by prediction type,
+ * where each value contains counts and the average accuracy for completed predictions.
+ *
+ * @param {Array<Array>} rows - Array of sheet rows where columns follow BotLearning format (Timestamp, Type, Target, Predicted, ..., Accuracy, ..., Status, ...).
+ * @returns {Object.<string, {total: number, completed: number, pending: number, avgAccuracy: number}>} An object mapping each prediction type to its stats: `total` rows, `completed` count, `pending` count, and `avgAccuracy` (rounded to two decimals; 0 if no accuracies).
  */
 function groupByType(rows) {
   const types = {};
@@ -3349,8 +3439,14 @@ function groupByType(rows) {
 }
 
 /**
- * Export prediction features for ML training
- * Exports features in format suitable for ML analysis
+ * Export completed prediction records' feature sets to a Drive JSON file for ML training.
+ *
+ * Filters BotLearning rows for completed predictions that include a `features` JSON field, flattens
+ * each record into a training sample, and saves the resulting array to the configured Drive
+ * analytics folder as a JSON file.
+ *
+ * @returns {Object} An operation response object. On success `data` contains `fileId` (string),
+ * `fileUrl` (string), and `sampleCount` (number). On error the response contains an error message.
  */
 function exportPredictionFeatures(data) {
   try {
@@ -3407,8 +3503,14 @@ function exportPredictionFeatures(data) {
 // ===========================================================
 
 /**
- * Create daily backup of all important sheets
- * Should be triggered daily via time-driven trigger
+ * Create a JSON backup of key sheets and save it to Drive in a date-based backups folder.
+ *
+ * Backs up a fixed set of sheet names plus the current week sheet, writes a timestamped JSON file
+ * under DRIVE_CONFIG.FOLDERS.BACKUPS/YYYY-MM-DD/, and prunes old backups.
+ *
+ * @returns {{status: string, message: string, timestamp?: string, data?: {fileId?: string, fileUrl?: string, sheetsCount?: number}}}
+ * An object describing the outcome. On success `data` contains `fileId`, `fileUrl`, and `sheetsCount`.
+ * On failure `status` will be `"error"` and `message` will contain the error text.
  */
 function createDailyBackup() {
   try {
@@ -3473,7 +3575,12 @@ function createDailyBackup() {
 }
 
 /**
- * Cleanup backups older than 30 days
+ * Remove dated backup subfolders older than 30 days from the given Drive folder.
+ *
+ * Expects each child folder name to be a date in YYYY-MM-DD format; folders with parseable dates
+ * earlier than 30 days ago are moved to trash. Logs the number of deleted folders and swallows errors.
+ *
+ * @param {GoogleAppsScript.Drive.Folder} backupsFolder - Drive folder containing date-named backup subfolders (YYYY-MM-DD).
  */
 function cleanupOldBackups(backupsFolder) {
   try {
@@ -3506,8 +3613,14 @@ function cleanupOldBackups(backupsFolder) {
 // ===========================================================
 
 /**
- * Log admin action to audit trail
- * @param {Object} data - { action, username, details, timestamp }
+ * Append an admin action entry to a daily JSON Lines audit file in Drive.
+ *
+ * @param {Object} data - Audit entry data.
+ * @param {string} data.action - Short identifier or description of the action performed.
+ * @param {string} data.username - User who performed the action.
+ * @param {Object|string} [data.details] - Additional structured details about the action.
+ * @param {string|number} [data.timestamp] - ISO timestamp or milliseconds since epoch to use for the entry; defaults to now.
+ * @returns {{status: string, message: string, data?: any}} An object with `status` set to `'ok'` on success or `'error'` on failure and a descriptive `message`. 
  */
 function logAuditTrail(data) {
   try {
@@ -3555,7 +3668,8 @@ function logAuditTrail(data) {
 }
 
 /**
- * Get current week sheet name
+ * Produce the sheet name for the current week using the week's Sunday date.
+ * @returns {string} The sheet name formed as CONFIG.SHEET_NAME_PREFIX followed by the Sunday's date formatted as `yyyyMMdd` in CONFIG.TIMEZONE.
  */
 function getCurrentWeekSheetName() {
   const now = new Date();
@@ -3573,17 +3687,19 @@ function getCurrentWeekSheetName() {
 // ===========================================================
 
 /**
- * BOOTSTRAP LEARNING FROM HISTORICAL DATA
+ * Populate the BotLearning sheet with completed price-prediction records derived from historical ForDistribution auction data.
  *
- * This function analyzes ALL historical auction data from ForDistribution
- * and populates the BotLearning sheet with completed predictions.
+ * Analyzes past auction results to generate completed `price_prediction` entries (predicted value, actual value, accuracy,
+ * confidence, and extracted features) and appends them to the BotLearning sheet to bootstrap the learning dataset.
+ * Intended to be run once after initial deployment to give the bot a starting knowledge base; safe to run multiple times.
  *
- * The bot will start "smart" instead of learning from scratch!
- *
- * Call this ONCE on first deployment to give the bot instant intelligence.
- * It's safe to run multiple times (skips existing predictions).
- *
- * @returns {Object} Response with bootstrap results
+ * @returns {Object} Response object containing bootstrap metrics:
+ *  - totalAuctions: total number of historical auction rows analyzed
+ *  - predictionsCreated: number of prediction records appended to BotLearning
+ *  - predictionsSkipped: number of auctions skipped (insufficient prior data or invalid)
+ *  - uniqueItems: count of distinct item names seen in history
+ *  - averageAccuracy: average accuracy computed for the bootstrapped predictions
+ *  - message: human-readable summary
  */
 function bootstrapLearningFromHistory() {
   try {
@@ -3758,7 +3874,14 @@ function bootstrapLearningFromHistory() {
 }
 
 /**
- * Calculate trend from price history
+ * Determine the overall trend of a numeric price history.
+ *
+ * @param {number[]} prices - Array of historical prices in chronological order (oldest to newest).
+ * @returns {'increasing'|'decreasing'|'stable'|'insufficient_data'} One of:
+ *  - `increasing` when recent prices are meaningfully higher than earlier prices,
+ *  - `decreasing` when recent prices are meaningfully lower than earlier prices,
+ *  - `stable` when changes are within a small threshold,
+ *  - `insufficient_data` when the input array is too short to assess a trend.
  */
 function calculateTrend(prices) {
   if (prices.length < 5) return 'insufficient_data';
@@ -3777,7 +3900,14 @@ function calculateTrend(prices) {
 }
 
 /**
- * Calculate average accuracy from bootstrap
+ * Compute the mean accuracy of bootstrapped predictions in a BotLearning sheet.
+ *
+ * Expects the sheet to have a header row and rows where column F contains accuracy
+ * and column H contains a JSON `features` object. Only rows whose parsed `features`
+ * include `bootstrapped: true` and that have a non-empty accuracy are included.
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} learningSheet - BotLearning sheet with header; accuracy in column F (6th), features JSON in column H (8th).
+ * @returns {number} The average accuracy for bootstrapped rows rounded to two decimal places, or `0` if no valid bootstrap rows exist or on error.
  */
 function calculateBootstrapAccuracy(learningSheet) {
   try {
@@ -3803,7 +3933,8 @@ function calculateBootstrapAccuracy(learningSheet) {
 }
 
 /**
- * Check if bootstrap is needed (BotLearning sheet is empty or has no bootstrapped data)
+ * Determine whether the BotLearning sheet requires bootstrapping.
+ * @returns {boolean} `true` if the BotLearning sheet has no data rows marked as bootstrapped or cannot be read, `false` otherwise.
  */
 function needsBootstrap() {
   try {
@@ -3838,11 +3969,9 @@ function needsBootstrap() {
 // ===========================================================
 
 /**
- * AUTOMATED DAILY BACKUP
- * Trigger: Time-driven > Day timer > 12am-1am (Manila time)
+ * Execute the scheduled daily backup job that exports all spreadsheet sheets to Drive at midnight Manila time.
  *
- * This runs automatically every day at midnight to backup all sheets.
- * Survives Discord bot restarts/crashes since it runs from Apps Script.
+ * Performs a full backup of all sheets and logs success or failure to the Apps Script logger.
  */
 function dailyAutomatedBackup() {
   try {
@@ -3860,11 +3989,10 @@ function dailyAutomatedBackup() {
 }
 
 /**
- * AUTOMATED WEEKLY LEARNING DATA EXPORT
- * Trigger: Time-driven > Week timer > Every Monday > 2am-3am (Manila time)
+ * Export learning records and ML feature samples from the previous week to Drive for analysis.
  *
- * Exports all learning data for the previous week for analysis.
- * Runs automatically regardless of bot status.
+ * Triggered weekly (time-driven; Manila timezone). Exports BotLearning records from the last 7 days
+ * and a feature-rich dataset for ML consumers; logs success or failure but does not return a value.
  */
 function weeklyLearningExport() {
   try {

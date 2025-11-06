@@ -843,6 +843,18 @@ const CATEGORY_DESCRIPTIONS = {
   Emergency: "⚠️ ADMIN ONLY: Force recovery from stuck states (requires confirmation)",
 };
 
+/**
+ * Send contextual help information to a channel or user based on provided arguments and member permissions.
+ *
+ * If a specific command name is provided in args, sends a detailed embed for that command (including usage, example,
+ * category, access, optional location, aliases, and features). If no specific command is requested, sends either a
+ * multi-page admin reference (for admins) or a single-page member guide (for non-admins).
+ *
+ * @param {import('discord.js').Message} message - The incoming message used to reply with help embeds.
+ * @param {string[]} args - Parsed command arguments; the first element (if present) is treated as a command name.
+ * @param {import('discord.js').GuildMember} member - The guild member who requested help; used to determine admin access.
+ * @returns {Promise<import('discord.js').Message|import('discord.js').Message[]|void>} The reply message(s) sent, or undefined if the help system was not initialized.
+ */
 async function handleHelp(message, args, member) {
   if (!config || !isAdminFunc) {
     console.error("❌ Help system not initialized!");
