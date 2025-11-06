@@ -44,7 +44,7 @@
 
 const { EmbedBuilder } = require('discord.js');
 const { getChannelById } = require('./utils/discord-cache');
-const { getTimestamp } = require('./utils/common');
+const { getCurrentTimestamp } = require('./utils/timestamp-cache');
 const { LearningSystem } = require('./learning-system');
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -369,11 +369,12 @@ class IntelligenceEngine {
   /**
    * Calculate member engagement score (0-100)
    * @param {string} username - Member username
+   * @param {Object} cachedData - Optional pre-fetched data to avoid redundant API calls
    * @returns {Object} Engagement analysis
    */
-  async analyzeMemberEngagement(username) {
+  async analyzeMemberEngagement(username, cachedData = {}) {
     try {
-      const profile = await this.getMemberProfile(username);
+      const profile = await this.getMemberProfile(username, cachedData);
 
       // Calculate engagement components
       const attendanceScore = this.calculateAttendanceScore(profile.attendance);
@@ -439,25 +440,41 @@ class IntelligenceEngine {
 
   /**
    * Get member profile from sheets
+   * @param {string} username - Member username
+   * @param {Object} cachedData - Optional pre-fetched data to avoid redundant API calls
+   * @param {Array} cachedData.attendanceData - Pre-fetched attendance data
+   * @param {Array} cachedData.biddingData - Pre-fetched bidding data
+   * @param {Object} cachedData.weeklyAttendance - Pre-fetched weekly attendance data
    */
-  async getMemberProfile(username) {
+  async getMemberProfile(username, cachedData = {}) {
     try {
-      // Fetch attendance data
-      const attendanceResponse = await this.sheetAPI.call('getTotalAttendance', {});
-      const attendanceData = attendanceResponse?.members ?? [];
+      // Use cached data if available, otherwise fetch
+      let attendanceData, biddingData;
+
+      if (cachedData.attendanceData) {
+        attendanceData = cachedData.attendanceData;
+      } else {
+        const attendanceResponse = await this.sheetAPI.call('getTotalAttendance', {});
+        attendanceData = attendanceResponse?.members ?? [];
+      }
+
+      if (cachedData.biddingData) {
+        biddingData = cachedData.biddingData;
+      } else {
+        const biddingResponse = await this.sheetAPI.call('getBiddingPoints', {});
+        biddingData = biddingResponse?.members ?? [];
+      }
+
       const memberAttendance = attendanceData.find(row =>
         row.username && row.username.toLowerCase() === username.toLowerCase()
       );
 
-      // Fetch bidding data
-      const biddingResponse = await this.sheetAPI.call('getBiddingPoints', {});
-      const biddingData = biddingResponse?.members ?? [];
       const memberBidding = biddingData.find(row =>
         row.username && row.username.toLowerCase() === username.toLowerCase()
       );
 
-      // Fetch recent spawns
-      const recentSpawns = await this.getRecentSpawnsForMember(username);
+      // Fetch recent spawns (with optional cached weekly attendance data)
+      const recentSpawns = await this.getRecentSpawnsForMember(username, cachedData.weeklyAttendance);
 
       // Note: attendancePoints is actually the spawn count (Total Attendance Days)
       const spawnCount = memberAttendance?.attendancePoints || 0;
@@ -890,12 +907,19 @@ class IntelligenceEngine {
 
   /**
    * Get recent spawns for a member
+   * @param {string} username - Member username
+   * @param {Object} cachedWeeklyAttendance - Optional pre-fetched weekly attendance data
    */
-  async getRecentSpawnsForMember(username) {
+  async getRecentSpawnsForMember(username, cachedWeeklyAttendance = null) {
     try {
-      // Fetch all weekly attendance data
-      const response = await this.sheetAPI.call('getAllWeeklyAttendance', {});
-      const allSheets = response?.sheets || [];
+      // Use cached data if available, otherwise fetch
+      let allSheets;
+      if (cachedWeeklyAttendance) {
+        allSheets = cachedWeeklyAttendance.sheets || [];
+      } else {
+        const response = await this.sheetAPI.call('getAllWeeklyAttendance', {});
+        allSheets = response?.sheets || [];
+      }
 
       if (allSheets.length === 0) {
         return [];
@@ -956,15 +980,37 @@ class IntelligenceEngine {
 
   /**
    * Analyze engagement for all members and identify at-risk members
+   * OPTIMIZED: Fetches all data once instead of per-member to reduce API calls from N*3 to 3
    */
   async analyzeAllMembersEngagement() {
     try {
-      const response = await this.sheetAPI.call('getBiddingPoints', {});
-      const biddingData = response?.members ?? [];
+      // Fetch all data ONCE instead of per-member (massive performance improvement)
+      console.log('[INTELLIGENCE] Fetching data for all members (optimized batch fetch)...');
+
+      const [biddingResponse, attendanceResponse, weeklyAttendanceResponse] = await Promise.all([
+        this.sheetAPI.call('getBiddingPoints', {}),
+        this.sheetAPI.call('getTotalAttendance', {}),
+        this.sheetAPI.call('getAllWeeklyAttendance', {}),
+      ]);
+
+      const biddingData = biddingResponse?.members ?? [];
+      const attendanceData = attendanceResponse?.members ?? [];
+      const weeklyAttendance = weeklyAttendanceResponse || {};
+
+      console.log(`[INTELLIGENCE] Processing ${biddingData.length} members with cached data...`);
+
+      // Create cached data object to pass to each analysis
+      const cachedData = {
+        attendanceData,
+        biddingData,
+        weeklyAttendance,
+      };
+
       const analyses = [];
 
       for (const member of biddingData) {
-        const analysis = await this.analyzeMemberEngagement(member.username);
+        // Pass cached data to avoid redundant API calls
+        const analysis = await this.analyzeMemberEngagement(member.username, cachedData);
         analyses.push(analysis);
       }
 
@@ -1065,7 +1111,7 @@ class IntelligenceEngine {
         anomaliesDetected: anomalies.length,
         anomalies,
         analyzed: auctionHistory.length,
-        timestamp: getTimestamp(),
+        timestamp: getCurrentTimestamp(),
       };
     } catch (error) {
       console.error('[INTELLIGENCE] Error detecting bidding anomalies:', error);
@@ -1115,7 +1161,7 @@ class IntelligenceEngine {
           averageSpawns: mean.toFixed(1),
           stdDev: stdDev.toFixed(1),
         },
-        timestamp: getTimestamp(),
+        timestamp: getCurrentTimestamp(),
       };
     } catch (error) {
       console.error('[INTELLIGENCE] Error detecting attendance anomalies:', error);
@@ -1401,7 +1447,7 @@ class IntelligenceEngine {
    */
   async monitorPerformance() {
     const metrics = {
-      timestamp: getTimestamp(),
+      timestamp: getCurrentTimestamp(),
       memory: process.memoryUsage(),
       memoryPercent: (process.memoryUsage().heapUsed / process.memoryUsage().heapTotal) * 100,
       uptime: process.uptime(),
