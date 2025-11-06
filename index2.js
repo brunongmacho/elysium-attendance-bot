@@ -1426,22 +1426,94 @@ const commandHandlers = {
 
             spawnInfo.closed = true;
 
-            await message.channel.send(
-              `   ├─ 📊 Submitting ${spawnInfo.members.length} member(s) to Google Sheets...`
-            );
+            // Check if there are any members to submit
+            if (spawnInfo.members.length === 0) {
+              // No members to submit - just close and archive the thread
+              await message.channel.send(
+                `   ├─ ⚠️ No members to submit (0 verified). Skipping Google Sheets submission...`
+              );
 
-            const payload = {
-              action: "submitAttendance",
-              boss: spawnInfo.boss,
-              date: spawnInfo.date,
-              time: spawnInfo.time,
-              timestamp: spawnInfo.timestamp,
-              members: spawnInfo.members,
-            };
+              await thread
+                .send(
+                  `⚠️ Thread closed with no verified members. No data submitted to Google Sheets.`
+                )
+                .catch((err) =>
+                  console.warn(
+                    `⚠️ Could not post to spawn thread ${threadId}: ${err.message}`
+                  )
+                );
 
-            const resp = await attendance.postToSheet(payload);
+              // Close confirmation thread if it exists
+              if (spawnInfo.confirmThreadId) {
+                const confirmThread = await guild.channels
+                  .fetch(spawnInfo.confirmThreadId)
+                  .catch(() => null);
+                if (confirmThread) {
+                  await confirmThread
+                    .send(
+                      `⚠️ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - 0 members (no submission)`
+                    )
+                    .catch(() => {});
+                  await errorHandler.safeDelete(confirmThread, 'message deletion');
+                }
+              }
 
-            if (resp.ok) {
+              // Clean up reactions
+              await message.channel.send(
+                `   ├─ 🧹 Cleaning up reactions from thread...`
+              );
+              const cleanupStats = await attendance.cleanupAllThreadReactions(
+                thread
+              );
+              totalReactionsRemoved += cleanupStats.success;
+              totalReactionsFailed += cleanupStats.failed;
+
+              if (cleanupStats.failed > 0) {
+                await message.channel.send(
+                  `   ├─ ⚠️ Warning: ${cleanupStats.failed} message(s) still have reactions`
+                );
+              }
+
+              // Archive the thread
+              await thread
+                .setArchived(true, `Mass close by ${member.user.username}`)
+                .catch(() => {});
+
+              // Clean up state
+              delete activeSpawns[threadId];
+              delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+              delete confirmationMessages[threadId];
+
+              successCount++;
+              results.push(
+                `⚠️ **${spawnInfo.boss}** - 0 members (thread closed, no submission)`
+              );
+
+              await message.channel.send(
+                `   └─ ✅ **Thread closed!** (No submission - 0 members)`
+              );
+
+              console.log(
+                `📍 Mass close: ${spawnInfo.boss} at ${spawnInfo.timestamp} (0 members - no submission)`
+              );
+            } else {
+              // Members exist - proceed with submission
+              await message.channel.send(
+                `   ├─ 📊 Submitting ${spawnInfo.members.length} member(s) to Google Sheets...`
+              );
+
+              const payload = {
+                action: "submitAttendance",
+                boss: spawnInfo.boss,
+                date: spawnInfo.date,
+                time: spawnInfo.time,
+                timestamp: spawnInfo.timestamp,
+                members: spawnInfo.members,
+              };
+
+              const resp = await attendance.postToSheet(payload);
+
+              if (resp.ok) {
               await thread
                 .send(
                   `✅ Attendance submitted successfully! Archiving thread...`
@@ -1564,6 +1636,7 @@ const commandHandlers = {
                 );
               }
             }
+            } // End of members.length > 0 check
 
             const operationTime = Date.now() - operationStartTime;
             const minDelay = TIMING.MASS_CLOSE_DELAY;
