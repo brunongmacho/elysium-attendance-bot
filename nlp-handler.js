@@ -161,29 +161,30 @@ const NLP_PATTERNS = {
 
   // Status queries
   bidstatus: [
-    // English
-    /^(?:what(?:'s|\s+is)\s+the\s+)?(?:auction\s+)?(?:status|stat)/i,
-    /^(?:show|check|view|display)\s+(?:auction\s+)?(?:status|stat)/i,
+    // English - require auction/bid context OR end of string to avoid matching attendance status
+    /^(?:what(?:'s|\s+is)\s+the\s+)?(?:auction|bidding|bid)\s+(?:status|stat)/i,
+    /^(?:what(?:'s|\s+is)\s+the\s+)?(?:status|stat)(?:\s+(?:of|for)\s+(?:the\s+)?(?:auction|bidding|bid))?$/i,
+    /^(?:show|check|view|display)\s+(?:auction|bidding|bid)\s+(?:status|stat)/i,
     /^(?:current\s+)?(?:auction|bidding|bid)\s+(?:status|info|details)/i,
-    /^(?:status|stat|info)$/i,               // Shortcuts
+    /^(?:status|stat|info)$/i,               // Shortcuts - single word only
     /^(?:bid\s+)?(?:info|details|update)$/i,
     /^(?:auction|bidding)\s+(?:update|news)/i,
-    /^(?:what's|whats)\s+(?:happening|going on)/i,
-    /^(?:status|update)\s+(?:pls|please|plz)/i,
+    /^(?:what's|whats)\s+(?:happening|going on)(?:\s+(?:with|in)\s+(?:the\s+)?(?:auction|bidding|bid))?$/i,
+    /^(?:status|update)\s+(?:of|for)\s+(?:the\s+)?(?:auction|bidding|bid)/i,
 
-    // Tagalog (TL)
-    /^(?:ano|anu|ano\s+ba)\s+(?:ang\s+)?(?:status|kalagayan|balita)/i,
-    /^(?:tignan|tingnan|tngin)\s+(?:ang\s+)?(?:status|balita)/i,
+    // Tagalog (TL) - require auction/bid context
+    /^(?:ano|anu|ano\s+ba)\s+(?:ang\s+)?(?:status|kalagayan|balita)(?:\s+(?:ng|sa)\s+)?(?:bid|auction)/i,
+    /^(?:tignan|tingnan|tngin)\s+(?:ang\s+)?(?:status|balita)(?:\s+(?:ng|sa)\s+)?(?:bid|auction)/i,
     /^(?:kamusta|kumusta|kmusta)\s+(?:na\s+)?(?:ang\s+)?(?:bid|auction)/i,
     /^(?:anong|anu)\s+(?:nangyayari|nangyari|meron)/i, // "anong nangyayari"
     /^(?:may|meron)\s+(?:bid|auction)\s+(?:ba|na)/i, // "may bid ba"
     /^(?:aktibo|active)\s+(?:ba|pa)\s+(?:ang\s+)?(?:bid|auction)/i, // "aktibo ba ang bid"
     /^(?:update|balita|news)(?:\s+(?:ba|po|naman))?$/i,
 
-    // Taglish
-    /^status\s+(?:na|ng|ba)\s*(?:auction|bidding)?/i,
+    // Taglish - require auction/bid context
+    /^status\s+(?:na|ng|ba)\s+(?:auction|bidding|bid)/i,
     /^(?:ano|anu)\s+(?:na|nangyari)\s+(?:sa\s+)?(?:bid|auction)/i,
-    /^(?:update|balita)\s+(?:naman|please|pls)/i,
+    /^(?:update|balita)\s+(?:naman|please|pls)(?:\s+(?:ng|sa)\s+)?(?:bid|auction)$/i,
     /^(?:kamusta|kumusta)\s+(?:bid|auction)/i,
     /^(?:may|meron)\s+(?:bang\s+)?(?:auction|bid)/i,
   ],
