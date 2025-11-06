@@ -333,9 +333,167 @@ const CONVERSATION_PATTERNS = {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class ConversationalAI {
-  constructor(nlpLearningSystem) {
+  constructor(nlpLearningSystem, config = null, sheetAPI = null) {
     this.learningSystem = nlpLearningSystem;
     this.conversationHistory = new Map(); // userId -> recent messages
+    this.config = config; // Bot config for accessing sheets
+    this.sheetAPI = sheetAPI; // For fetching user stats
+  }
+
+  /**
+   * Fetch user stats for personalized trash talk
+   * @param {string} username - Discord username
+   * @returns {Promise<Object>} User stats or null
+   */
+  async getUserStats(username) {
+    if (!this.sheetAPI) return null;
+
+    try {
+      // Fetch points and leaderboard data
+      const [pointsData, attendanceData, biddingData] = await Promise.all([
+        this.sheetAPI.call('getBiddingPointsSummary').catch(() => null),
+        this.sheetAPI.call('getAttendanceLeaderboard').catch(() => null),
+        this.sheetAPI.call('getBiddingLeaderboard').catch(() => null),
+      ]);
+
+      const stats = {
+        points: 0,
+        attendanceRank: null,
+        attendancePoints: 0,
+        biddingRank: null,
+        totalUsers: 0,
+      };
+
+      // Get points
+      if (pointsData && pointsData.points) {
+        const userKey = Object.keys(pointsData.points).find(
+          k => k.toLowerCase() === username.toLowerCase()
+        );
+        stats.points = userKey ? (pointsData.points[userKey] || 0) : 0;
+      }
+
+      // Get attendance rank and points
+      if (attendanceData && attendanceData.leaderboard) {
+        const rank = attendanceData.leaderboard.findIndex(
+          entry => entry.name.toLowerCase() === username.toLowerCase()
+        );
+        if (rank >= 0) {
+          stats.attendanceRank = rank + 1;
+          stats.attendancePoints = attendanceData.leaderboard[rank].points;
+        }
+        stats.totalUsers = attendanceData.leaderboard.length;
+      }
+
+      // Get bidding rank
+      if (biddingData && biddingData.leaderboard) {
+        const rank = biddingData.leaderboard.findIndex(
+          entry => entry.name.toLowerCase() === username.toLowerCase()
+        );
+        if (rank >= 0) {
+          stats.biddingRank = rank + 1;
+        }
+      }
+
+      return stats;
+    } catch (error) {
+      console.error('❌ Error fetching user stats for trash talk:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Generate genius stat-based trash talk
+   * @param {Object} stats - User statistics
+   * @param {string} username - Discord username
+   * @returns {string} Personalized roast
+   */
+  generateStatBasedRoast(stats, username) {
+    const roasts = [];
+
+    // Low points roasts (0-100 points)
+    if (stats.points !== null && stats.points < 100) {
+      roasts.push(
+        `LMAO! ${username} out here trash talking with only **${stats.points} points**! 😂 Even my error logs have more value than your balance!`,
+        `Hoy ${username}! **${stats.points} points** lang meron ka tapos ang yabang mo! 💀 Kahit 1-star boss drop mas mahal pa sa'yo!`,
+        `Imagine having **${stats.points} points** and thinking you can roast ME! 🤡 Check !mypoints and cry, buddy!`,
+        `${username} really said that with **${stats.points} points** in the bank! 🏦💀 Poverty called, they want their spokesperson back!`,
+        `Putangina ${username}, **${stats.points} points** lang tapos trash talk pa! 😤 Mag-attend ka muna ng raids para may pambili ka ng respect!`
+      );
+    }
+
+    // Medium-low points (100-300)
+    if (stats.points !== null && stats.points >= 100 && stats.points < 300) {
+      roasts.push(
+        `${username} talkin' big with **${stats.points} points**! 💸 That's barely enough for a vendor trash item, bro!`,
+        `Gago! **${stats.points} points** ka lang pero ang taas ng tingin mo sa sarili mo! 😂 Git gud muna!`,
+        `**${stats.points} points** and you're THIS confident? 🤣 The audacity! Check !leaderboard to see where you REALLY stand!`
+      );
+    }
+
+    // Bottom 50% ranking roasts
+    if (stats.attendanceRank && stats.totalUsers > 0) {
+      const percentage = (stats.attendanceRank / stats.totalUsers) * 100;
+
+      if (percentage > 50) {
+        roasts.push(
+          `You're ranked **#${stats.attendanceRank}** out of ${stats.totalUsers} in attendance! 📊💀 Bottom half energy right here!`,
+          `Rank **#${stats.attendanceRank}/${stats.totalUsers}**?! 😭 ${username}, you're literally in the bottom tier! Attendance please!`,
+          `Hala! **#${stats.attendanceRank}** ka lang sa attendance pero ang tapang mo! 🤡 Mag-present ka muna consistently bago ka mang-bash!`,
+          `Bottom ${Math.round(100 - percentage)}% ka pa sa rankings tapos ganyan ka magsalita?! 💀 Know your place, **#${stats.attendanceRank}**!`
+        );
+      }
+
+      // Last place special roasts
+      if (stats.attendanceRank === stats.totalUsers) {
+        roasts.push(
+          `🚨 DEAD LAST ALERT! 🚨 **#${stats.attendanceRank}/${stats.totalUsers}** and you're out here talking smack?! 😂😂😂`,
+          `Grabe! LAST PLACE ka **#${stats.totalUsers}** tapos ang yabang mo pa! 💀 Baka kailangan mo ng tutorial sa pag-attend!`,
+          `Congrats ${username}! You're **DEAD LAST** in attendance! 🏆💩 Here's your participation trophy for being consistently ABSENT!`
+        );
+      }
+    }
+
+    // Low attendance points
+    if (stats.attendancePoints !== null && stats.attendancePoints < 50) {
+      roasts.push(
+        `**${stats.attendancePoints} attendance points**?! 😂 You've been ghosting more than attending! Saan ka na?!`,
+        `${stats.attendancePoints} attendance points... Bro, AFK ka ba since Day 1?! 📊💀 Present naman minsan!`,
+        `With **${stats.attendancePoints} attendance points**, you're basically a myth! 👻 Guild members wondering if you even exist!`
+      );
+    }
+
+    // Combined low stats roasts
+    if (stats.points < 100 && stats.attendanceRank && stats.attendanceRank > stats.totalUsers * 0.7) {
+      roasts.push(
+        `PERFECT STORM! 🌪️ **${stats.points} points** + Rank **#${stats.attendanceRank}**! You're speed-running to becoming the guild's weakest link! 💀`,
+        `Let me get this straight: **${stats.points} points**, rank **#${stats.attendanceRank}**, and you're STILL talking shit?! 😂 The confidence of a noob!`,
+        `Tangina ${username}! **${stats.points} points** + **#${stats.attendanceRank}** ranking = CERTIFIED CARRIED! 🤡 Sana all may audacity!`,
+        `Your stats: Points: **${stats.points}** 📉 Rank: **#${stats.attendanceRank}** 📊 Trash Talk: **100** 💩 Bro, focus on ONE thing!`
+      );
+    }
+
+    // No data found roasts
+    if (!stats.points && !stats.attendanceRank) {
+      roasts.push(
+        `${username}? Who dis?! 🤔 You're not even in my database! Baka bagong salta ka lang at akala mo alam mo na lahat!`,
+        `Can't find your stats, ${username}! 👻 Either you're a ghost member or so irrelevant the system forgot you! 💀`,
+        `LOL! Wala ka pa sa records ko pero may lakas ka pang mang-trashtalk! 😂 Mag-exist ka muna sa guild bago ka sumagot!`
+      );
+    }
+
+    // If we have roasts based on stats, return one
+    if (roasts.length > 0) {
+      return roasts[Math.floor(Math.random() * roasts.length)];
+    }
+
+    // Default: user has decent stats but still trash talking
+    const defaultRoasts = [
+      `Oh, someone with ACTUAL stats is talking trash! 😏 Too bad your game sense is still trash! Check !help to improve!`,
+      `Ayos stats mo pero personality mo? BASURA! 🗑️ Bili ka ng class sa pagiging mabuting tao!`,
+      `You got stats but zero chill! 😤 Mag-relax ka lang at mag-!leaderboard para makita mo hindi ka pa rin #1!`
+    ];
+
+    return defaultRoasts[Math.floor(Math.random() * defaultRoasts.length)];
   }
 
   /**
@@ -347,6 +505,7 @@ class ConversationalAI {
   async handleConversation(message, content) {
     try {
       const userId = message.author.id;
+      const username = message.author.username;
 
       // Store conversation history for learning
       this.storeConversation(userId, content);
@@ -355,7 +514,18 @@ class ConversationalAI {
       for (const [type, config] of Object.entries(CONVERSATION_PATTERNS)) {
         for (const pattern of config.patterns) {
           if (pattern.test(content)) {
-            // Get random response
+            // Special handling for insults - use stat-based roasts!
+            if (type === 'insult' && this.sheetAPI) {
+              console.log(`🔥 [Trash Talk] ${username} is getting roasted with stats!`);
+              const stats = await this.getUserStats(username);
+              if (stats) {
+                const statRoast = this.generateStatBasedRoast(stats, username);
+                console.log(`🔥 [Trash Talk] Generated stat-based roast for ${username}`);
+                return statRoast;
+              }
+            }
+
+            // Get random response for other patterns
             const response = this.getRandomResponse(config.responses);
 
             // Learn from this interaction

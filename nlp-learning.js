@@ -55,6 +55,7 @@ const axios = require('axios');
 const levenshtein = require('fast-levenshtein');
 const { NLPHandler, NLP_PATTERNS } = require('./nlp-handler.js');
 const { ConversationalAI } = require('./nlp-conversation.js');
+const { SheetAPI } = require('./utils/sheet-api.js');
 
 // Load comprehensive vocabularies (5000+ words each)
 let ENGLISH_VOCABULARY = [];
@@ -216,6 +217,7 @@ class NLPLearningSystem {
     this.client = null;
     this.botUserId = null;
     this.config = null;
+    this.sheetAPI = null;
 
     // Sync timer
     this.syncTimer = null;
@@ -243,11 +245,14 @@ class NLPLearningSystem {
     // Get config from environment or client
     this.config = client.elysiumConfig || require('./config.json');
 
+    // Initialize SheetAPI for fetching user stats
+    this.sheetAPI = new SheetAPI(this.config.sheet_webhook_url);
+
     // Initialize static NLP handler for fallback
     this.staticHandler = new NLPHandler(this.config);
 
-    // Initialize conversational AI
-    this.conversationalAI = new ConversationalAI(this);
+    // Initialize conversational AI with config and SheetAPI for stat-based roasts
+    this.conversationalAI = new ConversationalAI(this, this.config, this.sheetAPI);
 
     console.log('🧠 [NLP Learning] Initializing system...');
 
@@ -260,6 +265,7 @@ class NLPLearningSystem {
     console.log(`🧠 [NLP Learning] Loaded ${this.learnedPatterns.size} patterns, ${this.userPreferences.size} user profiles`);
     console.log('🧠 [NLP Learning] Passive learning enabled (learns from all messages)');
     console.log('🧠 [NLP Learning] Active in: admin-logs, auction threads, @mentions');
+    console.log('🔥 [NLP Learning] Stat-based trash talk system enabled!');
 
     return this;
   }
