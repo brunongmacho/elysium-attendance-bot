@@ -730,7 +730,7 @@ class IntelligenceEngine {
    */
   async detectAttendanceAnomalies() {
     try {
-      const attendanceResponse = await this.sheetAPI.getTotalAttendance();
+      const attendanceResponse = await this.sheetAPI.call('getTotalAttendance', {});
       const attendanceData = attendanceResponse && attendanceResponse.data && attendanceResponse.data.members ? attendanceResponse.data.members : [];
       const anomalies = [];
 
