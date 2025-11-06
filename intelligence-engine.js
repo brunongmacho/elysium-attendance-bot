@@ -552,28 +552,75 @@ class IntelligenceEngine {
   async predictAttendanceLikelihood(profile, saveForLearning = false) {
     const { attendance, recentActivity } = profile;
 
-    // Simple prediction model based on recent patterns
-    if (recentActivity.length === 0) {
+    // If no attendance history at all, return low likelihood
+    if (attendance.spawns === 0) {
       if (saveForLearning) {
         return { likelihood: 0.1, confidence: 10 }; // Very unlikely if no history, low confidence
       }
       return 0.1;
     }
 
-    // Recent attendance rate
-    const last7Days = Date.now() - (7 * 24 * 60 * 60 * 1000);
+    // Calculate overall attendance rate based on total spawns in system
+    // Get total spawns from recent activity (this represents all spawns that have occurred)
+    const totalSystemSpawns = recentActivity.length;
+
+    // If we have no spawn data to compare against, use a simple heuristic
+    if (totalSystemSpawns === 0) {
+      // Base likelihood on number of spawns attended
+      // Use a sigmoid-like function: higher attendance = higher likelihood
+      // Cap at 0.9 (90%) since we have limited data
+      const likelihood = Math.min(0.9, attendance.spawns / (attendance.spawns + 10));
+
+      if (saveForLearning) {
+        const baseConfidence = this.calculateAttendanceConfidence(attendance.spawns, 0);
+        const adjustedConfidence = await this.learningSystem.adjustConfidence('engagement', baseConfidence);
+
+        await this.learningSystem.savePrediction(
+          'engagement',
+          profile.username,
+          likelihood,
+          adjustedConfidence,
+          {
+            totalSpawns: attendance.spawns,
+            recentSpawns: 0,
+            calculation: 'sigmoid_fallback',
+          }
+        );
+
+        return { likelihood, confidence: adjustedConfidence };
+      }
+      return likelihood;
+    }
+
+    // Calculate overall attendance rate: spawns attended / total spawns available
+    const overallRate = Math.min(attendance.spawns / totalSystemSpawns, 1.0);
+
+    // Calculate recent attendance (last 14 days)
+    const last14Days = Date.now() - (14 * 24 * 60 * 60 * 1000);
     const recentSpawns = recentActivity.filter(a =>
-      new Date(a.timestamp).getTime() > last7Days
+      new Date(a.timestamp).getTime() > last14Days
     );
 
-    const recentRate = recentSpawns.length / 3; // Expected 3 spawns per week
+    // For recent rate, we need to know how many of these recent spawns the user attended
+    // Since we don't have individual attendance records here, we'll estimate based on overall rate
+    // But give more weight to consistency if user has been active recently
+    let recentRate = overallRate; // Default to overall rate
 
-    // Overall attendance rate
-    const overallRate = attendance.spawns / 20; // Expected 20 total spawns
+    // If there are recent spawns, adjust based on recency
+    if (recentSpawns.length > 0) {
+      // If user has attended more recently, boost the rate slightly
+      // This is a heuristic: if overall rate is high and there are recent spawns, maintain high likelihood
+      const recencyBoost = Math.min(0.1, recentSpawns.length / 50); // Small boost for active period
+      recentRate = Math.min(overallRate + recencyBoost, 1.0);
+    } else {
+      // No recent spawns in system means we can't assess recent behavior
+      // Slightly reduce likelihood if there's been a gap
+      recentRate = overallRate * 0.9;
+    }
 
-    // Weighted prediction (60% recent, 40% overall)
-    const prediction = (recentRate * 0.6) + (overallRate * 0.4);
-    const likelihood = Math.min(prediction, 1.0);
+    // Weighted prediction (70% overall rate, 30% recent adjustment)
+    // Overall rate is more reliable since it's based on actual attendance data
+    const likelihood = Math.min((overallRate * 0.7) + (recentRate * 0.3), 1.0);
 
     // Calculate base confidence based on data quality
     const baseConfidence = this.calculateAttendanceConfidence(attendance.spawns, recentSpawns.length);
@@ -585,10 +632,10 @@ class IntelligenceEngine {
       // Save prediction for future learning
       const features = {
         totalSpawns: attendance.spawns,
-        recentSpawns: recentSpawns.length,
-        recentRate: recentRate,
+        totalSystemSpawns: totalSystemSpawns,
+        recentSystemSpawns: recentSpawns.length,
         overallRate: overallRate,
-        avgPointsPerSpawn: attendance.averagePerSpawn,
+        recentRate: recentRate,
       };
 
       await this.learningSystem.savePrediction(
@@ -693,17 +740,50 @@ class IntelligenceEngine {
         intervals.push(interval / (1000 * 60 * 60)); // Convert to hours
       }
 
-      // Calculate average interval and standard deviation
-      const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-      const variance = intervals.reduce((sum, interval) => sum + Math.pow(interval - avgInterval, 2), 0) / intervals.length;
+      // Filter outlier intervals using IQR method to remove anomalies
+      // (e.g., long gaps between spawn "seasons")
+      const sortedIntervals = [...intervals].sort((a, b) => a - b);
+      const q1Index = Math.floor(sortedIntervals.length * 0.25);
+      const q3Index = Math.floor(sortedIntervals.length * 0.75);
+      const q1 = sortedIntervals[q1Index];
+      const q3 = sortedIntervals[q3Index];
+      const iqr = q3 - q1;
+
+      // Filter out intervals beyond 1.5 * IQR (standard outlier detection)
+      const lowerBound = q1 - (1.5 * iqr);
+      const upperBound = q3 + (1.5 * iqr);
+      const filteredIntervals = intervals.filter(interval =>
+        interval >= lowerBound && interval <= upperBound
+      );
+
+      // If filtering removed too many intervals, fall back to using all intervals
+      const intervalsToUse = filteredIntervals.length >= 3 ? filteredIntervals : intervals;
+
+      // Use median interval for more robust prediction (less affected by outliers)
+      const medianInterval = this.calculateMedian(intervalsToUse);
+
+      // Also calculate mean for comparison
+      const avgInterval = intervalsToUse.reduce((a, b) => a + b, 0) / intervalsToUse.length;
+
+      // Weight recent intervals more heavily (70% recent, 30% overall)
+      const recentCount = Math.min(5, Math.floor(intervalsToUse.length * 0.3));
+      const recentIntervals = intervals.slice(-recentCount);
+      const recentAvg = recentIntervals.reduce((a, b) => a + b, 0) / recentIntervals.length;
+
+      // Combine median with recent trend
+      const predictedInterval = (medianInterval * 0.7) + (recentAvg * 0.3);
+
+      // Calculate standard deviation on filtered intervals
+      const variance = intervalsToUse.reduce((sum, interval) =>
+        sum + Math.pow(interval - avgInterval, 2), 0) / intervalsToUse.length;
       const stdDev = Math.sqrt(variance);
 
       // Predict next spawn time
       const lastSpawn = relevantSpawns[relevantSpawns.length - 1].timestamp;
-      const predictedNextSpawn = new Date(lastSpawn.getTime() + (avgInterval * 60 * 60 * 1000));
+      const predictedNextSpawn = new Date(lastSpawn.getTime() + (predictedInterval * 60 * 60 * 1000));
 
       // Calculate confidence based on consistency of intervals
-      const baseConfidence = this.calculateSpawnConfidence(intervals.length, stdDev, avgInterval);
+      const baseConfidence = this.calculateSpawnConfidence(intervalsToUse.length, stdDev, medianInterval);
 
       // Adjust confidence based on historical accuracy (learning system)
       const adjustedConfidence = await this.learningSystem.adjustConfidence('spawn_prediction', baseConfidence);
@@ -712,9 +792,11 @@ class IntelligenceEngine {
       const features = {
         bossName: bossName || 'any',
         historicalSpawns: relevantSpawns.length,
-        avgIntervalHours: avgInterval,
+        avgIntervalHours: predictedInterval,
+        medianIntervalHours: medianInterval,
         stdDevHours: stdDev,
-        consistency: stdDev / avgInterval, // Lower = more consistent
+        consistency: stdDev / medianInterval, // Lower = more consistent
+        outliersRemoved: intervals.length - intervalsToUse.length,
       };
 
       await this.learningSystem.savePrediction(
@@ -725,16 +807,19 @@ class IntelligenceEngine {
         features
       );
 
-      // Calculate prediction range (±1 standard deviation)
-      const earliestTime = new Date(predictedNextSpawn.getTime() - (stdDev * 60 * 60 * 1000));
-      const latestTime = new Date(predictedNextSpawn.getTime() + (stdDev * 60 * 60 * 1000));
+      // Calculate prediction range using filtered stdDev, capped at reasonable bounds
+      // Cap the range at ±50% of predicted interval to avoid absurdly wide ranges
+      const maxRange = predictedInterval * 0.5;
+      const rangeHours = Math.min(stdDev, maxRange);
+      const earliestTime = new Date(predictedNextSpawn.getTime() - (rangeHours * 60 * 60 * 1000));
+      const latestTime = new Date(predictedNextSpawn.getTime() + (rangeHours * 60 * 60 * 1000));
 
       return {
         predictedTime: predictedNextSpawn,
         earliestTime,
         latestTime,
         confidence: adjustedConfidence,
-        avgIntervalHours: avgInterval,
+        avgIntervalHours: predictedInterval, // Use predicted interval (median + recent trend)
         lastSpawnTime: lastSpawn,
         basedOnSpawns: relevantSpawns.length,
         bossName: bossName || 'any boss',
@@ -806,9 +891,48 @@ class IntelligenceEngine {
    * Get recent spawns for a member
    */
   async getRecentSpawnsForMember(username) {
-    // This would fetch from weekly attendance sheets
-    // For now, return empty array (to be implemented with actual sheet parsing)
-    return [];
+    try {
+      // Fetch all weekly attendance data
+      const response = await this.sheetAPI.call('getAllWeeklyAttendance', {});
+      const allSheets = response?.sheets || [];
+
+      if (allSheets.length === 0) {
+        return [];
+      }
+
+      const recentSpawns = [];
+
+      // For each weekly sheet
+      for (const weekSheet of allSheets) {
+        const columns = weekSheet.columns || [];
+
+        // For each spawn column in this sheet
+        for (const column of columns) {
+          // We need to fetch the actual attendance data for this member for this spawn
+          // This requires getting the member's row from the weekly sheet
+          // For now, we'll just add the spawn timestamp if we have it
+          if (column.timestamp && column.boss) {
+            // Parse timestamp - could be ISO or formatted date
+            const timestamp = new Date(column.timestamp);
+            if (!isNaN(timestamp.getTime())) {
+              recentSpawns.push({
+                boss: column.boss,
+                timestamp: timestamp.toISOString(),
+                weekSheet: weekSheet.weekSheet,
+              });
+            }
+          }
+        }
+      }
+
+      // Sort by timestamp descending (most recent first)
+      recentSpawns.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      return recentSpawns;
+    } catch (error) {
+      console.error('[INTELLIGENCE] Error fetching recent spawns:', error);
+      return [];
+    }
   }
 
   /**
