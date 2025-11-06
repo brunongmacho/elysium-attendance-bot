@@ -216,10 +216,16 @@ class NLPLearningSystem {
   // ═════════════════════════════════════════════════════════════════════════
 
   async interpretMessage(message, shouldRespond = true) {
-    const content = message.content.trim();
+    let content = message.content.trim();
 
     // Skip if it's a ! command
     if (content.startsWith('!')) return null;
+
+    // Check if bot is mentioned
+    const botMentioned = message.mentions.users.has(this.botUserId);
+
+    // Strip bot mentions from the beginning (e.g., "<@123456789> how many points")
+    content = content.replace(/^<@!?\d+>\s*/g, '').trim();
 
     // Try learned patterns first
     const learnedInterpretation = this.tryLearnedPatterns(content);
@@ -228,8 +234,8 @@ class NLPLearningSystem {
       return learnedInterpretation;
     }
 
-    // Fall back to static handler
-    const staticInterpretation = this.staticHandler.interpretMessage(message);
+    // Fall back to static handler (pass botMentioned flag)
+    const staticInterpretation = this.staticHandler.interpretMessage(message, botMentioned);
     if (staticInterpretation) {
       this.stats.successfulInterpretations++;
 

@@ -104,6 +104,9 @@ const NLP_PATTERNS = {
     /^(?:how\s+many|what(?:'s|\s+is)\s+my|check\s+my|show\s+my)\s+points?/i,
     /^(?:my\s+)?(?:points?|balance)/i,
     /^(?:what|how)\s+(?:are|is)\s+my\s+(?:points?|balance)/i,
+    /^how\s+much\s+(?:are|is)\s+my\s+(?:.*?\s+)?points?/i,  // "how much is my bidding points?"
+    /^how\s+many\s+(?:.*?\s+)?points?\s+(?:do\s+)?(?:i|we)\s+(?:have|got)/i,  // "how many points do i have?"
+    /^(?:check|show|tell|give)\s+(?:me\s+)?(?:my\s+)?(?:.*?\s+)?points?/i,  // "show me my bidding points"
 
     // Tagalog (TL)
     /^(?:ilang|ilan)\s+(?:ang\s+)?points?\s+(?:ko|namin)/i,  // "ilang points ko?"
@@ -302,14 +305,18 @@ class NLPHandler {
   /**
    * Check if NLP should process this message
    * @param {Message} message - Discord message
+   * @param {boolean} botMentioned - Whether the bot was explicitly mentioned
    * @returns {boolean} True if NLP should process
    */
-  shouldProcess(message) {
+  shouldProcess(message, botMentioned = false) {
     // Don't process bot messages
     if (message.author.bot) return false;
 
     // Don't process messages that start with ! (already a command)
     if (message.content.trim().startsWith('!')) return false;
+
+    // Always allow when bot is explicitly mentioned (regardless of channel)
+    if (botMentioned) return true;
 
     // Check if in enabled channel
     const isAdminLogs = message.channel.id === this.config.admin_logs_channel_id ||
@@ -331,12 +338,17 @@ class NLPHandler {
   /**
    * Interpret message and extract intent + parameters
    * @param {Message} message - Discord message
+   * @param {boolean} botMentioned - Whether the bot was explicitly mentioned
    * @returns {Object|null} Interpreted command or null
    */
-  interpretMessage(message) {
-    if (!this.shouldProcess(message)) return null;
+  interpretMessage(message, botMentioned = false) {
+    if (!this.shouldProcess(message, botMentioned)) return null;
 
-    const content = message.content.trim();
+    let content = message.content.trim();
+
+    // Strip bot mentions from the beginning (e.g., "<@123456789> how many points")
+    // This allows patterns to match properly when bot is mentioned
+    content = content.replace(/^<@!?\d+>\s*/g, '').trim();
 
     // Try each command pattern
     for (const [command, patterns] of Object.entries(NLP_PATTERNS)) {
