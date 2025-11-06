@@ -29,10 +29,12 @@
  *    - 75% similarity threshold for matches
  *    - Examples: "pints" → "points", "ilng" → "ilang"
  *
- * 4. SELF-IMPROVING PATTERNS (Auto-Learning)
+ * 4. SELF-IMPROVING PATTERNS (Auto-Learning with Popularity Tracking)
  *    - Learns patterns from user confirmations (✅ reactions)
  *    - Auto-suggests commands for unrecognized phrases
  *    - Uses fuzzy matching to guess intent (50%+ similarity)
+ *    - SMART PIPELINE: Guild chat (passive) → Tracks phrase → Active channel → Prioritized suggestion
+ *    - Popularity boost: Phrases seen multiple times get +5-25% confidence
  *    - Confidence scores improve over time (0.7 → 0.95+)
  *    - Patterns sync to Google Sheets every 5 minutes
  *    - Survives bot restarts (persistent storage)
@@ -325,7 +327,7 @@ class NLPLearningSystem {
       const suggestion = this.suggestCommandForPhrase(content);
       if (suggestion && suggestion.confidence >= LEARNING_CONFIG.learning.suggestionThreshold) {
         // Offer to learn this pattern with user confirmation
-        await this.offerToLearnPattern(message, content, suggestion.command, suggestion.confidence);
+        await this.offerToLearnPattern(message, content, suggestion.command, suggestion.confidence, suggestion.wasUnrecognized);
       }
     }
 
@@ -480,6 +482,10 @@ class NLPLearningSystem {
     let highestScore = 0;
     let matchReason = '';
 
+    // Check if this phrase was seen before in passive learning (unrecognized phrases)
+    const unrecognizedEntry = this.unrecognizedPhrases.get(normalized);
+    const popularityBoost = unrecognizedEntry ? this.calculatePopularityBoost(unrecognizedEntry) : 0;
+
     // PRIORITY 1: Check semantic synonyms (exact match = high confidence)
     for (const [command, synonyms] of Object.entries(LEARNING_CONFIG.synonyms)) {
       for (const synonym of synonyms) {
@@ -551,6 +557,23 @@ class NLPLearningSystem {
       }
     }
 
+    // Apply popularity boost (phrases seen frequently get higher confidence)
+    if (popularityBoost > 0 && bestMatch) {
+      const boostedScore = Math.min(highestScore + popularityBoost, 0.99);
+
+      if (boostedScore >= LEARNING_CONFIG.learning.suggestionThreshold) {
+        const seenCount = unrecognizedEntry ? unrecognizedEntry.count : 0;
+        const userCount = unrecognizedEntry ? unrecognizedEntry.userCount : 0;
+
+        return {
+          command: bestMatch,
+          confidence: boostedScore,
+          reasoning: `${matchReason} + popularity (${seenCount} times, ${userCount} users) = ${(boostedScore * 100).toFixed(0)}%`,
+          wasUnrecognized: true,
+        };
+      }
+    }
+
     if (bestMatch && highestScore >= LEARNING_CONFIG.learning.suggestionThreshold) {
       return {
         command: bestMatch,
@@ -560,6 +583,20 @@ class NLPLearningSystem {
     }
 
     return null;
+  }
+
+  /**
+   * Calculate confidence boost based on how popular an unrecognized phrase is
+   * More usage = higher boost (shows it's an important phrase to learn)
+   */
+  calculatePopularityBoost(unrecognizedEntry) {
+    // Boost based on frequency
+    const frequencyBoost = Math.min(unrecognizedEntry.count * 0.05, 0.15); // Max +15% (3+ uses)
+
+    // Boost based on unique users (shows it's not just one person)
+    const userBoost = Math.min(unrecognizedEntry.userCount * 0.05, 0.10); // Max +10% (2+ users)
+
+    return frequencyBoost + userBoost;
   }
 
   /**
@@ -636,7 +673,7 @@ class NLPLearningSystem {
   /**
    * Offer to learn a pattern with user confirmation
    */
-  async offerToLearnPattern(message, phrase, command, confidence) {
+  async offerToLearnPattern(message, phrase, command, confidence, wasUnrecognized = false) {
     try {
       // Don't offer to learn if we've already offered recently for this phrase
       const key = phrase.toLowerCase().trim();
@@ -646,8 +683,15 @@ class NLPLearningSystem {
 
       // Send confirmation message
       const confidencePercent = (confidence * 100).toFixed(0);
+
+      // Check if this was a popular phrase from passive learning
+      const unrecognizedEntry = this.unrecognizedPhrases.get(key);
+      const popularityNote = unrecognizedEntry
+        ? `\n💡 *I've seen this ${unrecognizedEntry.count} times from ${unrecognizedEntry.userCount} users - seems popular!*`
+        : '';
+
       const reply = await message.reply(
-        `🤔 I'm not sure what you mean, but maybe you want **${command}**? (${confidencePercent}% confident)\n` +
+        `🤔 I'm not sure what you mean, but maybe you want **${command}**? (${confidencePercent}% confident)${popularityNote}\n` +
         `React with ✅ to teach me this, or ❌ to ignore.`
       );
 
@@ -681,8 +725,15 @@ class NLPLearningSystem {
           // Learn this pattern!
           this.teachPattern(phrase, command, user.id);
 
+          // Remove from unrecognized phrases (now it's learned!)
+          const normalizedKey = phrase.toLowerCase().trim();
+          if (this.unrecognizedPhrases.has(normalizedKey)) {
+            this.unrecognizedPhrases.delete(normalizedKey);
+            console.log(`🧠 [NLP Learning] Removed from unrecognized (now learned): "${phrase}"`);
+          }
+
           // Clear any negative learning for this combination (user confirmed it's correct!)
-          const negKey = `${phrase.toLowerCase().trim()}::${command}`;
+          const negKey = `${normalizedKey}::${command}`;
           if (this.negativePatterns.has(negKey)) {
             this.negativePatterns.delete(negKey);
             console.log(`🧠 [NLP Learning] Cleared negative pattern (user confirmed): "${phrase}" → ${command}`);
