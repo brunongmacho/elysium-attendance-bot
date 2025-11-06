@@ -335,9 +335,14 @@ const isMemberCommand = memberCommands.some(cmd => content.startsWith(cmd)) || l
 
 1. **c08f5ac** - Fix: Add !leaderboard → !leaderboards alias for NLP compatibility
 2. **ba273cd** - Fix: Enable NLP Learning Google Sheets sync by adding missing handlers
-3. **[PENDING]** - Improve: Expand NLP Learning to all commands in auction threads
+3. **9967a85** - Fix: NLP patterns for 'show me the leaderboards' now correctly route to !leaderboard
+4. **fe4b4c1** - Fix: NLP Learning Google Sheets sync and add !nlpunhide command
+5. **0bb9fc2** - Improve: Expand NLP Learning to all commands in auction threads
+6. **24c3907** - Enhance: Make NLP system genius with semantic understanding
+7. **30a48ef** - Enhance: Smart learning pipeline - prioritize popular phrases from guild chat
+8. **8814859** - Complete: Full Google Sheets integration for NLP Learning System
 
-**Branch:** `claude/bot-initialization-recovery-011CUs7EYBgTCgjYvmjVdTrn`
+**Branch:** `claude/tagged-t-011CUs8tXH3ZTKyBh3g4a1SZ`
 
 ---
 
@@ -346,14 +351,30 @@ const isMemberCommand = memberCommands.some(cmd => content.startsWith(cmd)) || l
 **What's Working:** ✅
 - All natural language patterns interpreted correctly
 - Commands execute properly across all supported channels
-- Google Sheets sync fully functional
+- **Full bidirectional Google Sheets sync** (5 tabs, all features)
 - Passive learning records all user messages
 - @Mention support works everywhere
 - Learning system now learns from ALL commands in auction threads
+- **Auto-learning with user confirmation** (✅/❌ reactions)
+- **Semantic understanding** with 40+ synonyms per command
+- **Ultra-short shortcuts** (pts, lb, stat)
+- **Negative learning** (learns from rejections, forgiving 2-strike system)
+- **Smart popularity boost** from guild chat passive tracking
+- **Persistent learning** across bot restarts
+
+**New Features:** 🆕
+1. **Auto-Learning Pipeline**: Bot suggests commands for unrecognized phrases
+2. **Semantic Synonyms**: "rankings" → !leaderboard, "balance" → !mypoints
+3. **Negative Learning**: Learns what NOT to suggest (❌ reactions)
+4. **Popularity Boost**: Frequently-seen phrases get higher confidence (+5-25%)
+5. **5th Google Sheets Tab**: NLP_NegativePatterns (red) tracks rejected suggestions
+6. **!nlpunhide Command**: Easily view all NLP tabs in Google Sheets
 
 **Design Decisions:** ℹ️
 - Main bidding channel blocks natural language for non-admins (by design, keeps channel clean)
 - Guild chat has NLP disabled (prevents spam, but @mentions still work)
+- Guild chat passively tracks phrases → Prioritizes popular ones in active channels
+- Negative learning is forgiving: 1 rejection = 50% penalty, 2+ = block
 
 **Status:**
-The NLP system is **100% production-ready** and fully functional. All identified issues have been fixed.
+The NLP system is **enterprise-grade, fully self-learning, and production-ready**. All features are complete and integrated with Google Sheets for persistence.
