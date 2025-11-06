@@ -1,337 +1,343 @@
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║                 ELYSIUM NLP ADMIN DASHBOARD                               ║
- * ║           Commands to Monitor and Manage NLP Learning                     ║
+ * ║                    NLP LEARNING SYSTEM - ADMIN COMMANDS                   ║
+ * ║                  Dashboard & Management Interface                         ║
  * ╚═══════════════════════════════════════════════════════════════════════════╝
+ *
+ * @fileoverview Admin commands for monitoring and managing NLP learning system
+ * Provides statistics, pattern management, and troubleshooting tools.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ADMIN COMMANDS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * !nlpstats         - View learning statistics and progress
+ * !learned          - List all learned patterns with confidence scores
+ * !unrecognized     - Show phrases bot doesn't understand yet
+ * !teachbot "phrase" → !command - Manually teach a new pattern
+ * !clearlearned [phrase] - Remove specific or all learned patterns
+ * !myprofile        - View your personal learning profile (member accessible)
  */
 
 const { EmbedBuilder } = require('discord.js');
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ADMIN COMMANDS
+// COMMAND: !nlpstats
+// Show overall NLP learning statistics
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * Show NLP learning statistics
- * @param {Message} message - Discord message
- * @param {NLPLearningSystem} learningSystem - Learning system instance
- */
 async function showNLPStats(message, learningSystem) {
-  const stats = learningSystem.getStatistics();
+  try {
+    const stats = learningSystem.getStatistics();
 
-  const embed = new EmbedBuilder()
-    .setColor('#00ff00')
-    .setTitle('🧠 NLP Learning System Statistics')
-    .setDescription('Overview of bot learning progress')
-    .addFields(
-      {
-        name: '📚 Learned Patterns',
-        value: `Total: **${stats.totalLearnedPatterns}** patterns\nUsers tracked: **${stats.totalUsers}**`,
-        inline: true,
-      },
-      {
-        name: '❓ Unrecognized Phrases',
-        value: `Total: **${stats.totalUnrecognizedPhrases}**\nRecent messages: **${stats.recentMessagesCount}**`,
-        inline: true,
-      },
-      {
-        name: '🌍 Language Distribution',
-        value: Object.entries(stats.languageDistribution)
-          .map(([lang, count]) => `${lang.toUpperCase()}: ${count} users`)
-          .join('\n') || 'No data yet',
+    const embed = new EmbedBuilder()
+      .setTitle('🧠 NLP Learning System - Statistics')
+      .setColor(0x5865f2)
+      .setDescription('Self-improving natural language processing with multilingual support')
+      .addFields(
+        {
+          name: '📊 Learning Progress',
+          value: [
+            `**Patterns Learned:** ${stats.learnedPatternsCount}`,
+            `**Recognition Rate:** ${(stats.recognitionRate * 100).toFixed(1)}%`,
+            `**Users Tracked:** ${stats.usersTracked}`,
+            `**Unrecognized Phrases:** ${stats.unrecognizedCount}`,
+          ].join('\n'),
+          inline: true,
+        },
+        {
+          name: '📈 Activity Stats',
+          value: [
+            `**Messages Analyzed:** ${stats.messagesAnalyzed.toLocaleString()}`,
+            `**Successful:** ${stats.successfulInterpretations}`,
+            `**Failed:** ${stats.failedInterpretations}`,
+            `**Last Sync:** ${stats.lastSync ? stats.lastSync.toLocaleString() : 'Never'}`,
+          ].join('\n'),
+          inline: true,
+        },
+        {
+          name: '🌐 Language Distribution',
+          value: [
+            `**English:** ${stats.languageDistribution.en || 0}`,
+            `**Tagalog:** ${stats.languageDistribution.tl || 0}`,
+            `**Taglish:** ${stats.languageDistribution.taglish || 0}`,
+          ].join('\n'),
+          inline: false,
+        },
+        {
+          name: '💡 How It Works',
+          value: [
+            '• **Passive Learning:** Bot learns from all messages without responding',
+            '• **Mention-Based:** Only responds when @mentioned or in auction threads',
+            '• **Self-Improving:** Patterns improve with usage (confidence 0.7 → 0.95+)',
+            '• **Persistent:** Syncs to Google Sheets every 5 minutes',
+          ].join('\n'),
+          inline: false,
+        }
+      )
+      .setFooter({ text: 'Use !learned to see patterns | !unrecognized to see missed phrases' })
+      .setTimestamp();
+
+    await message.reply({ embeds: [embed] });
+  } catch (error) {
+    console.error('Error showing NLP stats:', error);
+    await message.reply('❌ Error retrieving NLP statistics.');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMMAND: !learned
+// Show all learned patterns with confidence scores
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function showLearned(message, learningSystem) {
+  try {
+    const patterns = learningSystem.getLearnedPatterns();
+
+    if (patterns.length === 0) {
+      await message.reply('📝 No learned patterns yet. The bot will learn as users interact with it.');
+      return;
+    }
+
+    // Group patterns by confidence level
+    const high = patterns.filter(p => p.confidence >= 0.9);
+    const medium = patterns.filter(p => p.confidence >= 0.75 && p.confidence < 0.9);
+    const low = patterns.filter(p => p.confidence < 0.75);
+
+    const embed = new EmbedBuilder()
+      .setTitle('📚 Learned Patterns')
+      .setColor(0x57f287)
+      .setDescription(`Total: ${patterns.length} patterns | Sorted by confidence`)
+      .setFooter({ text: 'Confidence increases with successful usage' })
+      .setTimestamp();
+
+    // High confidence patterns (> 90%)
+    if (high.length > 0) {
+      const highList = high.slice(0, 10).map(p =>
+        `**"${p.phrase}"** → \`${p.command}\` (${(p.confidence * 100).toFixed(0)}% | ${p.usageCount} uses)`
+      ).join('\n');
+      embed.addFields({
+        name: `✅ High Confidence (${high.length})`,
+        value: highList + (high.length > 10 ? `\n_...and ${high.length - 10} more_` : ''),
         inline: false,
-      }
-    )
-    .setFooter({ text: `Last sync: ${new Date(stats.lastSync).toLocaleString() || 'Never'}` })
-    .setTimestamp();
+      });
+    }
 
-  await message.reply({ embeds: [embed] });
-}
+    // Medium confidence patterns (75-90%)
+    if (medium.length > 0) {
+      const mediumList = medium.slice(0, 5).map(p =>
+        `**"${p.phrase}"** → \`${p.command}\` (${(p.confidence * 100).toFixed(0)}% | ${p.usageCount} uses)`
+      ).join('\n');
+      embed.addFields({
+        name: `⚠️ Medium Confidence (${medium.length})`,
+        value: mediumList + (medium.length > 5 ? `\n_...and ${medium.length - 5} more_` : ''),
+        inline: false,
+      });
+    }
 
-/**
- * Show top unrecognized phrases (for learning opportunities)
- * @param {Message} message - Discord message
- * @param {NLPLearningSystem} learningSystem - Learning system instance
- */
-async function showUnrecognizedPhrases(message, learningSystem) {
-  const stats = learningSystem.getStatistics();
+    // Low confidence patterns (< 75%)
+    if (low.length > 0) {
+      const lowList = low.slice(0, 3).map(p =>
+        `**"${p.phrase}"** → \`${p.command}\` (${(p.confidence * 100).toFixed(0)}% | ${p.usageCount} uses)`
+      ).join('\n');
+      embed.addFields({
+        name: `❓ Low Confidence (${low.length})`,
+        value: lowList + (low.length > 3 ? `\n_...and ${low.length - 3} more_` : ''),
+        inline: false,
+      });
+    }
 
-  if (stats.topUnrecognized.length === 0) {
-    return message.reply('✅ No unrecognized phrases! Bot understands everything so far.');
+    await message.reply({ embeds: [embed] });
+  } catch (error) {
+    console.error('Error showing learned patterns:', error);
+    await message.reply('❌ Error retrieving learned patterns.');
   }
-
-  const embed = new EmbedBuilder()
-    .setColor('#ffaa00')
-    .setTitle('❓ Top Unrecognized Phrases')
-    .setDescription('These phrases were not recognized by the bot. Consider teaching the bot or adding to static patterns.')
-    .setTimestamp();
-
-  stats.topUnrecognized.forEach((item, index) => {
-    embed.addFields({
-      name: `${index + 1}. "${item.phrase}"`,
-      value: `Used **${item.count}** times by **${item.userCount}** user(s)`,
-      inline: false,
-    });
-  });
-
-  embed.setFooter({ text: 'Use !teachbot to manually teach new patterns' });
-
-  await message.reply({ embeds: [embed] });
 }
 
-/**
- * Show top learned patterns
- * @param {Message} message - Discord message
- * @param {NLPLearningSystem} learningSystem - Learning system instance
- */
-async function showLearnedPatterns(message, learningSystem) {
-  const stats = learningSystem.getStatistics();
+// ═══════════════════════════════════════════════════════════════════════════
+// COMMAND: !unrecognized
+// Show phrases bot doesn't understand yet
+// ═══════════════════════════════════════════════════════════════════════════
 
-  if (stats.topLearnedPatterns.length === 0) {
-    return message.reply('📚 No learned patterns yet. Bot is still learning from user interactions.');
+async function showUnrecognized(message, learningSystem) {
+  try {
+    const phrases = learningSystem.getUnrecognizedPhrases();
+
+    if (phrases.length === 0) {
+      await message.reply('✅ No unrecognized phrases! Bot is understanding everything perfectly.');
+      return;
+    }
+
+    const top20 = phrases.slice(0, 20);
+
+    const embed = new EmbedBuilder()
+      .setTitle('❓ Unrecognized Phrases')
+      .setColor(0xfee75c)
+      .setDescription(`Top ${top20.length} phrases the bot doesn't understand yet`)
+      .addFields(
+        top20.map((phrase, index) => ({
+          name: `${index + 1}. "${phrase.phrase}"`,
+          value: `**Count:** ${phrase.count} | **Users:** ${phrase.userCount} | **Last seen:** ${new Date(phrase.lastSeen).toLocaleString()}`,
+          inline: false,
+        }))
+      )
+      .setFooter({ text: 'Use !teachbot "phrase" → !command to teach these patterns' })
+      .setTimestamp();
+
+    await message.reply({ embeds: [embed] });
+  } catch (error) {
+    console.error('Error showing unrecognized phrases:', error);
+    await message.reply('❌ Error retrieving unrecognized phrases.');
   }
-
-  const embed = new EmbedBuilder()
-    .setColor('#0099ff')
-    .setTitle('📚 Top Learned Patterns')
-    .setDescription('Most frequently used patterns learned from user confirmations')
-    .setTimestamp();
-
-  stats.topLearnedPatterns.forEach((item, index) => {
-    const confidenceEmoji = item.confidence >= 0.9 ? '🟢' : item.confidence >= 0.7 ? '🟡' : '🔴';
-    embed.addFields({
-      name: `${index + 1}. "${item.phrase}" → ${item.command}`,
-      value: `${confidenceEmoji} Confidence: **${(item.confidence * 100).toFixed(1)}%** | Used: **${item.usageCount}** times`,
-      inline: false,
-    });
-  });
-
-  embed.setFooter({ text: '🟢 High confidence | 🟡 Medium | 🔴 Low confidence' });
-
-  await message.reply({ embeds: [embed] });
 }
 
-/**
- * Manually teach bot a new pattern
- * Usage: !teachbot "phrase" → !command
- * @param {Message} message - Discord message
- * @param {Array} args - Command arguments
- * @param {NLPLearningSystem} learningSystem - Learning system instance
- */
+// ═══════════════════════════════════════════════════════════════════════════
+// COMMAND: !teachbot "phrase" → !command
+// Manually teach bot a new pattern
+// ═══════════════════════════════════════════════════════════════════════════
+
 async function teachBot(message, args, learningSystem) {
-  if (args.length < 3) {
-    return message.reply(
-      '❌ **Usage:** `!teachbot "phrase" → !command`\n' +
-      '**Example:** `!teachbot "pusta 500" → !bid`'
-    );
-  }
-
-  // Parse: "phrase" → !command
-  const fullText = args.join(' ');
-  const match = fullText.match(/["'](.+?)["']\s*→\s*(![\w]+)/);
-
-  if (!match) {
-    return message.reply(
-      '❌ **Invalid format!**\n' +
-      'Use: `!teachbot "phrase" → !command`\n' +
-      'Example: `!teachbot "pusta 500" → !bid`'
-    );
-  }
-
-  const [, phrase, command] = match;
-
-  // Validate command
-  const validCommands = [
-    '!bid', '!mypoints', '!present', '!leaderboard', '!bidstatus',
-    '!help', '!startauction', '!pause', '!resume', '!stop',
-    '!skip', '!skipitem', '!cancel', '!cancelitem', '!extend',
-  ];
-
-  if (!validCommands.includes(command)) {
-    return message.reply(
-      `❌ **Invalid command:** ${command}\n` +
-      `Valid commands: ${validCommands.join(', ')}`
-    );
-  }
-
-  // Create confirmation ID
-  const confirmationId = `teach_${Date.now()}`;
-
-  // Store in pending confirmations
-  learningSystem.pendingConfirmations.set(confirmationId, {
-    userId: message.author.id,
-    phrase: phrase.toLowerCase(),
-    suggestedCommand: command,
-    timestamp: Date.now(),
-  });
-
-  // Ask for confirmation
-  const confirmMsg = await message.reply(
-    `🤔 **Confirm Teaching:**\n` +
-    `Phrase: "${phrase}"\n` +
-    `Command: \`${command}\`\n\n` +
-    `React with ✅ to confirm or ❌ to cancel.`
-  );
-
-  await confirmMsg.react('✅');
-  await confirmMsg.react('❌');
-
-  // Wait for reaction
-  const filter = (reaction, user) =>
-    ['✅', '❌'].includes(reaction.emoji.name) && user.id === message.author.id;
-
   try {
-    const collected = await confirmMsg.awaitReactions({ filter, max: 1, time: 30000, errors: ['time'] });
-    const reaction = collected.first();
+    // Parse: !teachbot "phrase" → !command
+    const fullText = args.join(' ');
+    const match = fullText.match(/^"(.+?)"\s*→\s*(!?\w+)/);
 
-    if (reaction.emoji.name === '✅') {
-      // Confirm and teach
-      await learningSystem.confirmPattern(confirmationId, command);
-      await confirmMsg.edit(
-        `✅ **Successfully taught!**\n` +
-        `The bot will now recognize "${phrase}" as \`${command}\``
-      );
-    } else {
-      // Cancelled
-      learningSystem.pendingConfirmations.delete(confirmationId);
-      await confirmMsg.edit('❌ Teaching cancelled.');
+    if (!match) {
+      await message.reply({
+        content: '❌ **Invalid syntax!**\n\n**Usage:** `!teachbot "phrase" → !command`\n\n**Examples:**\n• `!teachbot "bawi ko 500" → !bid`\n• `!teachbot "ilan na ko" → !mypoints`',
+      });
+      return;
     }
+
+    const [, phrase, command] = match;
+    const normalizedCommand = command.startsWith('!') ? command : `!${command}`;
+
+    // Teach the pattern
+    learningSystem.teachPattern(phrase, normalizedCommand, message.author.id);
+
+    const embed = new EmbedBuilder()
+      .setTitle('✅ Pattern Taught Successfully')
+      .setColor(0x57f287)
+      .setDescription(`Bot will now recognize this phrase`)
+      .addFields(
+        {
+          name: '📝 Phrase',
+          value: `"${phrase}"`,
+          inline: true,
+        },
+        {
+          name: '➡️ Command',
+          value: `\`${normalizedCommand}\``,
+          inline: true,
+        },
+        {
+          name: '💡 How to Use',
+          value: `Users can now say: **${phrase}** and the bot will interpret it as \`${normalizedCommand}\``,
+          inline: false,
+        }
+      )
+      .setFooter({ text: `Taught by ${message.author.username}` })
+      .setTimestamp();
+
+    await message.reply({ embeds: [embed] });
   } catch (error) {
-    // Timeout
-    learningSystem.pendingConfirmations.delete(confirmationId);
-    await confirmMsg.edit('⏱️ Teaching timed out (30s). Please try again.');
+    console.error('Error teaching pattern:', error);
+    await message.reply('❌ Error teaching pattern.');
   }
-}
-
-/**
- * Clear all learned patterns (admin only, requires confirmation)
- * @param {Message} message - Discord message
- * @param {NLPLearningSystem} learningSystem - Learning system instance
- */
-async function clearLearnedPatterns(message, learningSystem) {
-  const confirmMsg = await message.reply(
-    '⚠️  **WARNING:** This will delete ALL learned patterns!\n' +
-    `Currently: **${learningSystem.learnedPatterns.size}** patterns\n\n` +
-    'React with ✅ to confirm or ❌ to cancel.'
-  );
-
-  await confirmMsg.react('✅');
-  await confirmMsg.react('❌');
-
-  const filter = (reaction, user) =>
-    ['✅', '❌'].includes(reaction.emoji.name) && user.id === message.author.id;
-
-  try {
-    const collected = await confirmMsg.awaitReactions({ filter, max: 1, time: 30000, errors: ['time'] });
-    const reaction = collected.first();
-
-    if (reaction.emoji.name === '✅') {
-      const count = learningSystem.learnedPatterns.size;
-      learningSystem.learnedPatterns.clear();
-      await learningSystem.syncToGoogleSheets();
-      await confirmMsg.edit(`✅ Cleared **${count}** learned patterns.`);
-    } else {
-      await confirmMsg.edit('❌ Operation cancelled.');
-    }
-  } catch (error) {
-    await confirmMsg.edit('⏱️ Operation timed out (30s).');
-  }
-}
-
-/**
- * Show user's language preference and statistics
- * @param {Message} message - Discord message
- * @param {NLPLearningSystem} learningSystem - Learning system instance
- */
-async function showUserProfile(message, learningSystem) {
-  const userId = message.author.id;
-  const prefs = learningSystem.userPreferences.get(userId);
-
-  if (!prefs) {
-    return message.reply('📊 No profile data yet. Send more messages for the bot to learn your preferences!');
-  }
-
-  const embed = new EmbedBuilder()
-    .setColor('#9b59b6')
-    .setTitle('👤 Your NLP Profile')
-    .setDescription(`Language preferences and statistics for ${message.author.username}`)
-    .addFields(
-      {
-        name: '🌍 Preferred Language',
-        value: `**${prefs.language.toUpperCase()}** (${prefs.language === 'en' ? 'English' : prefs.language === 'tl' ? 'Tagalog' : 'Taglish'})`,
-        inline: true,
-      },
-      {
-        name: '📝 Messages Analyzed',
-        value: `**${prefs.messageCount}** messages`,
-        inline: true,
-      },
-      {
-        name: '📊 Language Usage',
-        value: Object.entries(prefs.languageScores)
-          .map(([lang, count]) => `${lang.toUpperCase()}: ${count}`)
-          .join('\n'),
-        inline: false,
-      }
-    )
-    .setTimestamp();
-
-  if (Object.keys(prefs.shortcuts || {}).length > 0) {
-    embed.addFields({
-      name: '⚡ Personal Shortcuts',
-      value: Object.entries(prefs.shortcuts)
-        .map(([shortcut, command]) => `"${shortcut}" → ${command}`)
-        .join('\n'),
-      inline: false,
-    });
-  }
-
-  await message.reply({ embeds: [embed] });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// COMMAND ROUTER
+// COMMAND: !clearlearned [phrase]
+// Remove specific or all learned patterns
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * Route NLP admin commands
- * @param {Message} message - Discord message
- * @param {string} command - Command name
- * @param {Array} args - Command arguments
- * @param {NLPLearningSystem} learningSystem - Learning system instance
- */
-async function routeNLPAdminCommand(message, command, args, learningSystem) {
-  switch (command) {
-    case '!nlpstats':
-      await showNLPStats(message, learningSystem);
-      break;
+async function clearLearned(message, args, learningSystem) {
+  try {
+    if (args.length === 0) {
+      // Confirm before clearing all
+      await message.reply({
+        content: '⚠️ **Are you sure you want to clear ALL learned patterns?**\n\nThis will reset the bot to only use static patterns. Type `!clearlearned confirm` to proceed.',
+      });
+      return;
+    }
 
-    case '!unrecognized':
-      await showUnrecognizedPhrases(message, learningSystem);
-      break;
+    if (args[0] === 'confirm') {
+      const count = learningSystem.clearLearned();
+      await message.reply(`✅ Cleared ${count} learned patterns. Bot reset to static patterns only.`);
+      return;
+    }
 
-    case '!learned':
-      await showLearnedPatterns(message, learningSystem);
-      break;
+    // Clear specific phrase
+    const phrase = args.join(' ');
+    const deleted = learningSystem.clearLearned(phrase);
 
-    case '!teachbot':
-      await teachBot(message, args, learningSystem);
-      break;
-
-    case '!clearlearned':
-      await clearLearnedPatterns(message, learningSystem);
-      break;
-
-    case '!myprofile':
-    case '!nlpprofile':
-      await showUserProfile(message, learningSystem);
-      break;
-
-    default:
-      return false; // Command not handled
+    if (deleted) {
+      await message.reply(`✅ Removed learned pattern: **"${phrase}"**`);
+    } else {
+      await message.reply(`❌ Pattern **"${phrase}"** not found in learned patterns.`);
+    }
+  } catch (error) {
+    console.error('Error clearing learned patterns:', error);
+    await message.reply('❌ Error clearing patterns.');
   }
+}
 
-  return true; // Command handled
+// ═══════════════════════════════════════════════════════════════════════════
+// COMMAND: !myprofile
+// Show user's personal learning profile (member accessible)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function showMyProfile(message, learningSystem) {
+  try {
+    const profile = learningSystem.getUserProfile(message.author.id);
+
+    if (!profile) {
+      await message.reply({
+        content: '📝 No learning profile yet. Start interacting with the bot using natural language, and it will build your profile!',
+      });
+      return;
+    }
+
+    const langScores = profile.languageScores || { en: 0, tl: 0, taglish: 0 };
+    const totalLang = langScores.en + langScores.tl + langScores.taglish;
+
+    const embed = new EmbedBuilder()
+      .setTitle(`🧠 Learning Profile: ${message.author.username}`)
+      .setColor(0x5865f2)
+      .setThumbnail(message.author.displayAvatarURL())
+      .addFields(
+        {
+          name: '📊 Activity',
+          value: [
+            `**Messages Analyzed:** ${profile.messageCount}`,
+            `**Preferred Language:** ${profile.language.toUpperCase()}`,
+            `**Learning Enabled:** ${profile.learningEnabled ? 'Yes ✅' : 'No ❌'}`,
+          ].join('\n'),
+          inline: true,
+        },
+        {
+          name: '🌐 Language Usage',
+          value: [
+            `**English:** ${langScores.en} (${totalLang > 0 ? ((langScores.en / totalLang) * 100).toFixed(0) : 0}%)`,
+            `**Tagalog:** ${langScores.tl} (${totalLang > 0 ? ((langScores.tl / totalLang) * 100).toFixed(0) : 0}%)`,
+            `**Taglish:** ${langScores.taglish} (${totalLang > 0 ? ((langScores.taglish / totalLang) * 100).toFixed(0) : 0}%)`,
+          ].join('\n'),
+          inline: true,
+        },
+        {
+          name: '💡 What This Means',
+          value: 'The bot tracks your language preferences to better understand how you communicate. It adapts to your style over time!',
+          inline: false,
+        }
+      )
+      .setFooter({ text: `Last updated: ${new Date(profile.lastUpdated).toLocaleString()}` })
+      .setTimestamp();
+
+    await message.reply({ embeds: [embed] });
+  } catch (error) {
+    console.error('Error showing user profile:', error);
+    await message.reply('❌ Error retrieving your profile.');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -339,11 +345,10 @@ async function routeNLPAdminCommand(message, command, args, learningSystem) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 module.exports = {
-  routeNLPAdminCommand,
   showNLPStats,
-  showUnrecognizedPhrases,
-  showLearnedPatterns,
+  showLearned,
+  showUnrecognized,
   teachBot,
-  clearLearnedPatterns,
-  showUserProfile,
+  clearLearned,
+  showMyProfile,
 };
