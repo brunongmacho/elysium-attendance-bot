@@ -82,6 +82,7 @@ const scheduler = require('./utils/maintenance-scheduler'); // Unified maintenan
 const { IntelligenceEngine } = require('./intelligence-engine.js'); // AI/ML Intelligence Engine
 const { ProactiveIntelligence } = require('./proactive-intelligence.js'); // Proactive Monitoring
 const { NLPHandler } = require('./nlp-handler.js'); // Natural Language Processing
+const { NLPLearningSystem } = require('./nlp-learning.js'); // NLP Learning System (self-improving)
 
 /**
  * Command alias mapping for shorthand commands.
@@ -421,6 +422,15 @@ let proactiveIntelligence = null;
  * @type {NLPHandler}
  */
 let nlpHandler = null;
+
+/**
+ * NLP Learning System for self-improving natural language understanding
+ * Learns patterns from user confirmations and adapts to multilingual usage
+ * Mention-based activation (responds only when @mentioned)
+ * Passive learning mode (learns from all messages)
+ * @type {NLPLearningSystem}
+ */
+let nlpLearningSystem = null;
 
 /**
  * Flag indicating bot is currently recovering from a crash
@@ -3404,6 +3414,11 @@ client.once(Events.ClientReady, async () => {
   nlpHandler = new NLPHandler(config);
   console.log('💬 NLP Handler initialized (admin logs + auction threads)');
 
+  // INITIALIZE NLP LEARNING SYSTEM (Self-improving natural language understanding)
+  nlpLearningSystem = new NLPLearningSystem();
+  await nlpLearningSystem.initialize(client);
+  console.log('🧠 NLP Learning System initialized (mention-based activation, passive learning enabled)');
+
   console.log("\n╔═══════════════════════════════════════════════════════╗");
   console.log("║         🔄 BOT STATE RECOVERY (3-SWEEP SYSTEM)   ║");
   console.log("╚═══════════════════════════════════════════════════════╝\n");
@@ -3695,6 +3710,15 @@ client.on(Events.MessageCreate, async (message) => {
     if (!message.guild) return; // Skip DMs immediately
     if (message.guild.id !== config.main_guild_id) return; // Skip wrong guild
 
+    // 🧠 NLP LEARNING: Passive learning from all messages (learns without responding)
+    if (nlpLearningSystem) {
+      try {
+        await nlpLearningSystem.learnFromMessage(message);
+      } catch (error) {
+        console.error(`❌ NLP Learning error: ${error.message}`);
+      }
+    }
+
     // 🧹 BIDDING CHANNEL PROTECTION: Delete non-admin messages immediately
     // EXCEPT for member commands (!mypoints, !bidstatus, etc.)
     if (
@@ -3858,22 +3882,45 @@ client.on(Events.MessageCreate, async (message) => {
     // NLP PROCESSING (Natural Language → Commands)
     // ═════════════════════════════════════════════════════════════════════
     // Intercepts natural language and converts to command format
-    // Only works in admin logs and auction threads (NOT guild chat)
+    // Two-tier system:
+    // 1. Learning system (mention-based activation, learns from all messages)
+    // 2. Static handler (admin logs + auction threads)
     // Does NOT interfere with existing ! commands
 
     let nlpInterpretation = null;
-    if (nlpHandler && !message.content.trim().startsWith('!')) {
+    let usedLearningSystem = false;
+
+    // Try learning system first (if bot is mentioned or in auction thread)
+    if (nlpLearningSystem && !message.content.trim().startsWith('!')) {
+      const shouldRespond = nlpLearningSystem.shouldRespond(message);
+
+      if (shouldRespond) {
+        nlpInterpretation = await nlpLearningSystem.interpretMessage(message);
+        if (nlpInterpretation) {
+          usedLearningSystem = true;
+          console.log(`🧠 [NLP Learning] Interpreted: "${message.content}" → ${nlpInterpretation.command} (confidence: ${nlpInterpretation.confidence})`);
+        }
+      }
+    }
+
+    // Fall back to static handler if learning system didn't interpret
+    if (!nlpInterpretation && nlpHandler && !message.content.trim().startsWith('!')) {
       nlpInterpretation = nlpHandler.interpretMessage(message);
 
       if (nlpInterpretation) {
-        console.log(`💬 [NLP] Interpreted: "${message.content}" → ${nlpInterpretation.command}`);
+        console.log(`💬 [NLP Static] Interpreted: "${message.content}" → ${nlpInterpretation.command}`);
+      }
+    }
 
-        // Convert natural language to command format
-        // This allows the rest of the system to process it normally
-        const params = nlpInterpretation.params.join(' ');
-        message.content = `${nlpInterpretation.command}${params ? ' ' + params : ''}`;
+    // Apply interpretation if found
+    if (nlpInterpretation) {
+      // Convert natural language to command format
+      // This allows the rest of the system to process it normally
+      const params = nlpInterpretation.params.join(' ');
+      message.content = `${nlpInterpretation.command}${params ? ' ' + params : ''}`;
 
-        // Optional: Send brief feedback for non-bid commands
+      // Optional: Send brief feedback for non-bid commands
+      if (!usedLearningSystem && nlpHandler) {
         const contextMessage = nlpHandler.getContextMessage(nlpInterpretation.command, message);
         if (contextMessage) {
           await message.reply(contextMessage).catch(() => {});
@@ -4089,6 +4136,57 @@ client.on(Events.MessageCreate, async (message) => {
         await commandHandlers.predictattendance(message, member);
       } else if (resolvedCmd === "!predictspawn") {
         await commandHandlers.predictspawn(message, member);
+      }
+      return;
+    }
+
+    // =========================================================================
+    // NLP LEARNING SYSTEM COMMANDS (Admin only)
+    // =========================================================================
+    if (
+      resolvedCmd === "!nlpstats" ||
+      resolvedCmd === "!unrecognized" ||
+      resolvedCmd === "!learned" ||
+      resolvedCmd === "!teachbot" ||
+      resolvedCmd === "!clearlearned" ||
+      resolvedCmd === "!myprofile"
+    ) {
+      if (!userIsAdmin && resolvedCmd !== "!myprofile") {
+        await message.reply("❌ NLP admin commands are admin-only. Use `!myprofile` to see your learning profile.");
+        return;
+      }
+
+      if (
+        message.channel.isThread() &&
+        message.channel.parentId === config.attendance_channel_id
+      ) {
+        await message.reply(
+          "⚠️ Please use NLP commands in admin logs channel to avoid cluttering spawn threads."
+        );
+        return;
+      }
+
+      if (!nlpLearningSystem) {
+        await message.reply("❌ NLP Learning System is not initialized.");
+        return;
+      }
+
+      // Import and route to NLP admin command handlers
+      const nlpAdminCommands = require('./nlp-admin-commands.js');
+      const args = message.content.trim().split(/\s+/).slice(1);
+
+      if (resolvedCmd === "!nlpstats") {
+        await nlpAdminCommands.showNLPStats(message, nlpLearningSystem);
+      } else if (resolvedCmd === "!unrecognized") {
+        await nlpAdminCommands.showUnrecognized(message, nlpLearningSystem);
+      } else if (resolvedCmd === "!learned") {
+        await nlpAdminCommands.showLearned(message, nlpLearningSystem);
+      } else if (resolvedCmd === "!teachbot") {
+        await nlpAdminCommands.teachBot(message, args, nlpLearningSystem);
+      } else if (resolvedCmd === "!clearlearned") {
+        await nlpAdminCommands.clearLearned(message, args, nlpLearningSystem);
+      } else if (resolvedCmd === "!myprofile") {
+        await nlpAdminCommands.showMyProfile(message, nlpLearningSystem);
       }
       return;
     }
