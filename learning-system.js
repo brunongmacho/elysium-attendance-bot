@@ -71,6 +71,8 @@ class LearningSystem {
     this.cache = {
       metrics: null,
       lastUpdate: 0,
+      marketState: null,
+      marketStateLastUpdate: 0,
     };
   }
 
@@ -110,6 +112,57 @@ class LearningSystem {
   }
 
   /**
+   * Get cached market state (bidding points data)
+   * @param {boolean} useCache - Whether to use cached data
+   * @returns {Promise<Object|null>} Market state data or null
+   */
+  async getMarketState(useCache = true) {
+    try {
+      // Check cache
+      const now = Date.now();
+      if (useCache && this.cache.marketState && (now - this.cache.marketStateLastUpdate) < LEARNING_CONFIG.CACHE_DURATION) {
+        return this.cache.marketState;
+      }
+
+      const resp = await this.sheetAPI.call('getBiddingPoints', {});
+      // Handle both nested and top-level response shapes, plus legacy points map
+      const d = resp?.data ?? resp;
+      const members = Array.isArray(d?.members) ? d.members : [];
+      const fallbackFromMap = d?.points && typeof d.points === 'object'
+        ? Object.entries(d.points).map(([username, pointsLeft]) => ({ username, pointsLeft, biddingPoints: 0, totalSpent: 0 }))
+        : [];
+      const m = members.length ? members : fallbackFromMap;
+
+      if (m.length > 0) {
+        const points = m.map(x => x.pointsLeft ?? 0);
+        const consumed = m.map(x => x.totalSpent ?? 0);
+
+        const pointsSum = points.reduce((a, b) => a + b, 0);
+        const consumedSum = consumed.reduce((a, b) => a + b, 0);
+
+        const marketState = {
+          totalMembers: m.length,
+          avgPointsPerMember: points.length ? pointsSum / points.length : 0,
+          medianPoints: this.median(points),
+          totalPointsInEconomy: pointsSum,
+          avgPointsConsumed: consumed.length ? consumedSum / consumed.length : 0,
+          economyActivity: (pointsSum + consumedSum) ? (consumedSum / (pointsSum + consumedSum)) : 0,
+        };
+
+        // Update cache
+        this.cache.marketState = marketState;
+        this.cache.marketStateLastUpdate = now;
+
+        return marketState;
+      }
+      return null;
+    } catch (e) {
+      // Silently skip if market state unavailable
+      return null;
+    }
+  }
+
+  /**
    * ENHANCED: Enrich features with temporal, market, and behavioral context
    * With 60GB storage, we can store comprehensive data for robust ML
    * @param {Object} baseFeatures - Base features from prediction
@@ -137,36 +190,11 @@ class LearningSystem {
       };
     }
 
-    // MARKET STATE (current guild economy)
+    // MARKET STATE (current guild economy) - USE CACHE
     if (LEARNING_CONFIG.INCLUDE_MARKET_STATE) {
-      try {
-        const resp = await this.sheetAPI.call('getBiddingPoints', {});
-        // Handle both nested and top-level response shapes, plus legacy points map
-        const d = resp?.data ?? resp;
-        const members = Array.isArray(d?.members) ? d.members : [];
-        const fallbackFromMap = d?.points && typeof d.points === 'object'
-          ? Object.entries(d.points).map(([username, pointsLeft]) => ({ username, pointsLeft, biddingPoints: 0, totalSpent: 0 }))
-          : [];
-        const m = members.length ? members : fallbackFromMap;
-
-        if (m.length > 0) {
-          const points = m.map(x => x.pointsLeft ?? 0);
-          const consumed = m.map(x => x.totalSpent ?? 0);
-
-          const pointsSum = points.reduce((a, b) => a + b, 0);
-          const consumedSum = consumed.reduce((a, b) => a + b, 0);
-
-          enriched.marketState = {
-            totalMembers: m.length,
-            avgPointsPerMember: points.length ? pointsSum / points.length : 0,
-            medianPoints: this.median(points),
-            totalPointsInEconomy: pointsSum,
-            avgPointsConsumed: consumed.length ? consumedSum / consumed.length : 0,
-            economyActivity: (pointsSum + consumedSum) ? (consumedSum / (pointsSum + consumedSum)) : 0,
-          };
-        }
-      } catch (e) {
-        // Silently skip if market state unavailable
+      const marketState = await this.getMarketState(true);
+      if (marketState) {
+        enriched.marketState = marketState;
       }
     }
 
