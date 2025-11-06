@@ -12,6 +12,12 @@
  */
 
 // ═══════════════════════════════════════════════════════════════════════════
+// IMPORTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+const { PointsCache } = require('./utils/points-cache');
+
+// ═══════════════════════════════════════════════════════════════════════════
 // CONVERSATIONAL PATTERNS
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -386,12 +392,10 @@ class ConversationalAI {
         totalUsers: 0,
       };
 
-      // Get points
+      // Get points using PointsCache for O(1) lookup
       if (pointsData && pointsData.points) {
-        const userKey = Object.keys(pointsData.points).find(
-          k => k.toLowerCase() === username.toLowerCase()
-        );
-        stats.points = userKey ? (pointsData.points[userKey] || 0) : 0;
+        const pointsCache = new PointsCache(pointsData.points);
+        stats.points = pointsCache.getPoints(username);
       }
 
       // Get attendance rank and points
@@ -427,10 +431,10 @@ class ConversationalAI {
    * Generate genius stat-based trash talk with 500+ varieties
    * Mix-and-match system for maximum comedy and variety
    * @param {Object} stats - User statistics
-   * @param {string} username - Discord username
+   * @param {Message} message - Discord message object (to get nickname and mention)
    * @returns {string} Personalized roast
    */
-  generateStatBasedRoast(stats, username) {
+  generateStatBasedRoast(stats, message) {
     // Helper to pick random element
     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -440,31 +444,35 @@ class ConversationalAI {
       return parts.join(' ');
     };
 
+    // Get nickname (guild nick > display name > username) and mention
+    const nickname = message.member?.displayName || message.author.displayName || message.author.username;
+    const mention = `<@${message.author.id}>`;
+
     // ═══════════════════════════════════════════════════════════════════════
     // ROAST COMPONENTS - Mix and match for 500+ combinations!
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Opening reactions (120 varieties)
+    // Opening reactions (120 varieties) - Now with mentions!
     const openings = {
       shock: [
-        `YOOOOO! ${username}!`, `BRUH! ${username}!`, `AY PUTANGINA! ${username}!`, `WAIT WAIT WAIT! ${username}!`,
-        `HAHAHAHA! ${username}!`, `OMG! ${username}!`, `TANGINA NAMAN! ${username}!`, `GRABE! ${username}!`,
-        `HOY GAGO! ${username}!`, `LMAO! ${username}!`, `BRO! ${username}!`, `DUDE! ${username}!`,
-        `EXCUSE ME?! ${username}!`, `SAY WHAT?! ${username}!`, `YAWA! ${username}!`, `LECHE! ${username}!`,
+        `YOOOOO! ${mention}!`, `BRUH! ${mention}!`, `AY PUTANGINA! ${mention}!`, `WAIT WAIT WAIT! ${mention}!`,
+        `HAHAHAHA! ${mention}!`, `OMG! ${mention}!`, `TANGINA NAMAN! ${mention}!`, `GRABE! ${mention}!`,
+        `HOY GAGO! ${mention}!`, `LMAO! ${mention}!`, `BRO! ${mention}!`, `DUDE! ${mention}!`,
+        `EXCUSE ME?! ${mention}!`, `SAY WHAT?! ${mention}!`, `YAWA! ${mention}!`, `LECHE! ${mention}!`,
       ],
       question: [
-        `${username}, talaga ba?`, `${username}, seryoso ka?`, `${username}, totoo ba yan?`, `${username}, sure ka dyan?`,
-        `${username}, alam mo ba?`, `${username}, you sure about that?`, `${username}, for real?`, `${username}, is this a joke?`,
-        `${username}, nakalimutan mo ba?`, `${username}, did you forget?`, `${username}, aware ka ba?`, `${username}, realize mo ba?`,
+        `${mention}, talaga ba?`, `${mention}, seryoso ka?`, `${mention}, totoo ba yan?`, `${mention}, sure ka dyan?`,
+        `${mention}, alam mo ba?`, `${mention}, you sure about that?`, `${mention}, for real?`, `${mention}, is this a joke?`,
+        `${mention}, nakalimutan mo ba?`, `${mention}, did you forget?`, `${mention}, aware ka ba?`, `${mention}, realize mo ba?`,
       ],
       sarcastic: [
-        `Oh wow, ${username} the LEGEND!`, `Look everyone, it's ${username}!`, `Eto na, si ${username}!`, `Nandito na pala si ${username}!`,
-        `The AUDACITY of ${username}!`, `${username} really out here!`, `Ang tapang naman ni ${username}!`, `${username} feeling main character!`,
-        `BREAKING NEWS: ${username} speaks!`, `Everyone bow down to ${username}!`, `All hail ${username}!`, `Aba, si ${username} pala!`,
+        `Oh wow, ${mention} the LEGEND!`, `Look everyone, it's ${mention}!`, `Eto na, si ${mention}!`, `Nandito na pala si ${mention}!`,
+        `The AUDACITY of ${mention}!`, `${mention} really out here!`, `Ang tapang naman ni ${mention}!`, `${mention} feeling main character!`,
+        `BREAKING NEWS: ${mention} speaks!`, `Everyone bow down to ${mention}!`, `All hail ${mention}!`, `Aba, si ${mention} pala!`,
       ],
       direct: [
-        `${username},`, `Listen ${username},`, `Pakinggan mo ${username},`, `Look ${username},`,
-        `Real talk ${username},`, `Let me tell you ${username},`, `Check this ${username},`, `Tanungin kita ${username},`,
+        `${mention},`, `Listen ${mention},`, `Pakinggan mo ${mention},`, `Look ${mention},`,
+        `Real talk ${mention},`, `Let me tell you ${mention},`, `Check this ${mention},`, `Tanungin kita ${mention},`,
       ],
     };
 
@@ -589,35 +597,35 @@ class ConversationalAI {
 
     const completeRoasts = [];
 
-    // Generate stat-specific complete roasts
+    // Generate stat-specific complete roasts (with mentions!)
     if (stats.points !== null) {
       if (stats.points === 0) {
         completeRoasts.push(
-          `${username} got ZERO POINTS and still talking! 😂 That's like being broke AND loud! The worst combo! 💀`,
-          `ZERO POINTS?! ${username}, you're not just broke, you're BANKRUPT! File for Chapter 11! 📉`,
-          `Hoy ${username}! ZERO balance tapos trash talk pa?! Kahit mga bato sa daan may mas mahabang value! 🪨`,
-          `${username} with 0 points trying to roast me! Bro, you can't even afford to EXIST! 👻`,
+          `${mention} got ZERO POINTS and still talking! 😂 That's like being broke AND loud! The worst combo! 💀`,
+          `ZERO POINTS?! ${mention}, you're not just broke, you're BANKRUPT! File for Chapter 11! 📉`,
+          `Hoy ${mention}! ZERO balance tapos trash talk pa?! Kahit mga bato sa daan may mas mahabang value! 🪨`,
+          `${mention} with 0 points trying to roast me! Bro, you can't even afford to EXIST! 👻`,
         );
       } else if (stats.points < 50) {
         completeRoasts.push(
-          `${username} flexing **${stats.points} points** like it's something! Bro, that's lunch money! 🍔`,
-          `**${stats.points} points**?! ${username}, vendors won't even LOOK at you! Window shopping lang! 🪟`,
+          `${mention} flexing **${stats.points} points** like it's something! Bro, that's lunch money! 🍔`,
+          `**${stats.points} points**?! ${mention}, vendors won't even LOOK at you! Window shopping lang! 🪟`,
           `${pick(openings.shock)} **${stats.points} points** lang tapos ang tapang! Vendor trash ka lang! 🗑️`,
-          `${username}'s **${stats.points} points** balance! That's not a flex, that's a CRY for HELP! 📞`,
-          `LMAOOOO! ${username} got **${stats.points} points** but acting like they got the guild bank! 🏦💀`,
+          `**${nickname}'s ${stats.points} points** balance! That's not a flex, that's a CRY for HELP! 📞`,
+          `LMAOOOO! ${mention} got **${stats.points} points** but acting like they got the guild bank! 🏦💀`,
         );
       } else if (stats.points < 100) {
         completeRoasts.push(
-          `${username} out here with **${stats.points} points** talking BIG! That's barely ONE bid, sit down! 🪑`,
-          `**${stats.points} points**?! ${username}, di ka pa boss drop level! You're NORMAL MOB tier! 👹`,
-          `Grabe ${username}! **${stats.points} points** tapos magjudge?! Bahay-bahayan lang! 🏠`,
-          `${username}'s **${stats.points} points** can't even get good RNG! Budget problems! 💸`,
+          `${mention} out here with **${stats.points} points** talking BIG! That's barely ONE bid, sit down! 🪑`,
+          `**${stats.points} points**?! ${mention}, di ka pa boss drop level! You're NORMAL MOB tier! 👹`,
+          `Grabe ${mention}! **${stats.points} points** tapos magjudge?! Bahay-bahayan lang! 🏠`,
+          `**${nickname}'s ${stats.points} points** can't even get good RNG! Budget problems! 💸`,
         );
       } else if (stats.points < 300) {
         completeRoasts.push(
-          `${username} with **${stats.points} points** acting rich! Bro, that's STILL broke! Middle class delusion! 🎭`,
-          `**${stats.points} points**! ${username} thinks they're ballin'! That's one failed bid away from poverty! 📉`,
-          `${username}, **${stats.points} points** is NOT the flex you think it is! Still bottom 50%! 📊`,
+          `${mention} with **${stats.points} points** acting rich! Bro, that's STILL broke! Middle class delusion! 🎭`,
+          `**${stats.points} points**! ${mention} thinks they're ballin'! That's one failed bid away from poverty! 📉`,
+          `${mention}, **${stats.points} points** is NOT the flex you think it is! Still bottom 50%! 📊`,
         );
       }
     }
@@ -628,25 +636,25 @@ class ConversationalAI {
 
       if (stats.attendanceRank === stats.totalUsers) {
         completeRoasts.push(
-          `🚨 EMERGENCY! 🚨 ${username} is DEAD LAST (#${stats.totalUsers}/${stats.totalUsers}) and STILL trash talking! The CONFIDENCE! 😂`,
-          `${username} ranked #${stats.totalUsers} out of ${stats.totalUsers}! You're not just last, you're EPICALLY last! 🏆💩`,
-          `LAST PLACE ${username}! Congrats on your participation trophy! Should we frame your #${stats.totalUsers} rank?! 🖼️`,
-          `Hoy ${username}! LAST PLACE ka (#${stats.totalUsers}) tapos may lakas ka pang mang-bash?! Tutorial mo ba to?! 📖`,
-          `${username}'s rank: #${stats.totalUsers}/${stats.totalUsers}! Even the leaderboard tried to delete you! 🗑️`,
-          `BREAKING: ${username} sets RECORD for being #${stats.totalUsers}! Worst attendance NA! 📰`,
+          `🚨 EMERGENCY! 🚨 ${mention} is DEAD LAST (#${stats.totalUsers}/${stats.totalUsers}) and STILL trash talking! The CONFIDENCE! 😂`,
+          `${mention} ranked #${stats.totalUsers} out of ${stats.totalUsers}! You're not just last, you're EPICALLY last! 🏆💩`,
+          `LAST PLACE ${mention}! Congrats on your participation trophy! Should we frame your #${stats.totalUsers} rank?! 🖼️`,
+          `Hoy ${mention}! LAST PLACE ka (#${stats.totalUsers}) tapos may lakas ka pang mang-bash?! Tutorial mo ba to?! 📖`,
+          `**${nickname}'s rank:** #${stats.totalUsers}/${stats.totalUsers}! Even the leaderboard tried to delete you! 🗑️`,
+          `BREAKING: ${mention} sets RECORD for being #${stats.totalUsers}! Worst attendance NA! 📰`,
         );
       } else if (percentage > 80) {
         completeRoasts.push(
-          `${username} ranked #${stats.attendanceRank}/${stats.totalUsers}! BOTTOM 20%! You're basically furniture! 🪑`,
-          `#${stats.attendanceRank} out of ${stats.totalUsers}?! ${username}, you're the BENCH! The ACTUAL bench! 🏗️`,
-          `${username} sa bottom tier (#${stats.attendanceRank}) pero ang attitude TOP TIER?! MISMATCHED! 🎭`,
-          `Rank #${stats.attendanceRank}! ${username}, you're closer to LAST than to FIRST! Think about that! 🤔`,
+          `${mention} ranked #${stats.attendanceRank}/${stats.totalUsers}! BOTTOM 20%! You're basically furniture! 🪑`,
+          `#${stats.attendanceRank} out of ${stats.totalUsers}?! ${mention}, you're the BENCH! The ACTUAL bench! 🏗️`,
+          `${mention} sa bottom tier (#${stats.attendanceRank}) pero ang attitude TOP TIER?! MISMATCHED! 🎭`,
+          `Rank #${stats.attendanceRank}! ${mention}, you're closer to LAST than to FIRST! Think about that! 🤔`,
         );
       } else if (percentage > 50) {
         completeRoasts.push(
-          `${username} ranked #${stats.attendanceRank}/${stats.totalUsers}! BELOW AVERAGE confirmed! The math don't lie! 📐`,
+          `${mention} ranked #${stats.attendanceRank}/${stats.totalUsers}! BELOW AVERAGE confirmed! The math don't lie! 📐`,
           `${pick(openings.sarcastic)} Rank #${stats.attendanceRank}! Bottom half energy! 📉`,
-          `${username}'s #${stats.attendanceRank}! Mas mataas pa yung price ng brown items sa rank mo! 💩`,
+          `**${nickname}'s #${stats.attendanceRank}**! Mas mataas pa yung price ng brown items sa rank mo! 💩`,
         );
       }
     }
@@ -654,25 +662,25 @@ class ConversationalAI {
     // Low attendance roasts
     if (stats.attendancePoints !== null && stats.attendancePoints < 50) {
       completeRoasts.push(
-        `${username} got **${stats.attendancePoints} attendance points**! Bro, AFK ka ba since CREATION?! 🌍`,
-        `**${stats.attendancePoints} attendance**?! ${username}, you're basically a GHOST MEMBER! Guild legends! 👻`,
+        `${mention} got **${stats.attendancePoints} attendance points**! Bro, AFK ka ba since CREATION?! 🌍`,
+        `**${stats.attendancePoints} attendance**?! ${mention}, you're basically a GHOST MEMBER! Guild legends! 👻`,
         `${pick(openings.shock)} **${stats.attendancePoints} attendance points**! Present ka ba talaga EVER?! 🤔`,
-        `${username}'s **${stats.attendancePoints} attendance**! You exist in theory only! Schrodinger's member! 🐱`,
-        `**${stats.attendancePoints} attendance**! ${username}, even INACTIVE members show up more! 💤`,
-        `Hoy ${username}! **${stats.attendancePoints} attendance points** lang?! Absent king! Absent queen! 👑`,
+        `**${nickname}'s ${stats.attendancePoints} attendance**! You exist in theory only! Schrodinger's member! 🐱`,
+        `**${stats.attendancePoints} attendance**! ${mention}, even INACTIVE members show up more! 💤`,
+        `Hoy ${mention}! **${stats.attendancePoints} attendance points** lang?! Absent king! Absent queen! 👑`,
       );
     }
 
     // ULTRA COMBO ROASTS (Multiple weaknesses)
     if (stats.points < 100 && stats.attendanceRank && stats.attendanceRank > stats.totalUsers * 0.7) {
       completeRoasts.push(
-        `🌪️ PERFECT STORM! 🌪️ ${username}: **${stats.points} points** + #${stats.attendanceRank} rank! DOUBLE BOTTOM TIER! The ULTIMATE failure! 💀`,
-        `Wait... ${username} got **${stats.points} points** AND rank #${stats.attendanceRank}?! That's IMPRESSIVELY bad! How?! 😂`,
-        `${username}'s resume: ❌ Broke (**${stats.points}pts**) ❌ Last tier (#${stats.attendanceRank}) ❌ Still talking! CERTIFIED L! 📋`,
-        `TANGINA! ${username}! **${stats.points} points** + **#${stats.attendanceRank}** ranking = GUILD'S WEAKEST LINK! 🔗`,
-        `${username}: Points: **${stats.points}** 📉 | Rank: **#${stats.attendanceRank}** 📊 | Trash Talk: **∞** 💩 | Self-Awareness: **0** 🤡`,
-        `Bro ${username}, **${stats.points} points** + #${stats.attendanceRank} placement! You're SPEED-RUNNING to being kicked! 🏃`,
-        `${username} collected ALL the L's! **${stats.points}pts** + #${stats.attendanceRank} rank! L + L = 💀`,
+        `🌪️ PERFECT STORM! 🌪️ ${mention}: **${stats.points} points** + #${stats.attendanceRank} rank! DOUBLE BOTTOM TIER! The ULTIMATE failure! 💀`,
+        `Wait... ${mention} got **${stats.points} points** AND rank #${stats.attendanceRank}?! That's IMPRESSIVELY bad! How?! 😂`,
+        `**${nickname}'s resume:** ❌ Broke (**${stats.points}pts**) ❌ Last tier (#${stats.attendanceRank}) ❌ Still talking! CERTIFIED L! 📋`,
+        `TANGINA! ${mention}! **${stats.points} points** + **#${stats.attendanceRank}** ranking = GUILD'S WEAKEST LINK! 🔗`,
+        `${mention}: Points: **${stats.points}** 📉 | Rank: **#${stats.attendanceRank}** 📊 | Trash Talk: **∞** 💩 | Self-Awareness: **0** 🤡`,
+        `Bro ${mention}, **${stats.points} points** + #${stats.attendanceRank} placement! You're SPEED-RUNNING to being kicked! 🏃`,
+        `${mention} collected ALL the L's! **${stats.points}pts** + #${stats.attendanceRank} rank! L + L = 💀`,
       );
     }
 
@@ -706,21 +714,21 @@ class ConversationalAI {
     } else if (!stats.points && !stats.attendanceRank) {
       // No data
       return pick([
-        `${username}? WHO?! 🤔 You're not even in my database! Bagong member ka lang at akala mo alam mo na lahat?! 👶`,
-        `Can't find ${username}'s stats! 👻 Either you're SO bad the system deleted you OR you don't exist! 💀`,
-        `${username} not found! 404 ERROR! You're so irrelevant even my database gave up! 🗑️`,
-        `Sino ba yan si ${username}?! Wala sa records! Imaginary friend vibes! 🦄`,
-        `${pick(openings.shock)} ${username}, wala kang data pero ang lakas ng trash talk! Exist ka muna! 📊`,
+        `${mention}? WHO?! 🤔 You're not even in my database! Bagong member ka lang at akala mo alam mo na lahat?! 👶`,
+        `Can't find ${nickname}'s stats! 👻 Either you're SO bad the system deleted you OR you don't exist! 💀`,
+        `${mention} not found! 404 ERROR! You're so irrelevant even my database gave up! 🗑️`,
+        `Sino ba yan si ${mention}?! Wala sa records! Imaginary friend vibes! 🦄`,
+        `${pick(openings.shock)} ${mention}, wala kang data pero ang lakas ng trash talk! Exist ka muna! 📊`,
       ]);
     } else {
       // Decent stats but still trash talking
       return pick([
-        `Oh wow! ${username} got DECENT stats but TRASH personality! 😬 Money can't buy class! 💳`,
-        `${username}'s stats: ✅ Good! Attitude: ❌ BASURA! 🗑️ Fix yourself! 🔧`,
-        `Ayos naman stats ni ${username} pero ugali?! NEGATIVE! 📉 Mag-reflect! 🪞`,
-        `${username} proving you can have GOOD stats and ZERO class! 🎩 Impressive! 👏`,
+        `Oh wow! ${mention} got DECENT stats but TRASH personality! 😬 Money can't buy class! 💳`,
+        `${nickname}'s stats: ✅ Good! Attitude: ❌ BASURA! 🗑️ Fix yourself! 🔧`,
+        `Ayos naman stats ni ${mention} pero ugali?! NEGATIVE! 📉 Mag-reflect! 🪞`,
+        `${mention} proving you can have GOOD stats and ZERO class! 🎩 Impressive! 👏`,
         `${pick(openings.sarcastic)} Good stats pero TOXIC! You're the whole RED FLAG! 🚩`,
-        `${username} got points but NO chill! 😤 Relax bro! !leaderboard won't make you #1 in LIFE! 🌎`,
+        `${mention} got points but NO chill! 😤 Relax bro! !leaderboard won't make you #1 in LIFE! 🌎`,
       ]);
     }
 
@@ -754,7 +762,7 @@ class ConversationalAI {
               console.log(`🔥 [Trash Talk] ${username} is getting roasted with stats!`);
               const stats = await this.getUserStats(username);
               if (stats) {
-                const statRoast = this.generateStatBasedRoast(stats, username);
+                const statRoast = this.generateStatBasedRoast(stats, message);
                 console.log(`🔥 [Trash Talk] Generated stat-based roast for ${username}`);
                 return statRoast;
               }
