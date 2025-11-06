@@ -226,6 +226,164 @@ const accuracy = (predicted === actual) ? 100 : 0;
 }
 ```
 
+#### D. Boss Spawn Prediction (`boss_spawn`) 🆕
+
+**What**: Predicts when bosses will spawn next based on historical spawn patterns
+
+**Why**: Helps guild prepare for events, notify members in advance, optimize raid schedules
+
+**How**:
+1. Track historical boss spawn times (from attendance records)
+2. Calculate average spawn interval for each boss
+3. Detect patterns (e.g., weekly, bi-weekly, specific day/time)
+4. Predict next spawn time with confidence
+5. Update accuracy when boss actually spawns
+
+**Features Tracked**:
+```javascript
+{
+  avgInterval: 604800000,    // 7 days in milliseconds
+  stdDev: 43200000,          // 0.5 days standard deviation
+  historicalSpawns: 25,      // 25 past spawns recorded
+  dayOfWeek: 6,              // Saturday (0-6)
+  timeOfDay: 12,             // 12 PM
+  consistency: 0.92          // Very consistent spawn pattern
+}
+```
+
+**Accuracy Calculation**:
+```javascript
+// For time-based predictions (boss spawn)
+const predictedTime = new Date('2025-11-13 12:00');
+const actualTime = new Date('2025-11-13 14:30');
+const diffHours = Math.abs(predictedTime - actualTime) / (1000 * 60 * 60);
+
+// Accuracy based on time difference
+let accuracy = 0;
+if (diffHours <= 1) {
+  accuracy = 100;  // Within 1 hour = perfect
+} else if (diffHours <= 6) {
+  accuracy = 90 - (diffHours - 1) * 2;  // 90-80%
+} else if (diffHours <= 24) {
+  accuracy = 80 - (diffHours - 6) * 2;  // 80-44%
+} else {
+  accuracy = Math.max(0, 40 - (diffHours - 24));  // <40%
+}
+```
+
+**Implementation Example**:
+```javascript
+// Track boss spawn
+async onBossSpawn(bossName, spawnTime) {
+  // Get historical spawn times
+  const history = await getAttendanceRecords(bossName);
+  const spawnTimes = history.map(r => new Date(r.timestamp));
+
+  // Calculate intervals between spawns
+  const intervals = [];
+  for (let i = 1; i < spawnTimes.length; i++) {
+    intervals.push(spawnTimes[i] - spawnTimes[i-1]);
+  }
+
+  // Analyze pattern
+  const avgInterval = calculateMean(intervals);
+  const stdDev = calculateStdDev(intervals);
+  const dayOfWeek = spawnTime.getDay();
+  const timeOfDay = spawnTime.getHours();
+
+  // Predict next spawn
+  const predictedNextSpawn = new Date(
+    spawnTime.getTime() + avgInterval
+  );
+
+  // Calculate confidence
+  const consistency = 1 - (stdDev / avgInterval);  // High consistency = low stdDev
+  const confidence = Math.min(95, consistency * 100);
+
+  // Save prediction
+  await learningSystem.savePrediction(
+    'boss_spawn',
+    bossName,
+    predictedNextSpawn.toISOString(),
+    confidence,
+    {
+      avgInterval: avgInterval,
+      stdDev: stdDev,
+      historicalSpawns: spawnTimes.length,
+      dayOfWeek: dayOfWeek,
+      timeOfDay: timeOfDay,
+      consistency: consistency
+    }
+  );
+
+  // Notify admins
+  console.log(`📅 Predicted next ${bossName} spawn: ${predictedNextSpawn}`);
+  console.log(`📊 Confidence: ${confidence.toFixed(1)}% (based on ${spawnTimes.length} past spawns)`);
+  console.log(`⏱️ Average interval: ${(avgInterval / (24*60*60*1000)).toFixed(1)} days`);
+}
+
+// When boss actually spawns, update accuracy
+async onActualBossSpawn(bossName, actualSpawnTime) {
+  const updated = await learningSystem.updatePredictionAccuracy(
+    'boss_spawn',
+    bossName,
+    actualSpawnTime.toISOString()
+  );
+
+  if (updated) {
+    console.log(`🧠 Boss spawn prediction accuracy updated!`);
+    console.log(`Bot is learning ${bossName} spawn patterns...`);
+  }
+}
+```
+
+**Use Cases**:
+
+1. **Event Scheduling**:
+```
+!predictspawn Ragnaros
+→ Next Ragnaros spawn predicted: Saturday, Nov 13 at 12:00 PM
+→ Confidence: 92% (based on 25 past spawns)
+→ Pattern: Spawns every Saturday at noon ±30min
+```
+
+2. **Member Notifications**:
+```
+Proactive Intelligence sends to admin logs (48h before predicted spawn):
+"⚠️ @here Ragnaros expected to spawn Saturday 12 PM (92% confidence)
+Notify guild members to prepare!"
+```
+
+3. **Anomaly Detection**:
+```
+If boss spawns 3+ days earlier than predicted:
+"🚨 @here Anomaly detected! Ragnaros spawned Wednesday instead of Saturday.
+This breaks the weekly pattern. Update spawn schedules?"
+```
+
+4. **Spawn Calendar**:
+```
+!spawnschedule
+→ Upcoming Boss Spawns (Predicted):
+→ Ragnaros:    Sat Nov 13, 12:00 PM (92% confidence)
+→ Onyxia:      Thu Nov 11, 8:00 PM (85% confidence)
+→ Nefarian:    Sun Nov 14, 6:00 PM (78% confidence)
+```
+
+**Benefits**:
+- ✅ Guild knows when to expect bosses
+- ✅ Better raid scheduling and member availability
+- ✅ Advance warnings (48h+) for preparation
+- ✅ Detects when spawn patterns change
+- ✅ Bot learns each boss's unique spawn pattern
+- ✅ Accuracy improves as more spawns are recorded
+
+**Required Data**:
+- Historical attendance records with timestamps
+- At least 5 past spawns for initial prediction
+- 10+ past spawns for confident predictions
+- Consistent spawn tracking (don't miss spawns!)
+
 ### 3. Confidence Adjustment Algorithm
 
 The learning system **automatically adjusts confidence** based on historical accuracy.
