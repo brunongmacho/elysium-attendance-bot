@@ -740,17 +740,50 @@ class IntelligenceEngine {
         intervals.push(interval / (1000 * 60 * 60)); // Convert to hours
       }
 
-      // Calculate average interval and standard deviation
-      const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-      const variance = intervals.reduce((sum, interval) => sum + Math.pow(interval - avgInterval, 2), 0) / intervals.length;
+      // Filter outlier intervals using IQR method to remove anomalies
+      // (e.g., long gaps between spawn "seasons")
+      const sortedIntervals = [...intervals].sort((a, b) => a - b);
+      const q1Index = Math.floor(sortedIntervals.length * 0.25);
+      const q3Index = Math.floor(sortedIntervals.length * 0.75);
+      const q1 = sortedIntervals[q1Index];
+      const q3 = sortedIntervals[q3Index];
+      const iqr = q3 - q1;
+
+      // Filter out intervals beyond 1.5 * IQR (standard outlier detection)
+      const lowerBound = q1 - (1.5 * iqr);
+      const upperBound = q3 + (1.5 * iqr);
+      const filteredIntervals = intervals.filter(interval =>
+        interval >= lowerBound && interval <= upperBound
+      );
+
+      // If filtering removed too many intervals, fall back to using all intervals
+      const intervalsToUse = filteredIntervals.length >= 3 ? filteredIntervals : intervals;
+
+      // Use median interval for more robust prediction (less affected by outliers)
+      const medianInterval = this.calculateMedian(intervalsToUse);
+
+      // Also calculate mean for comparison
+      const avgInterval = intervalsToUse.reduce((a, b) => a + b, 0) / intervalsToUse.length;
+
+      // Weight recent intervals more heavily (70% recent, 30% overall)
+      const recentCount = Math.min(5, Math.floor(intervalsToUse.length * 0.3));
+      const recentIntervals = intervals.slice(-recentCount);
+      const recentAvg = recentIntervals.reduce((a, b) => a + b, 0) / recentIntervals.length;
+
+      // Combine median with recent trend
+      const predictedInterval = (medianInterval * 0.7) + (recentAvg * 0.3);
+
+      // Calculate standard deviation on filtered intervals
+      const variance = intervalsToUse.reduce((sum, interval) =>
+        sum + Math.pow(interval - avgInterval, 2), 0) / intervalsToUse.length;
       const stdDev = Math.sqrt(variance);
 
       // Predict next spawn time
       const lastSpawn = relevantSpawns[relevantSpawns.length - 1].timestamp;
-      const predictedNextSpawn = new Date(lastSpawn.getTime() + (avgInterval * 60 * 60 * 1000));
+      const predictedNextSpawn = new Date(lastSpawn.getTime() + (predictedInterval * 60 * 60 * 1000));
 
       // Calculate confidence based on consistency of intervals
-      const baseConfidence = this.calculateSpawnConfidence(intervals.length, stdDev, avgInterval);
+      const baseConfidence = this.calculateSpawnConfidence(intervalsToUse.length, stdDev, medianInterval);
 
       // Adjust confidence based on historical accuracy (learning system)
       const adjustedConfidence = await this.learningSystem.adjustConfidence('spawn_prediction', baseConfidence);
@@ -759,9 +792,11 @@ class IntelligenceEngine {
       const features = {
         bossName: bossName || 'any',
         historicalSpawns: relevantSpawns.length,
-        avgIntervalHours: avgInterval,
+        avgIntervalHours: predictedInterval,
+        medianIntervalHours: medianInterval,
         stdDevHours: stdDev,
-        consistency: stdDev / avgInterval, // Lower = more consistent
+        consistency: stdDev / medianInterval, // Lower = more consistent
+        outliersRemoved: intervals.length - intervalsToUse.length,
       };
 
       await this.learningSystem.savePrediction(
@@ -772,16 +807,19 @@ class IntelligenceEngine {
         features
       );
 
-      // Calculate prediction range (±1 standard deviation)
-      const earliestTime = new Date(predictedNextSpawn.getTime() - (stdDev * 60 * 60 * 1000));
-      const latestTime = new Date(predictedNextSpawn.getTime() + (stdDev * 60 * 60 * 1000));
+      // Calculate prediction range using filtered stdDev, capped at reasonable bounds
+      // Cap the range at ±50% of predicted interval to avoid absurdly wide ranges
+      const maxRange = predictedInterval * 0.5;
+      const rangeHours = Math.min(stdDev, maxRange);
+      const earliestTime = new Date(predictedNextSpawn.getTime() - (rangeHours * 60 * 60 * 1000));
+      const latestTime = new Date(predictedNextSpawn.getTime() + (rangeHours * 60 * 60 * 1000));
 
       return {
         predictedTime: predictedNextSpawn,
         earliestTime,
         latestTime,
         confidence: adjustedConfidence,
-        avgIntervalHours: avgInterval,
+        avgIntervalHours: predictedInterval, // Use predicted interval (median + recent trend)
         lastSpawnTime: lastSpawn,
         basedOnSpawns: relevantSpawns.length,
         bossName: bossName || 'any boss',
