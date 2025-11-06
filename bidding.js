@@ -1830,11 +1830,33 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 
   // Handle previous winner (unlock their points)
   if (currentItem.curWin && !isSelf) {
-    unlock(currentItem.curWin, currentItem.curBid);
+    try {
+      unlock(currentItem.curWin, currentItem.curBid);
+    } catch (err) {
+      console.error(`❌ CRITICAL: Failed to unlock points for ${currentItem.curWin}:`, err);
+      // Log to admin but continue - don't block new bid
+      // This should be investigated as it may indicate state corruption
+    }
   }
 
   // Lock the new bid
-  lock(u, needed);
+  try {
+    lock(u, needed);
+  } catch (err) {
+    console.error(`❌ CRITICAL: Failed to lock points for ${u}:`, err);
+    // If we can't lock points, we MUST restore previous state
+    if (currentItem.curWin && !isSelf) {
+      try {
+        lock(currentItem.curWin, currentItem.curBid); // Re-lock previous winner
+      } catch (restoreErr) {
+        console.error(`❌ FATAL: Failed to restore previous state:`, restoreErr);
+      }
+    }
+    return {
+      status: "error",
+      msg: "⚠️ Failed to process bid - system error. Please contact admin.",
+    };
+  }
 
   // Store previous bid for display
   const prevBid = currentItem.curBid;
@@ -1859,11 +1881,20 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 
   let timeExtended = false;
   if (timeLeft < 60000 && timeLeft > 0 && currentItem.extCnt < ME) {
-    // STEP 1: Clear ALL timers IMMEDIATELY to prevent old itemEnd from firing
-    if (auctRef && typeof auctRef.safelyClearItemTimers === "function") {
-      auctRef.safelyClearItemTimers();
-      console.log(`🛑 Cleared timers to prevent race condition`);
+    // CRITICAL: Validate auctioneering module has required methods
+    if (!auctRef ||
+        typeof auctRef.safelyClearItemTimers !== "function" ||
+        typeof auctRef.rescheduleItemTimers !== "function") {
+      console.error("❌ Cannot extend time - auctioneering module missing critical timer methods");
+      return {
+        status: "error",
+        msg: "⚠️ Time extension failed - system error. Please contact admin.",
+      };
     }
+
+    // STEP 1: Clear ALL timers IMMEDIATELY to prevent old itemEnd from firing
+    auctRef.safelyClearItemTimers();
+    console.log(`🛑 Cleared timers to prevent race condition`);
 
     // STEP 2: Update endTime (now safe since timers are cleared)
     const extensionTime = 60000; // 1 minute
@@ -1880,18 +1911,20 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     console.log(`📊 New time left: ${Math.ceil((currentItem.endTime - Date.now()) / 1000)}s`);
 
     // STEP 3: Reschedule timers with new endTime
-    if (auctRef && typeof auctRef.rescheduleItemTimers === "function") {
-      auctRef.rescheduleItemTimers(
-        msg.client,
-        config,
-        msg.channel
-      );
-      console.log(`✅ Timers rescheduled with new endTime`);
-    }
+    auctRef.rescheduleItemTimers(
+      msg.client,
+      config,
+      msg.channel
+    );
+    console.log(`✅ Timers rescheduled with new endTime`);
   }
 
-  // Update via auctioneering module
-  if (auctRef && typeof auctRef.updateCurrentItemState === "function") {
+  // Update via auctioneering module - CRITICAL for state sync
+  if (!auctRef || typeof auctRef.updateCurrentItemState !== "function") {
+    console.error("❌ CRITICAL: Cannot sync state with auctioneering module");
+    // This is critical - if state doesn't sync, timers will use stale data
+    // Continue anyway but log the issue for investigation
+  } else {
     auctRef.updateCurrentItemState({
       curBid: bid,
       curWin: u,
@@ -2177,6 +2210,11 @@ async function procBid(msg, amt, cfg) {
       clearInterval(countdownInterval);
       if (st.th[`countdown_${conf.id}`]) {
         delete st.th[`countdown_${conf.id}`];
+      }
+      // CRITICAL: Also cleanup the pending confirmation to prevent stale processing
+      if (st.pc[conf.id]) {
+        delete st.pc[conf.id];
+        save(); // Persist state change
       }
     }
   }, 1000);

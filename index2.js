@@ -3521,19 +3521,43 @@ client.once(Events.ClientReady, async () => {
   console.log("🔨 Starting weekly Saturday auction scheduler...");
   auctioneering.scheduleWeeklySaturdayAuction(client, config);
 
-  // START PERIODIC GARBAGE COLLECTION (Memory Optimization)
+  // START AGGRESSIVE MEMORY MANAGEMENT (Optimized for 512MB RAM on Koyeb)
   if (global.gc) {
-    console.log("🧹 Starting periodic garbage collection (every 10 minutes)");
+    console.log("🧹 Starting aggressive memory management (every 5 minutes)");
+
+    // Enhanced garbage collection with memory pressure detection
     setInterval(() => {
-      global.gc();
       const memUsage = process.memoryUsage();
+      const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+      const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
+      const rssMB = Math.round(memUsage.rss / 1024 / 1024);
+      const memoryPressure = (heapUsedMB / heapTotalMB) * 100;
+
+      // Run garbage collection
+      global.gc();
+
+      // Log memory stats
       console.log(
-        `🧹 GC: Heap used: ${Math.round(
-          memUsage.heapUsed / 1024 / 1024
-        )}MB / ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`
+        `🧹 GC: Heap ${heapUsedMB}MB/${heapTotalMB}MB (${Math.round(memoryPressure)}%) | RSS: ${rssMB}MB`
       );
-    }, 10 * 60 * 1000); // Every 10 minutes
+
+      // Aggressive GC if memory pressure is high (>70%)
+      if (memoryPressure > 70) {
+        console.warn(`⚠️ HIGH MEMORY PRESSURE (${Math.round(memoryPressure)}%) - Running aggressive GC`);
+        global.gc();
+        global.gc(); // Second pass for aggressive collection
+      }
+
+      // Alert if approaching Koyeb 512MB limit
+      if (rssMB > 400) {
+        console.error(`🚨 MEMORY ALERT: ${rssMB}MB RSS (Limit: 512MB) - Consider restarting`);
+      }
+    }, 5 * 60 * 1000); // Every 5 minutes (more aggressive than 10)
+  } else {
+    console.warn("⚠️ Garbage collection not available. Run with --expose-gc flag.");
   }
+
+  console.log("✅ Bot initialization complete and ready for operations!");
 });
 
 // =====================================================================

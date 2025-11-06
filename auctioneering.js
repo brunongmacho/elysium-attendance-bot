@@ -3469,6 +3469,42 @@ function scheduleWeeklySaturdayAuction(client, config) {
 
     console.log(`${EMOJI.CLOCK} Next Saturday auction scheduled for: ${dayName}, ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${days}d ${hours}h ${minutes}m)`);
 
+    // Schedule announcement 15 minutes before auction
+    const ANNOUNCEMENT_LEAD_TIME = 15 * 60 * 1000; // 15 minutes
+    const announcementDelay = delay - ANNOUNCEMENT_LEAD_TIME;
+
+    if (announcementDelay > 0) {
+      setTimeout(async () => {
+        try {
+          console.log(`${EMOJI.BELL} Sending 15-minute auction warning to announcement channel...`);
+          const announcementChannel = await discordCache.getChannel('guild_announcement_channel_id').catch(() => null);
+
+          if (announcementChannel) {
+            await announcementChannel.send({
+              content: '@everyone',
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(0xffa500) // Orange
+                  .setTitle(`${EMOJI.AUCTION} Auction Starting Soon!`)
+                  .setDescription('The weekly auction will begin in **15 minutes**!')
+                  .addFields(
+                    { name: '⏰ Start Time', value: '<t:' + Math.floor(nextUTC.getTime() / 1000) + ':R>', inline: true },
+                    { name: '📍 Location', value: '<#' + config.bidding_channel_id + '>', inline: true }
+                  )
+                  .setFooter({ text: 'Prepare your points and get ready to bid!' })
+                  .setTimestamp()
+              ]
+            });
+            console.log(`${EMOJI.SUCCESS} Auction announcement sent to announcement channel`);
+          } else {
+            console.warn(`${EMOJI.WARNING} Could not fetch announcement channel for pre-auction warning`);
+          }
+        } catch (err) {
+          console.error(`${EMOJI.ERROR} Failed to send auction announcement:`, err);
+        }
+      }, announcementDelay);
+    }
+
     weeklyAuctionTimer = setTimeout(async () => {
       console.log(`${EMOJI.AUCTION} Saturday auction time! Starting auction...`);
 
