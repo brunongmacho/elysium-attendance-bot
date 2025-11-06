@@ -29,8 +29,10 @@
  *    - 75% similarity threshold for matches
  *    - Examples: "pints" → "points", "ilng" → "ilang"
  *
- * 4. SELF-IMPROVING PATTERNS
+ * 4. SELF-IMPROVING PATTERNS (Auto-Learning)
  *    - Learns patterns from user confirmations (✅ reactions)
+ *    - Auto-suggests commands for unrecognized phrases
+ *    - Uses fuzzy matching to guess intent (50%+ similarity)
  *    - Confidence scores improve over time (0.7 → 0.95+)
  *    - Patterns sync to Google Sheets every 5 minutes
  *    - Survives bot restarts (persistent storage)
@@ -49,7 +51,7 @@
 
 const axios = require('axios');
 const levenshtein = require('fast-levenshtein');
-const { NLPHandler } = require('./nlp-handler.js');
+const { NLPHandler, NLP_PATTERNS } = require('./nlp-handler.js');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -71,6 +73,8 @@ const LEARNING_CONFIG = {
     maxConfidence: 0.98,           // Maximum confidence cap
     minUsageForLearning: 2,        // Min times pattern used before learning
     decayRate: 0.02,               // Confidence decrease per failed interpretation
+    autoSuggest: true,             // Auto-suggest commands for unrecognized phrases
+    suggestionThreshold: 0.5,      // Min similarity (0-1) to suggest a command
   },
 
   // Fuzzy matching (handles typos and shortcuts)
@@ -294,6 +298,15 @@ class NLPLearningSystem {
       };
     }
 
+    // No interpretation found - try fuzzy matching to suggest commands (if enabled)
+    if (LEARNING_CONFIG.learning.autoSuggest && shouldRespond && this.shouldRespond(message)) {
+      const suggestion = this.suggestCommandForPhrase(content);
+      if (suggestion && suggestion.confidence >= LEARNING_CONFIG.learning.suggestionThreshold) {
+        // Offer to learn this pattern with user confirmation
+        await this.offerToLearnPattern(message, content, suggestion.command, suggestion.confidence);
+      }
+    }
+
     // No interpretation found
     this.stats.failedInterpretations++;
     return null;
@@ -425,6 +438,145 @@ class NLPLearningSystem {
 
     this.stats.patternsLearned++;
     console.log(`🧠 [NLP Learning] New pattern: "${key}" → ${command}`);
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // AUTO-LEARNING WITH USER CONFIRMATION
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Suggest what command a phrase might mean using fuzzy matching
+   */
+  suggestCommandForPhrase(phrase) {
+    const normalized = phrase.toLowerCase().trim();
+
+    // Get all known commands from static patterns
+    const allCommands = Object.keys(NLP_PATTERNS);
+
+    let bestMatch = null;
+    let highestScore = 0;
+
+    // Try fuzzy matching against command names and known patterns
+    for (const command of allCommands) {
+      // Check similarity to command name itself
+      const commandSimilarity = this.calculatePhraseSimilarity(normalized, command);
+      if (commandSimilarity > highestScore) {
+        highestScore = commandSimilarity;
+        bestMatch = `!${command}`;
+      }
+
+      // Check if any learned patterns for this command are similar
+      for (const [learnedPhrase, pattern] of this.learnedPatterns.entries()) {
+        if (pattern.command === `!${command}`) {
+          const phraseSimilarity = this.calculatePhraseSimilarity(normalized, learnedPhrase);
+          if (phraseSimilarity > highestScore) {
+            highestScore = phraseSimilarity;
+            bestMatch = `!${command}`;
+          }
+        }
+      }
+    }
+
+    if (bestMatch && highestScore >= 0.5) {
+      return {
+        command: bestMatch,
+        confidence: highestScore,
+        reasoning: `${(highestScore * 100).toFixed(0)}% similar to known patterns`,
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Calculate similarity between two phrases (word-level fuzzy matching)
+   */
+  calculatePhraseSimilarity(phrase1, phrase2) {
+    const words1 = phrase1.split(/\s+/);
+    const words2 = phrase2.split(/\s+/);
+
+    // Check for word overlap
+    let matches = 0;
+    for (const word1 of words1) {
+      for (const word2 of words2) {
+        const distance = levenshtein.get(word1, word2);
+        const maxLen = Math.max(word1.length, word2.length);
+        const similarity = 1 - (distance / maxLen);
+        if (similarity >= 0.7) {
+          matches++;
+          break;
+        }
+      }
+    }
+
+    // Similarity score based on word overlap
+    const totalWords = Math.max(words1.length, words2.length);
+    return matches / totalWords;
+  }
+
+  /**
+   * Offer to learn a pattern with user confirmation
+   */
+  async offerToLearnPattern(message, phrase, command, confidence) {
+    try {
+      // Don't offer to learn if we've already offered recently for this phrase
+      const key = phrase.toLowerCase().trim();
+      if (this.pendingConfirmations && this.pendingConfirmations.has(key)) {
+        return; // Already waiting for confirmation
+      }
+
+      // Send confirmation message
+      const confidencePercent = (confidence * 100).toFixed(0);
+      const reply = await message.reply(
+        `🤔 I'm not sure what you mean, but maybe you want **${command}**? (${confidencePercent}% confident)\n` +
+        `React with ✅ to teach me this, or ❌ to ignore.`
+      );
+
+      // Add reactions
+      await reply.react('✅');
+      await reply.react('❌');
+
+      // Track pending confirmation
+      if (!this.pendingConfirmations) {
+        this.pendingConfirmations = new Map();
+      }
+
+      this.pendingConfirmations.set(key, {
+        phrase,
+        command,
+        confidence,
+        messageId: reply.id,
+        userId: message.author.id,
+        timestamp: Date.now(),
+      });
+
+      // Set up reaction collector
+      const filter = (reaction, user) => {
+        return ['✅', '❌'].includes(reaction.emoji.name) && user.id === message.author.id;
+      };
+
+      const collector = reply.createReactionCollector({ filter, time: 60000, max: 1 });
+
+      collector.on('collect', async (reaction, user) => {
+        if (reaction.emoji.name === '✅') {
+          // Learn this pattern!
+          this.teachPattern(phrase, command, user.id);
+          await reply.edit(`✅ Got it! I'll remember that **"${phrase}"** means **${command}**`);
+          console.log(`🧠 [NLP Learning] User confirmed: "${phrase}" → ${command}`);
+        } else {
+          await reply.edit(`❌ Okay, I won't learn that.`);
+        }
+        this.pendingConfirmations.delete(key);
+      });
+
+      collector.on('end', () => {
+        // Clean up if no reaction
+        this.pendingConfirmations.delete(key);
+      });
+
+    } catch (error) {
+      console.error('🧠 [NLP Learning] Error offering pattern:', error);
+    }
   }
 
   // ═════════════════════════════════════════════════════════════════════════
