@@ -124,15 +124,18 @@ class IntelligenceEngine {
   /**
    * Predict optimal starting bid for an item based on historical data
    * @param {string} itemName - Name of the item
+   * @param {Array} cachedAuctionHistory - Optional pre-fetched auction history to avoid redundant API calls
    * @returns {Object} Prediction with confidence interval and reasoning
    */
-  async predictItemValue(itemName) {
+  async predictItemValue(itemName, cachedAuctionHistory = null) {
     try {
-      // Fetch historical auction data for this item
-      const historicalData = await this.getItemAuctionHistory(itemName);
+      // Fetch historical auction data for this item (use cache if available)
+      const historicalData = cachedAuctionHistory
+        ? this.filterAuctionHistoryByItem(itemName, cachedAuctionHistory)
+        : await this.getItemAuctionHistory(itemName);
 
       if (historicalData.length < INTELLIGENCE_CONFIG.MIN_HISTORICAL_SAMPLES) {
-        const suggestion = await this.suggestSimilarItemPrice(itemName);
+        const suggestion = await this.suggestSimilarItemPrice(itemName, cachedAuctionHistory);
         return {
           success: false,
           reason: `Insufficient data (${historicalData.length} auctions). Need at least ${INTELLIGENCE_CONFIG.MIN_HISTORICAL_SAMPLES}.`,
@@ -267,10 +270,33 @@ class IntelligenceEngine {
   }
 
   /**
-   * Suggest price based on similar items (when no direct history)
+   * Filter cached auction history for a specific item
+   * @param {string} itemName - Name of the item to filter for
+   * @param {Array} auctionHistory - Pre-fetched auction history data
+   * @returns {Array} Filtered auction data for this item
    */
-  async suggestSimilarItemPrice(itemName) {
-    const allHistory = await this.getAllAuctionHistory();
+  filterAuctionHistoryByItem(itemName, auctionHistory) {
+    // Normalize item name for matching
+    const normalizedName = this.normalizeItemName(itemName);
+
+    // Find all auctions for this item
+    const matches = auctionHistory.filter(row => {
+      const rowItemName = this.normalizeItemName(row.itemName || '');
+      return rowItemName === normalizedName ||
+             this.calculateStringSimilarity(rowItemName, normalizedName) > 0.8;
+    });
+
+    // Return filtered data (already in correct format from getAllAuctionHistory)
+    return matches.filter(a => a.winningBid > 0);
+  }
+
+  /**
+   * Suggest price based on similar items (when no direct history)
+   * @param {string} itemName - Name of the item
+   * @param {Array} cachedAuctionHistory - Optional pre-fetched auction history to avoid redundant API calls
+   */
+  async suggestSimilarItemPrice(itemName, cachedAuctionHistory = null) {
+    const allHistory = cachedAuctionHistory || await this.getAllAuctionHistory();
 
     // Find similar items by name
     const similarities = allHistory.map(item => ({
