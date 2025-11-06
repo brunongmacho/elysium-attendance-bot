@@ -3732,7 +3732,12 @@ client.once(Events.ClientReady, async () => {
 client.on(Events.MessageCreate, async (message) => {
   try {
     // ⚡ PERFORMANCE: Early returns for irrelevant messages
-    if (message.author.bot) return; // Skip bot messages immediately
+    // Skip bot messages EXCEPT in attendance threads (other bots may post check-ins)
+    if (message.author.bot) {
+      const inAttendanceThread = message.channel.isThread() &&
+        message.channel.parentId === config.attendance_channel_id;
+      if (!inAttendanceThread) return;
+    }
     if (!message.guild) return; // Skip DMs immediately
     if (message.guild.id !== config.main_guild_id) return; // Skip wrong guild
 
@@ -3880,7 +3885,13 @@ client.on(Events.MessageCreate, async (message) => {
       }
     }
 
-    if (message.author.bot) return;
+    // Second bot check after timer server handling
+    // Allow bot messages in attendance threads (for other bots posting check-ins)
+    if (message.author.bot) {
+      const inAttendanceThread = message.channel.isThread() &&
+        message.channel.parentId === config.attendance_channel_id;
+      if (!inAttendanceThread) return;
+    }
 
     const guild = message.guild;
     if (!guild) return;
@@ -4237,6 +4248,10 @@ client.on(Events.MessageCreate, async (message) => {
       if (
         ["present", "here", "join", "checkin", "check-in"].includes(keyword)
       ) {
+        // Ignore bot check-ins (bots can't attend spawns)
+        // This allows reading bot messages in threads without letting them check in
+        if (message.author.bot) return;
+
         const spawnInfo = activeSpawns[message.channel.id];
 
         // Validate spawn is still open
