@@ -173,7 +173,8 @@ class LearningSystem {
     // BEHAVIORAL PATTERNS (recent activity)
     if (LEARNING_CONFIG.INCLUDE_BEHAVIORAL_PATTERNS && type === 'price_prediction') {
       try {
-        const forDist = await this.sheetAPI.call('getForDistribution', {});
+        // Use longer timeout as this fetches large dataset
+        const forDist = await this.sheetAPI.call('getForDistribution', {}, { timeout: 60000 });
         // Response structure has items at top level
         const items = forDist?.items || [];
         if (items.length > 0) {

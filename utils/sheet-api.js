@@ -308,20 +308,23 @@ class SheetAPI {
         const maxRetries = isRateLimited ? options.rateLimitMaxRetries : options.maxRetries;
         const isLastAttempt = currentAttempt >= maxRetries;
 
-        // Handle abort/timeout
+        // Handle abort/timeout - create new error instead of modifying read-only property
+        let errorToHandle = error;
         if (error.name === 'AbortError') {
           console.error(`⏱️ Timeout on ${action} (${options.timeout}ms)`);
-          error.message = `Request timeout after ${options.timeout}ms`;
+          errorToHandle = new Error(`Request timeout after ${options.timeout}ms`);
+          errorToHandle.name = 'TimeoutError';
+          errorToHandle.originalError = error;
         }
 
         // Log error
-        console.error(`❌ API error on ${action}: ${error.message}`);
+        console.error(`❌ API error on ${action}: ${errorToHandle.message}`);
 
         // If last attempt, fail
         if (isLastAttempt) {
           recordFailure();
           const errorType = isRateLimited ? ' (rate limit)' : '';
-          throw new Error(`API call failed after ${maxRetries} attempts${errorType}: ${error.message}`);
+          throw new Error(`API call failed after ${maxRetries} attempts${errorType}: ${errorToHandle.message}`);
         }
 
         // Calculate backoff delay - use rate limit settings if applicable

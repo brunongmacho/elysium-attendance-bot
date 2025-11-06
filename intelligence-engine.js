@@ -232,7 +232,8 @@ class IntelligenceEngine {
   async getItemAuctionHistory(itemName) {
     try {
       // Fetch from ForDistribution sheet (historical loot with prices)
-      const response = await this.sheetAPI.call('getForDistribution', {});
+      // Use longer timeout as this fetches large dataset
+      const response = await this.sheetAPI.call('getForDistribution', {}, { timeout: 60000 });
 
       if (!response || !response.items) {
         console.error('[INTELLIGENCE] Failed to fetch ForDistribution:', response?.message || 'No response');
@@ -307,7 +308,8 @@ class IntelligenceEngine {
    */
   async getAllAuctionHistory() {
     try {
-      const response = await this.sheetAPI.call('getForDistribution', {});
+      // Use longer timeout as this fetches large dataset
+      const response = await this.sheetAPI.call('getForDistribution', {}, { timeout: 60000 });
 
       // Validate response before accessing data
       if (!response) {
@@ -606,7 +608,8 @@ class IntelligenceEngine {
    */
   async getAuctionWinsForMember(username) {
     try {
-      const response = await this.sheetAPI.call('getForDistribution', {});
+      // Use longer timeout as this fetches large dataset
+      const response = await this.sheetAPI.call('getForDistribution', {}, { timeout: 60000 });
       // Response structure has items at top level
       const items = response?.items ?? [];
       const wins = items.filter(row =>
