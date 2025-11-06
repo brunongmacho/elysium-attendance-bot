@@ -4209,6 +4209,7 @@ function weeklyLearningExport() {
  * 2. NLP_UserPreferences (Purple) - Each member's language preferences
  * 3. NLP_UnrecognizedPhrases (Orange) - Phrases bot doesn't understand yet
  * 4. NLP_Analytics (Green) - Daily learning progress snapshots
+ * 5. NLP_NegativePatterns (Red) - Rejected suggestions (anti-spam)
  *
  * USAGE:
  * - Tabs auto-create when bot first calls getLearnedPatterns() or syncNLPLearning()
