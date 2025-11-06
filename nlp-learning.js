@@ -139,6 +139,9 @@ const LEARNING_CONFIG = {
     // Spawn synonyms (boss/raid)
     predictspawn: ['spawn', 'boss', 'raid', 'rb', 'epic', 'respawn', 'world boss', 'pop'],
 
+    // Close all threads synonyms (attendance management) - CRITICAL FIX!
+    closeallthread: ['close', 'closeall', 'close all', 'end all', 'finish all', 'submit all', 'done all', 'complete all', 'wrap up', 'wrap up all', 'finish', 'finalize', 'tapos', 'tapusin', 'isara', 'sara'],
+
     // Weekly synonyms
     weeklyreport: ['weekly', 'week', 'report', 'summary', 'stats', 'performance'],
   },
