@@ -812,6 +812,13 @@ class IntelligenceEngine {
       bossesByType[bossKey].spawns.push(spawn);
     }
 
+    // PRE-WARM CACHE: Fetch shared data once before parallel predictions
+    // This prevents 32 parallel API calls for the same data
+    await Promise.all([
+      this.learningSystem.getMetrics(true),      // Cache learning metrics
+      this.learningSystem.getMarketState(true),  // Cache market state
+    ]);
+
     // Predict next spawn for each boss type (in parallel for speed)
     const predictionPromises = Object.entries(bossesByType)
       .filter(([bossKey, bossData]) => bossData.spawns.length >= 2)
