@@ -81,6 +81,54 @@ const PROACTIVE_CONFIG = {
         // Roughly 2x attendance (boss points: 1pt=15 bosses, 2pt=10 bosses, 3pt=8 bosses, avg ~1.5-2x)
         major: [2000, 3000, 4000, 6000, 10000, 15000, 20000],  // Guild Announcements
         minor: [200, 500, 1000, 1500]                           // Guild Chat
+      },
+
+      // NEW: Engagement Score Milestones (AI-calculated 0-100)
+      engagement: {
+        major: [85, 90, 95, 100],                // Guild Announcements
+        minor: [60, 70, 80]                      // Guild Chat
+      },
+
+      // NEW: Hybrid Combo Milestones (attendance + bidding)
+      hybrid: {
+        major: [                                 // Guild Announcements
+          { attendance: 400, bidding: 650, name: 'Guild Pillar' },
+          { attendance: 600, bidding: 1000, name: 'Legend Status' }
+        ],
+        minor: [                                 // Guild Chat
+          { attendance: 100, bidding: 200, name: 'Balanced Player' },
+          { attendance: 250, bidding: 400, name: 'Rising Star' }
+        ]
+      },
+
+      // NEW: Guild-Wide Collective Milestones
+      guildWide: {
+        totalAttendance: [10000, 25000, 50000, 100000],
+        totalBidding: [15000, 30000, 60000, 120000],
+        activeMembers: [20, 30, 40, 45, 50]
+      },
+
+      // NEW: Streak Milestones
+      consecutiveSpawnStreak: {
+        major: [75, 100, 150, 200],              // Guild Announcements
+        minor: [10, 25, 50]                      // Guild Chat
+      },
+
+      calendarDayStreak: {                       // 5+ spawns per day
+        major: [45, 60, 90, 180],                // Guild Announcements
+        minor: [7, 14, 21, 30]                   // Guild Chat
+      },
+
+      // NEW: Perfect Attendance Week (100% spawns in week)
+      perfectWeek: {
+        major: [10, 20, 30],                     // Guild Announcements
+        minor: [1, 3, 5]                         // Guild Chat
+      },
+
+      // NEW: Loyalty/Tenure Milestones (days as member)
+      tenure: {
+        major: [365, 730, 1095],                 // Guild Announcements (1, 2, 3 years)
+        minor: [30, 60, 90, 180]                 // Guild Chat
       }
     },
   },
@@ -119,6 +167,19 @@ class ProactiveIntelligence {
     this.lastNotificationTime = {};
     this.MIN_NOTIFICATION_INTERVAL = 3600000; // 1 hour minimum between similar notifications
 
+    // NEW: Milestone batching queue (announced daily at 3:01 AM)
+    this.milestoneQueue = {
+      attendance: [],
+      bidding: [],
+      engagement: [],
+      hybrid: [],
+      guildWide: [],
+      spawnStreak: [],
+      calendarStreak: [],
+      tenure: [],
+      perfectWeek: []
+    };
+
     // Initialize
     this.initialized = false;
   }
@@ -137,34 +198,46 @@ class ProactiveIntelligence {
 
     console.log('🤖 [PROACTIVE] Initializing proactive intelligence system...');
 
-    // Schedule engagement digest (Monday 9 AM Manila time) with error handling
+    // Ensure milestone tabs exist in Google Sheets
+    await this.ensureMilestoneTabsExist();
+
+    // ═══════════════════════════════════════════════════════════════
+    // UNIFIED SCHEDULE: Daily 3:01 AM - Batch Announcements & Checks
+    // ═══════════════════════════════════════════════════════════════
     this.cronJobs.push(
-      cron.schedule('0 9 * * 1', () => {
+      cron.schedule('1 3 * * *', () => {
+        this.safeExecute('dailyBatch', async () => {
+          // 1. Announce all queued milestones from previous day
+          await this.announceMilestoneBatch();
+
+          // 2. Check calendar day streaks (5+ spawns yesterday)
+          await this.checkCalendarDayStreaks();
+
+          // 3. Check tenure milestones
+          await this.checkTenureMilestones();
+
+          // 4. Send anomaly digest (moved from 6 PM)
+          await this.sendAnomalyDigest();
+        }, false);
+      }, {
+        timezone: 'Asia/Manila'
+      })
+    );
+
+    // ═══════════════════════════════════════════════════════════════
+    // Monday 3:01 AM - Weekly Engagement Digest (moved from 9 AM)
+    // ═══════════════════════════════════════════════════════════════
+    this.cronJobs.push(
+      cron.schedule('1 3 * * 1', () => {
         this.safeExecute('engagementDigest', () => this.sendEngagementDigest(), false);
       }, {
         timezone: 'Asia/Manila'
       })
     );
 
-    // Schedule anomaly digest (Daily 6 PM Manila time) with error handling
-    this.cronJobs.push(
-      cron.schedule('0 18 * * *', () => {
-        this.safeExecute('anomalyDigest', () => this.sendAnomalyDigest(), false);
-      }, {
-        timezone: 'Asia/Manila'
-      })
-    );
-
-    // Schedule weekly positive summary (Sunday 8 PM Manila time) with error handling
-    this.cronJobs.push(
-      cron.schedule('0 20 * * 0', () => {
-        this.safeExecute('weeklySummary', () => this.sendWeeklySummary(), false);
-      }, {
-        timezone: 'Asia/Manila'
-      })
-    );
-
-    // Schedule pre-auction check (Saturday 10 AM Manila time) with error handling
+    // ═══════════════════════════════════════════════════════════════
+    // Saturday 10:00 AM - Pre-Auction Readiness Check (auction-specific)
+    // ═══════════════════════════════════════════════════════════════
     this.cronJobs.push(
       cron.schedule('0 10 * * 6', () => {
         this.safeExecute('auctionReadiness', () => this.checkAuctionReadiness(), false);
@@ -173,17 +246,44 @@ class ProactiveIntelligence {
       })
     );
 
-    // Check for milestones every hour with error handling and rate limiting
+    // ═══════════════════════════════════════════════════════════════
+    // Sunday 8:00 PM - Weekly Summary with Milestone Recap
+    // ═══════════════════════════════════════════════════════════════
+    this.cronJobs.push(
+      cron.schedule('0 20 * * 0', () => {
+        this.safeExecute('weeklySummary', () => this.sendWeeklySummary(), false);
+      }, {
+        timezone: 'Asia/Manila'
+      })
+    );
+
+    // ═══════════════════════════════════════════════════════════════
+    // Sunday 11:59 PM - Perfect Attendance Week Check
+    // ═══════════════════════════════════════════════════════════════
+    this.cronJobs.push(
+      cron.schedule('59 23 * * 0', () => {
+        this.safeExecute('perfectWeekCheck', () => this.checkPerfectAttendanceWeek(), false);
+      }, {
+        timezone: 'Asia/Manila'
+      })
+    );
+
+    // ═══════════════════════════════════════════════════════════════
+    // Hourly - Milestone Detection (QUEUE ONLY, NO ANNOUNCEMENTS)
+    // ═══════════════════════════════════════════════════════════════
     this.cronJobs.push(
       cron.schedule('0 * * * *', () => {
-        this.safeExecute('milestoneCheck', () => this.checkMilestones(), true);
+        this.safeExecute('milestoneDetection', async () => {
+          // Check all milestone types and ADD TO QUEUE
+          await this.detectAllMilestones();
+        }, true);
       }, {
         timezone: 'Asia/Manila'
       })
     );
 
     this.initialized = true;
-    console.log('✅ [PROACTIVE] Scheduled 5 monitoring tasks with robust error handling');
+    console.log('✅ [PROACTIVE] Scheduled 6 unified monitoring tasks');
   }
 
   /**
@@ -667,6 +767,77 @@ class ProactiveIntelligence {
         inline: false,
       });
 
+      // ═══════════════════════════════════════════════════════════════
+      // NEW: Add milestone recap section
+      // ═══════════════════════════════════════════════════════════════
+      try {
+        const weeklyMilestonesResponse = await this.intelligence.sheetAPI.call('getWeeklyMilestones', {});
+        const weeklyMilestones = weeklyMilestonesResponse?.data || [];
+
+        if (weeklyMilestones.length > 0) {
+          // Group milestones by type
+          const milestonesByType = {};
+          for (const m of weeklyMilestones) {
+            const type = m.milestoneType;
+            if (!milestonesByType[type]) {
+              milestonesByType[type] = [];
+            }
+            milestonesByType[type].push(m);
+          }
+
+          // Build milestone recap text
+          const recapLines = [];
+          for (const [type, milestones] of Object.entries(milestonesByType)) {
+            const count = milestones.length;
+            let emoji = '🎯';
+            let label = type;
+
+            if (type === 'attendance') {
+              emoji = '🎯';
+              label = 'Attendance';
+            } else if (type === 'bidding') {
+              emoji = '💰';
+              label = 'Bidding';
+            } else if (type === 'engagement') {
+              emoji = '🧠';
+              label = 'Engagement';
+            } else if (type === 'hybrid') {
+              emoji = '🔥';
+              label = 'Hybrid Combo';
+            } else if (type === 'guildWide') {
+              emoji = '🏆';
+              label = 'Guild-Wide';
+            } else if (type === 'spawnStreak') {
+              emoji = '⚡';
+              label = 'Spawn Streak';
+            } else if (type === 'calendarStreak') {
+              emoji = '📅';
+              label = 'Calendar Streak';
+            } else if (type === 'perfectWeek') {
+              emoji = '⭐';
+              label = 'Perfect Week';
+            } else if (type === 'tenure') {
+              emoji = '🗿';
+              label = 'Tenure';
+            }
+
+            recapLines.push(`${emoji} **${count}** ${label} milestone${count > 1 ? 's' : ''}`);
+          }
+
+          // Add to embed
+          embed.addFields({
+            name: '🎉 Milestones This Week',
+            value: recapLines.join('\n') || 'No milestones this week',
+            inline: false
+          });
+
+          console.log(`✅ [PROACTIVE] Added milestone recap: ${weeklyMilestones.length} total`);
+        }
+      } catch (error) {
+        console.error('[PROACTIVE] Error adding milestone recap:', error);
+        // Continue without recap if error
+      }
+
       // Send summary
       await guildAnnouncementChannel.send({ embeds: [embed] });
 
@@ -886,89 +1057,69 @@ class ProactiveIntelligence {
       // ANNOUNCE GROUPED MILESTONES (One embed per unique milestone)
       // ═════════════════════════════════════════════════════════════════════
 
-      let milestonesAnnounced = 0;
+      let milestonesQueued = 0;
 
-      // Announce ATTENDANCE milestones
-      console.log('📢 [PROACTIVE] Announcing ATTENDANCE milestone groups...');
+      // Queue ATTENDANCE milestones
+      console.log('📌 [PROACTIVE] Queueing ATTENDANCE milestones...');
       for (const [milestoneStr, achievers] of Object.entries(milestoneGroups.attendance)) {
         const milestone = parseInt(milestoneStr);
 
         try {
-          // Determine channel
-          const channel = ATTENDANCE_MILESTONES.major.includes(milestone)
-            ? guildAnnouncementChannel
-            : guildChatChannel;
-
-          // Create grouped embed
-          const embed = await this.createGroupedMilestoneEmbed(
-            achievers,
-            milestone,
-            'attendance',
-            attendanceMilestoneArray
-          );
-
-          await channel.send({ embeds: [embed] });
-
-          // Batch update Google Sheets for all achievers (sequential to prevent overwrites)
-          console.log(`   📝 Updating ${achievers.length} members in Google Sheets (sequential)...`);
-          const updateStartTime = Date.now();
-
           for (const achiever of achievers) {
+            // Queue milestone for batch announcement
+            this.queueMilestone('attendance', {
+              nickname: achiever.nickname,
+              milestone: milestone,
+              totalPoints: achiever.totalPoints,
+              lastMilestone: achiever.lastMilestone,
+              discordMember: achiever.discordMember
+            });
+
+            // Update Google Sheets
             await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: achiever.nickname,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'attendance'
-            }, { silent: true }); // Silent mode: no individual API logs
+            }, { silent: true });
           }
 
-          const updateDuration = ((Date.now() - updateStartTime) / 1000).toFixed(1);
-          milestonesAnnounced++;
-          console.log(`   - ✅ ${achievers.length} members at ${milestone} ATTENDANCE milestone → ${channel.name} (sheets updated in ${updateDuration}s)`);
+          milestonesQueued += achievers.length;
+          console.log(`   - ✅ Queued ${achievers.length} members at ${milestone} ATTENDANCE milestone`);
         } catch (error) {
-          console.error(`   - ❌ Error announcing ATTENDANCE milestone ${milestone}:`, error);
+          console.error(`   - ❌ Error queueing ATTENDANCE milestone ${milestone}:`, error);
         }
       }
 
-      // Announce BIDDING milestones
-      console.log('📢 [PROACTIVE] Announcing BIDDING milestone groups...');
+      // Queue BIDDING milestones
+      console.log('📌 [PROACTIVE] Queueing BIDDING milestones...');
       for (const [milestoneStr, achievers] of Object.entries(milestoneGroups.bidding)) {
         const milestone = parseInt(milestoneStr);
 
         try {
-          // Determine channel
-          const channel = BIDDING_MILESTONES.major.includes(milestone)
-            ? guildAnnouncementChannel
-            : guildChatChannel;
-
-          // Create grouped embed
-          const embed = await this.createGroupedMilestoneEmbed(
-            achievers,
-            milestone,
-            'bidding',
-            biddingMilestoneArray
-          );
-
-          await channel.send({ embeds: [embed] });
-
-          // Batch update Google Sheets for all achievers (sequential to prevent overwrites)
-          console.log(`   📝 Updating ${achievers.length} members in Google Sheets (sequential)...`);
-          const updateStartTime = Date.now();
-
           for (const achiever of achievers) {
+            // Queue milestone for batch announcement
+            this.queueMilestone('bidding', {
+              nickname: achiever.nickname,
+              milestone: milestone,
+              totalPoints: achiever.totalPoints,
+              lastMilestone: achiever.lastMilestone,
+              discordMember: achiever.discordMember
+            });
+
+            // Update Google Sheets
             await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: achiever.nickname,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'bidding'
-            }, { silent: true }); // Silent mode: no individual API logs
+            }, { silent: true });
           }
 
-          const updateDuration = ((Date.now() - updateStartTime) / 1000).toFixed(1);
-          milestonesAnnounced++;
-          console.log(`   - ✅ ${achievers.length} members at ${milestone} BIDDING milestone → ${channel.name} (sheets updated in ${updateDuration}s)`);
+          milestonesQueued += achievers.length;
+          console.log(`   - ✅ Queued ${achievers.length} members at ${milestone} BIDDING milestone`);
         } catch (error) {
-          console.error(`   - ❌ Error announcing BIDDING milestone ${milestone}:`, error);
+          console.error(`   - ❌ Error queueing BIDDING milestone ${milestone}:`, error);
         }
       }
 
@@ -976,13 +1127,1206 @@ class ProactiveIntelligence {
       console.log(`🤖 [PROACTIVE] Milestone check complete`);
       console.log(`   - Members checked: ${membersChecked}`);
       console.log(`   - New milestones found: ${milestonesFound}`);
-      console.log(`   - Unique milestone announcements: ${milestonesAnnounced}`);
+      console.log(`   - Milestones queued: ${milestonesQueued}`);
       console.log('🤖 [PROACTIVE] ═══════════════════════════════════════');
 
     } catch (error) {
       console.error('❌ [PROACTIVE] CRITICAL ERROR checking milestones:', error);
       console.error(error.stack);
     }
+  }
+  // ═════════════════════════════════════════════════════════════════════════
+  // ENHANCED MILESTONE SYSTEM - BATCHING & NEW TYPES
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Ensure milestone tabs exist in Google Sheets
+   */
+  async ensureMilestoneTabsExist() {
+    try {
+      console.log('[PROACTIVE] Ensuring milestone tabs exist in Google Sheets...');
+      const response = await this.intelligence.sheetAPI.call('ensureMilestoneTabsExist', {});
+      if (response.success) {
+        console.log('✅ [PROACTIVE] Milestone tabs verified/created');
+      }
+    } catch (error) {
+      console.error('[PROACTIVE] Error ensuring milestone tabs:', error);
+    }
+  }
+
+  /**
+   * Detect all milestone types (hourly check - queue only, no announcements)
+   */
+  async detectAllMilestones() {
+    try {
+      console.log('🔍 [PROACTIVE] Detecting milestones (queueing for batch announcement)...');
+
+      // Check existing milestone types (attendance/bidding) - now queues instead of announcing
+      await this.checkMilestones();
+
+      // Check new milestone types
+      await this.checkEngagementMilestones();
+      await this.checkHybridComboMilestones();
+      await this.checkGuildWideMilestones();
+
+      console.log('✅ [PROACTIVE] Milestone detection complete');
+    } catch (error) {
+      console.error('[PROACTIVE] Error detecting milestones:', error);
+    }
+  }
+
+  /**
+   * Queue a milestone for batch announcement (helper function)
+   */
+  queueMilestone(type, data) {
+    this.milestoneQueue[type].push({
+      ...data,
+      queuedAt: new Date()
+    });
+    console.log(`📌 [PROACTIVE] Queued ${type} milestone for ${data.nickname || 'Guild'}`);
+  }
+
+  /**
+   * Announce all queued milestones in batch (runs daily at 3:01 AM)
+   */
+  async announceMilestoneBatch() {
+    try {
+      console.log('🎉 [PROACTIVE] ═══════════════════════════════════════');
+      console.log('🎉 [PROACTIVE] Starting daily milestone batch announcement...');
+
+      // Count total queued
+      const totalQueued = Object.values(this.milestoneQueue).reduce((sum, arr) => sum + arr.length, 0);
+
+      if (totalQueued === 0) {
+        console.log('✅ [PROACTIVE] No milestones queued');
+        return;
+      }
+
+      console.log(`📊 [PROACTIVE] ${totalQueued} milestones queued for announcement`);
+
+      // Get channels
+      const guildAnnouncementChannel = await getChannelById(
+        this.client,
+        this.config.guild_announcement_channel_id
+      );
+
+      const guildChatChannel = await getChannelById(
+        this.client,
+        this.config.elysium_commands_channel_id
+      );
+
+      if (!guildAnnouncementChannel || !guildChatChannel) {
+        console.error('❌ [PROACTIVE] Required channels not found');
+        return;
+      }
+
+      // Get guild for member lookups
+      const guild = this.client.guilds.cache.get(this.config.main_guild_id);
+      if (!guild) {
+        console.error('❌ [PROACTIVE] Main guild not found');
+        return;
+      }
+
+      let totalAnnounced = 0;
+
+      // Calculate week range for logging
+      const now = new Date();
+      const weekStart = new Date(now);
+      weekStart.setHours(3, 1, 0, 0);
+      const dayOfWeek = weekStart.getDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      weekStart.setDate(weekStart.getDate() - daysToMonday);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+
+      // ═══════════════════════════════════════════════════════════════
+      // Announce Attendance Milestones
+      // ═══════════════════════════════════════════════════════════════
+      if (this.milestoneQueue.attendance.length > 0) {
+        console.log(`📢 [PROACTIVE] Announcing ${this.milestoneQueue.attendance.length} attendance milestones...`);
+        const grouped = this.groupMilestonesByThreshold(this.milestoneQueue.attendance);
+
+        for (const [milestone, achievers] of Object.entries(grouped)) {
+          const milestoneNum = parseInt(milestone);
+          const isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.attendance.major.includes(milestoneNum);
+          const channel = isMajor ? guildAnnouncementChannel : guildChatChannel;
+
+          const embed = await this.createGroupedMilestoneEmbed(
+            achievers,
+            milestoneNum,
+            'attendance',
+            [...PROACTIVE_CONFIG.thresholds.milestonePoints.attendance.minor,
+             ...PROACTIVE_CONFIG.thresholds.milestonePoints.attendance.major].sort((a, b) => a - b)
+          );
+
+          await channel.send({ embeds: [embed] });
+
+          // Log to weekly milestone log
+          for (const achiever of achievers) {
+            await this.intelligence.sheetAPI.call('logWeeklyMilestone', {
+              weekStartDate: weekStart.toISOString(),
+              weekEndDate: weekEnd.toISOString(),
+              milestoneType: 'attendance',
+              nickname: achiever.nickname,
+              milestone: milestoneNum,
+              value: achiever.totalPoints
+            });
+          }
+
+          totalAnnounced++;
+        }
+
+        this.milestoneQueue.attendance = [];
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // Announce Bidding Milestones
+      // ═══════════════════════════════════════════════════════════════
+      if (this.milestoneQueue.bidding.length > 0) {
+        console.log(`📢 [PROACTIVE] Announcing ${this.milestoneQueue.bidding.length} bidding milestones...`);
+        const grouped = this.groupMilestonesByThreshold(this.milestoneQueue.bidding);
+
+        for (const [milestone, achievers] of Object.entries(grouped)) {
+          const milestoneNum = parseInt(milestone);
+          const isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.bidding.major.includes(milestoneNum);
+          const channel = isMajor ? guildAnnouncementChannel : guildChatChannel;
+
+          const embed = await this.createGroupedMilestoneEmbed(
+            achievers,
+            milestoneNum,
+            'bidding',
+            [...PROACTIVE_CONFIG.thresholds.milestonePoints.bidding.minor,
+             ...PROACTIVE_CONFIG.thresholds.milestonePoints.bidding.major].sort((a, b) => a - b)
+          );
+
+          await channel.send({ embeds: [embed] });
+
+          // Log to weekly milestone log
+          for (const achiever of achievers) {
+            await this.intelligence.sheetAPI.call('logWeeklyMilestone', {
+              weekStartDate: weekStart.toISOString(),
+              weekEndDate: weekEnd.toISOString(),
+              milestoneType: 'bidding',
+              nickname: achiever.nickname,
+              milestone: milestoneNum,
+              value: achiever.totalPoints
+            });
+          }
+
+          totalAnnounced++;
+        }
+
+        this.milestoneQueue.bidding = [];
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // Announce Engagement Score Milestones
+      // ═══════════════════════════════════════════════════════════════
+      if (this.milestoneQueue.engagement.length > 0) {
+        console.log(`📢 [PROACTIVE] Announcing ${this.milestoneQueue.engagement.length} engagement milestones...`);
+        const grouped = this.groupMilestonesByThreshold(this.milestoneQueue.engagement);
+
+        for (const [milestone, achievers] of Object.entries(grouped)) {
+          const milestoneNum = parseInt(milestone);
+          const isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.engagement.major.includes(milestoneNum);
+          const channel = isMajor ? guildAnnouncementChannel : guildChatChannel;
+
+          const embed = this.createEngagementMilestoneEmbed(achievers, milestoneNum, isMajor);
+
+          await channel.send({ embeds: [embed] });
+
+          // Log to weekly milestone log
+          for (const achiever of achievers) {
+            await this.intelligence.sheetAPI.call('logWeeklyMilestone', {
+              weekStartDate: weekStart.toISOString(),
+              weekEndDate: weekEnd.toISOString(),
+              milestoneType: 'engagement',
+              nickname: achiever.nickname,
+              milestone: milestoneNum,
+              value: achiever.score
+            });
+          }
+
+          totalAnnounced++;
+        }
+
+        this.milestoneQueue.engagement = [];
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // Announce Hybrid Combo Milestones
+      // ═══════════════════════════════════════════════════════════════
+      if (this.milestoneQueue.hybrid.length > 0) {
+        console.log(`📢 [PROACTIVE] Announcing ${this.milestoneQueue.hybrid.length} hybrid milestones...`);
+
+        for (const achiever of this.milestoneQueue.hybrid) {
+          const isMajor = achiever.isMajor;
+          const channel = isMajor ? guildAnnouncementChannel : guildChatChannel;
+
+          const embed = this.createHybridMilestoneEmbed(achiever, isMajor);
+
+          await channel.send({ embeds: [embed] });
+
+          // Log to weekly milestone log
+          await this.intelligence.sheetAPI.call('logWeeklyMilestone', {
+            weekStartDate: weekStart.toISOString(),
+            weekEndDate: weekEnd.toISOString(),
+            milestoneType: 'hybrid',
+            nickname: achiever.nickname,
+            milestone: achiever.milestoneName,
+            value: `${achiever.attendance}/${achiever.bidding}`
+          });
+
+          totalAnnounced++;
+        }
+
+        this.milestoneQueue.hybrid = [];
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // Announce Guild-Wide Milestones
+      // ═══════════════════════════════════════════════════════════════
+      if (this.milestoneQueue.guildWide.length > 0) {
+        console.log(`📢 [PROACTIVE] Announcing ${this.milestoneQueue.guildWide.length} guild-wide milestones...`);
+
+        for (const milestone of this.milestoneQueue.guildWide) {
+          const embed = this.createGuildWideMilestoneEmbed(milestone);
+
+          await guildAnnouncementChannel.send({ embeds: [embed] });
+
+          // Log to weekly milestone log
+          await this.intelligence.sheetAPI.call('logWeeklyMilestone', {
+            weekStartDate: weekStart.toISOString(),
+            weekEndDate: weekEnd.toISOString(),
+            milestoneType: 'guildWide',
+            nickname: 'Guild',
+            milestone: `${milestone.milestoneType} ${milestone.threshold}`,
+            value: milestone.totalValue
+          });
+
+          totalAnnounced++;
+        }
+
+        this.milestoneQueue.guildWide = [];
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // Announce Streak Milestones (Spawn, Calendar, Perfect Week)
+      // ═══════════════════════════════════════════════════════════════
+      const streakTypes = ['spawnStreak', 'calendarStreak', 'perfectWeek', 'tenure'];
+
+      for (const streakType of streakTypes) {
+        if (this.milestoneQueue[streakType].length > 0) {
+          console.log(`📢 [PROACTIVE] Announcing ${this.milestoneQueue[streakType].length} ${streakType} milestones...`);
+          const grouped = this.groupMilestonesByThreshold(this.milestoneQueue[streakType]);
+
+          for (const [milestone, achievers] of Object.entries(grouped)) {
+            const milestoneNum = parseInt(milestone);
+
+            // Determine if major
+            let isMajor = false;
+            let configKey = '';
+
+            if (streakType === 'spawnStreak') {
+              configKey = 'consecutiveSpawnStreak';
+              isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.consecutiveSpawnStreak.major.includes(milestoneNum);
+            } else if (streakType === 'calendarStreak') {
+              configKey = 'calendarDayStreak';
+              isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.calendarDayStreak.major.includes(milestoneNum);
+            } else if (streakType === 'perfectWeek') {
+              configKey = 'perfectWeek';
+              isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.perfectWeek.major.includes(milestoneNum);
+            } else if (streakType === 'tenure') {
+              configKey = 'tenure';
+              isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.tenure.major.includes(milestoneNum);
+            }
+
+            const channel = isMajor ? guildAnnouncementChannel : guildChatChannel;
+
+            const embed = this.createStreakMilestoneEmbed(achievers, milestoneNum, streakType, isMajor);
+
+            await channel.send({ embeds: [embed] });
+
+            // Log to weekly milestone log
+            for (const achiever of achievers) {
+              await this.intelligence.sheetAPI.call('logWeeklyMilestone', {
+                weekStartDate: weekStart.toISOString(),
+                weekEndDate: weekEnd.toISOString(),
+                milestoneType: streakType,
+                nickname: achiever.nickname,
+                milestone: milestoneNum,
+                value: achiever.streak || achiever.days
+              });
+            }
+
+            totalAnnounced++;
+          }
+
+          this.milestoneQueue[streakType] = [];
+        }
+      }
+
+      console.log('🎉 [PROACTIVE] ═══════════════════════════════════════');
+      console.log(`🎉 [PROACTIVE] Batch announcement complete: ${totalAnnounced} unique milestones announced`);
+      console.log('🎉 [PROACTIVE] ═══════════════════════════════════════');
+
+    } catch (error) {
+      console.error('❌ [PROACTIVE] Error announcing milestone batch:', error);
+      console.error(error.stack);
+    }
+  }
+
+  /**
+   * Group milestones by threshold for batch announcement
+   */
+  groupMilestonesByThreshold(milestones) {
+    const grouped = {};
+    for (const milestone of milestones) {
+      const threshold = milestone.milestone;
+      if (!grouped[threshold]) {
+        grouped[threshold] = [];
+      }
+      grouped[threshold].push(milestone);
+    }
+    return grouped;
+  }
+
+  /**
+   * Check engagement score milestones (hourly)
+   */
+  async checkEngagementMilestones() {
+    try {
+      console.log('🧠 [PROACTIVE] Checking engagement score milestones...');
+
+      // Get engagement analysis
+      const analysis = await this.intelligence.analyzeAllMembersEngagement();
+      if (analysis.error) {
+        console.log('⚠️ [PROACTIVE] Error analyzing engagement');
+        return;
+      }
+
+      const allMilestones = [
+        ...PROACTIVE_CONFIG.thresholds.milestonePoints.engagement.minor,
+        ...PROACTIVE_CONFIG.thresholds.milestonePoints.engagement.major
+      ].sort((a, b) => a - b);
+
+      // Get milestone history
+      const historyResponse = await this.intelligence.sheetAPI.call('getMilestoneHistory', {});
+      const milestoneHistory = historyResponse?.milestoneHistory || {};
+
+      let milestonesFound = 0;
+
+      // Check each member's engagement score
+      for (const member of analysis.members || []) {
+        const nickname = member.username;
+        const normalizedNickname = this.normalizeUsername(nickname);
+        const engagementScore = member.engagementScore || 0;
+
+        // Get last celebrated milestone
+        const historyKey = `${normalizedNickname}-engagement`;
+        const history = milestoneHistory[historyKey] || {};
+        const lastMilestone = history.lastEngagementMilestone || 0;
+
+        // Find highest milestone crossed
+        let highestMilestone = null;
+        for (const milestone of allMilestones) {
+          if (engagementScore >= milestone && milestone > lastMilestone) {
+            highestMilestone = milestone;
+          }
+        }
+
+        if (highestMilestone) {
+          milestonesFound++;
+          console.log(`🎉 [PROACTIVE] ${nickname} reached engagement ${highestMilestone} (score: ${engagementScore})`);
+
+          // Queue milestone
+          this.queueMilestone('engagement', {
+            nickname,
+            milestone: highestMilestone,
+            score: engagementScore
+          });
+
+          // Update Google Sheets
+          await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
+            nickname,
+            milestone: highestMilestone,
+            totalPoints: engagementScore,
+            milestoneType: 'engagement'
+          }, { silent: true });
+        }
+      }
+
+      console.log(`✅ [PROACTIVE] Engagement check complete: ${milestonesFound} new milestones`);
+
+    } catch (error) {
+      console.error('[PROACTIVE] Error checking engagement milestones:', error);
+    }
+  }
+
+  /**
+   * Check hybrid combo milestones (hourly)
+   */
+  async checkHybridComboMilestones() {
+    try {
+      console.log('🔥 [PROACTIVE] Checking hybrid combo milestones...');
+
+      // Get attendance data
+      const attendanceResponse = await this.intelligence.sheetAPI.call('getTotalAttendance', {});
+      const attendanceData = attendanceResponse?.data?.members || attendanceResponse?.members || [];
+
+      // Get bidding data
+      const biddingResponse = await this.intelligence.sheetAPI.call('getBiddingPoints', {});
+      const biddingData = biddingResponse?.data?.members || biddingResponse?.members || [];
+
+      // Create bidding lookup
+      const biddingMap = {};
+      biddingData.forEach(m => {
+        const normalized = this.normalizeUsername(m.nickname || m.username);
+        biddingMap[normalized] = {
+          pointsLeft: m.pointsLeft || 0,
+          pointsConsumed: m.pointsConsumed || 0,
+          totalPoints: (m.pointsLeft || 0) + (m.pointsConsumed || 0)
+        };
+      });
+
+      // Get milestone history
+      const historyResponse = await this.intelligence.sheetAPI.call('getMilestoneHistory', {});
+      const milestoneHistory = historyResponse?.milestoneHistory || {};
+
+      let milestonesFound = 0;
+
+      // Check each member
+      for (const member of attendanceData) {
+        const nickname = member.username;
+        const normalizedNickname = this.normalizeUsername(nickname);
+        const attendancePoints = member.attendancePoints || 0;
+        const biddingPoints = biddingMap[normalizedNickname]?.totalPoints || 0;
+
+        // Get last celebrated hybrid milestone
+        const historyKey = `${normalizedNickname}-hybrid`;
+        const history = milestoneHistory[historyKey] || {};
+        const lastMilestone = history.lastHybridMilestone || '';
+
+        // Check all hybrid thresholds
+        const allHybrid = [
+          ...PROACTIVE_CONFIG.thresholds.milestonePoints.hybrid.minor,
+          ...PROACTIVE_CONFIG.thresholds.milestonePoints.hybrid.major
+        ];
+
+        for (const threshold of allHybrid) {
+          const meetsThreshold = attendancePoints >= threshold.attendance && biddingPoints >= threshold.bidding;
+          const alreadyCelebrated = lastMilestone === threshold.name;
+
+          if (meetsThreshold && !alreadyCelebrated) {
+            milestonesFound++;
+            console.log(`🎉 [PROACTIVE] ${nickname} reached ${threshold.name} (${attendancePoints}/${biddingPoints})`);
+
+            const isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.hybrid.major.includes(threshold);
+
+            // Queue milestone
+            this.queueMilestone('hybrid', {
+              nickname,
+              attendance: attendancePoints,
+              bidding: biddingPoints,
+              milestoneName: threshold.name,
+              isMajor
+            });
+
+            // Update Google Sheets
+            await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
+              nickname,
+              milestone: threshold.name,
+              totalPoints: `${attendancePoints}/${biddingPoints}`,
+              milestoneType: 'hybrid'
+            }, { silent: true });
+
+            break; // Only celebrate highest achieved
+          }
+        }
+      }
+
+      console.log(`✅ [PROACTIVE] Hybrid combo check complete: ${milestonesFound} new milestones`);
+
+    } catch (error) {
+      console.error('[PROACTIVE] Error checking hybrid milestones:', error);
+    }
+  }
+
+  /**
+   * Check guild-wide collective milestones (hourly)
+   */
+  async checkGuildWideMilestones() {
+    try {
+      console.log('🏆 [PROACTIVE] Checking guild-wide milestones...');
+
+      // Get guild milestones from sheets
+      const guildMilestonesResponse = await this.intelligence.sheetAPI.call('getGuildMilestones', {});
+      const achievedMilestones = guildMilestonesResponse?.data || [];
+
+      // Helper to check if milestone already achieved
+      const isAchieved = (type, threshold) => {
+        return achievedMilestones.some(m =>
+          m.milestoneType === type &&
+          parseInt(m.threshold) === threshold &&
+          m.announced === true
+        );
+      };
+
+      let milestonesFound = 0;
+
+      // ═══════════════════════════════════════════════════════════════
+      // Check Total Attendance
+      // ═══════════════════════════════════════════════════════════════
+      const attendanceResponse = await this.intelligence.sheetAPI.call('getTotalAttendance', {});
+      const attendanceData = attendanceResponse?.data?.members || attendanceResponse?.members || [];
+      const totalAttendance = attendanceData.reduce((sum, m) => sum + (m.attendancePoints || 0), 0);
+
+      for (const threshold of PROACTIVE_CONFIG.thresholds.milestonePoints.guildWide.totalAttendance) {
+        if (totalAttendance >= threshold && !isAchieved('attendance', threshold)) {
+          milestonesFound++;
+          console.log(`🎉 [PROACTIVE] Guild reached ${threshold} total attendance!`);
+
+          // Queue milestone
+          this.queueMilestone('guildWide', {
+            milestoneType: 'attendance',
+            threshold,
+            totalValue: totalAttendance
+          });
+
+          // Record in Google Sheets
+          await this.intelligence.sheetAPI.call('recordGuildMilestone', {
+            milestoneType: 'attendance',
+            threshold,
+            totalValue: totalAttendance
+          });
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // Check Total Bidding
+      // ═══════════════════════════════════════════════════════════════
+      const biddingResponse = await this.intelligence.sheetAPI.call('getBiddingPoints', {});
+      const biddingData = biddingResponse?.data?.members || biddingResponse?.members || [];
+      const totalBidding = biddingData.reduce((sum, m) => sum + ((m.pointsLeft || 0) + (m.pointsConsumed || 0)), 0);
+
+      for (const threshold of PROACTIVE_CONFIG.thresholds.milestonePoints.guildWide.totalBidding) {
+        if (totalBidding >= threshold && !isAchieved('bidding', threshold)) {
+          milestonesFound++;
+          console.log(`🎉 [PROACTIVE] Guild reached ${threshold} total bidding!`);
+
+          // Queue milestone
+          this.queueMilestone('guildWide', {
+            milestoneType: 'bidding',
+            threshold,
+            totalValue: totalBidding
+          });
+
+          // Record in Google Sheets
+          await this.intelligence.sheetAPI.call('recordGuildMilestone', {
+            milestoneType: 'bidding',
+            threshold,
+            totalValue: totalBidding
+          });
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // Check Active Members Count
+      // ═══════════════════════════════════════════════════════════════
+      const analysis = await this.intelligence.analyzeAllMembersEngagement();
+      if (!analysis.error) {
+        const activeCount = analysis.active || 0;
+
+        for (const threshold of PROACTIVE_CONFIG.thresholds.milestonePoints.guildWide.activeMembers) {
+          if (activeCount >= threshold && !isAchieved('activeMembers', threshold)) {
+            milestonesFound++;
+            console.log(`🎉 [PROACTIVE] Guild reached ${threshold} active members!`);
+
+            // Queue milestone
+            this.queueMilestone('guildWide', {
+              milestoneType: 'activeMembers',
+              threshold,
+              totalValue: activeCount
+            });
+
+            // Record in Google Sheets
+            await this.intelligence.sheetAPI.call('recordGuildMilestone', {
+              milestoneType: 'activeMembers',
+              threshold,
+              totalValue: activeCount
+            });
+          }
+        }
+      }
+
+      console.log(`✅ [PROACTIVE] Guild-wide check complete: ${milestonesFound} new milestones`);
+
+    } catch (error) {
+      console.error('[PROACTIVE] Error checking guild-wide milestones:', error);
+    }
+  }
+
+  /**
+   * Check tenure/loyalty milestones (daily at 3:01 AM)
+   */
+  async checkTenureMilestones() {
+    try {
+      console.log('🗿 [PROACTIVE] Checking tenure milestones...');
+
+      // Get attendance data (has memberSinceDate column)
+      const attendanceResponse = await this.intelligence.sheetAPI.call('getTotalAttendance', {});
+      const attendanceData = attendanceResponse?.data?.members || attendanceResponse?.members || [];
+
+      // Get milestone history
+      const historyResponse = await this.intelligence.sheetAPI.call('getMilestoneHistory', {});
+      const milestoneHistory = historyResponse?.milestoneHistory || {};
+
+      const allTenureMilestones = [
+        ...PROACTIVE_CONFIG.thresholds.milestonePoints.tenure.minor,
+        ...PROACTIVE_CONFIG.thresholds.milestonePoints.tenure.major
+      ].sort((a, b) => a - b);
+
+      let milestonesFound = 0;
+      const now = new Date();
+
+      for (const member of attendanceData) {
+        const nickname = member.username;
+        const normalizedNickname = this.normalizeUsername(nickname);
+
+        // Get member since date (use earliestAttendance or memberSinceDate)
+        let memberSinceDate = member.memberSinceDate || member.earliestAttendance;
+        if (!memberSinceDate) continue;
+
+        memberSinceDate = new Date(memberSinceDate);
+        const daysAsMember = Math.floor((now - memberSinceDate) / (1000 * 60 * 60 * 24));
+
+        // Get last celebrated tenure milestone
+        const historyKey = `${normalizedNickname}-tenure`;
+        const history = milestoneHistory[historyKey] || {};
+        const lastMilestone = history.lastMilestone || 0;
+
+        // Find highest milestone crossed
+        let highestMilestone = null;
+        for (const milestone of allTenureMilestones) {
+          if (daysAsMember >= milestone && milestone > lastMilestone) {
+            highestMilestone = milestone;
+          }
+        }
+
+        if (highestMilestone) {
+          milestonesFound++;
+          console.log(`🎉 [PROACTIVE] ${nickname} reached ${highestMilestone} days tenure`);
+
+          // Queue milestone
+          this.queueMilestone('tenure', {
+            nickname,
+            milestone: highestMilestone,
+            days: daysAsMember
+          });
+
+          // Update Google Sheets
+          await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
+            nickname,
+            milestone: highestMilestone,
+            totalPoints: daysAsMember,
+            milestoneType: 'tenure'
+          }, { silent: true });
+        }
+      }
+
+      console.log(`✅ [PROACTIVE] Tenure check complete: ${milestonesFound} new milestones`);
+
+    } catch (error) {
+      console.error('[PROACTIVE] Error checking tenure milestones:', error);
+    }
+  }
+
+  /**
+   * Check calendar day streaks (daily at 3:01 AM)
+   * Requires 5+ spawns per day to count as 1 streak day
+   */
+  async checkCalendarDayStreaks() {
+    try {
+      console.log('📅 [PROACTIVE] Checking calendar day streaks...');
+
+      // Calculate yesterday's date range
+      const now = new Date();
+      const yesterdayStart = new Date(now);
+      yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+      yesterdayStart.setHours(3, 1, 0, 0); // 3:01 AM yesterday
+
+      const yesterdayEnd = new Date(now);
+      yesterdayEnd.setHours(3, 0, 0, 0); // 3:00 AM today
+
+      console.log(`📊 [PROACTIVE] Checking spawns from ${yesterdayStart.toISOString()} to ${yesterdayEnd.toISOString()}`);
+
+      // Get all weekly attendance data
+      const response = await this.intelligence.sheetAPI.call('getAllWeeklyAttendance', {});
+      const allSheets = response?.data?.allSheets || response?.allSheets || [];
+
+      // Count spawns per member yesterday
+      const memberSpawnCounts = {};
+
+      for (const sheet of allSheets) {
+        const columns = sheet.columns || [];
+        for (const col of columns) {
+          if (col.boss && col.timestamp) {
+            const spawnDate = new Date(col.timestamp);
+            if (spawnDate >= yesterdayStart && spawnDate < yesterdayEnd) {
+              // Count attendance
+              const members = col.members || [];
+              for (const member of members) {
+                const normalized = this.normalizeUsername(member);
+                memberSpawnCounts[normalized] = (memberSpawnCounts[normalized] || 0) + 1;
+              }
+            }
+          }
+        }
+      }
+
+      console.log(`📊 [PROACTIVE] Found ${Object.keys(memberSpawnCounts).length} members with attendance yesterday`);
+
+      // Get streak data from Google Sheets
+      const allMilestones = [
+        ...PROACTIVE_CONFIG.thresholds.milestonePoints.calendarDayStreak.minor,
+        ...PROACTIVE_CONFIG.thresholds.milestonePoints.calendarDayStreak.major
+      ].sort((a, b) => a - b);
+
+      let milestonesFound = 0;
+
+      for (const [normalizedNickname, spawnCount] of Object.entries(memberSpawnCounts)) {
+        // Get streak data
+        const streakDataResponse = await this.intelligence.sheetAPI.call('getStreakData', { nickname: normalizedNickname });
+        const streakData = streakDataResponse?.data || {};
+
+        let currentStreak = streakData.calendarDayStreak || 0;
+        const lastCheck = streakData.lastCalendarStreakCheck ? new Date(streakData.lastCalendarStreakCheck) : null;
+        const lastMilestone = streakData.lastCalendarStreakMilestone || 0;
+
+        // Check if attended 5+ spawns yesterday
+        if (spawnCount >= 5) {
+          // Increment streak
+          currentStreak++;
+          const longestStreak = Math.max(currentStreak, streakData.longestCalendarStreak || 0);
+
+          // Update streak data
+          await this.intelligence.sheetAPI.call('updateStreakData', {
+            nickname: normalizedNickname,
+            calendarDayStreak: currentStreak,
+            longestCalendarStreak: longestStreak,
+            lastCalendarStreakCheck: now.toISOString()
+          });
+
+          // Check for milestone
+          let highestMilestone = null;
+          for (const milestone of allMilestones) {
+            if (currentStreak >= milestone && milestone > lastMilestone) {
+              highestMilestone = milestone;
+            }
+          }
+
+          if (highestMilestone) {
+            milestonesFound++;
+            console.log(`🎉 [PROACTIVE] ${normalizedNickname} reached ${highestMilestone}-day calendar streak!`);
+
+            // Queue milestone
+            this.queueMilestone('calendarStreak', {
+              nickname: normalizedNickname,
+              milestone: highestMilestone,
+              streak: currentStreak
+            });
+
+            // Update milestone in streak data
+            await this.intelligence.sheetAPI.call('updateStreakData', {
+              nickname: normalizedNickname,
+              lastCalendarStreakMilestone: highestMilestone
+            });
+          }
+        } else {
+          // Missed day (< 5 spawns), reset streak
+          if (currentStreak > 0) {
+            console.log(`📉 [PROACTIVE] ${normalizedNickname} streak reset (only ${spawnCount} spawns yesterday)`);
+            await this.intelligence.sheetAPI.call('updateStreakData', {
+              nickname: normalizedNickname,
+              calendarDayStreak: 0,
+              lastCalendarStreakCheck: now.toISOString()
+            });
+          }
+        }
+      }
+
+      console.log(`✅ [PROACTIVE] Calendar day streak check complete: ${milestonesFound} new milestones`);
+
+    } catch (error) {
+      console.error('[PROACTIVE] Error checking calendar day streaks:', error);
+    }
+  }
+
+  /**
+   * Check perfect attendance week (Sunday 11:59 PM)
+   */
+  async checkPerfectAttendanceWeek() {
+    try {
+      console.log('⭐ [PROACTIVE] Checking perfect attendance week...');
+
+      // Calculate this week's date range (Monday 3:01 AM to Sunday 11:59 PM)
+      const now = new Date();
+      const weekStart = new Date(now);
+      weekStart.setHours(3, 1, 0, 0);
+      const dayOfWeek = weekStart.getDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      weekStart.setDate(weekStart.getDate() - daysToMonday);
+
+      const weekEnd = new Date(now);
+      weekEnd.setHours(23, 59, 0, 0);
+
+      console.log(`📊 [PROACTIVE] Checking spawns from ${weekStart.toISOString()} to ${weekEnd.toISOString()}`);
+
+      // Get all spawns this week
+      const response = await this.intelligence.sheetAPI.call('getAllWeeklyAttendance', {});
+      const allSheets = response?.data?.allSheets || response?.allSheets || [];
+
+      // Collect all spawns and attendees this week
+      const weekSpawns = [];
+      for (const sheet of allSheets) {
+        const columns = sheet.columns || [];
+        for (const col of columns) {
+          if (col.boss && col.timestamp) {
+            const spawnDate = new Date(col.timestamp);
+            if (spawnDate >= weekStart && spawnDate <= weekEnd) {
+              weekSpawns.push({
+                boss: col.boss,
+                timestamp: col.timestamp,
+                members: col.members || []
+              });
+            }
+          }
+        }
+      }
+
+      if (weekSpawns.length === 0) {
+        console.log('⚠️ [PROACTIVE] No spawns found this week');
+        return;
+      }
+
+      console.log(`📊 [PROACTIVE] Found ${weekSpawns.length} spawns this week`);
+
+      // Check each member's attendance
+      const memberAttendance = {};
+
+      for (const spawn of weekSpawns) {
+        for (const member of spawn.members) {
+          const normalized = this.normalizeUsername(member);
+          if (!memberAttendance[normalized]) {
+            memberAttendance[normalized] = { attended: 0, total: weekSpawns.length };
+          }
+          memberAttendance[normalized].attended++;
+        }
+      }
+
+      // Find members with 100% attendance
+      const perfectMembers = [];
+      for (const [nickname, data] of Object.entries(memberAttendance)) {
+        if (data.attended === data.total) {
+          perfectMembers.push(nickname);
+        }
+      }
+
+      console.log(`📊 [PROACTIVE] ${perfectMembers.length} members with perfect attendance this week`);
+
+      const allMilestones = [
+        ...PROACTIVE_CONFIG.thresholds.milestonePoints.perfectWeek.minor,
+        ...PROACTIVE_CONFIG.thresholds.milestonePoints.perfectWeek.major
+      ].sort((a, b) => a - b);
+
+      let milestonesFound = 0;
+
+      for (const nickname of perfectMembers) {
+        // Get streak data
+        const streakDataResponse = await this.intelligence.sheetAPI.call('getStreakData', { nickname });
+        const streakData = streakDataResponse?.data || {};
+
+        const perfectWeeksCount = (streakData.perfectWeeksCount || 0) + 1;
+        const lastMilestone = streakData.lastPerfectWeekMilestone || 0;
+
+        // Update perfect weeks count
+        await this.intelligence.sheetAPI.call('updateStreakData', {
+          nickname,
+          perfectWeeksCount,
+          lastPerfectWeekDate: now.toISOString()
+        });
+
+        // Check for milestone
+        let highestMilestone = null;
+        for (const milestone of allMilestones) {
+          if (perfectWeeksCount >= milestone && milestone > lastMilestone) {
+            highestMilestone = milestone;
+          }
+        }
+
+        if (highestMilestone) {
+          milestonesFound++;
+          console.log(`🎉 [PROACTIVE] ${nickname} reached ${highestMilestone} perfect weeks!`);
+
+          // Queue milestone
+          this.queueMilestone('perfectWeek', {
+            nickname,
+            milestone: highestMilestone,
+            weeks: perfectWeeksCount
+          });
+
+          // Update milestone
+          await this.intelligence.sheetAPI.call('updateStreakData', {
+            nickname,
+            lastPerfectWeekMilestone: highestMilestone
+          });
+        }
+      }
+
+      console.log(`✅ [PROACTIVE] Perfect week check complete: ${milestonesFound} new milestones`);
+
+    } catch (error) {
+      console.error('[PROACTIVE] Error checking perfect attendance week:', error);
+    }
+  }
+
+  /**
+   * Check consecutive spawn streak (called on attendance verification)
+   * This should be called from attendance.js when a member's attendance is verified
+   */
+  async checkConsecutiveSpawnStreak(nickname, currentSpawnTimestamp) {
+    try {
+      // Get streak data
+      const streakDataResponse = await this.intelligence.sheetAPI.call('getStreakData', { nickname });
+      const streakData = streakDataResponse?.data || {};
+
+      const lastSpawnDate = streakData.lastSpawnDate ? new Date(streakData.lastSpawnDate) : null;
+      let currentStreak = streakData.consecutiveSpawnStreak || 0;
+      const lastMilestone = streakData.lastSpawnStreakMilestone || 0;
+
+      // Get all recent spawns to check if this is consecutive
+      const response = await this.intelligence.sheetAPI.call('getAllWeeklyAttendance', {});
+      const allSheets = response?.data?.allSheets || response?.allSheets || [];
+
+      // Collect all spawns
+      const allSpawns = [];
+      for (const sheet of allSheets) {
+        const columns = sheet.columns || [];
+        for (const col of columns) {
+          if (col.boss && col.timestamp) {
+            allSpawns.push({
+              timestamp: new Date(col.timestamp),
+              members: col.members || []
+            });
+          }
+        }
+      }
+
+      // Sort spawns by timestamp
+      allSpawns.sort((a, b) => a.timestamp - b.timestamp);
+
+      // Find current spawn in list
+      const currentSpawnDate = new Date(currentSpawnTimestamp);
+      const currentSpawnIndex = allSpawns.findIndex(s =>
+        Math.abs(s.timestamp - currentSpawnDate) < 60000 // Within 1 minute
+      );
+
+      if (currentSpawnIndex === -1) {
+        console.log('[PROACTIVE] Current spawn not found in spawn list');
+        return;
+      }
+
+      // Check if member attended previous spawn
+      let attendedPrevious = false;
+      if (currentSpawnIndex > 0) {
+        const previousSpawn = allSpawns[currentSpawnIndex - 1];
+        const normalizedNickname = this.normalizeUsername(nickname);
+        attendedPrevious = previousSpawn.members.some(m =>
+          this.normalizeUsername(m) === normalizedNickname
+        );
+      } else {
+        // First spawn ever, start streak
+        attendedPrevious = false;
+      }
+
+      // Update streak
+      if (attendedPrevious || currentSpawnIndex === 0) {
+        currentStreak++;
+      } else {
+        // Missed previous spawn, reset to 1
+        currentStreak = 1;
+      }
+
+      const longestStreak = Math.max(currentStreak, streakData.longestSpawnStreak || 0);
+
+      // Update streak data
+      await this.intelligence.sheetAPI.call('updateStreakData', {
+        nickname,
+        consecutiveSpawnStreak: currentStreak,
+        longestSpawnStreak: longestStreak,
+        lastSpawnDate: currentSpawnDate.toISOString()
+      });
+
+      // Check for milestone
+      const allMilestones = [
+        ...PROACTIVE_CONFIG.thresholds.milestonePoints.consecutiveSpawnStreak.minor,
+        ...PROACTIVE_CONFIG.thresholds.milestonePoints.consecutiveSpawnStreak.major
+      ].sort((a, b) => a - b);
+
+      let highestMilestone = null;
+      for (const milestone of allMilestones) {
+        if (currentStreak >= milestone && milestone > lastMilestone) {
+          highestMilestone = milestone;
+        }
+      }
+
+      if (highestMilestone) {
+        console.log(`🎉 [PROACTIVE] ${nickname} reached ${highestMilestone} consecutive spawn streak!`);
+
+        // Queue milestone
+        this.queueMilestone('spawnStreak', {
+          nickname,
+          milestone: highestMilestone,
+          streak: currentStreak
+        });
+
+        // Update milestone
+        await this.intelligence.sheetAPI.call('updateStreakData', {
+          nickname,
+          lastSpawnStreakMilestone: highestMilestone
+        });
+      }
+
+    } catch (error) {
+      console.error('[PROACTIVE] Error checking consecutive spawn streak:', error);
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // ENHANCED EMBED CREATORS FOR NEW MILESTONE TYPES
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Create engagement milestone embed
+   */
+  createEngagementMilestoneEmbed(achievers, milestone, isMajor) {
+    const opening = this.pickRandom(this.getMilestoneOpenings());
+
+    const achieverList = achievers.map(a => {
+      return `🧠 **${a.nickname}** - Score: **${a.score}/100**`;
+    }).join('\n');
+
+    const color = isMajor ? 0x9B59B6 : 0x3498DB;
+
+    const description = achievers.length === 1
+      ? `**${achievers[0].nickname}** just reached **${milestone} engagement score!** 🧠\n\nYour dedication and consistency is outstanding! Keep up the excellent participation!\n\n${achieverList}`
+      : `**${achievers.length} members** just reached the **${milestone} engagement score** milestone! 🧠\n\nAmazing dedication from everyone! Keep it up!\n\n${achieverList}`;
+
+    return new EmbedBuilder()
+      .setColor(color)
+      .setTitle(`${opening}`)
+      .setDescription(description)
+      .setFooter({ text: `🧠 Engagement Score Milestone | Score: ${milestone}/100` })
+      .setTimestamp();
+  }
+
+  /**
+   * Create hybrid milestone embed
+   */
+  createHybridMilestoneEmbed(achiever, isMajor) {
+    const opening = this.pickRandom(this.getMilestoneOpenings());
+
+    const color = isMajor ? 0xFF6B35 : 0x4ECDC4;
+
+    const description = `**${achiever.nickname}** just achieved **${achiever.milestoneName}** status! 🔥\n\n` +
+      `✅ **${achiever.attendance}** attendance points\n` +
+      `✅ **${achiever.bidding}** bidding points\n\n` +
+      `This is balanced excellence! True guild dedication! 💪`;
+
+    return new EmbedBuilder()
+      .setColor(color)
+      .setTitle(`${opening}`)
+      .setDescription(description)
+      .setFooter({ text: `🔥 Hybrid Combo Milestone | ${achiever.milestoneName}` })
+      .setTimestamp();
+  }
+
+  /**
+   * Create guild-wide milestone embed
+   */
+  createGuildWideMilestoneEmbed(milestone) {
+    const opening = '🎊 ELYSIUM GUILD ACHIEVEMENT! 🎊';
+
+    let typeLabel = '';
+    let emoji = '';
+    let color = 0xFFD700;
+
+    if (milestone.milestoneType === 'attendance') {
+      typeLabel = 'Total Attendance Points';
+      emoji = '📊';
+    } else if (milestone.milestoneType === 'bidding') {
+      typeLabel = 'Total Bidding Points';
+      emoji = '💰';
+    } else if (milestone.milestoneType === 'activeMembers') {
+      typeLabel = 'Active Members';
+      emoji = '👥';
+      color = 0x2ECC71;
+    }
+
+    const description = `Together we've reached **${milestone.threshold.toLocaleString()} ${typeLabel}!** ${emoji}\n\n` +
+      `This is the result of EVERYONE's hard work!\n` +
+      `Every spawn attended, every boss killed - we did this TOGETHER!\n\n` +
+      `Current Value: **${milestone.totalValue.toLocaleString()}**\n\n` +
+      `Let's keep this momentum going! 💪`;
+
+    return new EmbedBuilder()
+      .setColor(color)
+      .setTitle(opening)
+      .setDescription(description)
+      .setFooter({ text: `🏆 Guild Achievement | ${typeLabel}` })
+      .setTimestamp();
+  }
+
+  /**
+   * Create streak milestone embed
+   */
+  createStreakMilestoneEmbed(achievers, milestone, streakType, isMajor) {
+    const opening = this.pickRandom(this.getMilestoneOpenings());
+
+    let typeLabel = '';
+    let emoji = '';
+    let color = isMajor ? 0xE74C3C : 0xF39C12;
+
+    if (streakType === 'spawnStreak') {
+      typeLabel = 'Consecutive Spawn Streak';
+      emoji = '⚡';
+    } else if (streakType === 'calendarStreak') {
+      typeLabel = 'Calendar Day Streak';
+      emoji = '📅';
+    } else if (streakType === 'perfectWeek') {
+      typeLabel = 'Perfect Attendance Weeks';
+      emoji = '⭐';
+    } else if (streakType === 'tenure') {
+      typeLabel = 'Days as Member';
+      emoji = '🗿';
+      color = isMajor ? 0x95A5A6 : 0xBDC3C7;
+    }
+
+    const achieverList = achievers.map(a => {
+      const value = a.streak || a.days || a.weeks;
+      return `${emoji} **${a.nickname}** - ${value} ${streakType === 'tenure' ? 'days' : streakType.includes('Week') ? 'weeks' : 'streak'}`;
+    }).join('\n');
+
+    const description = achievers.length === 1
+      ? `**${achievers[0].nickname}** just reached **${milestone} ${typeLabel}!** ${emoji}\n\nConsistency is key! Amazing dedication! 🔥\n\n${achieverList}`
+      : `**${achievers.length} members** just hit the **${milestone} ${typeLabel}** milestone! ${emoji}\n\nIncredible consistency from everyone!\n\n${achieverList}`;
+
+    return new EmbedBuilder()
+      .setColor(color)
+      .setTitle(`${opening}`)
+      .setDescription(description)
+      .setFooter({ text: `${emoji} ${typeLabel} | Milestone: ${milestone}` })
+      .setTimestamp();
   }
 
   /**
