@@ -75,10 +75,11 @@
  *    - Prevents spam and accidental duplicate submissions
  *    - Timestamp-based tracking in st.lb
  *
- * 4. TIME EXTENSION LOGIC:
- *    - Bids in final 60 seconds extend auction by 1 minute
+ * 4. TIME EXTENSION LOGIC (Anti-Snipe Protection):
+ *    - Bids in final 60 seconds extend auction by 60 seconds
  *    - Maximum 60 extensions prevents infinite auctions
  *    - Timers are CLEARED then RESCHEDULED to prevent double-firing
+ *    - Works in BOTH standalone and auctioneering modes
  *
  * 5. INSTANT BID PROCESSING:
  *    - All bids process immediately without confirmation delays
@@ -113,9 +114,9 @@
  * AUTOMATION:
  *   ✓ Automatic session finalization with results submission
  *   ✓ Going once/twice/final call announcements
- *   ✓ Countdown timers on bid confirmations
+ *   ✓ Time extension on late bids (anti-snipe protection)
  *   ✓ Auto-archive completed auction threads
- *   ✓ Scheduled cleanup of pending confirmations
+ *   ✓ Automatic cleanup of stale state entries
  *
  * ADMIN TOOLS:
  *   ✓ Force reset (!resetauction) - nuclear option for stuck auctions
@@ -2306,6 +2307,46 @@ async function procBid(msg, amt, cfg) {
     } catch (err) {
       // Silently fail - don't block auction for DM errors
     }
+  }
+
+  // ==========================================
+  // TIME EXTENSION - Prevent Bid Sniping
+  // ==========================================
+  // If bid comes in final 60 seconds, extend auction by 60 seconds
+  // This gives everyone fair chance to counter-bid
+  const timeLeft = a.endTime - Date.now();
+  if (!a.extCnt) a.extCnt = 0;
+
+  if (timeLeft < 60000 && timeLeft > 0 && a.extCnt < ME) {
+    // Clear all timers before updating endTime (prevent race condition)
+    ["goingOnce", "goingTwice", "finalCall", "auctionEnd"].forEach((k) => {
+      if (st.th[k]) {
+        clearTimeout(st.th[k]);
+        delete st.th[k];
+      }
+    });
+
+    // Extend auction time
+    const extensionTime = 60000; // 60 seconds
+    const oldEndTime = a.endTime;
+    a.endTime += extensionTime;
+    a.extCnt++;
+    save();
+
+    // Reschedule timers with new endTime
+    schedTimers(msg.client, cfg);
+
+    // Announce time extension
+    const newTimeLeft = Math.ceil((a.endTime - Date.now()) / 1000);
+    await msg.channel.send(
+      `⏰ **TIME EXTENDED!** Bid received in final minute.\n` +
+      `Auction extended by 60 seconds (Extension #${a.extCnt}/${ME})\n` +
+      `⏱️ New time remaining: **${newTimeLeft}s**`
+    );
+
+    console.log(
+      `⏰ [TIME EXTENSION] ${a.item} extended by 60s due to bid by ${u} (ext #${a.extCnt}/${ME})`
+    );
   }
 
   console.log(`[BID] ${u} bid ${bid}pts on ${a.item} (was: ${prevBid}pts, self: ${isSelf})`);
