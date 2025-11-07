@@ -46,7 +46,7 @@
 // DEPENDENCIES
 // ============================================================================
 
-const { EmbedBuilder } = require("discord.js");
+const { EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, ComponentType } = require("discord.js");
 const errorHandler = require('./utils/error-handler');
 
 // ============================================================================
