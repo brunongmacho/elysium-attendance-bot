@@ -533,7 +533,7 @@ async function createSpawnThreads(
  * 2. Identifies already-verified members from bot confirmation messages
  * 3. Finds pending member check-ins that need admin verification
  * 4. Detects pending closure confirmations
- * 5. Re-adds missing reactions to check-in messages
+ * 5. Identifies button-based verification replies (no longer adds reactions)
  *
  * VERIFICATION WORKFLOW:
  * - Member posts "present" or "here" with screenshot
@@ -599,49 +599,48 @@ async function scanThreadForPendingReactions(thread, client, bossName, parsed) {
 
     // Check if message is a valid check-in keyword
     if (["present", "here", "join", "checkin", "check-in"].includes(keyword)) {
-      const hasCheckmark = msg.reactions.cache.has("✅");
-      const hasX = msg.reactions.cache.has("❌");
-
       // Get member display name (nickname or username)
       const author = await thread.guild.members.fetch(msg.author.id).catch(() => null);
       const username = author ? (author.nickname || msg.author.username) : msg.author.username;
 
-      // Case 1: Has both reactions - check if already verified
-      if (hasCheckmark && hasX) {
-        // Look for verification confirmation message
-        const hasVerificationReply = messages.some(
-          (m) =>
-            m.reference?.messageId === msgId &&
-            m.author.id === client.user.id &&
-            m.content.includes("verified")
-        );
+      // Look for bot reply with buttons (new system) or verification confirmation
+      const hasBotReply = messages.some(
+        (m) =>
+          m.reference?.messageId === msgId &&
+          m.author.id === client.user.id &&
+          (m.components?.length > 0 || m.content.includes("verified"))
+      );
 
-        // If not verified, add to pending queue
-        if (!hasVerificationReply) {
-          pending.push({
-            messageId: msgId,
-            author: username,
-            authorId: msg.author.id,
-            timestamp: msg.createdTimestamp
-          });
-        }
+      // Look for verification confirmation message
+      const hasVerificationReply = messages.some(
+        (m) =>
+          m.reference?.messageId === msgId &&
+          m.author.id === client.user.id &&
+          m.content.includes("verified")
+      );
+
+      // If has bot reply but not verified, add to pending queue
+      if (hasBotReply && !hasVerificationReply) {
+        pending.push({
+          messageId: msgId,
+          author: username,
+          authorId: msg.author.id,
+          timestamp: msg.createdTimestamp
+        });
       }
-      // Case 2: Missing reactions - re-add them for recovery
-      else if (!hasCheckmark || !hasX) {
-        try {
-          if (!hasCheckmark) await msg.react("✅");
-          if (!hasX) await msg.react("❌");
+      // Legacy support: Check for old reaction-based system
+      else if (!hasBotReply) {
+        const hasCheckmark = msg.reactions.cache.has("✅");
+        const hasX = msg.reactions.cache.has("❌");
 
+        // Only process if it has reactions (legacy messages)
+        if (hasCheckmark && hasX && !hasVerificationReply) {
           pending.push({
             messageId: msgId,
             author: username,
             authorId: msg.author.id,
             timestamp: msg.createdTimestamp
           });
-
-          console.log(`  ├─ ✅ Re-added reactions to ${username}'s check-in`);
-        } catch (err) {
-          console.warn(`  ├─ ⚠️ Could not add reactions to message ${msgId}: ${err.message}`);
         }
       }
     }
@@ -662,7 +661,8 @@ async function scanThreadForPendingReactions(thread, client, bossName, parsed) {
  *
  * RECOVERY PROCESS:
  * - Scans thread messages to find check-in messages
- * - Re-adds missing ✅/❌ reactions to check-in messages
+ * - Identifies button-based verification replies (new system)
+ * - Supports legacy reaction-based messages (backward compatibility)
  * - Identifies already-verified members from bot confirmation messages
  * - Detects pending closure confirmations
  * - Links attendance threads with their admin confirmation threads
