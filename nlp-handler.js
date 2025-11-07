@@ -82,7 +82,6 @@ const NLP_CONFIG = {
     'leaderboardbidding',
     'bidstatus',
     'mypoints',
-    'bid',
     'loot',
 
     // Weekly reports
@@ -130,31 +129,6 @@ const NLP_CONFIG = {
  */
 
 const NLP_PATTERNS = {
-  // Bidding commands (FORMAL TONE - Filipino-focused)
-  bid: [
-    // TAGALOG - FORMAL (80% - PRIORITY)
-    /^(?:mag-?bid|magbid)\s+(?:po\s+)?(?:ako\s+)?(?:ng\s+)?(\d+)/i,  // "magbid po ako ng 500"
-    /^(?:gusto|nais)\s+(?:ko\s+)?(?:po\s+)?(?:mag-?bid|magbid)\s+(?:ng\s+)?(\d+)/i,  // "gusto ko po magbid ng 500"
-    /^(?:i-?bid|ibid)\s+(?:ko\s+)?(?:po\s+)?(\d+)/i,  // "ibid ko po 500"
-    /^(?:taya|lagay)\s+(?:ko\s+)?(?:po\s+)?(\d+)/i,    // "taya ko po 500"
-    /^(\d+)\s+(?:po|po\s+ba)$/i,    // "500 po"
-    /^(\d+)\s+(?:points?|pts)\s+(?:po|lang\s+po)/i,  // "500 points po"
-    /^(?:lagay|taya|bid)\s+(?:na\s+lang\s+)?(\d+)/i,  // "lagay na lang 500"
-    /^(\d+)\s+(?:na\s+lang|lang)$/i,  // "500 na lang" / "500 lang"
-    /^(?:pasok|sali)\s+(?:ako\s+)?(?:ng\s+)?(\d+)/i,  // "pasok ako ng 500"
-    /^(\d+)\s+(?:pesos?|pts?|points?)$/i,  // "500 points"
-
-    // TAGLISH - FORMAL (15%)
-    /^bid\s+(?:ko\s+)?(?:po\s+)?(\d+)/i,  // "bid ko po 500"
-    /^(?:gusto|gusto\s+kong)\s+(?:mag-?)?bid\s+(?:ng\s+)?(\d+)/i,  // "gusto kong magbid ng 500"
-    /^(\d+)\s+lang$/i,  // "500 lang"
-
-    // ENGLISH - FORMAL (5%)
-    /^(?:i\s+)?(?:would\s+like\s+to\s+)?bid\s+(\d+)/i,  // "I would like to bid 500"
-    /^(?:place\s+)?(?:a\s+)?bid\s+(?:of\s+)?(\d+)/i,  // "place a bid of 500"
-    /^(\d+)\s+points?$/i,  // "500 points"
-  ],
-
   // Points queries
   mypoints: [
     // English
