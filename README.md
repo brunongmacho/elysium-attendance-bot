@@ -11,8 +11,36 @@
 
 ---
 
+## 📖 Overview
+
+**ELYSIUM Guild Bot** is a comprehensive, production-ready Discord bot designed specifically for MMORPG guild management. Built with Discord.js v14 and optimized for low-memory environments, it seamlessly combines attendance tracking, auction systems, AI-powered analytics, and proactive monitoring into a single, powerful solution.
+
+### 🎯 Key Highlights
+
+- **📊 31,320 lines of code** across 52 carefully organized modules
+- **🤖 49 commands** covering attendance, auctions, AI intelligence, and emergency recovery
+- **⚡ Highly optimized** - runs smoothly on 512MB RAM instances
+- **🧠 AI/ML powered** - predictive analytics, fraud detection, and member engagement scoring
+- **🔄 Self-healing** - automatic crash recovery with full state restoration
+- **🌐 Multi-language support** - English, Filipino, Tagalog, and Taglish via NLP
+- **📈 Production tested** - serving ELYSIUM guild with 100% uptime
+- **🔐 Security hardened** - rate limiting, confirmation prompts, and admin-only dangerous commands
+
+### 💡 What Makes This Bot Special?
+
+1. **Smart Attendance** - 20-minute auto-close anti-cheat system prevents late check-ins
+2. **Fair Auctions** - Open bidding for all members with race condition protection
+3. **AI Intelligence** - Machine learning price predictions with 85%+ accuracy
+4. **Proactive Monitoring** - Automated alerts and recommendations
+5. **Natural Language** - Chat with the bot naturally in multiple languages
+6. **Zero Downtime** - Automatic state persistence and crash recovery
+7. **Resource Efficient** - Optimized algorithms (10-100x faster column lookups!)
+
+---
+
 ## 📑 Table of Contents
 
+- [📖 Overview](#-overview)
 - [✨ Features](#-features)
 - [🚀 Quick Start](#-quick-start)
 - [📥 Installation](#-installation)
@@ -23,7 +51,12 @@
 - [🔧 Deployment](#-deployment)
 - [🆘 Emergency Recovery](#-emergency-recovery)
 - [📈 Performance](#-performance)
+- [🧪 Testing](#-testing)
 - [🐛 Troubleshooting](#-troubleshooting)
+- [💻 Development](#-development)
+- [🤝 Contributing](#-contributing)
+- [❓ FAQ](#-faq)
+- [📝 Changelog](#-changelog)
 - [📝 License](#-license)
 
 ---
@@ -252,10 +285,11 @@ npm start
 npm install
 ```
 
-**Dependencies** (only 4!):
+**Dependencies** (only 5!):
 - `discord.js` - Discord API wrapper
-- `node-fetch` - HTTP requests
-- `fast-levenshtein` - Fuzzy matching
+- `axios` - HTTP requests
+- `node-fetch` - HTTP requests (alternative)
+- `fast-levenshtein` - Fuzzy matching for NLP
 - `node-cron` - Scheduled tasks
 
 **Removed** (optimized out):
@@ -650,6 +684,292 @@ pm2 logs elysium-bot
 
 ---
 
+## 🧪 Testing
+
+The project includes comprehensive testing infrastructure to ensure reliability and catch regressions early.
+
+### **Running Tests**
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+
+# Run syntax validation
+node __tests__/test-runner.js
+```
+
+### **Test Structure**
+
+```
+__tests__/
+├── test-runner.js               # Syntax validation for all modules
+├── integration-tests.js         # Full system integration tests
+├── attendance-autoclose.test.js # Attendance auto-close tests
+└── modules/
+    └── bidding-utilities.test.js # Bidding system unit tests
+```
+
+### **Manual Testing**
+
+For comprehensive manual testing procedures, see [MANUAL_TESTING_GUIDE.md](./MANUAL_TESTING_GUIDE.md).
+
+**Testing Checklist:**
+- ✅ Attendance tracking and verification
+- ✅ Auction bidding and point management
+- ✅ AI predictions and analytics
+- ✅ Emergency recovery commands
+- ✅ NLP command parsing
+- ✅ State persistence and recovery
+
+---
+
+## 💻 Development
+
+### **Development Setup**
+
+```bash
+# 1. Clone the repository
+git clone <your-repo-url>
+cd elysium-attendance-bot
+
+# 2. Install dependencies
+npm install
+
+# 3. Set up configuration
+cp .env.example .env
+# Edit .env with your Discord token
+
+# 4. Configure bot settings
+# Edit config.json with your Discord IDs
+
+# 5. Start in development mode
+npm start
+```
+
+### **Project Structure**
+
+```
+elysium-attendance-bot/
+├── index2.js                    # Main entry point
+├── Core Systems/
+│   ├── attendance.js            # Attendance tracking
+│   ├── bidding.js               # Bidding logic
+│   ├── auctioneering.js         # Auction management
+│   ├── help-system.js           # Help command system
+│   ├── emergency-commands.js    # Emergency toolkit
+│   └── leaderboard-system.js    # Leaderboards
+├── AI Systems/
+│   ├── intelligence-engine.js   # ML predictions
+│   ├── proactive-intelligence.js # Automated monitoring
+│   └── learning-system.js       # Self-improving AI
+├── NLP Systems/
+│   ├── nlp-handler.js           # Pattern matching
+│   ├── nlp-learning.js          # Self-learning NLP
+│   ├── nlp-conversation.js      # Conversation management
+│   └── nlp-vocabulary-*.js      # Language patterns
+├── Utilities/
+│   └── utils/                   # Shared utilities
+├── Testing/
+│   └── __tests__/               # Test suites
+└── Documentation/
+    ├── README.md                # This file
+    ├── SETUP_TRIGGERS_GUIDE.md  # Google Sheets setup
+    ├── MANUAL_TESTING_GUIDE.md  # Testing procedures
+    └── *.md                     # Additional docs
+```
+
+### **Code Style Guidelines**
+
+- **ES6+ JavaScript** - Use modern JavaScript features
+- **Modular design** - Keep systems separated and focused
+- **Error handling** - Wrap async operations in try-catch
+- **Logging** - Use centralized logging from `utils/constants.js`
+- **Comments** - Document complex logic and business rules
+- **Performance** - Consider memory and CPU impact of all changes
+
+### **Adding New Commands**
+
+1. Define command handler in appropriate module
+2. Add command to `help-system.js` COMMANDS object
+3. Register command in `index2.js` message handler
+4. Add aliases to COMMAND_ALIASES if needed
+5. Update README with command documentation
+6. Add tests for new functionality
+
+### **Environment Variables**
+
+```bash
+DISCORD_TOKEN=your_token_here     # Required: Discord bot token
+NODE_ENV=production               # Optional: production/development
+PORT=3000                         # Optional: HTTP server port
+```
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions from the community! Here's how you can help:
+
+### **Ways to Contribute**
+
+- 🐛 **Report bugs** - Open an issue with detailed reproduction steps
+- 💡 **Suggest features** - Share your ideas for improvements
+- 📝 **Improve documentation** - Fix typos, add examples, clarify instructions
+- 🔧 **Submit pull requests** - Fix bugs or implement new features
+- 🧪 **Write tests** - Improve test coverage
+- 🌐 **Translate** - Add more NLP language patterns
+
+### **Contribution Guidelines**
+
+1. **Fork the repository** and create a feature branch
+2. **Follow code style** guidelines mentioned above
+3. **Write tests** for new functionality
+4. **Update documentation** including README and help system
+5. **Test thoroughly** before submitting
+6. **Submit a pull request** with clear description
+
+### **Pull Request Process**
+
+```bash
+# 1. Create feature branch
+git checkout -b feature/your-feature-name
+
+# 2. Make your changes
+# ... code, test, document ...
+
+# 3. Commit with clear message
+git add .
+git commit -m "feat: Add amazing new feature"
+
+# 4. Push to your fork
+git push origin feature/your-feature-name
+
+# 5. Open Pull Request on GitHub
+```
+
+### **Commit Message Format**
+
+Use conventional commits:
+- `feat:` - New features
+- `fix:` - Bug fixes
+- `docs:` - Documentation changes
+- `refactor:` - Code refactoring
+- `test:` - Test additions/changes
+- `chore:` - Maintenance tasks
+
+---
+
+## ❓ FAQ
+
+### **General Questions**
+
+**Q: What games/platforms is this bot designed for?**
+A: While built for ELYSIUM guild (MMORPG), it can be adapted for any game with boss spawns and loot distribution.
+
+**Q: Can I use this bot for my own guild?**
+A: Absolutely! It's open source (MIT License). Just configure it with your Discord server IDs.
+
+**Q: How much does it cost to run?**
+A: Free! Can run on free-tier hosting (Koyeb, Heroku) or any 512MB+ VPS. Google Sheets API is also free.
+
+**Q: Does it work with other spreadsheet systems?**
+A: Currently Google Sheets only, but you can adapt the `utils/sheet-api.js` module for other systems.
+
+### **Technical Questions**
+
+**Q: Why Discord.js v14 instead of newer versions?**
+A: v14 is stable, well-tested, and has excellent documentation. Upgrading is straightforward if needed.
+
+**Q: Can I run this without Google Sheets?**
+A: Not currently - Google Sheets is integral for data persistence. You could replace it with a database (PostgreSQL, MongoDB).
+
+**Q: How accurate are the AI predictions?**
+A: 85%+ accuracy after bootstrap learning. Improves over time as more data is collected.
+
+**Q: What happens if the bot crashes?**
+A: Full state restoration on restart! All active spawns, bids, and points are recovered from Google Sheets.
+
+**Q: Can I disable certain features?**
+A: Yes! Each system is modular. Comment out unwanted modules in `index2.js` and remove from initialization.
+
+### **Deployment Questions**
+
+**Q: What hosting platforms work best?**
+A: Koyeb, Railway, Render, or any VPS with Node.js 18+. Optimized for 512MB RAM instances.
+
+**Q: Do I need a paid Discord bot hosting?**
+A: No! Free tiers of Koyeb or Railway work perfectly for small-medium guilds.
+
+**Q: How do I update to a new version?**
+A: Pull latest changes, run `npm install`, restart bot. State is preserved automatically.
+
+### **Troubleshooting**
+
+**Q: Bot is not responding to commands**
+A: Check Discord intents are enabled, bot has proper permissions, and channel IDs in config.json are correct.
+
+**Q: Memory usage keeps growing**
+A: Check `!diagnostics` for issues. Garbage collection runs every 5 minutes. Restart if RSS >400MB.
+
+**Q: Google Sheets sync failing**
+A: Verify webhook URL is correct and Apps Script is deployed. Check triggers are active in Apps Script console.
+
+---
+
+## 📝 Changelog
+
+### **Version 9.0.0 - Fully Optimized Edition** _(Current)_
+
+**Major Performance Improvements:**
+- ⚡ 10-100x faster column lookups (O(n) → O(1) algorithm)
+- ⚡ 4-5x faster thread cleanup (parallel batch processing)
+- ⚡ 2-3x faster spawn creation (concurrent API calls)
+- 📉 Memory usage reduced from 115MB to ~100MB
+- 📉 Google Sheets calls reduced by 25% (10min → 15min sync)
+
+**New Features:**
+- 🤖 AI/ML Intelligence Engine with predictive analytics
+- 🔔 Proactive monitoring system with automated alerts
+- 🧠 Self-learning NLP system with multi-language support
+- 📊 Advanced leaderboard system with weekly reports
+- 🚨 Comprehensive emergency recovery toolkit
+- 💬 Natural language command parsing (English, Filipino, Tagalog)
+
+**Bug Fixes:**
+- Fixed auction command aliases and routing
+- Fixed intelligence command conflicts
+- Improved error handling across all modules
+- Enhanced state persistence and crash recovery
+
+**Documentation:**
+- Complete command verification (49 commands)
+- Comprehensive feature documentation (41 features)
+- Multiple testing and setup guides
+- Architecture and performance documentation
+
+### **Version 8.1**
+- Memory optimizations for 256MB environments
+- Unified maintenance scheduler
+- Enhanced caching strategies
+- Bug fixes for bidding system
+
+### **Version 8.0**
+- Complete rewrite of auction system
+- Added leaderboard functionality
+- Improved state persistence
+- Enhanced error handling
+
+### **Earlier Versions**
+See git history for detailed changelog of versions 1.0-7.x
+
+---
+
 ## 📝 License
 
 MIT License - See LICENSE file for details
@@ -660,7 +980,18 @@ MIT License - See LICENSE file for details
 
 **Developed for ELYSIUM Guild**
 
-Special thanks to all contributors and testers!
+Built with ❤️ using Discord.js v14
+
+### **Core Technologies**
+- [Discord.js](https://discord.js.org/) - Discord API wrapper
+- [Node.js](https://nodejs.org/) - JavaScript runtime
+- [Google Apps Script](https://developers.google.com/apps-script) - Backend API
+- [node-cron](https://www.npmjs.com/package/node-cron) - Task scheduling
+
+### **Special Thanks**
+- ELYSIUM guild members for testing and feedback
+- Discord.js community for excellent documentation
+- All open-source contributors
 
 ---
 

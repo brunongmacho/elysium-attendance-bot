@@ -36,6 +36,7 @@ ENV PORT=3000
 EXPOSE 3000
 EXPOSE 8000
 
-# ✅ Entry file is index2.js with GC flags and memory limit for Koyeb (256MB RAM)
-# Using 220MB limit to leave 36MB for system overhead
-CMD ["--expose-gc", "--max-old-space-size=220", "index2.js"]
+# ✅ Entry file is index2.js with GC flags and memory limit for Koyeb (512MB RAM)
+# Using 450MB limit to leave ~62MB for system overhead
+# Optimized for size with aggressive garbage collection
+CMD ["--expose-gc", "--max-old-space-size=450", "--optimize-for-size", "--gc-interval=100", "index2.js"]
