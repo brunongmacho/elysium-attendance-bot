@@ -4145,12 +4145,43 @@ client.on(Events.MessageCreate, async (message) => {
     const botMentioned = message.mentions.users.has(client.user.id);
     const contentLower = message.content.toLowerCase().trim();
 
-    // Quick insult pattern check (most common Filipino and English profanity)
-    const hasInsult = /(?:putang\s*ina|tangina|kinangina|king\s*ina|gago|ulol|bobo|tanga|fuck\s+you|hayop|buwisit|leche|peste|tarantado|puta|kupal|pakyu|pakshet|amputa|pucha|yawa|ungas|gunggong|engot|hinayupak)/i.test(contentLower);
+    // Check if this is a reply to a bot message
+    let isReplyToBot = false;
+    if (message.reference && message.reference.messageId) {
+      try {
+        const repliedMessage = await message.channel.messages.fetch(message.reference.messageId);
+        if (repliedMessage && repliedMessage.author.id === client.user.id) {
+          isReplyToBot = true;
+          console.log(`💬 [NLP] User replying to bot message - treating as conversation`);
+        }
+      } catch (error) {
+        console.error('Error fetching replied message:', error);
+      }
+    }
 
-    if (hasInsult && botMentioned && nlpLearningSystem) {
-      // This is likely an insult/roast - handle as conversation, not command
-      console.log(`🔥 [NLP] Detected insult pattern - skipping command interpretation`);
+    // Comprehensive insult pattern check (Filipino + English profanity and gaming taunts)
+    // Covers: Core Filipino profanity, text speak, regional variants, gaming taunts, English insults
+    const hasInsult = /(?:putang\s*ina|tangina|tanginang|kinangina|king\s*ina|kingina|putangina|gago|gagong|gagohan|kagaguhan|ulol|kaulol|bobo|tanga|katangahan|fuck\s+you|fuck\s+off|fuck|hayop|hinayupak|buwisit|bwisit|bwiset|buset|bwesit|bweset|leche|peste|tarantado|puta|pokpok|kupal|pakyu|pakshet|pakingshet|amputa|amfuta|amshet|amshit|ampucha|amputcha|pucha|putcha|yawa|yawaa|yawaon|pisting|ungas|gunggong|ggng|gnggng|engot|shunga|timang|abnoy|hudas|lintik|punyeta|walanghiya|gaga|salot|tite|puke|kantot|supot|bruha|taong\s+grasa|basura|dumi|walang\s+(?:kwenta|silbi|utak|alam|breeding|modo|hiya)|inutil|squammy|skwater|epal|jejemon|jologs|baduy|cheap|mukhang\s+pera|buwakaw|bano|bwesit|hangal|mangmang|ignorante|palpak|sablay|bulok)/i.test(contentLower) ||
+      /(?:tng\s*ina|tngnina|kngn|kngin|pksht|pkyou|fcku|gg0|bb0|tng4|g4g0|ul0l|b0b0|bno|bnong|ngng|nggg)/i.test(contentLower) ||
+      /(?:atay|buang|bugo|ambak|giatay|unggoy|baboy|baboyan|pisot|ukinnam|agkakapuy|sakim|takla)/i.test(contentLower) ||
+      /(?:shit|damn|ass|bitch|bastard|stupid|idiot|moron|dumb|retard|dumbass|smartass|jackass|asshole|dipshit|piece\s+of\s+shit|useless|trash|garbage|suck|pathetic|loser|clown|joke|waste|failure|disappointment|embarrassment)/i.test(contentLower) ||
+      /(?:noob|nub|newb|scrub|weak|rekt|pwned|owned|destroyed|demolished|get\s+(?:rekt|good|gud|wrecked|destroyed|owned|pwned)|mad|salty|tilted|crying|cope|skill\s+issue|ratio|L\s+bozo|hardstuck|boosted|carried|bottom\s+tier|bronze|iron|wood|inting|feeding|griefing|trolling|throwing|cringe|washed|washed\s+up)/i.test(contentLower) ||
+      /(?:mahina|duwag|talo|bugbug|bugbog|panalo|malas|walang\s+(?:laban|gana|skill|galing|diskarte)|ang\s+(?:weak|mahina|duwag|talo|bugbog|pangit|bano|bobo|tanga|gago|ulol)\s+mo|bugbog\s+sarado|talo\s+ka|wala\s+kang\s+laban|sablay\s+ka|noob\s+ka|newbie\s+ka|baguhan\s+ka|bobo\s+maglaro|lutang|hina|takot|daya|cheater|feeder|carry\s+mo|dala\s+mo|pasanin|deadweight|pabigat|lag|lagger|mabagal|masakit\s+sa\s+mata|nakakairita|one\s+trick|tryhard|smurf|booster|account\s+buyer)/i.test(contentLower) ||
+      /(?:ez\s+lang|easy\s+lang|noob\s+naman|weak\s+naman|bano\s+naman|talo\s+na|bugbog\s+ka|walang\s+laban\s+yan|sablay\s+yarn|git\s+gud|get\s+good|mag\s+(?:practice|training)|balik\s+tutorial|GG\s+ez|gg\s+ka|talo\s+ka\s+na|sayang\s+effort|toxic\s+ka|salty\s+ka|bitter\s+ka|masakit\s+ba|hard\s+carry\s+mo|need\s+carry|pinapabuhat|pasan\s+ka|low\s+elo|trash\s+tier|baba\s+rank)/i.test(contentLower) ||
+      /(?:you\s+(?:suck|are\s+(?:bad|trash|garbage|useless|stupid|dumb|weak))|bot\s+(?:sucks|is\s+bad|trash|useless|broken|stupid|bano|tanga|bobo)|your\s+(?:bot|system|code)\s+(?:sucks|trash|broken|pangit|bano)|worst\s+bot|trash\s+bot|useless\s+bot|bano\s+bot|tanga\s+bot|bot\s+mo\s+(?:bano|bobo|tanga|walang\s+kwenta)|buggy|laggy|error|broken|malfunction|crash|shit\s+bot)/i.test(contentLower) ||
+      /(?:gago\s+ka|ulol\s+ka|bobo\s+ka|tanga\s+ka|supot\s+ka|bano\s+ka|engot\s+ka|gunggong\s+ka|abnoy\s+ka|timang\s+ka|hangal\s+ka|nakakahiya\s+ka|kahihiyan|basura\s+ka|dumi\s+ka|kingina\s+mo|tangina\s+mo|gago\s+ka\s+pala|mas\s+(?:bobo|tanga|bano|mahina|pangit)\s+ka\s+pa|parang\s+(?:bobo|tanga|bano|ungas|gago)\s+ka|mukhang\s+(?:bobo|tanga|gago|ungas|tae))/i.test(contentLower);
+
+    // Check for laughter/reaction (common response to roasts)
+    // Matches: HAHAHA, HEHEHEHE, LOL, LMAO, etc. (with 4+ repetitions for long laughs)
+    const isLaughter = /^(?:[ha]{4,}|[he]{4,}|[hi]{4,}|[ho]{4,}|lol+|lmao+|rofl+|aha+ha+|ehe+he+|hue+|kek+|jaja+|jeje+|huhu+|wkwk+|😂+|🤣+|💀+|\s|!|\?|\.)*$/i.test(contentLower);
+
+    // Laughter only treated as conversation if replying to bot (common reaction to roasts)
+    const isLaughterReply = isLaughter && isReplyToBot;
+
+    if ((hasInsult || isReplyToBot || isLaughterReply) && (botMentioned || isReplyToBot || isLaughterReply) && nlpLearningSystem) {
+      // This is likely an insult/roast/laughter or reply to bot - handle as conversation, not command
+      const detectionReason = isLaughterReply ? 'laughter reply' : (hasInsult ? 'insult pattern' : 'reply to bot');
+      console.log(`🔥 [NLP] Detected ${detectionReason} - skipping command interpretation`);
       const conversationResponse = await nlpLearningSystem.handleConversation(message);
 
       if (conversationResponse) {
