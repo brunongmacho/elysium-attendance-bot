@@ -909,18 +909,18 @@ class ProactiveIntelligence {
 
           await channel.send({ embeds: [embed] });
 
-          // Batch update Google Sheets for all achievers (parallel execution)
-          console.log(`   📝 Updating ${achievers.length} members in Google Sheets (parallel)...`);
+          // Batch update Google Sheets for all achievers (sequential to prevent overwrites)
+          console.log(`   📝 Updating ${achievers.length} members in Google Sheets (sequential)...`);
           const updateStartTime = Date.now();
 
-          await Promise.all(achievers.map(achiever =>
-            this.intelligence.sheetAPI.call('updateMilestoneHistory', {
+          for (const achiever of achievers) {
+            await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: `${achiever.nickname}-attendance`,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'attendance'
-            }, { silent: true }) // Silent mode: no individual API logs
-          ));
+            }, { silent: true }); // Silent mode: no individual API logs
+          }
 
           const updateDuration = ((Date.now() - updateStartTime) / 1000).toFixed(1);
           milestonesAnnounced++;
@@ -951,18 +951,18 @@ class ProactiveIntelligence {
 
           await channel.send({ embeds: [embed] });
 
-          // Batch update Google Sheets for all achievers (parallel execution)
-          console.log(`   📝 Updating ${achievers.length} members in Google Sheets (parallel)...`);
+          // Batch update Google Sheets for all achievers (sequential to prevent overwrites)
+          console.log(`   📝 Updating ${achievers.length} members in Google Sheets (sequential)...`);
           const updateStartTime = Date.now();
 
-          await Promise.all(achievers.map(achiever =>
-            this.intelligence.sheetAPI.call('updateMilestoneHistory', {
+          for (const achiever of achievers) {
+            await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: `${achiever.nickname}-bidding`,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'bidding'
-            }, { silent: true }) // Silent mode: no individual API logs
-          ));
+            }, { silent: true }); // Silent mode: no individual API logs
+          }
 
           const updateDuration = ((Date.now() - updateStartTime) / 1000).toFixed(1);
           milestonesAnnounced++;
