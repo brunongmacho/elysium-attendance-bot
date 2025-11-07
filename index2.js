@@ -4,7 +4,7 @@
  * =====================================================================
  *
  * @file index2.js
- * @version 8.1
+ * @version 9.0.0
  * @description Comprehensive Discord bot for ELYSIUM guild management,
  *              integrating attendance tracking and auction bidding systems
  *              with Google Sheets synchronization.
