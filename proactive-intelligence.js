@@ -69,10 +69,19 @@ const PROACTIVE_CONFIG = {
     inactiveDays: 14,                          // 14 days = inactive
     engagementWarning: 40,                     // <40/100 = at-risk
 
-    // Milestone Tiers (Tiered Channel Routing)
+    // Milestone Tiers - SEPARATE for Attendance vs Bidding
+    // Attendance: 1 point per boss spawn
+    // Bidding: Attendance × Boss Point Value (actual boss points: 1-3, average ~1.5-2)
     milestonePoints: {
-      major: [1000, 1500, 2000, 3000, 5000, 7500, 10000],  // Guild Announcements
-      minor: [100, 250, 500, 750]                          // Guild Chat
+      attendance: {
+        major: [1000, 1500, 2000, 3000, 5000, 7500, 10000],  // Guild Announcements
+        minor: [100, 250, 500, 750]                          // Guild Chat
+      },
+      bidding: {
+        // Roughly 2x attendance (boss points: 1pt=15 bosses, 2pt=10 bosses, 3pt=8 bosses, avg ~1.5-2x)
+        major: [2000, 3000, 4000, 6000, 10000, 15000, 20000],  // Guild Announcements
+        minor: [200, 500, 1000, 1500]                           // Guild Chat
+      }
     },
   },
 
@@ -756,10 +765,15 @@ class ProactiveIntelligence {
         return;
       }
 
-      // Define milestone tiers
-      const MILESTONES = PROACTIVE_CONFIG.thresholds.milestonePoints;
-      const allMilestones = [...MILESTONES.minor, ...MILESTONES.major].sort((a, b) => a - b);
-      console.log(`🎯 [PROACTIVE] Milestone thresholds: ${allMilestones.join(', ')}`);
+      // Define milestone tiers - SEPARATE for each type
+      const ATTENDANCE_MILESTONES = PROACTIVE_CONFIG.thresholds.milestonePoints.attendance;
+      const BIDDING_MILESTONES = PROACTIVE_CONFIG.thresholds.milestonePoints.bidding;
+
+      const attendanceMilestoneArray = [...ATTENDANCE_MILESTONES.minor, ...ATTENDANCE_MILESTONES.major].sort((a, b) => a - b);
+      const biddingMilestoneArray = [...BIDDING_MILESTONES.minor, ...BIDDING_MILESTONES.major].sort((a, b) => a - b);
+
+      console.log(`🎯 [PROACTIVE] Attendance milestones: ${attendanceMilestoneArray.join(', ')}`);
+      console.log(`💰 [PROACTIVE] Bidding milestones: ${biddingMilestoneArray.join(', ')}`);
 
       // Track stats
       let membersChecked = 0;
@@ -781,7 +795,7 @@ class ProactiveIntelligence {
 
         // Find LATEST milestone they've crossed
         let latestMilestone = null;
-        for (const milestone of allMilestones) {
+        for (const milestone of attendanceMilestoneArray) {
           if (totalPoints >= milestone && milestone > lastMilestone) {
             latestMilestone = milestone;
           }
@@ -800,8 +814,8 @@ class ProactiveIntelligence {
             // Find Discord user for mention
             const discordMember = await this.findGuildMember(guild, nickname);
 
-            // Determine channel
-            const channel = MILESTONES.major.includes(latestMilestone)
+            // Determine channel (use attendance thresholds)
+            const channel = ATTENDANCE_MILESTONES.major.includes(latestMilestone)
               ? guildAnnouncementChannel
               : guildChatChannel;
 
@@ -812,7 +826,8 @@ class ProactiveIntelligence {
               totalPoints,
               lastMilestone,
               'attendance',
-              discordMember
+              discordMember,
+              attendanceMilestoneArray
             );
 
             await channel.send({ embeds: [embed] });
@@ -847,7 +862,7 @@ class ProactiveIntelligence {
 
         // Find LATEST milestone they've crossed
         let latestMilestone = null;
-        for (const milestone of allMilestones) {
+        for (const milestone of biddingMilestoneArray) {
           if (totalPoints >= milestone && milestone > lastMilestone) {
             latestMilestone = milestone;
           }
@@ -866,8 +881,8 @@ class ProactiveIntelligence {
             // Find Discord user for mention
             const discordMember = await this.findGuildMember(guild, nickname);
 
-            // Determine channel
-            const channel = MILESTONES.major.includes(latestMilestone)
+            // Determine channel (use bidding thresholds)
+            const channel = BIDDING_MILESTONES.major.includes(latestMilestone)
               ? guildAnnouncementChannel
               : guildChatChannel;
 
@@ -878,7 +893,8 @@ class ProactiveIntelligence {
               totalPoints,
               lastMilestone,
               'bidding',
-              discordMember
+              discordMember,
+              biddingMilestoneArray
             );
 
             await channel.send({ embeds: [embed] });
@@ -953,15 +969,11 @@ class ProactiveIntelligence {
    * @param {number} lastMilestone - Previous milestone
    * @param {string} milestoneType - 'attendance' or 'bidding'
    * @param {GuildMember|null} discordMember - Discord member for mention
+   * @param {Array<number>} milestoneArray - Array of milestone thresholds for this type
    */
-  async createMilestoneEmbed(member, milestone, totalPoints, lastMilestone, milestoneType, discordMember) {
-    // Calculate next milestone
-    const allMilestones = [
-      ...PROACTIVE_CONFIG.thresholds.milestonePoints.minor,
-      ...PROACTIVE_CONFIG.thresholds.milestonePoints.major
-    ].sort((a, b) => a - b);
-
-    const nextMilestone = allMilestones.find(m => m > milestone);
+  async createMilestoneEmbed(member, milestone, totalPoints, lastMilestone, milestoneType, discordMember, milestoneArray) {
+    // Calculate next milestone using the provided milestone array
+    const nextMilestone = milestoneArray.find(m => m > milestone);
 
     // Pick random components from variety system
     const opening = this.pickRandom(this.getMilestoneOpenings());
@@ -969,7 +981,8 @@ class ProactiveIntelligence {
     const closing = this.getMilestoneClosing(nextMilestone, totalPoints);
 
     // Determine color based on milestone type
-    const isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.major.includes(milestone);
+    const milestoneConfig = PROACTIVE_CONFIG.thresholds.milestonePoints[milestoneType];
+    const isMajor = milestoneConfig.major.includes(milestone);
     let color;
     if (milestoneType === 'attendance') {
       color = isMajor ? 0xFFD700 : 0x00FF00; // Gold or Green for attendance
