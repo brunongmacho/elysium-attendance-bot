@@ -223,6 +223,7 @@ class NLPLearningSystem {
     // Sync timer
     this.syncTimer = null;
     this.lastSync = null;
+    this.isSyncing = false; // Flag to prevent concurrent syncs
 
     // Statistics
     this.stats = {
@@ -518,6 +519,12 @@ class NLPLearningSystem {
   }
 
   considerLearningPattern(phrase, command, params = []) {
+    // CRITICAL: Never learn insults as commands
+    if (this.isInsult(phrase)) {
+      console.log(`🚫 [NLP Learning] Refusing to learn insult as pattern: "${phrase}"`);
+      return;
+    }
+
     const key = phrase.toLowerCase().trim();
 
     // If already learned, boost confidence
@@ -561,6 +568,12 @@ class NLPLearningSystem {
    * Suggest what command a phrase might mean using fuzzy matching + semantic understanding
    */
   suggestCommandForPhrase(phrase) {
+    // CRITICAL: Never suggest commands for insults
+    if (this.isInsult(phrase)) {
+      console.log(`🚫 [NLP Learning] Refusing to suggest command for insult: "${phrase}"`);
+      return null;
+    }
+
     const normalized = phrase.toLowerCase().trim();
     const words = normalized.split(/\s+/);
 
@@ -764,6 +777,12 @@ class NLPLearningSystem {
    */
   async offerToLearnPattern(message, phrase, command, confidence, wasUnrecognized = false) {
     try {
+      // CRITICAL: Never offer to learn insults
+      if (this.isInsult(phrase)) {
+        console.log(`🚫 [NLP Learning] Refusing to offer learning for insult: "${phrase}"`);
+        return;
+      }
+
       // Don't offer to learn if we've already offered recently for this phrase
       const key = phrase.toLowerCase().trim();
       if (this.pendingConfirmations && this.pendingConfirmations.has(key)) {
@@ -831,7 +850,16 @@ class NLPLearningSystem {
 
         if (isConfirm) {
           // Learn this pattern!
-          this.teachPattern(phrase, command, interaction.user.id);
+          const learned = this.teachPattern(phrase, command, interaction.user.id);
+
+          if (!learned) {
+            // Pattern was blocked (likely an insult)
+            await interaction.update({
+              content: `❌ Sorry, I can't learn that phrase - it contains inappropriate content.`,
+              components: [disabledRow]
+            });
+            return;
+          }
 
           // Remove from unrecognized phrases (now it's learned!)
           const normalizedKey = phrase.toLowerCase().trim();
@@ -961,6 +989,52 @@ class NLPLearningSystem {
   }
 
   // ═════════════════════════════════════════════════════════════════════════
+  // INSULT DETECTION & FILTERING
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Check if a phrase contains insults or inappropriate content
+   * Prevents the system from learning offensive patterns
+   * @param {string} content - The phrase to check
+   * @returns {boolean} True if content contains insults
+   */
+  isInsult(content) {
+    const { CONVERSATION_PATTERNS } = require('./nlp-conversation.js');
+
+    if (!content || typeof content !== 'string') return false;
+
+    const normalized = content.toLowerCase().trim();
+
+    // Check against all insult patterns from nlp-conversation.js
+    if (CONVERSATION_PATTERNS.insult && CONVERSATION_PATTERNS.insult.patterns) {
+      for (const pattern of CONVERSATION_PATTERNS.insult.patterns) {
+        if (pattern.test(normalized)) {
+          console.log(`🚫 [NLP Learning] Blocked insult pattern: "${content}"`);
+          return true;
+        }
+      }
+    }
+
+    // Additional check for common inappropriate words (backup filter)
+    const inappropriateWords = [
+      'putang', 'tangina', 'kingina', 'gago', 'ulol', 'tanga', 'bobo',
+      'puke', 'tite', 'kantot', 'kupal', 'fuck', 'shit', 'bitch',
+      'bastard', 'ass', 'damn', 'puta', 'leche', 'peste', 'tarantado',
+      'hayop', 'hinayupak', 'bwisit', 'ungas', 'gunggong', 'shunga',
+      'engot', 'supot', 'yawa', 'bruha', 'punyeta', 'pakshet'
+    ];
+
+    for (const word of inappropriateWords) {
+      if (normalized.includes(word)) {
+        console.log(`🚫 [NLP Learning] Blocked inappropriate word: "${word}" in "${content}"`);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
   // UNRECOGNIZED PHRASES TRACKING
   // ═════════════════════════════════════════════════════════════════════════
 
@@ -970,6 +1044,12 @@ class NLPLearningSystem {
 
     // Skip if it looks like casual conversation
     if (content.split(/\s+/).length > 10) return;
+
+    // CRITICAL: Skip insults and inappropriate content
+    if (this.isInsult(content)) {
+      console.log(`🚫 [NLP Learning] Skipping insult from unrecognized tracking: "${content}"`);
+      return;
+    }
 
     const key = content.toLowerCase().trim();
 
@@ -1063,87 +1143,118 @@ class NLPLearningSystem {
   }
 
   async syncToGoogleSheets() {
-    const maxRetries = 4;
+    // Prevent concurrent syncs (reduces memory pressure)
+    if (this.isSyncing) {
+      console.log('🧠 [NLP Learning] Sync already in progress, skipping...');
+      return;
+    }
+
+    this.isSyncing = true;
+    const maxRetries = 2; // Reduced from 4 to avoid memory buildup
     const baseDelay = 2000; // 2 seconds
 
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        const sheetsUrl = this.config.sheet_webhook_url;
-        if (!sheetsUrl) return;
+    try {
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const sheetsUrl = this.config.sheet_webhook_url;
+          if (!sheetsUrl) return;
 
-        // Prepare data
-        const patterns = Array.from(this.learnedPatterns.values());
-        const preferences = Array.from(this.userPreferences.values()).map(pref => ({
-          ...pref,
-          languageScores: pref.languageScores, // Already an object
-          shortcuts: pref.shortcuts,
-        }));
-        const unrecognized = Array.from(this.unrecognizedPhrases.values()).map(u => ({
-          ...u,
-          exampleUsers: Array.from(u.users).slice(0, 5).join(', '),
-        }));
-        const negativePatterns = Array.from(this.negativePatterns.values());
+          // Prepare data with size limits to prevent memory pressure
+          const patterns = Array.from(this.learnedPatterns.values()).slice(0, 200); // Limit patterns
+          const preferences = Array.from(this.userPreferences.values())
+            .slice(0, 100) // Limit users
+            .map(pref => ({
+              userId: pref.userId,
+              username: pref.username,
+              language: pref.language,
+              languageScores: pref.languageScores,
+              messageCount: pref.messageCount,
+              lastUpdated: pref.lastUpdated,
+              // Omit large objects like shortcuts to reduce payload
+            }));
+          const unrecognized = Array.from(this.unrecognizedPhrases.values())
+            .slice(0, 50) // Limit unrecognized phrases
+            .map(u => ({
+              phrase: u.phrase,
+              count: u.count,
+              userCount: u.userCount,
+              lastSeen: u.lastSeen,
+              // Omit user sets to reduce payload size
+            }));
+          const negativePatterns = Array.from(this.negativePatterns.values()).slice(0, 50);
 
-        const payload = {
-          patterns,
-          preferences,
-          unrecognized,
-          negativePatterns,
-          recognitionRate: this.getRecognitionRate(),
-        };
+          const payload = {
+            patterns,
+            preferences,
+            unrecognized,
+            negativePatterns,
+            recognitionRate: this.getRecognitionRate(),
+          };
 
-        const response = await axios.post(`${sheetsUrl}?action=syncNLPLearning`, payload, {
-          timeout: 30000, // Increased timeout to 30s
-          headers: { 'Content-Type': 'application/json' },
-        });
+          const response = await axios.post(`${sheetsUrl}?action=syncNLPLearning`, payload, {
+            timeout: 45000, // Increased timeout to 45s to reduce failures
+            headers: { 'Content-Type': 'application/json' },
+            maxContentLength: 10 * 1024 * 1024, // 10MB limit
+          });
 
-        // Check if sync was actually successful
-        if (response.data && response.data.success === false) {
-          console.error('🧠 [NLP Learning] Sync returned error:', response.data.message);
+          // Check if sync was actually successful
+          if (response.data && response.data.success === false) {
+            console.error('🧠 [NLP Learning] Sync returned error:', response.data.message);
+            return;
+          }
+
+          this.lastSync = new Date();
+          console.log(`🧠 [NLP Learning] Synced ${patterns.length} patterns, ${preferences.length} users, ${negativePatterns.length} negative patterns to Google Sheets`);
+
+          if (response.data && response.data.results) {
+            const r = response.data.results;
+            console.log(`🧠 [NLP Learning] Patterns: ${r.patterns.created} created, ${r.patterns.updated} updated`);
+            console.log(`🧠 [NLP Learning] Preferences: ${r.preferences.created} created, ${r.preferences.updated} updated`);
+            if (r.negativePatterns) {
+              console.log(`🧠 [NLP Learning] Negative Patterns: ${r.negativePatterns.created} created, ${r.negativePatterns.updated} updated`);
+            }
+          }
+
+          // Force garbage collection if available (helps with memory pressure)
+          if (global.gc) {
+            global.gc();
+            console.log('🧹 [NLP Learning] Triggered GC after successful sync');
+          }
+
+          // Success - break out of retry loop
+          return;
+
+        } catch (error) {
+          const isTimeoutError = error.code === 'ECONNABORTED' || error.message.includes('timeout');
+          const isRateLimitError = error.response && error.response.status === 429;
+          const isLastAttempt = attempt === maxRetries;
+
+          if ((isRateLimitError || isTimeoutError) && !isLastAttempt) {
+            const delay = baseDelay * Math.pow(2, attempt); // Exponential backoff: 2s, 4s
+            console.warn(`🧠 [NLP Learning] ${isTimeoutError ? 'Timeout' : 'Rate limit'}. Retrying in ${delay/1000}s... (Attempt ${attempt + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue; // Retry
+          }
+
+          // Log error and exit on last attempt or non-recoverable errors
+          console.error('🧠 [NLP Learning] Sync failed:', error.message);
+          if (error.response && !isTimeoutError) {
+            // Only log first 200 chars to reduce memory/log spam
+            const responseData = typeof error.response.data === 'string'
+              ? error.response.data.substring(0, 200)
+              : JSON.stringify(error.response.data).substring(0, 200);
+            console.error('🧠 [NLP Learning] Response:', responseData);
+          }
+
+          if (isLastAttempt) {
+            console.error('🧠 [NLP Learning] Max retries reached. Will try again on next sync cycle.');
+          }
           return;
         }
-
-        this.lastSync = new Date();
-        console.log(`🧠 [NLP Learning] Synced ${patterns.length} patterns, ${preferences.length} users, ${negativePatterns.length} negative patterns to Google Sheets`);
-
-        if (response.data && response.data.results) {
-          const r = response.data.results;
-          console.log(`🧠 [NLP Learning] Patterns: ${r.patterns.created} created, ${r.patterns.updated} updated`);
-          console.log(`🧠 [NLP Learning] Preferences: ${r.preferences.created} created, ${r.preferences.updated} updated`);
-          if (r.negativePatterns) {
-            console.log(`🧠 [NLP Learning] Negative Patterns: ${r.negativePatterns.created} created, ${r.negativePatterns.updated} updated`);
-          }
-        }
-
-        // Success - break out of retry loop
-        return;
-
-      } catch (error) {
-        const isRateLimitError = error.response && error.response.status === 429;
-        const isLastAttempt = attempt === maxRetries;
-
-        if (isRateLimitError && !isLastAttempt) {
-          const delay = baseDelay * Math.pow(2, attempt); // Exponential backoff: 2s, 4s, 8s, 16s
-          console.warn(`🧠 [NLP Learning] Rate limit hit (429). Retrying in ${delay/1000}s... (Attempt ${attempt + 1}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          continue; // Retry
-        }
-
-        // Log error and exit on last attempt or non-rate-limit errors
-        console.error('🧠 [NLP Learning] Sync failed:', error.message);
-        if (error.response) {
-          // Only log first 500 chars of response to avoid HTML spam
-          const responseData = typeof error.response.data === 'string'
-            ? error.response.data.substring(0, 500)
-            : JSON.stringify(error.response.data).substring(0, 500);
-          console.error('🧠 [NLP Learning] Response:', responseData);
-        }
-
-        if (isLastAttempt) {
-          console.error('🧠 [NLP Learning] Max retries reached. Will try again on next sync cycle.');
-        }
-        return;
       }
+    } finally {
+      // Always reset syncing flag, even on errors
+      this.isSyncing = false;
     }
   }
 
@@ -1187,6 +1298,12 @@ class NLPLearningSystem {
   // ═════════════════════════════════════════════════════════════════════════
 
   teachPattern(phrase, command, adminUserId) {
+    // CRITICAL: Prevent admins from accidentally teaching insults
+    if (this.isInsult(phrase)) {
+      console.log(`🚫 [NLP Learning] Admin attempted to teach insult: "${phrase}" - BLOCKED`);
+      return false;
+    }
+
     const key = phrase.toLowerCase().trim();
 
     this.learnedPatterns.set(key, {
