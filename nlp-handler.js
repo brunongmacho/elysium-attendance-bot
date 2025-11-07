@@ -302,29 +302,54 @@ const NLP_PATTERNS = {
 
   // Spawn prediction
   predictspawn: [
-    // English
+    // ═══════════════════════════════════════════════════════════════════════
+    // SPECIFIC BOSS SPAWN PREDICTIONS (MUST COME FIRST! - Higher Priority)
+    // ═══════════════════════════════════════════════════════════════════════
+    // These patterns capture boss names as parameters for specific predictions
+
+    // English - Specific boss patterns
+    /^(?:when|what\s+time)\s+(?:is|will|does)\s+(.+?)\s+(?:spawn|respawn|pop|up)/i,
+    /^(?:when(?:'s|\s+is)|what\s+time)\s+(?:is\s+)?(.+?)\s+(?:spawning|gonna\s+spawn|coming)/i,
+    /^(?:predict|estimate|guess)\s+(.+?)\s+spawn(?:\s+time)?/i,
+    /^(.+?)\s+spawn(?:\s+(?:time|timer|prediction|estimate))?$/i,
+    /^(?:how\s+long|when)\s+(?:until|till|before)\s+(.+?)\s+(?:spawns?|respawns?)/i,
+
+    // Tagalog - Specific boss patterns
+    /^(?:kailan|kalian|kelan)\s+(?:ang\s+)?(.+?)\s+(?:spawn|lalabas|lilitaw|darating)/i,
+    /^(?:kailan|kalian)\s+(?:mag|ma)?(?:spawn|lalabas|lilitaw)\s+(?:ang\s+)?(.+)/i,
+    /^predict\s+(?:spawn\s+)?(.+)/i,
+
+    // Taglish - Specific boss patterns
+    /^(?:when|kailan)\s+(?:ba|po|naman)\s+(?:ang\s+)?(.+?)\s+(?:spawn|lalabas)/i,
+    /^(.+?)\s+spawn\s+(?:ba|po|naman)/i,
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // GENERIC NEXT SPAWN PREDICTIONS (Lower Priority - Fallback)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // English - Generic patterns
     /^(?:when|what\s+time)\s+(?:is|will\s+be)\s+(?:the\s+)?next\s+spawn/i,
     /^(?:predict|estimate|guess)\s+(?:the\s+)?next\s+spawn/i,
-    /^next\s+spawn(?:\s+time)?/i,
-    /^(?:when(?:'s|\s+is)|what\s+time\s+is)\s+(?:the\s+)?spawn/i,
-    /^(?:spawn\s+)?(?:timer|prediction|estimate)/i,
+    /^next\s+spawn(?:\s+time)?$/i,
+    /^(?:when(?:'s|\s+is)|what\s+time\s+is)\s+(?:the\s+)?spawn$/i,
+    /^(?:spawn\s+)?(?:timer|prediction|estimate)$/i,
 
-    // Gaming terminology - boss/raid related
+    // Gaming terminology - boss/raid related (generic)
     /^(?:when|what\s+time)\s+(?:is|will)\s+(?:the\s+)?(?:next|upcoming)\s+(?:boss|raid|rb|epic)/i,
-    /^(?:next|upcoming)\s+(?:boss|raid|rb|epic|world\s+boss)(?:\s+(?:spawn|time))?/i,
-    /^(?:when(?:'s|\s+is)|what\s+time)\s+(?:boss|raid|rb|epic)\s+(?:spawn|up|respawn)/i,
-    /^(?:boss|raid|rb|epic)\s+(?:timer|schedule|window|respawn)/i,
-    /^(?:when\s+)?(?:does|will)\s+(?:it|boss|rb)\s+(?:spawn|respawn|pop)/i,
-    /^(?:respawn|spawn)\s+(?:time|timer|window)/i,
+    /^(?:next|upcoming)\s+(?:boss|raid|rb|epic|world\s+boss)(?:\s+(?:spawn|time))?$/i,
+    /^(?:when(?:'s|\s+is)|what\s+time)\s+(?:boss|raid|rb|epic)\s+(?:spawn|up|respawn)$/i,
+    /^(?:boss|raid|rb|epic)\s+(?:timer|schedule|window|respawn)$/i,
+    /^(?:when\s+)?(?:does|will)\s+(?:it|boss|rb)\s+(?:spawn|respawn|pop)$/i,
+    /^(?:respawn|spawn)\s+(?:time|timer|window)$/i,
 
-    // Tagalog
+    // Tagalog - Generic patterns
     /^(?:kailan|kalian)\s+(?:ang\s+)?(?:next|susunod)\s+(?:spawn|boss|raid)/i,
     /^next\s+(?:spawn|boss|raid)\s+(?:ba|po|naman)/i,
-    /^(?:kelan|kailan)\s+(?:lalabas|lilitaw)\s+(?:ang\s+)?(?:boss|raid)/i,
+    /^(?:kelan|kailan)\s+(?:lalabas|lilitaw)\s+(?:ang\s+)?(?:boss|raid)$/i,
 
-    // Taglish
+    // Taglish - Generic patterns
     /^(?:when|kailan)\s+(?:ba|po)\s+(?:next|susunod)\s+(?:spawn|boss|raid)/i,
-    /^(?:spawn|boss|raid)\s+(?:time|timer)\s+(?:ba|naman)/i,
+    /^(?:spawn|boss|raid)\s+(?:time|timer)\s+(?:ba|naman)$/i,
   ],
 
   // Predict attendance
