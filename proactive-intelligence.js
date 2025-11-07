@@ -678,6 +678,8 @@ class ProactiveIntelligence {
    * - Only announces LATEST milestone (prevents spam)
    * - Tiered channel routing (major → announcements, minor → guild chat)
    * - 100,000+ unique celebration combinations (80% Tagalog)
+   * - Tracks BOTH attendance AND bidding milestones separately
+   * - Mentions/tags achievers in announcements
    *
    * Runs every hour to detect new milestones
    */
@@ -693,46 +695,50 @@ class ProactiveIntelligence {
 
       console.log('✅ [PROACTIVE] Milestone celebrations ENABLED');
 
-      // Fetch TotalAttendance data (uses NICKNAME, not username!)
+      // Fetch BOTH attendance and bidding data
       console.log('📊 [PROACTIVE] Fetching total attendance data...');
       const attendanceResponse = await this.intelligence.sheetAPI.call('getTotalAttendance', {});
-      console.log('📊 [PROACTIVE] Attendance API response:', JSON.stringify(attendanceResponse).substring(0, 200));
-
       const attendanceData = attendanceResponse?.data?.members || attendanceResponse?.members || [];
       console.log(`📊 [PROACTIVE] Found ${attendanceData.length} members in attendance data`);
 
-      if (attendanceData.length === 0) {
-        console.log('⚠️ [PROACTIVE] No attendance data found, skipping milestone check');
+      console.log('📊 [PROACTIVE] Fetching bidding points data...');
+      const biddingResponse = await this.intelligence.sheetAPI.call('getBiddingPoints', {});
+      const biddingData = biddingResponse?.data?.members || biddingResponse?.members || [];
+      console.log(`📊 [PROACTIVE] Found ${biddingData.length} members in bidding data`);
+
+      if (attendanceData.length === 0 && biddingData.length === 0) {
+        console.log('⚠️ [PROACTIVE] No data found, skipping milestone check');
         return;
       }
 
-      // Log first 3 members as sample
-      console.log('📊 [PROACTIVE] Sample data (first 3 members):');
-      attendanceData.slice(0, 3).forEach(m => {
-        console.log(`   - ${m.username}: ${m.attendancePoints} points`);
+      // Create bidding lookup map
+      const biddingMap = {};
+      biddingData.forEach(m => {
+        const normalized = this.normalizeUsername(m.nickname || m.username);
+        biddingMap[normalized] = {
+          nickname: m.nickname || m.username,
+          pointsLeft: m.pointsLeft || 0,
+          pointsConsumed: m.pointsConsumed || 0,
+          totalPoints: (m.pointsLeft || 0) + (m.pointsConsumed || 0)
+        };
       });
 
       // Fetch milestone history from Google Sheets
       console.log('📊 [PROACTIVE] Fetching milestone history...');
       const historyResponse = await this.intelligence.sheetAPI.call('getMilestoneHistory', {});
-      console.log('📊 [PROACTIVE] History API response:', JSON.stringify(historyResponse).substring(0, 200));
-
       const milestoneHistory = historyResponse?.milestoneHistory || {};
       console.log(`📊 [PROACTIVE] Found ${Object.keys(milestoneHistory).length} members in milestone history`);
 
       // Get channels for tiered routing
       console.log('📺 [PROACTIVE] Getting channels...');
-      console.log(`📺 [PROACTIVE] Guild announcement channel ID: ${this.config.guild_announcement_channel_id}`);
-      console.log(`📺 [PROACTIVE] Guild chat channel ID: ${this.config.elysium_commands_channel_id}`);
-
       const guildAnnouncementChannel = await getChannelById(
         this.client,
-        this.config.guild_announcement_channel_id // Guild Announcements
+        this.config.guild_announcement_channel_id
       );
 
       const guildChatChannel = await getChannelById(
         this.client,
-        this.config.elysium_commands_channel_id // Guild Chat
+        this.config.elysium_commands_channel_id
       );
 
       console.log(`📺 [PROACTIVE] Guild announcement channel: ${guildAnnouncementChannel ? guildAnnouncementChannel.name : 'NOT FOUND'}`);
@@ -740,6 +746,13 @@ class ProactiveIntelligence {
 
       if (!guildAnnouncementChannel || !guildChatChannel) {
         console.error('❌ [PROACTIVE] Required channels not found - ABORTING');
+        return;
+      }
+
+      // Get guild for member lookups
+      const guild = this.client.guilds.cache.get(this.config.main_guild_id);
+      if (!guild) {
+        console.error('❌ [PROACTIVE] Main guild not found - ABORTING');
         return;
       }
 
@@ -753,72 +766,135 @@ class ProactiveIntelligence {
       let milestonesFound = 0;
       let milestonesAnnounced = 0;
 
-      // Check each member
-      console.log('🔍 [PROACTIVE] Checking members for new milestones...');
+      // Check ATTENDANCE milestones
+      console.log('🔍 [PROACTIVE] Checking ATTENDANCE milestones...');
       for (const member of attendanceData) {
         membersChecked++;
         const totalPoints = member.attendancePoints || 0;
-        const nickname = member.username; // Actually nickname in sheet
+        const nickname = member.username;
         const normalizedNickname = this.normalizeUsername(nickname);
 
-        // Get last celebrated milestone from Google Sheets
-        const history = milestoneHistory[normalizedNickname] || {};
+        // Get last celebrated milestone for THIS TYPE
+        const historyKey = `${normalizedNickname}-attendance`;
+        const history = milestoneHistory[historyKey] || {};
         const lastMilestone = history.lastMilestone || 0;
 
-        // Find LATEST milestone they've crossed (not all of them!)
+        // Find LATEST milestone they've crossed
         let latestMilestone = null;
         for (const milestone of allMilestones) {
           if (totalPoints >= milestone && milestone > lastMilestone) {
-            latestMilestone = milestone; // Keep updating to find highest
+            latestMilestone = milestone;
           }
         }
 
-        // If found new milestone, announce ONLY the latest
+        // If found new milestone, announce it
         if (latestMilestone) {
           milestonesFound++;
-          console.log(`🎉 [PROACTIVE] NEW MILESTONE FOUND!`);
-          console.log(`   - Member: ${nickname} (normalized: ${normalizedNickname})`);
+          console.log(`🎉 [PROACTIVE] NEW ATTENDANCE MILESTONE!`);
+          console.log(`   - Member: ${nickname}`);
+          console.log(`   - Type: ATTENDANCE`);
           console.log(`   - Current Points: ${totalPoints}`);
-          console.log(`   - Last Milestone: ${lastMilestone}`);
           console.log(`   - New Milestone: ${latestMilestone}`);
 
-          // Determine channel (tiered routing)
-          const channel = MILESTONES.major.includes(latestMilestone)
-            ? guildAnnouncementChannel
-            : guildChatChannel;
-
-          console.log(`   - Channel: ${channel.name} (${MILESTONES.major.includes(latestMilestone) ? 'MAJOR' : 'MINOR'})`);
-
           try {
-            // Create celebration embed with massive variety
-            console.log(`   - Creating embed...`);
-            const embed = await this.createMilestoneEmbed(member, latestMilestone, totalPoints, lastMilestone);
+            // Find Discord user for mention
+            const discordMember = await this.findGuildMember(guild, nickname);
 
-            console.log(`   - Sending to channel...`);
+            // Determine channel
+            const channel = MILESTONES.major.includes(latestMilestone)
+              ? guildAnnouncementChannel
+              : guildChatChannel;
+
+            // Create celebration embed
+            const embed = await this.createMilestoneEmbed(
+              member,
+              latestMilestone,
+              totalPoints,
+              lastMilestone,
+              'attendance',
+              discordMember
+            );
+
             await channel.send({ embeds: [embed] });
-            console.log(`   - ✅ Sent to ${channel.name}`);
 
-            // Update Google Sheets with new milestone (PERSISTENT!)
-            console.log(`   - Updating Google Sheets...`);
+            // Update Google Sheets
             await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
-              nickname: nickname,
+              nickname: `${nickname}-attendance`,
               milestone: latestMilestone,
               totalPoints: totalPoints,
-              milestoneType: 'points'
+              milestoneType: 'attendance'
             });
-            console.log(`   - ✅ Google Sheets updated`);
 
             milestonesAnnounced++;
+            console.log(`   - ✅ ATTENDANCE milestone announced in ${channel.name}`);
+          } catch (error) {
+            console.error(`   - ❌ Error announcing milestone:`, error);
+          }
+        }
+      }
 
-            // Log for audit trail
-            console.log(
-              `🎉 [PROACTIVE] ✅ MILESTONE ANNOUNCED: ${nickname} ` +
-              `reached ${latestMilestone} points (jumped from ${lastMilestone}) ` +
-              `in ${channel.name}`
+      // Check BIDDING milestones
+      console.log('🔍 [PROACTIVE] Checking BIDDING milestones...');
+      for (const [normalizedNickname, bidData] of Object.entries(biddingMap)) {
+        membersChecked++;
+        const totalPoints = bidData.totalPoints;
+        const nickname = bidData.nickname;
+
+        // Get last celebrated milestone for THIS TYPE
+        const historyKey = `${normalizedNickname}-bidding`;
+        const history = milestoneHistory[historyKey] || {};
+        const lastMilestone = history.lastMilestone || 0;
+
+        // Find LATEST milestone they've crossed
+        let latestMilestone = null;
+        for (const milestone of allMilestones) {
+          if (totalPoints >= milestone && milestone > lastMilestone) {
+            latestMilestone = milestone;
+          }
+        }
+
+        // If found new milestone, announce it
+        if (latestMilestone) {
+          milestonesFound++;
+          console.log(`🎉 [PROACTIVE] NEW BIDDING MILESTONE!`);
+          console.log(`   - Member: ${nickname}`);
+          console.log(`   - Type: BIDDING`);
+          console.log(`   - Total Points: ${totalPoints} (Left: ${bidData.pointsLeft}, Consumed: ${bidData.pointsConsumed})`);
+          console.log(`   - New Milestone: ${latestMilestone}`);
+
+          try {
+            // Find Discord user for mention
+            const discordMember = await this.findGuildMember(guild, nickname);
+
+            // Determine channel
+            const channel = MILESTONES.major.includes(latestMilestone)
+              ? guildAnnouncementChannel
+              : guildChatChannel;
+
+            // Create celebration embed
+            const embed = await this.createMilestoneEmbed(
+              { username: nickname, biddingPoints: totalPoints },
+              latestMilestone,
+              totalPoints,
+              lastMilestone,
+              'bidding',
+              discordMember
             );
-          } catch (announceError) {
-            console.error(`❌ [PROACTIVE] Error announcing milestone for ${nickname}:`, announceError);
-            console.error(announceError.stack);
+
+            await channel.send({ embeds: [embed] });
+
+            // Update Google Sheets
+            await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
+              nickname: `${nickname}-bidding`,
+              milestone: latestMilestone,
+              totalPoints: totalPoints,
+              milestoneType: 'bidding'
+            });
+
+            milestonesAnnounced++;
+            console.log(`   - ✅ BIDDING milestone announced in ${channel.name}`);
+          } catch (error) {
+            console.error(`   - ❌ Error announcing milestone:`, error);
           }
         }
       }
@@ -837,10 +913,48 @@ class ProactiveIntelligence {
   }
 
   /**
+   * Find a guild member by their nickname (case-insensitive, normalized)
+   * @param {Guild} guild - Discord guild
+   * @param {string} nickname - Member nickname to search for
+   * @returns {GuildMember|null} Discord guild member or null
+   */
+  async findGuildMember(guild, nickname) {
+    try {
+      const normalizedSearch = this.normalizeUsername(nickname);
+
+      // Search through cached members first
+      const cachedMember = guild.members.cache.find(m => {
+        const memberNick = m.nickname || m.user.username;
+        return this.normalizeUsername(memberNick) === normalizedSearch;
+      });
+
+      if (cachedMember) return cachedMember;
+
+      // If not in cache, fetch all members and search
+      await guild.members.fetch();
+      const fetchedMember = guild.members.cache.find(m => {
+        const memberNick = m.nickname || m.user.username;
+        return this.normalizeUsername(memberNick) === normalizedSearch;
+      });
+
+      return fetchedMember || null;
+    } catch (error) {
+      console.error(`[PROACTIVE] Error finding guild member ${nickname}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Create milestone embed with MASSIVE VARIETY (100,000+ combos)
    * 80% Tagalog, mix-and-match components
+   * @param {Object} member - Member data from sheets
+   * @param {number} milestone - Milestone reached
+   * @param {number} totalPoints - Total points
+   * @param {number} lastMilestone - Previous milestone
+   * @param {string} milestoneType - 'attendance' or 'bidding'
+   * @param {GuildMember|null} discordMember - Discord member for mention
    */
-  async createMilestoneEmbed(member, milestone, totalPoints, lastMilestone) {
+  async createMilestoneEmbed(member, milestone, totalPoints, lastMilestone, milestoneType, discordMember) {
     // Calculate next milestone
     const allMilestones = [
       ...PROACTIVE_CONFIG.thresholds.milestonePoints.minor,
@@ -851,12 +965,22 @@ class ProactiveIntelligence {
 
     // Pick random components from variety system
     const opening = this.pickRandom(this.getMilestoneOpenings());
-    const announcement = this.getMilestoneAnnouncement(member, milestone, totalPoints);
+    const announcement = this.getMilestoneAnnouncement(member, milestone, totalPoints, milestoneType, discordMember);
     const closing = this.getMilestoneClosing(nextMilestone, totalPoints);
 
-    // Determine color (gold for major, green for minor)
+    // Determine color based on milestone type
     const isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.major.includes(milestone);
-    const color = isMajor ? 0xFFD700 : 0x00FF00;
+    let color;
+    if (milestoneType === 'attendance') {
+      color = isMajor ? 0xFFD700 : 0x00FF00; // Gold or Green for attendance
+    } else {
+      color = isMajor ? 0xFF6B35 : 0x4ECDC4; // Orange or Cyan for bidding
+    }
+
+    // Milestone type emoji and label
+    const typeInfo = milestoneType === 'attendance'
+      ? { emoji: '🎯', label: 'Total Attendance Points' }
+      : { emoji: '💰', label: 'Total Bidding Points' };
 
     return new EmbedBuilder()
       .setColor(color)
@@ -865,7 +989,7 @@ class ProactiveIntelligence {
         `${announcement}\n\n${closing}`
       )
       .setFooter({
-        text: `Milestone: ${milestone} | Total: ${totalPoints} | Previous: ${lastMilestone || 0}`
+        text: `${typeInfo.emoji} ${typeInfo.label} | Milestone: ${milestone} | Total: ${totalPoints} | Previous: ${lastMilestone || 0}`
       })
       .setTimestamp();
   }
@@ -927,21 +1051,31 @@ class ProactiveIntelligence {
 
   /**
    * Milestone Announcement (Main Message)
-   * Personalized with member data
+   * Personalized with member data, mentions user, shows type
    */
-  getMilestoneAnnouncement(member, milestone, totalPoints) {
+  getMilestoneAnnouncement(member, milestone, totalPoints, milestoneType, discordMember) {
     const nickname = member.username; // Actually nickname from sheet
 
-    // Tagalog-heavy announcement templates
+    // Create mention string (falls back to bold nickname if user not found)
+    const userMention = discordMember ? `<@${discordMember.id}>` : `**${nickname}**`;
+
+    // Type-specific labels
+    const typeLabel = milestoneType === 'attendance'
+      ? 'Total Attendance Points'
+      : 'Total Bidding Points';
+
+    const typeEmoji = milestoneType === 'attendance' ? '🎯' : '💰';
+
+    // Tagalog-heavy announcement templates with mentions and type
     const templates = [
-      `**${nickname}** just hit **${milestone} attendance points!** 🎯`,
-      `**${nickname}** reached **${milestone} points** na! Grabe! 🔥`,
-      `Si **${nickname}** nag-**${milestone} points** na! Tuloy lang idol! 💪`,
-      `**${nickname}** - **${milestone} attendance points** achieved! Lakasss! ⚡`,
-      `Congrats **${nickname}**! **${milestone} points** unlocked! 👑`,
-      `**${milestone} points** milestone conquered by **${nickname}**! 🏆`,
-      `**${nickname}** is now at **${milestone} attendance points!** Lodi! 🌟`,
-      `Saludo! **${nickname}** naka-**${milestone} points** na! 🫡`,
+      `${userMention} just hit **${milestone} ${typeLabel}!** ${typeEmoji}`,
+      `${userMention} reached **${milestone} points** sa ${typeLabel} na! Grabe! 🔥`,
+      `Si ${userMention} nag-**${milestone} ${typeLabel}** na! Tuloy lang idol! 💪`,
+      `${userMention} - **${milestone} ${typeLabel}** achieved! Lakasss! ⚡`,
+      `Congrats ${userMention}! **${milestone} ${typeLabel}** unlocked! 👑`,
+      `**${milestone} ${typeLabel}** milestone conquered by ${userMention}! 🏆`,
+      `${userMention} is now at **${milestone} ${typeLabel}!** Lodi! 🌟`,
+      `Saludo! ${userMention} naka-**${milestone} ${typeLabel}** na! 🫡`,
     ];
 
     return this.pickRandom(templates);
