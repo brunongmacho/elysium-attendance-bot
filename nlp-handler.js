@@ -67,6 +67,9 @@ const NLP_CONFIG = {
   // Pattern matching priority order (checked first to last)
   // More specific patterns should come before generic ones
   patternPriority: [
+    // Time queries (must come first for context)
+    'timequeries',
+
     // Attendance-specific (must come first to avoid bid conflicts)
     'attendancestatus',
     'leaderboardattendance',
@@ -75,7 +78,7 @@ const NLP_CONFIG = {
     // Spawn predictions (specific before general)
     'predictspawn',
 
-    // Bidding-specific
+    // Bidding-specific (formal first)
     'leaderboardbidding',
     'bidstatus',
     'mypoints',
@@ -127,34 +130,29 @@ const NLP_CONFIG = {
  */
 
 const NLP_PATTERNS = {
-  // Bidding commands (auction threads)
+  // Bidding commands (FORMAL TONE - Filipino-focused)
   bid: [
-    // English
-    /^(?:i\s+)?(?:want\s+to\s+)?bid\s+(\d+)/i,
-    /^(?:offer|bidding)\s+(\d+)/i,
-    /^(\d+)\s+(?:points?|pts?)/i,
-    /^place\s+(?:a\s+)?bid\s+(?:of\s+)?(\d+)/i,
+    // TAGALOG - FORMAL (80% - PRIORITY)
+    /^(?:mag-?bid|magbid)\s+(?:po\s+)?(?:ako\s+)?(?:ng\s+)?(\d+)/i,  // "magbid po ako ng 500"
+    /^(?:gusto|nais)\s+(?:ko\s+)?(?:po\s+)?(?:mag-?bid|magbid)\s+(?:ng\s+)?(\d+)/i,  // "gusto ko po magbid ng 500"
+    /^(?:i-?bid|ibid)\s+(?:ko\s+)?(?:po\s+)?(\d+)/i,  // "ibid ko po 500"
+    /^(?:taya|lagay)\s+(?:ko\s+)?(?:po\s+)?(\d+)/i,    // "taya ko po 500"
+    /^(\d+)\s+(?:po|po\s+ba)$/i,    // "500 po"
+    /^(\d+)\s+(?:points?|pts)\s+(?:po|lang\s+po)/i,  // "500 points po"
+    /^(?:lagay|taya|bid)\s+(?:na\s+lang\s+)?(\d+)/i,  // "lagay na lang 500"
+    /^(\d+)\s+(?:na\s+lang|lang)$/i,  // "500 na lang" / "500 lang"
+    /^(?:pasok|sali)\s+(?:ako\s+)?(?:ng\s+)?(\d+)/i,  // "pasok ako ng 500"
+    /^(\d+)\s+(?:pesos?|pts?|points?)$/i,  // "500 points"
 
-    // Gaming terms
-    /^(?:i(?:'ll|\s+will)\s+)?(?:put|throw\s+in|go)\s+(\d+)/i,
-    /^(?:going|putting)\s+(\d+)\s+(?:on\s+(?:this|it))?/i,
-    /^(\d+)\s+(?:here|for\s+(?:this|it|me))/i,
-    /^(?:i\s+)?(?:call|raise)\s+(\d+)/i,
-    /^(?:spend|use|drop)\s+(\d+)/i,
+    // TAGLISH - FORMAL (15%)
+    /^bid\s+(?:ko\s+)?(?:po\s+)?(\d+)/i,  // "bid ko po 500"
+    /^(?:gusto|gusto\s+kong)\s+(?:mag-?)?bid\s+(?:ng\s+)?(\d+)/i,  // "gusto kong magbid ng 500"
+    /^(\d+)\s+lang$/i,  // "500 lang"
 
-    // Tagalog (TL)
-    /^(?:taya|lagay)\s+(?:ko\s+)?(\d+)/i,    // "taya 500" / "taya ko 500"
-    /^(?:pusta|pustahan)\s+(?:ng\s+)?(\d+)/i, // "pusta 500" / "pustahan ng 500"
-    /^(?:magtaya|maglagay)\s+(?:ako\s+)?(?:ng\s+)?(\d+)/i, // "magtaya 500"
-    /^(?:ibabayad|ibabayad ko)\s+(\d+)/i,    // "ibabayad 500"
-    /^(\d+)\s+(?:taya|pusta)/i,              // "500 taya"
-    /^(?:gastos|gugulin)\s+(?:ko\s+)?(\d+)/i, // "gastos ko 500"
-
-    // Taglish (code-switching)
-    /^bid\s+(?:ko|na|ng)\s+(\d+)/i,          // "bid ko 500"
-    /^(?:gusto|gusto kong)\s+(?:bid|mag-?bid)\s+(?:ng\s+)?(\d+)/i, // "gusto kong magbid ng 500"
-    /^(?:ako|ako ay)\s+bid\s+(?:ng\s+)?(\d+)/i, // "ako bid 500"
-    /^(\d+)\s+(?:lang|lang ako|muna)/i,      // "500 lang" / "500 muna"
+    // ENGLISH - FORMAL (5%)
+    /^(?:i\s+)?(?:would\s+like\s+to\s+)?bid\s+(\d+)/i,  // "I would like to bid 500"
+    /^(?:place\s+)?(?:a\s+)?bid\s+(?:of\s+)?(\d+)/i,  // "place a bid of 500"
+    /^(\d+)\s+points?$/i,  // "500 points"
   ],
 
   // Points queries
@@ -409,32 +407,52 @@ const NLP_PATTERNS = {
     /^top\s+sa\s+bidding/i,
   ],
 
-  // General leaderboard (must come after specific leaderboards)
+  // General leaderboard (must come after specific leaderboards) - ENHANCED
   leaderboard: [
-    /^(?:show|display|check|view)\s+(?:me\s+)?(?:the\s+)?(?:all\s+)?(?:leaderboards?|lb|rankings?)$/i,
+    // FILIPINO - Natural rank queries (80%)
+    /^(?:rank|ranking)\s+(?:ko|ko\s+ba|ko\s+ilan)/i,  // "rank ko", "rank ko ba"
+    /^(?:nasa\s+)?(?:ilan|ilang)\s+(?:ako|ako\s+ba)/i,  // "nasa ilan ako", "ilang ako"
+    /^(?:ano|anu)\s+(?:rank|ranking)\s+ko/i,  // "ano rank ko"
+    /^(?:pang-?)?(?:ilan|ilang)\s+(?:ba\s+)?ako/i,  // "pang-ilan ako", "pang ilan ba ako"
+    /^(?:position|pwesto)\s+ko(?:\s+(?:ba|ilan))?/i,  // "position ko", "pwesto ko ilan"
+
+    // General leaderboard queries
+    /^(?:show|display|check|view|tignan|tingnan)\s+(?:me\s+)?(?:the\s+)?(?:all\s+)?(?:leaderboards?|lb|rankings?)$/i,
     /^(?:top|rankings?|leaderboards?|lb)$/i,
-    /^(?:all\s+)?(?:leaderboards?|lb)(?:\s+(?:please|pls))?$/i,
+    /^(?:all\s+)?(?:leaderboards?|lb)(?:\s+(?:please|pls|po|naman))?$/i,
     /^who(?:'s|\s+is)\s+(?:on\s+)?(?:top|leading)(?:\s+overall)?/i,
     /^(?:top\s+)?(?:players?|members?|users?)$/i,
     /^(?:rank|ranking|ranks)$/i,
-    /^(?:show|display)\s+(?:all\s+)?(?:rankings?|stats?|scores?)/i,
 
-    // Gaming terms
-    /^(?:guild|clan)\s+(?:rankings?|stats?|leaderboard)/i,
-    /^(?:show|view)\s+(?:guild|clan|team)\s+(?:members?|players?|roster)/i,
-    /^(?:who(?:'s|\s+is)|show)\s+(?:the\s+)?(?:mvp|best|top\s+players?)/i,
-    /^(?:hall\s+of\s+)?(?:fame|legends?)/i,
-
-    // Tagalog
+    // Who queries
     /^(?:sino|who)\s+(?:ang\s+)?(?:nangungunang|nangunguna|nasa\s+top)/i,
-    /^(?:tignan|tingnan)\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:leaderboard|ranking)/i,
-    /^(?:top|rank|ranking)(?:\s+(?:ba|naman|po))?$/i,
-    /^(?:sino|who)\s+(?:ang\s+)?(?:mga\s+)?(?:mahuhusay|magagaling)/i, // "who are the skilled ones"
-
-    // Taglish
+    /^(?:sino|who)\s+(?:ang\s+)?(?:bottom|last|huli)/i,  // "sino ang bottom"
     /^(?:sino|who)\s+(?:top|nangunguna|mvp)(?:\s+sa\s+lahat)?/i,
+
+    // Display queries
+    /^(?:tignan|tingnan|check)\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:leaderboard|ranking)/i,
     /^(?:show|pakita)\s+(?:me\s+)?(?:the\s+)?(?:all\s+)?(?:ranking|leaderboards?)/i,
-    /^(?:guild|clan)\s+(?:members?|players?|rankings?)/i,
+    /^(?:guild|clan)\s+(?:members?|players?|rankings?|stats?|leaderboard)/i,
+  ],
+
+  // TIME-BASED QUERIES (Context-Aware)
+  timequeries: [
+    // FILIPINO - Time questions (80%)
+    /^(?:later|mamaya|mamayang)\s+(?:may\s+)?(?:spawn|boss|mvp)/i,  // "later may spawn?"
+    /^(?:may|meron)\s+(?:ba\s+)?(?:spawn|boss)\s+(?:later|mamaya|bukas)/i,  // "may spawn ba later?"
+    /^(?:bukas|tomorrow)\s+(?:may\s+)?(?:spawn|boss|auction)/i,  // "bukas may spawn?"
+    /^(?:ilang?|ilan)\s+(?:oras|hrs?|hours?)\s+(?:pa|na)/i,  // "ilan oras pa?"
+    /^(?:ilang?|ilan)\s+(?:minuto|mins?|minutes?)\s+(?:pa|na)/i,  // "ilang minuto pa?"
+    /^(?:anong\s+)?(?:oras|time)\s+(?:na|ngayon)/i,  // "anong oras na?", "time na?"
+    /^(?:kelan|kailan)\s+(?:pa|ulit)/i,  // "kelan pa?", "kelan ulit?"
+
+    // TAGLISH (15%)
+    /^(?:may|meron)\s+spawn\s+(?:later|mamaya)/i,
+    /^(?:ilan|how\s+many)\s+(?:hours?|oras)\s+pa/i,
+
+    // ENGLISH (5%)
+    /^(?:how\s+many|how\s+much)\s+(?:time|hours?|mins?)\s+(?:left|remaining)/i,
+    /^(?:what|what's)\s+(?:the\s+)?(?:time|current\s+time)/i,
   ],
 
   // Queue list
@@ -820,6 +838,45 @@ const NLP_PATTERNS = {
 class NLPHandler {
   constructor(config) {
     this.config = config;
+    // Context memory: Store recent conversations per user for follow-ups
+    // Format: Map<userId, {lastCommand, lastParams, timestamp, lastItem}>
+    this.contextMemory = new Map();
+    // Clear old contexts after 10 minutes
+    this.contextTimeout = 10 * 60 * 1000;
+  }
+
+  /**
+   * Store conversation context for follow-up questions
+   * @param {string} userId - Discord user ID
+   * @param {string} command - Last command executed
+   * @param {Array} params - Command parameters
+   * @param {Object} extraContext - Additional context (e.g., item name, boss name)
+   */
+  setContext(userId, command, params, extraContext = {}) {
+    this.contextMemory.set(userId, {
+      lastCommand: command,
+      lastParams: params,
+      timestamp: Date.now(),
+      ...extraContext
+    });
+  }
+
+  /**
+   * Get conversation context for a user
+   * @param {string} userId - Discord user ID
+   * @returns {Object|null} Context or null if expired/not found
+   */
+  getContext(userId) {
+    const context = this.contextMemory.get(userId);
+    if (!context) return null;
+
+    // Check if context expired
+    if (Date.now() - context.timestamp > this.contextTimeout) {
+      this.contextMemory.delete(userId);
+      return null;
+    }
+
+    return context;
   }
 
   /**
@@ -932,6 +989,7 @@ class NLPHandler {
 
   /**
    * Normalize content for better pattern matching
+   * INCLUDES: Filipino text speak normalization
    * @param {string} content - Message content
    * @returns {string} Normalized content
    */
@@ -939,13 +997,106 @@ class NLPHandler {
     // Remove extra whitespace
     content = content.replace(/\s+/g, ' ').trim();
 
-    // Handle common typos and variations
+    // FILIPINO TEXT SPEAK NORMALIZATION (SMS/Gaming abbreviations)
+    const filipinoTextSpeak = {
+      // Common Filipino abbreviations
+      'dpat': 'dapat',
+      'dpt': 'dapat',
+      'lng': 'lang',
+      'lng': 'lang',
+      'kc': 'kasi',
+      'ksi': 'kasi',
+      'pra': 'para',
+      'd2': 'dito',
+      'kta': 'kita',
+      'aq': 'ako',
+      'q': 'ako',
+      'aq': 'ako',
+      'kng': 'kung',
+      'hnd': 'hindi',
+      'dpt': 'dapat',
+      'mgkano': 'magkano',
+      'mkano': 'magkano',
+      'klan': 'kailan',
+      'klan': 'kailan',
+      'kelan': 'kailan',
+      'anu': 'ano',
+      'pla': 'pala',
+      'nmn': 'naman',
+      'dba': 'di ba',
+      'dto': 'dito',
+      'dyan': 'diyan',
+      'doon': 'doon',
+      'sna': 'sana',
+      'tpos': 'tapos',
+      'pag': 'pag',
+      'pg': 'pag',
+      'nsa': 'nasa',
+      'wla': 'wala',
+      'mron': 'meron',
+      'mrn': 'meron',
+      'ilan': 'ilang',
+      'pila': 'ilang',
+      'tngin': 'tingnan',
+      'tngan': 'tingnan',
+      'chck': 'check',
+      'chek': 'check',
+      'cek': 'check',
+      'kmusta': 'kumusta',
+      'kmsta': 'kumusta',
+      'kmu': 'kumusta',
+      'ok': 'okay',
+      'oks': 'okay',
+      'goods': 'good',
+      'gds': 'goods',
+    };
+
+    // Apply Filipino text speak normalization (word boundaries)
+    for (const [abbrev, full] of Object.entries(filipinoTextSpeak)) {
+      const regex = new RegExp(`\\b${abbrev}\\b`, 'gi');
+      content = content.replace(regex, full);
+    }
+
+    // Handle common English typos and variations
     content = content
       .replace(/whats/gi, "what's")
       .replace(/thats/gi, "that's")
       .replace(/hows/gi, "how's");
 
     return content;
+  }
+
+  /**
+   * Detect tone/politeness level in Filipino messages
+   * @param {string} content - Message content
+   * @returns {string} 'polite', 'casual', or 'rude'
+   */
+  detectTone(content) {
+    const contentLower = content.toLowerCase();
+
+    // RUDE indicators (Filipino bad words)
+    const rudeWords = [
+      'gago', 'tangina', 'putangina', 'ulol', 'tanga', 'bobo',
+      'leche', 'peste', 'bwisit', 'tarantado', 'kupal',
+      'hayop', 'hinayupak', 'fuck', 'shit', 'damn'
+    ];
+
+    for (const word of rudeWords) {
+      if (contentLower.includes(word)) {
+        return 'rude';
+      }
+    }
+
+    // POLITE indicators (Filipino respectful markers)
+    const politeMarkers = ['po', 'opo', 'please', 'pls', 'pakiusap', 'salamat'];
+
+    for (const marker of politeMarkers) {
+      if (contentLower.includes(marker)) {
+        return 'polite';
+      }
+    }
+
+    return 'casual';
   }
 
   /**
