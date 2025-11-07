@@ -1037,24 +1037,62 @@ class ConversationalAI {
       for (const [type, config] of Object.entries(CONVERSATION_PATTERNS)) {
         for (const pattern of config.patterns) {
           if (pattern.test(content)) {
-            // Special handling for insults - use dynamic roasts!
+            // Special handling for insults - RANDOMIZED roast selection!
             if (type === 'insult') {
-              // Try stat-based roast first (if stats available)
+              // ═══════════════════════════════════════════════════════════════
+              // RANDOMIZED ROAST SYSTEM - Maximum Variety!
+              // ═══════════════════════════════════════════════════════════════
+
+              const random = Math.random();
+              let roastType = null;
+              let roast = null;
+
+              // Determine roast type probabilities:
+              // - 40% stat-based (if stats available, otherwise redistributed)
+              // - 40% dynamic general
+              // - 20% static responses
+
+              // Try to get user stats
+              let stats = null;
               if (this.sheetAPI) {
-                console.log(`🔥 [Trash Talk] ${username} is getting roasted with stats!`);
-                const stats = await this.getUserStats(username);
-                if (stats) {
-                  const statRoast = this.generateStatBasedRoast(stats, message);
-                  console.log(`🔥 [Trash Talk] Generated stat-based roast for ${username}`);
-                  return statRoast;
+                stats = await this.getUserStats(username);
+              }
+
+              if (stats) {
+                // Stats available - use all three roast types with probability
+                if (random < 0.40) {
+                  // 40% - Stat-based roast (personalized with their actual stats)
+                  roastType = 'stat-based';
+                  roast = this.generateStatBasedRoast(stats, message);
+                  console.log(`🔥 [Trash Talk] ${username} getting STAT-BASED roast (40% chance)`);
+                } else if (random < 0.80) {
+                  // 40% - Dynamic general roast (time/day context)
+                  roastType = 'dynamic';
+                  roast = this.generateDynamicGeneralRoast(message);
+                  console.log(`🔥 [Trash Talk] ${username} getting DYNAMIC roast (40% chance)`);
+                } else {
+                  // 20% - Static response (classic hardcoded roasts)
+                  roastType = 'static';
+                  roast = this.getRandomResponse(config.responses);
+                  console.log(`🔥 [Trash Talk] ${username} getting STATIC roast (20% chance)`);
+                }
+              } else {
+                // No stats available - redistribute probability between dynamic and static
+                if (random < 0.70) {
+                  // 70% - Dynamic general roast
+                  roastType = 'dynamic';
+                  roast = this.generateDynamicGeneralRoast(message);
+                  console.log(`🔥 [Trash Talk] ${username} getting DYNAMIC roast (no stats, 70% chance)`);
+                } else {
+                  // 30% - Static response
+                  roastType = 'static';
+                  roast = this.getRandomResponse(config.responses);
+                  console.log(`🔥 [Trash Talk] ${username} getting STATIC roast (no stats, 30% chance)`);
                 }
               }
 
-              // Fallback to dynamic general roast (no stats needed!)
-              console.log(`🔥 [Trash Talk] Generating dynamic general roast for ${username}`);
-              const dynamicRoast = this.generateDynamicGeneralRoast(message);
-              console.log(`🔥 [Trash Talk] Generated dynamic context-aware roast`);
-              return dynamicRoast;
+              console.log(`✨ [Trash Talk] Roast type: ${roastType}, User: ${username}`);
+              return roast;
             }
 
             // Get random response for other patterns
