@@ -201,6 +201,28 @@ class ProactiveIntelligence {
     // Ensure milestone tabs exist in Google Sheets
     await this.ensureMilestoneTabsExist();
 
+    // Load milestone queue from Google Sheets (survive bot restarts)
+    try {
+      console.log('📥 [PROACTIVE] Loading milestone queue from Google Sheets...');
+      const response = await this.intelligence.sheetAPI.call('loadMilestoneQueue', {});
+      if (response && response.milestoneQueue) {
+        this.milestoneQueue = response.milestoneQueue;
+        const totalLoaded = Object.values(this.milestoneQueue).reduce((sum, arr) => sum + arr.length, 0);
+        console.log(`✅ [PROACTIVE] Loaded ${totalLoaded} queued milestones from Google Sheets`);
+        if (totalLoaded > 0) {
+          console.log('📌 [PROACTIVE] Queue contents:');
+          for (const [type, items] of Object.entries(this.milestoneQueue)) {
+            if (items.length > 0) {
+              console.log(`   - ${type}: ${items.length} milestone(s)`);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('⚠️ [PROACTIVE] Failed to load milestone queue from Google Sheets:', error.message);
+      console.log('   Starting with empty queue');
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // UNIFIED SCHEDULE: Daily 3:01 AM - Batch Announcements & Checks
     // ═══════════════════════════════════════════════════════════════
@@ -1067,7 +1089,7 @@ class ProactiveIntelligence {
         try {
           for (const achiever of achievers) {
             // Queue milestone for batch announcement
-            this.queueMilestone('attendance', {
+            await this.queueMilestone('attendance', {
               nickname: achiever.nickname,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
@@ -1099,7 +1121,7 @@ class ProactiveIntelligence {
         try {
           for (const achiever of achievers) {
             // Queue milestone for batch announcement
-            this.queueMilestone('bidding', {
+            await this.queueMilestone('bidding', {
               nickname: achiever.nickname,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
@@ -1177,13 +1199,24 @@ class ProactiveIntelligence {
 
   /**
    * Queue a milestone for batch announcement (helper function)
+   * Persists to Google Sheets to survive bot restarts
    */
-  queueMilestone(type, data) {
+  async queueMilestone(type, data) {
     this.milestoneQueue[type].push({
       ...data,
       queuedAt: new Date()
     });
     console.log(`📌 [PROACTIVE] Queued ${type} milestone for ${data.nickname || 'Guild'}`);
+
+    // Persist queue to Google Sheets to survive bot restarts
+    try {
+      await this.intelligence.sheetAPI.call('saveMilestoneQueue', {
+        milestoneQueue: this.milestoneQueue
+      }, { silent: true });
+    } catch (error) {
+      console.error('⚠️ [PROACTIVE] Failed to persist milestone queue:', error.message);
+      // Don't throw - queuing still works, just won't survive restart
+    }
   }
 
   /**
@@ -1466,6 +1499,14 @@ class ProactiveIntelligence {
         }
       }
 
+      // Clear milestone queue from Google Sheets after successful batch announcement
+      try {
+        await this.intelligence.sheetAPI.call('clearMilestoneQueue', {});
+        console.log('✅ [PROACTIVE] Milestone queue cleared from Google Sheets');
+      } catch (error) {
+        console.error('⚠️ [PROACTIVE] Failed to clear milestone queue from Google Sheets:', error.message);
+      }
+
       console.log('🎉 [PROACTIVE] ═══════════════════════════════════════');
       console.log(`🎉 [PROACTIVE] Batch announcement complete: ${totalAnnounced} unique milestones announced`);
       console.log('🎉 [PROACTIVE] ═══════════════════════════════════════');
@@ -1540,7 +1581,7 @@ class ProactiveIntelligence {
           console.log(`🎉 [PROACTIVE] ${nickname} reached engagement ${highestMilestone} (score: ${engagementScore})`);
 
           // Queue milestone
-          this.queueMilestone('engagement', {
+          await this.queueMilestone('engagement', {
             nickname,
             milestone: highestMilestone,
             score: engagementScore
@@ -1624,7 +1665,7 @@ class ProactiveIntelligence {
             const isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.hybrid.major.includes(threshold);
 
             // Queue milestone
-            this.queueMilestone('hybrid', {
+            await this.queueMilestone('hybrid', {
               nickname,
               attendance: attendancePoints,
               bidding: biddingPoints,
@@ -1687,7 +1728,7 @@ class ProactiveIntelligence {
           console.log(`🎉 [PROACTIVE] Guild reached ${threshold} total attendance!`);
 
           // Queue milestone
-          this.queueMilestone('guildWide', {
+          await this.queueMilestone('guildWide', {
             milestoneType: 'attendance',
             threshold,
             totalValue: totalAttendance
@@ -1715,7 +1756,7 @@ class ProactiveIntelligence {
           console.log(`🎉 [PROACTIVE] Guild reached ${threshold} total bidding!`);
 
           // Queue milestone
-          this.queueMilestone('guildWide', {
+          await this.queueMilestone('guildWide', {
             milestoneType: 'bidding',
             threshold,
             totalValue: totalBidding
@@ -1743,7 +1784,7 @@ class ProactiveIntelligence {
             console.log(`🎉 [PROACTIVE] Guild reached ${threshold} active members!`);
 
             // Queue milestone
-            this.queueMilestone('guildWide', {
+            await this.queueMilestone('guildWide', {
               milestoneType: 'activeMembers',
               threshold,
               totalValue: activeCount
@@ -1818,7 +1859,7 @@ class ProactiveIntelligence {
           console.log(`🎉 [PROACTIVE] ${nickname} reached ${highestMilestone} days tenure`);
 
           // Queue milestone
-          this.queueMilestone('tenure', {
+          await this.queueMilestone('tenure', {
             nickname,
             milestone: highestMilestone,
             days: daysAsMember
@@ -1930,7 +1971,7 @@ class ProactiveIntelligence {
             console.log(`🎉 [PROACTIVE] ${normalizedNickname} reached ${highestMilestone}-day calendar streak!`);
 
             // Queue milestone
-            this.queueMilestone('calendarStreak', {
+            await this.queueMilestone('calendarStreak', {
               nickname: normalizedNickname,
               milestone: highestMilestone,
               streak: currentStreak
@@ -2069,7 +2110,7 @@ class ProactiveIntelligence {
           console.log(`🎉 [PROACTIVE] ${nickname} reached ${highestMilestone} perfect weeks!`);
 
           // Queue milestone
-          this.queueMilestone('perfectWeek', {
+          await this.queueMilestone('perfectWeek', {
             nickname,
             milestone: highestMilestone,
             weeks: perfectWeeksCount
@@ -2184,7 +2225,7 @@ class ProactiveIntelligence {
         console.log(`🎉 [PROACTIVE] ${nickname} reached ${highestMilestone} consecutive spawn streak!`);
 
         // Queue milestone
-        this.queueMilestone('spawnStreak', {
+        await this.queueMilestone('spawnStreak', {
           nickname,
           milestone: highestMilestone,
           streak: currentStreak
