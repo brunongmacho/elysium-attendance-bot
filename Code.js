@@ -185,6 +185,10 @@ function doPost(e) {
     if (action === 'getBiddingLeaderboard') return getBiddingLeaderboard(data);
     if (action === 'getWeeklySummary') return getWeeklySummary(data);
 
+    // Milestone Tracking actions
+    if (action === 'getMilestoneHistory') return getMilestoneHistory(data);
+    if (action === 'updateMilestoneHistory') return updateMilestoneHistory(data);
+
     Logger.log(`❌ Unknown: ${action}`);
     return createResponse('error', 'Unknown action: ' + action);
 
@@ -4451,6 +4455,183 @@ function manualInitializeNLP() {
   const result = initializeNLPTabs();
   Logger.log('✅ Manual NLP initialization complete: ' + result.created.join(', '));
   return result;
+}
+
+// ===========================================================
+// MILESTONE TRACKING SYSTEM
+// ===========================================================
+
+/**
+ * Ensure MilestoneTracking sheet exists (auto-create if first run)
+ * @returns {Sheet} The MilestoneTracking sheet
+ */
+function ensureMilestoneTrackingSheet() {
+  const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+  let sheet = ss.getSheetByName('MilestoneTracking');
+
+  if (!sheet) {
+    Logger.log('📝 Creating MilestoneTracking sheet (first run)...');
+    sheet = ss.insertSheet('MilestoneTracking');
+
+    // Set headers
+    sheet.getRange(1, 1, 1, 6).setValues([[
+      'Nickname', 'LastMilestone', 'TotalPoints', 'LastAnnounced', 'AnnouncementLog', 'MilestoneType'
+    ]]);
+
+    // Format headers
+    sheet.getRange(1, 1, 1, 6)
+      .setFontWeight('bold')
+      .setBackground('#4a86e8')
+      .setFontColor('#ffffff');
+
+    // Set column widths for readability
+    sheet.setColumnWidth(1, 150); // Nickname
+    sheet.setColumnWidth(2, 120); // LastMilestone
+    sheet.setColumnWidth(3, 120); // TotalPoints
+    sheet.setColumnWidth(4, 180); // LastAnnounced
+    sheet.setColumnWidth(5, 250); // AnnouncementLog
+    sheet.setColumnWidth(6, 120); // MilestoneType
+
+    // Hide the sheet from regular users
+    sheet.hideSheet();
+
+    Logger.log('✅ MilestoneTracking sheet created and hidden');
+  }
+
+  return sheet;
+}
+
+/**
+ * Get milestone history for all members
+ * @param {Object} data - Request data (not used, but kept for API consistency)
+ * @returns {Object} Response with milestone history
+ */
+function getMilestoneHistory(data) {
+  try {
+    Logger.log('📊 Fetching milestone history...');
+
+    ensureMilestoneTrackingSheet();
+
+    const sheet = SpreadsheetApp.openById(CONFIG.SSHEET_ID)
+      .getSheetByName('MilestoneTracking');
+
+    const lastRow = sheet.getLastRow();
+
+    if (lastRow < 2) {
+      Logger.log('✅ No milestone history yet (fresh start)');
+      return createResponse('ok', 'No milestone history', { milestoneHistory: {} });
+    }
+
+    const data_values = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+    const milestoneHistory = {};
+
+    for (let i = 0; i < data_values.length; i++) {
+      const row = data_values[i];
+      const nickname = (row[0] || '').toString().trim();
+      const normalizedNickname = normalizeUsername(nickname);
+
+      if (normalizedNickname) {
+        milestoneHistory[normalizedNickname] = {
+          nickname: nickname, // Original (for display)
+          lastMilestone: parseInt(row[1]) || 0,
+          totalPoints: parseInt(row[2]) || 0,
+          lastAnnounced: row[3] || null,
+          announcementLog: row[4] || '',
+          milestoneType: row[5] || 'points'
+        };
+      }
+    }
+
+    Logger.log(`✅ Fetched milestone history for ${Object.keys(milestoneHistory).length} members`);
+    return createResponse('ok', 'Milestone history fetched', { milestoneHistory: milestoneHistory });
+
+  } catch (err) {
+    Logger.log('❌ Error fetching milestone history: ' + err.toString());
+    return createResponse('error', err.toString(), { milestoneHistory: {} });
+  }
+}
+
+/**
+ * Update milestone history for a member
+ * @param {Object} data - Contains nickname, milestone, totalPoints, milestoneType
+ * @returns {Object} Response with success status
+ */
+function updateMilestoneHistory(data) {
+  try {
+    const { nickname, milestone, totalPoints, milestoneType } = data;
+
+    if (!nickname || !milestone) {
+      return createResponse('error', 'Missing required parameters: nickname or milestone');
+    }
+
+    Logger.log(`📝 Updating milestone for ${nickname}: ${milestone} (${milestoneType || 'points'})`);
+
+    ensureMilestoneTrackingSheet();
+
+    const sheet = SpreadsheetApp.openById(CONFIG.SSHEET_ID)
+      .getSheetByName('MilestoneTracking');
+
+    const lastRow = sheet.getLastRow();
+    const normalizedInput = normalizeUsername(nickname);
+
+    // Find existing row for this member
+    let rowIndex = -1;
+
+    if (lastRow > 1) {
+      const nicknames = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (let i = 0; i < nicknames.length; i++) {
+        if (normalizeUsername(nicknames[i][0]) === normalizedInput) {
+          rowIndex = i + 2; // +2 because arrays are 0-indexed and row 1 is header
+          break;
+        }
+      }
+    }
+
+    const timestamp = Utilities.formatDate(
+      new Date(),
+      CONFIG.TIMEZONE,
+      'yyyy-MM-dd HH:mm:ss'
+    );
+
+    const type = milestoneType || 'points';
+
+    if (rowIndex > 0) {
+      // Update existing row
+      const existingData = sheet.getRange(rowIndex, 1, 1, 6).getValues()[0];
+      const existingLog = existingData[4] || '';
+      const newLog = existingLog
+        ? `${existingLog}→${milestone}`
+        : `${milestone}`;
+
+      sheet.getRange(rowIndex, 2, 1, 5).setValues([[
+        milestone,
+        totalPoints || 0,
+        timestamp,
+        newLog,
+        type
+      ]]);
+
+      Logger.log(`✅ Updated milestone for ${nickname} (row ${rowIndex})`);
+    } else {
+      // Add new row
+      sheet.appendRow([
+        nickname,
+        milestone,
+        totalPoints || 0,
+        timestamp,
+        `${milestone}`,
+        type
+      ]);
+
+      Logger.log(`✅ Created new milestone entry for ${nickname}`);
+    }
+
+    return createResponse('ok', `Updated milestone for ${nickname}: ${milestone}`, { success: true });
+
+  } catch (err) {
+    Logger.log('❌ Error updating milestone history: ' + err.toString());
+    return createResponse('error', err.toString(), { success: false });
+  }
 }
 
 // ===========================================================
