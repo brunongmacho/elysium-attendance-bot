@@ -1086,8 +1086,11 @@ class ProactiveIntelligence {
       ? { emoji: '🎯', label: 'Total Attendance Points' }
       : { emoji: '💰', label: 'Total Bidding Points' };
 
+    // Sort achievers by total points (descending - highest first)
+    const sortedAchievers = achievers.sort((a, b) => b.totalPoints - a.totalPoints);
+
     // Create achiever list with mentions
-    const achieverList = achievers.map(achiever => {
+    const achieverList = sortedAchievers.map(achiever => {
       const userMention = achiever.discordMember
         ? `<@${achiever.discordMember.id}>`
         : `**${achiever.nickname}**`;
