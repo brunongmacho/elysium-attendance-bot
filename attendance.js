@@ -43,10 +43,10 @@
  * WORKFLOW:
  * ---------
  * 1. Boss spawn detected -> createSpawnThreads()
- * 2. Member posts "present" + screenshot -> reactions added (✅/❌)
- * 3. Admin reacts with ✅ -> member verified and added to Google Sheets
- * 4. Admin types "close" -> confirmation prompt appears
- * 5. Admin confirms -> thread closed and all reactions removed
+ * 2. Member posts "present" + screenshot -> verification buttons shown (✅/❌)
+ * 3. Admin clicks ✅ Verify -> member verified and added to Google Sheets
+ * 4. Admin types "close" -> confirmation button prompt appears
+ * 5. Admin clicks ✅ Confirm -> thread closed and archived
  * 6. State periodically synced to Google Sheets for crash recovery
  *
  * @module attendance
@@ -537,9 +537,9 @@ async function createSpawnThreads(
  *
  * VERIFICATION WORKFLOW:
  * - Member posts "present" or "here" with screenshot
- * - Bot adds ✅ (verify) and ❌ (reject) reactions
- * - Admin reacts with ✅ to verify
- * - Bot removes reactions and posts confirmation message
+ * - Bot shows verification buttons: ✅ Verify and ❌ Deny
+ * - Admin clicks ✅ Verify button
+ * - Bot disables buttons and posts confirmation message
  * - Member added to Google Sheets with points
  *
  * @param {ThreadChannel} thread - Discord thread to scan
@@ -573,10 +573,17 @@ async function scanThreadForPendingReactions(thread, client, bossName, parsed) {
         if (match) members.push(match[1]);
       }
 
-      // Detect pending closure confirmations
-      if (msg.content.includes("React ✅ to confirm") && msg.content.includes("Close spawn")) {
+      // Detect pending closure confirmations (both old reaction-based and new button-based)
+      const isCloseConfirmation =
+        (msg.content.includes("React ✅ to confirm") && msg.content.includes("Close spawn")) || // Old format
+        (msg.embeds[0]?.title?.includes("Close Spawn Confirmation")); // New format
+
+      if (isCloseConfirmation) {
+        // Check for either reactions (old) or buttons (new)
         const hasReactions = msg.reactions.cache.has("✅") && msg.reactions.cache.has("❌");
-        if (hasReactions) {
+        const hasButtons = msg.components && msg.components.length > 0;
+
+        if (hasReactions || hasButtons) {
           confirmations.push({
             messageId: msgId,
             timestamp: msg.createdTimestamp

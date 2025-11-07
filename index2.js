@@ -5462,24 +5462,26 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 /**
  * =========================================================================
- * MESSAGE REACTION ADD EVENT HANDLER
+ * MESSAGE REACTION ADD EVENT HANDLER (LEGACY - FOR BACKWARD COMPATIBILITY)
  * =========================================================================
  *
- * Handles reaction-based interactions throughout the bot. Primary uses:
+ * Handles old reaction-based interactions for backward compatibility.
+ * Modern system uses buttons (handled in InteractionCreate event).
+ * Primary uses:
  *
  * 1. Attendance Verification:
- *    - Admin reacts ✅ to approve member check-in
- *    - Admin reacts ❌ to deny check-in
+ *    - Admin clicks ✅ Verify button to approve member check-in
+ *    - Admin clicks ❌ Deny button to reject check-in
  *    - Updates spawn member list and notifies user
  *
  * 2. Spawn Closure Confirmations:
- *    - Admin confirms spawn closure with ✅
+ *    - Admin clicks ✅ Confirm button to close spawn
  *    - Submits attendance to Google Sheets
  *    - Archives thread and cleans up state
  *
  * 3. Bid Confirmations:
- *    - User confirms bid placement with ✅
- *    - User cancels bid with ❌
+ *    - User clicks ✅ Confirm Bid button to place bid
+ *    - User clicks ❌ Cancel button to cancel bid
  *    - Handles both regular bidding and auctioneering modes
  *    - Manages point locking/unlocking
  *    - Handles outbid notifications
