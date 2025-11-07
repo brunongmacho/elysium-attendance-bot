@@ -767,6 +767,77 @@ class ProactiveIntelligence {
         inline: false,
       });
 
+      // ═══════════════════════════════════════════════════════════════
+      // NEW: Add milestone recap section
+      // ═══════════════════════════════════════════════════════════════
+      try {
+        const weeklyMilestonesResponse = await this.intelligence.sheetAPI.call('getWeeklyMilestones', {});
+        const weeklyMilestones = weeklyMilestonesResponse?.data || [];
+
+        if (weeklyMilestones.length > 0) {
+          // Group milestones by type
+          const milestonesByType = {};
+          for (const m of weeklyMilestones) {
+            const type = m.milestoneType;
+            if (!milestonesByType[type]) {
+              milestonesByType[type] = [];
+            }
+            milestonesByType[type].push(m);
+          }
+
+          // Build milestone recap text
+          const recapLines = [];
+          for (const [type, milestones] of Object.entries(milestonesByType)) {
+            const count = milestones.length;
+            let emoji = '🎯';
+            let label = type;
+
+            if (type === 'attendance') {
+              emoji = '🎯';
+              label = 'Attendance';
+            } else if (type === 'bidding') {
+              emoji = '💰';
+              label = 'Bidding';
+            } else if (type === 'engagement') {
+              emoji = '🧠';
+              label = 'Engagement';
+            } else if (type === 'hybrid') {
+              emoji = '🔥';
+              label = 'Hybrid Combo';
+            } else if (type === 'guildWide') {
+              emoji = '🏆';
+              label = 'Guild-Wide';
+            } else if (type === 'spawnStreak') {
+              emoji = '⚡';
+              label = 'Spawn Streak';
+            } else if (type === 'calendarStreak') {
+              emoji = '📅';
+              label = 'Calendar Streak';
+            } else if (type === 'perfectWeek') {
+              emoji = '⭐';
+              label = 'Perfect Week';
+            } else if (type === 'tenure') {
+              emoji = '🗿';
+              label = 'Tenure';
+            }
+
+            recapLines.push(`${emoji} **${count}** ${label} milestone${count > 1 ? 's' : ''}`);
+          }
+
+          // Add to embed
+          embed.addFields({
+            name: '🎉 Milestones This Week',
+            value: recapLines.join('\n') || 'No milestones this week',
+            inline: false
+          });
+
+          console.log(`✅ [PROACTIVE] Added milestone recap: ${weeklyMilestones.length} total`);
+        }
+      } catch (error) {
+        console.error('[PROACTIVE] Error adding milestone recap:', error);
+        // Continue without recap if error
+      }
+
       // Send summary
       await guildAnnouncementChannel.send({ embeds: [embed] });
 
@@ -986,89 +1057,69 @@ class ProactiveIntelligence {
       // ANNOUNCE GROUPED MILESTONES (One embed per unique milestone)
       // ═════════════════════════════════════════════════════════════════════
 
-      let milestonesAnnounced = 0;
+      let milestonesQueued = 0;
 
-      // Announce ATTENDANCE milestones
-      console.log('📢 [PROACTIVE] Announcing ATTENDANCE milestone groups...');
+      // Queue ATTENDANCE milestones
+      console.log('📌 [PROACTIVE] Queueing ATTENDANCE milestones...');
       for (const [milestoneStr, achievers] of Object.entries(milestoneGroups.attendance)) {
         const milestone = parseInt(milestoneStr);
 
         try {
-          // Determine channel
-          const channel = ATTENDANCE_MILESTONES.major.includes(milestone)
-            ? guildAnnouncementChannel
-            : guildChatChannel;
-
-          // Create grouped embed
-          const embed = await this.createGroupedMilestoneEmbed(
-            achievers,
-            milestone,
-            'attendance',
-            attendanceMilestoneArray
-          );
-
-          await channel.send({ embeds: [embed] });
-
-          // Batch update Google Sheets for all achievers (sequential to prevent overwrites)
-          console.log(`   📝 Updating ${achievers.length} members in Google Sheets (sequential)...`);
-          const updateStartTime = Date.now();
-
           for (const achiever of achievers) {
+            // Queue milestone for batch announcement
+            this.queueMilestone('attendance', {
+              nickname: achiever.nickname,
+              milestone: milestone,
+              totalPoints: achiever.totalPoints,
+              lastMilestone: achiever.lastMilestone,
+              discordMember: achiever.discordMember
+            });
+
+            // Update Google Sheets
             await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: achiever.nickname,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'attendance'
-            }, { silent: true }); // Silent mode: no individual API logs
+            }, { silent: true });
           }
 
-          const updateDuration = ((Date.now() - updateStartTime) / 1000).toFixed(1);
-          milestonesAnnounced++;
-          console.log(`   - ✅ ${achievers.length} members at ${milestone} ATTENDANCE milestone → ${channel.name} (sheets updated in ${updateDuration}s)`);
+          milestonesQueued += achievers.length;
+          console.log(`   - ✅ Queued ${achievers.length} members at ${milestone} ATTENDANCE milestone`);
         } catch (error) {
-          console.error(`   - ❌ Error announcing ATTENDANCE milestone ${milestone}:`, error);
+          console.error(`   - ❌ Error queueing ATTENDANCE milestone ${milestone}:`, error);
         }
       }
 
-      // Announce BIDDING milestones
-      console.log('📢 [PROACTIVE] Announcing BIDDING milestone groups...');
+      // Queue BIDDING milestones
+      console.log('📌 [PROACTIVE] Queueing BIDDING milestones...');
       for (const [milestoneStr, achievers] of Object.entries(milestoneGroups.bidding)) {
         const milestone = parseInt(milestoneStr);
 
         try {
-          // Determine channel
-          const channel = BIDDING_MILESTONES.major.includes(milestone)
-            ? guildAnnouncementChannel
-            : guildChatChannel;
-
-          // Create grouped embed
-          const embed = await this.createGroupedMilestoneEmbed(
-            achievers,
-            milestone,
-            'bidding',
-            biddingMilestoneArray
-          );
-
-          await channel.send({ embeds: [embed] });
-
-          // Batch update Google Sheets for all achievers (sequential to prevent overwrites)
-          console.log(`   📝 Updating ${achievers.length} members in Google Sheets (sequential)...`);
-          const updateStartTime = Date.now();
-
           for (const achiever of achievers) {
+            // Queue milestone for batch announcement
+            this.queueMilestone('bidding', {
+              nickname: achiever.nickname,
+              milestone: milestone,
+              totalPoints: achiever.totalPoints,
+              lastMilestone: achiever.lastMilestone,
+              discordMember: achiever.discordMember
+            });
+
+            // Update Google Sheets
             await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: achiever.nickname,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'bidding'
-            }, { silent: true }); // Silent mode: no individual API logs
+            }, { silent: true });
           }
 
-          const updateDuration = ((Date.now() - updateStartTime) / 1000).toFixed(1);
-          milestonesAnnounced++;
-          console.log(`   - ✅ ${achievers.length} members at ${milestone} BIDDING milestone → ${channel.name} (sheets updated in ${updateDuration}s)`);
+          milestonesQueued += achievers.length;
+          console.log(`   - ✅ Queued ${achievers.length} members at ${milestone} BIDDING milestone`);
         } catch (error) {
-          console.error(`   - ❌ Error announcing BIDDING milestone ${milestone}:`, error);
+          console.error(`   - ❌ Error queueing BIDDING milestone ${milestone}:`, error);
         }
       }
 
@@ -1076,7 +1127,7 @@ class ProactiveIntelligence {
       console.log(`🤖 [PROACTIVE] Milestone check complete`);
       console.log(`   - Members checked: ${membersChecked}`);
       console.log(`   - New milestones found: ${milestonesFound}`);
-      console.log(`   - Unique milestone announcements: ${milestonesAnnounced}`);
+      console.log(`   - Milestones queued: ${milestonesQueued}`);
       console.log('🤖 [PROACTIVE] ═══════════════════════════════════════');
 
     } catch (error) {
