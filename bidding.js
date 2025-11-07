@@ -2239,6 +2239,10 @@ async function procBid(msg, amt, cfg) {
     return { ok: false, msg: "Insufficient" };
   }
 
+  // Calculate expiry timestamp for dynamic countdown
+  const expiryTime = now + 10000; // 10 seconds from now
+  const expiryTimestamp = Math.floor(expiryTime / 1000);
+
   const confEmbed = new EmbedBuilder()
     .setColor(COLORS.AUCTION)
     .setTitle(`${EMOJI.CLOCK} Confirm Your Bid`)
@@ -2251,7 +2255,8 @@ async function procBid(msg, amt, cfg) {
         }\n\n` +
         `⚠️ **By confirming, you agree to:**\n` +
         `• Lock ${needed}pts from your available points\n` +
-        `• ${isSelf ? "Increase" : "Place"} your bid to ${bid}pts`
+        `• ${isSelf ? "Increase" : "Place"} your bid to ${bid}pts\n\n` +
+        `⏰ **Expires <t:${expiryTimestamp}:R>**`
     )
     .addFields(
       { name: `${EMOJI.BID} Your Bid`, value: `${bid}pts`, inline: true },
@@ -2274,7 +2279,7 @@ async function procBid(msg, amt, cfg) {
   confEmbed.setFooter({
     text: `${EMOJI.SUCCESS} YES, PLACE BID / ${EMOJI.ERROR} NO, CANCEL • ${
       isSelf ? "Overbidding yourself" : "Outbidding current leader"
-    } • 10s timeout`,
+    }`,
   });
 
   const conf = await msg.reply({
