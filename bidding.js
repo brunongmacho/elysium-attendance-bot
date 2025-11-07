@@ -2668,7 +2668,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       });
       break;
 
-    case "!forcesubmitresults":
+    case "!forcesubmitresults": {
       if (!st.sd || st.h.length === 0)
         return await msg.reply(`${EMOJI.ERROR} No history`);
       const submitButton = new ButtonBuilder()
@@ -2823,6 +2823,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         }
       });
       break;
+    }
 
     case "!cancelitem":
       if (!st.a) return await msg.reply(`${EMOJI.ERROR} No active auction`);
@@ -3325,7 +3326,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       await msg.reply({ embeds: [auditEmbed] });
       break;
 
-    case "!resetauction":
+    case "!resetauction": {
       // 🔄 COMPLETE AUCTION RESET (NUCLEAR OPTION)
       const resetAuditEmbed = new EmbedBuilder()
         .setColor(COLORS.ERROR)
@@ -3485,8 +3486,9 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         await msg.reply(`${EMOJI.ERROR} Error during reset: ${e.message}`);
       }
       break;
+    }
 
-    case "!recoverauction":
+    case "!recoverauction": {
       // 🔧 RECOVER FROM CRASHED AUCTION
       const auctioneering2 = require("./auctioneering.js");
       const auctState2 = auctioneering2.getAuctionState();
@@ -3632,6 +3634,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         await msg.reply(`${EMOJI.ERROR} Error during recovery: ${e.message}`);
       }
       break;
+    }
   }
 }
 
