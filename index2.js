@@ -60,6 +60,10 @@ const {
   Partials,         // Partial data structures for uncached entities
   Events,           // Event type constants
   EmbedBuilder,     // Rich embed message constructor
+  ActionRowBuilder, // Action row for buttons
+  ButtonBuilder,    // Button constructor
+  ButtonStyle,      // Button style constants
+  ComponentType,    // Component type constants
 } = require("discord.js");
 
 // External dependencies
@@ -4546,18 +4550,6 @@ client.on(Events.MessageCreate, async (message) => {
           return;
         }
 
-        // Add reaction buttons for admin to approve/deny
-        await Promise.all([message.react("✅"), message.react("❌")]);
-
-        // Track pending verification in state
-        pendingVerifications[message.id] = {
-          author: username,
-          authorId: message.author.id,
-          threadId: message.channel.id,
-          timestamp: Date.now(),
-        };
-        attendance.setPendingVerifications(pendingVerifications);
-
         const statusText = userIsAdmin
           ? `⏩ **${username}** (Admin) registered for **${spawnInfo.boss}**\n\nFast-track verification (no screenshot required)...`
           : `⏳ **${username}** registered for **${spawnInfo.boss}**\n\nWaiting for admin verification...`;
@@ -4565,9 +4557,32 @@ client.on(Events.MessageCreate, async (message) => {
         const embed = new EmbedBuilder()
           .setColor(userIsAdmin ? 0x00ff00 : 0xffa500)
           .setDescription(statusText)
-          .setFooter({ text: "Admins: React ✅ to verify, ❌ to deny" });
+          .setFooter({ text: "Admins: Click a button to verify or deny" });
 
-        await message.reply({ embeds: [embed] });
+        // Create buttons for admin approval
+        const approveButton = new ButtonBuilder()
+          .setCustomId(`verify_approve_${message.id}_${Date.now()}`)
+          .setLabel('✅ Verify')
+          .setStyle(ButtonStyle.Success);
+
+        const denyButton = new ButtonBuilder()
+          .setCustomId(`verify_deny_${message.id}_${Date.now()}`)
+          .setLabel('❌ Deny')
+          .setStyle(ButtonStyle.Danger);
+
+        const row = new ActionRowBuilder().addComponents(approveButton, denyButton);
+
+        const verificationMsg = await message.reply({ embeds: [embed], components: [row] });
+
+        // Track pending verification in state
+        pendingVerifications[message.id] = {
+          author: username,
+          authorId: message.author.id,
+          threadId: message.channel.id,
+          timestamp: Date.now(),
+          verificationMsgId: verificationMsg.id,
+        };
+        attendance.setPendingVerifications(pendingVerifications);
 
         if (spawnInfo.confirmThreadId) {
           const confirmThread = await guild.channels
@@ -4769,14 +4784,29 @@ client.on(Events.MessageCreate, async (message) => {
           return;
         }
 
-        const confirmMsg = await message.reply(
-          `🔒 Close spawn **${spawnInfo.boss}** (${spawnInfo.timestamp})?\n\n` +
-            `**${spawnInfo.members.length} members** will be submitted to Google Sheets.\n\n` +
-            `React ✅ to confirm or ❌ to cancel.`
-        );
+        const closeEmbed = new EmbedBuilder()
+          .setColor(0xffa500)
+          .setTitle('🔒 Close Spawn Confirmation')
+          .setDescription(
+            `Close spawn **${spawnInfo.boss}** (${spawnInfo.timestamp})?\n\n` +
+            `**${spawnInfo.members.length} members** will be submitted to Google Sheets.`
+          )
+          .setFooter({ text: 'Click a button to confirm or cancel' });
 
-        await confirmMsg.react("✅");
-        await confirmMsg.react("❌");
+        // Create buttons for confirmation
+        const confirmButton = new ButtonBuilder()
+          .setCustomId(`close_confirm_${message.author.id}_${Date.now()}`)
+          .setLabel('✅ Confirm')
+          .setStyle(ButtonStyle.Success);
+
+        const cancelButton = new ButtonBuilder()
+          .setCustomId(`close_cancel_${message.author.id}_${Date.now()}`)
+          .setLabel('❌ Cancel')
+          .setStyle(ButtonStyle.Secondary);
+
+        const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+        const confirmMsg = await message.reply({ embeds: [closeEmbed], components: [row] });
 
         pendingClosures[confirmMsg.id] = {
           threadId: message.channel.id,
@@ -5140,6 +5170,270 @@ client.on(Events.MessageCreate, async (message) => {
     }
   } catch (err) {
     console.error("❌ Message handler error:", err);
+  }
+});
+
+/**
+ * =========================================================================
+ * BUTTON INTERACTION EVENT HANDLER
+ * =========================================================================
+ *
+ * Handles button interactions for:
+ * - Attendance verification (✅ Verify / ❌ Deny)
+ * - Thread closure confirmation (✅ Confirm / ❌ Cancel)
+ */
+client.on(Events.InteractionCreate, async (interaction) => {
+  try {
+    if (!interaction.isButton()) return;
+    if (!interaction.message.guild) return;
+    if (interaction.message.guild.id !== config.main_guild_id) return;
+
+    const customId = interaction.customId;
+    const user = interaction.user;
+    const msg = interaction.message;
+    const guild = interaction.guild;
+
+    // Sync state from attendance module
+    activeSpawns = attendance.getActiveSpawns();
+    pendingVerifications = attendance.getPendingVerifications();
+    pendingClosures = attendance.getPendingClosures();
+
+    // Handle attendance verification buttons
+    if (customId.startsWith('verify_')) {
+      // Check if admin
+      const adminMember = await guild.members.fetch(user.id).catch(() => null);
+      if (!adminMember || !isAdmin(adminMember)) {
+        await interaction.reply({ content: '⚠️ Only admins can verify attendance.', ephemeral: true });
+        return;
+      }
+
+      // Find the pending verification
+      let pendingMsgId = null;
+      let pending = null;
+      for (const [msgId, verification] of Object.entries(pendingVerifications)) {
+        if (verification.verificationMsgId === msg.id) {
+          pendingMsgId = msgId;
+          pending = verification;
+          break;
+        }
+      }
+
+      if (!pending) {
+        await interaction.reply({ content: '⚠️ Verification already processed or expired.', ephemeral: true });
+        return;
+      }
+
+      const spawnInfo = activeSpawns[pending.threadId];
+
+      if (!spawnInfo || spawnInfo.closed) {
+        await interaction.update({ content: "⚠️ This spawn is closed.", components: [] });
+        delete pendingVerifications[pendingMsgId];
+        attendance.setPendingVerifications(pendingVerifications);
+        return;
+      }
+
+      const isApprove = customId.startsWith('verify_approve_');
+
+      // Disable buttons
+      const disabledRow = new ActionRowBuilder().addComponents(
+        ButtonBuilder.from(interaction.message.components[0].components[0]).setDisabled(true),
+        ButtonBuilder.from(interaction.message.components[0].components[1]).setDisabled(true)
+      );
+
+      if (isApprove) {
+        const isDuplicate = spawnInfo.members.some(
+          (m) => normalizeUsername(m) === normalizeUsername(pending.author)
+        );
+
+        if (isDuplicate) {
+          await interaction.update({
+            embeds: [EmbedBuilder.from(msg.embeds[0]).setColor(0xff0000).setFooter({ text: 'Already verified' })],
+            components: [disabledRow]
+          });
+          await interaction.followUp({ content: `⚠️ **${pending.author}** already verified.`, ephemeral: false });
+          delete pendingVerifications[pendingMsgId];
+          attendance.setPendingVerifications(pendingVerifications);
+          return;
+        }
+
+        spawnInfo.members.push(pending.author);
+        attendance.setActiveSpawns(activeSpawns);
+
+        await interaction.update({
+          embeds: [EmbedBuilder.from(msg.embeds[0]).setColor(0x00ff00).setFooter({ text: `Verified by ${user.username}` })],
+          components: [disabledRow]
+        });
+        await interaction.followUp({ content: `✅ **${pending.author}** verified by ${user.username}!`, ephemeral: false });
+
+        if (spawnInfo.confirmThreadId) {
+          const confirmThread = await guild.channels
+            .fetch(spawnInfo.confirmThreadId)
+            .catch(() => null);
+          if (confirmThread) {
+            const embed = new EmbedBuilder()
+              .setColor(0x00ff00)
+              .setTitle("✅ Attendance Verified")
+              .setDescription(
+                `**${pending.author}** verified for **${spawnInfo.boss}**`
+              )
+              .addFields(
+                { name: "Verified By", value: user.username, inline: true },
+                {
+                  name: "Points",
+                  value: `+${bossPoints[spawnInfo.boss].points}`,
+                  inline: true,
+                },
+                {
+                  name: "Total Verified",
+                  value: `${spawnInfo.members.length}`,
+                  inline: true,
+                }
+              )
+              .setTimestamp();
+
+            await confirmThread.send({ embeds: [embed] });
+          }
+        }
+
+        delete pendingVerifications[pendingMsgId];
+        attendance.setPendingVerifications(pendingVerifications);
+      } else {
+        // Deny
+        await interaction.update({
+          embeds: [EmbedBuilder.from(msg.embeds[0]).setColor(0xff0000).setFooter({ text: `Denied by ${user.username}` })],
+          components: [disabledRow]
+        });
+
+        await interaction.followUp({
+          content: `<@${pending.authorId}>, your attendance was **denied** by ${user.username}. ` +
+            `Please repost with a proper screenshot.`,
+          ephemeral: false
+        });
+
+        delete pendingVerifications[pendingMsgId];
+        attendance.setPendingVerifications(pendingVerifications);
+      }
+
+      return;
+    }
+
+    // Handle close confirmation buttons
+    if (customId.startsWith('close_')) {
+      // Check if admin
+      const adminMember = await guild.members.fetch(user.id).catch(() => null);
+      if (!adminMember || !isAdmin(adminMember)) {
+        await interaction.reply({ content: '⚠️ Only admins can close spawns.', ephemeral: true });
+        return;
+      }
+
+      const closePending = pendingClosures[msg.id];
+      if (!closePending) {
+        await interaction.reply({ content: '⚠️ Closure already processed or expired.', ephemeral: true });
+        return;
+      }
+
+      const spawnInfo = activeSpawns[closePending.threadId];
+      const isConfirm = customId.startsWith('close_confirm_');
+
+      // Disable buttons
+      const disabledRow = new ActionRowBuilder().addComponents(
+        ButtonBuilder.from(interaction.message.components[0].components[0]).setDisabled(true),
+        ButtonBuilder.from(interaction.message.components[0].components[1]).setDisabled(true)
+      );
+
+      if (isConfirm) {
+        if (!spawnInfo || spawnInfo.closed) {
+          await interaction.update({
+            embeds: [EmbedBuilder.from(msg.embeds[0]).setFooter({ text: 'Already closed' })],
+            components: [disabledRow]
+          });
+          await interaction.followUp({ content: "⚠️ Spawn already closed.", ephemeral: false });
+          delete pendingClosures[msg.id];
+          attendance.setPendingClosures(pendingClosures);
+          return;
+        }
+
+        spawnInfo.closed = true;
+        attendance.setActiveSpawns(activeSpawns);
+
+        await interaction.update({
+          embeds: [EmbedBuilder.from(msg.embeds[0]).setColor(0x00ff00).setFooter({ text: `Closed by ${user.username}` })],
+          components: [disabledRow]
+        });
+
+        await interaction.followUp({
+          content: `🔒 Closing spawn **${spawnInfo.boss}**... Submitting ${spawnInfo.members.length} members...`,
+          ephemeral: false
+        });
+
+        const payload = {
+          action: "submitAttendance",
+          boss: spawnInfo.boss,
+          date: spawnInfo.date,
+          time: spawnInfo.time,
+          timestamp: spawnInfo.timestamp,
+          members: spawnInfo.members,
+        };
+
+        const resp = await attendance.postToSheet(payload);
+
+        if (resp.ok) {
+          await interaction.channel.send(`✅ Attendance submitted! Archiving...`);
+
+          if (spawnInfo.confirmThreadId) {
+            const confirmThread = await guild.channels
+              .fetch(spawnInfo.confirmThreadId)
+              .catch(() => null);
+            if (confirmThread) {
+              await confirmThread.send(
+                `✅ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - ${spawnInfo.members.length} members`
+              );
+              await errorHandler.safeDelete(confirmThread, 'message deletion');
+            }
+          }
+
+          // Lock and archive the thread
+          await interaction.channel
+            .setLocked(true, `Locked by ${user.username}`)
+            .catch(() => {});
+          await interaction.channel
+            .setArchived(true, `Closed by ${user.username}`)
+            .catch(() => {});
+
+          delete activeSpawns[closePending.threadId];
+          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+          delete pendingClosures[msg.id];
+          delete confirmationMessages[closePending.threadId];
+
+          // Sync all changes
+          attendance.setActiveSpawns(activeSpawns);
+          attendance.setActiveColumns(activeColumns);
+          attendance.setPendingClosures(pendingClosures);
+          attendance.setConfirmationMessages(confirmationMessages);
+        } else {
+          await interaction.channel.send(
+            `⚠️ **Failed!**\n\nError: ${resp.text || resp.err}\n\n` +
+              `**Members:** ${spawnInfo.members.join(", ")}`
+          );
+        }
+      } else {
+        // Cancel
+        await interaction.update({
+          embeds: [EmbedBuilder.from(msg.embeds[0]).setFooter({ text: `Cancelled by ${user.username}` })],
+          components: [disabledRow]
+        });
+        await interaction.followUp({ content: "❌ Close canceled.", ephemeral: false });
+        delete pendingClosures[msg.id];
+        attendance.setPendingClosures(pendingClosures);
+      }
+
+      return;
+    }
+  } catch (err) {
+    console.error("❌ Button interaction error:", err);
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: '⚠️ An error occurred processing your request.', ephemeral: true }).catch(() => {});
+    }
   }
 });
 

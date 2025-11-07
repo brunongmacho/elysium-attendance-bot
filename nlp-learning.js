@@ -53,6 +53,7 @@
 
 const axios = require('axios');
 const levenshtein = require('fast-levenshtein');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const { NLPHandler, NLP_PATTERNS } = require('./nlp-handler.js');
 const { ConversationalAI } = require('./nlp-conversation.js');
 const { SheetAPI } = require('./utils/sheet-api.js');
@@ -778,14 +779,24 @@ class NLPLearningSystem {
         ? `\n💡 *I've seen this ${unrecognizedEntry.count} times from ${unrecognizedEntry.userCount} users - seems popular!*`
         : '';
 
-      const reply = await message.reply(
-        `🤔 I'm not sure what you mean, but maybe you want **${command}**? (${confidencePercent}% confident)${popularityNote}\n` +
-        `React with ✅ to teach me this, or ❌ to ignore.`
-      );
+      // Create buttons for confirmation
+      const confirmButton = new ButtonBuilder()
+        .setCustomId(`nlp_confirm_${message.author.id}_${Date.now()}`)
+        .setLabel('✅ Teach me this')
+        .setStyle(ButtonStyle.Success);
 
-      // Add reactions
-      await reply.react('✅');
-      await reply.react('❌');
+      const cancelButton = new ButtonBuilder()
+        .setCustomId(`nlp_cancel_${message.author.id}_${Date.now()}`)
+        .setLabel('❌ Ignore')
+        .setStyle(ButtonStyle.Secondary);
+
+      const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+      const reply = await message.reply({
+        content: `🤔 I'm not sure what you mean, but maybe you want **${command}**? (${confidencePercent}% confident)${popularityNote}\n` +
+          `Click a button below to respond.`,
+        components: [row]
+      });
 
       // Track pending confirmation
       if (!this.pendingConfirmations) {
@@ -801,17 +812,26 @@ class NLPLearningSystem {
         timestamp: Date.now(),
       });
 
-      // Set up reaction collector
-      const filter = (reaction, user) => {
-        return ['✅', '❌'].includes(reaction.emoji.name) && user.id === message.author.id;
-      };
+      // Set up button collector
+      const collector = reply.createMessageComponentCollector({
+        componentType: ComponentType.Button,
+        filter: (i) => i.user.id === message.author.id,
+        time: 60000,
+        max: 1
+      });
 
-      const collector = reply.createReactionCollector({ filter, time: 60000, max: 1 });
+      collector.on('collect', async (interaction) => {
+        const isConfirm = interaction.customId.startsWith('nlp_confirm_');
 
-      collector.on('collect', async (reaction, user) => {
-        if (reaction.emoji.name === '✅') {
+        // Disable buttons after interaction
+        const disabledRow = new ActionRowBuilder().addComponents(
+          ButtonBuilder.from(confirmButton).setDisabled(true),
+          ButtonBuilder.from(cancelButton).setDisabled(true)
+        );
+
+        if (isConfirm) {
           // Learn this pattern!
-          this.teachPattern(phrase, command, user.id);
+          this.teachPattern(phrase, command, interaction.user.id);
 
           // Remove from unrecognized phrases (now it's learned!)
           const normalizedKey = phrase.toLowerCase().trim();
@@ -827,22 +847,22 @@ class NLPLearningSystem {
             console.log(`🧠 [NLP Learning] Cleared negative pattern (user confirmed): "${phrase}" → ${command}`);
           }
 
-          await reply.edit(`✅ Got it! I'll remember that **"${phrase}"** means **${command}**`);
+          await interaction.update({
+            content: `✅ Got it! I'll remember that **"${phrase}"** means **${command}**`,
+            components: [disabledRow]
+          });
           console.log(`🧠 [NLP Learning] User confirmed: "${phrase}" → ${command}`);
         } else {
           // NEGATIVE LEARNING: Remember this is NOT the right command
           this.recordNegativePattern(phrase, command);
-          await reply.edit(`❌ Got it, **"${phrase}"** is NOT **${command}**. I'll be more careful next time.`);
+          await interaction.update({
+            content: `❌ Got it, **"${phrase}"** is NOT **${command}**. I'll be more careful next time.`,
+            components: [disabledRow]
+          });
           console.log(`🧠 [NLP Learning] User rejected: "${phrase}" ≠ ${command}`);
         }
 
-        // Remove all reactions after confirmation to avoid confusion
-        try {
-          await reply.reactions.removeAll();
-        } catch (error) {
-          console.log(`🧠 [NLP Learning] Could not remove reactions: ${error.message}`);
-        }
-
+        // Remove pending confirmation
         this.pendingConfirmations.delete(key);
       });
 
