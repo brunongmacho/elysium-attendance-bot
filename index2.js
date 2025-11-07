@@ -83,6 +83,7 @@ const { IntelligenceEngine } = require('./intelligence-engine.js'); // AI/ML Int
 const { ProactiveIntelligence } = require('./proactive-intelligence.js'); // Proactive Monitoring
 const { NLPHandler } = require('./nlp-handler.js'); // Natural Language Processing
 const { NLPLearningSystem } = require('./nlp-learning.js'); // NLP Learning System (self-improving)
+const eventReminders = require('./event-reminders.js'); // Game Event Reminder System
 
 /**
  * Command alias mapping for shorthand commands.
@@ -3837,6 +3838,10 @@ client.once(Events.ClientReady, async () => {
 
   // Start the scheduler
   scheduler.startScheduler();
+
+  // INITIALIZE EVENT REMINDER SYSTEM
+  console.log("🎯 Initializing game event reminder system...");
+  await eventReminders.initializeEventReminders(client, config, sheetAPI);
 
   console.log("✅ Bot initialization complete and ready for operations!");
 });

@@ -201,6 +201,10 @@ function doPost(e) {
     if (action === 'logWeeklyMilestone') return logWeeklyMilestone(data);
     if (action === 'getWeeklyMilestones') return getWeeklyMilestones(data);
 
+    // Event Reminder actions (crash recovery for game event reminders)
+    if (action === 'saveEventReminders') return saveEventReminders(data);
+    if (action === 'loadEventReminders') return loadEventReminders(data);
+
     Logger.log(`❌ Unknown: ${action}`);
     return createResponse('error', 'Unknown action: ' + action);
 
@@ -4869,6 +4873,142 @@ function clearMilestoneQueue(data) {
   } catch (err) {
     Logger.log('❌ Error clearing milestone queue: ' + err.toString());
     return createResponse('error', err.toString(), { success: false });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EVENT REMINDERS - CRASH RECOVERY
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Ensure EventReminders sheet exists (for crash recovery)
+ * Creates sheet with headers if missing
+ * @returns {Sheet} The EventReminders sheet
+ */
+function ensureEventRemindersSheet() {
+  const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+  let sheet = ss.getSheetByName('EventReminders');
+
+  if (!sheet) {
+    Logger.log('📝 Creating EventReminders sheet...');
+    sheet = ss.insertSheet('EventReminders');
+    sheet.appendRow([
+      'messageId',
+      'channelId',
+      'deleteAt',        // Timestamp when message should be deleted
+      'eventType',       // Event name (e.g., "Individual Arena", "Guild War Queue Reminder")
+      'savedAt'          // When this reminder was saved
+    ]);
+    sheet.getRange('1:1').setFontWeight('bold').setBackground('#e0e0e0');
+    Logger.log('✅ EventReminders sheet created');
+  }
+
+  return sheet;
+}
+
+/**
+ * Save active event reminders to Google Sheets (for crash recovery)
+ * @param {Object} data - Contains reminders object
+ * @returns {Object} Response with success status
+ */
+function saveEventReminders(data) {
+  try {
+    const { reminders } = data;
+
+    if (!reminders) {
+      return createResponse('error', 'Missing reminders parameter');
+    }
+
+    Logger.log('💾 Saving event reminders to Google Sheets...');
+
+    const sheet = ensureEventRemindersSheet();
+
+    // Clear existing data (except header)
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, 5).clear();
+    }
+
+    // Write new data
+    const now = new Date().toISOString();
+    const rows = [];
+
+    for (const [messageId, reminder] of Object.entries(reminders)) {
+      rows.push([
+        messageId,
+        reminder.channelId,
+        reminder.deleteAt,
+        reminder.eventType,
+        now
+      ]);
+    }
+
+    if (rows.length > 0) {
+      sheet.getRange(2, 1, rows.length, 5).setValues(rows);
+      Logger.log(`✅ Saved ${rows.length} event reminders to Google Sheets`);
+    } else {
+      Logger.log('✅ No event reminders to save (empty queue)');
+    }
+
+    return createResponse('ok', 'Event reminders saved', {
+      count: rows.length,
+      savedAt: now
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error saving event reminders: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Load active event reminders from Google Sheets (crash recovery)
+ * @param {Object} data - Request data (unused)
+ * @returns {Object} Response with reminders object
+ */
+function loadEventReminders(data) {
+  try {
+    Logger.log('📥 Loading event reminders from Google Sheets...');
+
+    const sheet = ensureEventRemindersSheet();
+    const lastRow = sheet.getLastRow();
+
+    if (lastRow < 2) {
+      Logger.log('✅ No event reminders found (starting fresh)');
+      return createResponse('ok', 'No event reminders', {
+        reminders: {}
+      });
+    }
+
+    const values = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+    const reminders = {};
+
+    for (const row of values) {
+      const [messageId, channelId, deleteAt, eventType, savedAt] = row;
+
+      // Skip empty rows
+      if (!messageId || !channelId) continue;
+
+      reminders[messageId] = {
+        channelId: channelId.toString(),
+        deleteAt: typeof deleteAt === 'number' ? deleteAt : new Date(deleteAt).getTime(),
+        eventType: eventType.toString(),
+      };
+    }
+
+    const count = Object.keys(reminders).length;
+    Logger.log(`✅ Loaded ${count} event reminders from Google Sheets`);
+
+    return createResponse('ok', 'Event reminders loaded', {
+      reminders: reminders,
+      count: count
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error loading event reminders: ' + err.toString());
+    return createResponse('error', err.toString(), {
+      reminders: {}
+    });
   }
 }
 
