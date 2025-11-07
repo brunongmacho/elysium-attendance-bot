@@ -1081,40 +1081,59 @@ async function awaitConfirmation(
   onConfirm,
   onCancel
 ) {
+  const confirmButton = new ButtonBuilder()
+    .setCustomId(`confirm_yes_${member.user.id}_${Date.now()}`)
+    .setLabel('✅ Confirm')
+    .setStyle(ButtonStyle.Success);
+
+  const cancelButton = new ButtonBuilder()
+    .setCustomId(`confirm_no_${member.user.id}_${Date.now()}`)
+    .setLabel('❌ Cancel')
+    .setStyle(ButtonStyle.Secondary);
+
+  const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
   const isEmbed = embedOrText instanceof EmbedBuilder;
   const confirmMsg = isEmbed
-    ? await message.reply({ embeds: [embedOrText] })
-    : await message.reply(embedOrText);
+    ? await message.reply({ embeds: [embedOrText], components: [row] })
+    : await message.reply({ content: embedOrText, components: [row] });
 
-  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
-  await Promise.all([
-    confirmMsg.react("✅"),
-    confirmMsg.react("❌")
-  ]);
+  const collector = confirmMsg.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: TIMING.CONFIRMATION_TIMEOUT,
+    filter: i => i.user.id === member.user.id
+  });
 
-  const filter = (reaction, user) =>
-    ["✅", "❌"].includes(reaction.emoji.name) && user.id === member.user.id;
+  collector.on('collect', async (interaction) => {
+    const isConfirm = interaction.customId.startsWith('confirm_yes_');
 
-  try {
-    const collected = await confirmMsg.awaitReactions({
-      filter,
-      max: 1,
-      time: TIMING.CONFIRMATION_TIMEOUT,
-      errors: ["time"],
-    });
-    const reaction = collected.first();
+    const disabledRow = new ActionRowBuilder().addComponents(
+      ButtonBuilder.from(confirmButton).setDisabled(true),
+      ButtonBuilder.from(cancelButton).setDisabled(true)
+    );
 
-    if (reaction.emoji.name === "✅") {
+    await interaction.update({ components: [disabledRow] });
+
+    if (isConfirm) {
       await onConfirm(confirmMsg);
     } else {
       await onCancel(confirmMsg);
     }
 
-    await attendance.removeAllReactionsWithRetry(confirmMsg);
-  } catch (err) {
-    await message.reply("⏱️ Confirmation timed out.");
-    await attendance.removeAllReactionsWithRetry(confirmMsg);
-  }
+    collector.stop();
+  });
+
+  collector.on('end', async (collected, reason) => {
+    if (reason === 'time' && collected.size === 0) {
+      const disabledRow = new ActionRowBuilder().addComponents(
+        ButtonBuilder.from(confirmButton).setDisabled(true),
+        ButtonBuilder.from(cancelButton).setDisabled(true)
+      );
+
+      await confirmMsg.edit({ components: [disabledRow] }).catch(() => {});
+      await message.reply("⏱️ Confirmation timed out.");
+    }
+  });
 }
 
 // =====================================================================
@@ -2015,49 +2034,45 @@ const commandHandlers = {
       .setFooter({ text: `30 seconds to respond` })
       .setTimestamp();
 
-    const confirmMsg = await message.reply({ embeds: [confirmEmbed] });
+    const confirmButton = new ButtonBuilder()
+      .setCustomId(`endauction_confirm_${message.author.id}_${Date.now()}`)
+      .setLabel('✅ End Session')
+      .setStyle(ButtonStyle.Danger);
 
-    // OPTIMIZATION v6.8: Parallel reactions
-    try {
-      await Promise.all([
-        confirmMsg.react("✅"),
-        confirmMsg.react("❌")
-      ]);
-    } catch (err) {
-      console.error("Failed to add reactions:", err);
-      return await message.reply("❌ Failed to create confirmation prompt");
-    }
+    const cancelButton = new ButtonBuilder()
+      .setCustomId(`endauction_cancel_${message.author.id}_${Date.now()}`)
+      .setLabel('❌ Cancel')
+      .setStyle(ButtonStyle.Secondary);
 
-    // Create reaction collector with proper filter
-    const filter = (reaction, user) => {
-      return (
-        ["✅", "❌"].includes(reaction.emoji.name) &&
-        user.id === message.author.id &&
-        !user.bot
-      );
-    };
+    const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+    const confirmMsg = await message.reply({ embeds: [confirmEmbed], components: [row] });
+
+    const collector = confirmMsg.createMessageComponentCollector({
+      componentType: ComponentType.Button,
+      time: 30000,
+      filter: i => i.user.id === message.author.id
+    });
 
     // Flag to prevent double execution
     let executed = false;
 
-    try {
-      const collected = await confirmMsg.awaitReactions({
-        filter,
-        max: 1,
-        time: 30000,
-        errors: ["time"],
-      });
-
+    collector.on('collect', async (interaction) => {
       // Prevent double execution
       if (executed) return;
       executed = true;
 
-      const reaction = collected.first();
+      const isConfirm = interaction.customId.startsWith('endauction_confirm_');
 
-      if (reaction.emoji.name === "✅") {
+      const disabledRow = new ActionRowBuilder().addComponents(
+        ButtonBuilder.from(confirmButton).setDisabled(true),
+        ButtonBuilder.from(cancelButton).setDisabled(true)
+      );
+
+      await interaction.update({ components: [disabledRow] });
+
+      if (isConfirm) {
         // User confirmed - end the auction
-        await errorHandler.safeRemoveReactions(confirmMsg, 'reaction removal');
-
         await message.reply(`🛑 Ending auction session immediately...`);
 
         // Get bidding channel for finalization (always use parent channel, not thread)
@@ -2073,23 +2088,28 @@ const commandHandlers = {
 
         await message.reply(`✅ Auction session ended and results submitted.`);
       } else {
+        // User cancelled
+        await message.reply(`❌ End auction canceled`);
+      }
+
+      collector.stop();
+    });
+
+    collector.on('end', async (collected, reason) => {
+      if (reason === 'time' && collected.size === 0) {
         // Prevent double execution
         if (executed) return;
         executed = true;
 
-        // User cancelled
-        await errorHandler.safeRemoveReactions(confirmMsg, 'reaction removal');
-        await message.reply(`❌ End auction canceled`);
-      }
-    } catch (error) {
-      // Prevent double execution
-      if (executed) return;
-      executed = true;
+        const disabledRow = new ActionRowBuilder().addComponents(
+          ButtonBuilder.from(confirmButton).setDisabled(true),
+          ButtonBuilder.from(cancelButton).setDisabled(true)
+        );
 
-      // Timeout or other error
-      await errorHandler.safeRemoveReactions(confirmMsg, 'reaction removal');
-      await message.reply(`⏱️ Confirmation timeout - auction continues`);
-    }
+        await confirmMsg.edit({ components: [disabledRow] }).catch(() => {});
+        await message.reply(`⏱️ Confirmation timeout - auction continues`);
+      }
+    });
   },
 
   queuelist: async (message, member) => {
