@@ -189,6 +189,15 @@ function doPost(e) {
     if (action === 'getMilestoneHistory') return getMilestoneHistory(data);
     if (action === 'updateMilestoneHistory') return updateMilestoneHistory(data);
 
+    // Enhanced Milestone Tracking actions (new milestone types)
+    if (action === 'ensureMilestoneTabsExist') return ensureMilestoneTabsExist();
+    if (action === 'getStreakData') return getStreakData(data);
+    if (action === 'updateStreakData') return updateStreakData(data);
+    if (action === 'getGuildMilestones') return getGuildMilestones(data);
+    if (action === 'recordGuildMilestone') return recordGuildMilestone(data);
+    if (action === 'logWeeklyMilestone') return logWeeklyMilestone(data);
+    if (action === 'getWeeklyMilestones') return getWeeklyMilestones(data);
+
     Logger.log(`❌ Unknown: ${action}`);
     return createResponse('error', 'Unknown action: ' + action);
 
@@ -4644,6 +4653,426 @@ function updateMilestoneHistory(data) {
   } catch (err) {
     Logger.log('❌ Error updating milestone history: ' + err.toString());
     return createResponse('error', err.toString(), { success: false });
+  }
+}
+
+// ===========================================================
+// ENHANCED MILESTONE TRACKING - NEW MILESTONE TYPES
+// ===========================================================
+
+/**
+ * Ensure all milestone tracking tabs exist (auto-create if missing)
+ * Creates: AttendanceStreaks, GuildMilestones, WeeklyMilestoneLog
+ * Also adds new columns to existing MilestoneTracking and AttendanceTracker
+ * @returns {Object} Response with success status
+ */
+function ensureMilestoneTabsExist() {
+  try {
+    Logger.log('📝 Ensuring all milestone tabs exist...');
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+
+    // ═══════════════════════════════════════════════════════════
+    // 1. Create AttendanceStreaks sheet if missing
+    // ═══════════════════════════════════════════════════════════
+    let streaksSheet = ss.getSheetByName('AttendanceStreaks');
+    if (!streaksSheet) {
+      Logger.log('📝 Creating AttendanceStreaks sheet...');
+      streaksSheet = ss.insertSheet('AttendanceStreaks');
+      streaksSheet.appendRow([
+        'nickname',
+        'consecutiveSpawnStreak',
+        'longestSpawnStreak',
+        'lastSpawnDate',
+        'lastSpawnStreakMilestone',
+        'calendarDayStreak',
+        'longestCalendarStreak',
+        'lastCalendarStreakCheck',
+        'lastCalendarStreakMilestone',
+        'perfectWeeksCount',
+        'lastPerfectWeekDate',
+        'lastPerfectWeekMilestone'
+      ]);
+      streaksSheet.getRange('1:1').setFontWeight('bold').setBackground('#e0e0e0');
+      streaksSheet.hideSheet();
+      Logger.log('✅ AttendanceStreaks sheet created');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 2. Create GuildMilestones sheet if missing
+    // ═══════════════════════════════════════════════════════════
+    let guildSheet = ss.getSheetByName('GuildMilestones');
+    if (!guildSheet) {
+      Logger.log('📝 Creating GuildMilestones sheet...');
+      guildSheet = ss.insertSheet('GuildMilestones');
+      guildSheet.appendRow(['milestoneType', 'threshold', 'achievedDate', 'totalValue', 'announced']);
+      guildSheet.getRange('1:1').setFontWeight('bold').setBackground('#e0e0e0');
+      guildSheet.hideSheet();
+      Logger.log('✅ GuildMilestones sheet created');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 3. Create WeeklyMilestoneLog sheet if missing
+    // ═══════════════════════════════════════════════════════════
+    let logSheet = ss.getSheetByName('WeeklyMilestoneLog');
+    if (!logSheet) {
+      Logger.log('📝 Creating WeeklyMilestoneLog sheet...');
+      logSheet = ss.insertSheet('WeeklyMilestoneLog');
+      logSheet.appendRow(['weekStartDate', 'weekEndDate', 'milestoneType', 'nickname', 'milestone', 'value', 'announcedDate']);
+      logSheet.getRange('1:1').setFontWeight('bold').setBackground('#e0e0e0');
+      logSheet.hideSheet();
+      Logger.log('✅ WeeklyMilestoneLog sheet created');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 4. Add columns to existing MilestoneTracking sheet
+    // ═══════════════════════════════════════════════════════════
+    const milestoneSheet = ss.getSheetByName('MilestoneTracking');
+    if (milestoneSheet) {
+      const headers = milestoneSheet.getRange(1, 1, 1, milestoneSheet.getLastColumn()).getValues()[0];
+      if (!headers.includes('lastEngagementMilestone')) {
+        const newCol = milestoneSheet.getLastColumn() + 1;
+        milestoneSheet.getRange(1, newCol).setValue('lastEngagementMilestone').setFontWeight('bold').setBackground('#e0e0e0');
+        Logger.log('✅ Added lastEngagementMilestone column to MilestoneTracking');
+      }
+      if (!headers.includes('lastHybridMilestone')) {
+        const newCol = milestoneSheet.getLastColumn() + 1;
+        milestoneSheet.getRange(1, newCol).setValue('lastHybridMilestone').setFontWeight('bold').setBackground('#e0e0e0');
+        Logger.log('✅ Added lastHybridMilestone column to MilestoneTracking');
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 5. Add columns to AttendanceTracker sheet
+    // ═══════════════════════════════════════════════════════════
+    const trackerSheet = ss.getSheetByName('AttendanceTracker');
+    if (trackerSheet) {
+      const headers = trackerSheet.getRange(1, 1, 1, trackerSheet.getLastColumn()).getValues()[0];
+      if (!headers.includes('memberSinceDate')) {
+        const newCol = trackerSheet.getLastColumn() + 1;
+        trackerSheet.getRange(1, newCol).setValue('memberSinceDate').setFontWeight('bold').setBackground('#e0e0e0');
+        Logger.log('✅ Added memberSinceDate column to AttendanceTracker');
+      }
+      if (!headers.includes('lastTenureMilestone')) {
+        const newCol = trackerSheet.getLastColumn() + 1;
+        trackerSheet.getRange(1, newCol).setValue('lastTenureMilestone').setFontWeight('bold').setBackground('#e0e0e0');
+        Logger.log('✅ Added lastTenureMilestone column to AttendanceTracker');
+      }
+    }
+
+    Logger.log('✅ All milestone tabs verified/created');
+    return createResponse('ok', 'All milestone tabs exist', { success: true });
+
+  } catch (err) {
+    Logger.log('❌ Error ensuring milestone tabs: ' + err.toString());
+    return createResponse('error', err.toString(), { success: false });
+  }
+}
+
+/**
+ * Get streak data for a member
+ * @param {Object} data - Contains nickname
+ * @returns {Object} Response with streak data
+ */
+function getStreakData(data) {
+  try {
+    const nickname = data.nickname;
+    if (!nickname) {
+      return createResponse('error', 'Missing nickname parameter');
+    }
+
+    Logger.log(`📊 Getting streak data for ${nickname}`);
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const sheet = ss.getSheetByName('AttendanceStreaks');
+
+    if (!sheet) {
+      Logger.log('⚠️ AttendanceStreaks sheet not found, returning defaults');
+      return createResponse('ok', 'No streak data', {
+        data: {
+          nickname,
+          consecutiveSpawnStreak: 0,
+          longestSpawnStreak: 0,
+          lastSpawnDate: null,
+          lastSpawnStreakMilestone: 0,
+          calendarDayStreak: 0,
+          longestCalendarStreak: 0,
+          lastCalendarStreakCheck: null,
+          lastCalendarStreakMilestone: 0,
+          perfectWeeksCount: 0,
+          lastPerfectWeekDate: null,
+          lastPerfectWeekMilestone: 0
+        }
+      });
+    }
+
+    const dataValues = sheet.getDataRange().getValues();
+    const headers = dataValues[0];
+    const nicknameCol = headers.indexOf('nickname');
+    const normalizedInput = normalizeUsername(nickname);
+
+    // Find member row
+    for (let i = 1; i < dataValues.length; i++) {
+      const rowNickname = (dataValues[i][nicknameCol] || '').toString().trim();
+      if (normalizeUsername(rowNickname) === normalizedInput) {
+        const row = {};
+        headers.forEach((header, idx) => {
+          row[header] = dataValues[i][idx];
+        });
+        Logger.log(`✅ Found streak data for ${nickname}`);
+        return createResponse('ok', 'Streak data found', { data: row });
+      }
+    }
+
+    // Not found, return defaults
+    Logger.log(`✅ No streak data for ${nickname}, returning defaults`);
+    return createResponse('ok', 'No streak data', {
+      data: {
+        nickname,
+        consecutiveSpawnStreak: 0,
+        longestSpawnStreak: 0,
+        lastSpawnDate: null,
+        lastSpawnStreakMilestone: 0,
+        calendarDayStreak: 0,
+        longestCalendarStreak: 0,
+        lastCalendarStreakCheck: null,
+        lastCalendarStreakMilestone: 0,
+        perfectWeeksCount: 0,
+        lastPerfectWeekDate: null,
+        lastPerfectWeekMilestone: 0
+      }
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error getting streak data: ' + err.toString());
+    return createResponse('error', err.toString(), { data: null });
+  }
+}
+
+/**
+ * Update streak data for a member
+ * @param {Object} data - Contains nickname and streak fields to update
+ * @returns {Object} Response with success status
+ */
+function updateStreakData(data) {
+  try {
+    const nickname = data.nickname;
+    if (!nickname) {
+      return createResponse('error', 'Missing nickname parameter');
+    }
+
+    Logger.log(`📝 Updating streak data for ${nickname}`);
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const sheet = ss.getSheetByName('AttendanceStreaks');
+
+    if (!sheet) {
+      return createResponse('error', 'AttendanceStreaks sheet not found');
+    }
+
+    const sheetData = sheet.getDataRange().getValues();
+    const headers = sheetData[0];
+    const nicknameCol = headers.indexOf('nickname');
+    const normalizedInput = normalizeUsername(nickname);
+
+    // Find or create row
+    let rowIndex = -1;
+    for (let i = 1; i < sheetData.length; i++) {
+      const rowNickname = (sheetData[i][nicknameCol] || '').toString().trim();
+      if (normalizeUsername(rowNickname) === normalizedInput) {
+        rowIndex = i + 1; // 1-indexed for setValues
+        break;
+      }
+    }
+
+    if (rowIndex === -1) {
+      // Append new row
+      const newRow = headers.map(h => data[h] !== undefined ? data[h] : '');
+      sheet.appendRow(newRow);
+      Logger.log(`✅ Created new streak entry for ${nickname}`);
+    } else {
+      // Update existing row
+      headers.forEach((header, idx) => {
+        if (data[header] !== undefined) {
+          sheet.getRange(rowIndex, idx + 1).setValue(data[header]);
+        }
+      });
+      Logger.log(`✅ Updated streak data for ${nickname} (row ${rowIndex})`);
+    }
+
+    return createResponse('ok', `Updated streak data for ${nickname}`, { success: true });
+
+  } catch (err) {
+    Logger.log('❌ Error updating streak data: ' + err.toString());
+    return createResponse('error', err.toString(), { success: false });
+  }
+}
+
+/**
+ * Get guild-wide milestone status
+ * @param {Object} data - Request data (not used)
+ * @returns {Object} Response with guild milestones array
+ */
+function getGuildMilestones(data) {
+  try {
+    Logger.log('📊 Getting guild milestones...');
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const sheet = ss.getSheetByName('GuildMilestones');
+
+    if (!sheet) {
+      Logger.log('⚠️ GuildMilestones sheet not found, returning empty array');
+      return createResponse('ok', 'No guild milestones', { data: [] });
+    }
+
+    const dataValues = sheet.getDataRange().getValues();
+    const headers = dataValues[0];
+    const milestones = [];
+
+    for (let i = 1; i < dataValues.length; i++) {
+      const row = {};
+      headers.forEach((header, idx) => {
+        row[header] = dataValues[i][idx];
+      });
+      milestones.push(row);
+    }
+
+    Logger.log(`✅ Found ${milestones.length} guild milestones`);
+    return createResponse('ok', 'Guild milestones fetched', { data: milestones });
+
+  } catch (err) {
+    Logger.log('❌ Error getting guild milestones: ' + err.toString());
+    return createResponse('error', err.toString(), { data: [] });
+  }
+}
+
+/**
+ * Record guild milestone achievement
+ * @param {Object} data - Contains milestoneType, threshold, totalValue
+ * @returns {Object} Response with success status
+ */
+function recordGuildMilestone(data) {
+  try {
+    const { milestoneType, threshold, totalValue } = data;
+
+    if (!milestoneType || !threshold) {
+      return createResponse('error', 'Missing required parameters');
+    }
+
+    Logger.log(`📝 Recording guild milestone: ${milestoneType} - ${threshold}`);
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const sheet = ss.getSheetByName('GuildMilestones');
+
+    if (!sheet) {
+      return createResponse('error', 'GuildMilestones sheet not found');
+    }
+
+    const timestamp = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
+
+    sheet.appendRow([
+      milestoneType,
+      threshold,
+      timestamp,
+      totalValue || 0,
+      true
+    ]);
+
+    Logger.log(`✅ Recorded guild milestone: ${milestoneType} - ${threshold}`);
+    return createResponse('ok', 'Guild milestone recorded', { success: true });
+
+  } catch (err) {
+    Logger.log('❌ Error recording guild milestone: ' + err.toString());
+    return createResponse('error', err.toString(), { success: false });
+  }
+}
+
+/**
+ * Log milestone for weekly recap
+ * @param {Object} data - Contains weekStartDate, weekEndDate, milestoneType, nickname, milestone, value
+ * @returns {Object} Response with success status
+ */
+function logWeeklyMilestone(data) {
+  try {
+    const { weekStartDate, weekEndDate, milestoneType, nickname, milestone, value } = data;
+
+    Logger.log(`📝 Logging weekly milestone: ${milestoneType} - ${nickname} - ${milestone}`);
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const sheet = ss.getSheetByName('WeeklyMilestoneLog');
+
+    if (!sheet) {
+      return createResponse('error', 'WeeklyMilestoneLog sheet not found');
+    }
+
+    const timestamp = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
+
+    sheet.appendRow([
+      weekStartDate || '',
+      weekEndDate || '',
+      milestoneType,
+      nickname,
+      milestone,
+      value || '',
+      timestamp
+    ]);
+
+    Logger.log(`✅ Logged weekly milestone: ${milestoneType} - ${nickname}`);
+    return createResponse('ok', 'Weekly milestone logged', { success: true });
+
+  } catch (err) {
+    Logger.log('❌ Error logging weekly milestone: ' + err.toString());
+    return createResponse('error', err.toString(), { success: false });
+  }
+}
+
+/**
+ * Get this week's milestone achievements for recap
+ * @param {Object} data - Request data (not used)
+ * @returns {Object} Response with milestones array
+ */
+function getWeeklyMilestones(data) {
+  try {
+    Logger.log('📊 Getting this week\'s milestones...');
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const sheet = ss.getSheetByName('WeeklyMilestoneLog');
+
+    if (!sheet) {
+      Logger.log('⚠️ WeeklyMilestoneLog sheet not found, returning empty array');
+      return createResponse('ok', 'No weekly milestones', { data: [] });
+    }
+
+    const dataValues = sheet.getDataRange().getValues();
+    const headers = dataValues[0];
+    const now = new Date();
+
+    // Calculate start of current week (Monday 3:01 AM Manila time)
+    const weekStart = new Date(now);
+    weekStart.setHours(3, 1, 0, 0);
+    const dayOfWeek = weekStart.getDay();
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    weekStart.setDate(weekStart.getDate() - daysToMonday);
+
+    const milestones = [];
+    const announcedDateCol = headers.indexOf('announcedDate');
+
+    for (let i = 1; i < dataValues.length; i++) {
+      const announcedDate = new Date(dataValues[i][announcedDateCol]);
+      if (announcedDate >= weekStart) {
+        const row = {};
+        headers.forEach((header, idx) => {
+          row[header] = dataValues[i][idx];
+        });
+        milestones.push(row);
+      }
+    }
+
+    Logger.log(`✅ Found ${milestones.length} milestones this week`);
+    return createResponse('ok', 'Weekly milestones fetched', { data: milestones });
+
+  } catch (err) {
+    Logger.log('❌ Error getting weekly milestones: ' + err.toString());
+    return createResponse('error', err.toString(), { data: [] });
   }
 }
 
