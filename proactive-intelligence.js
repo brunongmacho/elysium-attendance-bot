@@ -1097,13 +1097,16 @@ class ProactiveIntelligence {
               discordMember: achiever.discordMember
             });
 
-            // Update Google Sheets
+            // Update Google Sheets with delay to prevent rate limiting
             await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: achiever.nickname,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'attendance'
             }, { silent: true });
+
+            // Add small delay between API calls to prevent rate limiting
+            await new Promise(resolve => setTimeout(resolve, 500));
           }
 
           milestonesQueued += achievers.length;
@@ -1129,13 +1132,16 @@ class ProactiveIntelligence {
               discordMember: achiever.discordMember
             });
 
-            // Update Google Sheets
+            // Update Google Sheets with delay to prevent rate limiting
             await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: achiever.nickname,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'bidding'
             }, { silent: true });
+
+            // Add small delay between API calls to prevent rate limiting
+            await new Promise(resolve => setTimeout(resolve, 500));
           }
 
           milestonesQueued += achievers.length;
@@ -1587,13 +1593,16 @@ class ProactiveIntelligence {
             score: engagementScore
           });
 
-          // Update Google Sheets
+          // Update Google Sheets with delay to prevent rate limiting
           await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
             nickname,
             milestone: highestMilestone,
             totalPoints: engagementScore,
             milestoneType: 'engagement'
           }, { silent: true });
+
+          // Add small delay between API calls to prevent rate limiting
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
 
@@ -1673,13 +1682,16 @@ class ProactiveIntelligence {
               isMajor
             });
 
-            // Update Google Sheets
+            // Update Google Sheets with delay to prevent rate limiting
             await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname,
               milestone: threshold.name,
               totalPoints: `${attendancePoints}/${biddingPoints}`,
               milestoneType: 'hybrid'
             }, { silent: true });
+
+            // Add small delay between API calls to prevent rate limiting
+            await new Promise(resolve => setTimeout(resolve, 500));
 
             break; // Only celebrate highest achieved
           }

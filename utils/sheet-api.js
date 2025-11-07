@@ -32,14 +32,14 @@
 
 const DEFAULT_OPTIONS = {
   maxRetries: 3,
-  baseDelay: 2000, // 2 seconds
-  maxDelay: 30000, // 30 seconds
+  baseDelay: 3000, // 3 seconds (increased from 2)
+  maxDelay: 45000, // 45 seconds (increased from 30)
   timeout: 30000,  // 30 seconds
   enableCircuitBreaker: true,
   // Rate limit specific settings
-  rateLimitMaxRetries: 5, // More retries for rate limits
-  rateLimitBaseDelay: 10000, // 10 seconds for rate limits
-  rateLimitMaxDelay: 120000, // 2 minutes max for rate limits
+  rateLimitMaxRetries: 7, // More retries for rate limits (increased from 5)
+  rateLimitBaseDelay: 15000, // 15 seconds for rate limits (increased from 10)
+  rateLimitMaxDelay: 180000, // 3 minutes max for rate limits (increased from 2)
 };
 
 // ============================================================================
