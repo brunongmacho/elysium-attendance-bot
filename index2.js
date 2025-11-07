@@ -2066,12 +2066,14 @@ const commandHandlers = {
     const confirmButton = new ButtonBuilder()
       .setCustomId(`endauction_confirm_${message.author.id}_${Date.now()}`)
       .setLabel('✅ End Session')
-      .setStyle(ButtonStyle.Danger);
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(false);
 
     const cancelButton = new ButtonBuilder()
       .setCustomId(`endauction_cancel_${message.author.id}_${Date.now()}`)
       .setLabel('❌ Cancel')
-      .setStyle(ButtonStyle.Secondary);
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(false);
 
     const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 
@@ -4588,12 +4590,14 @@ client.on(Events.MessageCreate, async (message) => {
         const approveButton = new ButtonBuilder()
           .setCustomId(`verify_approve_${message.id}_${Date.now()}`)
           .setLabel('✅ Verify')
-          .setStyle(ButtonStyle.Success);
+          .setStyle(ButtonStyle.Success)
+          .setDisabled(false);
 
         const denyButton = new ButtonBuilder()
           .setCustomId(`verify_deny_${message.id}_${Date.now()}`)
           .setLabel('❌ Deny')
-          .setStyle(ButtonStyle.Danger);
+          .setStyle(ButtonStyle.Danger)
+          .setDisabled(false);
 
         const row = new ActionRowBuilder().addComponents(approveButton, denyButton);
 
@@ -4822,12 +4826,14 @@ client.on(Events.MessageCreate, async (message) => {
         const confirmButton = new ButtonBuilder()
           .setCustomId(`close_confirm_${message.author.id}_${Date.now()}`)
           .setLabel('✅ Confirm')
-          .setStyle(ButtonStyle.Success);
+          .setStyle(ButtonStyle.Success)
+          .setDisabled(false);
 
         const cancelButton = new ButtonBuilder()
           .setCustomId(`close_cancel_${message.author.id}_${Date.now()}`)
           .setLabel('❌ Cancel')
-          .setStyle(ButtonStyle.Secondary);
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(false);
 
         const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 

@@ -733,12 +733,14 @@ async function handleLootCommand(message, args, client) {
   const confirmButton = new ButtonBuilder()
     .setCustomId(`lootsubmit_confirm_${message.author.id}_${Date.now()}`)
     .setLabel('✅ Submit to Sheets')
-    .setStyle(ButtonStyle.Success);
+    .setStyle(ButtonStyle.Success)
+    .setDisabled(false);
 
   const cancelButton = new ButtonBuilder()
     .setCustomId(`lootsubmit_cancel_${message.author.id}_${Date.now()}`)
     .setLabel('❌ Cancel')
-    .setStyle(ButtonStyle.Secondary);
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(false);
 
   const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 
