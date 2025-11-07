@@ -554,154 +554,174 @@ const NLP_PATTERNS = {
   // INTELLIGENCE COMMANDS - Now Member-Accessible with Rich NLP Support!
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Intelligence - Predict next spawn time
+  // Intelligence - Predict next spawn time (FILIPINO-FOCUSED)
   predictspawn: [
-    // English - General (no boss specified)
+    // TAGALOG/BISAYA - General (PRIORITY - 80%)
+    /^(?:kelan|kailan|kilan|kan-o|klan)\s+(?:na\s+)?(?:ang\s+)?(?:next|susunod|sunod)\s+(?:na\s+)?spawn/i,
+    /^(?:kelan|kailan|kilan|kan-o)\s+(?:ang\s+)?(?:boss|spawn|mvp)/i,
+    /^(?:kelan|kailan|kilan)\s+(?:ba|kaya|na|pa)\s+(?:ang\s+)?(?:boss|spawn|mvp)/i,
+    /^(?:kelan|kailan)\s+(?:ulit|muli|uli)\s+(?:mag-?spawn|lalabas|dadating)/i,
+    /^(?:may|meron|mern|mern\s+ba)\s+(?:ba\s+)?(?:spawn|boss|mvp)\s+(?:ba|na|pa)/i,
+    /^(?:anong\s+oras|anu\s+oras|ano\s+oras|oras\s+na)\s+(?:ba\s+)?(?:ang\s+)?(?:next\s+)?spawn/i,
+    /^(?:oras|time|sked)\s+(?:ng|ng\s+)?spawn/i,
+    /^spawn\s+(?:time|oras|schedule|sked|kelan|kailan)/i,
+    /^(?:kelan|kailan)\s+(?:pwede|dapat|kailangan)\s+(?:mag-?online|naka-?online|online)/i,
+    /^(?:kelan|kailan)\s+(?:ko|ako)\s+(?:dapat|kailangan|need)\s+(?:mag-?online|online)/i,
+    /^(?:lalabas|dadating|magsspawn|mag-?spawn|sasabog)\s+(?:ba|na|pa)\s+(?:ang\s+)?boss/i,
+    /^(?:sasabog|lalabas|dadating|spawn)\s+(?:na\s+ba|ba|na)/i,
+    /^(?:susugod|mag-?sugod|magpunta|punta)\s+(?:ba|na|tayo|ako|kami)/i,
+    /^(?:laban|raid|hunt|gank)\s+(?:ba|na|tayo|ulit)/i,
+    /^(?:anong|ano|anu)\s+(?:oras|time)\s+(?:ba|na|ng)\s+(?:spawn|boss|mvp)/i,
+    /^(?:ilan|ilang|pila)\s+(?:oras|minuto|min)\s+(?:pa|na)/i,
+
+    // TAGALOG - Specific boss
+    /^(?:kelan|kailan|kilan)\s+(?:ang\s+)?(.+?)\s+(?:spawn|lalabas|dadating|sasabog)/i,
+    /^(?:kelan|kailan)\s+(?:ba|kaya|na)\s+(?:yung|ang|si)\s+(.+?)/i,
+    /^(.+?)\s+(?:kelan|kailan|anu\s+oras|anong\s+oras)/i,
+    /^(.+?)\s+(?:lalabas|spawn|dadating)\s+(?:na\s+ba|ba|kelan|kailan)/i,
+    /^(?:may|meron)\s+(?:ba\s+)?(.+?)\s+(?:later|mamaya|mamayang|bukas)/i,
+    /^(.+?)\s+(?:na\s+ba|ba|na)/i,
+
+    // TAGLISH (Filipino-English mix - 10%)
+    /^(?:kelan|kailan)\s+(?:na\s+)?next\s+spawn/i,
+    /^next\s+spawn\s+(?:kailan|kelan|na|ba)/i,
+    /^(?:anong\s+time|anu\s+time|ano\s+time)\s+(?:yung|ang|ng)\s+spawn/i,
+    /^spawn\s+(?:na|ba|kailan|kelan|anong\s+oras)/i,
+    /^(?:kelan|kailan)\s+(?:yung|yang|ang)\s+(.+?)\s+spawn/i,
+    /^(?:meron|may)\s+(?:bang\s+)?spawn\s+(?:later|mamaya|soon|mamayang)/i,
+    /^(?:next|susunod)\s+boss\s+(?:kailan|kelan|anong\s+time)/i,
+    /^boss\s+(?:na\s+ba|ba|kailan)/i,
+
+    // ENGLISH - General (10% only)
     /^(?:when|what\s+time)\s+(?:is|does)\s+(?:the\s+)?next\s+(?:boss\s+)?spawn/i,
-    /^(?:when|what\s+time)\s+(?:will|does)\s+(?:a\s+)?boss\s+spawn/i,
-    /^(?:predict|estimate|guess)\s+(?:next\s+)?spawn(?:\s+time)?/i,
     /^next\s+spawn(?:\s+time)?/i,
-    /^(?:when(?:'s|\s+is)|what\s+time)\s+(?:the\s+)?spawn/i,
-    /^(?:what(?:'s|\s+is)|show|tell)\s+(?:the\s+)?(?:next\s+)?spawn\s+(?:time|schedule)/i,
-    /^(?:any\s+)?(?:spawn|boss)\s+(?:coming|soon|incoming)/i,
-    /^(?:when\s+)?(?:can\s+i|should\s+i)\s+(?:be\s+)?online/i,
+    /^(?:any\s+)?boss\s+(?:coming|soon)/i,
 
-    // English - Specific boss
+    // ENGLISH - Specific boss
     /^(?:when|what\s+time)\s+(?:is|does|will)\s+(.+?)\s+spawn/i,
-    /^(?:predict|estimate)\s+(.+?)\s+spawn/i,
-    /^(.+?)\s+spawn\s+(?:time|schedule)/i,
-
-    // Tagalog - General
-    /^(?:kelan|kailan|kilan)\s+(?:ang\s+)?(?:next|susunod)\s+spawn/i,
-    /^(?:kelan|kailan)\s+(?:ang\s+)?boss\s+(?:spawn|lalabas)/i,
-    /^(?:may|meron)\s+(?:ba\s+)?spawn/i,
-    /^(?:anong\s+oras|anu)\s+(?:ang\s+)?spawn/i,
-    /^spawn\s+(?:time|schedule|oras)/i,
-
-    // Tagalog - Specific boss
-    /^(?:kelan|kailan)\s+(?:ang\s+)?(.+?)\s+(?:spawn|lalabas)/i,
-    /^(.+?)\s+(?:kelan|kailan|anong\s+oras)/i,
-
-    // Taglish
-    /^(?:kelan|kailan)\s+next\s+spawn/i,
-    /^next\s+spawn\s+(?:kailan|kelan)/i,
-    /^(?:anong\s+time|what\s+time)\s+(?:ang\s+)?spawn/i,
-    /^spawn\s+(?:na|ba|kailan)/i,
-    /^(?:kelan|kailan)\s+(.+?)\s+spawn/i,
-    /^(?:meron|may)\s+(?:bang\s+)?spawn\s+(?:later|mamaya)/i,
+    /^(.+?)\s+spawn\s+time/i,
   ],
 
-  // Intelligence - Predict item price
+  // Intelligence - Predict item price (FILIPINO-FOCUSED)
   predictprice: [
-    // English
-    /^(?:predict|estimate|suggest|guess)\s+price\s+(?:for\s+)?(.+)/i,
-    /^(?:what(?:'s|\s+is)\s+the\s+)?(?:predicted|estimated|suggested)\s+price\s+(?:for|of)\s+(.+)/i,
-    /^how\s+much\s+(?:is|should|would|will|does)\s+(.+)\s+(?:cost|be|go\s+for|worth)/i,
-    /^(?:what(?:'s|\s+is)|show)\s+(?:the\s+)?(?:fair|good|optimal)\s+price\s+(?:for|of)\s+(.+)/i,
-    /^price\s+(?:prediction|estimate|check)\s+(?:for\s+)?(.+)/i,
-    /^(?:what(?:'s|\s+is)|how\s+much\s+is)\s+(.+?)\s+worth/i,
-    /^(?:value|worth)\s+(?:of|for)\s+(.+)/i,
-    /^(?:how\s+much|what)\s+(?:should|would|can)\s+(?:i|we)\s+(?:bid|pay)\s+(?:for|on)\s+(.+)/i,
-    /^(?:good|fair)\s+(?:bid|price)\s+(?:for|on)\s+(.+)/i,
+    // TAGALOG - Price questions (PRIORITY - 80%)
+    /^(?:magkano|magkanu|mkano|mgkano)\s+(?:kaya|ba|ang|yung|yang)\s+(.+)/i,
+    /^(?:magkano|magkanu)\s+(?:na\s+)?(.+)/i,
+    /^(?:presyo|halaga|value|bili)\s+(?:ng|para\s+sa|ng\s+)?(.+)/i,
+    /^(?:ilang|ilan|pila)\s+(?:points?|pts|pesos)\s+(?:ang\s+)?(.+)/i,
+    /^(?:ilang|ilan|pila)\s+(?:ang\s+)?(.+)/i,
+    /^(?:hulaan|predict|estimate)\s+(?:price|presyo|halaga)\s+(?:ng|para\s+sa|ng\s+)?(.+)/i,
+    /^(?:magkano|magkanu)\s+(?:dapat|pwede|kaya)\s+(?:ko|kong|naming)\s+(?:i-?bid|taya|ibid)\s+(?:sa|para\s+sa|sa\s+)?(.+)/i,
+    /^(?:worth|halaga|value)\s+(?:ba|kaya)\s+(?:ng|ang)\s+(.+)/i,
+    /^(?:sulit|mahal|mura)\s+(?:ba|kaya)\s+(?:ang\s+)?(.+)/i,
+    /^(.+?)\s+(?:magkano|mkano|ilan|pila)/i,
+    /^(.+?)\s+(?:worth|halaga|presyo|bili)/i,
+    /^(?:ilan|ilang)\s+(?:ba|kaya)\s+(?:ang\s+)?(.+)/i,
+    /^(?:ano|anu|anong)\s+(?:presyo|price|halaga)\s+(?:ng|ng\s+)?(.+)/i,
+    /^(?:tignan|tingnan|check)\s+(?:presyo|price)\s+(?:ng|ng\s+)?(.+)/i,
+    /^(?:abot|kaya|afford)\s+(?:ko|natin|ba)\s+(?:ang\s+)?(.+)/i,
 
-    // Tagalog
-    /^(?:magkano|magkanu)\s+(?:kaya|ba|ang)\s+(.+)/i,
-    /^(?:presyo|halaga|value)\s+(?:ng|para\s+sa)\s+(.+)/i,
-    /^(?:ilang|ilan)\s+(?:points?|pts)\s+(?:ang\s+)?(.+)/i,
-    /^(?:predict|hulaan)\s+(?:price|presyo)\s+(?:ng|para\s+sa)\s+(.+)/i,
-    /^(?:magkano|magkanu)\s+(?:dapat|pwede)\s+(?:ko|kong)\s+(?:i-?bid|taya)\s+(?:sa|para\s+sa)\s+(.+)/i,
-
-    // Taglish
+    // TAGLISH (Filipino-English mix - 10%)
     /^(?:magkano|magkanu)\s+(?:kaya|ba)\s+ang\s+(.+)/i,
-    /^price\s+(?:ng|para\s+sa)\s+(.+)/i,
+    /^price\s+(?:ng|para\s+sa|ng\s+)?(.+)/i,
     /^(?:ilang|ilan)\s+(?:ang|ba)\s+(?:price|presyo)\s+(?:ng|ng\s+)?(.+)/i,
     /^(.+?)\s+(?:magkano|worth|value|price)/i,
     /^(?:check|tignan)\s+price\s+(?:ng|ng\s+)?(.+)/i,
+    /^worth\s+(?:ba|kaya)\s+(.+)/i,
+
+    // ENGLISH (10% only)
+    /^how\s+much\s+(?:is|should)\s+(.+)\s+(?:cost|worth)/i,
+    /^(?:what(?:'s|\s+is))\s+(.+?)\s+worth/i,
+    /^price\s+(?:of|for)\s+(.+)/i,
+    /^(?:good|fair)\s+price\s+for\s+(.+)/i,
   ],
 
-  // Intelligence - Predict attendance for user
+  // Intelligence - Predict attendance for user (FILIPINO-FOCUSED)
   predictattendance: [
-    // English
-    /^(?:predict|estimate|check)\s+attendance\s+(?:for\s+)?(.+)/i,
-    /^(?:will|is)\s+(.+?)\s+(?:attend|come|show\s+up|join)/i,
-    /^(?:attendance|participation)\s+(?:prediction|likelihood)\s+(?:for\s+)?(.+)/i,
-    /^(?:how\s+likely)\s+(?:is|that)\s+(.+?)\s+(?:will\s+)?(?:attend|come)/i,
-    /^(.+?)(?:'s)?\s+attendance\s+(?:prediction|rate)/i,
+    // TAGALOG - Attendance predictions (PRIORITY - 80%)
+    /^(?:darating|dadalo|dadating|susugod|sasama|pupunta)\s+(?:ba|kaya|pa)\s+(?:si\s+)?(.+)/i,
+    /^(?:pupunta|darating|dadalo)\s+(.+)\s+(?:ba|kaya)/i,
+    /^(?:online|naka-?online|mag-?online)\s+(?:ba|kaya)\s+(?:si\s+)?(.+)/i,
+    /^(?:si|yung|yang)\s+(.+?)\s+(?:darating|dadalo|susugod|online)\s+(?:ba|kaya)/i,
+    /^(.+?)\s+(?:darating|dadalo|susugod|pupunta|online)\s+(?:ba|kaya|pa)/i,
+    /^(?:predict|hulaan|tantiya)\s+(?:attendance|punta)\s+(?:ni|ng)\s+(.+)/i,
+    /^(?:kasama|sama)\s+(?:ba|kaya)\s+(?:si\s+)?(.+)/i,
+    /^(.+?)\s+(?:sasama|pupunta|online)\s+(?:ba|kaya)/i,
+    /^(?:attend|dadalo)\s+(?:ba|kaya)\s+(.+)/i,
+    /^(?:check|tignan)\s+(?:attendance|punta)\s+(?:ni|ng)\s+(.+)/i,
 
-    // Tagalog
-    /^(?:darating|dadalo|susugod)\s+(?:ba|kaya)\s+(.+)/i,
-    /^(?:predict|hulaan)\s+attendance\s+(?:ni|ng)\s+(.+)/i,
-
-    // Taglish
+    // TAGLISH (10%)
     /^(?:darating|dadalo)\s+(?:ba|kaya)\s+si\s+(.+)/i,
     /^predict\s+(.+?)\s+attendance/i,
     /^(.+?)\s+dadalo\s+(?:ba|kaya)/i,
+    /^online\s+(?:ba|kaya)\s+(.+)/i,
+
+    // ENGLISH (10% only)
+    /^(?:will|is)\s+(.+?)\s+(?:attend|come|join)/i,
+    /^predict\s+attendance\s+(.+)/i,
   ],
 
-  // Intelligence - Engagement analysis (specific user)
+  // Intelligence - Engagement analysis (FILIPINO-FOCUSED)
   engagement: [
-    // English
-    /^(?:check|analyze|show|view|display)\s+engagement\s+(?:for\s+)?(.+)/i,
-    /^(?:check|analyze|show|view)\s+(.+?)(?:'s)?\s+engagement/i,
-    /^engagement\s+(?:analysis|stats?|report|score)\s+(?:for\s+)?(.+)/i,
-    /^how\s+engaged\s+is\s+(.+)/i,
-    /^(.+?)(?:'s|\s+)engagement(?:\s+(?:score|rating|level))?/i,
-    /^analyze\s+(.+?)(?:'s)?\s+(?:activity|participation|stats?)/i,
-    /^(?:show|check)\s+(?:me\s+)?(.+?)(?:'s)?\s+(?:stats?|activity|participation)/i,
-    /^(?:how|what)\s+(?:is|are)\s+(.+?)(?:'s)?\s+(?:stats?|engagement)/i,
-    /^(.+?)\s+(?:stats?|engagement|activity|participation)$/i,
+    // TAGALOG - Self-check (PRIORITY - 50%)
+    /^(?:kamusta|kumusta|kmusta)\s+(?:na\s+)?(?:ako|ko)/i,
+    /^(?:ano|anu|anong)\s+(?:stats?|performance|score)\s+ko/i,
+    /^(?:tignan|tingnan|check|tngin)\s+(?:stats?|engagement|performance)\s+ko/i,
+    /^(?:stats?|engagement|activity|performance)\s+ko(?:\s+(?:ba|naman|please))?/i,
+    /^(?:paano|pano|kumusta)\s+(?:na\s+)?(?:ako|performance\s+ko)/i,
+    /^(?:ok|ayos|goods)\s+(?:ba|pa)\s+(?:ako|performance\s+ko)/i,
+    /^(?:gano|gaano)\s+(?:ako|ko)\s+(?:ka-?active|active)/i,
+    /^(?:mabuti|goods)\s+(?:ba|pa)\s+ako/i,
 
-    // Self-check variations (no username = check yourself)
-    /^(?:my|check\s+my|show\s+my)\s+engagement/i,
-    /^(?:my|check\s+my|show\s+my)\s+(?:stats?|activity|participation)/i,
-    /^(?:how\s+am\s+i|how(?:'m|\s+am)\s+i)\s+doing/i,
-    /^(?:my|check\s+my)\s+(?:performance|score|rating)/i,
-
-    // Tagalog
-    /^(?:tignan|check|tingnan)\s+engagement\s+(?:ni|ng)\s+(.+)/i,
-    /^(?:kamusta|kumusta)\s+(?:si|ang)\s+(.+)/i,
+    // TAGALOG - Check others (30%)
+    /^(?:tignan|tingnan|check|tngin)\s+(?:engagement|stats?|performance)\s+(?:ni|ng)\s+(.+)/i,
+    /^(?:kamusta|kumusta|kmusta)\s+(?:si|ang|yung|yang)\s+(.+)/i,
+    /^(?:kamusta|kumusta)\s+(?:na\s+)?(.+)/i,
     /^engagement\s+(?:ni|ng)\s+(.+)/i,
-    /^(?:stats?|activity)\s+(?:ni|ng)\s+(.+)/i,
+    /^(?:stats?|activity|performance)\s+(?:ni|ng)\s+(.+)/i,
+    /^(?:ano|anu)\s+(?:stats?|performance)\s+(?:ni|ng)\s+(.+)/i,
+    /^(.+?)\s+(?:kamusta|kumusta|ok\s+ba)/i,
+    /^(?:ok|ayos|goods)\s+(?:ba|pa)\s+(?:si\s+)?(.+)/i,
 
-    // Tagalog self-check
-    /^(?:kamusta|kumusta)\s+(?:ako|ko)/i,
-    /^(?:tignan|tingnan|check)\s+(?:stats?|engagement)\s+ko/i,
-    /^(?:stats?|engagement|activity)\s+ko/i,
-    /^(?:paano|kumusta)\s+(?:ako|performance\s+ko)/i,
-
-    // Taglish
+    // TAGLISH (10%)
     /^(?:check|tingnan)\s+engagement\s+(?:ni|ng|ni\s+)?(.+)/i,
     /^(.+?)(?:'s|\s+)stats?\s+(?:naman|please)/i,
     /^(?:kamusta|kumusta)\s+(?:ang\s+)?engagement\s+(?:ni|ng)\s+(.+)/i,
     /^(?:show|pakita)\s+(?:stats?|engagement)\s+(?:ni|ng)\s+(.+)/i,
-
-    // Taglish self-check
     /^(?:kamusta|kumusta)\s+ako/i,
     /^check\s+(?:stats?|engagement)\s+ko/i,
     /^my\s+(?:stats?|engagement)\s+naman/i,
+
+    // ENGLISH (10% only)
+    /^(?:my|check\s+my|show\s+my)\s+(?:engagement|stats?|activity|performance)/i,
+    /^(?:how\s+am\s+i|how(?:'m|\s+am)\s+i)\s+doing/i,
+    /^check\s+engagement\s+(.+)/i,
+    /^(.+?)\s+engagement/i,
+    /^how\s+engaged\s+is\s+(.+)/i,
   ],
 
-  // Guild-wide engagement (must come after specific user engagement)
+  // Guild-wide engagement (FILIPINO-FOCUSED)
   analyzeengagement: [
-    // English
-    /^analyze\s+(?:guild|all|everyone|overall|everybody)\s+engagement$/i,
-    /^(?:show|check|view|display)\s+(?:guild|all|overall|everyone)\s+engagement$/i,
-    /^engagement\s+(?:analysis|report|summary|overview|stats?)$/i,
-    /^(?:guild|overall|everyone|everybody|all)\s+engagement$/i,
-    /^(?:who(?:'s|\s+is)|show)\s+(?:the\s+)?(?:most|top)\s+engaged/i,
-    /^(?:guild|team|clan)\s+(?:stats?|analytics|performance)/i,
-    /^(?:all|everyone)\s+(?:stats?|activity|participation)/i,
-    /^(?:show|display|check)\s+(?:all|everyone)(?:'s)?\s+(?:stats?|engagement)/i,
+    // TAGALOG (PRIORITY - 80%)
+    /^(?:tignan|tingnan|check|tngin)\s+(?:engagement|stats?|performance)\s+(?:ng\s+lahat|overall|ng\s+buong\s+guild|lahat)/i,
+    /^(?:lahat|buong\s+guild|guild)\s+(?:engagement|stats?|performance)/i,
+    /^(?:sino|sinu|anu|ano)\s+(?:ang\s+)?(?:pinaka-?engaged|nangunguna|top|mataas)/i,
+    /^(?:sino|sinu)\s+(?:ang\s+)?(?:nangunguna|nanalo|mataas)/i,
+    /^(?:engagement|stats?|performance)\s+(?:ng\s+lahat|overall)/i,
+    /^(?:lahat|everyone|all)\s+(?:na\s+)?(?:ba|naman)/i,
+    /^(?:tignan|check)\s+(?:lahat|all|everyone)/i,
+    /^guild\s+(?:stats?|engagement|performance)/i,
 
-    // Tagalog
-    /^(?:tignan|check|tingnan)\s+engagement\s+(?:ng\s+lahat|overall|ng\s+buong\s+guild)/i,
-    /^(?:lahat|buong\s+guild)\s+engagement/i,
-    /^(?:sino|who)\s+(?:ang\s+)?(?:pinaka-?engaged|nangunguna)/i,
-
-    // Taglish
+    // TAGLISH (10%)
     /^engagement\s+(?:ng\s+lahat|overall)/i,
     /^(?:check|tingnan)\s+(?:all|lahat)\s+engagement/i,
     /^(?:sino|who)\s+(?:top|nangunguna)\s+sa\s+engagement/i,
+    /^guild\s+engagement/i,
+
+    // ENGLISH (10% only)
+    /^(?:show|check)\s+(?:guild|all|everyone)\s+engagement$/i,
+    /^guild\s+(?:stats?|analytics)$/i,
+    /^who(?:'s|\s+is)\s+top/i,
   ],
 
   // Intelligence commands - Anomalies
