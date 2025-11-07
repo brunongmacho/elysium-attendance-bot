@@ -796,9 +796,9 @@ function buildMainHelp() {
 }
 
 /**
- * Build category help
+ * Build category help (filtered by user permissions)
  */
-function buildCategoryHelp(category) {
+function buildCategoryHelp(category, isUserAdmin = true) {
   const categoryData = COMMANDS[category];
   if (!categoryData) return null;
 
@@ -856,8 +856,8 @@ function buildCategoryHelp(category) {
     }
   }
 
-  // Add fields
-  if (adminCommands.length > 0) {
+  // Add fields (filter admin commands for non-admins)
+  if (adminCommands.length > 0 && isUserAdmin) {
     embed.addFields({
       name: `${EMOJI.ADMIN} Admin Commands`,
       value: adminCommands.join('\n\n')
@@ -877,12 +877,15 @@ function buildCategoryHelp(category) {
 }
 
 /**
- * Build command-specific help
+ * Build command-specific help (filtered by user permissions)
  */
-function buildCommandHelp(commandName) {
+function buildCommandHelp(commandName, isUserAdmin = true) {
   // Search for command in all categories
   for (const [category, commands] of Object.entries(COMMANDS)) {
     for (const [key, cmd] of Object.entries(commands)) {
+      // Filter admin commands for non-admins
+      if (cmd.adminOnly && !isUserAdmin) continue;
+
       // Match by command name or aliases
       if (
         key === commandName.toLowerCase() ||
@@ -950,10 +953,13 @@ function buildErrorEmbed(query) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Handle help command
+ * Handle help command (with permission filtering)
  */
 async function handleHelp(message, args, member) {
   try {
+    // Check if user is admin
+    const userIsAdmin = isAdminFunc ? isAdminFunc(member) : true; // Default to true if not initialized
+
     // No args = main help
     if (!args || args.length === 0) {
       const embed = buildMainHelp();
@@ -965,7 +971,7 @@ async function handleHelp(message, args, member) {
 
     // Check if it's a category
     if (COMMANDS[query]) {
-      const embed = buildCategoryHelp(query);
+      const embed = buildCategoryHelp(query, userIsAdmin);
       if (embed) {
         await message.reply({ embeds: [embed] });
         return;
@@ -973,7 +979,7 @@ async function handleHelp(message, args, member) {
     }
 
     // Check if it's a specific command
-    const cmdEmbed = buildCommandHelp(query);
+    const cmdEmbed = buildCommandHelp(query, userIsAdmin);
     if (cmdEmbed) {
       await message.reply({ embeds: [cmdEmbed] });
       return;
