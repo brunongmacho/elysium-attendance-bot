@@ -4527,17 +4527,28 @@ function getMilestoneHistory(data) {
 
     for (let i = 0; i < data_values.length; i++) {
       const row = data_values[i];
-      const nickname = (row[0] || '').toString().trim();
+      let nickname = (row[0] || '').toString().trim();
+      const milestoneType = (row[5] || 'points').toString().trim();
+
+      // Strip type suffix from nickname if present (for backward compatibility)
+      // Old data may have "JohnDoe-attendance", new data will just be "JohnDoe"
+      if (nickname.endsWith(`-${milestoneType}`)) {
+        nickname = nickname.slice(0, -(milestoneType.length + 1));
+      }
+
       const normalizedNickname = normalizeUsername(nickname);
 
       if (normalizedNickname) {
-        milestoneHistory[normalizedNickname] = {
+        // Build composite key: normalizedNickname-type (e.g., "johndoe-attendance")
+        const historyKey = `${normalizedNickname}-${milestoneType}`;
+
+        milestoneHistory[historyKey] = {
           nickname: nickname, // Original (for display)
           lastMilestone: parseInt(row[1]) || 0,
           totalPoints: parseInt(row[2]) || 0,
           lastAnnounced: row[3] || null,
           announcementLog: row[4] || '',
-          milestoneType: row[5] || 'points'
+          milestoneType: milestoneType
         };
       }
     }
@@ -4574,13 +4585,15 @@ function updateMilestoneHistory(data) {
     const lastRow = sheet.getLastRow();
     const normalizedInput = normalizeUsername(nickname);
 
-    // Find existing row for this member
+    // Find existing row for this member AND milestone type
     let rowIndex = -1;
 
     if (lastRow > 1) {
-      const nicknames = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-      for (let i = 0; i < nicknames.length; i++) {
-        if (normalizeUsername(nicknames[i][0]) === normalizedInput) {
+      const allData = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+      for (let i = 0; i < allData.length; i++) {
+        const rowNickname = allData[i][0];
+        const rowType = allData[i][5] || 'points';
+        if (normalizeUsername(rowNickname) === normalizedInput && rowType === type) {
           rowIndex = i + 2; // +2 because arrays are 0-indexed and row 1 is header
           break;
         }
