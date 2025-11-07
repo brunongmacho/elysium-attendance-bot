@@ -700,12 +700,12 @@ class ProactiveIntelligence {
       // Get channels for tiered routing
       const guildAnnouncementChannel = await getChannelById(
         this.client,
-        '1401785278972039198' // Guild Announcements
+        this.config.guild_announcement_channel_id // Guild Announcements
       );
 
       const guildChatChannel = await getChannelById(
         this.client,
-        '1401784124922138646' // Guild Chat
+        this.config.elysium_commands_channel_id // Guild Chat
       );
 
       if (!guildAnnouncementChannel || !guildChatChannel) {
