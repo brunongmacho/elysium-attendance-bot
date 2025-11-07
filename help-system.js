@@ -415,11 +415,13 @@ const COMMANDS = {
       aliases: ["!nextspawn", "!whennext", "!spawntimer"],
       adminOnly: false,
       details: [
-        "• AI spawn time prediction",
-        "• Based on historical spawn patterns",
-        "• Confidence intervals",
+        "• AI spawn time prediction using multiple methods:",
+        "  - Timer-based: Known spawn intervals (e.g., Venatus 10h)",
+        "  - Schedule-based: Fixed times (e.g., Guild Boss Mon 21:00)",
+        "  - Historical: Pattern analysis from past spawns",
+        "• Confidence intervals with spawn type indicator",
         "• If no boss specified: shows next boss to spawn",
-        "• **NLP**: \"when is next spawn?\" or \"kelan spawn ng Kades?\"",
+        "• **NLP**: \"when is next spawn?\" or \"kelan lalabas venatus?\"",
         "• Use in guild chat by @mentioning the bot"
       ]
     },
