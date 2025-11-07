@@ -62,9 +62,9 @@ const GAME_EVENTS = {
     startTime: { hour: 19, minute: 25 }, // Actual event time
     durationMinutes: 3,
     color: 0xff4757, // Dark red
-    description: '**GUILD WAR** is starting in a few minutes!',
+    description: '**GUILD WAR** is starting soon! Get ready!',
     thumbnail: 'https://i.imgur.com/kR2B3Yx.png', // War icon
-    reminderOffsetMinutes: 5, // Remind 5 min before (event is very short)
+    reminderOffsetMinutes: 20, // Remind 20 min before (gives players time to prepare)
   },
 };
 
