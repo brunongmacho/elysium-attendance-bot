@@ -18,7 +18,7 @@
  *    - Traditional queue-based auction system
  *    - Items loaded from Google Sheets
  *    - Automatic session management with timers
- *    - Bid confirmation workflow with user acceptance
+ *    - Instant bidding (no confirmations required)
  *
  * 2. AUCTIONEERING MODE (auctioneering.js integration):
  *    - Manual auction control by admins
@@ -35,7 +35,7 @@
  * AUCTION STATE:
  *   - a: Active auction details (item, bids, timers, winner)
  *   - q: Item queue loaded from Google Sheets
- *   - pause: Pause status for bid confirmations
+ *   - pause: [DEPRECATED] Previously used for bid confirmations
  *
  * POINTS MANAGEMENT:
  *   - lp: Locked points per user (prevents double-spending)
@@ -44,7 +44,7 @@
  *
  * BID TRACKING:
  *   - h: Session history (all completed auctions)
- *   - pc: Pending bid confirmations with timeouts
+ *   - pc: [DEPRECATED] Previously used for pending bid confirmations
  *   - lb: Last bid time per user (rate limiting)
  *
  * TIMERS & LIFECYCLE:
@@ -80,9 +80,9 @@
  *    - Maximum 60 extensions prevents infinite auctions
  *    - Timers are CLEARED then RESCHEDULED to prevent double-firing
  *
- * 5. PENDING CONFIRMATION HANDLING:
- *    - Higher pending bids cancel lower pending bids
- *    - Automatic cleanup of stale confirmations (60s timeout)
+ * 5. INSTANT BID PROCESSING:
+ *    - All bids process immediately without confirmation delays
+ *    - Eliminates timeout and last-minute bidding issues
  *    - Thread locking prevents new bids during finalization
  *
  * ═══════════════════════════════════════════════════════════════════════════
@@ -90,8 +90,8 @@
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * BIDDING:
- *   ✓ Instant bidding (auctioneering mode) - no confirmations
- *   ✓ Confirmed bidding (standalone mode) - reaction-based acceptance
+ *   ✓ Instant bidding (ALL modes) - no confirmations required
+ *   ✓ Fast auction flow - eliminates timeout and delay issues
  *   ✓ Batch auctions - multiple winners for identical items
  *   ✓ Self-overbidding - users can increase their own bids
  *   ✓ Bid validation with boundary checks (max 99,999,999 pts)
@@ -2125,33 +2125,28 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// BID PROCESSING - Standalone Mode (Confirmation-Based Bidding)
+// BID PROCESSING - Standalone Mode (Instant Bidding)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Processes bids for standalone mode with user confirmation workflow
+ * Processes instant bids for standalone mode (NO confirmations)
  *
  * DUAL MODE ROUTING:
  * - First checks if auctioneering module is active
  * - Routes to procBidAuctioneering if auctioneering is active
  * - Continues with standalone mode if not
  *
- * CONFIRMATION WORKFLOW:
+ * INSTANT BIDDING WORKFLOW:
  * 1. Validate user and bid amount
  * 2. Check points availability
- * 3. Send confirmation embed with reactions (✅ confirm / ❌ cancel)
- * 4. Wait for user reaction (10 second timeout)
- * 5. Process bid on confirm, cancel on reject/timeout
+ * 3. Process bid immediately (no confirmation required)
+ * 4. Lock points and update state
+ * 5. Send confirmation message to bidder
  *
- * PAUSE MECHANISM:
- * - If bid occurs in final 10 seconds, auction is PAUSED
- * - Gives user time to confirm without rushing
- * - RESUMES on confirm/cancel/timeout
- *
- * COUNTDOWN TIMER:
- * - Updates confirmation embed every second
- * - Shows remaining time to user
- * - Cleaned up on confirm/cancel/timeout
+ * BENEFITS:
+ * - No timeouts or last-minute bid issues
+ * - Faster auction flow
+ * - Prevents confirmation delays
  *
  * RATE LIMITING:
  * - 3-second cooldown between bids per user
@@ -2160,7 +2155,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
  * @param {Message} msg - Discord message object
  * @param {string} amt - Bid amount as string (will be parsed to integer)
  * @param {Object} cfg - Bot configuration object
- * @returns {Promise<Object>} { ok: boolean, msg?: string, confId?: string }
+ * @returns {Promise<Object>} { ok: boolean, msg?: string }
  */
 async function procBid(msg, amt, cfg) {
   // CRITICAL FIX: Check if auctioneering is active first
@@ -2239,215 +2234,83 @@ async function procBid(msg, amt, cfg) {
     return { ok: false, msg: "Insufficient" };
   }
 
-  // Calculate expiry timestamp for dynamic countdown
-  const expiryTime = now + 10000; // 10 seconds from now
-  const expiryTimestamp = Math.floor(expiryTime / 1000);
+  // ==========================================
+  // INSTANT BIDDING - NO CONFIRMATIONS
+  // Bids process immediately with 3s rate limit spam protection
+  // ==========================================
 
-  const confEmbed = new EmbedBuilder()
-    .setColor(COLORS.AUCTION)
-    .setTitle(`${EMOJI.CLOCK} Confirm Your Bid`)
+  // Update rate limit immediately to prevent rapid-fire bids
+  st.lb[uid] = now;
+
+  // Handle previous winner (unlock their points)
+  if (a.curWin && !isSelf) {
+    unlock(a.curWin, a.curBid);
+  }
+
+  // Lock the new bid
+  lock(u, needed);
+
+  // Store previous bid for display
+  const prevBid = a.curBid;
+
+  // Update current auction
+  a.curBid = bid;
+  a.curWin = u;
+  a.curWinId = uid;
+
+  if (!a.bids) a.bids = [];
+  a.bids.push({
+    user: u,
+    userId: uid,
+    amount: bid,
+    timestamp: now,
+  });
+
+  save();
+
+  // Send immediate confirmation to bidder
+  const confirmEmbed = new EmbedBuilder()
+    .setColor(getColor(COLORS.SUCCESS))
+    .setTitle(`${EMOJI.SUCCESS} Bid Placed!`)
     .setDescription(
-      `**Item:** ${a.item}${
-        a.quantity > 1 ? ` (${a.quantity} available)` : ""
-      }\n` +
-        `**Action:** ${
-          isSelf ? "Increase your bid" : "Place bid and lock points"
-        }\n\n` +
-        `⚠️ **By confirming, you agree to:**\n` +
-        `• Lock ${needed}pts from your available points\n` +
-        `• ${isSelf ? "Increase" : "Place"} your bid to ${bid}pts\n\n` +
-        `⏰ **Expires <t:${expiryTimestamp}:R>**`
+      `You're now the highest bidder on **${a.item}**`
     )
     .addFields(
       { name: `${EMOJI.BID} Your Bid`, value: `${bid}pts`, inline: true },
-      {
-        name: `${EMOJI.CHART} Current High`,
-        value: `${a.curBid}pts`,
-        inline: true,
-      },
-      { name: "💳 Points After", value: `${av - needed}pts left`, inline: true }
-    );
+      { name: `${EMOJI.CHART} Previous High`, value: `${prevBid}pts`, inline: true },
+      { name: "💳 Points Left", value: `${av - needed}pts`, inline: true }
+    )
+    .setFooter({ text: isSelf ? "Self-overbid processed" : "Points locked until outbid or win" });
 
-  if (isSelf) {
-    confEmbed.addFields({
-      name: "🔄 Self-Overbid Details",
-      value: `Your current bid: ${a.curBid}pts\nNew bid: ${bid}pts\n**Additional points needed: +${needed}pts**`,
-      inline: false,
-    });
-  }
+  await msg.reply({ embeds: [confirmEmbed] });
 
-  confEmbed.setFooter({
-    text: isSelf ? "Overbidding yourself" : "Outbidding current leader",
-  });
-
-  // Create buttons for confirmation
-  const confirmButton = new ButtonBuilder()
-    .setCustomId(`bid_confirm_${msg.author.id}_${Date.now()}`)
-    .setLabel('✅ Confirm Bid')
-    .setStyle(ButtonStyle.Success);
-
-  const cancelButton = new ButtonBuilder()
-    .setCustomId(`bid_cancel_${msg.author.id}_${Date.now()}`)
-    .setLabel('❌ Cancel')
-    .setStyle(ButtonStyle.Danger);
-
-  const row = new ActionRowBuilder()
-    .addComponents(confirmButton, cancelButton);
-
-  const conf = await msg.reply({
-    content: `<@${uid}> **CONFIRM YOUR BID**`,
-    embeds: [confEmbed],
-    components: [row]
-  });
-
-  // Bug #23 fix: Limit pending confirmations to prevent unbounded growth
-  const MAX_PENDING_CONFIRMATIONS = 100;
-  const pendingCount = Object.keys(st.pc).length;
-  if (pendingCount >= MAX_PENDING_CONFIRMATIONS) {
-    console.warn(`⚠️ Pending confirmations limit reached (${pendingCount}), cleaning up old entries`);
-    cleanupPendingConfirmations();
-  }
-
-  st.pc[conf.id] = {
-    userId: uid,
-    username: u,
-    threadId: a.threadId,
-    amount: bid,
-    timestamp: now,
-    origMsgId: msg.id,
-    isSelf,
-    needed,
-  };
-  save();
-
-  st.lb[uid] = now; // Rate limit stamp
-
-  // Check if bid in last 10 seconds - PAUSE
-  const timeLeft = a.endTime - Date.now();
-  if (timeLeft <= 10000 && timeLeft > 0) {
-    pauseAuction();
-    await msg.channel.send(
-      `${EMOJI.PAUSE} **PAUSED** - Bid in last 10s! Timer paused for confirmation...`
-    );
-  }
-
-  // Create button collector
-  const collector = conf.createMessageComponentCollector({
-    componentType: ComponentType.Button,
-    time: CT, // 10 second timeout
-    filter: i => i.user.id === uid // Only accept interactions from the bidder
-  });
-
-  collector.on('collect', async (interaction) => {
+  // Notify previous winner they were outbid (if not self-overbid)
+  if (a.curWin && !isSelf && a.curWinId) {
     try {
-      const isConfirm = interaction.customId.startsWith('bid_confirm_');
-
-      if (isConfirm) {
-        // User confirmed bid
-        await procConfirm(uid, u, bid, isSelf, needed);
-
-        // Update embed to show confirmed
-        const confirmedEmbed = EmbedBuilder.from(confEmbed)
-          .setColor(getColor(COLORS.SUCCESS))
-          .setFooter({ text: `${EMOJI.SUCCESS} Bid confirmed!` });
-
-        // Disable buttons
-        const disabledRow = new ActionRowBuilder()
-          .addComponents(
-            ButtonBuilder.from(confirmButton).setDisabled(true),
-            ButtonBuilder.from(cancelButton).setDisabled(true)
-          );
-
-        await interaction.update({
-          embeds: [confirmedEmbed],
-          components: [disabledRow]
-        });
-
-        // Delete confirmation message after delay
-        setTimeout(async () => {
-          await errorHandler.safeDelete(conf, 'message deletion');
-        }, TIMEOUTS.MESSAGE_DELETE);
-
-      } else {
-        // User cancelled bid
-        const cancelledEmbed = EmbedBuilder.from(confEmbed)
+      const prevWinner = await msg.guild.members.fetch(a.curWinId).catch(() => null);
+      if (prevWinner) {
+        const outbidEmbed = new EmbedBuilder()
           .setColor(getColor(COLORS.INFO))
-          .setFooter({ text: `${EMOJI.ERROR} Bid cancelled` });
+          .setTitle(`${EMOJI.WARNING} You've Been Outbid!`)
+          .setDescription(`**${a.item}** - New high bid: ${bid}pts`)
+          .addFields(
+            { name: "Your Bid", value: `${prevBid}pts`, inline: true },
+            { name: "New High", value: `${bid}pts`, inline: true }
+          )
+          .setFooter({ text: `${prevBid}pts unlocked` });
 
-        // Disable buttons
-        const disabledRow = new ActionRowBuilder()
-          .addComponents(
-            ButtonBuilder.from(confirmButton).setDisabled(true),
-            ButtonBuilder.from(cancelButton).setDisabled(true)
-          );
-
-        await interaction.update({
-          embeds: [cancelledEmbed],
-          components: [disabledRow]
+        await prevWinner.send({ embeds: [outbidEmbed] }).catch(() => {
+          // Silently fail if DMs are closed
         });
-
-        // Delete confirmation message after delay
-        setTimeout(async () => {
-          await errorHandler.safeDelete(conf, 'message deletion');
-        }, TIMEOUTS.MESSAGE_DELETE);
       }
-
-      // Cleanup pending confirmation
-      delete st.pc[conf.id];
-      save();
-
-      // Resume if paused
-      if (st.pause) {
-        resumeAuction(conf.client, cfg);
-        await msg.channel.send(
-          `${EMOJI.PLAY} **RESUMED** - Auction continues...`
-        );
-      }
-
-      // Stop collector
-      collector.stop('completed');
     } catch (err) {
-      console.error('❌ Error handling bid confirmation button:', err);
+      // Silently fail - don't block auction for DM errors
     }
-  });
+  }
 
-  collector.on('end', async (collected, reason) => {
-    if (reason === 'time' && st.pc[conf.id]) {
-      // Timeout - user didn't respond
-      const timeoutEmbed = EmbedBuilder.from(confEmbed)
-        .setColor(getColor(COLORS.INFO))
-        .setFooter({ text: `${EMOJI.CLOCK} Timed out` });
+  console.log(`[BID] ${u} bid ${bid}pts on ${a.item} (was: ${prevBid}pts, self: ${isSelf})`);
 
-      // Disable buttons
-      const disabledRow = new ActionRowBuilder()
-        .addComponents(
-          ButtonBuilder.from(confirmButton).setDisabled(true),
-          ButtonBuilder.from(cancelButton).setDisabled(true)
-        );
-
-      await errorHandler.safeEdit(conf, {
-        embeds: [timeoutEmbed],
-        components: [disabledRow]
-      }, 'message edit');
-
-      setTimeout(async () => {
-        await errorHandler.safeDelete(conf, 'message deletion');
-      }, TIMEOUTS.MESSAGE_DELETE);
-
-      delete st.pc[conf.id];
-      save();
-
-      // Resume if paused
-      if (st.pause) {
-        resumeAuction(conf.client, cfg);
-        await msg.channel.send(
-          `${EMOJI.PLAY} **RESUMED** - Bid timeout, auction continues...`
-        );
-      }
-    }
-  });
-
-  return { ok: true, confId: conf.id };
+  return { ok: true, msg: "Bid placed" };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3895,8 +3758,7 @@ function stopCleanupSchedule() {
  * - submitSessionTally: Submit results to Google Sheets
  *
  * BID CONFIRMATION:
- * - confirmBid: Handle bid confirmation reactions
- * - cancelBid: Handle bid cancellation reactions
+ * - REMOVED: confirmBid and cancelBid (all bids are now instant, no confirmations)
  *
  * STATE RECOVERY:
  * - recoverBiddingState: Recover state after bot restart
@@ -3942,45 +3804,22 @@ module.exports = {
   // ═════════════════════════════════════════════════════════════════════════
 
   /**
-   * Handles bid confirmation reactions (✅ confirm)
+   * DEPRECATED: Bid confirmations removed - all bids are now instant
    *
-   * DUAL MODE SUPPORT:
-   * - Auctioneering mode: Direct processing with instant feedback
-   * - Standalone mode: Confirmation workflow with pause/resume
+   * This function is kept for backward compatibility but will not be called.
+   * All bidding is now instant (both auctioneering and standalone modes) to prevent:
+   * - Timeout issues
+   * - Last-minute bidding delays
+   * - Confirmation flow complexity
    *
-   * VALIDATION:
-   * - Verifies pending confirmation exists
-   * - Checks user is the bidder (prevents others from confirming)
-   * - Validates auction is still active
-   * - Checks bid is still valid (not outbid)
-   *
-   * RACE CONDITION PREVENTION:
-   * - Checks for higher pending bids from other users
-   * - Cancels lower bid if higher pending bid exists
-   * - Prevents simultaneous confirmations from causing issues
-   *
-   * POINTS LOCKING:
-   * - Unlocks previous winner's points
-   * - Locks new bidder's points
-   * - Handles self-overbidding (only lock difference)
-   *
-   * TIME EXTENSION:
-   * - Extends auction if bid in final minute (<60s remaining)
-   * - Reschedules all timers with new endTime
-   * - Maximum 60 extensions enforced
-   *
-   * CLEANUP:
-   * - Removes pending confirmation from state
-   * - Clears confirmation timeout timer
-   * - Clears countdown interval timer
-   * - Deletes confirmation message after 5 seconds
-   * - Resumes auction if paused
-   *
+   * @deprecated Since instant bidding implementation
    * @param {MessageReaction} reaction - Discord reaction object
    * @param {User} user - Discord user who reacted
    * @param {Object} config - Bot configuration object
    */
   confirmBid: async function (reaction, user, config) {
+    console.warn('[DEPRECATED] confirmBid called - this function is no longer used (instant bidding enabled)');
+    return;
     const p = st.pc[reaction.message.id];
     if (!p) return;
 
@@ -4442,36 +4281,22 @@ module.exports = {
   },
 
   /**
-   * Handles bid cancellation reactions (❌ cancel)
+   * DEPRECATED: Bid confirmations removed - all bids are now instant
    *
-   * AUTHORIZATION:
-   * - Bid owner can always cancel their own bid
-   * - Admins can cancel any pending bid
-   * - Others cannot cancel (reaction is removed)
+   * This function is kept for backward compatibility but will not be called.
+   * All bidding is now instant (both auctioneering and standalone modes) to prevent:
+   * - Timeout issues
+   * - Last-minute bidding delays
+   * - Confirmation flow complexity
    *
-   * CANCELLATION PROCESS:
-   * 1. Update confirmation message to show "Bid Canceled"
-   * 2. Remove all reactions from message
-   * 3. Delete confirmation message after 3 seconds
-   * 4. Delete original bid command message
-   * 5. Clear confirmation timeout timer
-   * 6. Remove pending confirmation from state
-   * 7. Resume auction if paused (standalone mode only)
-   *
-   * POINTS MANAGEMENT:
-   * - NO points are locked/unlocked (bid never processed)
-   * - User's points remain fully available
-   *
-   * STATE CLEANUP:
-   * - Removes pending confirmation (st.pc)
-   * - Clears timeout timer (st.th)
-   * - Persists cleaned state
-   *
+   * @deprecated Since instant bidding implementation
    * @param {MessageReaction} reaction - Discord reaction object
    * @param {User} user - Discord user who reacted
    * @param {Object} config - Bot configuration object
    */
   cancelBid: async function (reaction, user, config) {
+    console.warn('[DEPRECATED] cancelBid called - this function is no longer used (instant bidding enabled)');
+    return;
     const p = st.pc[reaction.message.id];
     if (!p) return;
 

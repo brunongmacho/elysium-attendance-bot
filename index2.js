@@ -1085,59 +1085,82 @@ async function awaitConfirmation(
   onConfirm,
   onCancel
 ) {
-  const confirmButton = new ButtonBuilder()
-    .setCustomId(`confirm_yes_${member.user.id}_${Date.now()}`)
-    .setLabel('✅ Confirm')
-    .setStyle(ButtonStyle.Success);
+  try {
+    const confirmButton = new ButtonBuilder()
+      .setCustomId(`confirm_yes_${member.user.id}_${Date.now()}`)
+      .setLabel('✅ Confirm')
+      .setStyle(ButtonStyle.Success);
 
-  const cancelButton = new ButtonBuilder()
-    .setCustomId(`confirm_no_${member.user.id}_${Date.now()}`)
-    .setLabel('❌ Cancel')
-    .setStyle(ButtonStyle.Secondary);
+    const cancelButton = new ButtonBuilder()
+      .setCustomId(`confirm_no_${member.user.id}_${Date.now()}`)
+      .setLabel('❌ Cancel')
+      .setStyle(ButtonStyle.Secondary);
 
-  const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+    const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 
-  const isEmbed = embedOrText instanceof EmbedBuilder;
-  const confirmMsg = isEmbed
-    ? await message.reply({ embeds: [embedOrText], components: [row] })
-    : await message.reply({ content: embedOrText, components: [row] });
+    const isEmbed = embedOrText instanceof EmbedBuilder;
+    const confirmMsg = isEmbed
+      ? await message.reply({ embeds: [embedOrText], components: [row] })
+      : await message.reply({ content: embedOrText, components: [row] });
 
-  const collector = confirmMsg.createMessageComponentCollector({
-    componentType: ComponentType.Button,
-    time: TIMING.CONFIRMATION_TIMEOUT,
-    filter: i => i.user.id === member.user.id
-  });
+    console.log(`🔘 [BUTTON] Confirmation sent to ${member.user.tag} (${member.user.id})`);
 
-  collector.on('collect', async (interaction) => {
-    const isConfirm = interaction.customId.startsWith('confirm_yes_');
+    const collector = confirmMsg.createMessageComponentCollector({
+      componentType: ComponentType.Button,
+      time: TIMING.CONFIRMATION_TIMEOUT,
+      filter: i => {
+        const matches = i.user.id === member.user.id;
+        if (!matches) {
+          console.log(`🔘 [BUTTON] Ignoring click from ${i.user.tag} (expected ${member.user.tag})`);
+        }
+        return matches;
+      }
+    });
 
-    const disabledRow = new ActionRowBuilder().addComponents(
-      ButtonBuilder.from(confirmButton).setDisabled(true),
-      ButtonBuilder.from(cancelButton).setDisabled(true)
-    );
+    collector.on('collect', async (interaction) => {
+      try {
+        const isConfirm = interaction.customId.startsWith('confirm_yes_');
+        console.log(`🔘 [BUTTON] ${member.user.tag} clicked ${isConfirm ? 'Confirm' : 'Cancel'}`);
 
-    await interaction.update({ components: [disabledRow] });
+        const disabledRow = new ActionRowBuilder().addComponents(
+          ButtonBuilder.from(confirmButton).setDisabled(true),
+          ButtonBuilder.from(cancelButton).setDisabled(true)
+        );
 
-    if (isConfirm) {
-      await onConfirm(confirmMsg);
-    } else {
-      await onCancel(confirmMsg);
-    }
+        await interaction.update({ components: [disabledRow] }).catch(err => {
+          console.error(`❌ [BUTTON] Failed to disable buttons: ${err.message}`);
+        });
 
-    collector.stop();
-  });
+        if (isConfirm) {
+          await onConfirm(confirmMsg);
+        } else {
+          await onCancel(confirmMsg);
+        }
 
-  collector.on('end', async (collected, reason) => {
-    if (reason === 'time' && collected.size === 0) {
-      const disabledRow = new ActionRowBuilder().addComponents(
-        ButtonBuilder.from(confirmButton).setDisabled(true),
-        ButtonBuilder.from(cancelButton).setDisabled(true)
-      );
+        collector.stop();
+      } catch (err) {
+        console.error(`❌ [BUTTON] Error handling button click: ${err.message}`);
+        await interaction.reply({ content: `❌ An error occurred: ${err.message}`, ephemeral: true }).catch(() => {});
+      }
+    });
 
-      await confirmMsg.edit({ components: [disabledRow] }).catch(() => {});
-      await message.reply("⏱️ Confirmation timed out.");
-    }
-  });
+    collector.on('end', async (collected, reason) => {
+      console.log(`🔘 [BUTTON] Collector ended: ${reason} (${collected.size} interactions)`);
+
+      if (reason === 'time' && collected.size === 0) {
+        const disabledRow = new ActionRowBuilder().addComponents(
+          ButtonBuilder.from(confirmButton).setDisabled(true),
+          ButtonBuilder.from(cancelButton).setDisabled(true)
+        );
+
+        await confirmMsg.edit({ components: [disabledRow] }).catch(() => {});
+        await message.reply("⏱️ Confirmation timed out.").catch(() => {});
+      }
+    });
+  } catch (err) {
+    console.error(`❌ [BUTTON] Error in awaitConfirmation: ${err.message}`);
+    throw err;
+  }
 }
 
 // =====================================================================
@@ -1285,7 +1308,7 @@ const commandHandlers = {
           Object.keys(pendingVerifications).length
         } pending verification(s)\n` +
         `• ${Object.keys(activeColumns).length} active column(s)\n\n` +
-        `React ✅ to confirm or ❌ to cancel.`,
+        `Click ✅ Confirm or ❌ Cancel button below.`,
       async (confirmMsg) => {
         // Reset all state variables to empty objects
         // This is a nuclear option for when the bot gets stuck
@@ -1363,7 +1386,7 @@ const commandHandlers = {
               } verified`
           )
           .join("\n") +
-        `\n\nReact ✅ to confirm or ❌ to cancel.\n\n` +
+        `\n\nClick ✅ Confirm or ❌ Cancel button below.\n\n` +
         `⏱️ This will take approximately ${openSpawns.length * 5} seconds.`,
       async (confirmMsg) => {
         await message.reply(
@@ -1749,7 +1772,7 @@ const commandHandlers = {
         `**Timestamp:** ${spawnInfo.timestamp}\n` +
         `**Members:** ${spawnInfo.members.length}\n\n` +
         `This will submit to Google Sheets WITHOUT closing the thread.\n\n` +
-        `React ✅ to confirm or ❌ to cancel.`,
+        `Click ✅ Confirm or ❌ Cancel button below.`,
       async (confirmMsg) => {
         await message.channel.send(
           `📊 Submitting ${spawnInfo.members.length} members to Google Sheets...`
@@ -1871,7 +1894,7 @@ const commandHandlers = {
       `⚠️ **Clear ${pendingInThread.length} pending verification(s)?**\n\n` +
         `This will remove all pending verifications for this thread.\n` +
         `Members will NOT be added to verified list.\n\n` +
-        `React ✅ to confirm or ❌ to cancel.`,
+        `Click ✅ Confirm or ❌ Cancel button below.`,
       async (confirmMsg) => {
         pendingInThread.forEach((msgId) => delete pendingVerifications[msgId]);
 
@@ -2033,7 +2056,7 @@ const commandHandlers = {
           `**Completed Items:** ${
             auctState.sessionItems?.filter((s) => s.winner).length || 0
           }\n\n` +
-          `React with ✅ to confirm or ❌ to cancel.`
+          `Click ✅ End Session or ❌ Cancel button below.`
       )
       .setFooter({ text: `30 seconds to respond` })
       .setTimestamp();
@@ -2179,7 +2202,7 @@ const commandHandlers = {
         `This will create spawn threads for **${maintenanceBosses.length} bosses** that spawn during maintenance:\n\n` +
         `${maintenanceBosses.map((b, i) => `${i + 1}. ${b}`).join("\n")}\n\n` +
         `**Spawn time:** 5 minutes from now\n\n` +
-        `React ✅ to confirm or ❌ to cancel.`,
+        `Click ✅ Confirm or ❌ Cancel button below.`,
       async (confirmMsg) => {
         // Get current time + 5 minutes
         const spawnDate = new Date(Date.now() + 5 * 60 * 1000);
@@ -2317,7 +2340,7 @@ const commandHandlers = {
         `• Delete all their point and attendance history\n` +
         `• ForDistribution sheet will NOT be touched (historical log)\n` +
         `• This action cannot be undone\n\n` +
-        `React ✅ to confirm or ❌ to cancel.`,
+        `Click ✅ Confirm or ❌ Cancel button below.`,
       async (confirmMsg) => {
         try {
           // Call Google Sheets to remove the member
@@ -4635,7 +4658,7 @@ client.on(Events.MessageCreate, async (message) => {
             pendingInThread
               .map(([msgId, p]) => `• **${p.author}**`)
               .join("\n") +
-            `\n\nReact ✅ to confirm or ❌ to cancel.`,
+            `\n\nClick ✅ Confirm or ❌ Cancel button below.`,
           async (confirmMsg) => {
             let verifiedCount = 0,
               duplicateCount = 0;
@@ -5439,24 +5462,26 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 /**
  * =========================================================================
- * MESSAGE REACTION ADD EVENT HANDLER
+ * MESSAGE REACTION ADD EVENT HANDLER (LEGACY - FOR BACKWARD COMPATIBILITY)
  * =========================================================================
  *
- * Handles reaction-based interactions throughout the bot. Primary uses:
+ * Handles old reaction-based interactions for backward compatibility.
+ * Modern system uses buttons (handled in InteractionCreate event).
+ * Primary uses:
  *
  * 1. Attendance Verification:
- *    - Admin reacts ✅ to approve member check-in
- *    - Admin reacts ❌ to deny check-in
+ *    - Admin clicks ✅ Verify button to approve member check-in
+ *    - Admin clicks ❌ Deny button to reject check-in
  *    - Updates spawn member list and notifies user
  *
  * 2. Spawn Closure Confirmations:
- *    - Admin confirms spawn closure with ✅
+ *    - Admin clicks ✅ Confirm button to close spawn
  *    - Submits attendance to Google Sheets
  *    - Archives thread and cleans up state
  *
  * 3. Bid Confirmations:
- *    - User confirms bid placement with ✅
- *    - User cancels bid with ❌
+ *    - User clicks ✅ Confirm Bid button to place bid
+ *    - User clicks ❌ Cancel button to cancel bid
  *    - Handles both regular bidding and auctioneering modes
  *    - Manages point locking/unlocking
  *    - Handles outbid notifications
@@ -5520,17 +5545,8 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
       }
     }
 
-    // Bidding confirmations (allow non-admin users who made the bid)
-    const biddingState = bidding.getBiddingState();
-
-    if (biddingState.pc[msg.id]) {
-      if (reaction.emoji.name === "✅") {
-        await bidding.confirmBid(reaction, user, config);
-      } else if (reaction.emoji.name === "❌") {
-        await bidding.cancelBid(reaction, user, config);
-      }
-      return;
-    }
+    // NOTE: Bidding confirmations removed - all bids are now instant (no reactions/buttons needed)
+    // This prevents timeouts and last-minute bidding issues
 
     // Attendance verification
     const pending = pendingVerifications[msg.id];

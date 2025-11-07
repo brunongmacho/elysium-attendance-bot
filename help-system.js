@@ -166,7 +166,7 @@ const COMMANDS = {
       details: [
         "• Screenshot verification (non-admins)",
         "• Admin fast-track (no screenshot)",
-        "• React ✅/❌ for verification",
+        "• Admins click ✅ Verify or ❌ Deny button",
         "• Auto-points on verification",
         "• **20-min auto-close** prevents cheating"
       ]
