@@ -152,6 +152,8 @@ const COMMAND_ALIASES = {
   "!diag": "!diagnostics",
   "!forcesync": "!forcesync",
   "!fsync": "!forcesync",
+  "!testmilestones": "!testmilestones",
+  "!tm": "!testmilestones",
 
   // Intelligence engine commands (admin)
   "!predict": "!predictprice",
@@ -3416,6 +3418,21 @@ const commandHandlers = {
   forcesync: async (message, member) => {
     await emergencyCommands.handleEmergencyCommand(message, ['sync']);
   },
+
+  /**
+   * Test milestone checking system (manual trigger)
+   * Usage: !testmilestones | !tm
+   */
+  testmilestones: async (message, member) => {
+    try {
+      await message.reply('🎯 Manually triggering milestone check...');
+      await proactiveIntelligence.checkMilestones();
+      await message.reply('✅ Milestone check complete! Check logs for details.');
+    } catch (error) {
+      console.error('[COMMAND] Error testing milestones:', error);
+      await message.reply(`❌ Error: ${error.message}`);
+    }
+  },
 };
 
 /**
@@ -4871,6 +4888,7 @@ client.on(Events.MessageCreate, async (message) => {
           "!clearallbids",
           "!diagnostics",
           "!forcesync",
+          "!testmilestones",
         ].includes(adminCmd)
       ) {
         const now = Date.now();
@@ -4916,6 +4934,8 @@ client.on(Events.MessageCreate, async (message) => {
           await commandHandlers.diagnostics(message, member);
         else if (adminCmd === "!forcesync")
           await commandHandlers.forcesync(message, member);
+        else if (adminCmd === "!testmilestones")
+          await commandHandlers.testmilestones(message, member);
         return;
       }
 
