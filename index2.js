@@ -2545,17 +2545,16 @@ const commandHandlers = {
   engagement: async (message, member) => {
     const args = message.content.trim().split(/\s+/).slice(1);
 
-    if (args.length === 0) {
-      await message.reply(
-        `❌ **Usage:** \`!engagement <username>\`\n\n` +
-        `**Example:** \`!engagement PlayerName\`\n\n` +
-        `I'll analyze engagement patterns, predict attendance likelihood, and provide personalized recommendations!`
-      );
-      return;
+    // If no args OR user says "my"/"me", check their own stats
+    let username;
+    if (args.length === 0 || ['my', 'me', 'myself'].includes(args[0]?.toLowerCase())) {
+      // Use guild nickname (same as attendance system) or Discord username as fallback
+      username = member.nickname || member.user.username;
+      await message.reply(`🤖 Analyzing your engagement **${username}**...`);
+    } else {
+      username = args.join(' ');
+      await message.reply(`🤖 Analyzing engagement for **${username}**...`);
     }
-
-    const username = args.join(' ');
-    await message.reply(`🤖 Analyzing engagement for **${username}**...`);
 
     try {
       const analysis = await intelligenceEngine.analyzeMemberEngagement(username);
@@ -4224,22 +4223,67 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     // =========================================================================
-    // INTELLIGENCE ENGINE COMMANDS (Admin only)
+    // INTELLIGENCE ENGINE COMMANDS - Member-Accessible (Guild Chat + Admin Logs)
     // =========================================================================
+    // Member-friendly prediction & analytics commands
     if (
       resolvedCmd === "!predictprice" ||
+      resolvedCmd === "!predictspawn" ||
+      resolvedCmd === "!predictattendance" ||
       resolvedCmd === "!engagement" ||
-      resolvedCmd === "!analyzeengagement" ||
+      resolvedCmd === "!analyzeengagement"
+    ) {
+      // Check permissions: either admin OR ELYSIUM role in allowed channels
+      const inAllowedChannel = inElysiumCommandsChannel || inAdminLogs;
+      const hasPermission = userIsAdmin || (hasElysiumRole(member) && inAllowedChannel);
+
+      if (!hasPermission) {
+        await message.reply(
+          "❌ Intelligence commands are available to ELYSIUM members in guild chat or admin logs.\n" +
+          "💡 **Tip:** Mention me in guild chat (e.g., `@bot when is next spawn?`)"
+        );
+        return;
+      }
+
+      // Don't clutter spawn threads
+      if (
+        message.channel.isThread() &&
+        message.channel.parentId === config.attendance_channel_id
+      ) {
+        await message.reply(
+          "⚠️ Please use intelligence commands in guild chat or admin logs to avoid cluttering spawn threads."
+        );
+        return;
+      }
+
+      // Route to appropriate command handler
+      if (resolvedCmd === "!predictprice") {
+        await commandHandlers.predictprice(message, member);
+      } else if (resolvedCmd === "!predictspawn") {
+        await commandHandlers.predictspawn(message, member);
+      } else if (resolvedCmd === "!predictattendance") {
+        await commandHandlers.predictattendance(message, member);
+      } else if (resolvedCmd === "!engagement") {
+        await commandHandlers.engagement(message, member);
+      } else if (resolvedCmd === "!analyzeengagement") {
+        await commandHandlers.analyzeengagement(message, member);
+      }
+      return;
+    }
+
+    // =========================================================================
+    // INTELLIGENCE ENGINE COMMANDS - Admin Only
+    // =========================================================================
+    // Advanced admin tools (fraud detection, performance, bootstrapping)
+    if (
       resolvedCmd === "!detectanomalies" ||
       resolvedCmd === "!recommendations" ||
       resolvedCmd === "!performance" ||
       resolvedCmd === "!analyzequeue" ||
-      resolvedCmd === "!bootstraplearning" ||
-      resolvedCmd === "!predictattendance" ||
-      resolvedCmd === "!predictspawn"
+      resolvedCmd === "!bootstraplearning"
     ) {
       if (!userIsAdmin) {
-        await message.reply("❌ Intelligence commands are admin-only.");
+        await message.reply("❌ This intelligence command is admin-only.");
         return;
       }
 
@@ -4254,15 +4298,7 @@ client.on(Events.MessageCreate, async (message) => {
       }
 
       // Route to appropriate command handler
-      const handlerName = resolvedCmd.substring(1); // Remove ! prefix
-
-      if (resolvedCmd === "!predictprice") {
-        await commandHandlers.predictprice(message, member);
-      } else if (resolvedCmd === "!engagement") {
-        await commandHandlers.engagement(message, member);
-      } else if (resolvedCmd === "!analyzeengagement") {
-        await commandHandlers.analyzeengagement(message, member);
-      } else if (resolvedCmd === "!detectanomalies") {
+      if (resolvedCmd === "!detectanomalies") {
         await commandHandlers.detectanomalies(message, member);
       } else if (resolvedCmd === "!recommendations") {
         await commandHandlers.recommendations(message, member);
@@ -4272,10 +4308,6 @@ client.on(Events.MessageCreate, async (message) => {
         await commandHandlers.analyzequeue(message, member);
       } else if (resolvedCmd === "!bootstraplearning") {
         await commandHandlers.bootstraplearning(message, member);
-      } else if (resolvedCmd === "!predictattendance") {
-        await commandHandlers.predictattendance(message, member);
-      } else if (resolvedCmd === "!predictspawn") {
-        await commandHandlers.predictspawn(message, member);
       }
       return;
     }

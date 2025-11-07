@@ -51,7 +51,7 @@ const NLP_CONFIG = {
   enabledChannels: {
     adminLogs: true,          // Admin logs channel
     auctionThreads: true,     // Threads in bidding channel
-    guildChat: false,         // NOT in guild chat (casual conversation)
+    guildChat: false,         // Guild chat: ONLY when bot is @mentioned
   },
 
   // Minimum confidence threshold (0-1)
@@ -72,6 +72,9 @@ const NLP_CONFIG = {
     'leaderboardattendance',
     'predictattendance',
 
+    // Spawn predictions (specific before general)
+    'predictspawn',
+
     // Bidding-specific
     'leaderboardbidding',
     'bidstatus',
@@ -79,13 +82,15 @@ const NLP_CONFIG = {
     'bid',
     'loot',
 
-    // Weekly/spawn predictions
+    // Weekly reports
     'weeklyreport',
-    'predictspawn',
 
     // User engagement (specific before general)
     'engagement',
     'analyzeengagement',
+
+    // Price predictions
+    'predictprice',
 
     // Admin commands
     'startauction',
@@ -96,8 +101,7 @@ const NLP_CONFIG = {
     'skipitem',
     'cancelitem',
 
-    // Intelligence
-    'predictprice',
+    // Admin intelligence
     'detectanomalies',
     'recommendations',
     'performance',
@@ -546,36 +550,158 @@ const NLP_PATTERNS = {
     /^(?:alisin|wag\s+na)\s+(?:ito|to|item)?/i,
   ],
 
-  // Intelligence commands - Price prediction
-  predictprice: [
-    /^(?:predict|estimate|suggest|guess)\s+price\s+(?:for\s+)?(.+)/i,
-    /^(?:what(?:'s|\s+is)\s+the\s+)?(?:predicted|estimated)\s+price\s+(?:for|of)\s+(.+)/i,
-    /^how\s+much\s+(?:is|should|would|will)\s+(.+)\s+(?:cost|be|go\s+for)/i,
-    /^price\s+(?:prediction|estimate)\s+(?:for\s+)?(.+)/i,
+  // ═══════════════════════════════════════════════════════════════════════════
+  // INTELLIGENCE COMMANDS - Now Member-Accessible with Rich NLP Support!
+  // ═══════════════════════════════════════════════════════════════════════════
 
-    // Tagalog
-    /^(?:magkano|magkanu)\s+(?:kaya|ba)\s+(.+)/i,
-    /^(?:predict|estimate)\s+price\s+(.+)/i,
+  // Intelligence - Predict next spawn time
+  predictspawn: [
+    // English - General (no boss specified)
+    /^(?:when|what\s+time)\s+(?:is|does)\s+(?:the\s+)?next\s+(?:boss\s+)?spawn/i,
+    /^(?:when|what\s+time)\s+(?:will|does)\s+(?:a\s+)?boss\s+spawn/i,
+    /^(?:predict|estimate|guess)\s+(?:next\s+)?spawn(?:\s+time)?/i,
+    /^next\s+spawn(?:\s+time)?/i,
+    /^(?:when(?:'s|\s+is)|what\s+time)\s+(?:the\s+)?spawn/i,
+    /^(?:what(?:'s|\s+is)|show|tell)\s+(?:the\s+)?(?:next\s+)?spawn\s+(?:time|schedule)/i,
+    /^(?:any\s+)?(?:spawn|boss)\s+(?:coming|soon|incoming)/i,
+    /^(?:when\s+)?(?:can\s+i|should\s+i)\s+(?:be\s+)?online/i,
+
+    // English - Specific boss
+    /^(?:when|what\s+time)\s+(?:is|does|will)\s+(.+?)\s+spawn/i,
+    /^(?:predict|estimate)\s+(.+?)\s+spawn/i,
+    /^(.+?)\s+spawn\s+(?:time|schedule)/i,
+
+    // Tagalog - General
+    /^(?:kelan|kailan|kilan)\s+(?:ang\s+)?(?:next|susunod)\s+spawn/i,
+    /^(?:kelan|kailan)\s+(?:ang\s+)?boss\s+(?:spawn|lalabas)/i,
+    /^(?:may|meron)\s+(?:ba\s+)?spawn/i,
+    /^(?:anong\s+oras|anu)\s+(?:ang\s+)?spawn/i,
+    /^spawn\s+(?:time|schedule|oras)/i,
+
+    // Tagalog - Specific boss
+    /^(?:kelan|kailan)\s+(?:ang\s+)?(.+?)\s+(?:spawn|lalabas)/i,
+    /^(.+?)\s+(?:kelan|kailan|anong\s+oras)/i,
+
+    // Taglish
+    /^(?:kelan|kailan)\s+next\s+spawn/i,
+    /^next\s+spawn\s+(?:kailan|kelan)/i,
+    /^(?:anong\s+time|what\s+time)\s+(?:ang\s+)?spawn/i,
+    /^spawn\s+(?:na|ba|kailan)/i,
+    /^(?:kelan|kailan)\s+(.+?)\s+spawn/i,
+    /^(?:meron|may)\s+(?:bang\s+)?spawn\s+(?:later|mamaya)/i,
   ],
 
-  // Intelligence commands - Engagement (specific user - must come first)
+  // Intelligence - Predict item price
+  predictprice: [
+    // English
+    /^(?:predict|estimate|suggest|guess)\s+price\s+(?:for\s+)?(.+)/i,
+    /^(?:what(?:'s|\s+is)\s+the\s+)?(?:predicted|estimated|suggested)\s+price\s+(?:for|of)\s+(.+)/i,
+    /^how\s+much\s+(?:is|should|would|will|does)\s+(.+)\s+(?:cost|be|go\s+for|worth)/i,
+    /^(?:what(?:'s|\s+is)|show)\s+(?:the\s+)?(?:fair|good|optimal)\s+price\s+(?:for|of)\s+(.+)/i,
+    /^price\s+(?:prediction|estimate|check)\s+(?:for\s+)?(.+)/i,
+    /^(?:what(?:'s|\s+is)|how\s+much\s+is)\s+(.+?)\s+worth/i,
+    /^(?:value|worth)\s+(?:of|for)\s+(.+)/i,
+    /^(?:how\s+much|what)\s+(?:should|would|can)\s+(?:i|we)\s+(?:bid|pay)\s+(?:for|on)\s+(.+)/i,
+    /^(?:good|fair)\s+(?:bid|price)\s+(?:for|on)\s+(.+)/i,
+
+    // Tagalog
+    /^(?:magkano|magkanu)\s+(?:kaya|ba|ang)\s+(.+)/i,
+    /^(?:presyo|halaga|value)\s+(?:ng|para\s+sa)\s+(.+)/i,
+    /^(?:ilang|ilan)\s+(?:points?|pts)\s+(?:ang\s+)?(.+)/i,
+    /^(?:predict|hulaan)\s+(?:price|presyo)\s+(?:ng|para\s+sa)\s+(.+)/i,
+    /^(?:magkano|magkanu)\s+(?:dapat|pwede)\s+(?:ko|kong)\s+(?:i-?bid|taya)\s+(?:sa|para\s+sa)\s+(.+)/i,
+
+    // Taglish
+    /^(?:magkano|magkanu)\s+(?:kaya|ba)\s+ang\s+(.+)/i,
+    /^price\s+(?:ng|para\s+sa)\s+(.+)/i,
+    /^(?:ilang|ilan)\s+(?:ang|ba)\s+(?:price|presyo)\s+(?:ng|ng\s+)?(.+)/i,
+    /^(.+?)\s+(?:magkano|worth|value|price)/i,
+    /^(?:check|tignan)\s+price\s+(?:ng|ng\s+)?(.+)/i,
+  ],
+
+  // Intelligence - Predict attendance for user
+  predictattendance: [
+    // English
+    /^(?:predict|estimate|check)\s+attendance\s+(?:for\s+)?(.+)/i,
+    /^(?:will|is)\s+(.+?)\s+(?:attend|come|show\s+up|join)/i,
+    /^(?:attendance|participation)\s+(?:prediction|likelihood)\s+(?:for\s+)?(.+)/i,
+    /^(?:how\s+likely)\s+(?:is|that)\s+(.+?)\s+(?:will\s+)?(?:attend|come)/i,
+    /^(.+?)(?:'s)?\s+attendance\s+(?:prediction|rate)/i,
+
+    // Tagalog
+    /^(?:darating|dadalo|susugod)\s+(?:ba|kaya)\s+(.+)/i,
+    /^(?:predict|hulaan)\s+attendance\s+(?:ni|ng)\s+(.+)/i,
+
+    // Taglish
+    /^(?:darating|dadalo)\s+(?:ba|kaya)\s+si\s+(.+)/i,
+    /^predict\s+(.+?)\s+attendance/i,
+    /^(.+?)\s+dadalo\s+(?:ba|kaya)/i,
+  ],
+
+  // Intelligence - Engagement analysis (specific user)
   engagement: [
-    /^(?:check|analyze|show|view)\s+engagement\s+(?:for\s+)?(.+)/i,
-    /^engagement\s+(?:analysis\s+)?(?:for\s+)?(.+)/i,
+    // English
+    /^(?:check|analyze|show|view|display)\s+engagement\s+(?:for\s+)?(.+)/i,
+    /^(?:check|analyze|show|view)\s+(.+?)(?:'s)?\s+engagement/i,
+    /^engagement\s+(?:analysis|stats?|report|score)\s+(?:for\s+)?(.+)/i,
     /^how\s+engaged\s+is\s+(.+)/i,
-    /^(.+)(?:'s|\s+)engagement/i,
-    /^analyze\s+(.+)(?:'s)?\s+(?:activity|participation)/i,
+    /^(.+?)(?:'s|\s+)engagement(?:\s+(?:score|rating|level))?/i,
+    /^analyze\s+(.+?)(?:'s)?\s+(?:activity|participation|stats?)/i,
+    /^(?:show|check)\s+(?:me\s+)?(.+?)(?:'s)?\s+(?:stats?|activity|participation)/i,
+    /^(?:how|what)\s+(?:is|are)\s+(.+?)(?:'s)?\s+(?:stats?|engagement)/i,
+    /^(.+?)\s+(?:stats?|engagement|activity|participation)$/i,
+
+    // Self-check variations (no username = check yourself)
+    /^(?:my|check\s+my|show\s+my)\s+engagement/i,
+    /^(?:my|check\s+my|show\s+my)\s+(?:stats?|activity|participation)/i,
+    /^(?:how\s+am\s+i|how(?:'m|\s+am)\s+i)\s+doing/i,
+    /^(?:my|check\s+my)\s+(?:performance|score|rating)/i,
+
+    // Tagalog
+    /^(?:tignan|check|tingnan)\s+engagement\s+(?:ni|ng)\s+(.+)/i,
+    /^(?:kamusta|kumusta)\s+(?:si|ang)\s+(.+)/i,
+    /^engagement\s+(?:ni|ng)\s+(.+)/i,
+    /^(?:stats?|activity)\s+(?:ni|ng)\s+(.+)/i,
+
+    // Tagalog self-check
+    /^(?:kamusta|kumusta)\s+(?:ako|ko)/i,
+    /^(?:tignan|tingnan|check)\s+(?:stats?|engagement)\s+ko/i,
+    /^(?:stats?|engagement|activity)\s+ko/i,
+    /^(?:paano|kumusta)\s+(?:ako|performance\s+ko)/i,
+
+    // Taglish
+    /^(?:check|tingnan)\s+engagement\s+(?:ni|ng|ni\s+)?(.+)/i,
+    /^(.+?)(?:'s|\s+)stats?\s+(?:naman|please)/i,
+    /^(?:kamusta|kumusta)\s+(?:ang\s+)?engagement\s+(?:ni|ng)\s+(.+)/i,
+    /^(?:show|pakita)\s+(?:stats?|engagement)\s+(?:ni|ng)\s+(.+)/i,
+
+    // Taglish self-check
+    /^(?:kamusta|kumusta)\s+ako/i,
+    /^check\s+(?:stats?|engagement)\s+ko/i,
+    /^my\s+(?:stats?|engagement)\s+naman/i,
   ],
 
   // Guild-wide engagement (must come after specific user engagement)
   analyzeengagement: [
-    /^analyze\s+(?:guild|all|everyone|overall)\s+engagement$/i,
-    /^(?:show|check|view)\s+(?:guild|all|overall)\s+engagement$/i,
-    /^engagement\s+(?:analysis|report|summary|overview)$/i,
-    /^(?:guild|overall|everyone)\s+engagement$/i,
+    // English
+    /^analyze\s+(?:guild|all|everyone|overall|everybody)\s+engagement$/i,
+    /^(?:show|check|view|display)\s+(?:guild|all|overall|everyone)\s+engagement$/i,
+    /^engagement\s+(?:analysis|report|summary|overview|stats?)$/i,
+    /^(?:guild|overall|everyone|everybody|all)\s+engagement$/i,
+    /^(?:who(?:'s|\s+is)|show)\s+(?:the\s+)?(?:most|top)\s+engaged/i,
+    /^(?:guild|team|clan)\s+(?:stats?|analytics|performance)/i,
+    /^(?:all|everyone)\s+(?:stats?|activity|participation)/i,
+    /^(?:show|display|check)\s+(?:all|everyone)(?:'s)?\s+(?:stats?|engagement)/i,
 
     // Tagalog
-    /^(?:tignan|check)\s+engagement\s+(?:ng\s+lahat|overall)/i,
+    /^(?:tignan|check|tingnan)\s+engagement\s+(?:ng\s+lahat|overall|ng\s+buong\s+guild)/i,
+    /^(?:lahat|buong\s+guild)\s+engagement/i,
+    /^(?:sino|who)\s+(?:ang\s+)?(?:pinaka-?engaged|nangunguna)/i,
+
+    // Taglish
+    /^engagement\s+(?:ng\s+lahat|overall)/i,
+    /^(?:check|tingnan)\s+(?:all|lahat)\s+engagement/i,
+    /^(?:sino|who)\s+(?:top|nangunguna)\s+sa\s+engagement/i,
   ],
 
   // Intelligence commands - Anomalies
@@ -701,10 +827,11 @@ class NLPHandler {
 
     const isGuildChat = message.channel.id === this.config.elysium_commands_channel_id;
 
-    // Enable in admin logs and auction threads, NOT in guild chat
+    // Enable in admin logs and auction threads (always active)
     if (NLP_CONFIG.enabledChannels.adminLogs && isAdminLogs) return true;
     if (NLP_CONFIG.enabledChannels.auctionThreads && isAuctionThread) return true;
-    if (NLP_CONFIG.enabledChannels.guildChat && isGuildChat) return true; // Currently disabled
+
+    // Guild chat: ONLY when bot is mentioned (handled by botMentioned check above)
 
     return false;
   }
