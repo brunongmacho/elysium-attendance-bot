@@ -6,7 +6,7 @@
  * Automated reminder system for recurring game events with crash recovery.
  *
  * FEATURES:
- * - Scheduled reminders for Individual Arena, Coop Arena, and Guild War
+ * - Scheduled reminders for Individual Arena, Coop Arena, Guild War, and World Boss
  * - @everyone mentions in guild chat channel
  * - Auto-deletion after events end
  * - Crash recovery via Google Sheets persistence
@@ -17,6 +17,7 @@
  * - Individual Arena: Mon, Wed, Fri at 19:30 - 20:30
  * - Coop Round Arena: Tue, Thu, Sat at 19:30 - 20:30
  * - Guild War: Fri, Sat, Sun at 19:25 - 19:28
+ * - World Boss Event: Daily at 11:00 AM and 20:00 PM (8:00 PM)
  * - Guild War Queue Reminder: Thu, Fri, Sat at 23:00 (auto-delete at 01:00)
  *
  * @module event-reminders
@@ -65,6 +66,26 @@ const GAME_EVENTS = {
     description: '**GUILD WAR** is starting soon! Get ready!',
     thumbnail: 'https://i.imgur.com/kR2B3Yx.png', // War icon
     reminderOffsetMinutes: 20, // Remind 20 min before (gives players time to prepare)
+  },
+  worldBossMorning: {
+    name: '🐉 World Boss Event',
+    days: [0, 1, 2, 3, 4, 5, 6], // Daily
+    startTime: { hour: 11, minute: 0 }, // 11:00 AM
+    durationMinutes: 30,
+    color: 0x9b59b6, // Purple
+    description: '**World Boss** is spawning soon! Prepare for battle!',
+    thumbnail: 'https://i.imgur.com/kR2B3Yx.png', // Boss icon
+    reminderOffsetMinutes: 10, // Remind 10 min before
+  },
+  worldBossEvening: {
+    name: '🐉 World Boss Event',
+    days: [0, 1, 2, 3, 4, 5, 6], // Daily
+    startTime: { hour: 20, minute: 0 }, // 20:00 PM (8:00 PM)
+    durationMinutes: 30,
+    color: 0x9b59b6, // Purple
+    description: '**World Boss** is spawning soon! Prepare for battle!',
+    thumbnail: 'https://i.imgur.com/kR2B3Yx.png', // Boss icon
+    reminderOffsetMinutes: 10, // Remind 10 min before
   },
 };
 
@@ -516,6 +537,16 @@ function scheduleAllEvents() {
   // Schedule Guild War (Fri, Sat, Sun)
   GAME_EVENTS.guildWar.days.forEach((day, index) => {
     scheduleEventReminder(`guildWar_${day}`, GAME_EVENTS.guildWar, day);
+  });
+
+  // Schedule World Boss Morning (Daily at 11:00 AM)
+  GAME_EVENTS.worldBossMorning.days.forEach((day, index) => {
+    scheduleEventReminder(`worldBossMorning_${day}`, GAME_EVENTS.worldBossMorning, day);
+  });
+
+  // Schedule World Boss Evening (Daily at 20:00 PM)
+  GAME_EVENTS.worldBossEvening.days.forEach((day, index) => {
+    scheduleEventReminder(`worldBossEvening_${day}`, GAME_EVENTS.worldBossEvening, day);
   });
 
   // Schedule Guild War queue reminders (Thu, Fri, Sat)
