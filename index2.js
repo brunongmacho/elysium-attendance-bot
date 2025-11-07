@@ -5545,17 +5545,8 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
       }
     }
 
-    // Bidding confirmations (allow non-admin users who made the bid)
-    const biddingState = bidding.getBiddingState();
-
-    if (biddingState.pc[msg.id]) {
-      if (reaction.emoji.name === "✅") {
-        await bidding.confirmBid(reaction, user, config);
-      } else if (reaction.emoji.name === "❌") {
-        await bidding.cancelBid(reaction, user, config);
-      }
-      return;
-    }
+    // NOTE: Bidding confirmations removed - all bids are now instant (no reactions/buttons needed)
+    // This prevents timeouts and last-minute bidding issues
 
     // Attendance verification
     const pending = pendingVerifications[msg.id];
