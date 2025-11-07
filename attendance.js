@@ -93,10 +93,10 @@ let lastSheetCall = 0;          // Timestamp of last Google Sheets API call
  * Timing constants for rate limiting and retry logic
  */
 const TIMING = {
-  MIN_SHEET_DELAY: 2000,              // Minimum delay between Google Sheets API calls (ms)
+  MIN_SHEET_DELAY: 3000,              // Minimum delay between Google Sheets API calls (ms) - increased from 2000
   CONFIRMATION_TIMEOUT: 30000,        // Timeout for confirmation prompts (ms)
-  RETRY_DELAY: 5000,                  // Delay between retry attempts (ms)
-  MASS_CLOSE_DELAY: 3000,             // Delay between mass close operations (ms)
+  RETRY_DELAY: 7000,                  // Delay between retry attempts (ms) - increased from 5000
+  MASS_CLOSE_DELAY: 4000,             // Delay between mass close operations (ms) - increased from 3000
   REACTION_RETRY_ATTEMPTS: 3,         // Number of attempts for adding/removing reactions
   REACTION_RETRY_DELAY: 1000,         // Delay between reaction retry attempts (ms)
   THREAD_AUTO_CLOSE_MINUTES: 20,      // Auto-close threads after this many minutes (prevents cheating)
@@ -1423,6 +1423,25 @@ async function checkAndAutoCloseThreads(client) {
               `Attendance window closed to prevent cheating.\n` +
               `${spawnInfo.members.length} member(s) verified and submitting to Google Sheets...`
             ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
+
+            // Validate data before submission
+            if (!spawnInfo.boss || !spawnInfo.timestamp || !spawnInfo.members || spawnInfo.members.length === 0) {
+              console.error(`   ❌ Invalid spawn data - skipping submission:`, {
+                boss: spawnInfo.boss || 'MISSING',
+                timestamp: spawnInfo.timestamp || 'MISSING',
+                membersCount: spawnInfo.members ? spawnInfo.members.length : 'MISSING'
+              });
+
+              await thread.send(
+                `⚠️ **Error**: Cannot submit attendance due to missing data. Please contact an admin.`
+              ).catch(() => {});
+
+              // Clean up and skip
+              delete activeSpawns[threadId];
+              const errorKey = `${(spawnInfo.boss || '').toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp || '')}`;
+              delete activeColumns[errorKey];
+              continue;
+            }
 
             // Submit to Google Sheets
             const payload = {

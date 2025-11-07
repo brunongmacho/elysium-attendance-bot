@@ -4591,7 +4591,10 @@ function updateMilestoneHistory(data) {
       return createResponse('error', 'Missing required parameters: nickname or milestone');
     }
 
-    Logger.log(`📝 Updating milestone for ${nickname}: ${milestone} (${milestoneType || 'points'})`);
+    // Initialize type early to avoid TDZ error
+    const type = milestoneType || 'points';
+
+    Logger.log(`📝 Updating milestone for ${nickname}: ${milestone} (${type})`);
 
     ensureMilestoneTrackingSheet();
 
@@ -4621,8 +4624,6 @@ function updateMilestoneHistory(data) {
       CONFIG.TIMEZONE,
       'yyyy-MM-dd HH:mm:ss'
     );
-
-    const type = milestoneType || 'points';
 
     if (rowIndex > 0) {
       // Update existing row
