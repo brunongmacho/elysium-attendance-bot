@@ -909,15 +909,15 @@ class ProactiveIntelligence {
 
           await channel.send({ embeds: [embed] });
 
-          // Batch update Google Sheets for all achievers
-          for (const achiever of achievers) {
-            await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
+          // Batch update Google Sheets for all achievers (parallel execution)
+          await Promise.all(achievers.map(achiever =>
+            this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: `${achiever.nickname}-attendance`,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'attendance'
-            });
-          }
+            })
+          ));
 
           milestonesAnnounced++;
           console.log(`   - ✅ ${achievers.length} members at ${milestone} ATTENDANCE milestone → ${channel.name}`);
@@ -947,15 +947,15 @@ class ProactiveIntelligence {
 
           await channel.send({ embeds: [embed] });
 
-          // Batch update Google Sheets for all achievers
-          for (const achiever of achievers) {
-            await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
+          // Batch update Google Sheets for all achievers (parallel execution)
+          await Promise.all(achievers.map(achiever =>
+            this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: `${achiever.nickname}-bidding`,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'bidding'
-            });
-          }
+            })
+          ));
 
           milestonesAnnounced++;
           console.log(`   - ✅ ${achievers.length} members at ${milestone} BIDDING milestone → ${channel.name}`);
@@ -1097,14 +1097,34 @@ class ProactiveIntelligence {
       return `${typeInfo.emoji} ${userMention} - **${achiever.totalPoints.toLocaleString()}** total`;
     }).join('\n');
 
-    // Announcement message for groups
-    const groupAnnouncements = [
-      `**${achievers.length} members** just hit the **${milestone.toLocaleString()} ${typeInfo.label}** milestone! 🎉`,
-      `Grabe! **${achievers.length} guild members** reached **${milestone.toLocaleString()} ${typeInfo.label}!** 🔥`,
-      `Saludo sa **${achievers.length} achievers** na nag-**${milestone.toLocaleString()} ${typeInfo.label}!** 👑`,
-      `**${achievers.length} legends** unlocked **${milestone.toLocaleString()} ${typeInfo.label}!** Lakasss! ⚡`,
-      `Tuloy-tuloy! **${achievers.length} members** conquered **${milestone.toLocaleString()} ${typeInfo.label}!** 💪`,
-    ];
+    // Announcement message for groups - DIFFERENT for major vs minor milestones
+    let groupAnnouncements;
+
+    if (isMajor) {
+      // MAJOR MILESTONES: Epic, legendary, guild-wide celebration
+      groupAnnouncements = [
+        `🏆 **LEGENDARY ACHIEVEMENT!** 🏆\n**${achievers.length} elite members** have reached the prestigious **${milestone.toLocaleString()} ${typeInfo.label}** milestone! This is guild history!`,
+        `⚡ **TANGINA! MAJOR MILESTONE!** ⚡\nGrabe talaga! **${achievers.length} guild legends** conquered **${milestone.toLocaleString()} ${typeInfo.label}!** INSANE! 🔥🔥🔥`,
+        `👑 **HALL OF FAME MOMENT!** 👑\n**${achievers.length} champions** just unlocked **${milestone.toLocaleString()} ${typeInfo.label}!** Elite tier na yan! RESPETO! 🙏`,
+        `💎 **PUTANGINA! DIAMOND TIER!** 💎\nSaludo sa **${achievers.length} absolute units** na nag-**${milestone.toLocaleString()} ${typeInfo.label}!** WALANG KATULAD! 💪💪`,
+        `🌟 **GUILD RECORD TERRITORY!** 🌟\n**${achievers.length} unstoppable members** reached **${milestone.toLocaleString()} ${typeInfo.label}!** ELYSIUM PRIDE! 🇵🇭`,
+        `🔥 **GAGO! GODLIKE TIER!** 🔥\n**${achievers.length} immortals** hit **${milestone.toLocaleString()} ${typeInfo.label}!** BEYOND LEGENDARY! 👹`,
+        `💯 **MAJOR BREAKTHROUGH!** 💯\nHISTORIC MOMENT! **${achievers.length} powerhouses** achieved **${milestone.toLocaleString()} ${typeInfo.label}!** PEAK PERFORMANCE! ⚡`,
+        `🎖️ **MILITARY HONOR!** 🎖️\n**${achievers.length} decorated veterans** earned **${milestone.toLocaleString()} ${typeInfo.label}!** SALUTE! 🫡`,
+      ];
+    } else {
+      // MINOR MILESTONES: Encouraging, supportive, friendly
+      groupAnnouncements = [
+        `**${achievers.length} members** just hit the **${milestone.toLocaleString()} ${typeInfo.label}** milestone! 🎉`,
+        `Grabe! **${achievers.length} guild members** reached **${milestone.toLocaleString()} ${typeInfo.label}!** 🔥`,
+        `Saludo sa **${achievers.length} achievers** na nag-**${milestone.toLocaleString()} ${typeInfo.label}!** 👑`,
+        `**${achievers.length} legends** unlocked **${milestone.toLocaleString()} ${typeInfo.label}!** Lakasss! ⚡`,
+        `Tuloy-tuloy! **${achievers.length} members** conquered **${milestone.toLocaleString()} ${typeInfo.label}!** 💪`,
+        `Ayos! **${achievers.length} solid members** hit **${milestone.toLocaleString()} ${typeInfo.label}!** Keep it up! 🌟`,
+        `Nice! **${achievers.length} grinders** reached **${milestone.toLocaleString()} ${typeInfo.label}!** Sipag! 📈`,
+        `Congrats! **${achievers.length} active members** achieved **${milestone.toLocaleString()} ${typeInfo.label}!** Laban! 👊`,
+      ];
+    }
 
     const announcement = this.pickRandom(groupAnnouncements);
 
