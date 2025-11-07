@@ -51,7 +51,7 @@ const NLP_CONFIG = {
   enabledChannels: {
     adminLogs: true,          // Admin logs channel
     auctionThreads: true,     // Threads in bidding channel
-    guildChat: false,         // NOT in guild chat (casual conversation)
+    guildChat: false,         // Guild chat: ONLY when bot is @mentioned
   },
 
   // Minimum confidence threshold (0-1)
@@ -67,25 +67,32 @@ const NLP_CONFIG = {
   // Pattern matching priority order (checked first to last)
   // More specific patterns should come before generic ones
   patternPriority: [
+    // Time queries (must come first for context)
+    'timequeries',
+
     // Attendance-specific (must come first to avoid bid conflicts)
     'attendancestatus',
     'leaderboardattendance',
     'predictattendance',
 
-    // Bidding-specific
+    // Spawn predictions (specific before general)
+    'predictspawn',
+
+    // Bidding-specific (formal first)
     'leaderboardbidding',
     'bidstatus',
     'mypoints',
-    'bid',
     'loot',
 
-    // Weekly/spawn predictions
+    // Weekly reports
     'weeklyreport',
-    'predictspawn',
 
     // User engagement (specific before general)
     'engagement',
     'analyzeengagement',
+
+    // Price predictions
+    'predictprice',
 
     // Admin commands
     'startauction',
@@ -96,8 +103,7 @@ const NLP_CONFIG = {
     'skipitem',
     'cancelitem',
 
-    // Intelligence
-    'predictprice',
+    // Admin intelligence
     'detectanomalies',
     'recommendations',
     'performance',
@@ -123,36 +129,6 @@ const NLP_CONFIG = {
  */
 
 const NLP_PATTERNS = {
-  // Bidding commands (auction threads)
-  bid: [
-    // English
-    /^(?:i\s+)?(?:want\s+to\s+)?bid\s+(\d+)/i,
-    /^(?:offer|bidding)\s+(\d+)/i,
-    /^(\d+)\s+(?:points?|pts?)/i,
-    /^place\s+(?:a\s+)?bid\s+(?:of\s+)?(\d+)/i,
-
-    // Gaming terms
-    /^(?:i(?:'ll|\s+will)\s+)?(?:put|throw\s+in|go)\s+(\d+)/i,
-    /^(?:going|putting)\s+(\d+)\s+(?:on\s+(?:this|it))?/i,
-    /^(\d+)\s+(?:here|for\s+(?:this|it|me))/i,
-    /^(?:i\s+)?(?:call|raise)\s+(\d+)/i,
-    /^(?:spend|use|drop)\s+(\d+)/i,
-
-    // Tagalog (TL)
-    /^(?:taya|lagay)\s+(?:ko\s+)?(\d+)/i,    // "taya 500" / "taya ko 500"
-    /^(?:pusta|pustahan)\s+(?:ng\s+)?(\d+)/i, // "pusta 500" / "pustahan ng 500"
-    /^(?:magtaya|maglagay)\s+(?:ako\s+)?(?:ng\s+)?(\d+)/i, // "magtaya 500"
-    /^(?:ibabayad|ibabayad ko)\s+(\d+)/i,    // "ibabayad 500"
-    /^(\d+)\s+(?:taya|pusta)/i,              // "500 taya"
-    /^(?:gastos|gugulin)\s+(?:ko\s+)?(\d+)/i, // "gastos ko 500"
-
-    // Taglish (code-switching)
-    /^bid\s+(?:ko|na|ng)\s+(\d+)/i,          // "bid ko 500"
-    /^(?:gusto|gusto kong)\s+(?:bid|mag-?bid)\s+(?:ng\s+)?(\d+)/i, // "gusto kong magbid ng 500"
-    /^(?:ako|ako ay)\s+bid\s+(?:ng\s+)?(\d+)/i, // "ako bid 500"
-    /^(\d+)\s+(?:lang|lang ako|muna)/i,      // "500 lang" / "500 muna"
-  ],
-
   // Points queries
   mypoints: [
     // English
@@ -405,32 +381,52 @@ const NLP_PATTERNS = {
     /^top\s+sa\s+bidding/i,
   ],
 
-  // General leaderboard (must come after specific leaderboards)
+  // General leaderboard (must come after specific leaderboards) - ENHANCED
   leaderboard: [
-    /^(?:show|display|check|view)\s+(?:me\s+)?(?:the\s+)?(?:all\s+)?(?:leaderboards?|lb|rankings?)$/i,
+    // FILIPINO - Natural rank queries (80%)
+    /^(?:rank|ranking)\s+(?:ko|ko\s+ba|ko\s+ilan)/i,  // "rank ko", "rank ko ba"
+    /^(?:nasa\s+)?(?:ilan|ilang)\s+(?:ako|ako\s+ba)/i,  // "nasa ilan ako", "ilang ako"
+    /^(?:ano|anu)\s+(?:rank|ranking)\s+ko/i,  // "ano rank ko"
+    /^(?:pang-?)?(?:ilan|ilang)\s+(?:ba\s+)?ako/i,  // "pang-ilan ako", "pang ilan ba ako"
+    /^(?:position|pwesto)\s+ko(?:\s+(?:ba|ilan))?/i,  // "position ko", "pwesto ko ilan"
+
+    // General leaderboard queries
+    /^(?:show|display|check|view|tignan|tingnan)\s+(?:me\s+)?(?:the\s+)?(?:all\s+)?(?:leaderboards?|lb|rankings?)$/i,
     /^(?:top|rankings?|leaderboards?|lb)$/i,
-    /^(?:all\s+)?(?:leaderboards?|lb)(?:\s+(?:please|pls))?$/i,
+    /^(?:all\s+)?(?:leaderboards?|lb)(?:\s+(?:please|pls|po|naman))?$/i,
     /^who(?:'s|\s+is)\s+(?:on\s+)?(?:top|leading)(?:\s+overall)?/i,
     /^(?:top\s+)?(?:players?|members?|users?)$/i,
     /^(?:rank|ranking|ranks)$/i,
-    /^(?:show|display)\s+(?:all\s+)?(?:rankings?|stats?|scores?)/i,
 
-    // Gaming terms
-    /^(?:guild|clan)\s+(?:rankings?|stats?|leaderboard)/i,
-    /^(?:show|view)\s+(?:guild|clan|team)\s+(?:members?|players?|roster)/i,
-    /^(?:who(?:'s|\s+is)|show)\s+(?:the\s+)?(?:mvp|best|top\s+players?)/i,
-    /^(?:hall\s+of\s+)?(?:fame|legends?)/i,
-
-    // Tagalog
+    // Who queries
     /^(?:sino|who)\s+(?:ang\s+)?(?:nangungunang|nangunguna|nasa\s+top)/i,
-    /^(?:tignan|tingnan)\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:leaderboard|ranking)/i,
-    /^(?:top|rank|ranking)(?:\s+(?:ba|naman|po))?$/i,
-    /^(?:sino|who)\s+(?:ang\s+)?(?:mga\s+)?(?:mahuhusay|magagaling)/i, // "who are the skilled ones"
-
-    // Taglish
+    /^(?:sino|who)\s+(?:ang\s+)?(?:bottom|last|huli)/i,  // "sino ang bottom"
     /^(?:sino|who)\s+(?:top|nangunguna|mvp)(?:\s+sa\s+lahat)?/i,
+
+    // Display queries
+    /^(?:tignan|tingnan|check)\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:leaderboard|ranking)/i,
     /^(?:show|pakita)\s+(?:me\s+)?(?:the\s+)?(?:all\s+)?(?:ranking|leaderboards?)/i,
-    /^(?:guild|clan)\s+(?:members?|players?|rankings?)/i,
+    /^(?:guild|clan)\s+(?:members?|players?|rankings?|stats?|leaderboard)/i,
+  ],
+
+  // TIME-BASED QUERIES (Context-Aware)
+  timequeries: [
+    // FILIPINO - Time questions (80%)
+    /^(?:later|mamaya|mamayang)\s+(?:may\s+)?(?:spawn|boss|mvp)/i,  // "later may spawn?"
+    /^(?:may|meron)\s+(?:ba\s+)?(?:spawn|boss)\s+(?:later|mamaya|bukas)/i,  // "may spawn ba later?"
+    /^(?:bukas|tomorrow)\s+(?:may\s+)?(?:spawn|boss|auction)/i,  // "bukas may spawn?"
+    /^(?:ilang?|ilan)\s+(?:oras|hrs?|hours?)\s+(?:pa|na)/i,  // "ilan oras pa?"
+    /^(?:ilang?|ilan)\s+(?:minuto|mins?|minutes?)\s+(?:pa|na)/i,  // "ilang minuto pa?"
+    /^(?:anong\s+)?(?:oras|time)\s+(?:na|ngayon)/i,  // "anong oras na?", "time na?"
+    /^(?:kelan|kailan)\s+(?:pa|ulit)/i,  // "kelan pa?", "kelan ulit?"
+
+    // TAGLISH (15%)
+    /^(?:may|meron)\s+spawn\s+(?:later|mamaya)/i,
+    /^(?:ilan|how\s+many)\s+(?:hours?|oras)\s+pa/i,
+
+    // ENGLISH (5%)
+    /^(?:how\s+many|how\s+much)\s+(?:time|hours?|mins?)\s+(?:left|remaining)/i,
+    /^(?:what|what's)\s+(?:the\s+)?(?:time|current\s+time)/i,
   ],
 
   // Queue list
@@ -546,36 +542,178 @@ const NLP_PATTERNS = {
     /^(?:alisin|wag\s+na)\s+(?:ito|to|item)?/i,
   ],
 
-  // Intelligence commands - Price prediction
+  // ═══════════════════════════════════════════════════════════════════════════
+  // INTELLIGENCE COMMANDS - Now Member-Accessible with Rich NLP Support!
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Intelligence - Predict next spawn time (FILIPINO-FOCUSED)
+  predictspawn: [
+    // TAGALOG/BISAYA - General (PRIORITY - 80%)
+    /^(?:kelan|kailan|kilan|kan-o|klan)\s+(?:na\s+)?(?:ang\s+)?(?:next|susunod|sunod)\s+(?:na\s+)?spawn/i,
+    /^(?:kelan|kailan|kilan|kan-o)\s+(?:ang\s+)?(?:boss|spawn|mvp)/i,
+    /^(?:kelan|kailan|kilan)\s+(?:ba|kaya|na|pa)\s+(?:ang\s+)?(?:boss|spawn|mvp)/i,
+    /^(?:kelan|kailan)\s+(?:ulit|muli|uli)\s+(?:mag-?spawn|lalabas|dadating)/i,
+    /^(?:may|meron|mern|mern\s+ba)\s+(?:ba\s+)?(?:spawn|boss|mvp)\s+(?:ba|na|pa)/i,
+    /^(?:anong\s+oras|anu\s+oras|ano\s+oras|oras\s+na)\s+(?:ba\s+)?(?:ang\s+)?(?:next\s+)?spawn/i,
+    /^(?:oras|time|sked)\s+(?:ng|ng\s+)?spawn/i,
+    /^spawn\s+(?:time|oras|schedule|sked|kelan|kailan)/i,
+    /^(?:kelan|kailan)\s+(?:pwede|dapat|kailangan)\s+(?:mag-?online|naka-?online|online)/i,
+    /^(?:kelan|kailan)\s+(?:ko|ako)\s+(?:dapat|kailangan|need)\s+(?:mag-?online|online)/i,
+    /^(?:lalabas|dadating|magsspawn|mag-?spawn|sasabog)\s+(?:ba|na|pa)\s+(?:ang\s+)?boss/i,
+    /^(?:sasabog|lalabas|dadating|spawn)\s+(?:na\s+ba|ba|na)/i,
+    /^(?:susugod|mag-?sugod|magpunta|punta)\s+(?:ba|na|tayo|ako|kami)/i,
+    /^(?:laban|raid|hunt|gank)\s+(?:ba|na|tayo|ulit)/i,
+    /^(?:anong|ano|anu)\s+(?:oras|time)\s+(?:ba|na|ng)\s+(?:spawn|boss|mvp)/i,
+    /^(?:ilan|ilang|pila)\s+(?:oras|minuto|min)\s+(?:pa|na)/i,
+
+    // TAGALOG - Specific boss
+    /^(?:kelan|kailan|kilan)\s+(?:ang\s+)?(.+?)\s+(?:spawn|lalabas|dadating|sasabog)/i,
+    /^(?:kelan|kailan)\s+(?:ba|kaya|na)\s+(?:yung|ang|si)\s+(.+?)/i,
+    /^(.+?)\s+(?:kelan|kailan|anu\s+oras|anong\s+oras)/i,
+    /^(.+?)\s+(?:lalabas|spawn|dadating)\s+(?:na\s+ba|ba|kelan|kailan)/i,
+    /^(?:may|meron)\s+(?:ba\s+)?(.+?)\s+(?:later|mamaya|mamayang|bukas)/i,
+    /^(.+?)\s+(?:na\s+ba|ba|na)/i,
+
+    // TAGLISH (Filipino-English mix - 10%)
+    /^(?:kelan|kailan)\s+(?:na\s+)?next\s+spawn/i,
+    /^next\s+spawn\s+(?:kailan|kelan|na|ba)/i,
+    /^(?:anong\s+time|anu\s+time|ano\s+time)\s+(?:yung|ang|ng)\s+spawn/i,
+    /^spawn\s+(?:na|ba|kailan|kelan|anong\s+oras)/i,
+    /^(?:kelan|kailan)\s+(?:yung|yang|ang)\s+(.+?)\s+spawn/i,
+    /^(?:meron|may)\s+(?:bang\s+)?spawn\s+(?:later|mamaya|soon|mamayang)/i,
+    /^(?:next|susunod)\s+boss\s+(?:kailan|kelan|anong\s+time)/i,
+    /^boss\s+(?:na\s+ba|ba|kailan)/i,
+
+    // ENGLISH - General (10% only)
+    /^(?:when|what\s+time)\s+(?:is|does)\s+(?:the\s+)?next\s+(?:boss\s+)?spawn/i,
+    /^next\s+spawn(?:\s+time)?/i,
+    /^(?:any\s+)?boss\s+(?:coming|soon)/i,
+
+    // ENGLISH - Specific boss
+    /^(?:when|what\s+time)\s+(?:is|does|will)\s+(.+?)\s+spawn/i,
+    /^(.+?)\s+spawn\s+time/i,
+  ],
+
+  // Intelligence - Predict item price (FILIPINO-FOCUSED)
   predictprice: [
-    /^(?:predict|estimate|suggest|guess)\s+price\s+(?:for\s+)?(.+)/i,
-    /^(?:what(?:'s|\s+is)\s+the\s+)?(?:predicted|estimated)\s+price\s+(?:for|of)\s+(.+)/i,
-    /^how\s+much\s+(?:is|should|would|will)\s+(.+)\s+(?:cost|be|go\s+for)/i,
-    /^price\s+(?:prediction|estimate)\s+(?:for\s+)?(.+)/i,
+    // TAGALOG - Price questions (PRIORITY - 80%)
+    /^(?:magkano|magkanu|mkano|mgkano)\s+(?:kaya|ba|ang|yung|yang)\s+(.+)/i,
+    /^(?:magkano|magkanu)\s+(?:na\s+)?(.+)/i,
+    /^(?:presyo|halaga|value|bili)\s+(?:ng|para\s+sa|ng\s+)?(.+)/i,
+    /^(?:ilang|ilan|pila)\s+(?:points?|pts|pesos)\s+(?:ang\s+)?(.+)/i,
+    /^(?:ilang|ilan|pila)\s+(?:ang\s+)?(.+)/i,
+    /^(?:hulaan|predict|estimate)\s+(?:price|presyo|halaga)\s+(?:ng|para\s+sa|ng\s+)?(.+)/i,
+    /^(?:magkano|magkanu)\s+(?:dapat|pwede|kaya)\s+(?:ko|kong|naming)\s+(?:i-?bid|taya|ibid)\s+(?:sa|para\s+sa|sa\s+)?(.+)/i,
+    /^(?:worth|halaga|value)\s+(?:ba|kaya)\s+(?:ng|ang)\s+(.+)/i,
+    /^(?:sulit|mahal|mura)\s+(?:ba|kaya)\s+(?:ang\s+)?(.+)/i,
+    /^(.+?)\s+(?:magkano|mkano|ilan|pila)/i,
+    /^(.+?)\s+(?:worth|halaga|presyo|bili)/i,
+    /^(?:ilan|ilang)\s+(?:ba|kaya)\s+(?:ang\s+)?(.+)/i,
+    /^(?:ano|anu|anong)\s+(?:presyo|price|halaga)\s+(?:ng|ng\s+)?(.+)/i,
+    /^(?:tignan|tingnan|check)\s+(?:presyo|price)\s+(?:ng|ng\s+)?(.+)/i,
+    /^(?:abot|kaya|afford)\s+(?:ko|natin|ba)\s+(?:ang\s+)?(.+)/i,
 
-    // Tagalog
-    /^(?:magkano|magkanu)\s+(?:kaya|ba)\s+(.+)/i,
-    /^(?:predict|estimate)\s+price\s+(.+)/i,
+    // TAGLISH (Filipino-English mix - 10%)
+    /^(?:magkano|magkanu)\s+(?:kaya|ba)\s+ang\s+(.+)/i,
+    /^price\s+(?:ng|para\s+sa|ng\s+)?(.+)/i,
+    /^(?:ilang|ilan)\s+(?:ang|ba)\s+(?:price|presyo)\s+(?:ng|ng\s+)?(.+)/i,
+    /^(.+?)\s+(?:magkano|worth|value|price)/i,
+    /^(?:check|tignan)\s+price\s+(?:ng|ng\s+)?(.+)/i,
+    /^worth\s+(?:ba|kaya)\s+(.+)/i,
+
+    // ENGLISH (10% only)
+    /^how\s+much\s+(?:is|should)\s+(.+)\s+(?:cost|worth)/i,
+    /^(?:what(?:'s|\s+is))\s+(.+?)\s+worth/i,
+    /^price\s+(?:of|for)\s+(.+)/i,
+    /^(?:good|fair)\s+price\s+for\s+(.+)/i,
   ],
 
-  // Intelligence commands - Engagement (specific user - must come first)
+  // Intelligence - Predict attendance for user (FILIPINO-FOCUSED)
+  predictattendance: [
+    // TAGALOG - Attendance predictions (PRIORITY - 80%)
+    /^(?:darating|dadalo|dadating|susugod|sasama|pupunta)\s+(?:ba|kaya|pa)\s+(?:si\s+)?(.+)/i,
+    /^(?:pupunta|darating|dadalo)\s+(.+)\s+(?:ba|kaya)/i,
+    /^(?:online|naka-?online|mag-?online)\s+(?:ba|kaya)\s+(?:si\s+)?(.+)/i,
+    /^(?:si|yung|yang)\s+(.+?)\s+(?:darating|dadalo|susugod|online)\s+(?:ba|kaya)/i,
+    /^(.+?)\s+(?:darating|dadalo|susugod|pupunta|online)\s+(?:ba|kaya|pa)/i,
+    /^(?:predict|hulaan|tantiya)\s+(?:attendance|punta)\s+(?:ni|ng)\s+(.+)/i,
+    /^(?:kasama|sama)\s+(?:ba|kaya)\s+(?:si\s+)?(.+)/i,
+    /^(.+?)\s+(?:sasama|pupunta|online)\s+(?:ba|kaya)/i,
+    /^(?:attend|dadalo)\s+(?:ba|kaya)\s+(.+)/i,
+    /^(?:check|tignan)\s+(?:attendance|punta)\s+(?:ni|ng)\s+(.+)/i,
+
+    // TAGLISH (10%)
+    /^(?:darating|dadalo)\s+(?:ba|kaya)\s+si\s+(.+)/i,
+    /^predict\s+(.+?)\s+attendance/i,
+    /^(.+?)\s+dadalo\s+(?:ba|kaya)/i,
+    /^online\s+(?:ba|kaya)\s+(.+)/i,
+
+    // ENGLISH (10% only)
+    /^(?:will|is)\s+(.+?)\s+(?:attend|come|join)/i,
+    /^predict\s+attendance\s+(.+)/i,
+  ],
+
+  // Intelligence - Engagement analysis (FILIPINO-FOCUSED)
   engagement: [
-    /^(?:check|analyze|show|view)\s+engagement\s+(?:for\s+)?(.+)/i,
-    /^engagement\s+(?:analysis\s+)?(?:for\s+)?(.+)/i,
+    // TAGALOG - Self-check (PRIORITY - 50%)
+    /^(?:kamusta|kumusta|kmusta)\s+(?:na\s+)?(?:ako|ko)/i,
+    /^(?:ano|anu|anong)\s+(?:stats?|performance|score)\s+ko/i,
+    /^(?:tignan|tingnan|check|tngin)\s+(?:stats?|engagement|performance)\s+ko/i,
+    /^(?:stats?|engagement|activity|performance)\s+ko(?:\s+(?:ba|naman|please))?/i,
+    /^(?:paano|pano|kumusta)\s+(?:na\s+)?(?:ako|performance\s+ko)/i,
+    /^(?:ok|ayos|goods)\s+(?:ba|pa)\s+(?:ako|performance\s+ko)/i,
+    /^(?:gano|gaano)\s+(?:ako|ko)\s+(?:ka-?active|active)/i,
+    /^(?:mabuti|goods)\s+(?:ba|pa)\s+ako/i,
+
+    // TAGALOG - Check others (30%)
+    /^(?:tignan|tingnan|check|tngin)\s+(?:engagement|stats?|performance)\s+(?:ni|ng)\s+(.+)/i,
+    /^(?:kamusta|kumusta|kmusta)\s+(?:si|ang|yung|yang)\s+(.+)/i,
+    /^(?:kamusta|kumusta)\s+(?:na\s+)?(.+)/i,
+    /^engagement\s+(?:ni|ng)\s+(.+)/i,
+    /^(?:stats?|activity|performance)\s+(?:ni|ng)\s+(.+)/i,
+    /^(?:ano|anu)\s+(?:stats?|performance)\s+(?:ni|ng)\s+(.+)/i,
+    /^(.+?)\s+(?:kamusta|kumusta|ok\s+ba)/i,
+    /^(?:ok|ayos|goods)\s+(?:ba|pa)\s+(?:si\s+)?(.+)/i,
+
+    // TAGLISH (10%)
+    /^(?:check|tingnan)\s+engagement\s+(?:ni|ng|ni\s+)?(.+)/i,
+    /^(.+?)(?:'s|\s+)stats?\s+(?:naman|please)/i,
+    /^(?:kamusta|kumusta)\s+(?:ang\s+)?engagement\s+(?:ni|ng)\s+(.+)/i,
+    /^(?:show|pakita)\s+(?:stats?|engagement)\s+(?:ni|ng)\s+(.+)/i,
+    /^(?:kamusta|kumusta)\s+ako/i,
+    /^check\s+(?:stats?|engagement)\s+ko/i,
+    /^my\s+(?:stats?|engagement)\s+naman/i,
+
+    // ENGLISH (10% only)
+    /^(?:my|check\s+my|show\s+my)\s+(?:engagement|stats?|activity|performance)/i,
+    /^(?:how\s+am\s+i|how(?:'m|\s+am)\s+i)\s+doing/i,
+    /^check\s+engagement\s+(.+)/i,
+    /^(.+?)\s+engagement/i,
     /^how\s+engaged\s+is\s+(.+)/i,
-    /^(.+)(?:'s|\s+)engagement/i,
-    /^analyze\s+(.+)(?:'s)?\s+(?:activity|participation)/i,
   ],
 
-  // Guild-wide engagement (must come after specific user engagement)
+  // Guild-wide engagement (FILIPINO-FOCUSED)
   analyzeengagement: [
-    /^analyze\s+(?:guild|all|everyone|overall)\s+engagement$/i,
-    /^(?:show|check|view)\s+(?:guild|all|overall)\s+engagement$/i,
-    /^engagement\s+(?:analysis|report|summary|overview)$/i,
-    /^(?:guild|overall|everyone)\s+engagement$/i,
+    // TAGALOG (PRIORITY - 80%)
+    /^(?:tignan|tingnan|check|tngin)\s+(?:engagement|stats?|performance)\s+(?:ng\s+lahat|overall|ng\s+buong\s+guild|lahat)/i,
+    /^(?:lahat|buong\s+guild|guild)\s+(?:engagement|stats?|performance)/i,
+    /^(?:sino|sinu|anu|ano)\s+(?:ang\s+)?(?:pinaka-?engaged|nangunguna|top|mataas)/i,
+    /^(?:sino|sinu)\s+(?:ang\s+)?(?:nangunguna|nanalo|mataas)/i,
+    /^(?:engagement|stats?|performance)\s+(?:ng\s+lahat|overall)/i,
+    /^(?:lahat|everyone|all)\s+(?:na\s+)?(?:ba|naman)/i,
+    /^(?:tignan|check)\s+(?:lahat|all|everyone)/i,
+    /^guild\s+(?:stats?|engagement|performance)/i,
 
-    // Tagalog
-    /^(?:tignan|check)\s+engagement\s+(?:ng\s+lahat|overall)/i,
+    // TAGLISH (10%)
+    /^engagement\s+(?:ng\s+lahat|overall)/i,
+    /^(?:check|tingnan)\s+(?:all|lahat)\s+engagement/i,
+    /^(?:sino|who)\s+(?:top|nangunguna)\s+sa\s+engagement/i,
+    /^guild\s+engagement/i,
+
+    // ENGLISH (10% only)
+    /^(?:show|check)\s+(?:guild|all|everyone)\s+engagement$/i,
+    /^guild\s+(?:stats?|analytics)$/i,
+    /^who(?:'s|\s+is)\s+top/i,
   ],
 
   // Intelligence commands - Anomalies
@@ -674,6 +812,45 @@ const NLP_PATTERNS = {
 class NLPHandler {
   constructor(config) {
     this.config = config;
+    // Context memory: Store recent conversations per user for follow-ups
+    // Format: Map<userId, {lastCommand, lastParams, timestamp, lastItem}>
+    this.contextMemory = new Map();
+    // Clear old contexts after 10 minutes
+    this.contextTimeout = 10 * 60 * 1000;
+  }
+
+  /**
+   * Store conversation context for follow-up questions
+   * @param {string} userId - Discord user ID
+   * @param {string} command - Last command executed
+   * @param {Array} params - Command parameters
+   * @param {Object} extraContext - Additional context (e.g., item name, boss name)
+   */
+  setContext(userId, command, params, extraContext = {}) {
+    this.contextMemory.set(userId, {
+      lastCommand: command,
+      lastParams: params,
+      timestamp: Date.now(),
+      ...extraContext
+    });
+  }
+
+  /**
+   * Get conversation context for a user
+   * @param {string} userId - Discord user ID
+   * @returns {Object|null} Context or null if expired/not found
+   */
+  getContext(userId) {
+    const context = this.contextMemory.get(userId);
+    if (!context) return null;
+
+    // Check if context expired
+    if (Date.now() - context.timestamp > this.contextTimeout) {
+      this.contextMemory.delete(userId);
+      return null;
+    }
+
+    return context;
   }
 
   /**
@@ -701,10 +878,11 @@ class NLPHandler {
 
     const isGuildChat = message.channel.id === this.config.elysium_commands_channel_id;
 
-    // Enable in admin logs and auction threads, NOT in guild chat
+    // Enable in admin logs and auction threads (always active)
     if (NLP_CONFIG.enabledChannels.adminLogs && isAdminLogs) return true;
     if (NLP_CONFIG.enabledChannels.auctionThreads && isAuctionThread) return true;
-    if (NLP_CONFIG.enabledChannels.guildChat && isGuildChat) return true; // Currently disabled
+
+    // Guild chat: ONLY when bot is mentioned (handled by botMentioned check above)
 
     return false;
   }
@@ -785,6 +963,7 @@ class NLPHandler {
 
   /**
    * Normalize content for better pattern matching
+   * INCLUDES: Filipino text speak normalization
    * @param {string} content - Message content
    * @returns {string} Normalized content
    */
@@ -792,13 +971,106 @@ class NLPHandler {
     // Remove extra whitespace
     content = content.replace(/\s+/g, ' ').trim();
 
-    // Handle common typos and variations
+    // FILIPINO TEXT SPEAK NORMALIZATION (SMS/Gaming abbreviations)
+    const filipinoTextSpeak = {
+      // Common Filipino abbreviations
+      'dpat': 'dapat',
+      'dpt': 'dapat',
+      'lng': 'lang',
+      'lng': 'lang',
+      'kc': 'kasi',
+      'ksi': 'kasi',
+      'pra': 'para',
+      'd2': 'dito',
+      'kta': 'kita',
+      'aq': 'ako',
+      'q': 'ako',
+      'aq': 'ako',
+      'kng': 'kung',
+      'hnd': 'hindi',
+      'dpt': 'dapat',
+      'mgkano': 'magkano',
+      'mkano': 'magkano',
+      'klan': 'kailan',
+      'klan': 'kailan',
+      'kelan': 'kailan',
+      'anu': 'ano',
+      'pla': 'pala',
+      'nmn': 'naman',
+      'dba': 'di ba',
+      'dto': 'dito',
+      'dyan': 'diyan',
+      'doon': 'doon',
+      'sna': 'sana',
+      'tpos': 'tapos',
+      'pag': 'pag',
+      'pg': 'pag',
+      'nsa': 'nasa',
+      'wla': 'wala',
+      'mron': 'meron',
+      'mrn': 'meron',
+      'ilan': 'ilang',
+      'pila': 'ilang',
+      'tngin': 'tingnan',
+      'tngan': 'tingnan',
+      'chck': 'check',
+      'chek': 'check',
+      'cek': 'check',
+      'kmusta': 'kumusta',
+      'kmsta': 'kumusta',
+      'kmu': 'kumusta',
+      'ok': 'okay',
+      'oks': 'okay',
+      'goods': 'good',
+      'gds': 'goods',
+    };
+
+    // Apply Filipino text speak normalization (word boundaries)
+    for (const [abbrev, full] of Object.entries(filipinoTextSpeak)) {
+      const regex = new RegExp(`\\b${abbrev}\\b`, 'gi');
+      content = content.replace(regex, full);
+    }
+
+    // Handle common English typos and variations
     content = content
       .replace(/whats/gi, "what's")
       .replace(/thats/gi, "that's")
       .replace(/hows/gi, "how's");
 
     return content;
+  }
+
+  /**
+   * Detect tone/politeness level in Filipino messages
+   * @param {string} content - Message content
+   * @returns {string} 'polite', 'casual', or 'rude'
+   */
+  detectTone(content) {
+    const contentLower = content.toLowerCase();
+
+    // RUDE indicators (Filipino bad words)
+    const rudeWords = [
+      'gago', 'tangina', 'putangina', 'ulol', 'tanga', 'bobo',
+      'leche', 'peste', 'bwisit', 'tarantado', 'kupal',
+      'hayop', 'hinayupak', 'fuck', 'shit', 'damn'
+    ];
+
+    for (const word of rudeWords) {
+      if (contentLower.includes(word)) {
+        return 'rude';
+      }
+    }
+
+    // POLITE indicators (Filipino respectful markers)
+    const politeMarkers = ['po', 'opo', 'please', 'pls', 'pakiusap', 'salamat'];
+
+    for (const marker of politeMarkers) {
+      if (contentLower.includes(marker)) {
+        return 'polite';
+      }
+    }
+
+    return 'casual';
   }
 
   /**

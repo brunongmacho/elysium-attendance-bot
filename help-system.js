@@ -406,68 +406,77 @@ const COMMANDS = {
   },
 
   // ─────────────────────────────────────────────────────────────────────────
-  // AI/INTELLIGENCE COMMANDS
+  // AI/INTELLIGENCE COMMANDS (Member-Accessible!)
   // ─────────────────────────────────────────────────────────────────────────
   intelligence: {
+    predictspawn: {
+      usage: "!predictspawn [boss name]",
+      description: "Predict next boss spawn time (AI-powered)",
+      aliases: ["!nextspawn", "!whennext", "!spawntimer"],
+      adminOnly: false,
+      details: [
+        "• AI spawn time prediction",
+        "• Based on historical spawn patterns",
+        "• Confidence intervals",
+        "• If no boss specified: shows next boss to spawn",
+        "• **NLP**: \"when is next spawn?\" or \"kelan spawn ng Kades?\"",
+        "• Use in guild chat by @mentioning the bot"
+      ]
+    },
     predictprice: {
       usage: "!predictprice <item>",
       description: "Get AI-powered price prediction for auction item",
-      aliases: ["!predict"],
-      adminOnly: true,
+      aliases: ["!predict", "!suggestprice"],
+      adminOnly: false,
       details: [
         "• Machine learning price estimation",
-        "• Confidence intervals",
-        "• Trend analysis",
+        "• Confidence intervals and trend analysis",
         "• Historical data with outlier detection",
-        "• **85%+ accuracy** after bootstrap learning"
-      ]
-    },
-    analyze: {
-      usage: "!analyze @member",
-      description: "Deep engagement analysis for specific member",
-      aliases: ["!engagement", "!engage"],
-      adminOnly: true,
-      details: [
-        "• Engagement scoring (attendance + bidding + consistency)",
-        "• Next event attendance prediction",
-        "• Personalized recommendations",
-        "• At-risk identification"
-      ]
-    },
-    analyzeall: {
-      usage: "!analyzeall",
-      description: "Guild-wide engagement analysis with top performers",
-      aliases: ["!analyzeengagement", "!guildanalyze"],
-      adminOnly: true,
-      details: [
-        "• Guild-wide statistics",
-        "• Top performers ranking",
-        "• At-risk members list",
-        "• Engagement trends"
+        "• **85%+ accuracy** after bootstrap learning",
+        "• **NLP**: \"how much is crimson pendant worth?\" or \"magkano flame claw?\"",
+        "• Use in guild chat by @mentioning the bot"
       ]
     },
     predictattendance: {
       usage: "!predictattendance <username>",
       description: "Predict member's likelihood to attend next spawn",
       aliases: ["!predatt"],
-      adminOnly: true,
+      adminOnly: false,
       details: [
         "• AI attendance prediction",
         "• Based on historical patterns",
         "• Confidence scoring",
-        "• Recent activity analysis"
+        "• Recent activity analysis",
+        "• **NLP**: \"will PlayerName attend?\" or \"dadalo ba si PlayerName?\"",
+        "• Use in guild chat by @mentioning the bot"
       ]
     },
-    predictspawn: {
-      usage: "!predictspawn [boss name]",
-      description: "Predict next boss spawn time",
-      aliases: ["!nextspawn", "!whennext", "!spawntimer"],
-      adminOnly: true,
+    analyze: {
+      usage: "!analyze [username]",
+      description: "Check engagement stats (no username = check yourself)",
+      aliases: ["!engagement", "!engage"],
+      adminOnly: false,
       details: [
-        "• AI spawn time prediction",
-        "• Based on historical spawn patterns",
-        "• Confidence intervals",
-        "• Earliest/latest possible times"
+        "• Engagement scoring (attendance + bidding + consistency)",
+        "• Next event attendance prediction",
+        "• Personalized recommendations",
+        "• **Self-check**: Just say \"!analyze\" or \"how am i doing?\"",
+        "• **NLP**: \"my stats\" or \"kamusta ako?\"",
+        "• Use in guild chat by @mentioning the bot"
+      ]
+    },
+    analyzeall: {
+      usage: "!analyzeall",
+      description: "Guild-wide engagement analysis with top performers",
+      aliases: ["!analyzeengagement", "!guildanalyze"],
+      adminOnly: false,
+      details: [
+        "• Guild-wide statistics",
+        "• Top performers ranking",
+        "• At-risk members list",
+        "• Engagement trends",
+        "• **NLP**: \"guild engagement\" or \"engagement ng lahat\"",
+        "• Use in guild chat by @mentioning the bot"
       ]
     },
     recommendations: {
@@ -787,9 +796,9 @@ function buildMainHelp() {
 }
 
 /**
- * Build category help
+ * Build category help (filtered by user permissions)
  */
-function buildCategoryHelp(category) {
+function buildCategoryHelp(category, isUserAdmin = true) {
   const categoryData = COMMANDS[category];
   if (!categoryData) return null;
 
@@ -847,8 +856,8 @@ function buildCategoryHelp(category) {
     }
   }
 
-  // Add fields
-  if (adminCommands.length > 0) {
+  // Add fields (filter admin commands for non-admins)
+  if (adminCommands.length > 0 && isUserAdmin) {
     embed.addFields({
       name: `${EMOJI.ADMIN} Admin Commands`,
       value: adminCommands.join('\n\n')
@@ -868,12 +877,15 @@ function buildCategoryHelp(category) {
 }
 
 /**
- * Build command-specific help
+ * Build command-specific help (filtered by user permissions)
  */
-function buildCommandHelp(commandName) {
+function buildCommandHelp(commandName, isUserAdmin = true) {
   // Search for command in all categories
   for (const [category, commands] of Object.entries(COMMANDS)) {
     for (const [key, cmd] of Object.entries(commands)) {
+      // Filter admin commands for non-admins
+      if (cmd.adminOnly && !isUserAdmin) continue;
+
       // Match by command name or aliases
       if (
         key === commandName.toLowerCase() ||
@@ -941,10 +953,13 @@ function buildErrorEmbed(query) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Handle help command
+ * Handle help command (with permission filtering)
  */
 async function handleHelp(message, args, member) {
   try {
+    // Check if user is admin
+    const userIsAdmin = isAdminFunc ? isAdminFunc(member) : true; // Default to true if not initialized
+
     // No args = main help
     if (!args || args.length === 0) {
       const embed = buildMainHelp();
@@ -956,7 +971,7 @@ async function handleHelp(message, args, member) {
 
     // Check if it's a category
     if (COMMANDS[query]) {
-      const embed = buildCategoryHelp(query);
+      const embed = buildCategoryHelp(query, userIsAdmin);
       if (embed) {
         await message.reply({ embeds: [embed] });
         return;
@@ -964,7 +979,7 @@ async function handleHelp(message, args, member) {
     }
 
     // Check if it's a specific command
-    const cmdEmbed = buildCommandHelp(query);
+    const cmdEmbed = buildCommandHelp(query, userIsAdmin);
     if (cmdEmbed) {
       await message.reply({ embeds: [cmdEmbed] });
       return;
