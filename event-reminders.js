@@ -398,10 +398,26 @@ function scheduleEventReminder(eventKey, event, targetDay) {
       `   Event hasn't started yet (${formatGMT8(eventStartTime)}), sending reminder NOW!`
     );
 
-    // Send immediately and reschedule for next week
-    sendEventReminder(event, eventStartTime).then(() => {
-      scheduleEventReminder(eventKey, event, targetDay);
-    });
+    // Send immediately
+    sendEventReminder(event, eventStartTime);
+
+    // Wait until after the event finishes, then reschedule for next week
+    // This prevents infinite loops where the bot keeps detecting the same "missed" reminder
+    const eventEndTime = eventStartTime.getTime() + (event.durationMinutes * 60 * 1000);
+    const delayUntilAfterEvent = eventEndTime - now.getTime() + 1000; // Add 1 second buffer
+
+    eventTimers[eventKey] = {
+      eventTimer: setTimeout(() => {
+        scheduleEventReminder(eventKey, event, targetDay);
+      }, delayUntilAfterEvent),
+      nextRun: new Date(eventEndTime),
+      eventTime: eventStartTime,
+    };
+
+    console.log(
+      `📅 [EVENT REMINDER] Will reschedule ${event.name} after event ends at ${formatGMT8(new Date(eventEndTime))}`
+    );
+
     return;
   }
 
