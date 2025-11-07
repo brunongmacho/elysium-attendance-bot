@@ -1379,12 +1379,14 @@ async function itemGo1(client, config, channel) {
   auctionState.currentItem.go1 = true;
 
   const item = auctionState.currentItem;
+  const endTimestamp = Math.floor(item.endTime / 1000);
+
   await channel.send({
     embeds: [
       new EmbedBuilder()
         .setColor(COLORS.WARNING)
         .setTitle(`${EMOJI.WARNING} GOING ONCE!`)
-        .setDescription("1 minute left")
+        .setDescription(`Auction ends <t:${endTimestamp}:R>`)
         .addFields({
           name: `${EMOJI.BID} Current`,
           value: item.curWin
@@ -1414,12 +1416,14 @@ async function itemGo2(client, config, channel) {
   auctionState.currentItem.go2 = true;
 
   const item = auctionState.currentItem;
+  const endTimestamp = Math.floor(item.endTime / 1000);
+
   await channel.send({
     embeds: [
       new EmbedBuilder()
         .setColor(COLORS.WARNING)
         .setTitle(`${EMOJI.WARNING} GOING TWICE!`)
-        .setDescription("30 seconds left")
+        .setDescription(`Auction ends <t:${endTimestamp}:R>`)
         .addFields({
           name: `${EMOJI.BID} Current`,
           value: item.curWin
@@ -1443,12 +1447,14 @@ async function itemGo3(client, config, channel) {
   if (!auctionState.active || !auctionState.currentItem) return;
 
   const item = auctionState.currentItem;
+  const endTimestamp = Math.floor(item.endTime / 1000);
+
   await channel.send({
     embeds: [
       new EmbedBuilder()
         .setColor(COLORS.ERROR)
         .setTitle(`${EMOJI.WARNING} FINAL CALL!`)
-        .setDescription("10 seconds left")
+        .setDescription(`Auction ends <t:${endTimestamp}:R>`)
         .addFields({
           name: `${EMOJI.BID} Current`,
           value: item.curWin

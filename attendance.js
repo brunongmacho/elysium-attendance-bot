@@ -445,11 +445,15 @@ async function createSpawnThreads(
   const normalizedKey = `${bossName.toUpperCase()}|${normalizeTimestamp(fullTimestamp)}`;
   activeColumns[normalizedKey] = attThread.id;
 
+  // Calculate auto-close timestamp (20 minutes from now)
+  const autoCloseTime = Date.now() + (20 * 60 * 1000);
+  const autoCloseTimestamp = Math.floor(autoCloseTime / 1000);
+
   // Create and send attendance instructions embed
   const embed = new EmbedBuilder()
     .setColor(0xffd700)
     .setTitle(`🎯 ${bossName}`)
-    .setDescription(`Boss detected! Please check in below.\n\n⏰ **Auto-closes in 20 minutes** to prevent cheating.`)
+    .setDescription(`Boss detected! Please check in below.\n\n⏰ **Auto-closes <t:${autoCloseTimestamp}:R>** to prevent cheating.`)
     .addFields(
       {
         name: "📸 How to Check In",

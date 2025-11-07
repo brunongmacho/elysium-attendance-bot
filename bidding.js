@@ -1325,13 +1325,15 @@ async function ann1(cli, cfg) {
     return;
   }
 
+  const endTimestamp = Math.floor(a.endTime / 1000);
+
   await th.send({
     content: "@everyone",
     embeds: [
       new EmbedBuilder()
         .setColor(COLORS.WARNING)
         .setTitle(`${EMOJI.WARNING} GOING ONCE!`)
-        .setDescription("1 min left")
+        .setDescription(`Auction ends <t:${endTimestamp}:R>`)
         .addFields({
           name: `${EMOJI.BID} Current`,
           value: a.curWin
@@ -1356,13 +1358,15 @@ async function ann2(cli, cfg) {
     return;
   }
 
+  const endTimestamp = Math.floor(a.endTime / 1000);
+
   await th.send({
     content: "@everyone",
     embeds: [
       new EmbedBuilder()
         .setColor(getColor(COLORS.WARNING))
         .setTitle(`${EMOJI.WARNING} GOING TWICE!`)
-        .setDescription("30s left")
+        .setDescription(`Auction ends <t:${endTimestamp}:R>`)
         .addFields({
           name: `${EMOJI.BID} Current`,
           value: a.curWin
@@ -1387,13 +1391,15 @@ async function ann3(cli, cfg) {
     return;
   }
 
+  const endTimestamp = Math.floor(a.endTime / 1000);
+
   await th.send({
     content: "@everyone",
     embeds: [
       new EmbedBuilder()
         .setColor(getColor(COLORS.ERROR))
         .setTitle(`${EMOJI.WARNING} FINAL CALL!`)
-        .setDescription("10s left")
+        .setDescription(`Auction ends <t:${endTimestamp}:R>`)
         .addFields({
           name: `${EMOJI.BID} Current`,
           value: a.curWin
