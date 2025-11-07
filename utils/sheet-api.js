@@ -235,10 +235,17 @@ class SheetAPI {
       }
 
       try {
-        // Log request
-        if (normalAttempts === 0 && rateLimitAttempts === 0) {
-          console.log(`📤 API call: ${action}`);
-        } else {
+        // Log request (unless silent mode)
+        if (!options.silent) {
+          if (normalAttempts === 0 && rateLimitAttempts === 0) {
+            console.log(`📤 API call: ${action}`);
+          } else {
+            const retryNum = isRateLimited ? rateLimitAttempts : normalAttempts;
+            console.log(`🔄 Retry ${retryNum}/${maxRetries}: ${action}`);
+            metrics.totalRetries++;
+          }
+        } else if ((normalAttempts > 0 || rateLimitAttempts > 0) && !options.silent) {
+          // Always log retries even in silent mode for important errors
           const retryNum = isRateLimited ? rateLimitAttempts : normalAttempts;
           console.log(`🔄 Retry ${retryNum}/${maxRetries}: ${action}`);
           metrics.totalRetries++;
@@ -287,7 +294,10 @@ class SheetAPI {
 
         recordSuccess();
 
-        console.log(`✅ API success: ${action} (${duration}ms)`);
+        // Log success (unless silent mode)
+        if (!options.silent) {
+          console.log(`✅ API success: ${action} (${duration}ms)`);
+        }
         return result;
 
       } catch (error) {
