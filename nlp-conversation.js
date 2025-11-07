@@ -22,6 +22,105 @@ const { PointsCache } = require('./utils/points-cache');
 // ═══════════════════════════════════════════════════════════════════════════
 
 const CONVERSATION_PATTERNS = {
+  // ═══════════════════════════════════════════════════════════════════════
+  // INSULTS FIRST - PRIORITY MATCHING!
+  // Must be checked before other patterns to avoid conflicts
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // Insult/Criticism (Playful Trash Talk Back!)
+  insult: {
+    patterns: [
+      // Filipino bad words & trash talk (PRIORITY - CHECK FIRST!)
+      /(?:putang\s*ina|tangina|gago|ulol|leche|peste|tarantado|bobo|tanga|bano|walang\s+kwenta)/i,
+      /(?:tite|puke|kantot|kupal|pakshet|pakyu|fuck\s+you|hayop|buwisit|hinayupak)/i,
+      /(?:supot|tanga|bruha|ungas|lintik|punyeta|walanghiya|gaga|salot|pakingshet)/i,
+      /(?:amputa|putcha|pucha|yawa|gunggong|engot|hudas|shunga|timang|abnoy)/i,
+
+      // English bad words & trash talk
+      /(?:fuck|shit|damn|ass|bitch|bastard|stupid|idiot|moron|dumb|retard)/i,
+      /(?:useless|trash|garbage|suck|pathetic|loser|noob|scrub|bad)/i,
+      /(?:you\s+(?:suck|are\s+(?:bad|trash|garbage|useless|stupid|dumb)))/i,
+
+      // Tagalog insults (full phrases)
+      /(?:ang\s+(?:bano|bobo|tanga|gago|ulol|supot|gunggong|engot)\s+mo)/i,
+      /(?:pakshet|pakyu|gago\s+ka|ulol\s+ka|bobo\s+ka|tanga\s+ka|supot\s+ka)/i,
+      /(?:supot|bano|engot|gunggong)\s+(?:ka|mo|naman|talaga)/i,
+
+      // Gaming/competitive taunts (English)
+      /(?:noob|nub|newb|scrub|trash|weak|easy|ez|rekt|pwned|owned|destroyed|demolished)/i,
+      /(?:you\s+(?:weak|suck\s+at|bad\s+at|terrible\s+at|worst|losing|lose|lost))/i,
+      /(?:get\s+(?:rekt|good|gud|wrecked|destroyed|owned|pwned))/i,
+      /(?:mad|salty|tilted|crying|cope|skill\s+issue)/i,
+
+      // Filipino gaming/competitive taunts
+      /(?:mahina|duwag|talo|bugbug|panalo|malas|walang\s+laban)/i,
+      /(?:ang\s+(?:weak|mahina|duwag|talo|bugbog)\s+mo)/i,
+      /(?:bugbog\s+sarado|talo\s+ka|wala\s+kang\s+laban)/i,
+      /(?:noob\s+ka|newbie\s+ka|baguhan\s+ka)/i,
+
+      // Taglish competitive taunts
+      /(?:ez\s+lang|easy\s+lang|noob\s+naman|weak\s+naman)/i,
+      /(?:talo\s+na|bugbog\s+ka|walang\s+laban\s+yan)/i,
+      /(?:git\s+gud|get\s+good|mag\s+practice)/i,
+
+      // Bot-specific taunts
+      /(?:bot\s+(?:sucks|is\s+bad|trash|useless|broken|stupid|bano|tanga|bobo))/i,
+      /(?:your\s+(?:bot|system|code)\s+(?:sucks|trash|broken))/i,
+      /(?:worst\s+bot|trash\s+bot|useless\s+bot|bano\s+bot)/i,
+    ],
+    responses: [
+      // PURE TAGALOG ROASTS (80% - PRIORITY)
+      "Hoy gago, balik ka sa tutorial! 😤 Mag-!help ka muna bago ka magsalita!",
+      "Ulol! Mas mataas pa IQ ko sa points mo! Tignan mo: !mypoints 💀",
+      "Tangina, mas late ka pa sa pag-intindi kaysa sa attendance mo! 📊",
+      "Bobo yarn? Ikaw nga di makapagtanda ng !bid eh! 💸",
+      "Gago spotted! Mag-git gud ka nalang! !leaderboard mo tingnan! 🏆",
+      "Leche, mas magaling pa magbid yung AI kesa sa'yo! 🤖💯",
+      "Pakshet! Ikaw yung tipo ng tao na nag-bid ng 1 point! 😂",
+      "Bobo! Balik ka pag nag-improve na utak mo! Simulan mo sa !help! 📚",
+      "Putangina, sabi ng mama ko wag makipag-usap sa mga walang-kwenta... pero sige, eto !help mo 🖕",
+      "Gago energy detected! Redirect mo yang galit mo sa attendance! 📊",
+      "Tanga amp! Mas mataas pa latency ng internet ko kesa sa IQ mo! 😂",
+      "Ulol ka! Di ka marunong mag-bid pero marunong mang-trashtalk! 💸",
+      "Leche ka! Anong akala mo sa sarili mo, pro player? Bottom tier ka lang! 🏆💀",
+      "Gago! Mas mabilis pa kumaripas yung attendance mo kesa sa points mo tumataas! 📊",
+      "Tarantado! Ikaw yung tipo ng player na nag-AFk sa gitna ng laban! 🎮",
+      "Peste! Wala kang points pero maraming hanash! !mypoints mo check! 🤡",
+      "Bwisit! Mas mababa pa attendance mo sa respeto na natitira sa'yo! 📊😂",
+      "Hayop ka! Toxic sa chat pero walang laman sa !leaderboard! 🏆",
+      "Kupal! Anong ginagawa mo dito? Mag-!help ka nalang! 📚",
+      "Walang kwenta! Mas productive pa yung error logs ko kesa sa'yo! 🤖",
+      "Tanga! Mas maayos pa mag-bid yung bot kesa sa'yo! 💸",
+      "Inutil! Balik ka sa bahay mo at mag-practice muna! 😤",
+      "Buang! Wala kang alam pero ang laki ng bibig! 🗣️💀",
+      "Hinayupak! Mas mahal pa yung pinaka-mura sa auction kesa sa value mo sa guild! 💰",
+      "Mangmang! Di mo alam gagawin pero expert ka sa pagiging toxic! 😏",
+      "Loko-loko! Akala mo magaling ka pero bottom tier ka lang! 🏆",
+      "Putangina talaga! Mas late ka pa sa pag-intindi kaysa sa loot distribution! 💎",
+      "Siraulo! Mag-aral ka muna bago ka mambara! !help mo basahin! 📖",
+      "Gago ka talaga! Mang-trashtalk ka pero di ka marunong mag-present! 📊",
+      "Ulol naman! Anong akala mo sa bot? Tanga din tulad mo? 🤖💯",
+
+      // TAGLISH ROASTS (15%)
+      "Hoy bobo, your trash talk game is weak! Try mo muna mag-!help! 😤",
+      "Gago yarn?! Mas mataas pa bot IQ ko kesa sa points mo! !mypoints nalang! 💯",
+      "Tangina, ikaw yung tipo na 'present' lang di mo pa masagot! 📊😂",
+      "Ulol! Git gud ka muna bago ka mang-trashtalk! !leaderboard mo tignan! 🏆",
+      "Putangina, mas toxic pa salita mo kesa sa rank mo! Check !leaderboard! 💀",
+      "Bobo spotted! Mas priority mo pa mang-bash kesa mag-attend! 📊",
+      "Gago! Your roast game weak AF! Mag-practice ka sa !help muna! 😏",
+
+      // ENGLISH ROASTS (5% only)
+      "Your trash talk is weaker than your bid game! Check !mypoints and cry! 💀",
+      "Damn, you're late even in insulting me! Just like your attendance! 🕐",
+      "Talk shit get hit with facts: You're at the BOTTOM of !leaderboard! 🏆😂",
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // OTHER CONVERSATIONAL PATTERNS
+  // ═══════════════════════════════════════════════════════════════════════
+
   // Greetings
   greeting: {
     patterns: [
@@ -140,93 +239,6 @@ const CONVERSATION_PATTERNS = {
       "Thanks! Happy to be useful! Let me know if you need anything!",
       "Salamat! I'm here to serve! 🤖",
       "Appreciated! Always ready to assist! 🎮",
-    ],
-  },
-
-  // Insult/Criticism (Playful Trash Talk Back!)
-  insult: {
-    patterns: [
-      // Filipino bad words & trash talk
-      /(?:putang\s*ina|tangina|gago|ulol|leche|peste|tarantado|bobo|tanga|bano|walang\s+kwenta)/i,
-      /(?:tite|puke|kantot|kupal|pakshet|pakyu|fuck\s+you|hayop|buwisit|hinayupak)/i,
-
-      // English bad words & trash talk
-      /(?:fuck|shit|damn|ass|bitch|bastard|stupid|idiot|moron|dumb|retard)/i,
-      /(?:useless|trash|garbage|suck|pathetic|loser|noob|scrub|bad)/i,
-      /(?:you\s+(?:suck|are\s+(?:bad|trash|garbage|useless|stupid|dumb)))/i,
-
-      // Tagalog insults
-      /(?:ang\s+(?:bano|bobo|tanga|gago|ulol)\s+mo)/i,
-      /(?:pakshet|pakyu|gago\s+ka|ulol\s+ka|bobo\s+ka)/i,
-
-      // Gaming/competitive taunts (English)
-      /(?:noob|nub|newb|scrub|trash|weak|easy|ez|rekt|pwned|owned|destroyed|demolished)/i,
-      /(?:you\s+(?:weak|suck\s+at|bad\s+at|terrible\s+at|worst|losing|lose|lost))/i,
-      /(?:get\s+(?:rekt|good|gud|wrecked|destroyed|owned|pwned))/i,
-      /(?:mad|salty|tilted|crying|cope|skill\s+issue)/i,
-
-      // Filipino gaming/competitive taunts
-      /(?:mahina|duwag|talo|bugbog|panalo|malas|walang\s+laban)/i,
-      /(?:ang\s+(?:weak|mahina|duwag|talo|bugbog)\s+mo)/i,
-      /(?:bugbog\s+sarado|talo\s+ka|wala\s+kang\s+laban)/i,
-      /(?:noob\s+ka|newbie\s+ka|baguhan\s+ka)/i,
-
-      // Taglish competitive taunts
-      /(?:ez\s+lang|easy\s+lang|noob\s+naman|weak\s+naman)/i,
-      /(?:talo\s+na|bugbog\s+ka|walang\s+laban\s+yan)/i,
-      /(?:git\s+gud|get\s+good|mag\s+practice)/i,
-
-      // Bot-specific taunts
-      /(?:bot\s+(?:sucks|is\s+bad|trash|useless|broken|stupid))/i,
-      /(?:your\s+(?:bot|system|code)\s+(?:sucks|trash|broken))/i,
-      /(?:worst\s+bot|trash\s+bot|useless\s+bot)/i,
-    ],
-    responses: [
-      // PURE TAGALOG ROASTS (80% - PRIORITY)
-      "Hoy gago, balik ka sa tutorial! 😤 Mag-!help ka muna bago ka magsalita!",
-      "Ulol! Mas mataas pa IQ ko sa points mo! Tignan mo: !mypoints 💀",
-      "Tangina, mas late ka pa sa pag-intindi kaysa sa attendance mo! 📊",
-      "Bobo yarn? Ikaw nga di makapagtanda ng !bid eh! 💸",
-      "Gago spotted! Mag-git gud ka nalang! !leaderboard mo tingnan! 🏆",
-      "Leche, mas magaling pa magbid yung AI kesa sa'yo! 🤖💯",
-      "Pakshet! Ikaw yung tipo ng tao na nag-bid ng 1 point! 😂",
-      "Bobo! Balik ka pag nag-improve na utak mo! Simulan mo sa !help! 📚",
-      "Putangina, sabi ng mama ko wag makipag-usap sa mga walang-kwenta... pero sige, eto !help mo 🖕",
-      "Gago energy detected! Redirect mo yang galit mo sa attendance! 📊",
-      "Tanga amp! Mas mataas pa latency ng internet ko kesa sa IQ mo! 😂",
-      "Ulol ka! Di ka marunong mag-bid pero marunong mang-trashtalk! 💸",
-      "Leche ka! Anong akala mo sa sarili mo, pro player? Bottom tier ka lang! 🏆💀",
-      "Gago! Mas mabilis pa kumaripas yung attendance mo kesa sa points mo tumataas! 📊",
-      "Tarantado! Ikaw yung tipo ng player na nag-AFk sa gitna ng laban! 🎮",
-      "Peste! Wala kang points pero maraming hanash! !mypoints mo check! 🤡",
-      "Bwisit! Mas mababa pa attendance mo sa respeto na natitira sa'yo! 📊😂",
-      "Hayop ka! Toxic sa chat pero walang laman sa !leaderboard! 🏆",
-      "Kupal! Anong ginagawa mo dito? Mag-!help ka nalang! 📚",
-      "Walang kwenta! Mas productive pa yung error logs ko kesa sa'yo! 🤖",
-      "Tanga! Mas maayos pa mag-bid yung bot kesa sa'yo! 💸",
-      "Inutil! Balik ka sa bahay mo at mag-practice muna! 😤",
-      "Buang! Wala kang alam pero ang laki ng bibig! 🗣️💀",
-      "Hinayupak! Mas mahal pa yung pinaka-mura sa auction kesa sa value mo sa guild! 💰",
-      "Mangmang! Di mo alam gagawin pero expert ka sa pagiging toxic! 😏",
-      "Loko-loko! Akala mo magaling ka pero bottom tier ka lang! 🏆",
-      "Putangina talaga! Mas late ka pa sa pag-intindi kaysa sa loot distribution! 💎",
-      "Siraulo! Mag-aral ka muna bago ka mambara! !help mo basahin! 📖",
-      "Gago ka talaga! Mang-trashtalk ka pero di ka marunong mag-present! 📊",
-      "Ulol naman! Anong akala mo sa bot? Tanga din tulad mo? 🤖💯",
-
-      // TAGLISH ROASTS (15%)
-      "Hoy bobo, your trash talk game is weak! Try mo muna mag-!help! 😤",
-      "Gago yarn?! Mas mataas pa bot IQ ko kesa sa points mo! !mypoints nalang! 💯",
-      "Tangina, ikaw yung tipo na 'present' lang di mo pa masagot! 📊😂",
-      "Ulol! Git gud ka muna bago ka mang-trashtalk! !leaderboard mo tignan! 🏆",
-      "Putangina, mas toxic pa salita mo kesa sa rank mo! Check !leaderboard! 💀",
-      "Bobo spotted! Mas priority mo pa mang-bash kesa mag-attend! 📊",
-      "Gago! Your roast game weak AF! Mag-practice ka sa !help muna! 😏",
-
-      // ENGLISH ROASTS (5% only)
-      "Your trash talk is weaker than your bid game! Check !mypoints and cry! 💀",
-      "Damn, you're late even in insulting me! Just like your attendance! 🕐",
-      "Talk shit get hit with facts: You're at the BOTTOM of !leaderboard! 🏆😂",
     ],
   },
 
@@ -368,6 +380,199 @@ class ConversationalAI {
     this.conversationHistory = new Map(); // userId -> recent messages
     this.config = config; // Bot config for accessing sheets
     this.sheetAPI = sheetAPI; // For fetching user stats
+  }
+
+  /**
+   * Generate dynamic general trash talk (no stats needed!)
+   * Uses time, day, and random combinations for variety
+   * @param {Message} message - Discord message object
+   * @returns {string} Dynamic roast
+   */
+  generateDynamicGeneralRoast(message) {
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const mention = `<@${message.author.id}>`;
+    const now = new Date();
+    const hour = now.getHours();
+    const day = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // TIME-BASED CONTEXT
+    // ═══════════════════════════════════════════════════════════════════════
+
+    const timeContext = {
+      // Late night (12am - 5am)
+      lateNight: hour >= 0 && hour < 5,
+      // Early morning (5am - 9am)
+      earlyMorning: hour >= 5 && hour < 9,
+      // Morning (9am - 12pm)
+      morning: hour >= 9 && hour < 12,
+      // Afternoon (12pm - 6pm)
+      afternoon: hour >= 12 && hour < 18,
+      // Evening (6pm - 10pm)
+      evening: hour >= 18 && hour < 22,
+      // Night (10pm - 12am)
+      night: hour >= 22,
+    };
+
+    // DAY-BASED CONTEXT
+    const dayContext = {
+      monday: day === 1,
+      friday: day === 5,
+      weekend: day === 0 || day === 6,
+      weekday: day >= 1 && day <= 5,
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // DYNAMIC ROAST COMPONENTS (300+ combinations!)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    const openings = [
+      `${mention},`, `Hoy ${mention}!`, `Listen up ${mention},`, `Pakinggan mo ${mention},`,
+      `YOOOOO ${mention}!`, `Excuse me ${mention}?`, `Real talk ${mention},`, `Look ${mention},`,
+      `Tangina ${mention},`, `Gago ${mention},`, `Ulol ${mention}!`, `Leche ${mention}!`,
+      `Bobo amputa ${mention},`, `Ay grabe ${mention}!`, `BRUH ${mention}!`, `Bro ${mention},`,
+    ];
+
+    const generalInsults = [
+      // Skill-based
+      "your skills are non-existent!", "you play like a tutorial NPC!", "you got skill issues fr fr!",
+      "mas magaling pa yung AI!", "noob energy is STRONG!", "you're the embodiment of 'skill issue'!",
+      "your gameplay makes me LAG!", "even bots play better!", "tutorial mode pa rin ba yan?!",
+      "walang kwentang laro mo!", "mas maayos pa yung lag spike!", "scrub tier detected!",
+
+      // Attitude-based
+      "ang taas ng confidence pero walang talent!", "all bark, zero bite!", "delusional yarn?!",
+      "ego mo di kasya sa server!", "akala mo magaling pero BOTTOM TIER!", "main character syndrome detected!",
+      "your attitude wrote checks your skill can't cash!", "confidence ng pro, gameplay ng noob!",
+      "lakas mang-bash pero palpak naman!", "toxic sa chat, useless sa game!",
+
+      // Effort-based
+      "parang di ka nag-eeffort!", "AFK ka ba lagi?!", "present lang sa ngalan!",
+      "mas active pa yung ghost members!", "participation? Never heard of it!", "invisible player spotted!",
+      "effort level: ZERO!", "contribution? Not found!", "parang backdrop ka lang!",
+
+      // Meta/funny
+      "you're the reason we can't have nice things!", "server IQ dropped when you joined!",
+      "your vibe is OFF!", "negative aura detected!", "you bring the CHAOS (in a bad way)!",
+      "even lag spikes are better company!", "404: Skill not found!", "you're the final boss... of CRINGE!",
+      "delulu is NOT the solulu!", "reality check: BOUNCED!", "L + ratio + skill issue!",
+    ];
+
+    const burns = [
+      // Command suggestions
+      "Try !help nalang kasi!", "Check !leaderboard para marealize mo!", "Mag-!mypoints ka, mag-reflect!",
+      "!help mo basahin, please!", "Mag-git gud ka muna!", "Tutorial mode enabled!",
+
+      // Action suggestions
+      "Touch grass bro!", "Log out and think about your life!", "Uninstall attitude!",
+      "Go outside!", "Factory reset needed!", "Restart from scratch!", "Delete and start over!",
+      "Mag-reflect ka muna!", "Take a break from life!", "Recalibrate yourself!",
+
+      // Comparisons
+      "Even NPCs laugh at you!", "My error logs have more value!", "Vendors ignore you!",
+      "The guild bank is embarrassed!", "Slimes have more dignity!", "Training dummies play better!",
+      "Beggars have standards higher than you!", "Copper coins flex harder!",
+
+      // Filipino cultural
+      "Pang-lugaw lang level mo!", "Kahit yung aso ng kapitbahay mas respectable!",
+      "Mas may future pa yung tinda sa kanto!", "Pang-level 1 pa rin!", "Starter pack vibes!",
+      "Di ka pa sweldo!", "Baon money energy!", "Tipid mode activated!",
+    ];
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // TIME-SPECIFIC ROASTS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    const timeBasedRoasts = [];
+
+    if (timeContext.lateNight) {
+      timeBasedRoasts.push(
+        `${mention}, it's ${hour}:${now.getMinutes()} AM! Bakit gising ka pa? Para mang-trashtalk?! Matulog ka na! 😴`,
+        `Hoy ${mention}! ${hour} AM na! Wala kang tulog tapos toxic pa?! Priorities mo ha! 🌙`,
+        `TANGINA ${mention}, ${hour} AM na nag-trashtalk ka pa! Sleep deprivation yan! 💤`,
+        `${mention} up at ${hour} AM just to roast me?! Get a LIFE bro! 🦉`,
+      );
+    }
+
+    if (timeContext.earlyMorning) {
+      timeBasedRoasts.push(
+        `${mention} starting the day with toxicity?! Magkape ka muna! ☕`,
+        `Good morning ${mention}! Yan ba breakfast mo? Trash talk?! 🍳`,
+        `${mention}, ${hour} AM tapos toxic agad?! Umaga pa lang! 🌅`,
+      );
+    }
+
+    if (timeContext.afternoon) {
+      timeBasedRoasts.push(
+        `${mention}, tanghali na! Kumain ka muna before ka mang-trash talk! 🍱`,
+        `Lunchtime toxicity from ${mention}! Yan ba ulam mo?! 🍚`,
+        `${mention} spending their lunch break roasting a bot! Sad! 🥪`,
+      );
+    }
+
+    if (timeContext.evening) {
+      timeBasedRoasts.push(
+        `${mention} after work/school tapos toxic agad?! Pagod ka na siguro! 😮‍💨`,
+        `Evening trash talk from ${mention}! Productive day yarn?! 🌆`,
+        `${mention}, gabi na! Rest your mouth and your attitude! 🌙`,
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // DAY-SPECIFIC ROASTS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    const dayBasedRoasts = [];
+
+    if (dayContext.monday) {
+      dayBasedRoasts.push(
+        `${mention} starting Monday with trash talk?! Productive week ahead! 📅`,
+        `Monday blues hitting ${mention} hard! Take it out on the bot! 😤`,
+        `${mention}, it's MONDAY! Save your energy for the week ahead! 💼`,
+      );
+    }
+
+    if (dayContext.friday) {
+      dayBasedRoasts.push(
+        `${mention} on a FRIDAY being toxic?! It's almost weekend, relax! 🎉`,
+        `TGIF pero ${mention} chose violence! 😂`,
+        `${mention}, Friday na! Wag mo sirain mood ng weekend! 🍻`,
+      );
+    }
+
+    if (dayContext.weekend) {
+      dayBasedRoasts.push(
+        `${mention} spending their WEEKEND roasting a bot! Walang buhay?! 🏖️`,
+        `Weekend warrior ${mention}! This is what you do on rest days?! 🎮`,
+        `${mention}, WEEKEND yan! Go outside! Touch grass! 🌱`,
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // GENERATE DYNAMIC ROAST
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // 40% chance for time/day-specific roast
+    const useContextRoast = Math.random() < 0.4;
+
+    if (useContextRoast && (timeBasedRoasts.length > 0 || dayBasedRoasts.length > 0)) {
+      const contextRoasts = [...timeBasedRoasts, ...dayBasedRoasts];
+      return pick(contextRoasts);
+    }
+
+    // Otherwise, combine random components
+    const opening = pick(openings);
+    const insult = pick(generalInsults);
+    const burn = pick(burns);
+
+    // 30% chance to drop the burn for shorter roast
+    const shortRoast = Math.random() < 0.3;
+
+    if (shortRoast) {
+      return `${opening} ${insult} 💀`;
+    }
+
+    return `${opening} ${insult} ${burn} 🔥`;
   }
 
   /**
@@ -832,15 +1037,24 @@ class ConversationalAI {
       for (const [type, config] of Object.entries(CONVERSATION_PATTERNS)) {
         for (const pattern of config.patterns) {
           if (pattern.test(content)) {
-            // Special handling for insults - use stat-based roasts!
-            if (type === 'insult' && this.sheetAPI) {
-              console.log(`🔥 [Trash Talk] ${username} is getting roasted with stats!`);
-              const stats = await this.getUserStats(username);
-              if (stats) {
-                const statRoast = this.generateStatBasedRoast(stats, message);
-                console.log(`🔥 [Trash Talk] Generated stat-based roast for ${username}`);
-                return statRoast;
+            // Special handling for insults - use dynamic roasts!
+            if (type === 'insult') {
+              // Try stat-based roast first (if stats available)
+              if (this.sheetAPI) {
+                console.log(`🔥 [Trash Talk] ${username} is getting roasted with stats!`);
+                const stats = await this.getUserStats(username);
+                if (stats) {
+                  const statRoast = this.generateStatBasedRoast(stats, message);
+                  console.log(`🔥 [Trash Talk] Generated stat-based roast for ${username}`);
+                  return statRoast;
+                }
               }
+
+              // Fallback to dynamic general roast (no stats needed!)
+              console.log(`🔥 [Trash Talk] Generating dynamic general roast for ${username}`);
+              const dynamicRoast = this.generateDynamicGeneralRoast(message);
+              console.log(`🔥 [Trash Talk] Generated dynamic context-aware roast`);
+              return dynamicRoast;
             }
 
             // Get random response for other patterns
