@@ -915,7 +915,7 @@ class ProactiveIntelligence {
 
           for (const achiever of achievers) {
             await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
-              nickname: `${achiever.nickname}-attendance`,
+              nickname: achiever.nickname,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'attendance'
@@ -957,7 +957,7 @@ class ProactiveIntelligence {
 
           for (const achiever of achievers) {
             await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
-              nickname: `${achiever.nickname}-bidding`,
+              nickname: achiever.nickname,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'bidding'
