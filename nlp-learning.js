@@ -1025,12 +1025,48 @@ class NLPLearningSystem {
     }
 
     // Additional check for common inappropriate words (backup filter)
+    // Expanded to cover Filipino slang, text speak, regional variants, and English profanity
     const inappropriateWords = [
-      'putang', 'tangina', 'kingina', 'gago', 'ulol', 'tanga', 'bobo',
-      'puke', 'tite', 'kantot', 'kupal', 'fuck', 'shit', 'bitch',
-      'bastard', 'ass', 'damn', 'puta', 'leche', 'peste', 'tarantado',
-      'hayop', 'hinayupak', 'bwisit', 'ungas', 'gunggong', 'shunga',
-      'engot', 'supot', 'yawa', 'bruha', 'punyeta', 'pakshet'
+      // Core Filipino profanity
+      'putang', 'tangina', 'tanginang', 'kinangina', 'kingina', 'putangina',
+      'gago', 'gagong', 'gagohan', 'kagaguhan', 'ulol', 'kaulol',
+      'tanga', 'bobo', 'katangahan', 'kabobohan',
+      'puke', 'tite', 'kantot', 'kupal', 'supot',
+
+      // Filipino profanity variants
+      'hayop', 'hinayupak', 'bwisit', 'buwisit', 'bwiset', 'buset', 'bwesit', 'bweset',
+      'leche', 'peste', 'tarantado', 'puta', 'pokpok',
+      'pakyu', 'pakshet', 'pakingshet',
+      'amputa', 'amfuta', 'amshet', 'amshit', 'ampucha', 'amputcha',
+      'pucha', 'putcha', 'lintik', 'punyeta', 'walanghiya',
+
+      // Filipino slang & insults
+      'ungas', 'gunggong', 'shunga', 'engot', 'timang', 'abnoy', 'hudas',
+      'gaga', 'salot', 'bruha', 'buwakaw', 'bano', 'hangal', 'mangmang',
+      'inutil', 'basura', 'dumi', 'squammy', 'skwater',
+      'epal', 'jejemon', 'jologs', 'baduy', 'palpak', 'sablay', 'bulok',
+
+      // Text speak variants
+      'tngnina', 'tngina', 'kngn', 'kngin', 'pksht', 'pkyou', 'fcku',
+      'gg0', 'bb0', 'tng4', 'g4g0', 'ul0l', 'b0b0', 'bno', 'bnong',
+      'ggng', 'gnggng', 'ngng', 'nggg',
+
+      // Regional variants (Bisaya, Ilocano)
+      'yawa', 'yawaa', 'yawaon', 'atay', 'buang', 'bugo', 'ambak',
+      'giatay', 'unggoy', 'baboy', 'baboyan', 'pisting', 'pisot',
+      'ukinnam', 'agkakapuy', 'sakim', 'takla',
+
+      // English profanity
+      'fuck', 'shit', 'damn', 'ass', 'bitch', 'bastard',
+      'dumbass', 'smartass', 'jackass', 'asshole', 'dipshit',
+      'stupid', 'idiot', 'moron', 'dumb', 'retard',
+
+      // Gaming insults (Filipino)
+      'mahina', 'duwag', 'lutang', 'feeder', 'pabigat', 'pasanin',
+
+      // Common insult phrases (will match partial)
+      'walang kwenta', 'walang silbi', 'walang utak', 'walang alam',
+      'bugbog', 'talo ka', 'noob ka', 'bobo maglaro'
     ];
 
     for (const word of inappropriateWords) {
