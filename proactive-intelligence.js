@@ -910,6 +910,9 @@ class ProactiveIntelligence {
           await channel.send({ embeds: [embed] });
 
           // Batch update Google Sheets for all achievers (parallel execution)
+          console.log(`   📝 Updating ${achievers.length} members in Google Sheets (parallel)...`);
+          const updateStartTime = Date.now();
+
           await Promise.all(achievers.map(achiever =>
             this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: `${achiever.nickname}-attendance`,
@@ -919,8 +922,9 @@ class ProactiveIntelligence {
             })
           ));
 
+          const updateDuration = ((Date.now() - updateStartTime) / 1000).toFixed(1);
           milestonesAnnounced++;
-          console.log(`   - ✅ ${achievers.length} members at ${milestone} ATTENDANCE milestone → ${channel.name}`);
+          console.log(`   - ✅ ${achievers.length} members at ${milestone} ATTENDANCE milestone → ${channel.name} (sheets updated in ${updateDuration}s)`);
         } catch (error) {
           console.error(`   - ❌ Error announcing ATTENDANCE milestone ${milestone}:`, error);
         }
@@ -948,6 +952,9 @@ class ProactiveIntelligence {
           await channel.send({ embeds: [embed] });
 
           // Batch update Google Sheets for all achievers (parallel execution)
+          console.log(`   📝 Updating ${achievers.length} members in Google Sheets (parallel)...`);
+          const updateStartTime = Date.now();
+
           await Promise.all(achievers.map(achiever =>
             this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: `${achiever.nickname}-bidding`,
@@ -957,8 +964,9 @@ class ProactiveIntelligence {
             })
           ));
 
+          const updateDuration = ((Date.now() - updateStartTime) / 1000).toFixed(1);
           milestonesAnnounced++;
-          console.log(`   - ✅ ${achievers.length} members at ${milestone} BIDDING milestone → ${channel.name}`);
+          console.log(`   - ✅ ${achievers.length} members at ${milestone} BIDDING milestone → ${channel.name} (sheets updated in ${updateDuration}s)`);
         } catch (error) {
           console.error(`   - ❌ Error announcing BIDDING milestone ${milestone}:`, error);
         }
