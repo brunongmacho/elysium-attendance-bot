@@ -306,22 +306,60 @@ const NLP_PATTERNS = {
     // SPECIFIC BOSS SPAWN PREDICTIONS (MUST COME FIRST! - Higher Priority)
     // ═══════════════════════════════════════════════════════════════════════
     // These patterns capture boss names as parameters for specific predictions
+    // Support multi-word boss names (Lady Dalia, Baron Braudmore, etc.)
 
-    // English - Specific boss patterns
-    /^(?:when|what\s+time)\s+(?:is|will|does)\s+(.+?)\s+(?:spawn|respawn|pop|up)/i,
-    /^(?:when(?:'s|\s+is)|what\s+time)\s+(?:is\s+)?(.+?)\s+(?:spawning|gonna\s+spawn|coming)/i,
-    /^(?:predict|estimate|guess)\s+(.+?)\s+spawn(?:\s+time)?/i,
-    /^(.+?)\s+spawn(?:\s+(?:time|timer|prediction|estimate))?$/i,
-    /^(?:how\s+long|when)\s+(?:until|till|before)\s+(.+?)\s+(?:spawns?|respawns?)/i,
+    // English - Conversational patterns (most flexible first)
+    // "Can you tell me when will we raid Baron Braudmore"
+    /(?:can\s+you\s+)?(?:tell\s+me\s+)?(?:when|what\s+time)\s+(?:will\s+)?(?:we\s+)?(?:raid|fight|kill|do|hunt)\s+(.+?)(?:\s*\??\s*$)/i,
+
+    // "Do you know when Lady Dalia spawns?"
+    /(?:do\s+you\s+know\s+)?(?:when|what\s+time)\s+(?:is|will|does)\s+(.+?)\s+(?:spawn|respawn|pop|up|coming)/i,
+
+    // "When will Lady Dalia spawn" / "When is Baron Braudmore spawn"
+    /(?:when|what\s+time)\s+(?:is|will|does)\s+(?:the\s+)?(?:boss\s+)?(.+?)\s+(?:spawn|respawn|pop|up)/i,
+
+    // "When is Lady Dalia spawning" / "What time is Baron Braudmore coming"
+    /(?:when(?:'s|\s+is)|what\s+time)\s+(?:is\s+)?(.+?)\s+(?:spawning|gonna\s+spawn|coming|due)/i,
+
+    // English - Direct patterns
+    // "Predict Lady Dalia spawn" / "Check Baron Braudmore spawn"
+    /^(?:predict|estimate|guess|check)\s+(.+?)\s+spawn(?:\s+time)?/i,
+
+    // "Lady Dalia spawn time" / "Baron Braudmore spawn"
+    /^(.+?)\s+spawn(?:\s+(?:time|timer|prediction|estimate|window))?$/i,
+
+    // "When until Lady Dalia spawns"
+    /^(?:how\s+long|when)\s+(?:until|till|before)\s+(.+?)\s+(?:spawns?|respawns?|pops?)/i,
+
+    // English - With action verbs (raid, fight, etc.)
+    // "When can we raid Lady Dalia?"
+    /(?:when|what\s+time)\s+(?:can\s+we|do\s+we|will\s+we)\s+(?:raid|fight|kill|hunt)\s+(.+?)(?:\s*\??\s*$)/i,
+
+    // "Raid time for Baron Braudmore"
+    /(?:raid|fight|kill|hunt)\s+(?:time|schedule)\s+(?:for\s+)?(.+?)(?:\s*\??\s*$)/i,
 
     // Tagalog - Specific boss patterns
+    // "Kailan Lady Dalia lalabas"
     /^(?:kailan|kalian|kelan)\s+(?:ang\s+)?(.+?)\s+(?:spawn|lalabas|lilitaw|darating)/i,
-    /^(?:kailan|kalian)\s+(?:mag|ma)?(?:spawn|lalabas|lilitaw)\s+(?:ang\s+)?(.+)/i,
-    /^predict\s+(?:spawn\s+)?(.+)/i,
+
+    // "Kailan mag-spawn ang Baron Braudmore"
+    /^(?:kailan|kalian)\s+(?:mag|ma)?(?:spawn|lalabas|lilitaw)\s+(?:ang\s+)?(.+?)(?:\s*\??\s*$)/i,
+
+    // "Kailan natin raid si Lady Dalia"
+    /^(?:kailan|kelan)\s+(?:natin\s+)?(?:raid|laban|patay)\s+(?:si\s+)?(.+?)(?:\s*\??\s*$)/i,
+
+    // "Predict Lady Dalia"
+    /^predict\s+(?:spawn\s+)?(.+?)(?:\s*\??\s*$)/i,
 
     // Taglish - Specific boss patterns
+    // "When ba Lady Dalia spawn"
     /^(?:when|kailan)\s+(?:ba|po|naman)\s+(?:ang\s+)?(.+?)\s+(?:spawn|lalabas)/i,
-    /^(.+?)\s+spawn\s+(?:ba|po|naman)/i,
+
+    // "Baron Braudmore spawn ba"
+    /^(.+?)\s+spawn\s+(?:ba|po|naman|time)/i,
+
+    // "Kelan ba raid si Lady Dalia"
+    /(?:kelan|kailan)\s+(?:ba|naman|po)\s+(?:raid|laban)\s+(?:si\s+)?(.+?)(?:\s*\??\s*$)/i,
 
     // ═══════════════════════════════════════════════════════════════════════
     // GENERIC NEXT SPAWN PREDICTIONS (Lower Priority - Fallback)
