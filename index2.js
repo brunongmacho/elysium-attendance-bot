@@ -4171,9 +4171,17 @@ client.on(Events.MessageCreate, async (message) => {
       /(?:you\s+(?:suck|are\s+(?:bad|trash|garbage|useless|stupid|dumb|weak))|bot\s+(?:sucks|is\s+bad|trash|useless|broken|stupid|bano|tanga|bobo)|your\s+(?:bot|system|code)\s+(?:sucks|trash|broken|pangit|bano)|worst\s+bot|trash\s+bot|useless\s+bot|bano\s+bot|tanga\s+bot|bot\s+mo\s+(?:bano|bobo|tanga|walang\s+kwenta)|buggy|laggy|error|broken|malfunction|crash|shit\s+bot)/i.test(contentLower) ||
       /(?:gago\s+ka|ulol\s+ka|bobo\s+ka|tanga\s+ka|supot\s+ka|bano\s+ka|engot\s+ka|gunggong\s+ka|abnoy\s+ka|timang\s+ka|hangal\s+ka|nakakahiya\s+ka|kahihiyan|basura\s+ka|dumi\s+ka|kingina\s+mo|tangina\s+mo|gago\s+ka\s+pala|mas\s+(?:bobo|tanga|bano|mahina|pangit)\s+ka\s+pa|parang\s+(?:bobo|tanga|bano|ungas|gago)\s+ka|mukhang\s+(?:bobo|tanga|gago|ungas|tae))/i.test(contentLower);
 
-    if ((hasInsult || isReplyToBot) && (botMentioned || isReplyToBot) && nlpLearningSystem) {
-      // This is likely an insult/roast or reply to bot - handle as conversation, not command
-      console.log(`🔥 [NLP] Detected ${hasInsult ? 'insult pattern' : 'reply to bot'} - skipping command interpretation`);
+    // Check for laughter/reaction (common response to roasts)
+    // Matches: HAHAHA, HEHEHEHE, LOL, LMAO, etc. (with 4+ repetitions for long laughs)
+    const isLaughter = /^(?:[ha]{4,}|[he]{4,}|[hi]{4,}|[ho]{4,}|lol+|lmao+|rofl+|aha+ha+|ehe+he+|hue+|kek+|jaja+|jeje+|huhu+|wkwk+|😂+|🤣+|💀+|\s|!|\?|\.)*$/i.test(contentLower);
+
+    // Laughter only treated as conversation if replying to bot (common reaction to roasts)
+    const isLaughterReply = isLaughter && isReplyToBot;
+
+    if ((hasInsult || isReplyToBot || isLaughterReply) && (botMentioned || isReplyToBot || isLaughterReply) && nlpLearningSystem) {
+      // This is likely an insult/roast/laughter or reply to bot - handle as conversation, not command
+      const detectionReason = isLaughterReply ? 'laughter reply' : (hasInsult ? 'insult pattern' : 'reply to bot');
+      console.log(`🔥 [NLP] Detected ${detectionReason} - skipping command interpretation`);
       const conversationResponse = await nlpLearningSystem.handleConversation(message);
 
       if (conversationResponse) {
