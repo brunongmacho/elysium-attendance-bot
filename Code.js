@@ -188,6 +188,9 @@ function doPost(e) {
     // Milestone Tracking actions
     if (action === 'getMilestoneHistory') return getMilestoneHistory(data);
     if (action === 'updateMilestoneHistory') return updateMilestoneHistory(data);
+    if (action === 'saveMilestoneQueue') return saveMilestoneQueue(data);
+    if (action === 'loadMilestoneQueue') return loadMilestoneQueue(data);
+    if (action === 'clearMilestoneQueue') return clearMilestoneQueue(data);
 
     // Enhanced Milestone Tracking actions (new milestone types)
     if (action === 'ensureMilestoneTabsExist') return ensureMilestoneTabsExist();
@@ -4652,6 +4655,219 @@ function updateMilestoneHistory(data) {
 
   } catch (err) {
     Logger.log('❌ Error updating milestone history: ' + err.toString());
+    return createResponse('error', err.toString(), { success: false });
+  }
+}
+
+// ===========================================================
+// MILESTONE QUEUE PERSISTENCE - SURVIVE BOT RESTARTS
+// ===========================================================
+
+/**
+ * Ensure MilestoneQueue sheet exists
+ * @returns {Sheet} The MilestoneQueue sheet
+ */
+function ensureMilestoneQueueSheet() {
+  const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+  let sheet = ss.getSheetByName('MilestoneQueue');
+
+  if (!sheet) {
+    Logger.log('📝 Creating MilestoneQueue sheet...');
+    sheet = ss.insertSheet('MilestoneQueue');
+    sheet.appendRow([
+      'queueType',      // attendance, bidding, engagement, hybrid, etc.
+      'nickname',
+      'milestone',
+      'totalPoints',
+      'lastMilestone',
+      'queuedAt',
+      'discordUserId',  // for mentions
+      'extraData'       // JSON string for additional data (hybrid combos, etc.)
+    ]);
+    sheet.getRange('1:1').setFontWeight('bold').setBackground('#e0e0e0');
+    sheet.hideSheet();
+    Logger.log('✅ MilestoneQueue sheet created');
+  }
+
+  return sheet;
+}
+
+/**
+ * Save milestone queue to Google Sheets
+ * @param {Object} data - Contains milestoneQueue object with all types
+ * @returns {Object} Response with success status
+ */
+function saveMilestoneQueue(data) {
+  try {
+    const { milestoneQueue } = data;
+
+    if (!milestoneQueue) {
+      return createResponse('error', 'Missing milestoneQueue parameter');
+    }
+
+    Logger.log('💾 Saving milestone queue to Google Sheets...');
+
+    const sheet = ensureMilestoneQueueSheet();
+
+    // Clear existing data (except header)
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, 8).clear();
+    }
+
+    // Convert queue to rows
+    const rows = [];
+    let totalQueued = 0;
+
+    for (const [queueType, items] of Object.entries(milestoneQueue)) {
+      if (!Array.isArray(items) || items.length === 0) continue;
+
+      for (const item of items) {
+        rows.push([
+          queueType,
+          item.nickname || '',
+          item.milestone || 0,
+          item.totalPoints || 0,
+          item.lastMilestone || 0,
+          item.queuedAt || new Date().toISOString(),
+          item.discordMember?.id || '',
+          JSON.stringify(item.extraData || {})
+        ]);
+        totalQueued++;
+      }
+    }
+
+    // Write to sheet if we have data
+    if (rows.length > 0) {
+      sheet.getRange(2, 1, rows.length, 8).setValues(rows);
+      Logger.log(`✅ Saved ${totalQueued} queued milestones to Google Sheets`);
+    } else {
+      Logger.log('✅ Milestone queue is empty (nothing to save)');
+    }
+
+    return createResponse('ok', `Saved ${totalQueued} queued milestones`, {
+      success: true,
+      queuedCount: totalQueued
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error saving milestone queue: ' + err.toString());
+    return createResponse('error', err.toString(), { success: false });
+  }
+}
+
+/**
+ * Load milestone queue from Google Sheets
+ * @returns {Object} Response with milestoneQueue object
+ */
+function loadMilestoneQueue(data) {
+  try {
+    Logger.log('📥 Loading milestone queue from Google Sheets...');
+
+    const sheet = ensureMilestoneQueueSheet();
+    const lastRow = sheet.getLastRow();
+
+    if (lastRow < 2) {
+      Logger.log('✅ No queued milestones found (starting fresh)');
+      return createResponse('ok', 'No queued milestones', {
+        milestoneQueue: {
+          attendance: [],
+          bidding: [],
+          engagement: [],
+          hybrid: [],
+          guildWide: [],
+          spawnStreak: [],
+          calendarStreak: [],
+          tenure: [],
+          perfectWeek: []
+        }
+      });
+    }
+
+    // Read all queued items
+    const data_values = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+
+    const milestoneQueue = {
+      attendance: [],
+      bidding: [],
+      engagement: [],
+      hybrid: [],
+      guildWide: [],
+      spawnStreak: [],
+      calendarStreak: [],
+      tenure: [],
+      perfectWeek: []
+    };
+
+    for (let i = 0; i < data_values.length; i++) {
+      const row = data_values[i];
+      const queueType = row[0];
+
+      if (!milestoneQueue[queueType]) {
+        Logger.log(`⚠️ Unknown queue type: ${queueType}, skipping`);
+        continue;
+      }
+
+      const item = {
+        nickname: row[1],
+        milestone: parseInt(row[2]) || 0,
+        totalPoints: parseInt(row[3]) || 0,
+        lastMilestone: parseInt(row[4]) || 0,
+        queuedAt: row[5],
+        discordMember: row[6] ? { id: row[6] } : null,
+        extraData: row[7] ? JSON.parse(row[7]) : {}
+      };
+
+      milestoneQueue[queueType].push(item);
+    }
+
+    const totalLoaded = Object.values(milestoneQueue).reduce((sum, arr) => sum + arr.length, 0);
+    Logger.log(`✅ Loaded ${totalLoaded} queued milestones from Google Sheets`);
+
+    return createResponse('ok', `Loaded ${totalLoaded} queued milestones`, {
+      milestoneQueue: milestoneQueue
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error loading milestone queue: ' + err.toString());
+    return createResponse('error', err.toString(), {
+      milestoneQueue: {
+        attendance: [],
+        bidding: [],
+        engagement: [],
+        hybrid: [],
+        guildWide: [],
+        spawnStreak: [],
+        calendarStreak: [],
+        tenure: [],
+        perfectWeek: []
+      }
+    });
+  }
+}
+
+/**
+ * Clear milestone queue from Google Sheets (after successful batch announcement)
+ * @returns {Object} Response with success status
+ */
+function clearMilestoneQueue(data) {
+  try {
+    Logger.log('🧹 Clearing milestone queue from Google Sheets...');
+
+    const sheet = ensureMilestoneQueueSheet();
+    const lastRow = sheet.getLastRow();
+
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, 8).clear();
+      Logger.log(`✅ Cleared milestone queue (${lastRow - 1} items removed)`);
+    } else {
+      Logger.log('✅ Milestone queue already empty');
+    }
+
+    return createResponse('ok', 'Milestone queue cleared', { success: true });
+
+  } catch (err) {
+    Logger.log('❌ Error clearing milestone queue: ' + err.toString());
     return createResponse('error', err.toString(), { success: false });
   }
 }
