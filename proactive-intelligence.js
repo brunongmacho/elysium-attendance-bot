@@ -69,10 +69,19 @@ const PROACTIVE_CONFIG = {
     inactiveDays: 14,                          // 14 days = inactive
     engagementWarning: 40,                     // <40/100 = at-risk
 
-    // Milestone Tiers (Tiered Channel Routing)
+    // Milestone Tiers - SEPARATE for Attendance vs Bidding
+    // Attendance: 1 point per boss spawn
+    // Bidding: Attendance × Boss Point Value (actual boss points: 1-3, average ~1.5-2)
     milestonePoints: {
-      major: [1000, 1500, 2000, 3000, 5000, 7500, 10000],  // Guild Announcements
-      minor: [100, 250, 500, 750]                          // Guild Chat
+      attendance: {
+        major: [1000, 1500, 2000, 3000, 5000, 7500, 10000],  // Guild Announcements
+        minor: [100, 250, 500, 750]                          // Guild Chat
+      },
+      bidding: {
+        // Roughly 2x attendance (boss points: 1pt=15 bosses, 2pt=10 bosses, 3pt=8 bosses, avg ~1.5-2x)
+        major: [2000, 3000, 4000, 6000, 10000, 15000, 20000],  // Guild Announcements
+        minor: [200, 500, 1000, 1500]                           // Guild Chat
+      }
     },
   },
 
@@ -756,15 +765,25 @@ class ProactiveIntelligence {
         return;
       }
 
-      // Define milestone tiers
-      const MILESTONES = PROACTIVE_CONFIG.thresholds.milestonePoints;
-      const allMilestones = [...MILESTONES.minor, ...MILESTONES.major].sort((a, b) => a - b);
-      console.log(`🎯 [PROACTIVE] Milestone thresholds: ${allMilestones.join(', ')}`);
+      // Define milestone tiers - SEPARATE for each type
+      const ATTENDANCE_MILESTONES = PROACTIVE_CONFIG.thresholds.milestonePoints.attendance;
+      const BIDDING_MILESTONES = PROACTIVE_CONFIG.thresholds.milestonePoints.bidding;
+
+      const attendanceMilestoneArray = [...ATTENDANCE_MILESTONES.minor, ...ATTENDANCE_MILESTONES.major].sort((a, b) => a - b);
+      const biddingMilestoneArray = [...BIDDING_MILESTONES.minor, ...BIDDING_MILESTONES.major].sort((a, b) => a - b);
+
+      console.log(`🎯 [PROACTIVE] Attendance milestones: ${attendanceMilestoneArray.join(', ')}`);
+      console.log(`💰 [PROACTIVE] Bidding milestones: ${biddingMilestoneArray.join(', ')}`);
 
       // Track stats
       let membersChecked = 0;
       let milestonesFound = 0;
-      let milestonesAnnounced = 0;
+
+      // Milestone grouping: { attendance: { 1000: [achiever1, achiever2], 500: [...] }, bidding: {...} }
+      const milestoneGroups = {
+        attendance: {},
+        bidding: {}
+      };
 
       // Check ATTENDANCE milestones
       console.log('🔍 [PROACTIVE] Checking ATTENDANCE milestones...');
@@ -781,13 +800,13 @@ class ProactiveIntelligence {
 
         // Find LATEST milestone they've crossed
         let latestMilestone = null;
-        for (const milestone of allMilestones) {
+        for (const milestone of attendanceMilestoneArray) {
           if (totalPoints >= milestone && milestone > lastMilestone) {
             latestMilestone = milestone;
           }
         }
 
-        // If found new milestone, announce it
+        // If found new milestone, ADD TO GROUP (don't announce yet)
         if (latestMilestone) {
           milestonesFound++;
           console.log(`🎉 [PROACTIVE] NEW ATTENDANCE MILESTONE!`);
@@ -796,40 +815,22 @@ class ProactiveIntelligence {
           console.log(`   - Current Points: ${totalPoints}`);
           console.log(`   - New Milestone: ${latestMilestone}`);
 
-          try {
-            // Find Discord user for mention
-            const discordMember = await this.findGuildMember(guild, nickname);
+          // Find Discord user for mention
+          const discordMember = await this.findGuildMember(guild, nickname);
 
-            // Determine channel
-            const channel = MILESTONES.major.includes(latestMilestone)
-              ? guildAnnouncementChannel
-              : guildChatChannel;
-
-            // Create celebration embed
-            const embed = await this.createMilestoneEmbed(
-              member,
-              latestMilestone,
-              totalPoints,
-              lastMilestone,
-              'attendance',
-              discordMember
-            );
-
-            await channel.send({ embeds: [embed] });
-
-            // Update Google Sheets
-            await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
-              nickname: `${nickname}-attendance`,
-              milestone: latestMilestone,
-              totalPoints: totalPoints,
-              milestoneType: 'attendance'
-            });
-
-            milestonesAnnounced++;
-            console.log(`   - ✅ ATTENDANCE milestone announced in ${channel.name}`);
-          } catch (error) {
-            console.error(`   - ❌ Error announcing milestone:`, error);
+          // Initialize group if needed
+          if (!milestoneGroups.attendance[latestMilestone]) {
+            milestoneGroups.attendance[latestMilestone] = [];
           }
+
+          // Add to group
+          milestoneGroups.attendance[latestMilestone].push({
+            member,
+            nickname,
+            totalPoints,
+            lastMilestone,
+            discordMember
+          });
         }
       }
 
@@ -847,13 +848,13 @@ class ProactiveIntelligence {
 
         // Find LATEST milestone they've crossed
         let latestMilestone = null;
-        for (const milestone of allMilestones) {
+        for (const milestone of biddingMilestoneArray) {
           if (totalPoints >= milestone && milestone > lastMilestone) {
             latestMilestone = milestone;
           }
         }
 
-        // If found new milestone, announce it
+        // If found new milestone, ADD TO GROUP (don't announce yet)
         if (latestMilestone) {
           milestonesFound++;
           console.log(`🎉 [PROACTIVE] NEW BIDDING MILESTONE!`);
@@ -862,40 +863,104 @@ class ProactiveIntelligence {
           console.log(`   - Total Points: ${totalPoints} (Left: ${bidData.pointsLeft}, Consumed: ${bidData.pointsConsumed})`);
           console.log(`   - New Milestone: ${latestMilestone}`);
 
-          try {
-            // Find Discord user for mention
-            const discordMember = await this.findGuildMember(guild, nickname);
+          // Find Discord user for mention
+          const discordMember = await this.findGuildMember(guild, nickname);
 
-            // Determine channel
-            const channel = MILESTONES.major.includes(latestMilestone)
-              ? guildAnnouncementChannel
-              : guildChatChannel;
+          // Initialize group if needed
+          if (!milestoneGroups.bidding[latestMilestone]) {
+            milestoneGroups.bidding[latestMilestone] = [];
+          }
 
-            // Create celebration embed
-            const embed = await this.createMilestoneEmbed(
-              { username: nickname, biddingPoints: totalPoints },
-              latestMilestone,
-              totalPoints,
-              lastMilestone,
-              'bidding',
-              discordMember
-            );
+          // Add to group
+          milestoneGroups.bidding[latestMilestone].push({
+            member: { username: nickname, biddingPoints: totalPoints },
+            nickname,
+            totalPoints,
+            lastMilestone,
+            discordMember
+          });
+        }
+      }
 
-            await channel.send({ embeds: [embed] });
+      // ═════════════════════════════════════════════════════════════════════
+      // ANNOUNCE GROUPED MILESTONES (One embed per unique milestone)
+      // ═════════════════════════════════════════════════════════════════════
 
-            // Update Google Sheets
+      let milestonesAnnounced = 0;
+
+      // Announce ATTENDANCE milestones
+      console.log('📢 [PROACTIVE] Announcing ATTENDANCE milestone groups...');
+      for (const [milestoneStr, achievers] of Object.entries(milestoneGroups.attendance)) {
+        const milestone = parseInt(milestoneStr);
+
+        try {
+          // Determine channel
+          const channel = ATTENDANCE_MILESTONES.major.includes(milestone)
+            ? guildAnnouncementChannel
+            : guildChatChannel;
+
+          // Create grouped embed
+          const embed = await this.createGroupedMilestoneEmbed(
+            achievers,
+            milestone,
+            'attendance',
+            attendanceMilestoneArray
+          );
+
+          await channel.send({ embeds: [embed] });
+
+          // Batch update Google Sheets for all achievers
+          for (const achiever of achievers) {
             await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
-              nickname: `${nickname}-bidding`,
-              milestone: latestMilestone,
-              totalPoints: totalPoints,
+              nickname: `${achiever.nickname}-attendance`,
+              milestone: milestone,
+              totalPoints: achiever.totalPoints,
+              milestoneType: 'attendance'
+            });
+          }
+
+          milestonesAnnounced++;
+          console.log(`   - ✅ ${achievers.length} members at ${milestone} ATTENDANCE milestone → ${channel.name}`);
+        } catch (error) {
+          console.error(`   - ❌ Error announcing ATTENDANCE milestone ${milestone}:`, error);
+        }
+      }
+
+      // Announce BIDDING milestones
+      console.log('📢 [PROACTIVE] Announcing BIDDING milestone groups...');
+      for (const [milestoneStr, achievers] of Object.entries(milestoneGroups.bidding)) {
+        const milestone = parseInt(milestoneStr);
+
+        try {
+          // Determine channel
+          const channel = BIDDING_MILESTONES.major.includes(milestone)
+            ? guildAnnouncementChannel
+            : guildChatChannel;
+
+          // Create grouped embed
+          const embed = await this.createGroupedMilestoneEmbed(
+            achievers,
+            milestone,
+            'bidding',
+            biddingMilestoneArray
+          );
+
+          await channel.send({ embeds: [embed] });
+
+          // Batch update Google Sheets for all achievers
+          for (const achiever of achievers) {
+            await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
+              nickname: `${achiever.nickname}-bidding`,
+              milestone: milestone,
+              totalPoints: achiever.totalPoints,
               milestoneType: 'bidding'
             });
-
-            milestonesAnnounced++;
-            console.log(`   - ✅ BIDDING milestone announced in ${channel.name}`);
-          } catch (error) {
-            console.error(`   - ❌ Error announcing milestone:`, error);
           }
+
+          milestonesAnnounced++;
+          console.log(`   - ✅ ${achievers.length} members at ${milestone} BIDDING milestone → ${channel.name}`);
+        } catch (error) {
+          console.error(`   - ❌ Error announcing BIDDING milestone ${milestone}:`, error);
         }
       }
 
@@ -903,7 +968,7 @@ class ProactiveIntelligence {
       console.log(`🤖 [PROACTIVE] Milestone check complete`);
       console.log(`   - Members checked: ${membersChecked}`);
       console.log(`   - New milestones found: ${milestonesFound}`);
-      console.log(`   - Milestones announced: ${milestonesAnnounced}`);
+      console.log(`   - Unique milestone announcements: ${milestonesAnnounced}`);
       console.log('🤖 [PROACTIVE] ═══════════════════════════════════════');
 
     } catch (error) {
@@ -953,15 +1018,11 @@ class ProactiveIntelligence {
    * @param {number} lastMilestone - Previous milestone
    * @param {string} milestoneType - 'attendance' or 'bidding'
    * @param {GuildMember|null} discordMember - Discord member for mention
+   * @param {Array<number>} milestoneArray - Array of milestone thresholds for this type
    */
-  async createMilestoneEmbed(member, milestone, totalPoints, lastMilestone, milestoneType, discordMember) {
-    // Calculate next milestone
-    const allMilestones = [
-      ...PROACTIVE_CONFIG.thresholds.milestonePoints.minor,
-      ...PROACTIVE_CONFIG.thresholds.milestonePoints.major
-    ].sort((a, b) => a - b);
-
-    const nextMilestone = allMilestones.find(m => m > milestone);
+  async createMilestoneEmbed(member, milestone, totalPoints, lastMilestone, milestoneType, discordMember, milestoneArray) {
+    // Calculate next milestone using the provided milestone array
+    const nextMilestone = milestoneArray.find(m => m > milestone);
 
     // Pick random components from variety system
     const opening = this.pickRandom(this.getMilestoneOpenings());
@@ -969,7 +1030,8 @@ class ProactiveIntelligence {
     const closing = this.getMilestoneClosing(nextMilestone, totalPoints);
 
     // Determine color based on milestone type
-    const isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.major.includes(milestone);
+    const milestoneConfig = PROACTIVE_CONFIG.thresholds.milestonePoints[milestoneType];
+    const isMajor = milestoneConfig.major.includes(milestone);
     let color;
     if (milestoneType === 'attendance') {
       color = isMajor ? 0xFFD700 : 0x00FF00; // Gold or Green for attendance
@@ -990,6 +1052,73 @@ class ProactiveIntelligence {
       )
       .setFooter({
         text: `${typeInfo.emoji} ${typeInfo.label} | Milestone: ${milestone} | Total: ${totalPoints} | Previous: ${lastMilestone || 0}`
+      })
+      .setTimestamp();
+  }
+
+  /**
+   * Create GROUPED milestone embed (multiple achievers, one announcement)
+   * Used when 2+ members hit the same milestone at the same time
+   * @param {Array} achievers - Array of achiever objects { member, nickname, totalPoints, discordMember }
+   * @param {number} milestone - Milestone reached
+   * @param {string} milestoneType - 'attendance' or 'bidding'
+   * @param {Array<number>} milestoneArray - Array of milestone thresholds for this type
+   */
+  async createGroupedMilestoneEmbed(achievers, milestone, milestoneType, milestoneArray) {
+    // Calculate next milestone
+    const nextMilestone = milestoneArray.find(m => m > milestone);
+
+    // Pick random opening
+    const opening = this.pickRandom(this.getMilestoneOpenings());
+
+    // Determine color based on milestone type
+    const milestoneConfig = PROACTIVE_CONFIG.thresholds.milestonePoints[milestoneType];
+    const isMajor = milestoneConfig.major.includes(milestone);
+    let color;
+    if (milestoneType === 'attendance') {
+      color = isMajor ? 0xFFD700 : 0x00FF00; // Gold or Green for attendance
+    } else {
+      color = isMajor ? 0xFF6B35 : 0x4ECDC4; // Orange or Cyan for bidding
+    }
+
+    // Milestone type emoji and label
+    const typeInfo = milestoneType === 'attendance'
+      ? { emoji: '🎯', label: 'Total Attendance Points' }
+      : { emoji: '💰', label: 'Total Bidding Points' };
+
+    // Sort achievers by total points (descending - highest first)
+    const sortedAchievers = achievers.sort((a, b) => b.totalPoints - a.totalPoints);
+
+    // Create achiever list with mentions
+    const achieverList = sortedAchievers.map(achiever => {
+      const userMention = achiever.discordMember
+        ? `<@${achiever.discordMember.id}>`
+        : `**${achiever.nickname}**`;
+      return `${typeInfo.emoji} ${userMention} - **${achiever.totalPoints.toLocaleString()}** total`;
+    }).join('\n');
+
+    // Announcement message for groups
+    const groupAnnouncements = [
+      `**${achievers.length} members** just hit the **${milestone.toLocaleString()} ${typeInfo.label}** milestone! 🎉`,
+      `Grabe! **${achievers.length} guild members** reached **${milestone.toLocaleString()} ${typeInfo.label}!** 🔥`,
+      `Saludo sa **${achievers.length} achievers** na nag-**${milestone.toLocaleString()} ${typeInfo.label}!** 👑`,
+      `**${achievers.length} legends** unlocked **${milestone.toLocaleString()} ${typeInfo.label}!** Lakasss! ⚡`,
+      `Tuloy-tuloy! **${achievers.length} members** conquered **${milestone.toLocaleString()} ${typeInfo.label}!** 💪`,
+    ];
+
+    const announcement = this.pickRandom(groupAnnouncements);
+
+    // Closing with next goal
+    const closing = this.getMilestoneClosing(nextMilestone, milestone);
+
+    return new EmbedBuilder()
+      .setColor(color)
+      .setTitle(`${opening}`)
+      .setDescription(
+        `${announcement}\n\n${achieverList}\n\n${closing}`
+      )
+      .setFooter({
+        text: `${typeInfo.emoji} ${typeInfo.label} | Milestone: ${milestone.toLocaleString()} | ${achievers.length} Achievers`
       })
       .setTimestamp();
   }
