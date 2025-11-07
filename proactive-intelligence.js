@@ -919,7 +919,7 @@ class ProactiveIntelligence {
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'attendance'
-            })
+            }, { silent: true }) // Silent mode: no individual API logs
           ));
 
           const updateDuration = ((Date.now() - updateStartTime) / 1000).toFixed(1);
@@ -961,7 +961,7 @@ class ProactiveIntelligence {
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'bidding'
-            })
+            }, { silent: true }) // Silent mode: no individual API logs
           ));
 
           const updateDuration = ((Date.now() - updateStartTime) / 1000).toFixed(1);
