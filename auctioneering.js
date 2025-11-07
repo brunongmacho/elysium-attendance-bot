@@ -2846,6 +2846,18 @@ async function handleCancelItem(message) {
     return await message.reply(`${EMOJI.ERROR} No active auction`);
   }
 
+  const cancelConfirmBtn = new ButtonBuilder()
+    .setCustomId(`cancelitem_confirm_${message.author.id}_${Date.now()}`)
+    .setLabel('✅ Yes, Cancel Item')
+    .setStyle(ButtonStyle.Danger);
+
+  const cancelCancelBtn = new ButtonBuilder()
+    .setCustomId(`cancelitem_cancel_${message.author.id}_${Date.now()}`)
+    .setLabel('❌ No, Keep Item')
+    .setStyle(ButtonStyle.Secondary);
+
+  const cancelRow = new ActionRowBuilder().addComponents(cancelConfirmBtn, cancelCancelBtn);
+
   const canMsg = await message.reply({
     embeds: [
       new EmbedBuilder()
@@ -2854,28 +2866,26 @@ async function handleCancelItem(message) {
         .setDescription(
           `**${auctionState.currentItem.item}**\n\nRefund all locked points?`
         )
-        .setFooter({ text: `${EMOJI.SUCCESS} yes / ${EMOJI.ERROR} no` }),
+        .setFooter({ text: 'Click a button below to confirm' }),
     ],
+    components: [cancelRow],
   });
 
-  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
-  await Promise.all([
-    canMsg.react(EMOJI.SUCCESS),
-    canMsg.react(EMOJI.ERROR)
-  ]);
+  const cancelCollector = canMsg.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: TIMEOUTS.CONFIRMATION,
+    filter: i => i.user.id === message.author.id
+  });
 
-  try {
-    const canCol = await canMsg.awaitReactions({
-      filter: (r, u) =>
-        [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
-        u.id === message.author.id,
-      max: 1,
-      time: TIMEOUTS.CONFIRMATION,
-      errors: ["time"],
-    });
+  cancelCollector.on('collect', async (interaction) => {
+    const isConfirm = interaction.customId.startsWith('cancelitem_confirm_');
 
-    if (canCol.first().emoji.name === EMOJI.SUCCESS) {
-      await errorHandler.safeRemoveReactions(canMsg, 'reaction removal');
+    const disabledCancelRow = new ActionRowBuilder().addComponents(
+      ButtonBuilder.from(cancelConfirmBtn).setDisabled(true),
+      ButtonBuilder.from(cancelCancelBtn).setDisabled(true)
+    );
+
+    if (isConfirm) {
       // Unlock points for current bidder
       const biddingState = biddingModule.getBiddingState();
       if (auctionState.currentItem && auctionState.currentItem.curWin) {
@@ -2941,12 +2951,44 @@ async function handleCancelItem(message) {
       auctionState.timers.nextItem = setTimeout(async () => {
         await auctionNextItem(message.client, cfg, parentChannel);
       }, 20000);
+
+      const successEmbed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle(`${EMOJI.SUCCESS} Item Cancelled`)
+        .setDescription('Item cancelled and points refunded')
+        .setTimestamp();
+
+      await interaction.update({ embeds: [successEmbed], components: [disabledCancelRow] });
+      cancelCollector.stop();
     } else {
-      await errorHandler.safeRemoveReactions(canMsg, 'reaction removal');
+      // User kept the item
+      const keepEmbed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle(`${EMOJI.SUCCESS} Item Kept`)
+        .setDescription('Item cancellation aborted')
+        .setTimestamp();
+
+      await interaction.update({ embeds: [keepEmbed], components: [disabledCancelRow] });
+      cancelCollector.stop();
     }
-  } catch (e) {
-    await errorHandler.safeRemoveReactions(canMsg, 'reaction removal');
-  }
+  });
+
+  cancelCollector.on('end', async (collected, reason) => {
+    if (reason === 'time' && collected.size === 0) {
+      const disabledCancelRow = new ActionRowBuilder().addComponents(
+        ButtonBuilder.from(cancelConfirmBtn).setDisabled(true),
+        ButtonBuilder.from(cancelCancelBtn).setDisabled(true)
+      );
+
+      const timeoutEmbed = new EmbedBuilder()
+        .setColor(0xff0000)
+        .setTitle(`${EMOJI.ERROR} Timed Out`)
+        .setDescription('Confirmation expired')
+        .setTimestamp();
+
+      await canMsg.edit({ embeds: [timeoutEmbed], components: [disabledCancelRow] }).catch(() => {});
+    }
+  });
 }
 
 /**
@@ -2978,6 +3020,18 @@ async function handleSkipItem(message) {
     return await message.reply(`${EMOJI.ERROR} No active auction`);
   }
 
+  const skipConfirmBtn = new ButtonBuilder()
+    .setCustomId(`skipitem_confirm_${message.author.id}_${Date.now()}`)
+    .setLabel('✅ Yes, Skip Item')
+    .setStyle(ButtonStyle.Primary);
+
+  const skipCancelBtn = new ButtonBuilder()
+    .setCustomId(`skipitem_cancel_${message.author.id}_${Date.now()}`)
+    .setLabel('❌ No, Continue')
+    .setStyle(ButtonStyle.Secondary);
+
+  const skipRow = new ActionRowBuilder().addComponents(skipConfirmBtn, skipCancelBtn);
+
   const skpMsg = await message.reply({
     embeds: [
       new EmbedBuilder()
@@ -2986,28 +3040,26 @@ async function handleSkipItem(message) {
         .setDescription(
           `**${auctionState.currentItem.item}**\n\nMark as no sale, move to next?`
         )
-        .setFooter({ text: `${EMOJI.SUCCESS} yes / ${EMOJI.ERROR} no` }),
+        .setFooter({ text: 'Click a button below to confirm' }),
     ],
+    components: [skipRow],
   });
 
-  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
-  await Promise.all([
-    skpMsg.react(EMOJI.SUCCESS),
-    skpMsg.react(EMOJI.ERROR)
-  ]);
+  const skipCollector = skpMsg.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: TIMEOUTS.CONFIRMATION,
+    filter: i => i.user.id === message.author.id
+  });
 
-  try {
-    const skpCol = await skpMsg.awaitReactions({
-      filter: (r, u) =>
-        [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
-        u.id === message.author.id,
-      max: 1,
-      time: TIMEOUTS.CONFIRMATION,
-      errors: ["time"],
-    });
+  skipCollector.on('collect', async (interaction) => {
+    const isConfirm = interaction.customId.startsWith('skipitem_confirm_');
 
-    if (skpCol.first().emoji.name === EMOJI.SUCCESS) {
-      await errorHandler.safeRemoveReactions(skpMsg, 'reaction removal');
+    const disabledSkipRow = new ActionRowBuilder().addComponents(
+      ButtonBuilder.from(skipConfirmBtn).setDisabled(true),
+      ButtonBuilder.from(skipCancelBtn).setDisabled(true)
+    );
+
+    if (isConfirm) {
       // Unlock points for current bidder
       const biddingState = biddingModule.getBiddingState();
       if (auctionState.currentItem && auctionState.currentItem.curWin) {
@@ -3071,12 +3123,44 @@ async function handleSkipItem(message) {
       auctionState.timers.nextItem = setTimeout(async () => {
         await auctionNextItem(message.client, cfg, parentChannel);
       }, 20000);
+
+      const successEmbed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle(`${EMOJI.SUCCESS} Item Skipped`)
+        .setDescription('Item skipped (no sale)')
+        .setTimestamp();
+
+      await interaction.update({ embeds: [successEmbed], components: [disabledSkipRow] });
+      skipCollector.stop();
     } else {
-      await errorHandler.safeRemoveReactions(skpMsg, 'reaction removal');
+      // User continued
+      const continueEmbed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle(`${EMOJI.SUCCESS} Continuing`)
+        .setDescription('Item skip cancelled')
+        .setTimestamp();
+
+      await interaction.update({ embeds: [continueEmbed], components: [disabledSkipRow] });
+      skipCollector.stop();
     }
-  } catch (e) {
-    await errorHandler.safeRemoveReactions(skpMsg, 'reaction removal');
-  }
+  });
+
+  skipCollector.on('end', async (collected, reason) => {
+    if (reason === 'time' && collected.size === 0) {
+      const disabledSkipRow = new ActionRowBuilder().addComponents(
+        ButtonBuilder.from(skipConfirmBtn).setDisabled(true),
+        ButtonBuilder.from(skipCancelBtn).setDisabled(true)
+      );
+
+      const timeoutEmbed = new EmbedBuilder()
+        .setColor(0xff0000)
+        .setTitle(`${EMOJI.ERROR} Timed Out`)
+        .setDescription('Confirmation expired')
+        .setTimestamp();
+
+      await skpMsg.edit({ embeds: [timeoutEmbed], components: [disabledSkipRow] }).catch(() => {});
+    }
+  });
 }
 
 /**
@@ -3109,6 +3193,18 @@ async function handleForceSubmitResults(message, config, biddingModule) {
     return await message.reply(`${EMOJI.ERROR} No results to submit`);
   }
 
+  const submitButton = new ButtonBuilder()
+    .setCustomId(`forcesubmit_confirm_${message.author.id}_${Date.now()}`)
+    .setLabel('✅ Submit Results')
+    .setStyle(ButtonStyle.Success);
+
+  const cancelButton = new ButtonBuilder()
+    .setCustomId(`forcesubmit_cancel_${message.author.id}_${Date.now()}`)
+    .setLabel('❌ Cancel')
+    .setStyle(ButtonStyle.Secondary);
+
+  const row = new ActionRowBuilder().addComponents(submitButton, cancelButton);
+
   const fsMsg = await message.reply({
     embeds: [
       new EmbedBuilder()
@@ -3122,37 +3218,66 @@ async function handleForceSubmitResults(message, config, biddingModule) {
             .join("\n"),
           inline: false,
         })
-        .setFooter({ text: `${EMOJI.SUCCESS} submit / ${EMOJI.ERROR} cancel` }),
+        .setFooter({ text: 'Click a button below to confirm' }),
     ],
+    components: [row],
   });
 
-  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
-  await Promise.all([
-    fsMsg.react(EMOJI.SUCCESS),
-    fsMsg.react(EMOJI.ERROR)
-  ]);
+  const collector = fsMsg.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: TIMEOUTS.CONFIRMATION,
+    filter: i => i.user.id === message.author.id
+  });
 
-  try {
-    const fsCol = await fsMsg.awaitReactions({
-      filter: (r, u) =>
-        [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
-        u.id === message.author.id,
-      max: 1,
-      time: TIMEOUTS.CONFIRMATION,
-      errors: ["time"],
-    });
+  collector.on('collect', async (interaction) => {
+    const isConfirm = interaction.customId.startsWith('forcesubmit_confirm_');
 
-    if (fsCol.first().emoji.name === EMOJI.SUCCESS) {
-      await errorHandler.safeRemoveReactions(fsMsg, 'reaction removal');
+    const disabledRow = new ActionRowBuilder().addComponents(
+      ButtonBuilder.from(submitButton).setDisabled(true),
+      ButtonBuilder.from(cancelButton).setDisabled(true)
+    );
+
+    if (isConfirm) {
       await biddingModule.submitSessionTally(config, auctionState.sessionItems);
-      await message.reply(`${EMOJI.SUCCESS} Results submitted!`);
       auctionState.sessionItems = [];
+
+      const successEmbed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle(`${EMOJI.SUCCESS} Results Submitted`)
+        .setDescription('Results submitted successfully!')
+        .setTimestamp();
+
+      await interaction.update({ embeds: [successEmbed], components: [disabledRow] });
+      collector.stop();
     } else {
-      await errorHandler.safeRemoveReactions(fsMsg, 'reaction removal');
+      // User cancelled
+      const cancelEmbed = new EmbedBuilder()
+        .setColor(0xff0000)
+        .setTitle(`${EMOJI.ERROR} Cancelled`)
+        .setDescription('Force submit cancelled')
+        .setTimestamp();
+
+      await interaction.update({ embeds: [cancelEmbed], components: [disabledRow] });
+      collector.stop();
     }
-  } catch (e) {
-    await errorHandler.safeRemoveReactions(fsMsg, 'reaction removal');
-  }
+  });
+
+  collector.on('end', async (collected, reason) => {
+    if (reason === 'time' && collected.size === 0) {
+      const disabledRow = new ActionRowBuilder().addComponents(
+        ButtonBuilder.from(submitButton).setDisabled(true),
+        ButtonBuilder.from(cancelButton).setDisabled(true)
+      );
+
+      const timeoutEmbed = new EmbedBuilder()
+        .setColor(0xff0000)
+        .setTitle(`${EMOJI.ERROR} Timed Out`)
+        .setDescription('Confirmation expired')
+        .setTimestamp();
+
+      await fsMsg.edit({ embeds: [timeoutEmbed], components: [disabledRow] }).catch(() => {});
+    }
+  });
 }
 
 /**

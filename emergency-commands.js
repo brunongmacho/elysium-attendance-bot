@@ -166,30 +166,50 @@ async function forceCloseAllAttendance(message) {
       `⚠️ **WARNING:** This does NOT submit attendance to sheets!\n` +
       `Use this only if threads are stuck and cannot be closed normally.`
     )
-    .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 15s timeout` });
+    .setFooter({ text: 'Click a button below to confirm • 15s timeout' });
 
-  const conf = await message.reply({ embeds: [confirmEmbed] });
-  // OPTIMIZATION v6.2: Batch reactions in parallel instead of sequential
-  await Promise.all([
-    conf.react(EMOJI.SUCCESS),
-    conf.react(EMOJI.ERROR)
-  ]);
+  const confirmButton = new ButtonBuilder()
+    .setCustomId(`closeall_confirm_${message.author.id}_${Date.now()}`)
+    .setLabel('✅ Confirm')
+    .setStyle(ButtonStyle.Danger);
 
-  try {
-    const collected = await conf.awaitReactions({
-      filter: (r, u) => [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) && u.id === message.author.id,
-      max: 1,
-      time: 15000,
-      errors: ["time"],
-    });
+  const cancelButton = new ButtonBuilder()
+    .setCustomId(`closeall_cancel_${message.author.id}_${Date.now()}`)
+    .setLabel('❌ Cancel')
+    .setStyle(ButtonStyle.Secondary);
 
-    if (collected.first().emoji.name === EMOJI.ERROR) {
-      await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })] });
-      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
+  const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+  const conf = await message.reply({ embeds: [confirmEmbed], components: [row] });
+
+  const collector = conf.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: 15000,
+    filter: i => i.user.id === message.author.id
+  });
+
+  let confirmed = false;
+
+  collector.on('collect', async (interaction) => {
+    const isConfirm = interaction.customId.startsWith('closeall_confirm_');
+
+    const disabledRow = new ActionRowBuilder().addComponents(
+      ButtonBuilder.from(confirmButton).setDisabled(true),
+      ButtonBuilder.from(cancelButton).setDisabled(true)
+    );
+
+    if (!isConfirm) {
+      await interaction.update({
+        embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })],
+        components: [disabledRow]
+      });
+      collector.stop('cancelled');
       return;
     }
 
-    await errorHandler.safeRemoveReactions(conf, 'reaction removal');
+    confirmed = true;
+    await interaction.update({ components: [disabledRow] });
+    collector.stop('confirmed');
 
     // OPTIMIZATION v6.4: Use cached channels for instant access
     const [attChannel, adminLogs] = await Promise.all([
@@ -245,16 +265,21 @@ async function forceCloseAllAttendance(message) {
 
     await conf.edit({ embeds: [resultEmbed] });
     await adminLogs.send({ embeds: [resultEmbed] });
+  });
 
-  } catch (err) {
-    if (err.message === "time") {
-      await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })] });
-      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
-    } else {
-      console.error("Emergency close all error:", err);
-      await message.reply(`${EMOJI.ERROR} Error: ${err.message}`);
+  collector.on('end', async (collected, reason) => {
+    if (reason === 'time' && !confirmed) {
+      const disabledRow = new ActionRowBuilder().addComponents(
+        ButtonBuilder.from(confirmButton).setDisabled(true),
+        ButtonBuilder.from(cancelButton).setDisabled(true)
+      );
+
+      await conf.edit({
+        embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })],
+        components: [disabledRow]
+      }).catch(() => {});
     }
-  }
+  });
 }
 
 // ==========================================
@@ -376,30 +401,50 @@ async function forceEndAuction(message) {
       `• Unlock all locked points\n\n` +
       `⚠️ Use this if the auction is stuck or bugged.`
     )
-    .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 15s timeout` });
+    .setFooter({ text: 'Click a button below to confirm • 15s timeout' });
 
-  const conf = await message.reply({ embeds: [confirmEmbed] });
-  // OPTIMIZATION v6.2: Batch reactions in parallel instead of sequential
-  await Promise.all([
-    conf.react(EMOJI.SUCCESS),
-    conf.react(EMOJI.ERROR)
-  ]);
+  const confirmButton = new ButtonBuilder()
+    .setCustomId(`endauction_confirm_${message.author.id}_${Date.now()}`)
+    .setLabel('✅ Confirm')
+    .setStyle(ButtonStyle.Danger);
 
-  try {
-    const collected = await conf.awaitReactions({
-      filter: (r, u) => [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) && u.id === message.author.id,
-      max: 1,
-      time: 15000,
-      errors: ["time"],
-    });
+  const cancelButton = new ButtonBuilder()
+    .setCustomId(`endauction_cancel_${message.author.id}_${Date.now()}`)
+    .setLabel('❌ Cancel')
+    .setStyle(ButtonStyle.Secondary);
 
-    if (collected.first().emoji.name === EMOJI.ERROR) {
-      await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })] });
-      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
+  const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+  const conf = await message.reply({ embeds: [confirmEmbed], components: [row] });
+
+  const collector = conf.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: 15000,
+    filter: i => i.user.id === message.author.id
+  });
+
+  let confirmed = false;
+
+  collector.on('collect', async (interaction) => {
+    const isConfirm = interaction.customId.startsWith('endauction_confirm_');
+
+    const disabledRow = new ActionRowBuilder().addComponents(
+      ButtonBuilder.from(confirmButton).setDisabled(true),
+      ButtonBuilder.from(cancelButton).setDisabled(true)
+    );
+
+    if (!isConfirm) {
+      await interaction.update({
+        embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })],
+        components: [disabledRow]
+      });
+      collector.stop('cancelled');
       return;
     }
 
-    await errorHandler.safeRemoveReactions(conf, 'reaction removal');
+    confirmed = true;
+    await interaction.update({ components: [disabledRow] });
+    collector.stop('confirmed');
 
     // Check auctioneering first
     if (auctioneering) {
@@ -441,16 +486,21 @@ async function forceEndAuction(message) {
         .setTitle(`${EMOJI.WARNING} No Active Auction`)
         .setDescription("No auction found to end")]
     });
+  });
 
-  } catch (err) {
-    if (err.message === "time") {
-      await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })] });
-      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
-    } else {
-      console.error("Emergency end auction error:", err);
-      await message.reply(`${EMOJI.ERROR} Error: ${err.message}`);
+  collector.on('end', async (collected, reason) => {
+    if (reason === 'time' && !confirmed) {
+      const disabledRow = new ActionRowBuilder().addComponents(
+        ButtonBuilder.from(confirmButton).setDisabled(true),
+        ButtonBuilder.from(cancelButton).setDisabled(true)
+      );
+
+      await conf.edit({
+        embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })],
+        components: [disabledRow]
+      }).catch(() => {});
     }
-  }
+  });
 }
 
 // ==========================================
@@ -507,30 +557,50 @@ async function unlockAllPoints(message) {
       `⚠️ This will unlock ALL points immediately.\n` +
       `Use this if points are stuck locked after a crashed auction.`
     )
-    .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 15s timeout` });
+    .setFooter({ text: 'Click a button below to confirm • 15s timeout' });
 
-  const conf = await message.reply({ embeds: [confirmEmbed] });
-  // OPTIMIZATION v6.2: Batch reactions in parallel instead of sequential
-  await Promise.all([
-    conf.react(EMOJI.SUCCESS),
-    conf.react(EMOJI.ERROR)
-  ]);
+  const confirmButton = new ButtonBuilder()
+    .setCustomId(`unlock_confirm_${message.author.id}_${Date.now()}`)
+    .setLabel('✅ Confirm')
+    .setStyle(ButtonStyle.Danger);
 
-  try {
-    const collected = await conf.awaitReactions({
-      filter: (r, u) => [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) && u.id === message.author.id,
-      max: 1,
-      time: 15000,
-      errors: ["time"],
-    });
+  const cancelButton = new ButtonBuilder()
+    .setCustomId(`unlock_cancel_${message.author.id}_${Date.now()}`)
+    .setLabel('❌ Cancel')
+    .setStyle(ButtonStyle.Secondary);
 
-    if (collected.first().emoji.name === EMOJI.ERROR) {
-      await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })] });
-      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
+  const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+  const conf = await message.reply({ embeds: [confirmEmbed], components: [row] });
+
+  const collector = conf.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: 15000,
+    filter: i => i.user.id === message.author.id
+  });
+
+  let confirmed = false;
+
+  collector.on('collect', async (interaction) => {
+    const isConfirm = interaction.customId.startsWith('unlock_confirm_');
+
+    const disabledRow = new ActionRowBuilder().addComponents(
+      ButtonBuilder.from(confirmButton).setDisabled(true),
+      ButtonBuilder.from(cancelButton).setDisabled(true)
+    );
+
+    if (!isConfirm) {
+      await interaction.update({
+        embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })],
+        components: [disabledRow]
+      });
+      collector.stop('cancelled');
       return;
     }
 
-    await errorHandler.safeRemoveReactions(conf, 'reaction removal');
+    confirmed = true;
+    await interaction.update({ components: [disabledRow] });
+    collector.stop('confirmed');
 
     const totalUnlocked = Object.values(biddingState.lp).reduce((sum, pts) => sum + pts, 0);
 
@@ -547,16 +617,21 @@ async function unlockAllPoints(message) {
         )
         .setTimestamp()]
     });
+  });
 
-  } catch (err) {
-    if (err.message === "time") {
-      await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })] });
-      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
-    } else {
-      console.error("Emergency unlock error:", err);
-      await message.reply(`${EMOJI.ERROR} Error: ${err.message}`);
+  collector.on('end', async (collected, reason) => {
+    if (reason === 'time' && !confirmed) {
+      const disabledRow = new ActionRowBuilder().addComponents(
+        ButtonBuilder.from(confirmButton).setDisabled(true),
+        ButtonBuilder.from(cancelButton).setDisabled(true)
+      );
+
+      await conf.edit({
+        embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })],
+        components: [disabledRow]
+      }).catch(() => {});
     }
-  }
+  });
 }
 
 // ==========================================
@@ -607,30 +682,50 @@ async function clearPendingConfirmations(message) {
       `⚠️ Users will need to re-bid.\n` +
       `Use this if confirmations are stuck.`
     )
-    .setFooter({ text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • 15s timeout` });
+    .setFooter({ text: 'Click a button below to confirm • 15s timeout' });
 
-  const conf = await message.reply({ embeds: [confirmEmbed] });
-  // OPTIMIZATION v6.2: Batch reactions in parallel instead of sequential
-  await Promise.all([
-    conf.react(EMOJI.SUCCESS),
-    conf.react(EMOJI.ERROR)
-  ]);
+  const confirmButton = new ButtonBuilder()
+    .setCustomId(`clearbids_confirm_${message.author.id}_${Date.now()}`)
+    .setLabel('✅ Confirm')
+    .setStyle(ButtonStyle.Danger);
 
-  try {
-    const collected = await conf.awaitReactions({
-      filter: (r, u) => [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) && u.id === message.author.id,
-      max: 1,
-      time: 15000,
-      errors: ["time"],
-    });
+  const cancelButton = new ButtonBuilder()
+    .setCustomId(`clearbids_cancel_${message.author.id}_${Date.now()}`)
+    .setLabel('❌ Cancel')
+    .setStyle(ButtonStyle.Secondary);
 
-    if (collected.first().emoji.name === EMOJI.ERROR) {
-      await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })] });
-      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
+  const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+  const conf = await message.reply({ embeds: [confirmEmbed], components: [row] });
+
+  const collector = conf.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: 15000,
+    filter: i => i.user.id === message.author.id
+  });
+
+  let confirmed = false;
+
+  collector.on('collect', async (interaction) => {
+    const isConfirm = interaction.customId.startsWith('clearbids_confirm_');
+
+    const disabledRow = new ActionRowBuilder().addComponents(
+      ButtonBuilder.from(confirmButton).setDisabled(true),
+      ButtonBuilder.from(cancelButton).setDisabled(true)
+    );
+
+    if (!isConfirm) {
+      await interaction.update({
+        embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })],
+        components: [disabledRow]
+      });
+      collector.stop('cancelled');
       return;
     }
 
-    await errorHandler.safeRemoveReactions(conf, 'reaction removal');
+    confirmed = true;
+    await interaction.update({ components: [disabledRow] });
+    collector.stop('confirmed');
 
     // Try to delete all pending confirmation messages
     const guild = message.guild;
@@ -667,16 +762,21 @@ async function clearPendingConfirmations(message) {
         )
         .setTimestamp()]
     });
+  });
 
-  } catch (err) {
-    if (err.message === "time") {
-      await conf.edit({ embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })] });
-      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
-    } else {
-      console.error("Emergency clear confirmations error:", err);
-      await message.reply(`${EMOJI.ERROR} Error: ${err.message}`);
+  collector.on('end', async (collected, reason) => {
+    if (reason === 'time' && !confirmed) {
+      const disabledRow = new ActionRowBuilder().addComponents(
+        ButtonBuilder.from(confirmButton).setDisabled(true),
+        ButtonBuilder.from(cancelButton).setDisabled(true)
+      );
+
+      await conf.edit({
+        embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })],
+        components: [disabledRow]
+      }).catch(() => {});
     }
-  }
+  });
 }
 
 // ==========================================

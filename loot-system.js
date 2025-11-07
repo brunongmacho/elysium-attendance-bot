@@ -727,44 +727,50 @@ async function handleLootCommand(message, args, client) {
     .setTimestamp();
 
   // ========================================
-  // CONFIRMATION: Show Results & Add Reactions
+  // CONFIRMATION: Show Results & Add Buttons
   // ========================================
+
+  const confirmButton = new ButtonBuilder()
+    .setCustomId(`lootsubmit_confirm_${message.author.id}_${Date.now()}`)
+    .setLabel('✅ Submit to Sheets')
+    .setStyle(ButtonStyle.Success);
+
+  const cancelButton = new ButtonBuilder()
+    .setCustomId(`lootsubmit_cancel_${message.author.id}_${Date.now()}`)
+    .setLabel('❌ Cancel')
+    .setStyle(ButtonStyle.Secondary);
+
+  const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
   const confirmMsg = await processingMsg.edit({
     embeds: [resultEmbed],
     content:
       `${EMOJI.LOOT} **Ready to submit to Google Sheets?**\n\n` +
-      `React ${EMOJI.SUCCESS} to confirm or ${EMOJI.ERROR} to cancel.\n\n` +
+      `Click a button below to confirm or cancel.\n\n` +
       `⏱️ 30 second timeout`,
+    components: [row],
   });
 
-  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
-  await Promise.all([
-    confirmMsg.react(EMOJI.SUCCESS),
-    confirmMsg.react(EMOJI.ERROR)
-  ]);
+  const collector = confirmMsg.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: 30000,
+    filter: i => i.user.id === message.author.id
+  });
 
-  // Filter to only accept reactions from the command user
-  const filter = (reaction, user) =>
-    [EMOJI.SUCCESS, EMOJI.ERROR].includes(reaction.emoji.name) &&
-    user.id === message.author.id;
+  collector.on('collect', async (interaction) => {
+    const isConfirm = interaction.customId.startsWith('lootsubmit_confirm_');
 
-  // ========================================
-  // CONFIRMATION: Wait for Admin Response
-  // ========================================
-  try {
-    const collected = await confirmMsg.awaitReactions({
-      filter,
-      max: 1,
-      time: 30000,
-      errors: ["time"],
-    });
+    const disabledRow = new ActionRowBuilder().addComponents(
+      ButtonBuilder.from(confirmButton).setDisabled(true),
+      ButtonBuilder.from(cancelButton).setDisabled(true)
+    );
 
-    const reaction = collected.first();
+    await interaction.update({ components: [disabledRow] });
 
     // ========================================
     // SUBMISSION: User Confirmed
     // ========================================
-    if (reaction.emoji.name === EMOJI.SUCCESS) {
+    if (isConfirm) {
       await submitLootToSheet(
         enrichedLoots,
         bossName,
@@ -778,20 +784,30 @@ async function handleLootCommand(message, args, client) {
       // ========================================
       // CANCELLATION: User Declined
       // ========================================
-      await errorHandler.safeRemoveReactions(confirmMsg, 'reaction removal');
       await message.reply(
         `${EMOJI.ERROR} Loot submission canceled. No data was saved.`
       );
     }
-  } catch (err) {
-    // ========================================
-    // TIMEOUT: No Response Within 30s
-    // ========================================
-    await errorHandler.safeRemoveReactions(confirmMsg, 'reaction removal');
-    await message.reply(
-      `${EMOJI.ERROR} Confirmation timed out. No data was saved.`
-    );
-  }
+
+    collector.stop();
+  });
+
+  collector.on('end', async (collected, reason) => {
+    if (reason === 'time' && collected.size === 0) {
+      // ========================================
+      // TIMEOUT: No Response Within 30s
+      // ========================================
+      const disabledRow = new ActionRowBuilder().addComponents(
+        ButtonBuilder.from(confirmButton).setDisabled(true),
+        ButtonBuilder.from(cancelButton).setDisabled(true)
+      );
+
+      await confirmMsg.edit({ components: [disabledRow] }).catch(() => {});
+      await message.reply(
+        `${EMOJI.ERROR} Confirmation timed out. No data was saved.`
+      );
+    }
+  });
 }
 
 // ============================================================================
