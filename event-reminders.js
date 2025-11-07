@@ -223,8 +223,10 @@ async function sendEventReminder(event, eventTime) {
     }
 
     const now = new Date();
-    const timeUntilEvent = eventTime.getTime() - now.getTime();
     const endTime = new Date(eventTime.getTime() + event.durationMinutes * 60 * 1000);
+
+    // Convert to Unix timestamp (seconds) for Discord's dynamic timestamp
+    const eventTimestamp = Math.floor(eventTime.getTime() / 1000);
 
     const embed = new EmbedBuilder()
       .setColor(event.color)
@@ -233,7 +235,7 @@ async function sendEventReminder(event, eventTime) {
       .addFields(
         {
           name: '⏰ Start Time',
-          value: formatGMT8(eventTime),
+          value: `<t:${eventTimestamp}:F>`, // Full date/time format
           inline: true,
         },
         {
@@ -243,7 +245,7 @@ async function sendEventReminder(event, eventTime) {
         },
         {
           name: '⏳ Starts In',
-          value: formatTimeRemaining(timeUntilEvent),
+          value: `<t:${eventTimestamp}:R>`, // Relative time (live countdown!)
           inline: true,
         }
       )
@@ -302,6 +304,7 @@ async function sendGuildWarQueueReminder() {
 
     const now = new Date();
     const deleteAt = now.getTime() + (GUILD_WAR_QUEUE_REMINDER.deleteAfterMinutes * 60 * 1000);
+    const deleteTimestamp = Math.floor(deleteAt / 1000);
 
     const embed = new EmbedBuilder()
       .setColor(GUILD_WAR_QUEUE_REMINDER.color)
@@ -310,7 +313,7 @@ async function sendGuildWarQueueReminder() {
         `${GUILD_WAR_QUEUE_REMINDER.description}\n\n` +
         `📋 **Action Required:**\n` +
         `Please queue the guild for tomorrow's Guild War before server reset.\n\n` +
-        `⏰ This reminder will be deleted at **1:00 AM GMT+8**`
+        `⏰ This reminder will be deleted <t:${deleteTimestamp}:R> (<t:${deleteTimestamp}:t>)`
       )
       .setTimestamp();
 
