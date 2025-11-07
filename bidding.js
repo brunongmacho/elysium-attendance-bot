@@ -3354,25 +3354,40 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           text: `${EMOJI.SUCCESS} RESET EVERYTHING / ${EMOJI.ERROR} cancel`,
         });
 
-      const resetConfirmMsg = await msg.reply({ embeds: [resetAuditEmbed] });
-      // OPTIMIZATION v6.8: Parallel reactions
-      await Promise.all([
-        resetConfirmMsg.react(EMOJI.SUCCESS),
-        resetConfirmMsg.react(EMOJI.ERROR)
-      ]);
+      // Create buttons for confirmation
+      const confirmButton = new ButtonBuilder()
+        .setCustomId(`reset_confirm_${msg.author.id}_${Date.now()}`)
+        .setLabel('✅ RESET EVERYTHING')
+        .setStyle(ButtonStyle.Danger);
+
+      const cancelButton = new ButtonBuilder()
+        .setCustomId(`reset_cancel_${msg.author.id}_${Date.now()}`)
+        .setLabel('❌ Cancel')
+        .setStyle(ButtonStyle.Secondary);
+
+      const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+      const resetConfirmMsg = await msg.reply({ embeds: [resetAuditEmbed], components: [row] });
 
       try {
-        const resetCol = await resetConfirmMsg.awaitReactions({
-          filter: (r, u) =>
-            [EMOJI.SUCCESS, EMOJI.ERROR].includes(r.emoji.name) &&
-            u.id === msg.author.id,
+        const collector = resetConfirmMsg.createMessageComponentCollector({
+          componentType: ComponentType.Button,
+          filter: (i) => i.user.id === msg.author.id,
           max: 1,
           time: 30000, // 30 second timeout for such a critical action
-          errors: ["time"],
         });
 
-        if (resetCol.first().emoji.name === EMOJI.SUCCESS) {
-          await errorHandler.safeRemoveReactions(resetConfirmMsg, 'reaction removal');
+        collector.on('collect', async (interaction) => {
+          const isConfirm = interaction.customId.startsWith('reset_confirm_');
+
+          // Disable buttons after interaction
+          const disabledRow = new ActionRowBuilder().addComponents(
+            ButtonBuilder.from(confirmButton).setDisabled(true),
+            ButtonBuilder.from(cancelButton).setDisabled(true)
+          );
+
+        if (isConfirm) {
+          await interaction.update({ embeds: [resetAuditEmbed], components: [disabledRow] });
 
           // Stop all timers
           clearAllTimers();
@@ -3451,12 +3466,23 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             ],
           });
         } else {
-          await errorHandler.safeRemoveReactions(resetConfirmMsg, 'reaction removal');
+          await interaction.update({ embeds: [resetAuditEmbed], components: [disabledRow] });
           await msg.reply(`${EMOJI.INFO} Reset cancelled`);
         }
+        });
+
+        collector.on('end', async (collected, reason) => {
+          if (reason === 'time' && collected.size === 0) {
+            const disabledRow = new ActionRowBuilder().addComponents(
+              ButtonBuilder.from(confirmButton).setDisabled(true),
+              ButtonBuilder.from(cancelButton).setDisabled(true)
+            );
+            await resetConfirmMsg.edit({ embeds: [resetAuditEmbed], components: [disabledRow] });
+            await msg.reply(`${EMOJI.INFO} Reset timed out (cancelled)`);
+          }
+        });
       } catch (e) {
-        await errorHandler.safeRemoveReactions(resetConfirmMsg, 'reaction removal');
-        await msg.reply(`${EMOJI.INFO} Reset timed out (cancelled)`);
+        await msg.reply(`${EMOJI.ERROR} Error during reset: ${e.message}`);
       }
       break;
 
@@ -3478,35 +3504,53 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             `• Bidding auction: ${st.a ? st.a.item : "None"}\n` +
             `• Locked points: ${Object.keys(st.lp).length} members\n\n` +
             `**Recovery Options:**\n\n` +
-            `1️⃣ **Clear stuck state** - Unlock points, clear timers\n` +
-            `2️⃣ **Force finalize** - End current session, submit results\n` +
-            `3️⃣ **Full reset** - Use \`!resetauction\` instead\n\n` +
-            `What would you like to do?`
+            `**Clear stuck state** - Unlock points, clear timers\n` +
+            `**Force finalize** - End current session, submit results\n\n` +
+            `Click a button below to choose your recovery option.`
         )
-        .setFooter({ text: "React: 1️⃣ Clear | 2️⃣ Finalize | ❌ Cancel" });
+        .setFooter({ text: "30s timeout" });
 
-      const recoveryMsg = await msg.reply({ embeds: [recoveryEmbed] });
-      // OPTIMIZATION v6.8: Parallel reactions (3x faster)
-      await Promise.all([
-        recoveryMsg.react("1️⃣"),
-        recoveryMsg.react("2️⃣"),
-        recoveryMsg.react(EMOJI.ERROR)
-      ]);
+      // Create buttons for recovery options
+      const clearButton = new ButtonBuilder()
+        .setCustomId(`recovery_clear_${msg.author.id}_${Date.now()}`)
+        .setLabel('Clear stuck state')
+        .setStyle(ButtonStyle.Primary);
+
+      const finalizeButton = new ButtonBuilder()
+        .setCustomId(`recovery_finalize_${msg.author.id}_${Date.now()}`)
+        .setLabel('Force finalize')
+        .setStyle(ButtonStyle.Danger);
+
+      const cancelButton = new ButtonBuilder()
+        .setCustomId(`recovery_cancel_${msg.author.id}_${Date.now()}`)
+        .setLabel('❌ Cancel')
+        .setStyle(ButtonStyle.Secondary);
+
+      const row = new ActionRowBuilder().addComponents(clearButton, finalizeButton, cancelButton);
+
+      const recoveryMsg = await msg.reply({ embeds: [recoveryEmbed], components: [row] });
 
       try {
-        const recoveryCol = await recoveryMsg.awaitReactions({
-          filter: (r, u) =>
-            ["1️⃣", "2️⃣", EMOJI.ERROR].includes(r.emoji.name) &&
-            u.id === msg.author.id,
+        const collector = recoveryMsg.createMessageComponentCollector({
+          componentType: ComponentType.Button,
+          filter: (i) => i.user.id === msg.author.id,
           max: 1,
           time: 30000,
-          errors: ["time"],
         });
 
-        const choice = recoveryCol.first().emoji.name;
-        await errorHandler.safeRemoveReactions(recoveryMsg, 'reaction removal');
+        collector.on('collect', async (interaction) => {
+          const customId = interaction.customId;
 
-        if (choice === "1️⃣") {
+          // Disable buttons after interaction
+          const disabledRow = new ActionRowBuilder().addComponents(
+            ButtonBuilder.from(clearButton).setDisabled(true),
+            ButtonBuilder.from(finalizeButton).setDisabled(true),
+            ButtonBuilder.from(cancelButton).setDisabled(true)
+          );
+
+          await interaction.update({ embeds: [recoveryEmbed], components: [disabledRow] });
+
+        if (customId.startsWith('recovery_clear_')) {
           // Clear stuck state
           clearAllTimers();
           st.lp = {};
@@ -3530,7 +3574,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
                 .setTimestamp(),
             ],
           });
-        } else if (choice === "2️⃣") {
+        } else if (customId.startsWith('recovery_finalize_')) {
           // Force finalize
           if (!auctState2.active) {
             return await msg.reply(
@@ -3571,9 +3615,21 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         } else {
           await msg.reply(`${EMOJI.INFO} Recovery cancelled`);
         }
+        });
+
+        collector.on('end', async (collected, reason) => {
+          if (reason === 'time' && collected.size === 0) {
+            const disabledRow = new ActionRowBuilder().addComponents(
+              ButtonBuilder.from(clearButton).setDisabled(true),
+              ButtonBuilder.from(finalizeButton).setDisabled(true),
+              ButtonBuilder.from(cancelButton).setDisabled(true)
+            );
+            await recoveryMsg.edit({ embeds: [recoveryEmbed], components: [disabledRow] });
+            await msg.reply(`${EMOJI.INFO} Recovery timed out (cancelled)`);
+          }
+        });
       } catch (e) {
-        await errorHandler.safeRemoveReactions(recoveryMsg, 'reaction removal');
-        await msg.reply(`${EMOJI.INFO} Recovery timed out (cancelled)`);
+        await msg.reply(`${EMOJI.ERROR} Error during recovery: ${e.message}`);
       }
       break;
   }
