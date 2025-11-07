@@ -2537,12 +2537,14 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       const submitButton = new ButtonBuilder()
         .setCustomId(`forcesubmit_confirm_${msg.author.id}_${Date.now()}`)
         .setLabel('✅ Submit Results')
-        .setStyle(ButtonStyle.Success);
+        .setStyle(ButtonStyle.Success)
+        .setDisabled(false);
 
       const cancelButton = new ButtonBuilder()
         .setCustomId(`forcesubmit_cancel_${msg.author.id}_${Date.now()}`)
         .setLabel('❌ Cancel')
-        .setStyle(ButtonStyle.Secondary);
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(false);
 
       const row = new ActionRowBuilder().addComponents(submitButton, cancelButton);
 
@@ -3222,12 +3224,14 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       const confirmButton = new ButtonBuilder()
         .setCustomId(`reset_confirm_${msg.author.id}_${Date.now()}`)
         .setLabel('✅ RESET EVERYTHING')
-        .setStyle(ButtonStyle.Danger);
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(false);
 
       const cancelButton = new ButtonBuilder()
         .setCustomId(`reset_cancel_${msg.author.id}_${Date.now()}`)
         .setLabel('❌ Cancel')
-        .setStyle(ButtonStyle.Secondary);
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(false);
 
       const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 
@@ -3379,17 +3383,20 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       const clearButton = new ButtonBuilder()
         .setCustomId(`recovery_clear_${msg.author.id}_${Date.now()}`)
         .setLabel('Clear stuck state')
-        .setStyle(ButtonStyle.Primary);
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(false);
 
       const finalizeButton = new ButtonBuilder()
         .setCustomId(`recovery_finalize_${msg.author.id}_${Date.now()}`)
         .setLabel('Force finalize')
-        .setStyle(ButtonStyle.Danger);
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(false);
 
       const cancelButton = new ButtonBuilder()
         .setCustomId(`recovery_cancel_${msg.author.id}_${Date.now()}`)
         .setLabel('❌ Cancel')
-        .setStyle(ButtonStyle.Secondary);
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(false);
 
       const row = new ActionRowBuilder().addComponents(clearButton, finalizeButton, cancelButton);
 

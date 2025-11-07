@@ -3202,12 +3202,14 @@ async function handleForceSubmitResults(message, config, biddingModule) {
   const submitButton = new ButtonBuilder()
     .setCustomId(`forcesubmit_confirm_${message.author.id}_${Date.now()}`)
     .setLabel('✅ Submit Results')
-    .setStyle(ButtonStyle.Success);
+    .setStyle(ButtonStyle.Success)
+    .setDisabled(false);
 
   const cancelButton = new ButtonBuilder()
     .setCustomId(`forcesubmit_cancel_${message.author.id}_${Date.now()}`)
     .setLabel('❌ Cancel')
-    .setStyle(ButtonStyle.Secondary);
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(false);
 
   const row = new ActionRowBuilder().addComponents(submitButton, cancelButton);
 

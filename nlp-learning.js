@@ -802,12 +802,14 @@ class NLPLearningSystem {
       const confirmButton = new ButtonBuilder()
         .setCustomId(`nlp_confirm_${message.author.id}_${Date.now()}`)
         .setLabel('✅ Teach me this')
-        .setStyle(ButtonStyle.Success);
+        .setStyle(ButtonStyle.Success)
+        .setDisabled(false);
 
       const cancelButton = new ButtonBuilder()
         .setCustomId(`nlp_cancel_${message.author.id}_${Date.now()}`)
         .setLabel('❌ Ignore')
-        .setStyle(ButtonStyle.Secondary);
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(false);
 
       const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 
