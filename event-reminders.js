@@ -44,7 +44,6 @@ const GAME_EVENTS = {
     durationMinutes: 60,
     color: 0xff6b6b, // Red
     description: 'Individual Arena is starting soon!',
-    thumbnail: 'https://i.imgur.com/7GJvQqz.png', // Arena icon
     reminderOffsetMinutes: REMINDER_OFFSET_MINUTES, // Remind 10 min before
   },
   coopArena: {
@@ -54,7 +53,6 @@ const GAME_EVENTS = {
     durationMinutes: 60,
     color: 0x4ecdc4, // Teal
     description: 'Coop Round Arena is starting soon!',
-    thumbnail: 'https://i.imgur.com/7GJvQqz.png', // Arena icon
     reminderOffsetMinutes: REMINDER_OFFSET_MINUTES, // Remind 10 min before
   },
   guildWar: {
@@ -64,7 +62,6 @@ const GAME_EVENTS = {
     durationMinutes: 3,
     color: 0xff4757, // Dark red
     description: '**GUILD WAR** is starting soon! Get ready!',
-    thumbnail: 'https://i.imgur.com/kR2B3Yx.png', // War icon
     reminderOffsetMinutes: 20, // Remind 20 min before (gives players time to prepare)
   },
 };
@@ -79,7 +76,6 @@ const DAILY_EVENTS = {
     durationMinutes: 30,
     color: 0x9b59b6, // Purple
     description: '**World Boss** is spawning soon! Prepare for battle!',
-    thumbnail: 'https://i.imgur.com/kR2B3Yx.png', // Boss icon
     reminderOffsetMinutes: 10, // Remind 10 min before
   },
   worldBossEvening: {
@@ -88,7 +84,6 @@ const DAILY_EVENTS = {
     durationMinutes: 30,
     color: 0x9b59b6, // Purple
     description: '**World Boss** is spawning soon! Prepare for battle!',
-    thumbnail: 'https://i.imgur.com/kR2B3Yx.png', // Boss icon
     reminderOffsetMinutes: 10, // Remind 10 min before
   },
 };
@@ -257,8 +252,10 @@ async function sendEventReminder(event, eventTime) {
     }
 
     const now = new Date();
-    const timeUntilEvent = eventTime.getTime() - now.getTime();
     const endTime = new Date(eventTime.getTime() + event.durationMinutes * 60 * 1000);
+
+    // Convert to Unix timestamp (seconds) for Discord's dynamic timestamp
+    const eventTimestamp = Math.floor(eventTime.getTime() / 1000);
 
     const embed = new EmbedBuilder()
       .setColor(event.color)
@@ -267,7 +264,7 @@ async function sendEventReminder(event, eventTime) {
       .addFields(
         {
           name: '⏰ Start Time',
-          value: formatGMT8(eventTime),
+          value: `<t:${eventTimestamp}:F>`, // Full date/time format
           inline: true,
         },
         {
@@ -277,7 +274,7 @@ async function sendEventReminder(event, eventTime) {
         },
         {
           name: '⏳ Starts In',
-          value: formatTimeRemaining(timeUntilEvent),
+          value: `<t:${eventTimestamp}:R>`, // Relative time (live countdown!)
           inline: true,
         }
       )
@@ -336,6 +333,7 @@ async function sendGuildWarQueueReminder() {
 
     const now = new Date();
     const deleteAt = now.getTime() + (GUILD_WAR_QUEUE_REMINDER.deleteAfterMinutes * 60 * 1000);
+    const deleteTimestamp = Math.floor(deleteAt / 1000);
 
     const embed = new EmbedBuilder()
       .setColor(GUILD_WAR_QUEUE_REMINDER.color)
@@ -344,7 +342,7 @@ async function sendGuildWarQueueReminder() {
         `${GUILD_WAR_QUEUE_REMINDER.description}\n\n` +
         `📋 **Action Required:**\n` +
         `Please queue the guild for tomorrow's Guild War before server reset.\n\n` +
-        `⏰ This reminder will be deleted at **1:00 AM GMT+8**`
+        `⏰ This reminder will be deleted <t:${deleteTimestamp}:R> (<t:${deleteTimestamp}:t>)`
       )
       .setTimestamp();
 

@@ -4089,6 +4089,28 @@ client.on(Events.MessageCreate, async (message) => {
     let nlpInterpretation = null;
     let usedLearningSystem = false;
 
+    // PRIORITY CHECK: If message contains insults/roasts, skip command interpretation
+    // and go straight to conversation handling to avoid misinterpreting roasts as commands
+    const botMentioned = message.mentions.users.has(client.user.id);
+    const contentLower = message.content.toLowerCase().trim();
+
+    // Quick insult pattern check (most common Filipino and English profanity)
+    const hasInsult = /(?:putang\s*ina|tangina|kinangina|king\s*ina|gago|ulol|bobo|tanga|fuck\s+you|hayop|buwisit|leche|peste|tarantado|puta|kupal|pakyu|pakshet|amputa|pucha|yawa|ungas|gunggong|engot|hinayupak)/i.test(contentLower);
+
+    if (hasInsult && botMentioned && nlpLearningSystem) {
+      // This is likely an insult/roast - handle as conversation, not command
+      console.log(`🔥 [NLP] Detected insult pattern - skipping command interpretation`);
+      const conversationResponse = await nlpLearningSystem.handleConversation(message);
+
+      if (conversationResponse) {
+        console.log(`💬 [NLP Conversation] User: "${message.content.substring(0, 50)}..." → Roasting back`);
+        await message.reply(conversationResponse).catch((error) => {
+          console.error('❌ Error sending conversation response:', error);
+        });
+        return; // Return early - this was handled as conversation
+      }
+    }
+
     // Try learning system first (if bot is mentioned or in auction thread)
     if (nlpLearningSystem && !message.content.trim().startsWith('!')) {
       const shouldRespond = nlpLearningSystem.shouldRespond(message);

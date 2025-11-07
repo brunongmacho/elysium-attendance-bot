@@ -176,7 +176,7 @@
 // DEPENDENCIES
 // ═══════════════════════════════════════════════════════════════════════════
 
-const { EmbedBuilder } = require("discord.js");
+const { EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, ComponentType } = require("discord.js");
 const fs = require("fs");
 const { normalizeUsername, formatDuration } = require("./modules/bidding/utilities");
 const errorHandler = require('./utils/error-handler');
@@ -1325,13 +1325,15 @@ async function ann1(cli, cfg) {
     return;
   }
 
+  const endTimestamp = Math.floor(a.endTime / 1000);
+
   await th.send({
     content: "@everyone",
     embeds: [
       new EmbedBuilder()
         .setColor(COLORS.WARNING)
         .setTitle(`${EMOJI.WARNING} GOING ONCE!`)
-        .setDescription("1 min left")
+        .setDescription(`Auction ends <t:${endTimestamp}:R>`)
         .addFields({
           name: `${EMOJI.BID} Current`,
           value: a.curWin
@@ -1356,13 +1358,15 @@ async function ann2(cli, cfg) {
     return;
   }
 
+  const endTimestamp = Math.floor(a.endTime / 1000);
+
   await th.send({
     content: "@everyone",
     embeds: [
       new EmbedBuilder()
         .setColor(getColor(COLORS.WARNING))
         .setTitle(`${EMOJI.WARNING} GOING TWICE!`)
-        .setDescription("30s left")
+        .setDescription(`Auction ends <t:${endTimestamp}:R>`)
         .addFields({
           name: `${EMOJI.BID} Current`,
           value: a.curWin
@@ -1387,13 +1391,15 @@ async function ann3(cli, cfg) {
     return;
   }
 
+  const endTimestamp = Math.floor(a.endTime / 1000);
+
   await th.send({
     content: "@everyone",
     embeds: [
       new EmbedBuilder()
         .setColor(getColor(COLORS.ERROR))
         .setTitle(`${EMOJI.WARNING} FINAL CALL!`)
-        .setDescription("10s left")
+        .setDescription(`Auction ends <t:${endTimestamp}:R>`)
         .addFields({
           name: `${EMOJI.BID} Current`,
           value: a.curWin
@@ -2233,6 +2239,10 @@ async function procBid(msg, amt, cfg) {
     return { ok: false, msg: "Insufficient" };
   }
 
+  // Calculate expiry timestamp for dynamic countdown
+  const expiryTime = now + 10000; // 10 seconds from now
+  const expiryTimestamp = Math.floor(expiryTime / 1000);
+
   const confEmbed = new EmbedBuilder()
     .setColor(COLORS.AUCTION)
     .setTitle(`${EMOJI.CLOCK} Confirm Your Bid`)
@@ -2245,7 +2255,8 @@ async function procBid(msg, amt, cfg) {
         }\n\n` +
         `⚠️ **By confirming, you agree to:**\n` +
         `• Lock ${needed}pts from your available points\n` +
-        `• ${isSelf ? "Increase" : "Place"} your bid to ${bid}pts`
+        `• ${isSelf ? "Increase" : "Place"} your bid to ${bid}pts\n\n` +
+        `⏰ **Expires <t:${expiryTimestamp}:R>**`
     )
     .addFields(
       { name: `${EMOJI.BID} Your Bid`, value: `${bid}pts`, inline: true },
@@ -2266,20 +2277,28 @@ async function procBid(msg, amt, cfg) {
   }
 
   confEmbed.setFooter({
-    text: `${EMOJI.SUCCESS} YES, PLACE BID / ${EMOJI.ERROR} NO, CANCEL • ${
-      isSelf ? "Overbidding yourself" : "Outbidding current leader"
-    } • 10s timeout`,
+    text: isSelf ? "Overbidding yourself" : "Outbidding current leader",
   });
 
+  // Create buttons for confirmation
+  const confirmButton = new ButtonBuilder()
+    .setCustomId(`bid_confirm_${msg.author.id}_${Date.now()}`)
+    .setLabel('✅ Confirm Bid')
+    .setStyle(ButtonStyle.Success);
+
+  const cancelButton = new ButtonBuilder()
+    .setCustomId(`bid_cancel_${msg.author.id}_${Date.now()}`)
+    .setLabel('❌ Cancel')
+    .setStyle(ButtonStyle.Danger);
+
+  const row = new ActionRowBuilder()
+    .addComponents(confirmButton, cancelButton);
+
   const conf = await msg.reply({
-    content: `<@${uid}> **CONFIRM YOUR BID - React below within 10 seconds**`,
+    content: `<@${uid}> **CONFIRM YOUR BID**`,
     embeds: [confEmbed],
+    components: [row]
   });
-  // OPTIMIZATION v6.8: Parallel reactions (2x faster)
-  await Promise.all([
-    conf.react(EMOJI.SUCCESS),
-    conf.react(EMOJI.ERROR)
-  ]);
 
   // Bug #23 fix: Limit pending confirmations to prevent unbounded growth
   const MAX_PENDING_CONFIRMATIONS = 100;
@@ -2303,35 +2322,6 @@ async function procBid(msg, amt, cfg) {
 
   st.lb[uid] = now; // Rate limit stamp
 
-  // Countdown timer
-  let countdown = 10;
-  const countdownInterval = setInterval(async () => {
-    try {
-      countdown--;
-      if (countdown > 0 && countdown <= 10 && st.pc[conf.id]) {
-        const updatedEmbed = EmbedBuilder.from(confEmbed).setFooter({
-          text: `${EMOJI.SUCCESS} confirm / ${EMOJI.ERROR} cancel • ${countdown}s remaining`,
-        });
-        await errorHandler.safeEdit(conf, { embeds: [updatedEmbed] }, 'message edit');
-      }
-    } catch (err) {
-      // Handle archived thread or deleted message errors
-      console.warn(`⚠️ Countdown interval error (${conf.id}):`, err.message);
-      clearInterval(countdownInterval);
-      if (st.th[`countdown_${conf.id}`]) {
-        delete st.th[`countdown_${conf.id}`];
-      }
-      // CRITICAL: Also cleanup the pending confirmation to prevent stale processing
-      if (st.pc[conf.id]) {
-        delete st.pc[conf.id];
-        save(); // Persist state change
-      }
-    }
-  }, 1000);
-
-  // Store countdown interval for cleanup
-  st.th[`countdown_${conf.id}`] = countdownInterval;
-
   // Check if bid in last 10 seconds - PAUSE
   const timeLeft = a.endTime - Date.now();
   if (timeLeft <= 10000 && timeLeft > 0) {
@@ -2341,19 +2331,109 @@ async function procBid(msg, amt, cfg) {
     );
   }
 
-  st.th[`c_${conf.id}`] = setTimeout(async () => {
-    clearInterval(st.th[`countdown_${conf.id}`]);
-    delete st.th[`countdown_${conf.id}`];
-    if (st.pc[conf.id]) {
-      await errorHandler.safeRemoveReactions(conf, 'reaction removal');
+  // Create button collector
+  const collector = conf.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: CT, // 10 second timeout
+    filter: i => i.user.id === uid // Only accept interactions from the bidder
+  });
+
+  collector.on('collect', async (interaction) => {
+    try {
+      const isConfirm = interaction.customId.startsWith('bid_confirm_');
+
+      if (isConfirm) {
+        // User confirmed bid
+        await procConfirm(uid, u, bid, isSelf, needed);
+
+        // Update embed to show confirmed
+        const confirmedEmbed = EmbedBuilder.from(confEmbed)
+          .setColor(getColor(COLORS.SUCCESS))
+          .setFooter({ text: `${EMOJI.SUCCESS} Bid confirmed!` });
+
+        // Disable buttons
+        const disabledRow = new ActionRowBuilder()
+          .addComponents(
+            ButtonBuilder.from(confirmButton).setDisabled(true),
+            ButtonBuilder.from(cancelButton).setDisabled(true)
+          );
+
+        await interaction.update({
+          embeds: [confirmedEmbed],
+          components: [disabledRow]
+        });
+
+        // Delete confirmation message after delay
+        setTimeout(async () => {
+          await errorHandler.safeDelete(conf, 'message deletion');
+        }, TIMEOUTS.MESSAGE_DELETE);
+
+      } else {
+        // User cancelled bid
+        const cancelledEmbed = EmbedBuilder.from(confEmbed)
+          .setColor(getColor(COLORS.INFO))
+          .setFooter({ text: `${EMOJI.ERROR} Bid cancelled` });
+
+        // Disable buttons
+        const disabledRow = new ActionRowBuilder()
+          .addComponents(
+            ButtonBuilder.from(confirmButton).setDisabled(true),
+            ButtonBuilder.from(cancelButton).setDisabled(true)
+          );
+
+        await interaction.update({
+          embeds: [cancelledEmbed],
+          components: [disabledRow]
+        });
+
+        // Delete confirmation message after delay
+        setTimeout(async () => {
+          await errorHandler.safeDelete(conf, 'message deletion');
+        }, TIMEOUTS.MESSAGE_DELETE);
+      }
+
+      // Cleanup pending confirmation
+      delete st.pc[conf.id];
+      save();
+
+      // Resume if paused
+      if (st.pause) {
+        resumeAuction(conf.client, cfg);
+        await msg.channel.send(
+          `${EMOJI.PLAY} **RESUMED** - Auction continues...`
+        );
+      }
+
+      // Stop collector
+      collector.stop('completed');
+    } catch (err) {
+      console.error('❌ Error handling bid confirmation button:', err);
+    }
+  });
+
+  collector.on('end', async (collected, reason) => {
+    if (reason === 'time' && st.pc[conf.id]) {
+      // Timeout - user didn't respond
       const timeoutEmbed = EmbedBuilder.from(confEmbed)
         .setColor(getColor(COLORS.INFO))
         .setFooter({ text: `${EMOJI.CLOCK} Timed out` });
-      await errorHandler.safeEdit(conf, { embeds: [timeoutEmbed] }, 'message edit');
-      setTimeout(
-        async () => await errorHandler.safeDelete(conf, 'message deletion'),
-        TIMEOUTS.MESSAGE_DELETE
-      );
+
+      // Disable buttons
+      const disabledRow = new ActionRowBuilder()
+        .addComponents(
+          ButtonBuilder.from(confirmButton).setDisabled(true),
+          ButtonBuilder.from(cancelButton).setDisabled(true)
+        );
+
+      await errorHandler.safeEdit(conf, {
+        embeds: [timeoutEmbed],
+        components: [disabledRow]
+      }, 'message edit');
+
+      setTimeout(async () => {
+        await errorHandler.safeDelete(conf, 'message deletion');
+      }, TIMEOUTS.MESSAGE_DELETE);
+
       delete st.pc[conf.id];
       save();
 
@@ -2365,7 +2445,7 @@ async function procBid(msg, amt, cfg) {
         );
       }
     }
-  }, CT);
+  });
 
   return { ok: true, confId: conf.id };
 }
@@ -2805,7 +2885,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       // Only in bidding channel (not thread)
       if (msg.channel.isThread() || msg.channel.id !== cfg.bidding_channel_id) {
         return await msg.reply(
-          `${EMOJI.ERROR} Use \`!mypoints\` in bidding channel only (not threads)`
+          `${EMOJI.ERROR} Use \`!mypoints\` in <#${cfg.bidding_channel_id}> only (not threads)`
         );
       }
 
