@@ -683,21 +683,48 @@ class ProactiveIntelligence {
    */
   async checkMilestones() {
     try {
-      if (!PROACTIVE_CONFIG.features.celebrateMilestones) return;
+      console.log('🤖 [PROACTIVE] ═══════════════════════════════════════');
+      console.log('🤖 [PROACTIVE] Starting milestone check...');
 
-      console.log('🤖 [PROACTIVE] Checking for milestones...');
+      if (!PROACTIVE_CONFIG.features.celebrateMilestones) {
+        console.log('⚠️ [PROACTIVE] Milestone celebrations are DISABLED in config');
+        return;
+      }
+
+      console.log('✅ [PROACTIVE] Milestone celebrations ENABLED');
 
       // Fetch TotalAttendance data (uses NICKNAME, not username!)
+      console.log('📊 [PROACTIVE] Fetching total attendance data...');
       const attendanceResponse = await this.intelligence.sheetAPI.call('getTotalAttendance', {});
-      const attendanceData = attendanceResponse?.data?.members || attendanceResponse?.members || [];
+      console.log('📊 [PROACTIVE] Attendance API response:', JSON.stringify(attendanceResponse).substring(0, 200));
 
-      if (attendanceData.length === 0) return;
+      const attendanceData = attendanceResponse?.data?.members || attendanceResponse?.members || [];
+      console.log(`📊 [PROACTIVE] Found ${attendanceData.length} members in attendance data`);
+
+      if (attendanceData.length === 0) {
+        console.log('⚠️ [PROACTIVE] No attendance data found, skipping milestone check');
+        return;
+      }
+
+      // Log first 3 members as sample
+      console.log('📊 [PROACTIVE] Sample data (first 3 members):');
+      attendanceData.slice(0, 3).forEach(m => {
+        console.log(`   - ${m.username}: ${m.attendancePoints} points`);
+      });
 
       // Fetch milestone history from Google Sheets
+      console.log('📊 [PROACTIVE] Fetching milestone history...');
       const historyResponse = await this.intelligence.sheetAPI.call('getMilestoneHistory', {});
+      console.log('📊 [PROACTIVE] History API response:', JSON.stringify(historyResponse).substring(0, 200));
+
       const milestoneHistory = historyResponse?.milestoneHistory || {};
+      console.log(`📊 [PROACTIVE] Found ${Object.keys(milestoneHistory).length} members in milestone history`);
 
       // Get channels for tiered routing
+      console.log('📺 [PROACTIVE] Getting channels...');
+      console.log(`📺 [PROACTIVE] Guild announcement channel ID: ${this.config.guild_announcement_channel_id}`);
+      console.log(`📺 [PROACTIVE] Guild chat channel ID: ${this.config.elysium_commands_channel_id}`);
+
       const guildAnnouncementChannel = await getChannelById(
         this.client,
         this.config.guild_announcement_channel_id // Guild Announcements
@@ -708,17 +735,28 @@ class ProactiveIntelligence {
         this.config.elysium_commands_channel_id // Guild Chat
       );
 
+      console.log(`📺 [PROACTIVE] Guild announcement channel: ${guildAnnouncementChannel ? guildAnnouncementChannel.name : 'NOT FOUND'}`);
+      console.log(`📺 [PROACTIVE] Guild chat channel: ${guildChatChannel ? guildChatChannel.name : 'NOT FOUND'}`);
+
       if (!guildAnnouncementChannel || !guildChatChannel) {
-        console.error('❌ [PROACTIVE] Required channels not found');
+        console.error('❌ [PROACTIVE] Required channels not found - ABORTING');
         return;
       }
 
       // Define milestone tiers
       const MILESTONES = PROACTIVE_CONFIG.thresholds.milestonePoints;
       const allMilestones = [...MILESTONES.minor, ...MILESTONES.major].sort((a, b) => a - b);
+      console.log(`🎯 [PROACTIVE] Milestone thresholds: ${allMilestones.join(', ')}`);
+
+      // Track stats
+      let membersChecked = 0;
+      let milestonesFound = 0;
+      let milestonesAnnounced = 0;
 
       // Check each member
+      console.log('🔍 [PROACTIVE] Checking members for new milestones...');
       for (const member of attendanceData) {
+        membersChecked++;
         const totalPoints = member.attendancePoints || 0;
         const nickname = member.username; // Actually nickname in sheet
         const normalizedNickname = this.normalizeUsername(nickname);
@@ -737,35 +775,64 @@ class ProactiveIntelligence {
 
         // If found new milestone, announce ONLY the latest
         if (latestMilestone) {
+          milestonesFound++;
+          console.log(`🎉 [PROACTIVE] NEW MILESTONE FOUND!`);
+          console.log(`   - Member: ${nickname} (normalized: ${normalizedNickname})`);
+          console.log(`   - Current Points: ${totalPoints}`);
+          console.log(`   - Last Milestone: ${lastMilestone}`);
+          console.log(`   - New Milestone: ${latestMilestone}`);
+
           // Determine channel (tiered routing)
           const channel = MILESTONES.major.includes(latestMilestone)
             ? guildAnnouncementChannel
             : guildChatChannel;
 
-          // Create celebration embed with massive variety
-          const embed = await this.createMilestoneEmbed(member, latestMilestone, totalPoints, lastMilestone);
+          console.log(`   - Channel: ${channel.name} (${MILESTONES.major.includes(latestMilestone) ? 'MAJOR' : 'MINOR'})`);
 
-          await channel.send({ embeds: [embed] });
+          try {
+            // Create celebration embed with massive variety
+            console.log(`   - Creating embed...`);
+            const embed = await this.createMilestoneEmbed(member, latestMilestone, totalPoints, lastMilestone);
 
-          // Update Google Sheets with new milestone (PERSISTENT!)
-          await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
-            nickname: nickname,
-            milestone: latestMilestone,
-            totalPoints: totalPoints,
-            milestoneType: 'points'
-          });
+            console.log(`   - Sending to channel...`);
+            await channel.send({ embeds: [embed] });
+            console.log(`   - ✅ Sent to ${channel.name}`);
 
-          // Log for audit trail
-          console.log(
-            `🎉 [PROACTIVE] Celebrated ${nickname} ` +
-            `reaching ${latestMilestone} points (jumped from ${lastMilestone}) ` +
-            `in ${channel.name}`
-          );
+            // Update Google Sheets with new milestone (PERSISTENT!)
+            console.log(`   - Updating Google Sheets...`);
+            await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
+              nickname: nickname,
+              milestone: latestMilestone,
+              totalPoints: totalPoints,
+              milestoneType: 'points'
+            });
+            console.log(`   - ✅ Google Sheets updated`);
+
+            milestonesAnnounced++;
+
+            // Log for audit trail
+            console.log(
+              `🎉 [PROACTIVE] ✅ MILESTONE ANNOUNCED: ${nickname} ` +
+              `reached ${latestMilestone} points (jumped from ${lastMilestone}) ` +
+              `in ${channel.name}`
+            );
+          } catch (announceError) {
+            console.error(`❌ [PROACTIVE] Error announcing milestone for ${nickname}:`, announceError);
+            console.error(announceError.stack);
+          }
         }
       }
 
+      console.log('🤖 [PROACTIVE] ═══════════════════════════════════════');
+      console.log(`🤖 [PROACTIVE] Milestone check complete`);
+      console.log(`   - Members checked: ${membersChecked}`);
+      console.log(`   - New milestones found: ${milestonesFound}`);
+      console.log(`   - Milestones announced: ${milestonesAnnounced}`);
+      console.log('🤖 [PROACTIVE] ═══════════════════════════════════════');
+
     } catch (error) {
-      console.error('[PROACTIVE] Error checking milestones:', error);
+      console.error('❌ [PROACTIVE] CRITICAL ERROR checking milestones:', error);
+      console.error(error.stack);
     }
   }
 
