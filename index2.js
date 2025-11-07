@@ -4145,12 +4145,26 @@ client.on(Events.MessageCreate, async (message) => {
     const botMentioned = message.mentions.users.has(client.user.id);
     const contentLower = message.content.toLowerCase().trim();
 
-    // Quick insult pattern check (most common Filipino and English profanity)
-    const hasInsult = /(?:putang\s*ina|tangina|kinangina|king\s*ina|gago|ulol|bobo|tanga|fuck\s+you|hayop|buwisit|leche|peste|tarantado|puta|kupal|pakyu|pakshet|amputa|pucha|yawa|ungas|gunggong|engot|hinayupak)/i.test(contentLower);
+    // Check if this is a reply to a bot message
+    let isReplyToBot = false;
+    if (message.reference && message.reference.messageId) {
+      try {
+        const repliedMessage = await message.channel.messages.fetch(message.reference.messageId);
+        if (repliedMessage && repliedMessage.author.id === client.user.id) {
+          isReplyToBot = true;
+          console.log(`💬 [NLP] User replying to bot message - treating as conversation`);
+        }
+      } catch (error) {
+        console.error('Error fetching replied message:', error);
+      }
+    }
 
-    if (hasInsult && botMentioned && nlpLearningSystem) {
-      // This is likely an insult/roast - handle as conversation, not command
-      console.log(`🔥 [NLP] Detected insult pattern - skipping command interpretation`);
+    // Quick insult pattern check (most common Filipino and English profanity)
+    const hasInsult = /(?:putang\s*ina|tangina|kinangina|king\s*ina|gago|ulol|bobo|tanga|fuck\s+you|fuck|hayop|buwisit|leche|peste|tarantado|puta|kupal|pakyu|pakshet|amputa|pucha|yawa|ungas|gunggong|engot|hinayupak)/i.test(contentLower);
+
+    if ((hasInsult || isReplyToBot) && (botMentioned || isReplyToBot) && nlpLearningSystem) {
+      // This is likely an insult/roast or reply to bot - handle as conversation, not command
+      console.log(`🔥 [NLP] Detected ${hasInsult ? 'insult pattern' : 'reply to bot'} - skipping command interpretation`);
       const conversationResponse = await nlpLearningSystem.handleConversation(message);
 
       if (conversationResponse) {

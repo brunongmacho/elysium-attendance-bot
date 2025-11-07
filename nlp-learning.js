@@ -362,6 +362,13 @@ class NLPLearningSystem {
     // Strip bot mentions from the beginning (e.g., "<@123456789> how many points")
     content = content.replace(/^<@!?\d+>\s*/g, '').trim();
 
+    // CRITICAL: Check for insults BEFORE command interpretation
+    // Insults should be handled as conversation, not commands
+    if (this.isInsult(content)) {
+      console.log(`🚫 [NLP Learning] Detected insult, routing to conversation handler: "${content}"`);
+      return null; // Let it fall through to conversation handling
+    }
+
     // Try learned patterns first
     const learnedInterpretation = this.tryLearnedPatterns(content);
     if (learnedInterpretation) {
