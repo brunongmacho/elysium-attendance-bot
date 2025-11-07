@@ -44,7 +44,6 @@ const GAME_EVENTS = {
     durationMinutes: 60,
     color: 0xff6b6b, // Red
     description: 'Individual Arena is starting soon!',
-    thumbnail: 'https://i.imgur.com/7GJvQqz.png', // Arena icon
     reminderOffsetMinutes: REMINDER_OFFSET_MINUTES, // Remind 10 min before
   },
   coopArena: {
@@ -54,7 +53,6 @@ const GAME_EVENTS = {
     durationMinutes: 60,
     color: 0x4ecdc4, // Teal
     description: 'Coop Round Arena is starting soon!',
-    thumbnail: 'https://i.imgur.com/7GJvQqz.png', // Arena icon
     reminderOffsetMinutes: REMINDER_OFFSET_MINUTES, // Remind 10 min before
   },
   guildWar: {
@@ -64,7 +62,6 @@ const GAME_EVENTS = {
     durationMinutes: 3,
     color: 0xff4757, // Dark red
     description: '**GUILD WAR** is starting soon! Get ready!',
-    thumbnail: 'https://i.imgur.com/kR2B3Yx.png', // War icon
     reminderOffsetMinutes: 20, // Remind 20 min before (gives players time to prepare)
   },
   worldBossMorning: {
@@ -74,7 +71,6 @@ const GAME_EVENTS = {
     durationMinutes: 30,
     color: 0x9b59b6, // Purple
     description: '**World Boss** is spawning soon! Prepare for battle!',
-    thumbnail: 'https://i.imgur.com/kR2B3Yx.png', // Boss icon
     reminderOffsetMinutes: 10, // Remind 10 min before
   },
   worldBossEvening: {
@@ -84,7 +80,6 @@ const GAME_EVENTS = {
     durationMinutes: 30,
     color: 0x9b59b6, // Purple
     description: '**World Boss** is spawning soon! Prepare for battle!',
-    thumbnail: 'https://i.imgur.com/kR2B3Yx.png', // Boss icon
     reminderOffsetMinutes: 10, // Remind 10 min before
   },
 };
