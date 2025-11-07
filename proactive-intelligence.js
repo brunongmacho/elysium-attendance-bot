@@ -909,15 +909,15 @@ class ProactiveIntelligence {
 
           await channel.send({ embeds: [embed] });
 
-          // Batch update Google Sheets for all achievers
-          for (const achiever of achievers) {
-            await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
+          // Batch update Google Sheets for all achievers (parallel execution)
+          await Promise.all(achievers.map(achiever =>
+            this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: `${achiever.nickname}-attendance`,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'attendance'
-            });
-          }
+            })
+          ));
 
           milestonesAnnounced++;
           console.log(`   - ✅ ${achievers.length} members at ${milestone} ATTENDANCE milestone → ${channel.name}`);
@@ -947,15 +947,15 @@ class ProactiveIntelligence {
 
           await channel.send({ embeds: [embed] });
 
-          // Batch update Google Sheets for all achievers
-          for (const achiever of achievers) {
-            await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
+          // Batch update Google Sheets for all achievers (parallel execution)
+          await Promise.all(achievers.map(achiever =>
+            this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: `${achiever.nickname}-bidding`,
               milestone: milestone,
               totalPoints: achiever.totalPoints,
               milestoneType: 'bidding'
-            });
-          }
+            })
+          ));
 
           milestonesAnnounced++;
           console.log(`   - ✅ ${achievers.length} members at ${milestone} BIDDING milestone → ${channel.name}`);
