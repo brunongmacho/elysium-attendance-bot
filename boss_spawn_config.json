@@ -1,0 +1,229 @@
+{
+  "timerBasedBosses": {
+    "Venatus": {
+      "spawnIntervalHours": 10,
+      "description": "Spawns 10 hours after being killed"
+    },
+    "Viorent": {
+      "spawnIntervalHours": 10,
+      "description": "Spawns 10 hours after being killed"
+    },
+    "Ego": {
+      "spawnIntervalHours": 21,
+      "description": "Spawns 21 hours after being killed"
+    },
+    "Livera": {
+      "spawnIntervalHours": 24,
+      "description": "Spawns 24 hours after being killed"
+    },
+    "Araneo": {
+      "spawnIntervalHours": 24,
+      "description": "Spawns 24 hours after being killed"
+    },
+    "Undomiel": {
+      "spawnIntervalHours": 24,
+      "description": "Spawns 24 hours after being killed"
+    },
+    "Lady Dalia": {
+      "spawnIntervalHours": 18,
+      "description": "Spawns 18 hours after being killed"
+    },
+    "General Aquleus": {
+      "spawnIntervalHours": 29,
+      "description": "Spawns 29 hours after being killed"
+    },
+    "Amentis": {
+      "spawnIntervalHours": 29,
+      "description": "Spawns 29 hours after being killed"
+    },
+    "Baron Braudmore": {
+      "spawnIntervalHours": 32,
+      "description": "Spawns 32 hours after being killed"
+    },
+    "Wannitas": {
+      "spawnIntervalHours": 48,
+      "description": "Spawns 48 hours after being killed"
+    },
+    "Metus": {
+      "spawnIntervalHours": 48,
+      "description": "Spawns 48 hours after being killed"
+    },
+    "Duplican": {
+      "spawnIntervalHours": 48,
+      "description": "Spawns 48 hours after being killed"
+    },
+    "Shuliar": {
+      "spawnIntervalHours": 35,
+      "description": "Spawns 35 hours after being killed"
+    },
+    "Gareth": {
+      "spawnIntervalHours": 32,
+      "description": "Spawns 32 hours after being killed"
+    },
+    "Titore": {
+      "spawnIntervalHours": 37,
+      "description": "Spawns 37 hours after being killed"
+    },
+    "Larba": {
+      "spawnIntervalHours": 35,
+      "description": "Spawns 35 hours after being killed"
+    },
+    "Catena": {
+      "spawnIntervalHours": 35,
+      "description": "Spawns 35 hours after being killed"
+    },
+    "Secreta": {
+      "spawnIntervalHours": 62,
+      "description": "Spawns 62 hours after being killed"
+    },
+    "Ordo": {
+      "spawnIntervalHours": 62,
+      "description": "Spawns 62 hours after being killed"
+    },
+    "Asta": {
+      "spawnIntervalHours": 62,
+      "description": "Spawns 62 hours after being killed"
+    },
+    "Supore": {
+      "spawnIntervalHours": 62,
+      "description": "Spawns 62 hours after being killed"
+    }
+  },
+  "scheduleBasedBosses": {
+    "Clemantis": {
+      "schedules": [
+        {
+          "day": "Monday",
+          "time": "11:30",
+          "dayOfWeek": 1
+        },
+        {
+          "day": "Thursday",
+          "time": "19:00",
+          "dayOfWeek": 4
+        }
+      ],
+      "description": "Spawns Monday 11:30, Thursday 19:00"
+    },
+    "Saphirus": {
+      "schedules": [
+        {
+          "day": "Sunday",
+          "time": "17:00",
+          "dayOfWeek": 0
+        },
+        {
+          "day": "Tuesday",
+          "time": "11:30",
+          "dayOfWeek": 2
+        }
+      ],
+      "description": "Spawns Sunday 17:00, Tuesday 11:30"
+    },
+    "Neutro": {
+      "schedules": [
+        {
+          "day": "Tuesday",
+          "time": "19:00",
+          "dayOfWeek": 2
+        },
+        {
+          "day": "Thursday",
+          "time": "11:30",
+          "dayOfWeek": 4
+        }
+      ],
+      "description": "Spawns Tuesday 19:00, Thursday 11:30"
+    },
+    "Thymele": {
+      "schedules": [
+        {
+          "day": "Monday",
+          "time": "19:00",
+          "dayOfWeek": 1
+        },
+        {
+          "day": "Wednesday",
+          "time": "11:30",
+          "dayOfWeek": 3
+        }
+      ],
+      "description": "Spawns Monday 19:00, Wednesday 11:30"
+    },
+    "Milavy": {
+      "schedules": [
+        {
+          "day": "Saturday",
+          "time": "15:00",
+          "dayOfWeek": 6
+        }
+      ],
+      "description": "Spawns Saturday 15:00"
+    },
+    "Ringor": {
+      "schedules": [
+        {
+          "day": "Saturday",
+          "time": "17:00",
+          "dayOfWeek": 6
+        }
+      ],
+      "description": "Spawns Saturday 17:00"
+    },
+    "Roderick": {
+      "schedules": [
+        {
+          "day": "Friday",
+          "time": "19:00",
+          "dayOfWeek": 5
+        }
+      ],
+      "description": "Spawns Friday 19:00"
+    },
+    "Auraq": {
+      "schedules": [
+        {
+          "day": "Friday",
+          "time": "22:00",
+          "dayOfWeek": 5
+        },
+        {
+          "day": "Wednesday",
+          "time": "21:00",
+          "dayOfWeek": 3
+        }
+      ],
+      "description": "Spawns Friday 22:00, Wednesday 21:00"
+    },
+    "Chaiflock": {
+      "schedules": [
+        {
+          "day": "Saturday",
+          "time": "22:00",
+          "dayOfWeek": 6
+        }
+      ],
+      "description": "Spawns Saturday 22:00"
+    },
+    "Benji": {
+      "schedules": [
+        {
+          "day": "Sunday",
+          "time": "21:00",
+          "dayOfWeek": 0
+        }
+      ],
+      "description": "Spawns Sunday 21:00"
+    },
+    "Guild Boss": {
+      "schedules": [
+        {
+          "day": "Monday",
+          "time": "21:00",
+          "dayOfWeek": 1
+        }
+      ],
+      "description": "Guild boss raid every Monday 21:00"
+    }
+  }
+}

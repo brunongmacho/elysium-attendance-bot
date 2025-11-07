@@ -77,7 +77,7 @@ const leaderboardSystem = require("./leaderboard-system.js"); // Leaderboards
 const errorHandler = require('./utils/error-handler');      // Centralized error handling
 const { SheetAPI } = require('./utils/sheet-api');          // Unified Google Sheets API
 const { DiscordCache } = require('./utils/discord-cache');  // Channel caching system
-const { normalizeUsername } = require('./utils/common');    // Username normalization
+const { normalizeUsername, findBossMatch } = require('./utils/common');    // Username normalization and boss matching
 const scheduler = require('./utils/maintenance-scheduler'); // Unified maintenance scheduler
 const { IntelligenceEngine } = require('./intelligence-engine.js'); // AI/ML Intelligence Engine
 const { ProactiveIntelligence } = require('./proactive-intelligence.js'); // Proactive Monitoring
@@ -2114,31 +2114,35 @@ const commandHandlers = {
   },
 
   maintenance: async (message, member) => {
-    // Define all maintenance bosses that spawn during maintenance
-    const maintenanceBosses = [
-      "Venatus",
-      "Viorent",
-      "Ego",
-      "Livera",
-      "Araneo",
-      "Undomiel",
-      "Lady Dalia",
-      "General Aquleus",
-      "Amentis",
-      "Baron Braudmore",
-      "Wannitas",
-      "Metus",
-      "Duplican",
-      "Shuliar",
-      "Gareth",
-      "Titore",
-      "Larba",
-      "Catena",
-      "Secreta",
-      "Ordo",
-      "Asta",
-      "Supore",
-    ];
+    // Load timer-based bosses from configuration (these spawn during maintenance)
+    // ENHANCED: Now dynamic and uses the same config as spawn predictions
+    let maintenanceBosses = [];
+
+    try {
+      const bossSpawnConfig = intelligenceEngine.bossSpawnConfig;
+      if (bossSpawnConfig && bossSpawnConfig.timerBasedBosses) {
+        maintenanceBosses = Object.keys(bossSpawnConfig.timerBasedBosses);
+        console.log(`[MAINTENANCE] Loaded ${maintenanceBosses.length} timer-based bosses from config`);
+      } else {
+        // Fallback to hardcoded list if config not available
+        maintenanceBosses = [
+          "Venatus", "Viorent", "Ego", "Livera", "Araneo", "Undomiel",
+          "Lady Dalia", "General Aquleus", "Amentis", "Baron Braudmore",
+          "Wannitas", "Metus", "Duplican", "Shuliar", "Gareth", "Titore",
+          "Larba", "Catena", "Secreta", "Ordo", "Asta", "Supore",
+        ];
+        console.warn('[MAINTENANCE] Using fallback boss list - config not available');
+      }
+    } catch (error) {
+      console.error('[MAINTENANCE] Error loading boss config:', error);
+      // Use fallback list
+      maintenanceBosses = [
+        "Venatus", "Viorent", "Ego", "Livera", "Araneo", "Undomiel",
+        "Lady Dalia", "General Aquleus", "Amentis", "Baron Braudmore",
+        "Wannitas", "Metus", "Duplican", "Shuliar", "Gareth", "Titore",
+        "Larba", "Catena", "Secreta", "Ordo", "Asta", "Supore",
+      ];
+    }
 
     // Show confirmation message
     await awaitConfirmation(
@@ -3185,10 +3189,50 @@ const commandHandlers = {
   /**
    * Predict next boss spawn time based on historical patterns
    * Usage: !predictspawn [boss name]
+   *
+   * ENHANCED NLP: Automatically detects boss names from natural language
+   * - "next spawn" or "!predictspawn" → predicts next boss to spawn
+   * - "when Venatus spawn" or "!predictspawn Venatus" → predicts Venatus specifically
    */
   predictspawn: async (message, member) => {
-    const args = message.content.trim().split(/\s+/).slice(1);
-    const bossName = args.length > 0 ? args.join(' ') : null;
+    const messageContent = message.content.trim();
+    let bossName = null;
+
+    // Try to detect boss name from the message using fuzzy matching
+    // This allows natural language like "when venatus spawn" or "kailan lalabas ego"
+    const words = messageContent.split(/\s+/);
+
+    for (let i = 0; i < words.length; i++) {
+      // Try single words
+      const match = findBossMatch(words[i], bossPoints);
+      if (match) {
+        bossName = match;
+        console.log(`[PREDICTSPAWN] Detected boss "${bossName}" from word: "${words[i]}"`);
+        break;
+      }
+
+      // Try two-word combinations (for bosses like "Lady Dalia", "Baron Braudmore")
+      if (i < words.length - 1) {
+        const twoWords = `${words[i]} ${words[i + 1]}`;
+        const match2 = findBossMatch(twoWords, bossPoints);
+        if (match2) {
+          bossName = match2;
+          console.log(`[PREDICTSPAWN] Detected boss "${bossName}" from phrase: "${twoWords}"`);
+          break;
+        }
+      }
+
+      // Try three-word combinations (for "General Aquleus")
+      if (i < words.length - 2) {
+        const threeWords = `${words[i]} ${words[i + 1]} ${words[i + 2]}`;
+        const match3 = findBossMatch(threeWords, bossPoints);
+        if (match3) {
+          bossName = match3;
+          console.log(`[PREDICTSPAWN] Detected boss "${bossName}" from phrase: "${threeWords}"`);
+          break;
+        }
+      }
+    }
 
     await message.reply(
       bossName
@@ -3235,10 +3279,23 @@ const commandHandlers = {
             inline: true,
           },
           {
-            name: '⏱️ Avg Interval',
-            value: `${prediction.avgIntervalHours.toFixed(1)} hours`,
+            name: '⏱️ Spawn Type',
+            value: prediction.spawnType === 'schedule'
+              ? '📅 Fixed Schedule'
+              : prediction.usingConfiguredTimer
+              ? '⏰ Timer-Based'
+              : '📊 Historical Data',
             inline: true,
           },
+          // Only show interval for non-schedule bosses
+          ...(prediction.avgIntervalHours
+            ? [{
+                name: '⏱️ Avg Interval',
+                value: `${prediction.avgIntervalHours.toFixed(1)} hours`,
+                inline: true,
+              }]
+            : []
+          ),
           {
             name: '🕐 Earliest Possible',
             value: `<t:${Math.floor(prediction.earliestTime.getTime() / 1000)}:F>`,
@@ -3256,9 +3313,11 @@ const commandHandlers = {
           },
           {
             name: '🧠 AI Insight',
-            value:
-              `Based on ${prediction.basedOnSpawns} historical spawns, the bot predicts **${prediction.bossName}** ` +
-              `will spawn in approximately **${daysUntil > 0 ? `${daysUntil} days and ` : ''}${remainingHours} hours**.`,
+            value: prediction.spawnType === 'schedule'
+              ? `**${prediction.bossName}** uses a fixed weekly schedule. ${prediction.scheduleInfo || 'Next spawn calculated from schedule.'}`
+              : prediction.usingConfiguredTimer
+              ? `**${prediction.bossName}** has a **${prediction.avgIntervalHours.toFixed(1)}-hour** spawn timer. Prediction blends configured timer with ${prediction.basedOnSpawns} historical spawns for accuracy.`
+              : `Based on ${prediction.basedOnSpawns} historical spawns, the bot predicts **${prediction.bossName}** will spawn in approximately **${daysUntil > 0 ? `${daysUntil} days and ` : ''}${remainingHours} hours**.`,
             inline: false,
           }
         );

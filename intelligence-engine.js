@@ -46,6 +46,8 @@ const { EmbedBuilder } = require('discord.js');
 const { getChannelById } = require('./utils/discord-cache');
 const { getCurrentTimestamp } = require('./utils/timestamp-cache');
 const { LearningSystem } = require('./learning-system');
+const fs = require('fs');
+const path = require('path');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -110,6 +112,9 @@ class IntelligenceEngine {
       ttl: 30 * 60 * 1000,        // 30-minute cache TTL
     };
 
+    // Boss spawn configuration (timer and schedule-based spawns)
+    this.bossSpawnConfig = this.loadBossSpawnConfig();
+
     // Performance metrics
     this.performanceMetrics = {
       memoryUsage: [],
@@ -123,6 +128,118 @@ class IntelligenceEngine {
 
     // Initialize
     this.initialized = false;
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // BOSS SPAWN CONFIGURATION
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Load boss spawn configuration from JSON file
+   * @returns {Object} Boss spawn configuration with timer and schedule-based data
+   */
+  loadBossSpawnConfig() {
+    try {
+      const configPath = path.join(__dirname, 'boss_spawn_config.json');
+      if (fs.existsSync(configPath)) {
+        const configData = fs.readFileSync(configPath, 'utf8');
+        const config = JSON.parse(configData);
+        console.log('[INTELLIGENCE] Boss spawn configuration loaded successfully');
+        return config;
+      } else {
+        console.warn('[INTELLIGENCE] Boss spawn config file not found, using historical data only');
+        return { timerBasedBosses: {}, scheduleBasedBosses: {} };
+      }
+    } catch (error) {
+      console.error('[INTELLIGENCE] Error loading boss spawn config:', error);
+      return { timerBasedBosses: {}, scheduleBasedBosses: {} };
+    }
+  }
+
+  /**
+   * Get boss spawn type and configuration
+   * @param {string} bossName - Boss name
+   * @returns {Object|null} Boss spawn info { type: 'timer'|'schedule', config: {...} }
+   */
+  getBossSpawnType(bossName) {
+    if (!this.bossSpawnConfig) {
+      return null;
+    }
+
+    const normalizedName = bossName.trim();
+
+    // Check timer-based bosses (case-insensitive)
+    for (const [configBossName, config] of Object.entries(this.bossSpawnConfig.timerBasedBosses || {})) {
+      if (configBossName.toLowerCase() === normalizedName.toLowerCase()) {
+        return {
+          type: 'timer',
+          config: config,
+          name: configBossName,
+        };
+      }
+    }
+
+    // Check schedule-based bosses (case-insensitive)
+    for (const [configBossName, config] of Object.entries(this.bossSpawnConfig.scheduleBasedBosses || {})) {
+      if (configBossName.toLowerCase() === normalizedName.toLowerCase()) {
+        return {
+          type: 'schedule',
+          config: config,
+          name: configBossName,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Calculate next spawn time for schedule-based boss
+   * @param {Object} scheduleConfig - Boss schedule configuration
+   * @returns {Date} Next spawn time
+   */
+  calculateNextScheduledSpawn(scheduleConfig) {
+    const now = new Date();
+    const schedules = scheduleConfig.schedules || [];
+
+    if (schedules.length === 0) {
+      return null;
+    }
+
+    const upcomingSpawns = [];
+
+    for (const schedule of schedules) {
+      const [hours, minutes] = schedule.time.split(':').map(Number);
+      const dayOfWeek = schedule.dayOfWeek;
+
+      // Calculate next occurrence of this schedule
+      const nextSpawn = new Date(now);
+      const currentDay = nextSpawn.getDay();
+
+      // Days until next occurrence
+      let daysUntil = dayOfWeek - currentDay;
+      if (daysUntil < 0) {
+        daysUntil += 7;
+      } else if (daysUntil === 0) {
+        // If it's today, check if the time has passed
+        const todaySpawnTime = new Date(now);
+        todaySpawnTime.setHours(hours, minutes, 0, 0);
+
+        if (now >= todaySpawnTime) {
+          // Time has passed, next spawn is next week
+          daysUntil = 7;
+        }
+      }
+
+      nextSpawn.setDate(nextSpawn.getDate() + daysUntil);
+      nextSpawn.setHours(hours, minutes, 0, 0);
+
+      upcomingSpawns.push(nextSpawn);
+    }
+
+    // Return the soonest spawn time
+    upcomingSpawns.sort((a, b) => a - b);
+    return upcomingSpawns[0];
   }
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -921,6 +1038,15 @@ class IntelligenceEngine {
    * @returns {Promise<Object>} Prediction with time, confidence, and stats
    */
   async calculateBossSpawnPrediction(spawns, bossName) {
+    // Check if this is a schedule-based boss
+    const bossSpawnType = this.getBossSpawnType(bossName);
+
+    if (bossSpawnType && bossSpawnType.type === 'schedule') {
+      // For schedule-based bosses, use fixed schedule instead of historical data
+      return this.predictScheduledBoss(bossSpawnType, spawns);
+    }
+
+    // For timer-based and unknown bosses, calculate from historical data
     // Calculate intervals between spawns
     const intervals = [];
     for (let i = 1; i < spawns.length; i++) {
@@ -979,7 +1105,30 @@ class IntelligenceEngine {
     // Adaptive weighting: use more recent data if sample size is small
     const medianWeight = intervals.length >= 10 ? 0.7 : 0.5;
     const recentWeight = 1 - medianWeight;
-    const predictedInterval = (medianInterval * medianWeight) + (recentAvg * recentWeight);
+    let predictedInterval = (medianInterval * medianWeight) + (recentAvg * recentWeight);
+
+    // ENHANCED: Use timer-based configuration if available
+    let usingConfiguredTimer = false;
+    if (bossSpawnType && bossSpawnType.type === 'timer') {
+      const configuredInterval = bossSpawnType.config.spawnIntervalHours;
+      console.log(`[INTELLIGENCE] Boss "${bossName}" has configured timer: ${configuredInterval}h (historical: ${predictedInterval.toFixed(2)}h)`);
+
+      // Blend configured interval with historical data for accuracy
+      // If historical data is close to configured (within 15%), trust historical more
+      // Otherwise, weight configured interval higher
+      const percentDiff = Math.abs(predictedInterval - configuredInterval) / configuredInterval;
+
+      if (percentDiff < 0.15) {
+        // Historical data matches config well, use 70% historical, 30% config
+        predictedInterval = (predictedInterval * 0.7) + (configuredInterval * 0.3);
+        console.log(`[INTELLIGENCE] Historical data matches config (${(percentDiff * 100).toFixed(1)}% diff), blended: ${predictedInterval.toFixed(2)}h`);
+      } else {
+        // Historical data differs significantly, trust config more (70% config, 30% historical)
+        predictedInterval = (configuredInterval * 0.7) + (predictedInterval * 0.3);
+        console.log(`[INTELLIGENCE] Historical data differs (${(percentDiff * 100).toFixed(1)}% diff), using config-weighted: ${predictedInterval.toFixed(2)}h`);
+      }
+      usingConfiguredTimer = true;
+    }
 
     // Calculate standard deviation on filtered intervals
     const variance = intervalsToUse.reduce((sum, interval) =>
@@ -992,6 +1141,16 @@ class IntelligenceEngine {
 
     // Calculate confidence based on consistency of intervals
     let baseConfidence = this.calculateSpawnConfidence(intervalsToUse.length, stdDev, medianInterval);
+
+    // ENHANCED: Boost confidence if using configured timer data
+    if (usingConfiguredTimer) {
+      // Having exact spawn timer info increases confidence
+      // Boost by up to 15 points, scaled by how consistent historical data is
+      const consistencyFactor = Math.max(0, 1 - (stdDev / medianInterval));
+      const confidenceBoost = 15 * consistencyFactor;
+      baseConfidence = Math.min(95, baseConfidence + confidenceBoost);
+      console.log(`[INTELLIGENCE] Confidence boosted by ${confidenceBoost.toFixed(1)} points for configured timer`);
+    }
 
     // Adjust confidence based on time since last spawn (recency penalty)
     const now = new Date();
@@ -1059,6 +1218,75 @@ class IntelligenceEngine {
       lastSpawnTime: lastSpawn,
       basedOnSpawns: spawns.length,
       bossName: bossName,
+      usingConfiguredTimer: usingConfiguredTimer,
+      spawnType: bossSpawnType ? bossSpawnType.type : 'historical',
+    };
+  }
+
+  /**
+   * Predict spawn for schedule-based boss (fixed day/time spawns)
+   * @param {Object} bossSpawnType - Boss spawn type info
+   * @param {Array} spawns - Historical spawns (for learning system)
+   * @returns {Promise<Object>} Prediction with time and confidence
+   */
+  async predictScheduledBoss(bossSpawnType, spawns) {
+    const bossName = bossSpawnType.name;
+    const scheduleConfig = bossSpawnType.config;
+
+    console.log(`[INTELLIGENCE] Boss "${bossName}" uses fixed schedule: ${scheduleConfig.description}`);
+
+    // Calculate next scheduled spawn time
+    const nextSpawnTime = this.calculateNextScheduledSpawn(scheduleConfig);
+
+    if (!nextSpawnTime) {
+      return {
+        error: `No valid schedule found for ${bossName}`,
+        confidence: 0,
+      };
+    }
+
+    // For schedule-based bosses, confidence is very high (90%)
+    // since spawn times are fixed and don't depend on kill time
+    const baseConfidence = 90;
+
+    // Slight adjustment based on historical accuracy (learning system)
+    const adjustedConfidence = await this.learningSystem.adjustConfidence('spawn_prediction', baseConfidence);
+
+    // Save prediction for future learning
+    const features = {
+      bossName: bossName,
+      historicalSpawns: spawns.length,
+      spawnType: 'schedule',
+      scheduleCount: scheduleConfig.schedules.length,
+    };
+
+    await this.learningSystem.savePrediction(
+      'spawn_prediction',
+      bossName,
+      nextSpawnTime.toISOString(),
+      adjustedConfidence,
+      features
+    );
+
+    // For schedule-based bosses, the range is very tight (±30 minutes for server time variance)
+    const rangeHours = 0.5; // 30 minutes
+    const earliestTime = new Date(nextSpawnTime.getTime() - (rangeHours * 60 * 60 * 1000));
+    const latestTime = new Date(nextSpawnTime.getTime() + (rangeHours * 60 * 60 * 1000));
+
+    // Calculate when this was last spawned (if we have history)
+    const lastSpawn = spawns.length > 0 ? spawns[spawns.length - 1].timestamp : null;
+
+    return {
+      predictedTime: nextSpawnTime,
+      earliestTime,
+      latestTime,
+      confidence: adjustedConfidence,
+      avgIntervalHours: null, // Not applicable for schedule-based
+      lastSpawnTime: lastSpawn,
+      basedOnSpawns: spawns.length,
+      bossName: bossName,
+      spawnType: 'schedule',
+      scheduleInfo: scheduleConfig.description,
     };
   }
 
