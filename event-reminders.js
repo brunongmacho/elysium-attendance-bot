@@ -62,9 +62,9 @@ const GAME_EVENTS = {
     startTime: { hour: 19, minute: 25 }, // Actual event time
     durationMinutes: 3,
     color: 0xff4757, // Dark red
-    description: '**GUILD WAR** is starting in a few minutes!',
+    description: '**GUILD WAR** is starting soon! Get ready!',
     thumbnail: 'https://i.imgur.com/kR2B3Yx.png', // War icon
-    reminderOffsetMinutes: 5, // Remind 5 min before (event is very short)
+    reminderOffsetMinutes: 20, // Remind 20 min before (gives players time to prepare)
   },
 };
 
@@ -389,6 +389,33 @@ function scheduleEventReminder(eventKey, event, targetDay) {
     clearTimeout(eventTimers[eventKey].eventTimer);
   }
 
+  // CRASH RECOVERY: If reminder time has passed but event hasn't started yet
+  // (e.g., bot restarted at 19:12, reminder was at 19:05, event is at 19:25)
+  // Send the reminder immediately instead of waiting for next week
+  if (delay < 0 && now < eventStartTime) {
+    console.log(
+      `⚠️ [EVENT REMINDER] Missed reminder for ${event.name} at ${formatGMT8(reminderTime)}\n` +
+      `   Event hasn't started yet (${formatGMT8(eventStartTime)}), sending reminder NOW!`
+    );
+
+    // Send immediately and reschedule for next week
+    sendEventReminder(event, eventStartTime).then(() => {
+      scheduleEventReminder(eventKey, event, targetDay);
+    });
+    return;
+  }
+
+  // If both reminder time AND event time have passed, skip to next occurrence
+  if (delay < 0) {
+    console.log(
+      `⏭️ [EVENT REMINDER] Event ${event.name} already finished at ${formatGMT8(eventStartTime)}\n` +
+      `   Scheduling for next occurrence...`
+    );
+    // Event already passed, schedule for next week
+    scheduleEventReminder(eventKey, event, targetDay);
+    return;
+  }
+
   // Schedule event reminder
   eventTimers[eventKey] = {
     eventTimer: setTimeout(async () => {
@@ -426,6 +453,18 @@ function scheduleQueueReminder(targetDay) {
   // Clear existing timer if any
   if (queueReminderTimers[queueKey]) {
     clearTimeout(queueReminderTimers[queueKey]);
+  }
+
+  // CRASH RECOVERY: If reminder time has passed, skip to next occurrence
+  // (Queue reminders are posted once and deleted after 2 hours, no need to re-send)
+  if (delay < 0) {
+    console.log(
+      `⏭️ [QUEUE REMINDER] Missed queue reminder at ${formatGMT8(nextOccurrence)}\n` +
+      `   Scheduling for next occurrence...`
+    );
+    // Skip to next week
+    scheduleQueueReminder(targetDay);
+    return;
   }
 
   // Schedule queue reminder
