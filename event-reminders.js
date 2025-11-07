@@ -67,10 +67,15 @@ const GAME_EVENTS = {
     thumbnail: 'https://i.imgur.com/kR2B3Yx.png', // War icon
     reminderOffsetMinutes: 20, // Remind 20 min before (gives players time to prepare)
   },
+};
+
+/**
+ * Daily game event definitions (occur every day, not weekly)
+ */
+const DAILY_EVENTS = {
   worldBossMorning: {
     name: '🐉 World Boss Event',
-    days: [0, 1, 2, 3, 4, 5, 6], // Daily
-    startTime: { hour: 11, minute: 0 }, // 11:00 AM
+    startTime: { hour: 11, minute: 0 }, // 11:00 AM GMT+8
     durationMinutes: 30,
     color: 0x9b59b6, // Purple
     description: '**World Boss** is spawning soon! Prepare for battle!',
@@ -79,8 +84,7 @@ const GAME_EVENTS = {
   },
   worldBossEvening: {
     name: '🐉 World Boss Event',
-    days: [0, 1, 2, 3, 4, 5, 6], // Daily
-    startTime: { hour: 20, minute: 0 }, // 20:00 PM (8:00 PM)
+    startTime: { hour: 20, minute: 0 }, // 20:00 (8:00 PM) GMT+8
     durationMinutes: 30,
     color: 0x9b59b6, // Purple
     description: '**World Boss** is spawning soon! Prepare for battle!',
@@ -169,6 +173,31 @@ function calculateNextOccurrence(targetDay, hour, minute) {
 
   // Add days to reach target
   next.setDate(next.getDate() + daysUntilTarget);
+
+  // Convert back to UTC
+  const utcNext = new Date(next.getTime() - TIMEZONE_OFFSET);
+
+  return utcNext;
+}
+
+/**
+ * Calculate next daily occurrence of a specific time in GMT+8
+ * @param {number} hour - Hour in 24h format
+ * @param {number} minute - Minute
+ * @returns {Date} UTC date of next occurrence
+ */
+function calculateNextDailyOccurrence(hour, minute) {
+  const now = new Date();
+  const nowGMT8 = getCurrentGMT8();
+
+  // Start with today at the target time in GMT+8
+  let next = new Date(nowGMT8);
+  next.setHours(hour, minute, 0, 0);
+
+  // If time has already passed today, schedule for tomorrow
+  if (nowGMT8 >= next) {
+    next.setDate(next.getDate() + 1);
+  }
 
   // Convert back to UTC
   const utcNext = new Date(next.getTime() - TIMEZONE_OFFSET);
@@ -472,6 +501,92 @@ function scheduleEventReminder(eventKey, event, targetDay) {
 }
 
 /**
+ * Schedule a daily event reminder (occurs every day, not weekly)
+ * @param {string} eventKey - Unique event key
+ * @param {Object} event - Event configuration
+ * @returns {void}
+ */
+function scheduleDailyEventReminder(eventKey, event) {
+  // Calculate the actual event start time (next daily occurrence)
+  const eventStartTime = calculateNextDailyOccurrence(
+    event.startTime.hour,
+    event.startTime.minute
+  );
+
+  // Calculate when to send the reminder (offset minutes before event)
+  const reminderOffsetMs = (event.reminderOffsetMinutes || REMINDER_OFFSET_MINUTES) * 60 * 1000;
+  const reminderTime = new Date(eventStartTime.getTime() - reminderOffsetMs);
+
+  const now = new Date();
+  const delay = reminderTime.getTime() - now.getTime();
+
+  // Clear existing timer if any
+  if (eventTimers[eventKey]?.eventTimer) {
+    clearTimeout(eventTimers[eventKey].eventTimer);
+  }
+
+  // CRASH RECOVERY: If reminder time has passed but event hasn't started yet
+  if (delay < 0 && now < eventStartTime) {
+    console.log(
+      `⚠️ [EVENT REMINDER] Missed reminder for ${event.name} at ${formatGMT8(reminderTime)}\n` +
+      `   Event hasn't started yet (${formatGMT8(eventStartTime)}), sending reminder NOW!`
+    );
+
+    // Send immediately
+    sendEventReminder(event, eventStartTime);
+
+    // Wait until after the event finishes, then reschedule for next day
+    const eventEndTime = eventStartTime.getTime() + (event.durationMinutes * 60 * 1000);
+    const delayUntilAfterEvent = eventEndTime - now.getTime() + 1000;
+
+    eventTimers[eventKey] = {
+      eventTimer: setTimeout(() => {
+        scheduleDailyEventReminder(eventKey, event);
+      }, delayUntilAfterEvent),
+      nextRun: new Date(eventEndTime),
+      eventTime: eventStartTime,
+    };
+
+    console.log(
+      `📅 [EVENT REMINDER] Will reschedule ${event.name} after event ends at ${formatGMT8(new Date(eventEndTime))}`
+    );
+
+    return;
+  }
+
+  // If both reminder time AND event time have passed, skip to next occurrence
+  if (delay < 0) {
+    console.log(
+      `⏭️ [EVENT REMINDER] Event ${event.name} already finished at ${formatGMT8(eventStartTime)}\n` +
+      `   Scheduling for next occurrence...`
+    );
+    // Event already passed, schedule for next day
+    scheduleDailyEventReminder(eventKey, event);
+    return;
+  }
+
+  // Schedule event reminder
+  eventTimers[eventKey] = {
+    eventTimer: setTimeout(async () => {
+      await sendEventReminder(event, eventStartTime);
+      // Reschedule for next day (not next week!)
+      scheduleDailyEventReminder(eventKey, event);
+    }, delay),
+    nextRun: reminderTime,
+    eventTime: eventStartTime,
+  };
+
+  const nowGMT8 = getCurrentGMT8();
+  const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][nowGMT8.getDay()];
+
+  console.log(
+    `📅 [EVENT REMINDER] Scheduled: ${event.name} (Daily)\n` +
+    `   Reminder at: ${formatGMT8(reminderTime)} (in ${formatTimeRemaining(delay)})\n` +
+    `   Event starts: ${formatGMT8(eventStartTime)}`
+  );
+}
+
+/**
  * Schedule Guild War queue reminder
  * @param {number} targetDay - Day of week
  * @returns {void}
@@ -539,15 +654,9 @@ function scheduleAllEvents() {
     scheduleEventReminder(`guildWar_${day}`, GAME_EVENTS.guildWar, day);
   });
 
-  // Schedule World Boss Morning (Daily at 11:00 AM)
-  GAME_EVENTS.worldBossMorning.days.forEach((day, index) => {
-    scheduleEventReminder(`worldBossMorning_${day}`, GAME_EVENTS.worldBossMorning, day);
-  });
-
-  // Schedule World Boss Evening (Daily at 20:00 PM)
-  GAME_EVENTS.worldBossEvening.days.forEach((day, index) => {
-    scheduleEventReminder(`worldBossEvening_${day}`, GAME_EVENTS.worldBossEvening, day);
-  });
+  // Schedule Daily Events (World Boss)
+  scheduleDailyEventReminder('worldBossMorning', DAILY_EVENTS.worldBossMorning);
+  scheduleDailyEventReminder('worldBossEvening', DAILY_EVENTS.worldBossEvening);
 
   // Schedule Guild War queue reminders (Thu, Fri, Sat)
   GUILD_WAR_QUEUE_REMINDER.days.forEach(day => {
