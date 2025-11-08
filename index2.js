@@ -1089,14 +1089,12 @@ async function awaitConfirmation(
     const confirmButton = new ButtonBuilder()
       .setCustomId(`confirm_yes_${member.user.id}_${Date.now()}`)
       .setLabel('✅ Confirm')
-      .setStyle(ButtonStyle.Success)
-      .setDisabled(false);
+      .setStyle(ButtonStyle.Success);
 
     const cancelButton = new ButtonBuilder()
       .setCustomId(`confirm_no_${member.user.id}_${Date.now()}`)
       .setLabel('❌ Cancel')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(false);
+      .setStyle(ButtonStyle.Secondary);
 
     const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 
