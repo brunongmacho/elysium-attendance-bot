@@ -710,6 +710,36 @@ class NLPLearningSystem {
     const normalized = phrase.toLowerCase().trim();
     const words = normalized.split(/\s+/);
 
+    // CRITICAL: Block ambiguous single words that are too generic to learn safely
+    // These words have multiple meanings or are too common in casual conversation
+    const ambiguousWords = [
+      // Generic status words (could mean many different things)
+      'status', 'stat', 'stats', 'info', 'information',
+
+      // Generic ranking words
+      'top', 'rank', 'ranking', 'ranks', 'leaderboard',
+
+      // Generic action words
+      'show', 'view', 'check', 'see', 'get', 'give',
+
+      // Generic attendance words without context
+      'attendance', 'attend', 'present', 'here',
+
+      // Generic points words
+      'points', 'pts', 'point',
+
+      // Generic boss words
+      'boss', 'spawn', 'next', 'when',
+
+      // Gaming slang (too ambiguous alone)
+      'gg', 'wp', 'lol', 'haha', 'nice', 'cool', 'ok', 'okay',
+    ];
+
+    if (words.length === 1 && ambiguousWords.includes(normalized)) {
+      console.log(`🚫 [NLP Learning] Refusing to learn ambiguous single word: "${phrase}"`);
+      return null;
+    }
+
     // Calculate conversational penalty - reduce confidence for phrases that look conversational
     const conversationalPenalty = this.calculateConversationalPenalty(normalized);
     if (conversationalPenalty > 0) {
@@ -853,6 +883,16 @@ class NLPLearningSystem {
       /\b(?:who|what|sino|ano)\s+(?:are|is|ka)\s+you/i,
       /\b(?:your|mo|ng)\s+(?:name|master|owner|creator|boss)/i,
       /\b(?:sino|who)\s+(?:.*?\s+)?(?:master|owner|creator|boss|amo|may\s+ari)\s+(?:mo|your)/i, // "sino master mo", "who your master"
+
+      // Personal questions (Filipino & English)
+      /\b(?:virgin|bakla|tomboy|bading|bayot)\s+(?:ka|pa|ba)/i, // "virgin ka pa ba?", "bakla ka ba?"
+      /\b(?:ikaw|you)\s+(?:virgin|bakla|gay|tomboy)/i, // "ikaw virgin?", "you gay?"
+      /\b(?:sex|kantutan|kantot|chicks|jowa)/i, // Sexual/relationship questions
+
+      // Gaming taunts (single word or short phrases)
+      /^(?:noob|n00b|newbie|trash|ez|rekt|pwned|owned|scrub)$/i,
+      /^(?:git\s+gud|git\s+good|ez\s+clap|gg\s+ez)$/i,
+      /\b(?:you\s+)?(?:noob|trash|garbage|bot\s+player)/i,
 
       // Greetings
       /^(?:hi|hello|hey|sup|yo|kumusta|kamusta)\b/i,
@@ -1308,9 +1348,21 @@ class NLPLearningSystem {
       // Gaming insults (Filipino)
       'mahina', 'duwag', 'lutang', 'feeder', 'pabigat', 'pasanin',
 
+      // Gaming taunts (English/International)
+      'noob', 'n00b', 'newbie', 'trash', 'garbage', 'scrub',
+      'git gud', 'git good', 'ez clap', 'rekt', 'pwned', 'owned',
+      'tryhard', 'hardstuck', 'bot player', 'iron player',
+
+      // Personal/Sexual questions (Filipino & English)
+      'virgin', 'birhen', 'bakla', 'tomboy', 'bayot',
+      'sex', 'kantutan', 'chicks', 'bading', 'baktin',
+      'jowa', 'girlfriend', 'boyfriend', 'kabit', 'kasal',
+
       // Common insult phrases (will match partial)
       'walang kwenta', 'walang silbi', 'walang utak', 'walang alam',
-      'bugbog', 'talo ka', 'noob ka', 'bobo maglaro'
+      'bugbog', 'talo ka', 'noob ka', 'bobo maglaro',
+      'ka pa ba', 'ikaw ba', 'virgin ka', 'bading ka',
+      'you virgin', 'you gay', 'you noob'
     ];
 
     for (const word of inappropriateWords) {
