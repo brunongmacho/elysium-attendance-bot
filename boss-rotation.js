@@ -148,9 +148,16 @@ async function getRotationStatus(bossName, useCache = true) {
     // Fetch from Google Sheets
     const result = await sheetAPI.call('getBossRotation', { bossName: normalizedName });
 
-    if (result.status === 'ok' && result.data.isRotating) {
+    console.log(`[DEBUG] getBossRotation response for ${normalizedName}:`, JSON.stringify(result, null, 2));
+
+    if (result.status === 'ok' && result.data && result.data.isRotating) {
       // Update cache
       rotationCache[normalizedName] = result.data;
+      return result.data;
+    }
+
+    // If we got an OK response but boss not rotating, return that
+    if (result.status === 'ok' && result.data) {
       return result.data;
     }
 
