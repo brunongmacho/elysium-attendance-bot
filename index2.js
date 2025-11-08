@@ -2816,66 +2816,162 @@ const commandHandlers = {
       }
 
       const totalAnomalies = biddingAnomalies.anomaliesDetected + attendanceAnomalies.anomaliesDetected;
+      const allAnomalies = [...biddingAnomalies.anomalies, ...attendanceAnomalies.anomalies];
+
+      // Group by severity
+      const highSeverity = allAnomalies.filter(a => a.severity === 'HIGH');
+      const mediumSeverity = allAnomalies.filter(a => a.severity === 'MEDIUM');
+      const lowSeverity = allAnomalies.filter(a => a.severity === 'LOW');
+
+      // Determine embed color based on highest severity
+      let embedColor = 0x00ff00; // Green (no issues)
+      if (highSeverity.length > 0) embedColor = 0xff0000; // Red
+      else if (mediumSeverity.length > 0) embedColor = 0xff9900; // Orange
+      else if (lowSeverity.length > 0) embedColor = 0xffff00; // Yellow
 
       const embed = new EmbedBuilder()
-        .setColor(totalAnomalies > 0 ? 0xff0000 : 0x00ff00)
-        .setTitle(`🔍 Anomaly Detection Report`)
+        .setColor(embedColor)
+        .setTitle(`🔍 Comprehensive Anomaly Detection Report`)
         .setDescription(
           totalAnomalies === 0
             ? '✅ **No anomalies detected!** All patterns appear normal.'
-            : `⚠️ **${totalAnomalies} anomalies detected** - Review recommended.`
+            : `⚠️ **${totalAnomalies} anomalies detected** - Review recommended.\n\n` +
+              `**Severity Breakdown:**\n` +
+              `🔴 High: ${highSeverity.length} | 🟠 Medium: ${mediumSeverity.length} | 🟡 Low: ${lowSeverity.length}`
         )
         .addFields({
           name: '💰 Bidding Analysis',
           value:
-            `Analyzed: ${biddingAnomalies.analyzed} auctions\n` +
-            `Anomalies: ${biddingAnomalies.anomaliesDetected}`,
+            `Auctions: ${biddingAnomalies.analyzed}\n` +
+            `Members: ${biddingAnomalies.totalMembers || 'N/A'}\n` +
+            `Issues: ${biddingAnomalies.anomaliesDetected}`,
           inline: true,
         })
         .addFields({
           name: '📊 Attendance Analysis',
           value:
-            `Analyzed: ${attendanceAnomalies.analyzed} members\n` +
-            `Anomalies: ${attendanceAnomalies.anomaliesDetected}`,
+            `Members: ${attendanceAnomalies.analyzed}\n` +
+            `Avg Spawns: ${attendanceAnomalies.statistics.averageSpawns}\n` +
+            `Issues: ${attendanceAnomalies.anomaliesDetected}`,
           inline: true,
         })
         .setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
         .setTimestamp();
 
-      // Add bidding anomalies
-      if (biddingAnomalies.anomaliesDetected > 0) {
-        const biddingDetails = biddingAnomalies.anomalies
+      // HIGH SEVERITY ANOMALIES
+      if (highSeverity.length > 0) {
+        const highDetails = highSeverity
           .slice(0, 5)
-          .map((a) => `• **${a.type}** (${a.severity})\n  ${a.recommendation}`)
-          .join('\n');
+          .map((a) => commandHandlers.formatAnomalyDetail(a))
+          .join('\n\n');
 
         embed.addFields({
-          name: '⚠️ Bidding Anomalies',
-          value: biddingDetails,
+          name: `🔴 High Severity Issues (${highSeverity.length})`,
+          value: highDetails + (highSeverity.length > 5 ? `\n\n*+${highSeverity.length - 5} more*` : ''),
           inline: false,
         });
       }
 
-      // Add attendance anomalies
-      if (attendanceAnomalies.anomaliesDetected > 0) {
-        const attendanceDetails = attendanceAnomalies.anomalies
+      // MEDIUM SEVERITY ANOMALIES
+      if (mediumSeverity.length > 0) {
+        const mediumDetails = mediumSeverity
           .slice(0, 5)
-          .map((a) => `• **${a.username}** (${a.deviation})\n  ${a.recommendation}`)
-          .join('\n');
+          .map((a) => commandHandlers.formatAnomalyDetail(a))
+          .join('\n\n');
 
         embed.addFields({
-          name: '⚠️ Attendance Anomalies',
-          value: attendanceDetails,
+          name: `🟠 Medium Severity Issues (${mediumSeverity.length})`,
+          value: mediumDetails + (mediumSeverity.length > 5 ? `\n\n*+${mediumSeverity.length - 5} more*` : ''),
           inline: false,
         });
+      }
+
+      // LOW SEVERITY ANOMALIES (show fewer to avoid clutter)
+      if (lowSeverity.length > 0) {
+        const lowDetails = lowSeverity
+          .slice(0, 3)
+          .map((a) => commandHandlers.formatAnomalyDetail(a))
+          .join('\n\n');
+
+        embed.addFields({
+          name: `🟡 Low Severity Issues (${lowSeverity.length})`,
+          value: lowDetails + (lowSeverity.length > 3 ? `\n\n*+${lowSeverity.length - 3} more*` : ''),
+          inline: false,
+        });
+      }
+
+      // Add actionable recommendations
+      if (totalAnomalies > 0) {
+        const recommendations = [];
+        if (highSeverity.length > 0) {
+          recommendations.push('🔴 **Immediate action required for high severity issues**');
+        }
+        if (mediumSeverity.some(a => a.type === 'ATTENDANCE_BIDDING_MISMATCH')) {
+          recommendations.push('📢 Send engagement reminders to inactive bidders');
+        }
+        if (lowSeverity.some(a => a.type === 'POINT_HOARDING')) {
+          recommendations.push('💰 Remind members with unused points about upcoming auctions');
+        }
+        if (lowSeverity.some(a => a.type === 'SUDDEN_INACTIVITY')) {
+          recommendations.push('📬 Check in with suddenly inactive members');
+        }
+
+        if (recommendations.length > 0) {
+          embed.addFields({
+            name: '💡 Recommended Actions',
+            value: recommendations.slice(0, 4).join('\n'),
+            inline: false,
+          });
+        }
       }
 
       await message.reply({ embeds: [embed] });
-      console.log(`🤖 [INTELLIGENCE] Anomaly detection: ${totalAnomalies} anomalies found`);
+      console.log(`🤖 [INTELLIGENCE] Anomaly detection: ${totalAnomalies} anomalies found (H:${highSeverity.length} M:${mediumSeverity.length} L:${lowSeverity.length})`);
     } catch (error) {
       console.error('[INTELLIGENCE] Error detecting anomalies:', error);
       await message.reply(`❌ Error detecting anomalies: ${error.message}`);
     }
+  },
+
+  /**
+   * Format anomaly detail for display
+   */
+  formatAnomalyDetail(anomaly) {
+    const typeLabels = {
+      COLLUSION_SUSPECTED: '🚨 Collusion Suspected',
+      UNUSUAL_BID_AMOUNTS: '📊 Unusual Bid Amounts',
+      FREQUENT_ITEM: '🔁 Frequent Item',
+      POINT_HOARDING: '💰 Point Hoarding',
+      HIGH_BIDDING_VELOCITY: '⚡ High Spending',
+      UNUSUAL_ATTENDANCE: '📊 Unusual Attendance',
+      ATTENDANCE_BIDDING_MISMATCH: '⚠️ Attendance-Bidding Mismatch',
+      SUSPICIOUS_STREAK: '📅 Suspicious Streak',
+      SUDDEN_ACTIVITY_SPIKE: '📈 Sudden Activity Spike',
+      SUDDEN_INACTIVITY: '📉 Sudden Inactivity',
+    };
+
+    const label = typeLabels[anomaly.type] || anomaly.type;
+    let detail = `**${label}**\n`;
+
+    // Add description
+    if (anomaly.description) {
+      detail += `${anomaly.description}\n`;
+    }
+
+    // Add examples for UNUSUAL_BID_AMOUNTS
+    if (anomaly.type === 'UNUSUAL_BID_AMOUNTS' && anomaly.examples) {
+      const exampleText = anomaly.examples
+        .map(ex => `  - ${ex.item}: ${ex.bid}pts (${ex.winner})`)
+        .join('\n');
+      detail += `Examples:\n${exampleText}\n`;
+    }
+
+    // Add recommendation
+    if (anomaly.recommendation) {
+      detail += `└ *${anomaly.recommendation}*`;
+    }
+
+    return detail;
   },
 
   /**

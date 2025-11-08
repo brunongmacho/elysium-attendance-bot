@@ -1498,7 +1498,11 @@ class IntelligenceEngine {
    */
   async detectBiddingAnomalies() {
     try {
-      const auctionHistory = await this.getAllAuctionHistory();
+      const [auctionHistory, biddingResponse] = await Promise.all([
+        this.getAllAuctionHistory(),
+        this.sheetAPI.call('getBiddingPoints', {}),
+      ]);
+      const biddingData = biddingResponse?.members ?? [];
       const anomalies = [];
 
       // 1. Detect collusion (same winner repeatedly dominating item types)
@@ -1513,6 +1517,7 @@ class IntelligenceEngine {
               type: 'COLLUSION_SUSPECTED',
               severity: 'HIGH',
               description: `${winner} is winning ${(frequency * 100).toFixed(0)}% of ${itemType} auctions`,
+              details: `${count} out of ${total} auctions`,
               recommendation: 'Review auction history for this member',
             });
           }
@@ -1535,6 +1540,7 @@ class IntelligenceEngine {
           type: 'UNUSUAL_BID_AMOUNTS',
           severity: 'MEDIUM',
           count: outliers.length,
+          description: `${outliers.length} auction(s) with unusual bid amounts (>${INTELLIGENCE_CONFIG.BID_PATTERN_STDEV}σ from mean)`,
           examples: outliers.slice(0, 3).map(o => ({
             item: o.itemName,
             bid: o.winningBid,
@@ -1551,9 +1557,64 @@ class IntelligenceEngine {
           anomalies.push({
             type: 'FREQUENT_ITEM',
             severity: 'LOW',
+            description: `${itemName} appeared ${count} times in auction history`,
             itemName,
             occurrences: count,
             recommendation: 'Verify item source - possible duplication or farming',
+          });
+        }
+      }
+
+      // 4. Point hoarding detection
+      const totalMembers = biddingData.length;
+      const hoarders = biddingData.filter(member => {
+        const totalPoints = member.pointsLeft + member.pointsConsumed;
+        const hoardingRate = totalPoints > 0 ? (member.pointsLeft / totalPoints) : 0;
+        return totalPoints >= 100 && hoardingRate > 0.85; // 85% or more points unused with significant balance
+      });
+
+      for (const member of hoarders) {
+        const totalPoints = member.pointsLeft + member.pointsConsumed;
+        const hoardingRate = ((member.pointsLeft / totalPoints) * 100).toFixed(0);
+        anomalies.push({
+          type: 'POINT_HOARDING',
+          severity: 'LOW',
+          description: `${member.username} has ${member.pointsLeft}/${totalPoints} points unused (${hoardingRate}%)`,
+          username: member.username,
+          pointsLeft: member.pointsLeft,
+          totalPoints,
+          recommendation: 'Member may need reminder to participate in auctions',
+        });
+      }
+
+      // 5. Bidding velocity analysis (members with unusually high spending)
+      const activeBidders = biddingData.filter(m => m.pointsConsumed > 0);
+      if (activeBidders.length > 0) {
+        const consumptionRates = activeBidders.map(m => {
+          const total = m.pointsLeft + m.pointsConsumed;
+          return total > 0 ? (m.pointsConsumed / total) : 0;
+        });
+        const avgConsumption = this.calculateMean(consumptionRates);
+        const stdDevConsumption = this.calculateStdDev(consumptionRates);
+
+        const highVelocity = (Math.abs(stdDevConsumption) < Number.EPSILON) ? [] : activeBidders.filter(member => {
+          const total = member.pointsLeft + member.pointsConsumed;
+          const rate = total > 0 ? (member.pointsConsumed / total) : 0;
+          const zScore = (rate - avgConsumption) / stdDevConsumption;
+          return zScore > 2.0 && rate > 0.9; // High spenders at >90% consumption
+        });
+
+        for (const member of highVelocity) {
+          const total = member.pointsLeft + member.pointsConsumed;
+          const consumptionRate = ((member.pointsConsumed / total) * 100).toFixed(0);
+          anomalies.push({
+            type: 'HIGH_BIDDING_VELOCITY',
+            severity: 'LOW',
+            description: `${member.username} spent ${member.pointsConsumed}/${total} points (${consumptionRate}%)`,
+            username: member.username,
+            pointsConsumed: member.pointsConsumed,
+            totalPoints: total,
+            recommendation: 'High engagement - monitor for sustainability',
           });
         }
       }
@@ -1562,6 +1623,7 @@ class IntelligenceEngine {
         anomaliesDetected: anomalies.length,
         anomalies,
         analyzed: auctionHistory.length,
+        totalMembers,
         timestamp: getCurrentTimestamp(),
       };
     } catch (error) {
@@ -1575,8 +1637,12 @@ class IntelligenceEngine {
    */
   async detectAttendanceAnomalies() {
     try {
-      const attendanceResponse = await this.sheetAPI.call('getTotalAttendance', {});
+      const [attendanceResponse, biddingResponse] = await Promise.all([
+        this.sheetAPI.call('getTotalAttendance', {}),
+        this.sheetAPI.call('getBiddingPoints', {}),
+      ]);
       const attendanceData = attendanceResponse?.members ?? [];
+      const biddingData = biddingResponse?.members ?? [];
       const anomalies = [];
 
       // Calculate attendance statistics
@@ -1585,7 +1651,7 @@ class IntelligenceEngine {
       const mean = this.calculateMean(spawnCounts);
       const stdDev = this.calculateStdDev(spawnCounts);
 
-      // Detect statistical outliers
+      // 1. Detect statistical outliers (unusually high/low attendance)
       // Guard: skip z-score calculation if stdDev is zero or near-zero (all spawn counts identical)
       const outliers = (Math.abs(stdDev) < Number.EPSILON) ? [] : attendanceData.filter(member => {
         const memberSpawns = member.attendancePoints || 0;
@@ -1595,17 +1661,75 @@ class IntelligenceEngine {
 
       for (const member of outliers) {
         const memberSpawns = member.attendancePoints || 0;
+        const zScore = ((memberSpawns - mean) / stdDev).toFixed(1);
         anomalies.push({
           type: 'UNUSUAL_ATTENDANCE',
           severity: 'MEDIUM',
           username: member.username,
           spawnCount: memberSpawns,
-          deviation: `${((memberSpawns - mean) / stdDev).toFixed(1)}σ`,
+          description: `${member.username} has ${memberSpawns} spawns (${zScore}σ from avg)`,
+          deviation: `${zScore}σ`,
           recommendation: memberSpawns > mean
             ? 'Exceptionally high attendance - verify legitimacy'
             : 'Unusually low attendance - possible inactive account',
         });
       }
+
+      // 2. Detect attendance-bidding correlation anomalies
+      // High attendance but low/no bidding activity = potentially problematic
+      for (const attendanceMember of attendanceData) {
+        const memberSpawns = attendanceMember.attendancePoints || 0;
+        if (memberSpawns > mean) { // Only check above-average attenders
+          const biddingMember = biddingData.find(b =>
+            b.username && attendanceMember.username &&
+            b.username.toLowerCase() === attendanceMember.username.toLowerCase()
+          );
+
+          if (biddingMember) {
+            const totalPoints = biddingMember.pointsLeft + biddingMember.pointsConsumed;
+            const consumptionRate = totalPoints > 0 ? (biddingMember.pointsConsumed / totalPoints) : 0;
+
+            // High attendance but very low bidding = suspicious
+            if (memberSpawns >= mean * 1.5 && consumptionRate < 0.1 && totalPoints >= 50) {
+              anomalies.push({
+                type: 'ATTENDANCE_BIDDING_MISMATCH',
+                severity: 'MEDIUM',
+                username: attendanceMember.username,
+                description: `${attendanceMember.username}: ${memberSpawns} spawns but only ${(consumptionRate * 100).toFixed(0)}% points used`,
+                spawnCount: memberSpawns,
+                consumptionRate: `${(consumptionRate * 100).toFixed(0)}%`,
+                recommendation: 'High attendance but minimal bidding - possible point farming',
+              });
+            }
+          }
+        }
+      }
+
+      // 3. Streak anomaly detection
+      // Members with very high calendar streaks vs total spawns might indicate manipulation
+      for (const member of attendanceData) {
+        const spawns = member.attendancePoints || 0;
+        const calendarStreak = member.calendarDayStreak || 0;
+
+        // If calendar streak is suspiciously close to total spawns (suggesting attendance every single day)
+        // This is only suspicious if they have very high numbers
+        if (spawns >= 30 && calendarStreak >= spawns * 0.9) {
+          anomalies.push({
+            type: 'SUSPICIOUS_STREAK',
+            severity: 'LOW',
+            username: member.username,
+            description: `${member.username}: ${calendarStreak}-day streak with ${spawns} spawns (${((calendarStreak/spawns)*100).toFixed(0)}% daily rate)`,
+            calendarStreak,
+            spawnCount: spawns,
+            recommendation: 'Verify perfect/near-perfect attendance legitimacy',
+          });
+        }
+      }
+
+      // 4. Detect sudden activity changes (members with recent activity that differs from their pattern)
+      // This requires comparing recent spawns vs historical average
+      const recentActivityAnomalies = await this.detectSuddenActivityChanges(attendanceData);
+      anomalies.push(...recentActivityAnomalies);
 
       return {
         anomaliesDetected: anomalies.length,
@@ -1621,6 +1745,66 @@ class IntelligenceEngine {
       console.error('[INTELLIGENCE] Error detecting attendance anomalies:', error);
       return { error: error.message };
     }
+  }
+
+  /**
+   * Detect sudden changes in attendance patterns
+   */
+  async detectSuddenActivityChanges(attendanceData) {
+    const anomalies = [];
+
+    try {
+      // Get weekly attendance for recent activity analysis
+      const weeklyResponse = await this.sheetAPI.call('getWeeklyAttendance', {});
+      const weeklyData = weeklyResponse?.members ?? [];
+
+      for (const member of attendanceData) {
+        const totalSpawns = member.attendancePoints || 0;
+        if (totalSpawns < 10) continue; // Skip very new members
+
+        // Find their weekly data
+        const weeklyMember = weeklyData.find(w =>
+          w.username && member.username &&
+          w.username.toLowerCase() === member.username.toLowerCase()
+        );
+
+        if (weeklyMember) {
+          const weeklySpawns = weeklyMember.spawnsThisWeek || 0;
+          const expectedWeeklyRate = totalSpawns / 52; // Rough estimate: total spawns spread over year
+
+          // If this week's activity is >3x their average weekly rate, flag it
+          if (weeklySpawns > expectedWeeklyRate * 3 && weeklySpawns >= 10) {
+            anomalies.push({
+              type: 'SUDDEN_ACTIVITY_SPIKE',
+              severity: 'LOW',
+              username: member.username,
+              description: `${member.username}: ${weeklySpawns} spawns this week (${(weeklySpawns/expectedWeeklyRate).toFixed(1)}x normal rate)`,
+              weeklySpawns,
+              expectedWeekly: expectedWeeklyRate.toFixed(1),
+              recommendation: 'Sudden activity increase - verify legitimacy or returning member',
+            });
+          }
+
+          // If member has high total but zero this week (sudden drop)
+          if (totalSpawns >= 20 && weeklySpawns === 0 && member.calendarDayStreak > 0) {
+            anomalies.push({
+              type: 'SUDDEN_INACTIVITY',
+              severity: 'LOW',
+              username: member.username,
+              description: `${member.username}: 0 spawns this week (${totalSpawns} total, ${member.calendarDayStreak}-day streak at risk)`,
+              totalSpawns,
+              calendarStreak: member.calendarDayStreak,
+              recommendation: 'Previously active member now inactive - may need reminder',
+            });
+          }
+        }
+      }
+    } catch (error) {
+      // Weekly attendance might not be available - not critical for anomaly detection
+      console.log('[INTELLIGENCE] Weekly attendance not available for sudden change detection');
+    }
+
+    return anomalies;
   }
 
   /**
