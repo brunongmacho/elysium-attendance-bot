@@ -619,6 +619,123 @@ const COMMANDS = {
   },
 
   // ─────────────────────────────────────────────────────────────────────────
+  // BOSS ROTATION COMMANDS
+  // ─────────────────────────────────────────────────────────────────────────
+  rotation: {
+    rotation: {
+      usage: "!rotation <status|set|increment>",
+      description: "Manage boss rotation system for multi-guild bosses",
+      aliases: ["!rot"],
+      adminOnly: true,
+      details: [
+        "• **!rotation status** - Show current rotation for all rotating bosses",
+        "• **!rotation set <boss> <index>** - Manually set rotation (1-5)",
+        "• **!rotation increment <boss>** - Advance to next guild's turn",
+        "• Tracks: Amentis, General Aquleus, Baron Braudmore",
+        "• 5-guild rotation system (ELYSIUM is position 1)",
+        "• Auto-increments on boss kills",
+        "Examples:",
+        "  - !rotation status",
+        "  - !rotation set Amentis 1",
+        "  - !rotation increment \"General Aquleus\""
+      ]
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // NLP LEARNING SYSTEM COMMANDS
+  // ─────────────────────────────────────────────────────────────────────────
+  nlp: {
+    nlpstats: {
+      usage: "!nlpstats",
+      description: "View NLP learning statistics and progress",
+      aliases: ["!nlp", "!nlpinfo"],
+      adminOnly: true,
+      details: [
+        "• Total patterns learned",
+        "• Success rate statistics",
+        "• Unrecognized phrases count",
+        "• Learning system health",
+        "• Multi-language support stats (EN/TL/Taglish)"
+      ]
+    },
+    learned: {
+      usage: "!learned",
+      description: "List all learned NLP patterns with confidence scores",
+      aliases: ["!learnedpatterns", "!patterns"],
+      adminOnly: true,
+      details: [
+        "• Shows all custom-learned patterns",
+        "• Confidence scores for each",
+        "• Command mappings",
+        "• Usage frequency",
+        "• Sorted by confidence"
+      ]
+    },
+    unrecognized: {
+      usage: "!unrecognized",
+      description: "Show phrases the bot doesn't understand yet",
+      aliases: ["!unrec", "!unknown"],
+      adminOnly: true,
+      details: [
+        "• Lists unrecognized user inputs",
+        "• Helps identify missing patterns",
+        "• Shows frequency of attempts",
+        "• Use for improving NLP coverage"
+      ]
+    },
+    teachbot: {
+      usage: "!teachbot \"phrase\" → !command",
+      description: "Manually teach the bot a new NLP pattern",
+      aliases: ["!teach", "!addpattern"],
+      adminOnly: true,
+      details: [
+        "• Add custom pattern mappings",
+        "• Supports multi-language",
+        "• Immediate effect",
+        "• Example: !teachbot \"ilan points ko?\" → !mypoints",
+        "• Validates command exists before saving"
+      ]
+    },
+    clearlearned: {
+      usage: "!clearlearned [pattern]",
+      description: "Remove specific or all learned patterns",
+      aliases: ["!clearnlp", "!resetlearned"],
+      adminOnly: true,
+      details: [
+        "• With pattern: removes specific learned pattern",
+        "• Without pattern: clears all learned patterns",
+        "• Requires confirmation for bulk clear",
+        "• Resets to default patterns"
+      ]
+    },
+    nlpunhide: {
+      usage: "!nlpunhide",
+      description: "Unhide NLP tabs in Google Sheets for viewing",
+      aliases: ["!shownlp"],
+      adminOnly: true,
+      details: [
+        "• Makes NLP sheets visible",
+        "• View learned patterns directly in Sheets",
+        "• See unrecognized phrases log",
+        "• Useful for debugging"
+      ]
+    },
+    myprofile: {
+      usage: "!myprofile",
+      description: "View your personal NLP learning profile",
+      aliases: ["!profile", "!mypatterns"],
+      adminOnly: false,
+      details: [
+        "• See commands you use most",
+        "• View your NLP patterns",
+        "• Engagement statistics",
+        "• Personal usage insights"
+      ]
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
   // EMERGENCY COMMANDS
   // ─────────────────────────────────────────────────────────────────────────
   emergency: {
@@ -774,6 +891,16 @@ function buildMainHelp() {
         inline: true
       },
       {
+        name: `🔄 Boss Rotation`,
+        value: `\`!help rotation\`\nMulti-guild boss rotation tracking`,
+        inline: true
+      },
+      {
+        name: `🧠 NLP Learning`,
+        value: `\`!help nlp\`\nNatural language pattern management`,
+        inline: true
+      },
+      {
         name: `${EMOJI.EMERGENCY} Emergency`,
         value: `\`!help emergency\`\nRecovery tools, diagnostics, force commands`,
         inline: true
@@ -829,6 +956,16 @@ function buildCategoryHelp(category, isUserAdmin = true) {
       title: `${EMOJI.ADMIN} Member Management Commands`,
       description: "Manage guild roster and member data",
       color: COLORS.WARNING
+    },
+    rotation: {
+      title: `🔄 Boss Rotation System Commands`,
+      description: "Multi-guild boss rotation tracking and management",
+      color: COLORS.PRIMARY
+    },
+    nlp: {
+      title: `🧠 NLP Learning System Commands`,
+      description: "Natural language pattern learning and management",
+      color: COLORS.AI
     },
     emergency: {
       title: `${EMOJI.EMERGENCY} Emergency Recovery Commands`,
@@ -944,6 +1081,9 @@ function buildErrorEmbed(query) {
       `• \`!help auction\`\n` +
       `• \`!help intelligence\`\n` +
       `• \`!help leaderboard\`\n` +
+      `• \`!help management\`\n` +
+      `• \`!help rotation\`\n` +
+      `• \`!help nlp\`\n` +
       `• \`!help emergency\`\n\n` +
       `Or try \`!help\` for the main menu.`
     )

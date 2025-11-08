@@ -18,7 +18,7 @@
 ### 🎯 Key Highlights
 
 - **📊 31,320 lines of code** across 52 carefully organized modules
-- **🤖 49 commands** covering attendance, auctions, AI intelligence, and emergency recovery
+- **🤖 60+ commands** covering attendance, auctions, AI intelligence, rotation, NLP learning, and emergency recovery
 - **⚡ Highly optimized** - runs smoothly on 512MB RAM instances
 - **🧠 AI/ML powered** - predictive analytics, fraud detection, and member engagement scoring
 - **🔄 Self-healing** - automatic crash recovery with full state restoration
@@ -205,6 +205,41 @@ Admin Logs:
 - ✅ Safe channel restrictions
 - ✅ Fuzzy pattern matching
 
+**Self-Learning System:**
+- 🧠 Learns from user interactions automatically
+- 🧠 Multi-language support (English, Tagalog, Taglish)
+- 🧠 Pattern confidence scoring
+- 🧠 Unrecognized phrase tracking
+- 🧠 Manual pattern teaching via `!teachbot`
+- 🧠 Stores learned patterns in Google Sheets
+
+---
+
+### 🔄 Boss Rotation System
+**Multi-Guild Boss Tracking**
+
+Automatically manages rotation for bosses shared across 5 guilds:
+
+**Tracked Bosses:**
+- 🎯 **Amentis** - 5-guild rotation
+- 🎯 **General Aquleus** - 5-guild rotation
+- 🎯 **Baron Braudmore** - 5-guild rotation
+
+**Features:**
+- ✅ **Position tracking** - ELYSIUM is position 1
+- ✅ **Auto-increment** - Advances rotation after boss kills
+- ✅ **Manual controls** - Set or increment rotation manually
+- ✅ **Status viewing** - Check current rotation for all bosses
+- ✅ **Conflict prevention** - Ensures fair rotation across guilds
+- ✅ **Persistent state** - Survives bot restarts
+
+**Commands:**
+```
+!rotation status           # View current rotation
+!rotation set <boss> <1-5> # Set rotation index
+!rotation increment <boss> # Advance to next guild
+```
+
 ---
 
 ### 📊 Leaderboard System
@@ -325,6 +360,9 @@ See [SETUP_TRIGGERS_GUIDE.md](./SETUP_TRIGGERS_GUIDE.md) for detailed instructio
 - `BiddingHistory` - Auction results
 - `AttendanceState` - Bot state (auto-created)
 - `BotLearning` - AI predictions (auto-created)
+- `BossRotation` - Rotation tracking (auto-created)
+- `NLPLearned` - Learned NLP patterns (auto-created)
+- `NLPUnrecognized` - Unrecognized phrases (auto-created)
 
 ---
 
@@ -368,8 +406,11 @@ npm start
 !help                     # Show comprehensive help
 !help attendance          # Attendance commands
 !help auction             # Auction commands
-!help admin               # Admin commands
 !help intelligence        # AI commands
+!help leaderboard         # Leaderboard commands
+!help management          # Member management commands
+!help rotation            # Boss rotation commands
+!help nlp                 # NLP learning commands
 !help emergency           # Emergency commands
 ```
 
@@ -377,65 +418,134 @@ npm start
 
 | Command | Description | Alias |
 |---------|-------------|-------|
-| `!status` | Bot health + active spawns | `!st` |
+| `!status` | Bot health + active spawns | `!st`, `!attendancestatus` |
 | `!addthread <boss> ...` | Manually create spawn | `!addth` |
 | `!verify @user` | Manually verify member | `!v` |
 | `!verifyall` | Auto-verify all pending | `!vall` |
 | `!resetpending` | Clear pending queue | `!resetpend` |
 | `!forcesubmit` | Submit without closing | `!fs` |
 | `!forceclose` | Force close thread | `!fc` |
+| `!debugthread` | Debug current thread state | `!debug` |
+| `!closeallthread` | Close all spawn threads | `!closeall` |
+| `!maintenance` | Create maintenance boss threads | `!maint` |
+| `!clearstate` | Clear ALL attendance state | `!clear` |
 
 ### **💰 Auction Commands**
 
 **Admin:**
 ```bash
-!auction                  # Start auction manually
-!pauseauction             # Pause session
-!resumeauction            # Resume session
-!extend <minutes>         # Add time to item
-!skip                     # Skip item w/ refund
-!cancel                   # Cancel item w/ refund
-!forceend                 # Emergency end
+!auction                  # Start auction manually (aliases: !startauction, !start, !auc-start)
+!pauseauction             # Pause session (aliases: !pause, !auc-pause, !hold)
+!resumeauction            # Resume session (aliases: !resume, !auc-resume, !continue)
+!extend <minutes>         # Add time to item (aliases: !ext, !auc-extend)
+!skip                     # Skip item w/ refund (alias: !skipitem)
+!cancel                   # Cancel item w/ refund (alias: !cancelitem)
+!stop                     # Stop current item (aliases: !auc-stop, !end-item)
+!endauction               # End entire auction session
+!startauctionnow          # Bypass 10-min cooldown (alias: !auc-now)
+!queuelist                # View full queue (aliases: !ql, !queue)
 ```
 
 **Members:**
 ```bash
-!bid <amount>             # Place bid (or just "bid 500")
-!mypoints                 # Check points balance
-!bidstatus                # Current auction status
+!bid <amount>             # Place bid (alias: !b, or just type "bid 500")
+!mypoints                 # Check points balance (aliases: !pts, !mp)
+!bidstatus                # Current auction status (aliases: !bs, !bstatus)
 ```
 
-### **🤖 AI/Intelligence Commands** (Admin Only)
+### **🤖 AI/Intelligence Commands**
 
+**Member-Accessible:**
 ```bash
-!predictprice <item>      # Price prediction
-!analyze @member          # Member engagement analysis
-!suggestauction           # Analyze full queue
-!analyzeall               # Guild-wide engagement
-!detectanomalies          # Fraud detection scan
-!bootstraplearning        # Re-bootstrap AI learning
+!predictspawn [boss]      # Predict next boss spawn (aliases: !nextspawn, !whennext, !spawntimer)
+!predictprice <item>      # Price prediction (aliases: !predict, !suggestprice)
+!predictattendance <user> # Predict attendance likelihood (alias: !predatt)
+!analyze [username]       # Engagement analysis (aliases: !engagement, !engage)
+!analyzeall               # Guild-wide engagement (aliases: !analyzeengagement, !guildanalyze)
+```
+
+**Admin Only:**
+```bash
+!recommendations          # Guild management recommendations (aliases: !recommend, !suggest)
+!performance              # System performance metrics (alias: !perf)
+!suggestauction           # Analyze full queue (aliases: !analyzequeue, !aq, !auctionqueue)
+!detectanomalies          # Fraud detection scan (aliases: !fraud, !anomaly)
+!bootstraplearning        # Re-bootstrap AI learning (aliases: !bootstrap, !learnhistory)
 ```
 
 ### **📊 Leaderboard Commands**
 
 ```bash
-!leaderboardattendance    # Attendance rankings
-!leaderboardbidding       # Bidding rankings
-!leaderboards             # Show both
-!weeklyreport             # Force weekly report (admin)
+!leaderboardattendance    # Attendance rankings (aliases: !lbattendance, !lba, !leadatt)
+!leaderboardbidding       # Bidding rankings (aliases: !lbbidding, !lbb, !leadbid)
+!leaderboards             # Show both (aliases: !lb, !leaderboard)
+!weeklyreport             # Force weekly report - admin only (aliases: !weekly, !week)
 ```
+
+### **🔄 Boss Rotation Commands** (Admin Only)
+
+```bash
+!rotation status          # Show current rotation for all rotating bosses
+!rotation set <boss> <index>  # Manually set rotation (1-5)
+!rotation increment <boss>    # Advance to next guild's turn
+```
+
+**Tracked Bosses:**
+- Amentis
+- General Aquleus
+- Baron Braudmore
+
+**Features:**
+- 5-guild rotation system (ELYSIUM is position 1)
+- Auto-increments on boss kills
+- Prevents rotation conflicts
+
+### **🧠 NLP Learning Commands**
+
+**Admin Commands:**
+```bash
+!nlpstats                 # View learning statistics
+!learned                  # List all learned patterns
+!unrecognized             # Show unrecognized phrases
+!teachbot "phrase" → !cmd # Manually teach pattern
+!clearlearned [pattern]   # Remove learned pattern(s)
+!nlpunhide                # Unhide NLP sheets
+```
+
+**Member Commands:**
+```bash
+!myprofile                # View your NLP learning profile
+```
+
+**Features:**
+- Multi-language support (English, Tagalog, Taglish)
+- Self-learning from user interactions
+- Pattern confidence scoring
+- Unrecognized phrase tracking
 
 ### **🚨 Emergency Commands** (Admin Only)
 
 ```bash
-!forceclosethread         # Close current thread
-!forcecloseallthreads     # Close all threads
-!forceendauction          # End stuck auction
-!unlockallpoints          # Release locked points
-!clearallbids             # Clear pending bids
-!diagnostics              # System diagnostics
-!forcesync                # Force state sync
-!clearstate               # Clear attendance state
+!forceclosethread         # Close current thread (alias: !fct)
+!forcecloseallthreads     # Close all threads (alias: !fcat)
+!forceendauction          # End stuck auction (alias: !fea)
+!unlockallpoints          # Release locked points (alias: !unlock)
+!clearallbids             # Clear pending bids (alias: !clearbids)
+!diagnostics              # System diagnostics (alias: !diag)
+!forcesync                # Force state sync (alias: !fsync)
+!clearstate               # Clear attendance state (alias: !clear)
+```
+
+**Alternative Access:**
+All emergency commands can also be accessed via `!emergency <subcommand>`:
+```bash
+!emergency closeall       # = !forcecloseallthreads
+!emergency close <id>     # = !forceclosethread
+!emergency endauction     # = !forceendauction
+!emergency unlock         # = !unlockallpoints
+!emergency clearbids      # = !clearallbids
+!emergency diag           # = !diagnostics
+!emergency sync           # = !forcesync
 ```
 
 ---
@@ -457,6 +567,8 @@ elysium-attendance-bot/
 ├── proactive-intelligence.js    # Automated monitoring system
 ├── learning-system.js           # Bot learning & accuracy tracking
 ├── nlp-handler.js               # Natural language processing
+├── nlp-learning.js              # Self-learning NLP system
+├── rotation-system.js           # Boss rotation tracking
 ├── utils/
 │   ├── constants.js             # Centralized constants
 │   ├── common.js                # Shared utilities
@@ -464,7 +576,7 @@ elysium-attendance-bot/
 │   ├── sheet-api.js             # Google Sheets API
 │   ├── discord-cache.js         # Channel caching
 │   ├── cache-manager.js         # General caching
-│   ├── maintenance-scheduler.js # Unified task scheduler (NEW!)
+│   ├── maintenance-scheduler.js # Unified task scheduler
 │   └── ...
 └── config.json                  # Bot configuration
 ```
@@ -763,7 +875,8 @@ elysium-attendance-bot/
 │   ├── auctioneering.js         # Auction management
 │   ├── help-system.js           # Help command system
 │   ├── emergency-commands.js    # Emergency toolkit
-│   └── leaderboard-system.js    # Leaderboards
+│   ├── leaderboard-system.js    # Leaderboards
+│   └── rotation-system.js       # Boss rotation tracking
 ├── AI Systems/
 │   ├── intelligence-engine.js   # ML predictions
 │   ├── proactive-intelligence.js # Automated monitoring
