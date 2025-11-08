@@ -148,17 +148,26 @@ async function getRotationStatus(bossName, useCache = true) {
     // Fetch from Google Sheets
     const result = await sheetAPI.call('getBossRotation', { bossName: normalizedName });
 
-    console.log(`[DEBUG] getBossRotation response for ${normalizedName}:`, JSON.stringify(result, null, 2));
+    if (result.status === 'ok' && result.isRotating) {
+      // Extract rotation data from response (data is at root level, not nested)
+      const rotationData = {
+        isRotating: result.isRotating,
+        bossName: result.bossName,
+        currentIndex: result.currentIndex,
+        currentGuild: result.currentGuild,
+        isOurTurn: result.isOurTurn,
+        guilds: result.guilds,
+        nextGuild: result.nextGuild
+      };
 
-    if (result.status === 'ok' && result.data && result.data.isRotating) {
       // Update cache
-      rotationCache[normalizedName] = result.data;
-      return result.data;
+      rotationCache[normalizedName] = rotationData;
+      return rotationData;
     }
 
-    // If we got an OK response but boss not rotating, return that
-    if (result.status === 'ok' && result.data) {
-      return result.data;
+    // If boss not in rotation system
+    if (result.status === 'ok' && result.isRotating === false) {
+      return { isRotating: false, bossName: normalizedName };
     }
 
     return { isRotating: false, bossName: normalizedName };
@@ -214,19 +223,19 @@ async function incrementRotation(bossName) {
     const result = await sheetAPI.call('incrementBossRotation', { bossName: normalizedName });
 
     if (result.status === 'ok') {
-      console.log(`✅ ${normalizedName} rotation: ${result.data.oldIndex} (${result.data.oldGuild}) → ${result.data.newIndex} (${result.data.newGuild})`);
+      console.log(`✅ ${normalizedName} rotation: ${result.oldIndex} (${result.oldGuild}) → ${result.newIndex} (${result.newGuild})`);
 
       // Update cache
       rotationCache[normalizedName] = {
-        currentIndex: result.data.newIndex,
-        currentGuild: result.data.newGuild,
-        isOurTurn: result.data.isNowOurTurn
+        currentIndex: result.newIndex,
+        currentGuild: result.newGuild,
+        isOurTurn: result.isNowOurTurn
       };
 
       // Send admin notification
-      await sendRotationUpdateNotification(result.data);
+      await sendRotationUpdateNotification(result);
 
-      return result.data;
+      return result;
     } else {
       console.error(`❌ Failed to increment rotation for ${normalizedName}:`, result.message);
       return { updated: false, bossName: normalizedName, error: result.message };
@@ -263,16 +272,16 @@ async function setRotation(bossName, newIndex) {
     const result = await sheetAPI.call('setBossRotation', { bossName: normalizedName, newIndex });
 
     if (result.status === 'ok') {
-      console.log(`✅ ${normalizedName} rotation set: ${result.data.oldIndex} → ${result.data.newIndex} (${result.data.currentGuild})`);
+      console.log(`✅ ${normalizedName} rotation set: ${result.oldIndex} → ${result.newIndex} (${result.currentGuild})`);
 
       // Update cache
       rotationCache[normalizedName] = {
-        currentIndex: result.data.newIndex,
-        currentGuild: result.data.currentGuild,
-        isOurTurn: result.data.isOurTurn
+        currentIndex: result.newIndex,
+        currentGuild: result.currentGuild,
+        isOurTurn: result.isOurTurn
       };
 
-      return { success: true, data: result.data };
+      return { success: true, data: result };
     } else {
       return { success: false, message: result.message };
     }
