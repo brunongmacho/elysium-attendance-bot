@@ -171,14 +171,12 @@ async function forceCloseAllAttendance(message) {
   const confirmButton = new ButtonBuilder()
     .setCustomId(`closeall_confirm_${message.author.id}_${Date.now()}`)
     .setLabel('✅ Confirm')
-    .setStyle(ButtonStyle.Danger)
-    .setDisabled(false);
+    .setStyle(ButtonStyle.Danger);
 
   const cancelButton = new ButtonBuilder()
     .setCustomId(`closeall_cancel_${message.author.id}_${Date.now()}`)
     .setLabel('❌ Cancel')
-    .setStyle(ButtonStyle.Secondary)
-    .setDisabled(false);
+    .setStyle(ButtonStyle.Secondary);
 
   const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 
@@ -408,14 +406,12 @@ async function forceEndAuction(message) {
   const confirmButton = new ButtonBuilder()
     .setCustomId(`endauction_confirm_${message.author.id}_${Date.now()}`)
     .setLabel('✅ Confirm')
-    .setStyle(ButtonStyle.Danger)
-    .setDisabled(false);
+    .setStyle(ButtonStyle.Danger);
 
   const cancelButton = new ButtonBuilder()
     .setCustomId(`endauction_cancel_${message.author.id}_${Date.now()}`)
     .setLabel('❌ Cancel')
-    .setStyle(ButtonStyle.Secondary)
-    .setDisabled(false);
+    .setStyle(ButtonStyle.Secondary);
 
   const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 
@@ -566,14 +562,12 @@ async function unlockAllPoints(message) {
   const confirmButton = new ButtonBuilder()
     .setCustomId(`unlock_confirm_${message.author.id}_${Date.now()}`)
     .setLabel('✅ Confirm')
-    .setStyle(ButtonStyle.Danger)
-    .setDisabled(false);
+    .setStyle(ButtonStyle.Danger);
 
   const cancelButton = new ButtonBuilder()
     .setCustomId(`unlock_cancel_${message.author.id}_${Date.now()}`)
     .setLabel('❌ Cancel')
-    .setStyle(ButtonStyle.Secondary)
-    .setDisabled(false);
+    .setStyle(ButtonStyle.Secondary);
 
   const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 
@@ -693,14 +687,12 @@ async function clearPendingConfirmations(message) {
   const confirmButton = new ButtonBuilder()
     .setCustomId(`clearbids_confirm_${message.author.id}_${Date.now()}`)
     .setLabel('✅ Confirm')
-    .setStyle(ButtonStyle.Danger)
-    .setDisabled(false);
+    .setStyle(ButtonStyle.Danger);
 
   const cancelButton = new ButtonBuilder()
     .setCustomId(`clearbids_cancel_${message.author.id}_${Date.now()}`)
     .setLabel('❌ Cancel')
-    .setStyle(ButtonStyle.Secondary)
-    .setDisabled(false);
+    .setStyle(ButtonStyle.Secondary);
 
   const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 
