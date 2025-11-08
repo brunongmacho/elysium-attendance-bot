@@ -34,8 +34,8 @@ const CONVERSATION_PATTERNS = {
       // FILIPINO BAD WORDS & TRASH TALK - PRIORITY! (80% TAGALOG FOCUS!)
       // ═══════════════════════════════════════════════════════════════════════
 
-      // Core Filipino profanity - Most common (kingina variants added!)
-      /(?:putang\s*ina|tang\s*ina|tangina|kingina|kinangina|king\s*ina|gago|ulol|leche|peste|tarantado)/i,
+      // Core Filipino profanity - Most common (kingina variants + text speak!)
+      /(?:putang\s*ina|tang\s*ina|tangina|taena|ta\s*ena|kingina|kinangina|king\s*ina|gago|ulol|leche|peste|tarantado)/i,
       /(?:bobo|tanga|bano|walang\s+kwenta|tite|puke|kantot|kupal|pakshet|pakyu)/i,
       /(?:supot|bruha|ungas|lintik|punyeta|walanghiya|gaga|salot|pakingshet)/i,
       /(?:amputa|putcha|pucha|yawa|gunggong|engot|hudas|shunga|timang|abnoy)/i,
@@ -46,17 +46,17 @@ const CONVERSATION_PATTERNS = {
       /(?:inutil|inutil\s+ka|walang\s+silbi|basura|dumi|squammy|skwater)/i,
       /(?:epal|jejemon|jologs|baduy|cheap|mukhang\s+pera|walang\s+modo)/i,
       /(?:taong\s+grasa|tanga\s+tanga|gago\s+gago|ulol\s+ulol)/i,
-      /(?:putangina\s+mo|tangina\s+mo|gago\s+ka\s+talaga|ulol\s+ka\s+talaga)/i,
+      /(?:putangina\s+mo|tangina\s+mo|taena\s+mo|gago\s+ka\s+talaga|ulol\s+ka\s+talaga)/i,
       /(?:pisting\s+yawa|lintek|punyeta\s+ka|pakyu\s+ka|fuck\s+off)/i,
       /(?:buwakaw|bwiset|buset|bwisit|bwesit|bweset|leche\s+ka)/i,
       /(?:tarantado\s+ka|peste\s+ka|salot\s+ka|bruha\s+ka|ungas\s+ka)/i,
       /(?:shunga\s+ka|engot\s+ka|gunggong\s+ka|abnoy\s+ka|timang\s+ka)/i,
       /(?:hangal|mangmang|ignorante|walang\s+utak|walang\s+alam|walang\s+breeding)/i,
       /(?:palpak|sablay|epic\s+fail|bulok|walang\s+kwenta\s+talaga)/i,
-      /(?:tarantado\s+amputa|gago\s+amputa|tangina\s+talaga|kingina\s+talaga)/i,
+      /(?:tarantado\s+amputa|gago\s+amputa|tangina\s+talaga|taena\s+talaga|kingina\s+talaga)/i,
 
       // Filipino text speak / internet slang variants
-      /(?:gnggng|ggng|tng\s*ina|tngnina|kngn|kngin|pksht|pkyou|fcku)/i,
+      /(?:gnggng|ggng|tng\s*ina|tngnina|taena|t\s*ena|kngn|kngin|pksht|pkyou|fcku)/i,
       /(?:gg0|bb0|tng4|g4g0|ul0l|b0b0|tng|bno|bnong)/i,
       /(?:ngng|nggg|dedma|ewan|walang\s+katuturan|waley|wala\s+eh)/i,
       /(?:ampucha|amputcha|amfuta|amshet|amshit|paksht)/i,

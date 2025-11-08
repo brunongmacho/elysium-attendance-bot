@@ -4680,14 +4680,14 @@ function ensureMilestoneQueueSheet() {
     Logger.log('📝 Creating MilestoneQueue sheet...');
     sheet = ss.insertSheet('MilestoneQueue');
     sheet.appendRow([
-      'queueType',      // attendance, bidding, engagement, hybrid, etc.
+      'queueType',      // attendance, bidding, engagement, etc.
       'nickname',
       'milestone',
       'totalPoints',
       'lastMilestone',
       'queuedAt',
       'discordUserId',  // for mentions
-      'extraData'       // JSON string for additional data (hybrid combos, etc.)
+      'extraData'       // JSON string for additional data
     ]);
     sheet.getRange('1:1').setFontWeight('bold').setBackground('#e0e0e0');
     sheet.hideSheet();
@@ -4779,7 +4779,6 @@ function loadMilestoneQueue(data) {
           attendance: [],
           bidding: [],
           engagement: [],
-          hybrid: [],
           guildWide: [],
           spawnStreak: [],
           calendarStreak: [],
@@ -4796,7 +4795,6 @@ function loadMilestoneQueue(data) {
       attendance: [],
       bidding: [],
       engagement: [],
-      hybrid: [],
       guildWide: [],
       spawnStreak: [],
       calendarStreak: [],
@@ -4840,7 +4838,6 @@ function loadMilestoneQueue(data) {
         attendance: [],
         bidding: [],
         engagement: [],
-        hybrid: [],
         guildWide: [],
         spawnStreak: [],
         calendarStreak: [],
@@ -5090,11 +5087,6 @@ function ensureMilestoneTabsExist() {
         const newCol = milestoneSheet.getLastColumn() + 1;
         milestoneSheet.getRange(1, newCol).setValue('lastEngagementMilestone').setFontWeight('bold').setBackground('#e0e0e0');
         Logger.log('✅ Added lastEngagementMilestone column to MilestoneTracking');
-      }
-      if (!headers.includes('lastHybridMilestone')) {
-        const newCol = milestoneSheet.getLastColumn() + 1;
-        milestoneSheet.getRange(1, newCol).setValue('lastHybridMilestone').setFontWeight('bold').setBackground('#e0e0e0');
-        Logger.log('✅ Added lastHybridMilestone column to MilestoneTracking');
       }
     }
 
