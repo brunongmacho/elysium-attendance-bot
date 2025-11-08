@@ -35,7 +35,7 @@ const CONVERSATION_PATTERNS = {
       // ═══════════════════════════════════════════════════════════════════════
 
       // Core Filipino profanity - Most common (kingina variants added!)
-      /(?:putang\s*ina|tangina|kingina|kinangina|king\s*ina|gago|ulol|leche|peste|tarantado)/i,
+      /(?:putang\s*ina|tang\s*ina|tangina|kingina|kinangina|king\s*ina|gago|ulol|leche|peste|tarantado)/i,
       /(?:bobo|tanga|bano|walang\s+kwenta|tite|puke|kantot|kupal|pakshet|pakyu)/i,
       /(?:supot|bruha|ungas|lintik|punyeta|walanghiya|gaga|salot|pakingshet)/i,
       /(?:amputa|putcha|pucha|yawa|gunggong|engot|hudas|shunga|timang|abnoy)/i,

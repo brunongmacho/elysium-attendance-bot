@@ -2103,6 +2103,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 
   // Announce time extension if it happened
   if (timeExtended) {
+    const endTimestamp = Math.floor(currentItem.endTime / 1000);
     await msg.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -2112,8 +2113,8 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
             `Bid placed in final minute - adding 1 more minute to the auction!`
           )
           .addFields({
-            name: "⏱️ New Time Remaining",
-            value: `${Math.ceil((currentItem.endTime - Date.now()) / 1000)}s`,
+            name: "⏱️ Ends",
+            value: `<t:${endTimestamp}:R>`,
             inline: true,
           })
           .setFooter({ text: `Extension ${currentItem.extCnt}/${ME}` }),
@@ -3944,6 +3945,7 @@ module.exports = {
         currentItem.endTime += extensionTime;
         currentItem.extCnt++;
 
+        const endTimestamp = Math.floor(currentItem.endTime / 1000);
         await reaction.message.channel.send({
           embeds: [
             new EmbedBuilder()
@@ -3953,10 +3955,8 @@ module.exports = {
                 `Bid placed in final minute - adding 1 more minute to the auction!`
               )
               .addFields({
-                name: "⏱️ New Time Remaining",
-                value: `${Math.ceil(
-                  (currentItem.endTime - Date.now()) / 1000
-                )}s`,
+                name: "⏱️ Ends",
+                value: `<t:${endTimestamp}:R>`,
                 inline: true,
               }),
           ],
@@ -4174,6 +4174,7 @@ module.exports = {
       a.go1 = false;
       a.go2 = false;
 
+      const endTimestamp = Math.floor((st.pause ? (Date.now() + st.a.remainingTime) : a.endTime) / 1000);
       await reaction.message.channel.send({
         embeds: [
           new EmbedBuilder()
@@ -4183,10 +4184,8 @@ module.exports = {
               `Bid placed in final minute - adding 1 more minute to the auction!`
             )
             .addFields({
-              name: "⏱️ New Time Remaining",
-              value: `${Math.ceil(
-                (st.pause ? st.a.remainingTime : a.endTime - Date.now()) / 1000
-              )}s`,
+              name: "⏱️ Ends",
+              value: `<t:${endTimestamp}:R>`,
               inline: true,
             }),
         ],

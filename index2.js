@@ -1124,9 +1124,22 @@ async function awaitConfirmation(
         const isConfirm = interaction.customId.startsWith('confirm_yes_');
         console.log(`🔘 [BUTTON] ${member.user.tag} clicked ${isConfirm ? 'Confirm' : 'Cancel'}`);
 
+        // Create fresh disabled buttons (defensive: avoid any potential mutation of originals)
+        const disabledConfirmButton = new ButtonBuilder()
+          .setCustomId(confirmButton.data.custom_id)
+          .setLabel(confirmButton.data.label)
+          .setStyle(confirmButton.data.style)
+          .setDisabled(true);
+
+        const disabledCancelButton = new ButtonBuilder()
+          .setCustomId(cancelButton.data.custom_id)
+          .setLabel(cancelButton.data.label)
+          .setStyle(cancelButton.data.style)
+          .setDisabled(true);
+
         const disabledRow = new ActionRowBuilder().addComponents(
-          ButtonBuilder.from(confirmButton).setDisabled(true),
-          ButtonBuilder.from(cancelButton).setDisabled(true)
+          disabledConfirmButton,
+          disabledCancelButton
         );
 
         await interaction.update({ components: [disabledRow] }).catch(err => {
@@ -1150,9 +1163,22 @@ async function awaitConfirmation(
       console.log(`🔘 [BUTTON] Collector ended: ${reason} (${collected.size} interactions)`);
 
       if (reason === 'time' && collected.size === 0) {
+        // Create fresh disabled buttons (defensive: avoid any potential mutation of originals)
+        const disabledConfirmButton = new ButtonBuilder()
+          .setCustomId(confirmButton.data.custom_id)
+          .setLabel(confirmButton.data.label)
+          .setStyle(confirmButton.data.style)
+          .setDisabled(true);
+
+        const disabledCancelButton = new ButtonBuilder()
+          .setCustomId(cancelButton.data.custom_id)
+          .setLabel(cancelButton.data.label)
+          .setStyle(cancelButton.data.style)
+          .setDisabled(true);
+
         const disabledRow = new ActionRowBuilder().addComponents(
-          ButtonBuilder.from(confirmButton).setDisabled(true),
-          ButtonBuilder.from(cancelButton).setDisabled(true)
+          disabledConfirmButton,
+          disabledCancelButton
         );
 
         await confirmMsg.edit({ components: [disabledRow] }).catch(() => {});
