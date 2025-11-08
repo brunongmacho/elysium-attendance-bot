@@ -1206,8 +1206,43 @@ class ProactiveIntelligence {
   /**
    * Queue a milestone for batch announcement (helper function)
    * Persists to Google Sheets to survive bot restarts
+   * PREVENTS DUPLICATES: Checks if same milestone already queued
    */
   async queueMilestone(type, data) {
+    // CRITICAL: Check for duplicates to prevent spam at 3:01 AM
+    // Each hourly check might find the same milestone if player continuously meets threshold
+    const isDuplicate = this.milestoneQueue[type].some(queued => {
+      // For individual player milestones
+      if (data.nickname) {
+        const normalizedNewNickname = this.normalizeUsername(data.nickname);
+        const normalizedQueuedNickname = this.normalizeUsername(queued.nickname);
+
+        // Check if same player + same milestone
+        if (normalizedNewNickname === normalizedQueuedNickname) {
+          // Different milestone types have different unique identifiers
+          if (type === 'attendance' || type === 'bidding') {
+            return queued.milestone === data.milestone;
+          } else if (type === 'hybrid') {
+            return queued.milestoneName === data.milestoneName;
+          } else if (type === 'engagement') {
+            return queued.milestone === data.milestone;
+          } else if (type === 'tenure' || type === 'calendarStreak' || type === 'perfectWeek' || type === 'spawnStreak') {
+            return queued.milestone === data.milestone;
+          }
+        }
+      } else if (type === 'guildWide') {
+        // For guild-wide milestones, check if same milestone type + threshold
+        return queued.milestoneType === data.milestoneType && queued.threshold === data.threshold;
+      }
+      return false;
+    });
+
+    if (isDuplicate) {
+      console.log(`⚠️ [PROACTIVE] Duplicate ${type} milestone detected for ${data.nickname || 'Guild'}, skipping queue`);
+      return; // Don't queue duplicates
+    }
+
+    // Not a duplicate - add to queue
     this.milestoneQueue[type].push({
       ...data,
       queuedAt: new Date()
@@ -1233,7 +1268,7 @@ class ProactiveIntelligence {
       console.log('🎉 [PROACTIVE] ═══════════════════════════════════════');
       console.log('🎉 [PROACTIVE] Starting daily milestone batch announcement...');
 
-      // Count total queued
+      // Count total queued BEFORE deduplication
       const totalQueued = Object.values(this.milestoneQueue).reduce((sum, arr) => sum + arr.length, 0);
 
       if (totalQueued === 0) {
@@ -1242,6 +1277,61 @@ class ProactiveIntelligence {
       }
 
       console.log(`📊 [PROACTIVE] ${totalQueued} milestones queued for announcement`);
+
+      // ═══════════════════════════════════════════════════════════════
+      // DEDUPLICATION LAYER: Remove any duplicate milestones
+      // (Safety net in case duplicates snuck through from loaded queue data)
+      // ═══════════════════════════════════════════════════════════════
+      const deduplicateQueue = (type, queue) => {
+        const seen = new Set();
+        return queue.filter(item => {
+          let key;
+          if (item.nickname) {
+            const normalized = this.normalizeUsername(item.nickname);
+            if (type === 'hybrid') {
+              key = `${normalized}-${item.milestoneName}`;
+            } else if (type === 'engagement' || type === 'attendance' || type === 'bidding' || type === 'tenure' || type === 'calendarStreak' || type === 'perfectWeek' || type === 'spawnStreak') {
+              key = `${normalized}-${item.milestone}`;
+            } else {
+              key = `${normalized}`;
+            }
+          } else if (type === 'guildWide') {
+            key = `${item.milestoneType}-${item.threshold}`;
+          } else {
+            key = JSON.stringify(item);
+          }
+
+          if (seen.has(key)) {
+            console.log(`⚠️ [PROACTIVE] Removing duplicate ${type} milestone: ${key}`);
+            return false;
+          }
+          seen.add(key);
+          return true;
+        });
+      };
+
+      let duplicatesRemoved = 0;
+      for (const [type, queue] of Object.entries(this.milestoneQueue)) {
+        const originalLength = queue.length;
+        this.milestoneQueue[type] = deduplicateQueue(type, queue);
+        const removed = originalLength - this.milestoneQueue[type].length;
+        if (removed > 0) {
+          duplicatesRemoved += removed;
+          console.log(`🔧 [PROACTIVE] Removed ${removed} duplicate ${type} milestones`);
+        }
+      }
+
+      const totalAfterDedup = Object.values(this.milestoneQueue).reduce((sum, arr) => sum + arr.length, 0);
+      if (duplicatesRemoved > 0) {
+        console.log(`✅ [PROACTIVE] Deduplication complete: ${duplicatesRemoved} duplicates removed (${totalQueued} → ${totalAfterDedup})`);
+      }
+
+      if (totalAfterDedup === 0) {
+        console.log('✅ [PROACTIVE] No milestones to announce after deduplication');
+        return;
+      }
+
+      console.log(`📊 [PROACTIVE] ${totalAfterDedup} unique milestones to announce`);
 
       // Get channels
       const guildAnnouncementChannel = await getChannelById(
