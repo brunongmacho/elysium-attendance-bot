@@ -594,12 +594,19 @@ const CONVERSATION_PATTERNS = {
       /^(?:who|what)\s+are\s+you/i,
       /^(?:sino|ano)\s+(?:ka|ikaw)/i,
       /^(?:what|whats)\s+your\s+(?:name|function|purpose)/i,
+      // Who is your master/owner/creator questions
+      /^(?:who(?:'s|\s+is)|sino)\s+(?:your|ang|yung|ng)?\s*(?:master|owner|creator|boss|maker|gumawa|may\s+ari)/i,
+      /^(?:sino|who)\s+(?:ang\s+)?(?:nag-?gawa|lumikha|nag-?create|nag-?develop)\s+(?:sa\s+iyo|sayo|mo)/i,
+      /^(?:sino|who)\s+(?:ang\s+)?(?:may\s+ari|amo|boss|master)\s+mo/i,
     ],
     responses: [
       "I'm your guild attendance & bidding bot! 🤖\nI help track attendance, manage auctions, and keep leaderboards!",
       "I'm here to help with:\n• Attendance tracking 📊\n• Auction bidding 💰\n• Leaderboards 🏆\n• And more!",
       "Ako ay bot na tumutulong sa guild! I manage attendance, bids, and rankings!",
       "I'm your guild assistant! Mention me and ask for help, points, status, or leaderboards!",
+      "I serve the guild! 🛡️ Built by the guild leaders to help manage attendance, bidding, and analytics!",
+      "Ako ay bot ng guild! Created to make your lives easier - tracking attendance, managing auctions, and keeping score! 🎮",
+      "My masters? The entire guild! 👑 I work for everyone - tracking your raids, managing loot auctions, and analyzing performance!",
     ],
   },
 

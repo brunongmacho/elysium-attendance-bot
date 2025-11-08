@@ -93,7 +93,7 @@ const LEARNING_CONFIG = {
     minUsageForLearning: 2,        // Min times pattern used before learning
     decayRate: 0.02,               // Confidence decrease per failed interpretation
     autoSuggest: true,             // Auto-suggest commands for unrecognized phrases
-    suggestionThreshold: 0.5,      // Min similarity (0-1) to suggest a command
+    suggestionThreshold: 0.6,      // Min similarity (0-1) to suggest a command (increased from 0.5 for fewer false positives)
   },
 
   // Fuzzy matching (handles typos and shortcuts)
@@ -392,6 +392,17 @@ class NLPLearningSystem {
       };
     }
 
+    // CRITICAL: Check if this matches a conversation pattern BEFORE fuzzy matching
+    // This prevents conversational questions (like "sino master mo?") from being
+    // incorrectly suggested as commands
+    if (botMentioned || this.shouldRespond(message)) {
+      const isConversational = this.isConversationalPattern(content);
+      if (isConversational) {
+        console.log(`💬 [NLP Learning] Detected conversational pattern, skipping command matching: "${content.substring(0, 50)}"`);
+        return null; // Let it fall through to conversation handler
+      }
+    }
+
     // No interpretation found - try fuzzy matching to suggest commands (if enabled)
     if (LEARNING_CONFIG.learning.autoSuggest && shouldRespond && this.shouldRespond(message)) {
       const suggestion = this.suggestCommandForPhrase(content);
@@ -404,6 +415,89 @@ class NLPLearningSystem {
     // No interpretation found
     this.stats.failedInterpretations++;
     return null;
+  }
+
+  /**
+   * Check if content matches a conversational pattern (not a command)
+   * Uses multiple heuristics to detect conversational content:
+   * 1. Explicit conversation patterns
+   * 2. Question words about the bot itself
+   * 3. Greetings and social phrases
+   * 4. Meta questions about the bot's functionality
+   *
+   * @param {string} content - Message content
+   * @returns {boolean} True if matches conversation pattern
+   */
+  isConversationalPattern(content) {
+    if (!this.conversationalAI) return false;
+
+    try {
+      const normalized = content.toLowerCase().trim();
+
+      // LAYER 1: Check explicit conversation patterns from ConversationalAI
+      const { CONVERSATION_PATTERNS } = require('./nlp-conversation.js');
+      for (const [type, config] of Object.entries(CONVERSATION_PATTERNS)) {
+        for (const pattern of config.patterns) {
+          if (pattern.test(content)) {
+            console.log(`🎯 [NLP Learning] Matched conversation type: ${type}`);
+            return true;
+          }
+        }
+      }
+
+      // LAYER 2: Heuristic detection of conversational content
+      // Questions about the bot itself (who/what are you, your creator, etc.)
+      const botIdentityQuestions = [
+        /\b(?:who|what|sino|ano)\s+(?:are|is|ka|ikaw|ang)\s+(?:you|your|mo|ng)/i,
+        /\b(?:your|mo|ng)\s+(?:name|purpose|function|job|role|master|owner|creator|boss)/i,
+        /\b(?:who|sino)\s+(?:made|created|built|gumawa|lumikha)/i,
+        /\b(?:tell|sabihin|explain|ipaliliwanag)\s+(?:me\s+)?(?:about|tungkol)\s+(?:yourself|you)/i,
+      ];
+
+      for (const pattern of botIdentityQuestions) {
+        if (pattern.test(normalized)) {
+          console.log(`🎯 [NLP Learning] Detected bot identity question`);
+          return true;
+        }
+      }
+
+      // Greetings and social pleasantries (not commands)
+      const socialPhrases = [
+        /^(?:hi|hello|hey|sup|yo|kamusta|kumusta|musta|hoy)\b/i,
+        /^(?:good\s+(?:morning|afternoon|evening|night)|magandang\s+(?:umaga|hapon|gabi))/i,
+        /^(?:thank|thanks|salamat|tysm|ty|thx)/i,
+        /^(?:sorry|pasensya|paumanhin)/i,
+        /^(?:bye|goodbye|paalam|sige)/i,
+        /^(?:congrats|congratulations|grats)/i,
+      ];
+
+      for (const pattern of socialPhrases) {
+        if (pattern.test(normalized)) {
+          console.log(`🎯 [NLP Learning] Detected social phrase/greeting`);
+          return true;
+        }
+      }
+
+      // Meta questions about bot capabilities (not specific commands)
+      const metaQuestions = [
+        /\b(?:can|could|pwede|kaya)\s+(?:you|mo)\s+(?:help|tulong)/i,
+        /\b(?:what|ano)\s+(?:can|could)\s+(?:you|the bot)\s+do/i,
+        /\b(?:how|paano)\s+(?:do|does|to)\s+(?:use|gamit)/i,
+        /\b(?:teach|turuan|show|ipakita)\s+me\s+how/i,
+      ];
+
+      for (const pattern of metaQuestions) {
+        if (pattern.test(normalized)) {
+          console.log(`🎯 [NLP Learning] Detected meta question about bot capabilities`);
+          return true;
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.error('❌ Error checking conversation pattern:', error);
+      return false; // Fail gracefully
+    }
   }
 
   /**
@@ -584,6 +678,12 @@ class NLPLearningSystem {
     const normalized = phrase.toLowerCase().trim();
     const words = normalized.split(/\s+/);
 
+    // Calculate conversational penalty - reduce confidence for phrases that look conversational
+    const conversationalPenalty = this.calculateConversationalPenalty(normalized);
+    if (conversationalPenalty > 0) {
+      console.log(`📉 [NLP Learning] Applying ${(conversationalPenalty * 100).toFixed(0)}% conversational penalty to "${phrase.substring(0, 40)}"`);
+    }
+
     // Get all known commands from static patterns
     const allCommands = Object.keys(NLP_PATTERNS);
 
@@ -668,7 +768,10 @@ class NLPLearningSystem {
 
     // Apply popularity boost (phrases seen frequently get higher confidence)
     if (popularityBoost > 0 && bestMatch) {
-      const boostedScore = Math.min(highestScore + popularityBoost, 0.99);
+      let boostedScore = Math.min(highestScore + popularityBoost, 0.99);
+
+      // Apply conversational penalty even to popular phrases
+      boostedScore = boostedScore * (1 - conversationalPenalty);
 
       if (boostedScore >= LEARNING_CONFIG.learning.suggestionThreshold) {
         const seenCount = unrecognizedEntry ? unrecognizedEntry.count : 0;
@@ -680,18 +783,101 @@ class NLPLearningSystem {
           reasoning: `${matchReason} + popularity (${seenCount} times, ${userCount} users) = ${(boostedScore * 100).toFixed(0)}%`,
           wasUnrecognized: true,
         };
+      } else if (conversationalPenalty > 0) {
+        console.log(`🚫 [NLP Learning] Popular phrase suggestion blocked by conversational penalty`);
       }
     }
 
-    if (bestMatch && highestScore >= LEARNING_CONFIG.learning.suggestionThreshold) {
-      return {
-        command: bestMatch,
-        confidence: highestScore,
-        reasoning: matchReason || `${(highestScore * 100).toFixed(0)}% similar`,
-      };
+    // Apply conversational penalty to final confidence
+    if (bestMatch) {
+      const finalConfidence = highestScore * (1 - conversationalPenalty);
+
+      if (finalConfidence >= LEARNING_CONFIG.learning.suggestionThreshold) {
+        return {
+          command: bestMatch,
+          confidence: finalConfidence,
+          reasoning: matchReason || `${(finalConfidence * 100).toFixed(0)}% similar`,
+        };
+      } else if (conversationalPenalty > 0) {
+        console.log(`🚫 [NLP Learning] Suggestion blocked by conversational penalty (${(highestScore * 100).toFixed(0)}% → ${(finalConfidence * 100).toFixed(0)}%)`);
+      }
     }
 
     return null;
+  }
+
+  /**
+   * Calculate penalty for conversational indicators
+   * Returns a penalty multiplier (0-1) where higher = more conversational
+   * @param {string} normalized - Normalized phrase
+   * @returns {number} Penalty multiplier (0 = no penalty, 1 = full penalty)
+   */
+  calculateConversationalPenalty(normalized) {
+    let penalty = 0;
+
+    // Strong conversational indicators (80% penalty)
+    const strongIndicators = [
+      // Questions about the bot itself
+      /\b(?:who|what|sino|ano)\s+(?:are|is|ka)\s+you/i,
+      /\b(?:your|mo|ng)\s+(?:name|master|owner|creator|boss)/i,
+      /\b(?:sino|who)\s+(?:.*?\s+)?(?:master|owner|creator|boss|amo|may\s+ari)\s+(?:mo|your)/i, // "sino master mo", "who your master"
+
+      // Greetings
+      /^(?:hi|hello|hey|sup|yo|kumusta|kamusta)\b/i,
+      /^good\s+(?:morning|afternoon|evening)/i,
+
+      // Social pleasantries
+      /^(?:thank|thanks|salamat|sorry|pasensya|congrats)/i,
+      /^(?:bye|goodbye|paalam)/i,
+    ];
+
+    for (const indicator of strongIndicators) {
+      if (indicator.test(normalized)) {
+        penalty = Math.max(penalty, 0.8); // 80% penalty (blocks most suggestions)
+        break;
+      }
+    }
+
+    // Medium conversational indicators (20% penalty each, cumulative)
+    const mediumIndicators = [
+      // Question words in non-command context
+      /\b(?:how|why|when|where)\s+(?:are|is|do|does|can|will)/i,
+
+      // "Can you" / "Could you" questions
+      /\b(?:can|could|pwede|kaya)\s+you/i,
+
+      // Emotional expressions
+      /\b(?:lol|haha|hehe|omg|wtf)\b/i,
+
+      // Very short phrases (likely not commands)
+      /^(?:ok|okay|ayos|nice|cool|gg|wp)\s*$/i,
+    ];
+
+    for (const indicator of mediumIndicators) {
+      if (indicator.test(normalized)) {
+        penalty = Math.min(penalty + 0.3, 1.0); // Add 30% penalty per match (max 100%)
+      }
+    }
+
+    // Weak conversational indicators (10% penalty, cumulative)
+    const weakIndicators = [
+      // Ends with question mark
+      /\?$/,
+
+      // Contains multiple question words
+      /(who|what|when|where|why|how|sino|ano|kailan|saan|bakit|paano).*\b(who|what|when|where|why|how|sino|ano|kailan|saan|bakit|paano)/i,
+
+      // Very long phrases (>10 words - likely conversation)
+      /^(\S+\s+){10,}/,
+    ];
+
+    for (const indicator of weakIndicators) {
+      if (indicator.test(normalized)) {
+        penalty = Math.min(penalty + 0.15, 1.0); // Add 15% penalty per match (max 100%)
+      }
+    }
+
+    return penalty;
   }
 
   /**
