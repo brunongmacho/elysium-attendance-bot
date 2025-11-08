@@ -4639,7 +4639,8 @@ client.on(Events.MessageCreate, async (message) => {
       resolvedCmd === "!recommendations" ||
       resolvedCmd === "!performance" ||
       resolvedCmd === "!analyzequeue" ||
-      resolvedCmd === "!bootstraplearning"
+      resolvedCmd === "!bootstraplearning" ||
+      resolvedCmd === "!rotation"
     ) {
       if (!userIsAdmin) {
         await message.reply("❌ This intelligence command is admin-only.");
@@ -4667,6 +4668,8 @@ client.on(Events.MessageCreate, async (message) => {
         await commandHandlers.analyzequeue(message, member);
       } else if (resolvedCmd === "!bootstraplearning") {
         await commandHandlers.bootstraplearning(message, member);
+      } else if (resolvedCmd === "!rotation") {
+        await commandHandlers.rotation(message, member);
       }
       return;
     }
