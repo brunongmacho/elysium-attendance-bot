@@ -1755,7 +1755,7 @@ class IntelligenceEngine {
 
     try {
       // Get weekly attendance for recent activity analysis
-      const weeklyResponse = await this.sheetAPI.call('getWeeklyAttendance', {});
+      const weeklyResponse = await this.sheetAPI.call('getAllWeeklyAttendance', {});
       const weeklyData = weeklyResponse?.members ?? [];
 
       for (const member of attendanceData) {
