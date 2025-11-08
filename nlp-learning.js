@@ -207,6 +207,7 @@ class NLPLearningSystem {
     this.unrecognizedPhrases = new Map();  // phrase → { count, users, lastSeen }
     this.recentMessages = [];              // Circular buffer of recent messages
     this.negativePatterns = new Map();     // phrase + command → { count, reason } - patterns that DON'T match
+    this.pendingConfirmations = new Map(); // Confirmation prompts waiting for user response
 
     // Static NLP handler for fallback
     this.staticHandler = null;
@@ -317,12 +318,18 @@ class NLPLearningSystem {
   async learnFromMessage(message) {
     if (!LEARNING_CONFIG.activationModes.passiveLearning) return;
 
+    // Validate message structure to prevent null reference errors
+    if (!message || !message.author || !message.content || !message.channel) {
+      console.warn('🧠 [NLP Learning] Invalid message structure, skipping learning');
+      return;
+    }
+
     this.stats.messagesAnalyzed++;
 
     // Add to recent messages buffer
     this.recentMessages.push({
       userId: message.author.id,
-      username: message.author.username,
+      username: message.author.username || 'Unknown',
       content: message.content,
       timestamp: Date.now(),
       channelId: message.channel.id,
@@ -435,12 +442,37 @@ class NLPLearningSystem {
       const normalized = content.toLowerCase().trim();
 
       // LAYER 1: Check explicit conversation patterns from ConversationalAI
-      const { CONVERSATION_PATTERNS } = require('./nlp-conversation.js');
+      let CONVERSATION_PATTERNS;
+      try {
+        ({ CONVERSATION_PATTERNS } = require('./nlp-conversation.js'));
+      } catch (reqError) {
+        console.error('❌ [NLP Learning] Failed to load conversation patterns:', reqError.message);
+        return false;
+      }
+
+      if (!CONVERSATION_PATTERNS || typeof CONVERSATION_PATTERNS !== 'object') {
+        console.error('❌ [NLP Learning] Invalid CONVERSATION_PATTERNS structure');
+        return false;
+      }
+
       for (const [type, config] of Object.entries(CONVERSATION_PATTERNS)) {
+        // Validate config structure
+        if (!config || !config.patterns || !Array.isArray(config.patterns)) {
+          console.warn(`⚠️ [NLP Learning] Invalid pattern config for type: ${type}`);
+          continue;
+        }
+
         for (const pattern of config.patterns) {
-          if (pattern.test(content)) {
-            console.log(`🎯 [NLP Learning] Matched conversation type: ${type}`);
-            return true;
+          // Validate pattern is a RegExp with test method
+          if (pattern && typeof pattern.test === 'function') {
+            try {
+              if (pattern.test(content)) {
+                console.log(`🎯 [NLP Learning] Matched conversation type: ${type}`);
+                return true;
+              }
+            } catch (testError) {
+              console.warn(`⚠️ [NLP Learning] Pattern test failed for ${type}:`, testError.message);
+            }
           }
         }
       }
@@ -1013,10 +1045,6 @@ class NLPLearningSystem {
       });
 
       // Track pending confirmation
-      if (!this.pendingConfirmations) {
-        this.pendingConfirmations = new Map();
-      }
-
       this.pendingConfirmations.set(key, {
         phrase,
         command,
@@ -1037,10 +1065,18 @@ class NLPLearningSystem {
       collector.on('collect', async (interaction) => {
         const isConfirm = interaction.customId.startsWith('nlp_confirm_');
 
-        // Disable buttons after interaction
+        // Disable buttons after interaction (create fresh instances to prevent mutation)
         const disabledRow = new ActionRowBuilder().addComponents(
-          ButtonBuilder.from(confirmButton).setDisabled(true),
-          ButtonBuilder.from(cancelButton).setDisabled(true)
+          new ButtonBuilder()
+            .setCustomId(confirmButton.data.custom_id)
+            .setLabel(confirmButton.data.label)
+            .setStyle(confirmButton.data.style)
+            .setDisabled(true),
+          new ButtonBuilder()
+            .setCustomId(cancelButton.data.custom_id)
+            .setLabel(cancelButton.data.label)
+            .setStyle(cancelButton.data.style)
+            .setDisabled(true)
         );
 
         if (isConfirm) {
@@ -1194,20 +1230,42 @@ class NLPLearningSystem {
    * @returns {boolean} True if content contains insults
    */
   isInsult(content) {
-    const { CONVERSATION_PATTERNS } = require('./nlp-conversation.js');
-
     if (!content || typeof content !== 'string') return false;
 
-    const normalized = content.toLowerCase().trim();
+    try {
+      let CONVERSATION_PATTERNS;
+      try {
+        ({ CONVERSATION_PATTERNS } = require('./nlp-conversation.js'));
+      } catch (reqError) {
+        console.error('❌ [NLP Learning] Failed to load conversation patterns for insult detection:', reqError.message);
+        return false;
+      }
 
-    // Check against all insult patterns from nlp-conversation.js
-    if (CONVERSATION_PATTERNS.insult && CONVERSATION_PATTERNS.insult.patterns) {
-      for (const pattern of CONVERSATION_PATTERNS.insult.patterns) {
-        if (pattern.test(normalized)) {
-          console.log(`🚫 [NLP Learning] Blocked insult pattern: "${content}"`);
-          return true;
+      if (!CONVERSATION_PATTERNS || !CONVERSATION_PATTERNS.insult) {
+        console.warn('⚠️ [NLP Learning] Insult patterns not found');
+        return false;
+      }
+
+      const normalized = content.toLowerCase().trim();
+
+      // Check against all insult patterns from nlp-conversation.js
+      if (CONVERSATION_PATTERNS.insult.patterns && Array.isArray(CONVERSATION_PATTERNS.insult.patterns)) {
+        for (const pattern of CONVERSATION_PATTERNS.insult.patterns) {
+          if (pattern && typeof pattern.test === 'function') {
+            try {
+              if (pattern.test(normalized)) {
+                console.log(`🚫 [NLP Learning] Blocked insult pattern: "${content}"`);
+                return true;
+              }
+            } catch (testError) {
+              console.warn('⚠️ [NLP Learning] Insult pattern test failed:', testError.message);
+            }
+          }
         }
       }
+    } catch (error) {
+      console.error('❌ [NLP Learning] Error in insult detection:', error.message);
+      return false;
     }
 
     // Additional check for common inappropriate words (backup filter)
@@ -1305,10 +1363,14 @@ class NLPLearningSystem {
 
     // Limit size
     if (this.unrecognizedPhrases.size > LEARNING_CONFIG.storage.maxUnrecognizedPhrases) {
-      // Remove oldest entries
+      // Remove least common phrase
       const sorted = Array.from(this.unrecognizedPhrases.entries())
         .sort((a, b) => a[1].count - b[1].count);
-      this.unrecognizedPhrases.delete(sorted[0][0]);
+
+      if (sorted.length > 0) {
+        this.unrecognizedPhrases.delete(sorted[0][0]);
+        console.log(`🧹 [NLP Learning] Removed least common phrase: "${sorted[0][0]}" (count: ${sorted[0][1].count})`);
+      }
     }
   }
 
@@ -1321,7 +1383,33 @@ class NLPLearningSystem {
       await this.syncToGoogleSheets();
     }, LEARNING_CONFIG.storage.syncInterval);
 
+    // Also start cleanup timer for stale pending confirmations
+    this.cleanupTimer = setInterval(() => {
+      this.cleanupStalePendingConfirmations();
+    }, 60000); // Run every minute
+
     console.log(`🧠 [NLP Learning] Sync timer started (every ${LEARNING_CONFIG.storage.syncInterval / 60000} minutes)`);
+    console.log('🧹 [NLP Learning] Pending confirmation cleanup timer started (every 1 minute)');
+  }
+
+  /**
+   * Clean up stale pending confirmations to prevent memory leak
+   */
+  cleanupStalePendingConfirmations() {
+    const now = Date.now();
+    const MAX_AGE = 5 * 60 * 1000; // 5 minutes
+    let cleanedCount = 0;
+
+    for (const [key, data] of this.pendingConfirmations.entries()) {
+      if (now - data.timestamp > MAX_AGE) {
+        this.pendingConfirmations.delete(key);
+        cleanedCount++;
+      }
+    }
+
+    if (cleanedCount > 0) {
+      console.log(`🧹 [NLP Learning] Cleaned up ${cleanedCount} stale pending confirmation(s)`);
+    }
   }
 
   async loadFromGoogleSheets() {

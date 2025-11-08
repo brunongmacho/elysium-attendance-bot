@@ -880,6 +880,63 @@ class NLPHandler {
     this.contextMemory = new Map();
     // Clear old contexts after 10 minutes
     this.contextTimeout = 10 * 60 * 1000;
+
+    // Pre-compile Filipino text speak regexes for performance (avoid creating regex on every message)
+    this.filipinoTextSpeakMap = new Map();
+    const filipinoTextSpeak = {
+      'dpat': 'dapat',
+      'dpt': 'dapat',
+      'lng': 'lang',
+      'kc': 'kasi',
+      'ksi': 'kasi',
+      'pra': 'para',
+      'd2': 'dito',
+      'kta': 'kita',
+      'aq': 'ako',
+      'q': 'ako',
+      'kng': 'kung',
+      'hnd': 'hindi',
+      'mgkano': 'magkano',
+      'mkano': 'magkano',
+      'klan': 'kailan',
+      'kelan': 'kailan',
+      'anu': 'ano',
+      'pla': 'pala',
+      'nmn': 'naman',
+      'dba': 'di ba',
+      'dto': 'dito',
+      'dyan': 'diyan',
+      'doon': 'doon',
+      'sna': 'sana',
+      'tpos': 'tapos',
+      'pag': 'pag',
+      'pg': 'pag',
+      'nsa': 'nasa',
+      'wla': 'wala',
+      'mron': 'meron',
+      'mrn': 'meron',
+      'ilan': 'ilang',
+      'pila': 'ilang',
+      'tngin': 'tingnan',
+      'tngan': 'tingnan',
+      'chck': 'check',
+      'chek': 'check',
+      'cek': 'check',
+      'kmusta': 'kumusta',
+      'kmsta': 'kumusta',
+      'kmu': 'kumusta',
+      'ok': 'okay',
+      'oks': 'okay',
+      'goods': 'good',
+      'gds': 'goods',
+    };
+
+    for (const [abbrev, full] of Object.entries(filipinoTextSpeak)) {
+      this.filipinoTextSpeakMap.set(abbrev, {
+        regex: new RegExp(`\\b${abbrev}\\b`, 'gi'),
+        replacement: full
+      });
+    }
   }
 
   /**
@@ -962,6 +1019,13 @@ class NLPHandler {
 
       let content = message.content.trim();
 
+      // Input length validation to prevent potential DoS from catastrophic backtracking
+      const MAX_INPUT_LENGTH = 300;
+      if (content.length > MAX_INPUT_LENGTH) {
+        console.warn(`🧠 [NLP] Input too long (${content.length} chars), truncating to ${MAX_INPUT_LENGTH}`);
+        content = content.substring(0, MAX_INPUT_LENGTH);
+      }
+
       // Strip bot mentions from the beginning (e.g., "<@123456789> how many points")
       // This allows patterns to match properly when bot is mentioned
       content = content.replace(/^<@!?\d+>\s*/g, '').trim();
@@ -1035,63 +1099,9 @@ class NLPHandler {
     content = content.replace(/\s+/g, ' ').trim();
 
     // FILIPINO TEXT SPEAK NORMALIZATION (SMS/Gaming abbreviations)
-    const filipinoTextSpeak = {
-      // Common Filipino abbreviations
-      'dpat': 'dapat',
-      'dpt': 'dapat',
-      'lng': 'lang',
-      'lng': 'lang',
-      'kc': 'kasi',
-      'ksi': 'kasi',
-      'pra': 'para',
-      'd2': 'dito',
-      'kta': 'kita',
-      'aq': 'ako',
-      'q': 'ako',
-      'aq': 'ako',
-      'kng': 'kung',
-      'hnd': 'hindi',
-      'dpt': 'dapat',
-      'mgkano': 'magkano',
-      'mkano': 'magkano',
-      'klan': 'kailan',
-      'klan': 'kailan',
-      'kelan': 'kailan',
-      'anu': 'ano',
-      'pla': 'pala',
-      'nmn': 'naman',
-      'dba': 'di ba',
-      'dto': 'dito',
-      'dyan': 'diyan',
-      'doon': 'doon',
-      'sna': 'sana',
-      'tpos': 'tapos',
-      'pag': 'pag',
-      'pg': 'pag',
-      'nsa': 'nasa',
-      'wla': 'wala',
-      'mron': 'meron',
-      'mrn': 'meron',
-      'ilan': 'ilang',
-      'pila': 'ilang',
-      'tngin': 'tingnan',
-      'tngan': 'tingnan',
-      'chck': 'check',
-      'chek': 'check',
-      'cek': 'check',
-      'kmusta': 'kumusta',
-      'kmsta': 'kumusta',
-      'kmu': 'kumusta',
-      'ok': 'okay',
-      'oks': 'okay',
-      'goods': 'good',
-      'gds': 'goods',
-    };
-
-    // Apply Filipino text speak normalization (word boundaries)
-    for (const [abbrev, full] of Object.entries(filipinoTextSpeak)) {
-      const regex = new RegExp(`\\b${abbrev}\\b`, 'gi');
-      content = content.replace(regex, full);
+    // Use pre-compiled regexes for better performance
+    for (const [abbrev, data] of this.filipinoTextSpeakMap.entries()) {
+      content = content.replace(data.regex, data.replacement);
     }
 
     // Handle common English typos and variations
