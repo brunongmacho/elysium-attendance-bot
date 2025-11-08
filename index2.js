@@ -1047,6 +1047,29 @@ function stopBiddingChannelCleanupSchedule() {
 // =====================================================================
 // SECTION 7: CONFIRMATION UTILITIES
 // =====================================================================
+/**
+ * Creates a disabled button row from two buttons.
+ * Uses fresh ButtonBuilder instances to avoid mutation issues with ButtonBuilder.from().
+ *
+ * @param {ButtonBuilder} btn1 - First button to disable
+ * @param {ButtonBuilder} btn2 - Second button to disable
+ * @returns {ActionRowBuilder} Row with both buttons disabled
+ */
+function createDisabledRow(btn1, btn2) {
+  const disabledBtn1 = new ButtonBuilder()
+    .setCustomId(btn1.data.custom_id)
+    .setLabel(btn1.data.label)
+    .setStyle(btn1.data.style)
+    .setDisabled(true);
+
+  const disabledBtn2 = new ButtonBuilder()
+    .setCustomId(btn2.data.custom_id)
+    .setLabel(btn2.data.label)
+    .setStyle(btn2.data.style)
+    .setDisabled(true);
+
+  return new ActionRowBuilder().addComponents(disabledBtn1, disabledBtn2);
+}
 
 /**
  * Universal confirmation dialog with reaction-based user response.
@@ -2121,10 +2144,7 @@ const commandHandlers = {
 
       const isConfirm = interaction.customId.startsWith('endauction_confirm_');
 
-      const disabledRow = new ActionRowBuilder().addComponents(
-        ButtonBuilder.from(confirmButton).setDisabled(true),
-        ButtonBuilder.from(cancelButton).setDisabled(true)
-      );
+      const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
       await interaction.update({ components: [disabledRow] });
 
@@ -2158,10 +2178,7 @@ const commandHandlers = {
         if (executed) return;
         executed = true;
 
-        const disabledRow = new ActionRowBuilder().addComponents(
-          ButtonBuilder.from(confirmButton).setDisabled(true),
-          ButtonBuilder.from(cancelButton).setDisabled(true)
-        );
+        const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
         await confirmMsg.edit({ components: [disabledRow] }).catch(() => {});
         await message.reply(`⏱️ Confirmation timeout - auction continues`);
@@ -5323,10 +5340,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const isApprove = customId.startsWith('verify_approve_');
 
       // Disable buttons
-      const disabledRow = new ActionRowBuilder().addComponents(
-        ButtonBuilder.from(interaction.message.components[0].components[0]).setDisabled(true),
-        ButtonBuilder.from(interaction.message.components[0].components[1]).setDisabled(true)
-      );
+      const btn1 = interaction.message.components[0].components[0];
+      const btn2 = interaction.message.components[0].components[1];
+      const disabledRow = createDisabledRow(btn1, btn2);
 
       if (isApprove) {
         const isDuplicate = spawnInfo.members.some(
@@ -5424,10 +5440,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const isConfirm = customId.startsWith('close_confirm_');
 
       // Disable buttons
-      const disabledRow = new ActionRowBuilder().addComponents(
-        ButtonBuilder.from(interaction.message.components[0].components[0]).setDisabled(true),
-        ButtonBuilder.from(interaction.message.components[0].components[1]).setDisabled(true)
-      );
+      const btn1 = interaction.message.components[0].components[0];
+      const btn2 = interaction.message.components[0].components[1];
+      const disabledRow = createDisabledRow(btn1, btn2);
 
       if (isConfirm) {
         if (!spawnInfo || spawnInfo.closed) {

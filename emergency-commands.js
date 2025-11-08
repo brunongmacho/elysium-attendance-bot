@@ -93,6 +93,32 @@ let isAdminFunc = null;      // Admin check function
 let discordCache = null;     // Discord channel cache
 
 // ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Creates a disabled row with fresh button instances (defensive: avoids mutation)
+ * @param {ButtonBuilder} btn1 - First button to disable
+ * @param {ButtonBuilder} btn2 - Second button to disable
+ * @returns {ActionRowBuilder} Row with disabled buttons
+ */
+function createDisabledRow(btn1, btn2) {
+  const disabledBtn1 = new ButtonBuilder()
+    .setCustomId(btn1.data.custom_id)
+    .setLabel(btn1.data.label)
+    .setStyle(btn1.data.style)
+    .setDisabled(true);
+
+  const disabledBtn2 = new ButtonBuilder()
+    .setCustomId(btn2.data.custom_id)
+    .setLabel(btn2.data.label)
+    .setStyle(btn2.data.style)
+    .setDisabled(true);
+
+  return new ActionRowBuilder().addComponents(disabledBtn1, disabledBtn2);
+}
+
+// ============================================================================
 // INITIALIZATION
 // ============================================================================
 
@@ -195,10 +221,7 @@ async function forceCloseAllAttendance(message) {
   collector.on('collect', async (interaction) => {
     const isConfirm = interaction.customId.startsWith('closeall_confirm_');
 
-    const disabledRow = new ActionRowBuilder().addComponents(
-      ButtonBuilder.from(confirmButton).setDisabled(true),
-      ButtonBuilder.from(cancelButton).setDisabled(true)
-    );
+    const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
     if (!isConfirm) {
       await interaction.update({
@@ -271,10 +294,7 @@ async function forceCloseAllAttendance(message) {
 
   collector.on('end', async (collected, reason) => {
     if (reason === 'time' && !confirmed) {
-      const disabledRow = new ActionRowBuilder().addComponents(
-        ButtonBuilder.from(confirmButton).setDisabled(true),
-        ButtonBuilder.from(cancelButton).setDisabled(true)
-      );
+      const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
       await conf.edit({
         embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })],
@@ -432,10 +452,7 @@ async function forceEndAuction(message) {
   collector.on('collect', async (interaction) => {
     const isConfirm = interaction.customId.startsWith('endauction_confirm_');
 
-    const disabledRow = new ActionRowBuilder().addComponents(
-      ButtonBuilder.from(confirmButton).setDisabled(true),
-      ButtonBuilder.from(cancelButton).setDisabled(true)
-    );
+    const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
     if (!isConfirm) {
       await interaction.update({
@@ -494,10 +511,7 @@ async function forceEndAuction(message) {
 
   collector.on('end', async (collected, reason) => {
     if (reason === 'time' && !confirmed) {
-      const disabledRow = new ActionRowBuilder().addComponents(
-        ButtonBuilder.from(confirmButton).setDisabled(true),
-        ButtonBuilder.from(cancelButton).setDisabled(true)
-      );
+      const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
       await conf.edit({
         embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })],
@@ -590,10 +604,7 @@ async function unlockAllPoints(message) {
   collector.on('collect', async (interaction) => {
     const isConfirm = interaction.customId.startsWith('unlock_confirm_');
 
-    const disabledRow = new ActionRowBuilder().addComponents(
-      ButtonBuilder.from(confirmButton).setDisabled(true),
-      ButtonBuilder.from(cancelButton).setDisabled(true)
-    );
+    const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
     if (!isConfirm) {
       await interaction.update({
@@ -627,10 +638,7 @@ async function unlockAllPoints(message) {
 
   collector.on('end', async (collected, reason) => {
     if (reason === 'time' && !confirmed) {
-      const disabledRow = new ActionRowBuilder().addComponents(
-        ButtonBuilder.from(confirmButton).setDisabled(true),
-        ButtonBuilder.from(cancelButton).setDisabled(true)
-      );
+      const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
       await conf.edit({
         embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })],
@@ -717,10 +725,7 @@ async function clearPendingConfirmations(message) {
   collector.on('collect', async (interaction) => {
     const isConfirm = interaction.customId.startsWith('clearbids_confirm_');
 
-    const disabledRow = new ActionRowBuilder().addComponents(
-      ButtonBuilder.from(confirmButton).setDisabled(true),
-      ButtonBuilder.from(cancelButton).setDisabled(true)
-    );
+    const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
     if (!isConfirm) {
       await interaction.update({
@@ -774,10 +779,7 @@ async function clearPendingConfirmations(message) {
 
   collector.on('end', async (collected, reason) => {
     if (reason === 'time' && !confirmed) {
-      const disabledRow = new ActionRowBuilder().addComponents(
-        ButtonBuilder.from(confirmButton).setDisabled(true),
-        ButtonBuilder.from(cancelButton).setDisabled(true)
-      );
+      const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
       await conf.edit({
         embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })],

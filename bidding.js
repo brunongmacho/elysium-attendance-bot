@@ -499,6 +499,34 @@ const fmtDur = formatDuration;
 const { formatUptime: fmtTime } = require('./utils/common');
 
 // ═══════════════════════════════════════════════════════════════════════════
+// BUTTON UTILITIES
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Creates a disabled button row from two buttons.
+ * Uses fresh ButtonBuilder instances to avoid mutation issues with ButtonBuilder.from().
+ *
+ * @param {ButtonBuilder} btn1 - First button to disable
+ * @param {ButtonBuilder} btn2 - Second button to disable
+ * @returns {ActionRowBuilder} Row with both buttons disabled
+ */
+function createDisabledRow(btn1, btn2) {
+  const disabledBtn1 = new ButtonBuilder()
+    .setCustomId(btn1.data.custom_id)
+    .setLabel(btn1.data.label)
+    .setStyle(btn1.data.style)
+    .setDisabled(true);
+
+  const disabledBtn2 = new ButtonBuilder()
+    .setCustomId(btn2.data.custom_id)
+    .setLabel(btn2.data.label)
+    .setStyle(btn2.data.style)
+    .setDisabled(true);
+
+  return new ActionRowBuilder().addComponents(disabledBtn1, disabledBtn2);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // POINTS LOCKING SYSTEM - Race Condition Prevention
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -2484,10 +2512,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
       rstCollector.on('collect', async (interaction) => {
         const isConfirm = interaction.customId.startsWith('reset_confirm_');
-        const disabledRow = new ActionRowBuilder().addComponents(
-          ButtonBuilder.from(rstConfirmBtn).setDisabled(true),
-          ButtonBuilder.from(rstCancelBtn).setDisabled(true)
-        );
+        const disabledRow = createDisabledRow(rstConfirmBtn, rstCancelBtn);
 
         if (isConfirm) {
           clearAllTimers();
@@ -2522,10 +2547,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
       rstCollector.on('end', async (collected, reason) => {
         if (reason === 'time') {
-          const disabledRow = new ActionRowBuilder().addComponents(
-            ButtonBuilder.from(rstConfirmBtn).setDisabled(true),
-            ButtonBuilder.from(rstCancelBtn).setDisabled(true)
-          );
+          const disabledRow = createDisabledRow(rstConfirmBtn, rstCancelBtn);
           const timeoutEmbed = EmbedBuilder.from(rstEmbed).setColor(COLORS.INFO).setTitle(`${EMOJI.CLOCK} Timed Out`);
           await errorHandler.safeEdit(rstMsg, { embeds: [timeoutEmbed], components: [disabledRow] }, 'message edit');
         }
@@ -2578,10 +2600,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       collector.on('collect', async (interaction) => {
         const isConfirm = interaction.customId.startsWith('forcesubmit_confirm_');
 
-        const disabledRow = new ActionRowBuilder().addComponents(
-          ButtonBuilder.from(submitButton).setDisabled(true),
-          ButtonBuilder.from(cancelButton).setDisabled(true)
-        );
+        const disabledRow = createDisabledRow(submitButton, cancelButton);
 
         if (isConfirm) {
           if (!st.sd) st.sd = ts();
@@ -2674,10 +2693,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
       collector.on('end', async (collected, reason) => {
         if (reason === 'time' && collected.size === 0) {
-          const disabledRow = new ActionRowBuilder().addComponents(
-            ButtonBuilder.from(submitButton).setDisabled(true),
-            ButtonBuilder.from(cancelButton).setDisabled(true)
-          );
+          const disabledRow = createDisabledRow(submitButton, cancelButton);
 
           const timeoutEmbed = new EmbedBuilder()
             .setColor(getColor(COLORS.ERROR))
@@ -2732,10 +2748,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       cancelCollector.on('collect', async (interaction) => {
         const isConfirm = interaction.customId.startsWith('cancelitem_confirm_');
 
-        const disabledCancelRow = new ActionRowBuilder().addComponents(
-          ButtonBuilder.from(cancelConfirmBtn).setDisabled(true),
-          ButtonBuilder.from(cancelCancelBtn).setDisabled(true)
-        );
+        const disabledCancelRow = createDisabledRow(cancelConfirmBtn, cancelCancelBtn);
 
         if (isConfirm) {
           clearAllTimers();
@@ -2782,10 +2795,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
       cancelCollector.on('end', async (collected, reason) => {
         if (reason === 'time' && collected.size === 0) {
-          const disabledCancelRow = new ActionRowBuilder().addComponents(
-            ButtonBuilder.from(cancelConfirmBtn).setDisabled(true),
-            ButtonBuilder.from(cancelCancelBtn).setDisabled(true)
-          );
+          const disabledCancelRow = createDisabledRow(cancelConfirmBtn, cancelCancelBtn);
 
           const timeoutEmbed = new EmbedBuilder()
             .setColor(getColor(COLORS.ERROR))
@@ -2839,10 +2849,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       skipCollector.on('collect', async (interaction) => {
         const isConfirm = interaction.customId.startsWith('skipitem_confirm_');
 
-        const disabledSkipRow = new ActionRowBuilder().addComponents(
-          ButtonBuilder.from(skipConfirmBtn).setDisabled(true),
-          ButtonBuilder.from(skipCancelBtn).setDisabled(true)
-        );
+        const disabledSkipRow = createDisabledRow(skipConfirmBtn, skipCancelBtn);
 
         if (isConfirm) {
           clearAllTimers();
@@ -2889,10 +2896,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
       skipCollector.on('end', async (collected, reason) => {
         if (reason === 'time' && collected.size === 0) {
-          const disabledSkipRow = new ActionRowBuilder().addComponents(
-            ButtonBuilder.from(skipConfirmBtn).setDisabled(true),
-            ButtonBuilder.from(skipCancelBtn).setDisabled(true)
-          );
+          const disabledSkipRow = createDisabledRow(skipConfirmBtn, skipCancelBtn);
 
           const timeoutEmbed = new EmbedBuilder()
             .setColor(getColor(COLORS.ERROR))
@@ -3046,10 +3050,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       fixCollector.on('collect', async (interaction) => {
         const isConfirm = interaction.customId.startsWith('fixlocked_confirm_');
 
-        const disabledFixRow = new ActionRowBuilder().addComponents(
-          ButtonBuilder.from(clearBtn).setDisabled(true),
-          ButtonBuilder.from(cancelBtn).setDisabled(true)
-        );
+        const disabledFixRow = createDisabledRow(clearBtn, cancelBtn);
 
         if (isConfirm) {
           const clearedCount = lockedMembers.length;
@@ -3088,10 +3089,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
       fixCollector.on('end', async (collected, reason) => {
         if (reason === 'time' && collected.size === 0) {
-          const disabledFixRow = new ActionRowBuilder().addComponents(
-            ButtonBuilder.from(clearBtn).setDisabled(true),
-            ButtonBuilder.from(cancelBtn).setDisabled(true)
-          );
+          const disabledFixRow = createDisabledRow(clearBtn, cancelBtn);
 
           const timeoutEmbed = new EmbedBuilder()
             .setColor(getColor(COLORS.ERROR))
@@ -3250,10 +3248,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           const isConfirm = interaction.customId.startsWith('reset_confirm_');
 
           // Disable buttons after interaction
-          const disabledRow = new ActionRowBuilder().addComponents(
-            ButtonBuilder.from(confirmButton).setDisabled(true),
-            ButtonBuilder.from(cancelButton).setDisabled(true)
-          );
+          const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
         if (isConfirm) {
           await interaction.update({ embeds: [resetAuditEmbed], components: [disabledRow] });
