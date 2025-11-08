@@ -314,6 +314,28 @@ const TIMEOUTS = {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
+ * Creates a disabled row with fresh button instances (defensive: avoids mutation)
+ * @param {ButtonBuilder} btn1 - First button to disable
+ * @param {ButtonBuilder} btn2 - Second button to disable
+ * @returns {ActionRowBuilder} Row with disabled buttons
+ */
+function createDisabledRow(btn1, btn2) {
+  const disabledBtn1 = new ButtonBuilder()
+    .setCustomId(btn1.data.custom_id)
+    .setLabel(btn1.data.label)
+    .setStyle(btn1.data.style)
+    .setDisabled(true);
+
+  const disabledBtn2 = new ButtonBuilder()
+    .setCustomId(btn2.data.custom_id)
+    .setLabel(btn2.data.label)
+    .setStyle(btn2.data.style)
+    .setDisabled(true);
+
+  return new ActionRowBuilder().addComponents(disabledBtn1, disabledBtn2);
+}
+
+/**
  * Initializes the auctioneering module with required dependencies.
  * Must be called during bot startup before any auctions can run.
  *
@@ -2886,10 +2908,7 @@ async function handleCancelItem(message) {
   cancelCollector.on('collect', async (interaction) => {
     const isConfirm = interaction.customId.startsWith('cancelitem_confirm_');
 
-    const disabledCancelRow = new ActionRowBuilder().addComponents(
-      ButtonBuilder.from(cancelConfirmBtn).setDisabled(true),
-      ButtonBuilder.from(cancelCancelBtn).setDisabled(true)
-    );
+    const disabledCancelRow = createDisabledRow(cancelConfirmBtn, cancelCancelBtn);
 
     if (isConfirm) {
       // Unlock points for current bidder
@@ -3060,10 +3079,7 @@ async function handleSkipItem(message) {
   skipCollector.on('collect', async (interaction) => {
     const isConfirm = interaction.customId.startsWith('skipitem_confirm_');
 
-    const disabledSkipRow = new ActionRowBuilder().addComponents(
-      ButtonBuilder.from(skipConfirmBtn).setDisabled(true),
-      ButtonBuilder.from(skipCancelBtn).setDisabled(true)
-    );
+    const disabledSkipRow = createDisabledRow(skipConfirmBtn, skipCancelBtn);
 
     if (isConfirm) {
       // Unlock points for current bidder
@@ -3240,10 +3256,7 @@ async function handleForceSubmitResults(message, config, biddingModule) {
   collector.on('collect', async (interaction) => {
     const isConfirm = interaction.customId.startsWith('forcesubmit_confirm_');
 
-    const disabledRow = new ActionRowBuilder().addComponents(
-      ButtonBuilder.from(submitButton).setDisabled(true),
-      ButtonBuilder.from(cancelButton).setDisabled(true)
-    );
+    const disabledRow = createDisabledRow(submitButton, cancelButton);
 
     if (isConfirm) {
       await biddingModule.submitSessionTally(config, auctionState.sessionItems);
