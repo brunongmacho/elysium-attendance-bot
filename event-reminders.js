@@ -484,8 +484,22 @@ function scheduleEventReminder(eventKey, event, targetDay) {
   eventTimers[eventKey] = {
     eventTimer: setTimeout(async () => {
       await sendEventReminder(event, eventStartTime); // Pass actual event time for display
-      // Reschedule for next week
-      scheduleEventReminder(eventKey, event, targetDay);
+
+      // CRITICAL FIX: Wait until after the event ends before rescheduling
+      // This prevents rescheduling during the reminder window (which would cause double-posting)
+      const eventEndTime = eventStartTime.getTime() + (event.durationMinutes * 60 * 1000);
+      const now = Date.now();
+      const delayUntilAfterEvent = eventEndTime - now + 1000; // Add 1 second buffer
+
+      // Only wait if event hasn't ended yet
+      if (delayUntilAfterEvent > 0) {
+        setTimeout(() => {
+          scheduleEventReminder(eventKey, event, targetDay);
+        }, delayUntilAfterEvent);
+      } else {
+        // Event already ended, reschedule immediately
+        scheduleEventReminder(eventKey, event, targetDay);
+      }
     }, delay),
     nextRun: reminderTime,
     eventTime: eventStartTime,

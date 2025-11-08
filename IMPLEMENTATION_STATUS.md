@@ -14,7 +14,7 @@
 - `AttendanceStreaks` (hidden) - All streak types
 - `GuildMilestones` (hidden) - Guild-wide achievements
 - `WeeklyMilestoneLog` (hidden) - Weekly recap data
-- Enhanced `MilestoneTracking` - Added engagement + hybrid columns
+- Enhanced `MilestoneTracking` - Added engagement columns
 - Enhanced `AttendanceTracker` - Added tenure tracking columns
 
 ---
@@ -22,7 +22,6 @@
 ### **2. Milestone Configuration - 100% COMPLETE** ✅
 **File:** `proactive-intelligence.js` (lines 65-134)
 - ✅ Added engagement score thresholds (60, 70, 80, 85, 90, 95, 100)
-- ✅ Added hybrid combo thresholds (Balanced Player, Rising Star, Guild Pillar, Legend Status)
 - ✅ Added guild-wide thresholds (10k-100k attendance, 15k-120k bidding, 20-50 active members)
 - ✅ Added streak thresholds (consecutive spawn, calendar day, perfect week)
 - ✅ Added tenure thresholds (30, 60, 90, 180, 365, 730, 1095 days)
@@ -47,14 +46,13 @@
 
 ---
 
-### **5. All 7 New Milestone Types - 100% COMPLETE** ✅
+### **5. All 6 New Milestone Types - 100% COMPLETE** ✅
 **File:** `proactive-intelligence.js` (lines 1087-1636)
 - ✅ `ensureMilestoneTabsExist()` - Initialize Google Sheets
 - ✅ `detectAllMilestones()` - Hourly detection coordinator
 - ✅ `queueMilestone()` - Helper to add to queue
 - ✅ `announceMilestoneBatch()` - Daily 3:01 AM batch announcements
 - ✅ `checkEngagementMilestones()` - Engagement score detection
-- ✅ `checkHybridComboMilestones()` - Hybrid combo detection
 - ✅ `checkGuildWideMilestones()` - Guild-wide detection
 - ✅ `checkTenureMilestones()` - Loyalty/tenure detection
 - ✅ `checkCalendarDayStreaks()` - Calendar day streak (5+ spawns/day)
@@ -204,9 +202,6 @@ Inserted this code BEFORE the final `await guildAnnouncementChannel.send({ embed
             } else if (type === 'engagement') {
               emoji = '🧠';
               label = 'Engagement';
-            } else if (type === 'hybrid') {
-              emoji = '🔥';
-              label = 'Hybrid Combo';
             } else if (type === 'guildWide') {
               emoji = '🏆';
               label = 'Guild-Wide';
@@ -287,7 +282,6 @@ After completing the remaining tasks:
 
 5. **Test New Milestone Types:**
    - Engagement: Check members crossing 60, 70, 80+ scores
-   - Hybrid: Check members with 100+200, 250+400, etc.
    - Guild-Wide: Check total attendance/bidding crossing thresholds
    - Streaks: Attend spawns and verify streak tracking
    - Tenure: Check members reaching 30, 60, 90+ days
@@ -319,7 +313,7 @@ After completing the remaining tasks:
 ## 🎉 **Implementation Complete!**
 
 All code changes are complete and ready for deployment. The enhanced milestone system includes:
-- 7 new milestone types (engagement, hybrid, guild-wide, 3 streak types, tenure)
+- 6 new milestone types (engagement, guild-wide, 3 streak types, tenure)
 - Batching queue system (no more spam!)
 - Unified cron schedules (3:01 AM daily)
 - Weekly milestone recap in Sunday summary

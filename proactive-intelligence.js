@@ -89,18 +89,6 @@ const PROACTIVE_CONFIG = {
         minor: [60, 70, 80]                      // Guild Chat
       },
 
-      // NEW: Hybrid Combo Milestones (attendance + bidding)
-      hybrid: {
-        major: [                                 // Guild Announcements
-          { attendance: 400, bidding: 650, name: 'Guild Pillar' },
-          { attendance: 600, bidding: 1000, name: 'Legend Status' }
-        ],
-        minor: [                                 // Guild Chat
-          { attendance: 100, bidding: 200, name: 'Balanced Player' },
-          { attendance: 250, bidding: 400, name: 'Rising Star' }
-        ]
-      },
-
       // NEW: Guild-Wide Collective Milestones
       guildWide: {
         totalAttendance: [10000, 25000, 50000, 100000],
@@ -172,7 +160,6 @@ class ProactiveIntelligence {
       attendance: [],
       bidding: [],
       engagement: [],
-      hybrid: [],
       guildWide: [],
       spawnStreak: [],
       calendarStreak: [],
@@ -823,9 +810,6 @@ class ProactiveIntelligence {
             } else if (type === 'engagement') {
               emoji = '🧠';
               label = 'Engagement';
-            } else if (type === 'hybrid') {
-              emoji = '🔥';
-              label = 'Hybrid Combo';
             } else if (type === 'guildWide') {
               emoji = '🏆';
               label = 'Guild-Wide';
@@ -1194,7 +1178,6 @@ class ProactiveIntelligence {
 
       // Check new milestone types
       await this.checkEngagementMilestones();
-      await this.checkHybridComboMilestones();
       await this.checkGuildWideMilestones();
 
       console.log('✅ [PROACTIVE] Milestone detection complete');
@@ -1222,8 +1205,6 @@ class ProactiveIntelligence {
           // Different milestone types have different unique identifiers
           if (type === 'attendance' || type === 'bidding') {
             return queued.milestone === data.milestone;
-          } else if (type === 'hybrid') {
-            return queued.milestoneName === data.milestoneName;
           } else if (type === 'engagement') {
             return queued.milestone === data.milestone;
           } else if (type === 'tenure' || type === 'calendarStreak' || type === 'perfectWeek' || type === 'spawnStreak') {
@@ -1288,9 +1269,7 @@ class ProactiveIntelligence {
           let key;
           if (item.nickname) {
             const normalized = this.normalizeUsername(item.nickname);
-            if (type === 'hybrid') {
-              key = `${normalized}-${item.milestoneName}`;
-            } else if (type === 'engagement' || type === 'attendance' || type === 'bidding' || type === 'tenure' || type === 'calendarStreak' || type === 'perfectWeek' || type === 'spawnStreak') {
+            if (type === 'engagement' || type === 'attendance' || type === 'bidding' || type === 'tenure' || type === 'calendarStreak' || type === 'perfectWeek' || type === 'spawnStreak') {
               key = `${normalized}-${item.milestone}`;
             } else {
               key = `${normalized}`;
@@ -1483,36 +1462,6 @@ class ProactiveIntelligence {
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // Announce Hybrid Combo Milestones
-      // ═══════════════════════════════════════════════════════════════
-      if (this.milestoneQueue.hybrid.length > 0) {
-        console.log(`📢 [PROACTIVE] Announcing ${this.milestoneQueue.hybrid.length} hybrid milestones...`);
-
-        for (const achiever of this.milestoneQueue.hybrid) {
-          const isMajor = achiever.isMajor;
-          const channel = isMajor ? guildAnnouncementChannel : guildChatChannel;
-
-          const embed = this.createHybridMilestoneEmbed(achiever, isMajor);
-
-          await channel.send({ embeds: [embed] });
-
-          // Log to weekly milestone log
-          await this.intelligence.sheetAPI.call('logWeeklyMilestone', {
-            weekStartDate: weekStart.toISOString(),
-            weekEndDate: weekEnd.toISOString(),
-            milestoneType: 'hybrid',
-            nickname: achiever.nickname,
-            milestone: achiever.milestoneName,
-            value: `${achiever.attendance}/${achiever.bidding}`
-          });
-
-          totalAnnounced++;
-        }
-
-        this.milestoneQueue.hybrid = [];
-      }
-
-      // ═══════════════════════════════════════════════════════════════
       // Announce Guild-Wide Milestones
       // ═══════════════════════════════════════════════════════════════
       if (this.milestoneQueue.guildWide.length > 0) {
@@ -1700,98 +1649,6 @@ class ProactiveIntelligence {
 
     } catch (error) {
       console.error('[PROACTIVE] Error checking engagement milestones:', error);
-    }
-  }
-
-  /**
-   * Check hybrid combo milestones (hourly)
-   */
-  async checkHybridComboMilestones() {
-    try {
-      console.log('🔥 [PROACTIVE] Checking hybrid combo milestones...');
-
-      // Get attendance data
-      const attendanceResponse = await this.intelligence.sheetAPI.call('getTotalAttendance', {});
-      const attendanceData = attendanceResponse?.data?.members || attendanceResponse?.members || [];
-
-      // Get bidding data
-      const biddingResponse = await this.intelligence.sheetAPI.call('getBiddingPoints', {});
-      const biddingData = biddingResponse?.data?.members || biddingResponse?.members || [];
-
-      // Create bidding lookup
-      const biddingMap = {};
-      biddingData.forEach(m => {
-        const normalized = this.normalizeUsername(m.nickname || m.username);
-        biddingMap[normalized] = {
-          pointsLeft: m.pointsLeft || 0,
-          pointsConsumed: m.pointsConsumed || 0,
-          totalPoints: (m.pointsLeft || 0) + (m.pointsConsumed || 0)
-        };
-      });
-
-      // Get milestone history
-      const historyResponse = await this.intelligence.sheetAPI.call('getMilestoneHistory', {});
-      const milestoneHistory = historyResponse?.milestoneHistory || {};
-
-      let milestonesFound = 0;
-
-      // Check each member
-      for (const member of attendanceData) {
-        const nickname = member.username;
-        const normalizedNickname = this.normalizeUsername(nickname);
-        const attendancePoints = member.attendancePoints || 0;
-        const biddingPoints = biddingMap[normalizedNickname]?.totalPoints || 0;
-
-        // Get last celebrated hybrid milestone
-        const historyKey = `${normalizedNickname}-hybrid`;
-        const history = milestoneHistory[historyKey] || {};
-        const lastMilestone = history.lastHybridMilestone || '';
-
-        // Check all hybrid thresholds
-        const allHybrid = [
-          ...PROACTIVE_CONFIG.thresholds.milestonePoints.hybrid.minor,
-          ...PROACTIVE_CONFIG.thresholds.milestonePoints.hybrid.major
-        ];
-
-        for (const threshold of allHybrid) {
-          const meetsThreshold = attendancePoints >= threshold.attendance && biddingPoints >= threshold.bidding;
-          const alreadyCelebrated = lastMilestone === threshold.name;
-
-          if (meetsThreshold && !alreadyCelebrated) {
-            milestonesFound++;
-            console.log(`🎉 [PROACTIVE] ${nickname} reached ${threshold.name} (${attendancePoints}/${biddingPoints})`);
-
-            const isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.hybrid.major.includes(threshold);
-
-            // Queue milestone
-            await this.queueMilestone('hybrid', {
-              nickname,
-              attendance: attendancePoints,
-              bidding: biddingPoints,
-              milestoneName: threshold.name,
-              isMajor
-            });
-
-            // Update Google Sheets with delay to prevent rate limiting
-            await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
-              nickname,
-              milestone: threshold.name,
-              totalPoints: `${attendancePoints}/${biddingPoints}`,
-              milestoneType: 'hybrid'
-            }, { silent: true });
-
-            // Add small delay between API calls to prevent rate limiting
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            break; // Only celebrate highest achieved
-          }
-        }
-      }
-
-      console.log(`✅ [PROACTIVE] Hybrid combo check complete: ${milestonesFound} new milestones`);
-
-    } catch (error) {
-      console.error('[PROACTIVE] Error checking hybrid milestones:', error);
     }
   }
 
@@ -2370,27 +2227,6 @@ class ProactiveIntelligence {
       .setTitle(`${opening}`)
       .setDescription(description)
       .setFooter({ text: `🧠 Engagement Score Milestone | Score: ${milestone}/100` })
-      .setTimestamp();
-  }
-
-  /**
-   * Create hybrid milestone embed
-   */
-  createHybridMilestoneEmbed(achiever, isMajor) {
-    const opening = this.pickRandom(this.getMilestoneOpenings());
-
-    const color = isMajor ? 0xFF6B35 : 0x4ECDC4;
-
-    const description = `**${achiever.nickname}** just achieved **${achiever.milestoneName}** status! 🔥\n\n` +
-      `✅ **${achiever.attendance}** attendance points\n` +
-      `✅ **${achiever.bidding}** bidding points\n\n` +
-      `This is balanced excellence! True guild dedication! 💪`;
-
-    return new EmbedBuilder()
-      .setColor(color)
-      .setTitle(`${opening}`)
-      .setDescription(description)
-      .setFooter({ text: `🔥 Hybrid Combo Milestone | ${achiever.milestoneName}` })
       .setTimestamp();
   }
 

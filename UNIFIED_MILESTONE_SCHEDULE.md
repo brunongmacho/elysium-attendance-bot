@@ -10,7 +10,6 @@ All times in **GMT+8 (Manila Time)**
    - Attendance milestones (100, 250, 500, 750, 1000, 1500, 2000, 3000, 5000, 7500, 10000)
    - Bidding milestones (200, 500, 1000, 1500, 2000, 3000, 4000, 6000, 10000, 15000, 20000)
    - Engagement score milestones (60, 70, 80, 85, 90, 95, 100)
-   - Hybrid combo milestones (100+200, 250+400, 400+650, 600+1000)
    - Guild-wide milestones (10k, 25k, 50k, 100k attendance | 15k, 30k, 60k, 120k bidding | 20, 30, 40, 45, 50 active)
    - Streak milestones (consecutive spawns, calendar days)
    - Tenure milestones (30, 60, 90, 180, 365, 730, 1095 days)
@@ -82,9 +81,6 @@ milestoneQueue = {
   engagement: [
     { nickname: 'Bob', milestone: 80, score: 82, type: 'engagement' }
   ],
-  hybrid: [
-    { nickname: 'Alice', milestone: '400+650', attendance: 432, bidding: 722, type: 'hybrid' }
-  ],
   guildWide: [
     { milestoneType: 'attendance', threshold: 10000, totalValue: 10234 }
   ],
@@ -127,10 +123,6 @@ milestoneQueue = {
 ### **Engagement Score** (AI-calculated 0-100)
 - **Minor (Guild Chat):** 60, 70, 80
 - **Major (Announcements):** 85, 90, 95, 100
-
-### **Hybrid Combo** (Attendance + Bidding)
-- **Minor (Guild Chat):** 100 attendance + 200 bidding, 250 + 400
-- **Major (Announcements):** 400 + 650, 600 + 1000
 
 ### **Guild-Wide Collective**
 - **Attendance Total:** 10,000 | 25,000 | 50,000 | 100,000
@@ -204,7 +196,6 @@ Columns:
 ```
 NEW Columns:
 - lastEngagementMilestone
-- lastHybridMilestone
 ```
 
 #### **AttendanceTracker** (existing, add columns)
@@ -265,9 +256,6 @@ function ensureMilestoneTabsExist() {
     const headers = historySheet.getRange(1, 1, 1, historySheet.getLastColumn()).getValues()[0];
     if (!headers.includes('lastEngagementMilestone')) {
       historySheet.getRange(1, historySheet.getLastColumn() + 1).setValue('lastEngagementMilestone');
-    }
-    if (!headers.includes('lastHybridMilestone')) {
-      historySheet.getRange(1, historySheet.getLastColumn() + 1).setValue('lastHybridMilestone');
     }
   }
 
@@ -534,7 +522,7 @@ function getWeeklyMilestones(e) {
 - [ ] Add Apps Script functions to Code.gs
 - [ ] Create milestone queue system in proactive-intelligence.js
 - [ ] Modify existing milestone checks to queue instead of announce
-- [ ] Add 7 new milestone types (engagement, hybrid, guild-wide, streaks, tenure, perfect week)
+- [ ] Add 6 new milestone types (engagement, guild-wide, streaks, tenure, perfect week)
 - [ ] Update cron schedules to normalized times
 - [ ] Add milestone recap to weekly summary
 - [ ] Test all milestone types
