@@ -601,9 +601,9 @@ async function sendWeeklyReport() {
         weekAttText += `**Average Attendance per Spawn:** ${weekAtt.averagePerSpawn || 0}\n`;
 
         if (weekAtt.topAttendees && weekAtt.topAttendees.length > 0) {
-          weekAttText += `\n**Top 3 Attendees This Week:**\n`;
-          weekAtt.topAttendees.slice(0, 3).forEach((member, index) => {
-            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
+          weekAttText += `\n**Top 5 Attendees This Week:**\n`;
+          weekAtt.topAttendees.slice(0, 5).forEach((member, index) => {
+            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
             weekAttText += `${medal} ${member.name} - ${member.points} pts\n`;
           });
         }
@@ -620,9 +620,9 @@ async function sendWeeklyReport() {
         let weekBidText = `**Points Consumed This Week:** ${weekBid.totalConsumed || 0}\n`;
 
         if (weekBid.topSpenders && weekBid.topSpenders.length > 0) {
-          weekBidText += `\n**Top 3 Spenders This Week:**\n`;
-          weekBid.topSpenders.slice(0, 3).forEach((member, index) => {
-            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
+          weekBidText += `\n**Top 5 Spenders This Week:**\n`;
+          weekBid.topSpenders.slice(0, 5).forEach((member, index) => {
+            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
             weekBidText += `${medal} ${member.name} - ${member.consumed} pts consumed\n`;
           });
         }
