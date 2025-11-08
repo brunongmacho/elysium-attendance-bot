@@ -1232,6 +1232,8 @@ class NLPLearningSystem {
   isInsult(content) {
     if (!content || typeof content !== 'string') return false;
 
+    const normalized = content.toLowerCase().trim();
+
     try {
       let CONVERSATION_PATTERNS;
       try {
@@ -1245,8 +1247,6 @@ class NLPLearningSystem {
         console.warn('⚠️ [NLP Learning] Insult patterns not found');
         return false;
       }
-
-      const normalized = content.toLowerCase().trim();
 
       // Check against all insult patterns from nlp-conversation.js
       if (CONVERSATION_PATTERNS.insult.patterns && Array.isArray(CONVERSATION_PATTERNS.insult.patterns)) {
