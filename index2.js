@@ -88,6 +88,7 @@ const { ProactiveIntelligence } = require('./proactive-intelligence.js'); // Pro
 const { NLPHandler } = require('./nlp-handler.js'); // Natural Language Processing
 const { NLPLearningSystem } = require('./nlp-learning.js'); // NLP Learning System (self-improving)
 const eventReminders = require('./event-reminders.js'); // Game Event Reminder System
+const bossRotation = require('./boss-rotation.js'); // Boss Rotation System (5-guild tracking)
 
 /**
  * Command alias mapping for shorthand commands.
@@ -1620,6 +1621,9 @@ const commandHandlers = {
               const resp = await attendance.postToSheet(payload);
 
               if (resp.ok) {
+              // Auto-increment boss rotation if it's a rotating boss
+              await bossRotation.handleBossKill(spawnInfo.boss);
+
               await thread
                 .send(
                   `✅ Attendance submitted successfully! Archiving thread...`
@@ -1845,6 +1849,9 @@ const commandHandlers = {
         const resp = await attendance.postToSheet(payload);
 
         if (resp.ok) {
+          // Auto-increment boss rotation if it's a rotating boss
+          await bossRotation.handleBossKill(spawnInfo.boss);
+
           await message.channel.send(
             `✅ **Attendance submitted successfully!**\n\n` +
               `${spawnInfo.members.length} members recorded.\n` +
@@ -3680,6 +3687,10 @@ client.once(Events.ClientReady, async () => {
   );
   leaderboardSystem.init(client, config, discordCache); // Initialize leaderboard system
 
+  // INITIALIZE BOSS ROTATION SYSTEM (5-guild rotation tracking)
+  bossRotation.initialize(config, client, intelligenceEngine);
+  console.log('🔄 Boss Rotation System initialized (Amentis, General Aquleus, Baron Braudmore)');
+
   // INITIALIZE PROACTIVE INTELLIGENCE (Auto-notifications & monitoring)
   proactiveIntelligence = new ProactiveIntelligence(client, config, intelligenceEngine);
   await proactiveIntelligence.initialize();
@@ -4963,6 +4974,9 @@ client.on(Events.MessageCreate, async (message) => {
         const resp = await attendance.postToSheet(payload);
 
         if (resp.ok) {
+          // Auto-increment boss rotation if it's a rotating boss
+          await bossRotation.handleBossKill(spawnInfo.boss);
+
           await message.channel.send(
             `✅ Attendance submitted successfully! (${spawnInfo.members.length} members)`
           );
@@ -5489,6 +5503,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const resp = await attendance.postToSheet(payload);
 
         if (resp.ok) {
+          // Auto-increment boss rotation if it's a rotating boss
+          await bossRotation.handleBossKill(spawnInfo.boss);
+
           await interaction.channel.send(`✅ Attendance submitted! Archiving...`);
 
           if (spawnInfo.confirmThreadId) {
@@ -5766,6 +5783,9 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         const resp = await attendance.postToSheet(payload); // CHANGED
 
         if (resp.ok) {
+          // Auto-increment boss rotation if it's a rotating boss
+          await bossRotation.handleBossKill(spawnInfo.boss);
+
           await msg.channel.send(`✅ Attendance submitted! Archiving...`);
 
           await attendance.removeAllReactionsWithRetry(msg); // CHANGED

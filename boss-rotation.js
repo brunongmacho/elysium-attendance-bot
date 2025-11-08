@@ -40,6 +40,7 @@ const { SheetAPI } = require('./utils/sheet-api');
 let config = null;
 let sheetAPI = null;
 let client = null;
+let intelligenceEngine = null; // Reference to intelligence engine for spawn predictions
 
 /**
  * Rotating bosses that use the 5-guild system
@@ -54,6 +55,19 @@ let rotationCache = {};
 let lastCacheRefresh = 0;
 const CACHE_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
+/**
+ * Track already-warned spawns to avoid spam
+ * Format: { "Amentis-2025-01-15T10:30": true }
+ */
+let warnedSpawns = {};
+
+/**
+ * Spawn warning monitoring timer
+ */
+let spawnMonitorTimer = null;
+const SPAWN_CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes
+const WARNING_WINDOW_MINUTES = 15; // Warn when spawn is 15-20 mins away
+
 // ============================================================================
 // INITIALIZATION
 // ============================================================================
@@ -62,10 +76,12 @@ const CACHE_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
  * Initializes the boss rotation system
  * @param {Object} cfg - Bot configuration from config.json
  * @param {Client} discordClient - Discord.js client instance
+ * @param {Object} intelligence - Intelligence engine for spawn predictions
  */
-function initialize(cfg, discordClient) {
+function initialize(cfg, discordClient, intelligence = null) {
   config = cfg;
   client = discordClient;
+  intelligenceEngine = intelligence;
   sheetAPI = new SheetAPI(cfg.sheet_webhook_url);
 
   console.log('✅ Boss Rotation System initialized');
@@ -75,6 +91,14 @@ function initialize(cfg, discordClient) {
 
   // Load initial rotation status
   refreshRotationCache();
+
+  // Start spawn warning monitor if intelligence engine available
+  if (intelligenceEngine) {
+    startSpawnMonitor();
+    console.log('🔔 Rotation spawn monitor started (checks every 5 minutes for 15-min warnings)');
+  } else {
+    console.warn('⚠️ Intelligence engine not provided - rotation warnings disabled');
+  }
 }
 
 // ============================================================================
@@ -356,6 +380,92 @@ async function sendRotationWarning(bossName, predictedSpawnTime) {
 }
 
 // ============================================================================
+// SPAWN WARNING MONITOR
+// ============================================================================
+
+/**
+ * Start periodic spawn monitoring for rotation warnings
+ */
+function startSpawnMonitor() {
+  // Clear any existing timer
+  if (spawnMonitorTimer) {
+    clearInterval(spawnMonitorTimer);
+  }
+
+  // Run check immediately on startup
+  checkUpcomingSpawns();
+
+  // Then check every 5 minutes
+  spawnMonitorTimer = setInterval(() => {
+    checkUpcomingSpawns();
+  }, SPAWN_CHECK_INTERVAL);
+}
+
+/**
+ * Check if any rotating bosses will spawn soon and send warnings if it's our rotation
+ */
+async function checkUpcomingSpawns() {
+  try {
+    if (!intelligenceEngine) return;
+
+    // Check each rotating boss
+    for (const bossName of ROTATING_BOSSES) {
+      try {
+        // Get spawn prediction
+        const prediction = await intelligenceEngine.predictNextSpawnTime(bossName);
+
+        if (prediction.error) {
+          continue; // Skip if prediction failed
+        }
+
+        const now = new Date();
+        const predictedTime = prediction.predictedTime;
+        const minutesUntilSpawn = (predictedTime - now) / (1000 * 60);
+
+        // Check if spawn is within warning window (15-20 minutes)
+        if (minutesUntilSpawn >= WARNING_WINDOW_MINUTES && minutesUntilSpawn <= (WARNING_WINDOW_MINUTES + 5)) {
+          // Create unique key for this predicted spawn
+          const spawnKey = `${bossName}-${predictedTime.toISOString().slice(0, 16)}`; // Truncate to minute precision
+
+          // Skip if already warned
+          if (warnedSpawns[spawnKey]) {
+            continue;
+          }
+
+          // Check rotation status
+          const rotation = await getRotationStatus(bossName);
+
+          if (rotation.isRotating && rotation.isOurTurn) {
+            // Send warning!
+            await sendRotationWarning(bossName, predictedTime);
+
+            // Mark as warned
+            warnedSpawns[spawnKey] = true;
+
+            console.log(`🟢 Sent 15-min rotation warning for ${bossName} (our turn, spawning at ${predictedTime.toISOString()})`);
+          }
+        }
+
+        // Clean up old warned spawns (older than 2 hours)
+        const twoHoursAgo = now.getTime() - (2 * 60 * 60 * 1000);
+        for (const key in warnedSpawns) {
+          const timestamp = key.split('-').slice(1).join('-');
+          if (new Date(timestamp).getTime() < twoHoursAgo) {
+            delete warnedSpawns[key];
+          }
+        }
+
+      } catch (bossError) {
+        console.error(`❌ Error checking spawn for ${bossName}:`, bossError.message);
+      }
+    }
+
+  } catch (err) {
+    console.error('❌ Error in spawn monitor:', err.message);
+  }
+}
+
+// ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
@@ -393,6 +503,31 @@ async function getAllRotations() {
   return rotations;
 }
 
+/**
+ * Handle boss kill - auto-increment rotation if it's a rotating boss
+ * Call this after successful attendance submission
+ * @param {string} bossName - Name of the boss that was killed
+ * @returns {Promise<void>}
+ */
+async function handleBossKill(bossName) {
+  try {
+    if (!isRotatingBoss(bossName)) {
+      return; // Not a rotating boss, nothing to do
+    }
+
+    console.log(`🔄 Boss killed: ${bossName} (rotating boss - incrementing rotation counter)`);
+
+    const result = await incrementRotation(bossName);
+
+    if (result.updated !== false) {
+      console.log(`✅ Rotation updated: ${bossName} ${result.oldIndex} → ${result.newIndex} (${result.newGuild})`);
+    }
+
+  } catch (err) {
+    console.error(`❌ Error handling boss kill for rotation: ${bossName}`, err.message);
+  }
+}
+
 // ============================================================================
 // MODULE EXPORTS
 // ============================================================================
@@ -404,6 +539,7 @@ module.exports = {
   incrementRotation,
   setRotation,
   sendRotationWarning,
+  handleBossKill,
   isRotatingBoss,
   getRotatingBosses,
   getAllRotations
