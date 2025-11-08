@@ -392,6 +392,17 @@ class NLPLearningSystem {
       };
     }
 
+    // CRITICAL: Check if this matches a conversation pattern BEFORE fuzzy matching
+    // This prevents conversational questions (like "sino master mo?") from being
+    // incorrectly suggested as commands
+    if (botMentioned || this.shouldRespond(message)) {
+      const isConversational = this.isConversationalPattern(content);
+      if (isConversational) {
+        console.log(`💬 [NLP Learning] Detected conversational pattern, skipping command matching: "${content.substring(0, 50)}"`);
+        return null; // Let it fall through to conversation handler
+      }
+    }
+
     // No interpretation found - try fuzzy matching to suggest commands (if enabled)
     if (LEARNING_CONFIG.learning.autoSuggest && shouldRespond && this.shouldRespond(message)) {
       const suggestion = this.suggestCommandForPhrase(content);
@@ -404,6 +415,35 @@ class NLPLearningSystem {
     // No interpretation found
     this.stats.failedInterpretations++;
     return null;
+  }
+
+  /**
+   * Check if content matches a conversational pattern (not a command)
+   * @param {string} content - Message content
+   * @returns {boolean} True if matches conversation pattern
+   */
+  isConversationalPattern(content) {
+    if (!this.conversationalAI) return false;
+
+    try {
+      // Get conversation patterns from ConversationalAI
+      const { CONVERSATION_PATTERNS } = require('./nlp-conversation.js');
+
+      // Check if content matches any conversation pattern
+      for (const [type, config] of Object.entries(CONVERSATION_PATTERNS)) {
+        for (const pattern of config.patterns) {
+          if (pattern.test(content)) {
+            console.log(`🎯 [NLP Learning] Matched conversation type: ${type}`);
+            return true;
+          }
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.error('❌ Error checking conversation pattern:', error);
+      return false; // Fail gracefully
+    }
   }
 
   /**
