@@ -3009,13 +3009,123 @@ function getWeeklySummary(data) {
     const currentWeekSheet = getCurrentWeekSheet();
     const weekName = currentWeekSheet ? currentWeekSheet.getName() : 'N/A';
 
+    // ==========================================
+    // HELPER: GET PREVIOUS WEEK SHEET
+    // ==========================================
+    function getPreviousWeekSheet() {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const now = new Date();
+      const currentSunday = new Date(now);
+      currentSunday.setDate(currentSunday.getDate() - currentSunday.getDay());
+
+      // Go back 7 days to get last week's Sunday
+      const previousSunday = new Date(currentSunday);
+      previousSunday.setDate(previousSunday.getDate() - 7);
+
+      const weekIndex = Utilities.formatDate(previousSunday, CONFIG.TIMEZONE, 'yyyyMMdd');
+      const sheetName = CONFIG.SHEET_NAME_PREFIX + weekIndex;
+      return ss.getSheetByName(sheetName);
+    }
+
+    // ==========================================
+    // HELPER: EXTRACT WEEK DATA FROM SHEET
+    // ==========================================
+    function extractWeekData(sheet) {
+      const weekData = {
+        attendance: {
+          totalSpawns: 0,
+          uniqueAttendees: 0,
+          averagePerSpawn: 0,
+          topAttendees: []
+        },
+        bidding: {
+          totalConsumed: 0,
+          topSpenders: []
+        }
+      };
+
+      if (!sheet || sheet.getLastRow() <= 2) {
+        return weekData;
+      }
+
+      const lastRow = sheet.getLastRow();
+      const lastCol = sheet.getLastColumn();
+      const sheetData = sheet.getRange(3, 1, lastRow - 2, Math.max(4, lastCol)).getValues();
+
+      const weekMembers = [];
+      let totalWeekPointsConsumed = 0;
+
+      for (let i = 0; i < sheetData.length; i++) {
+        const name = sheetData[i][0]; // Column 1: MEMBERS
+        const pointsConsumed = sheetData[i][1] || 0; // Column 2: POINTS_CONSUMED
+        const attendancePoints = sheetData[i][3] || 0; // Column 4: ATTENDANCE_POINTS
+
+        if (name && name.toString().trim()) {
+          const memberName = name.toString().trim();
+          const attPts = typeof attendancePoints === 'number' ? attendancePoints : 0;
+          const consPts = typeof pointsConsumed === 'number' ? pointsConsumed : 0;
+
+          weekMembers.push({
+            name: memberName,
+            attendancePoints: attPts,
+            pointsConsumed: consPts
+          });
+
+          totalWeekPointsConsumed += consPts;
+        }
+      }
+
+      // Sort by attendance points for top attendees
+      const sortedByAttendance = weekMembers.slice().sort((a, b) => b.attendancePoints - a.attendancePoints);
+
+      // Sort by points consumed for top spenders
+      const sortedByConsumed = weekMembers.slice().sort((a, b) => b.pointsConsumed - a.pointsConsumed);
+
+      // Calculate week-specific spawns (columns from FIRST_SPAWN onwards)
+      const weekSpawns = lastCol >= COLUMNS.FIRST_SPAWN ? lastCol - COLUMNS.FIRST_SPAWN + 1 : 0;
+
+      // Calculate week-specific total attendance points and average
+      const totalWeekAttPoints = weekMembers.reduce((sum, m) => sum + m.attendancePoints, 0);
+      const weekAverage = weekSpawns > 0 ? Math.round((totalWeekAttPoints / weekSpawns) * 10) / 10 : 0;
+
+      return {
+        attendance: {
+          totalSpawns: weekSpawns,
+          uniqueAttendees: weekMembers.filter(m => m.attendancePoints > 0).length,
+          averagePerSpawn: weekAverage,
+          topAttendees: sortedByAttendance.slice(0, 5).map(m => ({
+            name: m.name,
+            points: m.attendancePoints
+          }))
+        },
+        bidding: {
+          totalConsumed: totalWeekPointsConsumed,
+          topSpenders: sortedByConsumed.slice(0, 5).filter(m => m.pointsConsumed > 0).map(m => ({
+            name: m.name,
+            consumed: m.pointsConsumed
+          }))
+        }
+      };
+    }
+
+    // ==========================================
+    // NEW: GET WEEK-SPECIFIC DATA
+    // ==========================================
+    const weekSpecificData = extractWeekData(currentWeekSheet);
+    const lastWeekSheet = getPreviousWeekSheet();
+    const lastWeekData = extractWeekData(lastWeekSheet);
+    const lastWeekName = lastWeekSheet ? lastWeekSheet.getName() : null;
+
     Logger.log(`✅ Generated weekly summary`);
 
     return createResponse('ok', 'Weekly summary fetched', {
       weekName: weekName,
       attendance: attendanceData,
       bidding: biddingData,
-      mostActive: mostActive.slice(0, 5)
+      mostActive: mostActive.slice(0, 5),
+      weekSpecific: weekSpecificData,  // Current week data
+      lastWeek: lastWeekData,  // NEW: Last week data
+      lastWeekName: lastWeekName  // NEW: Last week sheet name
     });
 
   } catch (err) {

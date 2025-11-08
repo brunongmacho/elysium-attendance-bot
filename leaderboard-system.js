@@ -587,15 +587,115 @@ async function sendWeeklyReport() {
       .setDescription(`**Week:** ${data.weekName || 'N/A'}\n**Report Generated:** ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`)
       .setTimestamp();
 
-    // Attendance Summary
+    // ==========================================
+    // NEW: WEEK-SPECIFIC STATISTICS (Sunday-Saturday)
+    // ==========================================
+    if (data.weekSpecific) {
+      const weekAtt = data.weekSpecific.attendance;
+      const weekBid = data.weekSpecific.bidding;
+
+      // Week-specific attendance
+      if (weekAtt) {
+        let weekAttText = `**Total Spawns:** ${weekAtt.totalSpawns || 0}\n`;
+        weekAttText += `**Unique Attendees:** ${weekAtt.uniqueAttendees || 0}\n`;
+        weekAttText += `**Average Attendance per Spawn:** ${weekAtt.averagePerSpawn || 0}\n`;
+
+        if (weekAtt.topAttendees && weekAtt.topAttendees.length > 0) {
+          weekAttText += `\n**Top 5 Attendees This Week:**\n`;
+          weekAtt.topAttendees.slice(0, 5).forEach((member, index) => {
+            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+            weekAttText += `${medal} ${member.name} - ${member.points} pts\n`;
+          });
+        }
+
+        embed.addFields({
+          name: '📅 This Week\'s Attendance (Sunday-Saturday)',
+          value: weekAttText,
+          inline: false
+        });
+      }
+
+      // Week-specific bidding
+      if (weekBid && weekBid.totalConsumed > 0) {
+        let weekBidText = `**Points Consumed This Week:** ${weekBid.totalConsumed || 0}\n`;
+
+        if (weekBid.topSpenders && weekBid.topSpenders.length > 0) {
+          weekBidText += `\n**Top 5 Spenders This Week:**\n`;
+          weekBid.topSpenders.slice(0, 5).forEach((member, index) => {
+            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+            weekBidText += `${medal} ${member.name} - ${member.consumed} pts consumed\n`;
+          });
+        }
+
+        embed.addFields({
+          name: '💸 This Week\'s Bidding Activity (Sunday-Saturday)',
+          value: weekBidText,
+          inline: false
+        });
+      }
+    }
+
+    // ==========================================
+    // NEW: LAST WEEK'S STATISTICS
+    // ==========================================
+    if (data.lastWeek && data.lastWeekName) {
+      const lastWeekAtt = data.lastWeek.attendance;
+      const lastWeekBid = data.lastWeek.bidding;
+
+      // Last week's attendance
+      if (lastWeekAtt && (lastWeekAtt.topAttendees.length > 0 || lastWeekAtt.totalSpawns > 0)) {
+        let lastWeekAttText = `**Total Spawns:** ${lastWeekAtt.totalSpawns || 0}\n`;
+        lastWeekAttText += `**Unique Attendees:** ${lastWeekAtt.uniqueAttendees || 0}\n`;
+        lastWeekAttText += `**Average Attendance per Spawn:** ${lastWeekAtt.averagePerSpawn || 0}\n`;
+
+        if (lastWeekAtt.topAttendees && lastWeekAtt.topAttendees.length > 0) {
+          lastWeekAttText += `\n**Top 5 Attendees Last Week:**\n`;
+          lastWeekAtt.topAttendees.slice(0, 5).forEach((member, index) => {
+            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+            lastWeekAttText += `${medal} ${member.name} - ${member.points} pts\n`;
+          });
+        }
+
+        embed.addFields({
+          name: '📆 Last Week\'s Attendance',
+          value: lastWeekAttText,
+          inline: false
+        });
+      }
+
+      // Last week's bidding
+      if (lastWeekBid && lastWeekBid.totalConsumed > 0) {
+        let lastWeekBidText = `**Points Consumed Last Week:** ${lastWeekBid.totalConsumed || 0}\n`;
+
+        if (lastWeekBid.topSpenders && lastWeekBid.topSpenders.length > 0) {
+          lastWeekBidText += `\n**Top 5 Spenders Last Week:**\n`;
+          lastWeekBid.topSpenders.slice(0, 5).forEach((member, index) => {
+            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+            lastWeekBidText += `${medal} ${member.name} - ${member.consumed} pts consumed\n`;
+          });
+        }
+
+        embed.addFields({
+          name: '💵 Last Week\'s Bidding Activity',
+          value: lastWeekBidText,
+          inline: false
+        });
+      }
+    }
+
+    // ==========================================
+    // OVERALL STATISTICS (All-Time)
+    // ==========================================
+
+    // Attendance Summary (Overall)
     if (data.attendance) {
       const att = data.attendance;
-      let attText = `**Total Spawns:** ${att.totalSpawns || 0}\n`;
+      let attText = `**Total Spawns (All-Time):** ${att.totalSpawns || 0}\n`;
       attText += `**Total Unique Attendees:** ${att.uniqueAttendees || 0}\n`;
       attText += `**Average Attendance per Spawn:** ${att.averagePerSpawn || 0}\n`;
 
       if (att.topAttendees && att.topAttendees.length > 0) {
-        attText += `\n**Top 3 Attendees:**\n`;
+        attText += `\n**Top 3 Attendees (All-Time):**\n`;
         att.topAttendees.slice(0, 3).forEach((member, index) => {
           const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
           attText += `${medal} ${member.name} - ${member.points} pts\n`;
@@ -603,7 +703,7 @@ async function sendWeeklyReport() {
       }
 
       embed.addFields({
-        name: '📈 Attendance Summary',
+        name: '📈 Overall Attendance Summary',
         value: attText,
         inline: false
       });
@@ -630,7 +730,7 @@ async function sendWeeklyReport() {
       }
     }
 
-    // Bidding Summary
+    // Bidding Summary (Overall)
     if (data.bidding) {
       const bid = data.bidding;
       let bidText = `**Total Points Distributed:** ${bid.totalDistributed || 0}\n`;
@@ -638,7 +738,7 @@ async function sendWeeklyReport() {
       bidText += `**Total Points Remaining:** ${bid.totalRemaining || 0}\n`;
 
       if (bid.topSpenders && bid.topSpenders.length > 0) {
-        bidText += `\n**Top 3 Spenders:**\n`;
+        bidText += `\n**Top 3 Spenders (All-Time):**\n`;
         bid.topSpenders.slice(0, 3).forEach((member, index) => {
           const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
           bidText += `${medal} ${member.name} - ${member.consumed} pts consumed\n`;
@@ -646,7 +746,7 @@ async function sendWeeklyReport() {
       }
 
       embed.addFields({
-        name: '💰 Bidding Summary',
+        name: '💰 Overall Bidding Summary',
         value: bidText,
         inline: false
       });
