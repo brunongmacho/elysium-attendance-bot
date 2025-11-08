@@ -636,6 +636,54 @@ async function sendWeeklyReport() {
     }
 
     // ==========================================
+    // NEW: LAST WEEK'S STATISTICS
+    // ==========================================
+    if (data.lastWeek && data.lastWeekName) {
+      const lastWeekAtt = data.lastWeek.attendance;
+      const lastWeekBid = data.lastWeek.bidding;
+
+      // Last week's attendance
+      if (lastWeekAtt && (lastWeekAtt.topAttendees.length > 0 || lastWeekAtt.totalSpawns > 0)) {
+        let lastWeekAttText = `**Total Spawns:** ${lastWeekAtt.totalSpawns || 0}\n`;
+        lastWeekAttText += `**Unique Attendees:** ${lastWeekAtt.uniqueAttendees || 0}\n`;
+        lastWeekAttText += `**Average Attendance per Spawn:** ${lastWeekAtt.averagePerSpawn || 0}\n`;
+
+        if (lastWeekAtt.topAttendees && lastWeekAtt.topAttendees.length > 0) {
+          lastWeekAttText += `\n**Top 5 Attendees Last Week:**\n`;
+          lastWeekAtt.topAttendees.slice(0, 5).forEach((member, index) => {
+            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+            lastWeekAttText += `${medal} ${member.name} - ${member.points} pts\n`;
+          });
+        }
+
+        embed.addFields({
+          name: '📆 Last Week\'s Attendance',
+          value: lastWeekAttText,
+          inline: false
+        });
+      }
+
+      // Last week's bidding
+      if (lastWeekBid && lastWeekBid.totalConsumed > 0) {
+        let lastWeekBidText = `**Points Consumed Last Week:** ${lastWeekBid.totalConsumed || 0}\n`;
+
+        if (lastWeekBid.topSpenders && lastWeekBid.topSpenders.length > 0) {
+          lastWeekBidText += `\n**Top 5 Spenders Last Week:**\n`;
+          lastWeekBid.topSpenders.slice(0, 5).forEach((member, index) => {
+            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+            lastWeekBidText += `${medal} ${member.name} - ${member.consumed} pts consumed\n`;
+          });
+        }
+
+        embed.addFields({
+          name: '💵 Last Week\'s Bidding Activity',
+          value: lastWeekBidText,
+          inline: false
+        });
+      }
+    }
+
+    // ==========================================
     // OVERALL STATISTICS (All-Time)
     // ==========================================
 

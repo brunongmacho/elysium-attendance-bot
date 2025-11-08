@@ -3010,35 +3010,55 @@ function getWeeklySummary(data) {
     const weekName = currentWeekSheet ? currentWeekSheet.getName() : 'N/A';
 
     // ==========================================
-    // NEW: GET WEEK-SPECIFIC DATA
+    // HELPER: GET PREVIOUS WEEK SHEET
     // ==========================================
-    let weekSpecificData = {
-      attendance: {
-        totalSpawns: 0,
-        uniqueAttendees: 0,
-        averagePerSpawn: 0,
-        topAttendees: []
-      },
-      bidding: {
-        totalConsumed: 0,
-        topSpenders: []
+    function getPreviousWeekSheet() {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const now = new Date();
+      const currentSunday = new Date(now);
+      currentSunday.setDate(currentSunday.getDate() - currentSunday.getDay());
+
+      // Go back 7 days to get last week's Sunday
+      const previousSunday = new Date(currentSunday);
+      previousSunday.setDate(previousSunday.getDate() - 7);
+
+      const weekIndex = Utilities.formatDate(previousSunday, CONFIG.TIMEZONE, 'yyyyMMdd');
+      const sheetName = CONFIG.SHEET_NAME_PREFIX + weekIndex;
+      return ss.getSheetByName(sheetName);
+    }
+
+    // ==========================================
+    // HELPER: EXTRACT WEEK DATA FROM SHEET
+    // ==========================================
+    function extractWeekData(sheet) {
+      const weekData = {
+        attendance: {
+          totalSpawns: 0,
+          uniqueAttendees: 0,
+          averagePerSpawn: 0,
+          topAttendees: []
+        },
+        bidding: {
+          totalConsumed: 0,
+          topSpenders: []
+        }
+      };
+
+      if (!sheet || sheet.getLastRow() <= 2) {
+        return weekData;
       }
-    };
 
-    if (currentWeekSheet && currentWeekSheet.getLastRow() > 2) {
-      const lastRow = currentWeekSheet.getLastRow();
-      const lastCol = currentWeekSheet.getLastColumn();
-
-      // Get member names, attendance points, and points consumed for this week
-      const weekData = currentWeekSheet.getRange(3, 1, lastRow - 2, Math.max(4, lastCol)).getValues();
+      const lastRow = sheet.getLastRow();
+      const lastCol = sheet.getLastColumn();
+      const sheetData = sheet.getRange(3, 1, lastRow - 2, Math.max(4, lastCol)).getValues();
 
       const weekMembers = [];
       let totalWeekPointsConsumed = 0;
 
-      for (let i = 0; i < weekData.length; i++) {
-        const name = weekData[i][0]; // Column 1: MEMBERS
-        const pointsConsumed = weekData[i][1] || 0; // Column 2: POINTS_CONSUMED
-        const attendancePoints = weekData[i][3] || 0; // Column 4: ATTENDANCE_POINTS
+      for (let i = 0; i < sheetData.length; i++) {
+        const name = sheetData[i][0]; // Column 1: MEMBERS
+        const pointsConsumed = sheetData[i][1] || 0; // Column 2: POINTS_CONSUMED
+        const attendancePoints = sheetData[i][3] || 0; // Column 4: ATTENDANCE_POINTS
 
         if (name && name.toString().trim()) {
           const memberName = name.toString().trim();
@@ -3068,7 +3088,7 @@ function getWeeklySummary(data) {
       const totalWeekAttPoints = weekMembers.reduce((sum, m) => sum + m.attendancePoints, 0);
       const weekAverage = weekSpawns > 0 ? Math.round((totalWeekAttPoints / weekSpawns) * 10) / 10 : 0;
 
-      weekSpecificData = {
+      return {
         attendance: {
           totalSpawns: weekSpawns,
           uniqueAttendees: weekMembers.filter(m => m.attendancePoints > 0).length,
@@ -3088,6 +3108,14 @@ function getWeeklySummary(data) {
       };
     }
 
+    // ==========================================
+    // NEW: GET WEEK-SPECIFIC DATA
+    // ==========================================
+    const weekSpecificData = extractWeekData(currentWeekSheet);
+    const lastWeekSheet = getPreviousWeekSheet();
+    const lastWeekData = extractWeekData(lastWeekSheet);
+    const lastWeekName = lastWeekSheet ? lastWeekSheet.getName() : null;
+
     Logger.log(`✅ Generated weekly summary`);
 
     return createResponse('ok', 'Weekly summary fetched', {
@@ -3095,7 +3123,9 @@ function getWeeklySummary(data) {
       attendance: attendanceData,
       bidding: biddingData,
       mostActive: mostActive.slice(0, 5),
-      weekSpecific: weekSpecificData  // NEW: Include week-specific data
+      weekSpecific: weekSpecificData,  // Current week data
+      lastWeek: lastWeekData,  // NEW: Last week data
+      lastWeekName: lastWeekName  // NEW: Last week sheet name
     });
 
   } catch (err) {
