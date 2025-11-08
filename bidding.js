@@ -3050,6 +3050,12 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       fixCollector.on('collect', async (interaction) => {
         const isConfirm = interaction.customId.startsWith('fixlocked_confirm_');
 
+        // CRITICAL: Defer the interaction immediately to prevent timeout
+        // (save operation can take 3-4 seconds, Discord interactions expire after 3 seconds)
+        await interaction.deferUpdate().catch(err => {
+          console.error(`⚠️ Failed to defer interaction: ${err.message}`);
+        });
+
         const disabledFixRow = createDisabledRow(clearBtn, cancelBtn);
 
         if (isConfirm) {
@@ -3072,7 +3078,9 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             })
             .setTimestamp();
 
-          await interaction.update({ embeds: [successEmbed], components: [disabledFixRow] });
+          await interaction.editReply({ embeds: [successEmbed], components: [disabledFixRow] }).catch(err => {
+            console.error(`⚠️ Failed to update interaction: ${err.message}`);
+          });
           fixCollector.stop();
         } else {
           // User cancelled
@@ -3082,7 +3090,9 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             .setDescription('Operation cancelled')
             .setTimestamp();
 
-          await interaction.update({ embeds: [cancelEmbed], components: [disabledFixRow] });
+          await interaction.editReply({ embeds: [cancelEmbed], components: [disabledFixRow] }).catch(err => {
+            console.error(`⚠️ Failed to update interaction: ${err.message}`);
+          });
           fixCollector.stop();
         }
       });
