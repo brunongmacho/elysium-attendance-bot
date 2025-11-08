@@ -140,6 +140,10 @@ const COMMAND_ALIASES = {
   "!startauc": "!startauction",
   "!resetb": "!resetbids",
   "!forcesubmit": "!forcesubmitresults",
+  "!fixlocked": "!fixlockedpoints",
+  "!audit": "!auctionaudit",
+  "!resetauc": "!resetauction",
+  "!recover": "!recoverauction",
 
   // Emergency commands (admin) - Standalone commands
   "!emerg": "!emergency",
@@ -5132,6 +5136,10 @@ client.on(Events.MessageCreate, async (message) => {
           "!forcesubmitresults",
           "!endauction",
           "!movetodistribution",
+          "!fixlockedpoints",
+          "!auctionaudit",
+          "!resetauction",
+          "!recoverauction",
         ].includes(adminCmd)
       ) {
         console.log(`🎯 Processing auction command (${rawCmd} -> ${adminCmd})`);
