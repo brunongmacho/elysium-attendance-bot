@@ -56,6 +56,7 @@
 
 const { EmbedBuilder } = require("discord.js");
 const { SheetAPI } = require('./utils/sheet-api');
+const bossRotation = require('./boss-rotation.js');
 const {
   getCurrentTimestamp,
   getSundayOfWeek,
@@ -1457,6 +1458,9 @@ async function checkAndAutoCloseThreads(client) {
 
             if (resp.ok) {
             console.log(`   ✅ Submitted ${spawnInfo.members.length} members to Google Sheets`);
+
+            // Auto-increment boss rotation if it's a rotating boss
+            await bossRotation.handleBossKill(spawnInfo.boss);
 
             await thread.send(
               `✅ Attendance submitted! (${spawnInfo.members.length} members)\n` +

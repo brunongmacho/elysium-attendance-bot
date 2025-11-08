@@ -88,6 +88,7 @@ const { ProactiveIntelligence } = require('./proactive-intelligence.js'); // Pro
 const { NLPHandler } = require('./nlp-handler.js'); // Natural Language Processing
 const { NLPLearningSystem } = require('./nlp-learning.js'); // NLP Learning System (self-improving)
 const eventReminders = require('./event-reminders.js'); // Game Event Reminder System
+const bossRotation = require('./boss-rotation.js'); // Boss Rotation System (5-guild tracking)
 
 /**
  * Command alias mapping for shorthand commands.
@@ -1620,6 +1621,9 @@ const commandHandlers = {
               const resp = await attendance.postToSheet(payload);
 
               if (resp.ok) {
+              // Auto-increment boss rotation if it's a rotating boss
+              await bossRotation.handleBossKill(spawnInfo.boss);
+
               await thread
                 .send(
                   `✅ Attendance submitted successfully! Archiving thread...`
@@ -1845,6 +1849,9 @@ const commandHandlers = {
         const resp = await attendance.postToSheet(payload);
 
         if (resp.ok) {
+          // Auto-increment boss rotation if it's a rotating boss
+          await bossRotation.handleBossKill(spawnInfo.boss);
+
           await message.channel.send(
             `✅ **Attendance submitted successfully!**\n\n` +
               `${spawnInfo.members.length} members recorded.\n` +
@@ -3532,6 +3539,122 @@ const commandHandlers = {
       await message.reply(`❌ Error: ${error.message}`);
     }
   },
+
+  /**
+   * Boss rotation management commands
+   * Usage: !rotation status | !rotation set <boss> <index> | !rotation increment <boss>
+   */
+  rotation: async (message, member) => {
+    if (!isAdmin(member, config)) {
+      await message.reply('❌ Admin-only command.');
+      return;
+    }
+
+    const args = message.content.trim().split(/\s+/).slice(1); // Remove "!rotation"
+    const subcommand = args[0]?.toLowerCase();
+
+    try {
+      // !rotation status - Show all rotation statuses
+      if (!subcommand || subcommand === 'status') {
+        const rotations = await bossRotation.getAllRotations();
+        const rotatingBosses = bossRotation.getRotatingBosses();
+
+        if (Object.keys(rotations).length === 0) {
+          await message.reply('⚠️ No rotation data available. BossRotation sheet may not be set up.');
+          return;
+        }
+
+        const embed = new EmbedBuilder()
+          .setColor(0x4a90e8)
+          .setTitle('🔄 Boss Rotation Status')
+          .setDescription('Current rotation for 5-guild system')
+          .setTimestamp();
+
+        for (const boss of rotatingBosses) {
+          const rotation = rotations[boss];
+          if (rotation) {
+            const emoji = rotation.isOurTurn ? '🟢' : '🔴';
+            const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
+            embed.addFields({
+              name: `${emoji} ${boss}`,
+              value: `Guild ${rotation.currentIndex}/5 - **${status}**\nNext: ${rotation.guilds[rotation.currentIndex % 5]}`,
+              inline: false
+            });
+          }
+        }
+
+        await message.reply({ embeds: [embed] });
+      }
+      // !rotation set <boss> <index> - Manually set rotation
+      else if (subcommand === 'set') {
+        const bossName = args[1];
+        const newIndex = parseInt(args[2]);
+
+        if (!bossName || !newIndex) {
+          await message.reply('❌ Usage: `!rotation set <boss> <index>`\nExample: `!rotation set Amentis 1`');
+          return;
+        }
+
+        if (newIndex < 1 || newIndex > 5) {
+          await message.reply('❌ Index must be between 1 and 5');
+          return;
+        }
+
+        await message.reply(`⚙️ Setting ${bossName} rotation to index ${newIndex}...`);
+
+        const result = await bossRotation.setRotation(bossName, newIndex);
+
+        if (result.success) {
+          const emoji = result.data.isOurTurn ? '🟢' : '🔴';
+          const status = result.data.isOurTurn ? 'ELYSIUM\'S TURN' : `${result.data.currentGuild}'s turn`;
+          await message.reply(
+            `✅ **${bossName}** rotation set to index **${newIndex}**\n\n` +
+            `${emoji} Status: **${status}**\n` +
+            `Guild: ${result.data.currentGuild}`
+          );
+        } else {
+          await message.reply(`❌ ${result.message}`);
+        }
+      }
+      // !rotation increment <boss> - Manually advance rotation
+      else if (subcommand === 'increment' || subcommand === 'inc') {
+        const bossName = args[1];
+
+        if (!bossName) {
+          await message.reply('❌ Usage: `!rotation increment <boss>`\nExample: `!rotation increment Amentis`');
+          return;
+        }
+
+        await message.reply(`🔄 Advancing ${bossName} rotation...`);
+
+        const result = await bossRotation.incrementRotation(bossName);
+
+        if (result.updated !== false) {
+          const emoji = result.isNowOurTurn ? '🟢' : '🔴';
+          const status = result.isNowOurTurn ? 'ELYSIUM\'S TURN' : `${result.newGuild}'s turn`;
+          await message.reply(
+            `✅ **${bossName}** rotation advanced\n\n` +
+            `${result.oldIndex} (${result.oldGuild}) → ${result.newIndex} (${result.newGuild})\n\n` +
+            `${emoji} Status: **${status}**`
+          );
+        } else {
+          await message.reply(`❌ ${bossName} is not a rotating boss or update failed`);
+        }
+      }
+      else {
+        await message.reply(
+          `❌ Unknown subcommand: ${subcommand}\n\n` +
+          `**Valid commands:**\n` +
+          `• \`!rotation status\` - Show all rotation statuses\n` +
+          `• \`!rotation set <boss> <index>\` - Set rotation (1-5)\n` +
+          `• \`!rotation increment <boss>\` - Advance rotation`
+        );
+      }
+    } catch (error) {
+      console.error('[ROTATION] Command error:', error);
+      await message.reply(`❌ Error: ${error.message}`);
+    }
+  },
 };
 
 /**
@@ -3679,6 +3802,10 @@ client.once(Events.ClientReady, async () => {
     discordCache
   );
   leaderboardSystem.init(client, config, discordCache); // Initialize leaderboard system
+
+  // INITIALIZE BOSS ROTATION SYSTEM (5-guild rotation tracking)
+  bossRotation.initialize(config, client, intelligenceEngine);
+  console.log('🔄 Boss Rotation System initialized (Amentis, General Aquleus, Baron Braudmore)');
 
   // INITIALIZE PROACTIVE INTELLIGENCE (Auto-notifications & monitoring)
   proactiveIntelligence = new ProactiveIntelligence(client, config, intelligenceEngine);
@@ -4963,6 +5090,9 @@ client.on(Events.MessageCreate, async (message) => {
         const resp = await attendance.postToSheet(payload);
 
         if (resp.ok) {
+          // Auto-increment boss rotation if it's a rotating boss
+          await bossRotation.handleBossKill(spawnInfo.boss);
+
           await message.channel.send(
             `✅ Attendance submitted successfully! (${spawnInfo.members.length} members)`
           );
@@ -5489,6 +5619,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const resp = await attendance.postToSheet(payload);
 
         if (resp.ok) {
+          // Auto-increment boss rotation if it's a rotating boss
+          await bossRotation.handleBossKill(spawnInfo.boss);
+
           await interaction.channel.send(`✅ Attendance submitted! Archiving...`);
 
           if (spawnInfo.confirmThreadId) {
@@ -5766,6 +5899,9 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         const resp = await attendance.postToSheet(payload); // CHANGED
 
         if (resp.ok) {
+          // Auto-increment boss rotation if it's a rotating boss
+          await bossRotation.handleBossKill(spawnInfo.boss);
+
           await msg.channel.send(`✅ Attendance submitted! Archiving...`);
 
           await attendance.removeAllReactionsWithRetry(msg); // CHANGED

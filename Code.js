@@ -205,6 +205,12 @@ function doPost(e) {
     if (action === 'saveEventReminders') return saveEventReminders(data);
     if (action === 'loadEventReminders') return loadEventReminders(data);
 
+    // Boss Rotation actions (5-guild rotation tracking)
+    if (action === 'getBossRotation') return getBossRotation(data);
+    if (action === 'incrementBossRotation') return incrementBossRotation(data);
+    if (action === 'setBossRotation') return setBossRotation(data);
+    if (action === 'ensureBossRotationSheetExists') return ensureBossRotationSheetExists();
+
     Logger.log(`❌ Unknown: ${action}`);
     return createResponse('error', 'Unknown action: ' + action);
 
@@ -5422,6 +5428,284 @@ function getWeeklyMilestones(data) {
   } catch (err) {
     Logger.log('❌ Error getting weekly milestones: ' + err.toString());
     return createResponse('error', err.toString(), { data: [] });
+  }
+}
+
+// ===========================================================
+// BOSS ROTATION SYSTEM (5-Guild Rotation Tracking)
+// ===========================================================
+
+/**
+ * Ensures BossRotation sheet exists with proper structure
+ * Auto-creates if missing with default 5-guild setup
+ * @returns {Object} Response with success status
+ */
+function ensureBossRotationSheetExists() {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    let sheet = ss.getSheetByName('BossRotation');
+
+    if (!sheet) {
+      Logger.log('📋 Creating BossRotation sheet...');
+      sheet = ss.insertSheet('BossRotation');
+
+      // Set up headers
+      const headers = ['Boss Name', 'Current Index', 'Guild1', 'Guild2', 'Guild3', 'Guild4', 'Guild5'];
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+      // Format header row
+      sheet.getRange(1, 1, 1, headers.length)
+        .setBackground('#4a86e8')
+        .setFontColor('#ffffff')
+        .setFontWeight('bold');
+
+      // Add initial data for 3 rotating bosses
+      const rotatingBosses = [
+        ['Amentis', 1, 'ELYSIUM', 'Guild B', 'Guild C', 'Guild D', 'Guild E'],
+        ['General Aquleus', 1, 'ELYSIUM', 'Guild B', 'Guild C', 'Guild D', 'Guild E'],
+        ['Baron Braudmore', 1, 'ELYSIUM', 'Guild B', 'Guild C', 'Guild D', 'Guild E']
+      ];
+
+      sheet.getRange(2, 1, rotatingBosses.length, headers.length).setValues(rotatingBosses);
+
+      // Format data rows
+      sheet.setColumnWidth(1, 150); // Boss Name
+      sheet.setColumnWidth(2, 100); // Current Index
+      for (let i = 3; i <= 7; i++) {
+        sheet.setColumnWidth(i, 120); // Guild columns
+      }
+
+      // Center align index column
+      sheet.getRange(2, 2, rotatingBosses.length, 1).setHorizontalAlignment('center');
+
+      // Freeze header row
+      sheet.setFrozenRows(1);
+
+      Logger.log('✅ BossRotation sheet created successfully');
+    }
+
+    return createResponse('ok', 'BossRotation sheet ready', { exists: true });
+
+  } catch (err) {
+    Logger.log('❌ Error ensuring BossRotation sheet exists: ' + err.toString());
+    return createResponse('error', err.toString(), { exists: false });
+  }
+}
+
+/**
+ * Get rotation status for a specific boss
+ * @param {Object} data - Contains bossName
+ * @returns {Object} Response with rotation data
+ */
+function getBossRotation(data) {
+  try {
+    const bossName = (data.bossName || '').toString().trim();
+
+    if (!bossName) {
+      return createResponse('error', 'Missing bossName parameter');
+    }
+
+    // Ensure sheet exists first
+    ensureBossRotationSheetExists();
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const sheet = ss.getSheetByName('BossRotation');
+
+    if (!sheet) {
+      return createResponse('error', 'BossRotation sheet not found');
+    }
+
+    const dataValues = sheet.getDataRange().getValues();
+    const headers = dataValues[0];
+
+    // Find boss row (case-insensitive)
+    let bossRow = null;
+    for (let i = 1; i < dataValues.length; i++) {
+      if (dataValues[i][0].toString().trim().toUpperCase() === bossName.toUpperCase()) {
+        bossRow = dataValues[i];
+        break;
+      }
+    }
+
+    if (!bossRow) {
+      Logger.log(`⚠️ Boss not found in rotation: ${bossName}`);
+      return createResponse('ok', 'Boss not in rotation system', {
+        isRotating: false,
+        bossName: bossName
+      });
+    }
+
+    const currentIndex = parseInt(bossRow[1]) || 1;
+    const guilds = [
+      bossRow[2] || 'Guild1',
+      bossRow[3] || 'Guild2',
+      bossRow[4] || 'Guild3',
+      bossRow[5] || 'Guild4',
+      bossRow[6] || 'Guild5'
+    ];
+
+    const currentGuild = guilds[currentIndex - 1];
+    const isOurTurn = (currentIndex === 1); // ELYSIUM is always Guild1
+
+    Logger.log(`✅ Rotation for ${bossName}: Index ${currentIndex} (${currentGuild}) - ${isOurTurn ? 'OUR TURN' : 'NOT OUR TURN'}`);
+
+    return createResponse('ok', 'Rotation status fetched', {
+      isRotating: true,
+      bossName: bossName,
+      currentIndex: currentIndex,
+      currentGuild: currentGuild,
+      isOurTurn: isOurTurn,
+      guilds: guilds,
+      nextGuild: guilds[currentIndex % 5] // Next guild after this kill
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error getting boss rotation: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Increment rotation counter for a boss (called after boss is killed)
+ * Advances from 1→2→3→4→5→1 (loops back to ELYSIUM)
+ * @param {Object} data - Contains bossName
+ * @returns {Object} Response with updated rotation data
+ */
+function incrementBossRotation(data) {
+  try {
+    const bossName = (data.bossName || '').toString().trim();
+
+    if (!bossName) {
+      return createResponse('error', 'Missing bossName parameter');
+    }
+
+    // Ensure sheet exists first
+    ensureBossRotationSheetExists();
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const sheet = ss.getSheetByName('BossRotation');
+
+    if (!sheet) {
+      return createResponse('error', 'BossRotation sheet not found');
+    }
+
+    const dataValues = sheet.getDataRange().getValues();
+
+    // Find boss row
+    let rowIndex = -1;
+    for (let i = 1; i < dataValues.length; i++) {
+      if (dataValues[i][0].toString().trim().toUpperCase() === bossName.toUpperCase()) {
+        rowIndex = i + 1; // +1 for 1-based indexing
+        break;
+      }
+    }
+
+    if (rowIndex === -1) {
+      Logger.log(`⚠️ Boss not found in rotation: ${bossName}`);
+      return createResponse('ok', 'Boss not in rotation system', { updated: false });
+    }
+
+    // Get current index and increment (1→2→3→4→5→1)
+    const currentIndex = parseInt(dataValues[rowIndex - 1][1]) || 1;
+    const newIndex = (currentIndex % 5) + 1; // Loops: 1→2, 2→3, 3→4, 4→5, 5→1
+
+    // Update the sheet
+    sheet.getRange(rowIndex, 2).setValue(newIndex);
+
+    const guilds = [
+      dataValues[rowIndex - 1][2],
+      dataValues[rowIndex - 1][3],
+      dataValues[rowIndex - 1][4],
+      dataValues[rowIndex - 1][5],
+      dataValues[rowIndex - 1][6]
+    ];
+
+    const oldGuild = guilds[currentIndex - 1];
+    const newGuild = guilds[newIndex - 1];
+
+    Logger.log(`✅ ${bossName} rotation: ${currentIndex} (${oldGuild}) → ${newIndex} (${newGuild})`);
+
+    return createResponse('ok', 'Rotation incremented', {
+      bossName: bossName,
+      oldIndex: currentIndex,
+      newIndex: newIndex,
+      oldGuild: oldGuild,
+      newGuild: newGuild,
+      isNowOurTurn: (newIndex === 1)
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error incrementing boss rotation: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Manually set rotation index for a boss (admin override)
+ * @param {Object} data - Contains bossName and newIndex (1-5)
+ * @returns {Object} Response with updated rotation data
+ */
+function setBossRotation(data) {
+  try {
+    const bossName = (data.bossName || '').toString().trim();
+    const newIndex = parseInt(data.newIndex);
+
+    if (!bossName || !newIndex || newIndex < 1 || newIndex > 5) {
+      return createResponse('error', 'Invalid parameters (bossName required, newIndex must be 1-5)');
+    }
+
+    // Ensure sheet exists first
+    ensureBossRotationSheetExists();
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const sheet = ss.getSheetByName('BossRotation');
+
+    if (!sheet) {
+      return createResponse('error', 'BossRotation sheet not found');
+    }
+
+    const dataValues = sheet.getDataRange().getValues();
+
+    // Find boss row
+    let rowIndex = -1;
+    for (let i = 1; i < dataValues.length; i++) {
+      if (dataValues[i][0].toString().trim().toUpperCase() === bossName.toUpperCase()) {
+        rowIndex = i + 1; // +1 for 1-based indexing
+        break;
+      }
+    }
+
+    if (rowIndex === -1) {
+      Logger.log(`⚠️ Boss not found in rotation: ${bossName}`);
+      return createResponse('error', 'Boss not found in rotation system');
+    }
+
+    const currentIndex = parseInt(dataValues[rowIndex - 1][1]) || 1;
+
+    // Update the sheet
+    sheet.getRange(rowIndex, 2).setValue(newIndex);
+
+    const guilds = [
+      dataValues[rowIndex - 1][2],
+      dataValues[rowIndex - 1][3],
+      dataValues[rowIndex - 1][4],
+      dataValues[rowIndex - 1][5],
+      dataValues[rowIndex - 1][6]
+    ];
+
+    Logger.log(`✅ ${bossName} rotation manually set: ${currentIndex} → ${newIndex} (${guilds[newIndex - 1]})`);
+
+    return createResponse('ok', 'Rotation set successfully', {
+      bossName: bossName,
+      oldIndex: currentIndex,
+      newIndex: newIndex,
+      currentGuild: guilds[newIndex - 1],
+      isOurTurn: (newIndex === 1)
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error setting boss rotation: ' + err.toString());
+    return createResponse('error', err.toString());
   }
 }
 
