@@ -43,9 +43,10 @@ let client = null;
 let intelligenceEngine = null; // Reference to intelligence engine for spawn predictions
 
 /**
- * Rotating bosses that use the 5-guild system
+ * Rotating bosses list (dynamically loaded from Google Sheets)
+ * Updated on initialization and cache refresh
  */
-const ROTATING_BOSSES = ['Amentis', 'General Aquleus', 'Baron Braudmore'];
+let ROTATING_BOSSES = ['Amentis', 'General Aquleus', 'Baron Braudmore']; // Default fallback
 
 /**
  * In-memory cache of rotation status (refreshed from sheets periodically)
@@ -123,6 +124,25 @@ async function ensureRotationSheetExists() {
 }
 
 /**
+ * Fetches the list of all rotating bosses from Google Sheets
+ * Updates the ROTATING_BOSSES array dynamically
+ */
+async function fetchRotatingBosses() {
+  try {
+    const result = await sheetAPI.call('getAllRotatingBosses');
+
+    if (result.status === 'ok' && result.bosses && result.bosses.length > 0) {
+      ROTATING_BOSSES = result.bosses;
+      console.log(`✅ Loaded ${result.bosses.length} rotating bosses: ${result.bosses.join(', ')}`);
+    } else {
+      console.warn('⚠️ No rotating bosses found in sheet, using default list');
+    }
+  } catch (err) {
+    console.error('❌ Error fetching rotating bosses:', err.message);
+  }
+}
+
+/**
  * Get rotation status for a specific boss
  * @param {string} bossName - Name of the boss
  * @param {boolean} useCache - Whether to use cached data (default true)
@@ -184,6 +204,9 @@ async function getRotationStatus(bossName, useCache = true) {
 async function refreshRotationCache() {
   try {
     console.log('🔄 Refreshing rotation cache...');
+
+    // Fetch latest list of rotating bosses from sheet
+    await fetchRotatingBosses();
 
     for (const boss of ROTATING_BOSSES) {
       const rotation = await getRotationStatus(boss, false); // Force fetch from sheets
@@ -263,8 +286,8 @@ async function setRotation(bossName, newIndex) {
       return { success: false, message: `${bossName} is not a rotating boss` };
     }
 
-    if (newIndex < 1 || newIndex > 5) {
-      return { success: false, message: 'Index must be between 1 and 5' };
+    if (newIndex < 1) {
+      return { success: false, message: 'Index must be >= 1' };
     }
 
     console.log(`⚙️ Manually setting ${normalizedName} rotation to index ${newIndex}...`);
