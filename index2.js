@@ -4736,7 +4736,9 @@ client.on(Events.MessageCreate, async (message) => {
       resolvedCmd === "!leaderboardattendance" ||
       resolvedCmd === "!leaderboardbidding" ||
       resolvedCmd === "!leaderboards" ||
-      resolvedCmd === "!weeklyreport"
+      resolvedCmd === "!weeklyreport" ||
+      resolvedCmd === "!monthlyreport" ||
+      resolvedCmd === "!activity"
     ) {
       // Check permissions: either admin OR ELYSIUM role in ELYSIUM commands channel
       const hasPermission = userIsAdmin || (hasElysiumRole(member) && inElysiumCommandsChannel);
