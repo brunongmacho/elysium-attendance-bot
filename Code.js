@@ -184,6 +184,7 @@ function doPost(e) {
     if (action === 'getAttendanceLeaderboard') return getAttendanceLeaderboard(data);
     if (action === 'getBiddingLeaderboard') return getBiddingLeaderboard(data);
     if (action === 'getWeeklySummary') return getWeeklySummary(data);
+    if (action === 'getMemberStats') return getMemberStats(data);
 
     // Milestone Tracking actions
     if (action === 'getMilestoneHistory') return getMilestoneHistory(data);
@@ -3138,6 +3139,212 @@ function getWeeklySummary(data) {
     Logger.log('❌ Error in getWeeklySummary: ' + err.toString());
     return createResponse('error', err.toString());
   }
+}
+
+/**
+ * Get detailed stats for a specific member
+ * Fetches attendance history, bidding info, rank, and recent activity
+ */
+function getMemberStats(data) {
+  try {
+    const memberName = data.memberName;
+
+    if (!memberName) {
+      return createResponse('error', 'Member name is required');
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // ==========================================
+    // GET BIDDING DATA
+    // ==========================================
+    const biddingSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
+    let biddingData = { left: 0, consumed: 0, total: 0, consumptionRate: 0 };
+
+    if (biddingSheet && biddingSheet.getLastRow() > 1) {
+      const biddingValues = biddingSheet.getDataRange().getValues();
+      const memberRow = biddingValues.find(row => row[0] && row[0].toString().trim() === memberName);
+
+      if (memberRow) {
+        const left = memberRow[1] || 0;
+        const consumed = memberRow[2] || 0;
+        const total = left + consumed;
+        const consumptionRate = total > 0 ? Math.round((consumed / total) * 100) : 0;
+
+        biddingData = { left, consumed, total, consumptionRate };
+      }
+    }
+
+    // ==========================================
+    // GET ATTENDANCE DATA
+    // ==========================================
+    const logSheet = ss.getSheetByName('AttendanceLog');
+    let attendanceData = {
+      total: 0,
+      points: 0,
+      rate: 0,
+      recentBosses: [],
+      favoriteBoss: null,
+      streak: 0
+    };
+
+    if (logSheet && logSheet.getLastRow() > 1) {
+      const lastRow = logSheet.getLastRow();
+      const logValues = logSheet.getRange(2, 1, lastRow - 1, 5).getValues();
+
+      const memberAttendance = [];
+      const bossCounts = {};
+      const totalSpawns = logValues.filter(row => row[3] && row[3].toString().trim()).length;
+
+      // Filter rows where member attended
+      for (let i = 0; i < logValues.length; i++) {
+        const boss = (logValues[i][1] || '').toString().trim();
+        const timestamp = logValues[i][0];
+        const membersStr = (logValues[i][3] || '').toString().trim();
+
+        if (membersStr) {
+          const members = membersStr.split(',').map(m => m.trim());
+
+          if (members.includes(memberName)) {
+            const points = getBossPointValue(boss);
+
+            memberAttendance.push({
+              boss: boss,
+              timestamp: timestamp,
+              points: points
+            });
+
+            bossCounts[boss] = (bossCounts[boss] || 0) + 1;
+          }
+        }
+      }
+
+      // Calculate total points
+      const totalPoints = memberAttendance.reduce((sum, entry) => sum + entry.points, 0);
+
+      // Find favorite boss
+      const favoriteBoss = Object.keys(bossCounts).length > 0
+        ? Object.entries(bossCounts).sort(([,a], [,b]) => b - a)[0]
+        : null;
+
+      // Calculate attendance rate
+      const attendanceRate = totalSpawns > 0 ? Math.round((memberAttendance.length / totalSpawns) * 100) : 0;
+
+      // Sort by timestamp descending for recent bosses
+      memberAttendance.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      // Calculate streak
+      const streak = calculateMemberStreak(memberAttendance);
+
+      attendanceData = {
+        total: memberAttendance.length,
+        points: totalPoints,
+        rate: attendanceRate,
+        recentBosses: memberAttendance.slice(0, 10),
+        favoriteBoss: favoriteBoss ? {
+          name: favoriteBoss[0],
+          count: favoriteBoss[1]
+        } : null,
+        streak: streak
+      };
+    }
+
+    // ==========================================
+    // GET RANK
+    // ==========================================
+    const totalAttendanceSheet = ss.getSheetByName('TOTAL ATTENDANCE');
+    let rank = 0;
+    let totalMembers = 0;
+
+    if (totalAttendanceSheet && totalAttendanceSheet.getLastRow() > 1) {
+      const lastRow = totalAttendanceSheet.getLastRow();
+      const values = totalAttendanceSheet.getRange(2, 1, lastRow - 1, 2).getValues();
+
+      const members = values
+        .filter(row => row[0] && row[0].toString().trim())
+        .map(row => ({
+          name: row[0].toString().trim(),
+          points: row[1] || 0
+        }))
+        .sort((a, b) => b.points - a.points);
+
+      totalMembers = members.length;
+      const memberIndex = members.findIndex(m => m.name === memberName);
+      rank = memberIndex >= 0 ? memberIndex + 1 : 0;
+    }
+
+    Logger.log(`✅ Fetched stats for ${memberName}: Rank #${rank}, ${attendanceData.total} attendance, ${biddingData.left} points left`);
+
+    return createResponse('ok', 'Member stats fetched', {
+      memberName: memberName,
+      attendance: attendanceData,
+      bidding: biddingData,
+      rank: rank,
+      totalMembers: totalMembers
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error in getMemberStats: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Helper: Get boss point value from boss name
+ */
+function getBossPointValue(bossName) {
+  const bossPoints = {
+    'Kundun': 3,
+    'Selupan': 5,
+    'Red Dragon': 4,
+    'Maya': 8,
+    'Nightmare': 10,
+    'Medusa': 12,
+    'Balgass': 15,
+    'Gorgon': 18,
+    'Gaion': 20
+  };
+
+  return bossPoints[bossName] || 1;
+}
+
+/**
+ * Helper: Calculate consecutive days streak
+ */
+function calculateMemberStreak(attendanceRecords) {
+  if (attendanceRecords.length === 0) return 0;
+
+  // Get unique dates (normalized to day)
+  const attendanceDates = [];
+  const seenDates = new Set();
+
+  for (let i = 0; i < attendanceRecords.length; i++) {
+    const date = new Date(attendanceRecords[i].timestamp);
+    date.setHours(0, 0, 0, 0);
+    const dateStr = date.toDateString();
+
+    if (!seenDates.has(dateStr)) {
+      seenDates.add(dateStr);
+      attendanceDates.push(date);
+    }
+  }
+
+  // Sort dates descending
+  attendanceDates.sort((a, b) => b - a);
+
+  let streak = 1;
+  for (let i = 0; i < attendanceDates.length - 1; i++) {
+    const dayDiff = Math.floor((attendanceDates[i] - attendanceDates[i + 1]) / (1000 * 60 * 60 * 24));
+
+    if (dayDiff === 1) {
+      streak++;
+    } else if (dayDiff > 1) {
+      break; // Streak broken
+    }
+    // If dayDiff === 0, same day (already handled by seenDates)
+  }
+
+  return streak;
 }
 
 // UTILITIES
