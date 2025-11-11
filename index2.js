@@ -4132,6 +4132,8 @@ client.once(Events.ClientReady, async () => {
 
   // Register GC task (every 5 minutes)
   if (global.gc) {
+    let lastMemoryWarning = 0; // Track last memory warning to prevent log spam
+
     scheduler.registerTask('gc-management', async () => {
       const memUsage = process.memoryUsage();
       const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
@@ -4142,21 +4144,37 @@ client.once(Events.ClientReady, async () => {
       // Run garbage collection
       global.gc();
 
-      // Log memory stats
-      console.log(
-        `🧹 GC: Heap ${heapUsedMB}MB/${heapTotalMB}MB (${Math.round(memoryPressure)}%) | RSS: ${rssMB}MB`
-      );
+      // Log memory stats (only if memory is high to reduce log spam)
+      if (memoryPressure > 70 || rssMB > 350) {
+        console.log(
+          `🧹 GC: Heap ${heapUsedMB}MB/${heapTotalMB}MB (${Math.round(memoryPressure)}%) | RSS: ${rssMB}MB`
+        );
+      }
 
       // Aggressive GC if memory pressure is high (>70%)
+      // Only log warning once per hour to reduce spam
       if (memoryPressure > 70) {
-        console.warn(`⚠️ HIGH MEMORY PRESSURE (${Math.round(memoryPressure)}%) - Running aggressive GC`);
+        const now = Date.now();
+        const oneHour = 60 * 60 * 1000;
+
+        if (now - lastMemoryWarning > oneHour) {
+          console.warn(`⚠️ HIGH MEMORY PRESSURE (${Math.round(memoryPressure)}%) - Running aggressive GC`);
+          lastMemoryWarning = now;
+        }
+
         global.gc();
         global.gc(); // Second pass for aggressive collection
       }
 
-      // Alert if approaching Koyeb 512MB limit
+      // Alert if approaching Koyeb 512MB limit (rate limited to once per hour)
       if (rssMB > 400) {
-        console.error(`🚨 MEMORY ALERT: ${rssMB}MB RSS (Limit: 512MB) - Consider restarting`);
+        const now = Date.now();
+        const oneHour = 60 * 60 * 1000;
+
+        if (now - lastMemoryWarning > oneHour) {
+          console.error(`🚨 MEMORY ALERT: ${rssMB}MB RSS (Limit: 512MB) - Consider restarting`);
+          lastMemoryWarning = now;
+        }
       }
     }, 5 * 60 * 1000); // Every 5 minutes
   } else {
