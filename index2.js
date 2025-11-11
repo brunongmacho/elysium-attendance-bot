@@ -1371,35 +1371,45 @@ const commandHandlers = {
     const question = args && args.length > 0 ? args.join(" ") : null;
 
     if (!question) {
-      return await message.reply("🎱 You need to ask a question! Usage: `!8ball <your question>`");
+      return await message.reply("🎱 Magtanong ka muna! Usage: `!8ball <tanong mo>`");
     }
 
     const responses = [
-      // Affirmative responses
-      "It is certain.",
-      "It is decidedly so.",
-      "Without a doubt.",
-      "Yes - definitely.",
-      "You may rely on it.",
-      "As I see it, yes.",
-      "Most likely.",
-      "Outlook good.",
-      "Yes.",
-      "Signs point to yes.",
+      // Affirmative responses (Positive/Yes)
+      "Oo naman! 💯",
+      "Sure na sure! ✨",
+      "100% yan! 🔥",
+      "Tiwala lang! 💪",
+      "Go na yan! 🚀",
+      "Pwede na yan! 👍",
+      "Sige, bakit hindi? 😎",
+      "Aba oo! 🎉",
+      "Syempre naman! ⭐",
+      "Tapos na usapan! ✅",
 
-      // Non-committal responses
-      "Reply hazy, try again.",
-      "Ask again later.",
-      "Better not tell you now.",
-      "Cannot predict now.",
-      "Concentrate and ask again.",
+      // Non-committal responses (Maybe/Uncertain)
+      "Baka pwede, baka hindi 🤷",
+      "Mamaya na tanong ulit 😅",
+      "Di ko alam eh 🤔",
+      "Bahala na si Batman 🦇",
+      "Sige, isip muna 💭",
+      "Antayin mo muna ⏳",
+      "Hindi pa sure 😬",
+      "Malay ko 🙃",
+      "Baka bukas, hindi ngayon 📅",
+      "Pakiulit nga tanong 🔄",
 
-      // Negative responses
-      "Don't count on it.",
-      "My reply is no.",
-      "My sources say no.",
-      "Outlook not so good.",
-      "Very doubtful."
+      // Negative responses (No/Doubtful)
+      "Asa ka pa! 😂",
+      "Wag na umasa 💔",
+      "Hindi yan! ❌",
+      "Dream on! 😴",
+      "Malabo yan 🌫️",
+      "Imposible! 🚫",
+      "Wag kang umasa 🙅",
+      "Forget it! 👋",
+      "Hindi pwede ⛔",
+      "Naku, wala yan 😬"
     ];
 
     const response = responses[Math.floor(Math.random() * responses.length)];
