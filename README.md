@@ -239,6 +239,7 @@ Automatically manages rotation for bosses shared across 5 guilds:
 !rotation status           # View current rotation
 !rotation set <boss> <1-5> # Set rotation index
 !rotation increment <boss> # Advance to next guild
+!rotation refresh          # Reload boss data from Google Sheets
 ```
 
 ---
@@ -506,19 +507,18 @@ npm start
 
 ```bash
 !rotation status          # Show current rotation for all rotating bosses
-!rotation set <boss> <index>  # Manually set rotation (1-5)
+!rotation set <boss> <index>  # Manually set rotation index
 !rotation increment <boss>    # Advance to next guild's turn
+!rotation refresh         # Reload boss data from Google Sheets immediately
 ```
 
-**Tracked Bosses:**
-- Amentis
-- General Aquleus
-- Baron Braudmore
-
 **Features:**
-- 5-guild rotation system (ELYSIUM is position 1)
-- Auto-increments on boss kills
-- Prevents rotation conflicts
+- **Dynamic boss loading** - Bosses are loaded from Google Sheets (not hardcoded)
+- **Flexible rotation lengths** - Each boss can have different guild counts (3, 5, etc.)
+- **Instant reload** - Use `!rotation refresh` to load new bosses without restarting
+- **Auto-increment** - Rotation advances automatically on boss kills
+- **Crash recovery** - Rotation state persists in Google Sheets
+- ELYSIUM is always position 1 in rotation
 
 ### **🧠 NLP Learning Commands**
 

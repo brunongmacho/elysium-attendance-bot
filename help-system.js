@@ -650,7 +650,7 @@ const COMMANDS = {
   // ─────────────────────────────────────────────────────────────────────────
   rotation: {
     rotation: {
-      usage: "!rotation <status|set|increment>",
+      usage: "!rotation <status|set|increment|refresh>",
       description: "Manage boss rotation system for multi-guild bosses",
       aliases: ["!rot"],
       adminOnly: true,
@@ -658,13 +658,15 @@ const COMMANDS = {
         "• **!rotation status** - Show current rotation for all rotating bosses",
         "• **!rotation set <boss> <index>** - Manually set rotation (1-5)",
         "• **!rotation increment <boss>** - Advance to next guild's turn",
-        "• Tracks: Amentis, General Aquleus, Baron Braudmore",
-        "• 5-guild rotation system (ELYSIUM is position 1)",
+        "• **!rotation refresh** - Reload boss data from Google Sheets immediately",
+        "• Dynamically loads bosses from sheet (not hardcoded)",
+        "• Supports variable rotation lengths (3 guilds, 5 guilds, etc.)",
         "• Auto-increments on boss kills",
         "Examples:",
         "  - !rotation status",
         "  - !rotation set Amentis 1",
-        "  - !rotation increment \"General Aquleus\""
+        "  - !rotation increment \"General Aquleus\"",
+        "  - !rotation refresh"
       ]
     }
   },
