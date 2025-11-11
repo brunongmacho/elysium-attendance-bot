@@ -4764,6 +4764,10 @@ client.on(Events.MessageCreate, async (message) => {
         await commandHandlers.leaderboards(message, member);
       } else if (resolvedCmd === "!weeklyreport") {
         await commandHandlers.weeklyreport(message, member);
+      } else if (resolvedCmd === "!monthlyreport") {
+        await commandHandlers.monthlyreport(message, member);
+      } else if (resolvedCmd === "!activity") {
+        await commandHandlers.activity(message, member);
       }
       return;
     }

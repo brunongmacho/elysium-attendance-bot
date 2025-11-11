@@ -932,7 +932,7 @@ function scheduleWeeklyReport() {
  * Generates and sends the monthly summary report to admin-logs.
  *
  * Similar to weekly reports but covers the entire month's activity.
- * Sent on the 1st of each month at 11:59pm GMT+8.
+ * Sent on the LAST day of each month at 11:59pm GMT+8.
  *
  * REPORT CONTENTS:
  * 1. Monthly Attendance Summary:
@@ -1058,7 +1058,7 @@ async function sendMonthlyReport() {
       });
     }
 
-    embed.setFooter({ text: 'Next monthly report: 1st of next month at 11:59pm GMT+8' });
+    embed.setFooter({ text: 'Next monthly report: Last day of next month at 11:59pm GMT+8' });
     embed.setTimestamp();
 
     // Send the report
@@ -1071,9 +1071,9 @@ async function sendMonthlyReport() {
 }
 
 /**
- * Schedules monthly reports for the 1st of each month at 11:59pm GMT+8.
+ * Schedules monthly reports for the LAST day of each month at 11:59pm GMT+8.
  *
- * Similar to weekly report scheduler but calculates the 1st of next month.
+ * Similar to weekly report scheduler but calculates the last day of current month.
  * Automatically reschedules after each report.
  *
  * TIMEZONE HANDLING:
@@ -1091,11 +1091,11 @@ function scheduleMonthlyReport() {
   }
 
   /**
-   * Calculates the 1st of next month at 11:59pm GMT+8 in UTC time
+   * Calculates the last day of current month at 11:59pm GMT+8 in UTC time
    *
-   * @returns {Date} UTC date object representing 1st of next month 11:59pm GMT+8
+   * @returns {Date} UTC date object representing last day of month 11:59pm GMT+8
    */
-  const calculateNext1stOfMonth1159PM = () => {
+  const calculateNextLastDayOfMonth1159PM = () => {
     const now = new Date();
     const GMT8_OFFSET = 8 * 60 * 60 * 1000;
 
@@ -1107,27 +1107,37 @@ function scheduleMonthlyReport() {
     const currentMonth = nowGMT8.getUTCMonth();
     const currentYear = nowGMT8.getUTCFullYear();
 
-    // Determine target month and year
-    let targetMonth, targetYear;
+    // Calculate last day of current month
+    // Get first day of next month, then subtract 1 day to get last day of current month
+    const nextMonth = (currentMonth + 1) % 12;
+    const nextMonthYear = nextMonth === 0 ? currentYear + 1 : currentYear;
+    const firstDayOfNextMonth = new Date(Date.UTC(nextMonthYear, nextMonth, 1, 0, 0, 0, 0));
+    const lastDayOfCurrentMonth = new Date(firstDayOfNextMonth.getTime() - (24 * 60 * 60 * 1000));
+    const lastDateOfMonth = lastDayOfCurrentMonth.getUTCDate();
 
-    // If it's the 1st and past 11:59pm, schedule for next month
-    if (currentDate === 1 && (nowGMT8.getUTCHours() > 23 || (nowGMT8.getUTCHours() === 23 && nowGMT8.getUTCMinutes() >= 59))) {
-      targetMonth = (currentMonth + 1) % 12;
-      targetYear = targetMonth === 0 ? currentYear + 1 : currentYear;
+    // Determine target month, year, and day
+    let targetMonth, targetYear, targetDay;
+
+    // If it's the last day of month and past 11:59pm, schedule for next month's last day
+    if (currentDate === lastDateOfMonth && (nowGMT8.getUTCHours() > 23 || (nowGMT8.getUTCHours() === 23 && nowGMT8.getUTCMinutes() >= 59))) {
+      targetMonth = nextMonth;
+      targetYear = nextMonthYear;
+      // Calculate last day of next month
+      const monthAfterNext = (nextMonth + 1) % 12;
+      const monthAfterNextYear = monthAfterNext === 0 ? nextMonthYear + 1 : nextMonthYear;
+      const firstDayOfMonthAfterNext = new Date(Date.UTC(monthAfterNextYear, monthAfterNext, 1, 0, 0, 0, 0));
+      const lastDayOfNextMonth = new Date(firstDayOfMonthAfterNext.getTime() - (24 * 60 * 60 * 1000));
+      targetDay = lastDayOfNextMonth.getUTCDate();
     }
-    // If it's not the 1st yet, schedule for this month's 1st
-    else if (currentDate === 1) {
+    // Otherwise, schedule for current month's last day
+    else {
       targetMonth = currentMonth;
       targetYear = currentYear;
-    }
-    // Otherwise, schedule for next month's 1st
-    else {
-      targetMonth = (currentMonth + 1) % 12;
-      targetYear = targetMonth === 0 ? currentYear + 1 : currentYear;
+      targetDay = lastDateOfMonth;
     }
 
     // Create target date in GMT+8
-    const targetGMT8 = new Date(Date.UTC(targetYear, targetMonth, 1, 23, 59, 0, 0));
+    const targetGMT8 = new Date(Date.UTC(targetYear, targetMonth, targetDay, 23, 59, 0, 0));
 
     // Convert back to UTC for setTimeout
     const targetUTC = new Date(targetGMT8.getTime() - GMT8_OFFSET);
@@ -1139,12 +1149,12 @@ function scheduleMonthlyReport() {
    * Schedules the next monthly report execution
    */
   const scheduleNext = () => {
-    const next1stUTC = calculateNext1stOfMonth1159PM();
+    const nextLastDayUTC = calculateNextLastDayOfMonth1159PM();
     const now = new Date();
-    const delay = next1stUTC.getTime() - now.getTime();
+    const delay = nextLastDayUTC.getTime() - now.getTime();
 
     // Format for logging (convert to GMT+8 for display)
-    const displayTime = new Date(next1stUTC.getTime() + 8 * 60 * 60 * 1000);
+    const displayTime = new Date(nextLastDayUTC.getTime() + 8 * 60 * 60 * 1000);
     const hours = Math.floor(delay / 1000 / 60 / 60);
     const days = Math.floor(hours / 24);
 
@@ -1159,7 +1169,7 @@ function scheduleMonthlyReport() {
 
   // Start the scheduling cycle
   scheduleNext();
-  console.log('✅ Monthly report scheduler initialized (1st of month 11:59pm GMT+8)');
+  console.log('✅ Monthly report scheduler initialized (last day of month 11:59pm GMT+8)');
 }
 
 // ============================================================================
