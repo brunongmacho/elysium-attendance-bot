@@ -270,6 +270,13 @@ let discordCache = null;
  */
 const bossPoints = JSON.parse(fs.readFileSync("./boss_points.json"));
 
+/**
+ * Slap command responses loaded from slap-responses.json
+ * Contains arrays of funny objects and actions for the !slap command
+ * @type {Object.<string, Array<string>>}
+ */
+const slapResponses = JSON.parse(fs.readFileSync("./slap-responses.json"));
+
 // =====================================================================
 // SECTION 2: DISCORD CLIENT INITIALIZATION
 // =====================================================================
@@ -1429,41 +1436,9 @@ const commandHandlers = {
       return await message.reply("👋 Sino ba gusto mo sampalin? Usage: `!slap <tao o bagay>`");
     }
 
-    const objects = [
-      "isang malaking tilapia 🐟",
-      "tsinelas ni nanay 🩴",
-      "walis tingting 🧹",
-      "rolled up na dyaryo 📰",
-      "unan na unan 🛏️",
-      "electric fan 🌀",
-      "kawali 🍳",
-      "plantsa ♨️",
-      "remote control 📺",
-      "tubo ng walis ting-ting 🎋",
-      "plunger 🪠",
-      "sako ng bigas 🌾",
-      "isang buong durian 🌰",
-      "tabo 🪣",
-      "gripo 🚰",
-      "lamesa 🪑",
-      "keyboard na walang letter 'E' ⌨️",
-      "wet floor sign ⚠️",
-      "malaking bato 🪨",
-      "saging na saba 🍌"
-    ];
-
-    const actions = [
-      "Sinampal si",
-      "Hinampas ng malakas si",
-      "Binato ng",
-      "Tinira ng",
-      "Sinapak gamit ang",
-      "Binugbog ng",
-      "Inuntog sa",
-      "Sinaktan ng",
-      "Ginulpi gamit ang",
-      "Binayo ng"
-    ];
+    // Load objects and actions from external JSON file for maintainability
+    const objects = slapResponses.objects;
+    const actions = slapResponses.actions;
 
     const object = objects[Math.floor(Math.random() * objects.length)];
     const action = actions[Math.floor(Math.random() * actions.length)];
