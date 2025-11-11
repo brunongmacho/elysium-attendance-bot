@@ -113,6 +113,8 @@ const COMMAND_ALIASES = {
   "!8ball": "!eightball",
   "!8b": "!eightball",
   "!magic": "!eightball",
+  "!sampal": "!slap",
+  "!hampas": "!slap",
 
   // Leaderboard commands
   "!leadatt": "!leaderboardattendance",
@@ -1415,6 +1417,58 @@ const commandHandlers = {
     const response = responses[Math.floor(Math.random() * responses.length)];
 
     await message.reply(`🎱 **${response}**`);
+  },
+
+  // =========================================================================
+  // SLAP COMMAND - Slap someone with a random object
+  // =========================================================================
+  slap: async (message, member, args) => {
+    const target = args && args.length > 0 ? args.join(" ") : null;
+
+    if (!target) {
+      return await message.reply("👋 Sino ba gusto mo sampalin? Usage: `!slap <tao o bagay>`");
+    }
+
+    const objects = [
+      "isang malaking tilapia 🐟",
+      "tsinelas ni nanay 🩴",
+      "walis tingting 🧹",
+      "rolled up na dyaryo 📰",
+      "unan na unan 🛏️",
+      "electric fan 🌀",
+      "kawali 🍳",
+      "plantsa ♨️",
+      "remote control 📺",
+      "tubo ng walis ting-ting 🎋",
+      "plunger 🪠",
+      "sako ng bigas 🌾",
+      "isang buong durian 🌰",
+      "tabo 🪣",
+      "gripo 🚰",
+      "lamesa 🪑",
+      "keyboard na walang letter 'E' ⌨️",
+      "wet floor sign ⚠️",
+      "malaking bato 🪨",
+      "saging na saba 🍌"
+    ];
+
+    const actions = [
+      "Sinampal si",
+      "Hinampas ng malakas si",
+      "Binato ng",
+      "Tinira ng",
+      "Sinapak gamit ang",
+      "Binugbog ng",
+      "Inuntog sa",
+      "Sinaktan ng",
+      "Ginulpi gamit ang",
+      "Binayo ng"
+    ];
+
+    const object = objects[Math.floor(Math.random() * objects.length)];
+    const action = actions[Math.floor(Math.random() * actions.length)];
+
+    await message.reply(`👊 **${action} ${target}** gamit ang **${object}**!`);
   },
 
   // =========================================================================
@@ -5529,6 +5583,13 @@ client.on(Events.MessageCreate, async (message) => {
       if (memberCmd === "!eightball") {
         console.log(`🎱 8ball command detected in guild chat by ${member.user.username}`);
         await commandHandlers.eightball(message, member, args);
+        return;
+      }
+
+      // !slap command - Slap someone with a random object
+      if (memberCmd === "!slap") {
+        console.log(`👊 Slap command detected in guild chat by ${member.user.username}`);
+        await commandHandlers.slap(message, member, args);
         return;
       }
     }
