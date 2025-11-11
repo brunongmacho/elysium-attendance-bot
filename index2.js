@@ -3799,13 +3799,49 @@ const commandHandlers = {
           await message.reply(`❌ ${bossName} is not a rotating boss or update failed`);
         }
       }
+      // !rotation refresh - Force reload rotation data from Google Sheets
+      else if (subcommand === 'refresh' || subcommand === 'reload') {
+        await message.reply('🔄 Refreshing rotation data from Google Sheets...');
+
+        await bossRotation.refreshRotationCache();
+
+        const rotations = await bossRotation.getAllRotations();
+        const rotatingBosses = bossRotation.getRotatingBosses();
+
+        if (Object.keys(rotations).length === 0) {
+          await message.reply('⚠️ No rotation data found after refresh. BossRotation sheet may not be set up.');
+          return;
+        }
+
+        const embed = new EmbedBuilder()
+          .setColor(0x00ff00)
+          .setTitle('✅ Rotation Data Refreshed')
+          .setDescription(`Loaded ${rotatingBosses.length} rotating bosses from Google Sheets`)
+          .setTimestamp();
+
+        for (const boss of rotatingBosses) {
+          const rotation = rotations[boss];
+          if (rotation) {
+            const emoji = rotation.isOurTurn ? '🟢' : '🔴';
+            const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
+            embed.addFields({
+              name: `${emoji} ${boss}`,
+              value: `Guild ${rotation.currentIndex}/${rotation.guilds ? rotation.guilds.length : 5} - **${status}**`,
+              inline: false
+            });
+          }
+        }
+
+        await message.reply({ embeds: [embed] });
+      }
       else {
         await message.reply(
           `❌ Unknown subcommand: ${subcommand}\n\n` +
           `**Valid commands:**\n` +
           `• \`!rotation status\` - Show all rotation statuses\n` +
           `• \`!rotation set <boss> <index>\` - Set rotation (1-5)\n` +
-          `• \`!rotation increment <boss>\` - Advance rotation`
+          `• \`!rotation increment <boss>\` - Advance rotation\n` +
+          `• \`!rotation refresh\` - Reload boss data from Google Sheets`
         );
       }
     } catch (error) {
