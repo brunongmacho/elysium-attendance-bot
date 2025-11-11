@@ -6,7 +6,7 @@
 ![Version](https://img.shields.io/badge/version-9.0.0-blue)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
 ![Discord.js](https://img.shields.io/badge/discord.js-v14.11-5865F2)
-![Memory](https://img.shields.io/badge/memory-optimized_for_512MB-orange)
+![Memory](https://img.shields.io/badge/memory-~100MB_usage-orange)
 ![Performance](https://img.shields.io/badge/performance-⚡_highly_optimized-yellow)
 
 ---
@@ -521,8 +521,8 @@ npm start
 
 **Features:**
 - Multi-language support (English, Tagalog, Taglish)
-- Self-learning from user interactions
-- Pattern confidence scoring
+- Pattern learning from user interactions
+- Pattern confidence scoring (frequency-based)
 - Unrecognized phrase tracking
 
 ### **🚨 Emergency Commands** (Admin Only)
@@ -1014,7 +1014,7 @@ A: Verify webhook URL is correct and Apps Script is deployed. Check triggers are
 ### **Version 9.0.0 - Fully Optimized Edition** _(Current)_
 
 **Major Performance Improvements:**
-- ⚡ 10-100x faster column lookups (O(n) → O(1) algorithm)
+- ⚡ Up to 100x faster column lookups (local caching vs repeated queries)
 - ⚡ 4-5x faster thread cleanup (parallel batch processing)
 - ⚡ 2-3x faster spawn creation (concurrent API calls)
 - 📉 Memory usage reduced from 115MB to ~100MB

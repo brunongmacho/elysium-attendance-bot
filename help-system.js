@@ -164,11 +164,11 @@ const COMMANDS = {
       aliases: ["here", "join", "checkin"],
       adminOnly: false,
       details: [
-        "• Screenshot verification (non-admins)",
-        "• Admin fast-track (no screenshot)",
-        "• Admins click ✅ Verify or ❌ Deny button",
-        "• Auto-points on verification",
-        "• **20-min auto-close** prevents cheating"
+        "• Screenshot required (non-admins)",
+        "• Admin fast-track (no screenshot needed)",
+        "• Admins manually verify via ✅ or deny via ❌",
+        "• Points awarded upon admin verification",
+        "• **20-min auto-close** prevents late cheating"
       ]
     },
     close: {
@@ -406,16 +406,16 @@ const COMMANDS = {
   },
 
   // ─────────────────────────────────────────────────────────────────────────
-  // AI/INTELLIGENCE COMMANDS (Member-Accessible!)
+  // INTELLIGENCE/ANALYTICS COMMANDS (Member-Accessible!)
   // ─────────────────────────────────────────────────────────────────────────
   intelligence: {
     predictspawn: {
       usage: "!predictspawn [boss name]",
-      description: "Predict next boss spawn time (AI-powered)",
+      description: "Predict next boss spawn time (pattern-based)",
       aliases: ["!nextspawn", "!whennext", "!spawntimer"],
       adminOnly: false,
       details: [
-        "• AI spawn time prediction using multiple methods:",
+        "• Spawn time prediction using multiple methods:",
         "  - Timer-based: Known spawn intervals (e.g., Venatus 10h)",
         "  - Schedule-based: Fixed times (e.g., Guild Boss Mon 21:00)",
         "  - Historical: Pattern analysis from past spawns",
@@ -427,14 +427,14 @@ const COMMANDS = {
     },
     predictprice: {
       usage: "!predictprice <item>",
-      description: "Get AI-powered price prediction for auction item",
+      description: "Get statistical price prediction for auction item",
       aliases: ["!predict", "!suggestprice"],
       adminOnly: false,
       details: [
-        "• Machine learning price estimation",
+        "• Statistical price estimation using historical averages",
         "• Confidence intervals and trend analysis",
         "• Historical data with outlier detection",
-        "• **85%+ accuracy** after bootstrap learning",
+        "• **85%+ accuracy** after bootstrapping",
         "• **NLP**: \"how much is crimson pendant worth?\" or \"magkano flame claw?\"",
         "• Use in guild chat by @mentioning the bot"
       ]
@@ -445,8 +445,8 @@ const COMMANDS = {
       aliases: ["!predatt"],
       adminOnly: false,
       details: [
-        "• AI attendance prediction",
-        "• Based on historical patterns",
+        "• Pattern-based attendance prediction",
+        "• Based on historical attendance patterns",
         "• Confidence scoring",
         "• Recent activity analysis",
         "• **NLP**: \"will PlayerName attend?\" or \"dadalo ba si PlayerName?\"",
@@ -483,7 +483,7 @@ const COMMANDS = {
     },
     recommendations: {
       usage: "!recommendations",
-      description: "Get AI recommendations for optimal guild management",
+      description: "Get analytics-based recommendations for guild management",
       aliases: ["!recommend", "!suggest"],
       adminOnly: true,
       details: [
@@ -511,10 +511,10 @@ const COMMANDS = {
       aliases: ["!analyzequeue", "!aq", "!auctionqueue"],
       adminOnly: true,
       details: [
-        "• AI price suggestions for all items",
+        "• Statistical price suggestions for all items",
         "• Optimal item ordering",
         "• Participation forecasts",
-        "• Smart recommendations"
+        "• Analytics-based recommendations"
       ]
     },
     detectanomalies: {
@@ -532,15 +532,15 @@ const COMMANDS = {
     },
     bootstraplearning: {
       usage: "!bootstraplearning",
-      description: "Re-bootstrap AI learning from ALL historical data",
+      description: "Re-analyze ALL historical data for baseline predictions",
       aliases: ["!bootstrap", "!learnhistory"],
       adminOnly: true,
       details: [
         "• Analyzes all historical auction data",
-        "• Creates hundreds of predictions",
-        "• **85%+ accuracy from day 1**",
+        "• Creates baseline statistical predictions",
+        "• **85%+ accuracy from day 1** (with sufficient data)",
         "• No warm-up period needed",
-        "• Run once on first deployment"
+        "• Run once on first deployment or after major data changes"
       ]
     }
   },
@@ -943,8 +943,8 @@ function buildCategoryHelp(category, isUserAdmin = true) {
       color: COLORS.AUCTION
     },
     intelligence: {
-      title: `${EMOJI.ROBOT} AI/Intelligence Commands`,
-      description: "Predictive analytics and smart automation",
+      title: `${EMOJI.ROBOT} Intelligence/Analytics Commands`,
+      description: "Statistical analytics and pattern-based predictions",
       color: COLORS.AI
     },
     leaderboard: {
