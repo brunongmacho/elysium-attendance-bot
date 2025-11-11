@@ -109,6 +109,11 @@ const COMMAND_ALIASES = {
   "!commands": "!help",
   "!cmds": "!help",
 
+  // Fun commands
+  "!8ball": "!eightball",
+  "!8b": "!eightball",
+  "!magic": "!eightball",
+
   // Leaderboard commands
   "!leadatt": "!leaderboardattendance",
   "!leadbid": "!leaderboardbidding",
@@ -1357,6 +1362,59 @@ const commandHandlers = {
       .setTimestamp();
 
     await message.reply({ embeds: [embed] });
+  },
+
+  // =========================================================================
+  // 8BALL COMMAND - Magic 8-Ball for fun predictions
+  // =========================================================================
+  eightball: async (message, member, args) => {
+    const question = args && args.length > 0 ? args.join(" ") : null;
+
+    if (!question) {
+      return await message.reply("🎱 Magtanong ka muna! Usage: `!8ball <tanong mo>`");
+    }
+
+    const responses = [
+      // Affirmative responses (Positive/Yes)
+      "Oo naman! 💯",
+      "Sure na sure! ✨",
+      "100% yan! 🔥",
+      "Tiwala lang! 💪",
+      "Go na yan! 🚀",
+      "Pwede na yan! 👍",
+      "Sige, bakit hindi? 😎",
+      "Aba oo! 🎉",
+      "Syempre naman! ⭐",
+      "Tapos na usapan! ✅",
+
+      // Non-committal responses (Maybe/Uncertain)
+      "Baka pwede, baka hindi 🤷",
+      "Mamaya na tanong ulit 😅",
+      "Di ko alam eh 🤔",
+      "Bahala na si Batman 🦇",
+      "Sige, isip muna 💭",
+      "Antayin mo muna ⏳",
+      "Hindi pa sure 😬",
+      "Malay ko 🙃",
+      "Baka bukas, hindi ngayon 📅",
+      "Pakiulit nga tanong 🔄",
+
+      // Negative responses (No/Doubtful)
+      "Asa ka pa! 😂",
+      "Wag na umasa 💔",
+      "Hindi yan! ❌",
+      "Dream on! 😴",
+      "Malabo yan 🌫️",
+      "Imposible! 🚫",
+      "Wag kang umasa 🙅",
+      "Forget it! 👋",
+      "Hindi pwede ⛔",
+      "Naku, wala yan 😬"
+    ];
+
+    const response = responses[Math.floor(Math.random() * responses.length)];
+
+    await message.reply(`🎱 **${response}**`);
   },
 
   // =========================================================================
@@ -5457,6 +5515,22 @@ client.on(Events.MessageCreate, async (message) => {
       }
 
       return;
+    }
+
+    // =========================================================================
+    // MEMBER COMMANDS IN ELYSIUM COMMANDS CHANNEL (Guild Chat)
+    // =========================================================================
+    // Fun commands available to all members in guild chat
+    if (inElysiumCommandsChannel) {
+      const memberCmd = resolveCommandAlias(rawCmd);
+      const args = message.content.trim().split(/\s+/).slice(1);
+
+      // !8ball command - Magic 8-Ball predictions
+      if (memberCmd === "!eightball") {
+        console.log(`🎱 8ball command detected in guild chat by ${member.user.username}`);
+        await commandHandlers.eightball(message, member, args);
+        return;
+      }
     }
 
     // Admin-only commands in admin logs
