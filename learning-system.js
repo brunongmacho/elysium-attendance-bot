@@ -99,7 +99,7 @@ class LearningSystem {
       });
 
       if (response.status === 'ok') {
-        console.log(`[LEARNING] 📚 Saved ${type} prediction for ${target} (${Object.keys(enrichedFeatures).length} features)`);
+        // Removed verbose logging - predictions are saved silently
         return response;
       } else {
         console.error('[LEARNING] ❌ Failed to save prediction:', response.message);
@@ -399,7 +399,10 @@ class LearningSystem {
 
       const adjustedConfidence = Math.min(100, Math.max(0, baseConfidence + adjustment));
 
-      console.log(`[LEARNING] 🎯 Adjusted ${type} confidence: ${baseConfidence.toFixed(1)}% → ${adjustedConfidence.toFixed(1)}% (accuracy: ${weightedAccuracy.toFixed(1)}%)`);
+      // Removed verbose logging - only log significant adjustments
+      if (Math.abs(adjustment) > 10) {
+        console.log(`[LEARNING] Adjusted ${type} confidence by ${adjustment > 0 ? '+' : ''}${adjustment.toFixed(1)}% (accuracy: ${weightedAccuracy.toFixed(1)}%)`);
+      }
 
       return adjustedConfidence;
     } catch (error) {

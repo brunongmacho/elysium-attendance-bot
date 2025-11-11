@@ -363,7 +363,7 @@ async function saveSchedulerTaskExecution(taskName, lastRun) {
       state: recoveryState.scheduler,
     }, { silent: true });
 
-    console.log(`💾 [CRASH RECOVERY] Saved scheduler task: ${taskName}`);
+    // Removed verbose logging - only log errors
   } catch (error) {
     console.error(`⚠️ [CRASH RECOVERY] Failed to save scheduler task ${taskName}:`, error.message);
   }

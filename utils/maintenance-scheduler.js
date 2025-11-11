@@ -69,7 +69,7 @@ async function executeTask(name) {
   if (!task || !task.enabled) return;
 
   try {
-    console.log(`⚙️ [SCHEDULER] Running: ${name}`);
+    // Removed verbose logging - only log errors
     await task.fn();
     task.lastRun = Date.now();
     task.errorCount = 0; // Reset on success
