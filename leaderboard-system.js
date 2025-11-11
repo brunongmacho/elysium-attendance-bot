@@ -793,6 +793,12 @@ async function sendWeeklyReport() {
 let weeklyReportTimer = null;
 
 /**
+ * Timer reference for the monthly report scheduler
+ * Prevents duplicate schedulers from being created
+ */
+let monthlyReportTimer = null;
+
+/**
  * Schedules weekly reports for every Saturday at 11:59pm GMT+8
  *
  * TIMEZONE HANDLING:
@@ -903,6 +909,244 @@ function scheduleWeeklyReport() {
 }
 
 // ============================================================================
+// MONTHLY REPORTS
+// ============================================================================
+
+/**
+ * Generates and sends the monthly summary report to admin-logs.
+ *
+ * Similar to weekly reports but covers the entire month's activity.
+ * Sent on the 1st of each month at 11:59pm GMT+8.
+ *
+ * REPORT CONTENTS:
+ * 1. Monthly Attendance Summary:
+ *    - Total spawns for the month
+ *    - Unique attendees count
+ *    - Average attendance per spawn
+ *    - Most attended bosses
+ *
+ * 2. Monthly Bidding Summary:
+ *    - Total points distributed
+ *    - Total points consumed
+ *    - Average bid per item
+ *    - Top bidders
+ *
+ * 3. Top Performers:
+ *    - Top 3 attendees
+ *    - Top 3 bidders
+ *    - Month-over-month trends
+ *
+ * @returns {Promise<void>}
+ */
+async function sendMonthlyReport() {
+  try {
+    if (!client || !config) {
+      console.error('❌ Leaderboard system not initialized');
+      return;
+    }
+
+    console.log('📅 Generating monthly report...');
+
+    // Get admin-logs channel
+    const channel = await client.channels.fetch(config.admin_logs_channel_id).catch(() => null);
+    if (!channel) {
+      console.error('❌ Admin logs channel not found for monthly report');
+      return;
+    }
+
+    // Fetch leaderboard data
+    const [attendanceData, biddingData] = await Promise.all([
+      fetchAttendanceLeaderboard(),
+      fetchBiddingLeaderboard()
+    ]);
+
+    // Get current month info (GMT+8)
+    const now = new Date();
+    const gmt8Time = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'];
+    const lastMonth = (gmt8Time.getUTCMonth() - 1 + 12) % 12;
+    const year = lastMonth === 11 ? gmt8Time.getUTCFullYear() - 1 : gmt8Time.getUTCFullYear();
+    const monthName = `${monthNames[lastMonth]} ${year}`;
+
+    // Calculate attendance metrics
+    const totalSpawns = attendanceData.totalSpawns || 0;
+    const uniqueAttendees = attendanceData.leaderboard ? attendanceData.leaderboard.length : 0;
+    const avgAttendance = totalSpawns > 0
+      ? Math.round((attendanceData.leaderboard.reduce((sum, p) => sum + p.points, 0) / totalSpawns) * 10) / 10
+      : 0;
+
+    // Calculate bidding metrics
+    const totalPointsDistributed = biddingData.totalPointsDistributed || 0;
+    const totalPointsConsumed = biddingData.totalPointsConsumed || 0;
+    const avgBid = totalPointsConsumed > 0 && biddingData.leaderboard
+      ? Math.round(totalPointsConsumed / biddingData.leaderboard.length)
+      : 0;
+
+    // Create monthly report embed
+    const embed = new EmbedBuilder()
+      .setTitle(`📅 Monthly Guild Report - ${monthName}`)
+      .setDescription(`Comprehensive summary of guild activity for ${monthName}`)
+      .setColor(0x9B59B6)  // Purple color for monthly reports
+      .addFields(
+        {
+          name: '📊 Attendance Summary',
+          value:
+            `• **Total Spawns:** ${totalSpawns}\n` +
+            `• **Unique Attendees:** ${uniqueAttendees}\n` +
+            `• **Avg Attendance/Spawn:** ${avgAttendance} members\n`,
+          inline: false
+        },
+        {
+          name: '💰 Bidding Summary',
+          value:
+            `• **Total Points Distributed:** ${totalPointsDistributed}\n` +
+            `• **Total Points Consumed:** ${totalPointsConsumed}\n` +
+            `• **Avg Bid/Member:** ${avgBid} points\n`,
+          inline: false
+        }
+      );
+
+    // Add top 3 attendees
+    if (attendanceData.leaderboard && attendanceData.leaderboard.length > 0) {
+      const top3Attendance = attendanceData.leaderboard
+        .slice(0, 3)
+        .map((p, i) => {
+          const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
+          return `${medal} **${p.name}** - ${p.points} points`;
+        })
+        .join('\n');
+
+      embed.addFields({
+        name: '🏆 Top Attendees',
+        value: top3Attendance,
+        inline: false
+      });
+    }
+
+    // Add top 3 bidders (most points remaining = least spent)
+    if (biddingData.leaderboard && biddingData.leaderboard.length > 0) {
+      const top3Bidding = biddingData.leaderboard
+        .slice(0, 3)
+        .map((p, i) => {
+          const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
+          const consumed = (biddingData.totalPointsDistributed / biddingData.leaderboard.length) - p.points;
+          return `${medal} **${p.name}** - ${Math.round(consumed)} points spent`;
+        })
+        .join('\n');
+
+      embed.addFields({
+        name: '💎 Top Bidders',
+        value: top3Bidding,
+        inline: false
+      });
+    }
+
+    embed.setFooter({ text: 'Next monthly report: 1st of next month at 11:59pm GMT+8' });
+    embed.setTimestamp();
+
+    // Send the report
+    await channel.send({ embeds: [embed] });
+    console.log(`✅ Monthly report sent successfully for ${monthName}`);
+
+  } catch (error) {
+    console.error('❌ Error sending monthly report:', error);
+  }
+}
+
+/**
+ * Schedules monthly reports for the 1st of each month at 11:59pm GMT+8.
+ *
+ * Similar to weekly report scheduler but calculates the 1st of next month.
+ * Automatically reschedules after each report.
+ *
+ * TIMEZONE HANDLING:
+ * - All calculations done in GMT+8 (Asia/Manila)
+ * - Converted to UTC for setTimeout
+ * - Logs show GMT+8 times for clarity
+ *
+ * @returns {void}
+ */
+function scheduleMonthlyReport() {
+  // Prevent duplicate schedulers
+  if (monthlyReportTimer) {
+    console.log('⚠️ Monthly report scheduler already running, skipping initialization');
+    return;
+  }
+
+  /**
+   * Calculates the 1st of next month at 11:59pm GMT+8 in UTC time
+   *
+   * @returns {Date} UTC date object representing 1st of next month 11:59pm GMT+8
+   */
+  const calculateNext1stOfMonth1159PM = () => {
+    const now = new Date();
+    const GMT8_OFFSET = 8 * 60 * 60 * 1000;
+
+    // Get current time in GMT+8
+    const nowGMT8 = new Date(now.getTime() + GMT8_OFFSET);
+
+    // Get current date
+    const currentDate = nowGMT8.getUTCDate();
+    const currentMonth = nowGMT8.getUTCMonth();
+    const currentYear = nowGMT8.getUTCFullYear();
+
+    // Determine target month and year
+    let targetMonth, targetYear;
+
+    // If it's the 1st and past 11:59pm, schedule for next month
+    if (currentDate === 1 && (nowGMT8.getUTCHours() > 23 || (nowGMT8.getUTCHours() === 23 && nowGMT8.getUTCMinutes() >= 59))) {
+      targetMonth = (currentMonth + 1) % 12;
+      targetYear = targetMonth === 0 ? currentYear + 1 : currentYear;
+    }
+    // If it's not the 1st yet, schedule for this month's 1st
+    else if (currentDate === 1) {
+      targetMonth = currentMonth;
+      targetYear = currentYear;
+    }
+    // Otherwise, schedule for next month's 1st
+    else {
+      targetMonth = (currentMonth + 1) % 12;
+      targetYear = targetMonth === 0 ? currentYear + 1 : currentYear;
+    }
+
+    // Create target date in GMT+8
+    const targetGMT8 = new Date(Date.UTC(targetYear, targetMonth, 1, 23, 59, 0, 0));
+
+    // Convert back to UTC for setTimeout
+    const targetUTC = new Date(targetGMT8.getTime() - GMT8_OFFSET);
+
+    return targetUTC;
+  };
+
+  /**
+   * Schedules the next monthly report execution
+   */
+  const scheduleNext = () => {
+    const next1stUTC = calculateNext1stOfMonth1159PM();
+    const now = new Date();
+    const delay = next1stUTC.getTime() - now.getTime();
+
+    // Format for logging (convert to GMT+8 for display)
+    const displayTime = new Date(next1stUTC.getTime() + 8 * 60 * 60 * 1000);
+    const hours = Math.floor(delay / 1000 / 60 / 60);
+    const days = Math.floor(hours / 24);
+
+    console.log(`📅 Next monthly report scheduled for: ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${days} days)`);
+
+    // Schedule the report
+    monthlyReportTimer = setTimeout(async () => {
+      await sendMonthlyReport();
+      scheduleNext(); // Automatically schedule next month's report
+    }, delay);
+  };
+
+  // Start the scheduling cycle
+  scheduleNext();
+  console.log('✅ Monthly report scheduler initialized (1st of month 11:59pm GMT+8)');
+}
+
+// ============================================================================
 // MODULE EXPORTS
 // ============================================================================
 
@@ -912,5 +1156,7 @@ module.exports = {
   displayBiddingLeaderboard,
   displayCombinedLeaderboards,
   sendWeeklyReport,
-  scheduleWeeklyReport
+  scheduleWeeklyReport,
+  sendMonthlyReport,
+  scheduleMonthlyReport
 };

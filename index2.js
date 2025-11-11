@@ -89,6 +89,7 @@ const { NLPHandler } = require('./nlp-handler.js'); // Natural Language Processi
 const { NLPLearningSystem } = require('./nlp-learning.js'); // NLP Learning System (self-improving)
 const eventReminders = require('./event-reminders.js'); // Game Event Reminder System
 const bossRotation = require('./boss-rotation.js'); // Boss Rotation System (5-guild tracking)
+const activityHeatmap = require('./activity-heatmap.js'); // Activity Heatmap System
 
 /**
  * Command alias mapping for shorthand commands.
@@ -118,6 +119,13 @@ const COMMAND_ALIASES = {
   "!lb": "!leaderboards",
   "!week": "!weeklyreport",
   "!weekly": "!weeklyreport",
+  "!month": "!monthlyreport",
+  "!monthly": "!monthlyreport",
+
+  // Activity heatmap commands
+  "!heatmap": "!activity",
+  "!activityheatmap": "!activity",
+  "!guildactivity": "!activity",
 
   // Attendance commands (admin)
   "!st": "!status",
@@ -2531,6 +2539,26 @@ const commandHandlers = {
     await leaderboardSystem.sendWeeklyReport();
   },
 
+  monthlyreport: async (message, member) => {
+    // Permission check is done in routing logic
+    console.log(`📅 ${member.user.username} manually triggered monthly report`);
+    await message.reply({ content: "📊 Generating monthly report...", failIfNotExists: false });
+    await leaderboardSystem.sendMonthlyReport();
+  },
+
+  // ==========================================
+  // ACTIVITY HEATMAP COMMANDS
+  // ==========================================
+
+  activity: async (message, member) => {
+    // Permission check is done in routing logic
+    const args = message.content.trim().split(/\s+/).slice(1);
+    const mode = args[0]?.toLowerCase();
+
+    console.log(`📊 ${member.user.username} requested activity heatmap${mode ? ` (${mode})` : ''}`);
+    await activityHeatmap.displayActivityHeatmap(message, mode);
+  },
+
   // =========================================================================
   // INTELLIGENCE ENGINE COMMANDS - AI/ML Powered Features
   // =========================================================================
@@ -3899,6 +3927,10 @@ client.once(Events.ClientReady, async () => {
   );
   leaderboardSystem.init(client, config, discordCache); // Initialize leaderboard system
 
+  // INITIALIZE ACTIVITY HEATMAP SYSTEM
+  activityHeatmap.init(client, config);
+  console.log('📊 Activity Heatmap System initialized');
+
   // INITIALIZE BOSS ROTATION SYSTEM (5-guild rotation tracking)
   bossRotation.initialize(config, client, intelligenceEngine);
   console.log('🔄 Boss Rotation System initialized (Amentis, General Aquleus, Baron Braudmore)');
@@ -4117,6 +4149,10 @@ client.once(Events.ClientReady, async () => {
   console.log("📅 Starting weekly report scheduler...");
   leaderboardSystem.scheduleWeeklyReport();
 
+  // START MONTHLY REPORT SCHEDULER (1st of month 11:59pm GMT+8)
+  console.log("📅 Starting monthly report scheduler...");
+  leaderboardSystem.scheduleMonthlyReport();
+
   // START WEEKLY SATURDAY AUCTION SCHEDULER (12:00 PM GMT+8)
   console.log("🔨 Starting weekly Saturday auction scheduler...");
   auctioneering.scheduleWeeklySaturdayAuction(client, config);
@@ -4220,6 +4256,16 @@ client.on(Events.MessageCreate, async (message) => {
         await nlpLearningSystem.learnFromMessage(message);
       } catch (error) {
         console.error(`❌ NLP Learning error: ${error.message}`);
+      }
+    }
+
+    // 📊 ACTIVITY TRACKING: Track message for activity heatmap
+    // Skip bot messages for more accurate member activity data
+    if (activityHeatmap && !message.author.bot) {
+      try {
+        activityHeatmap.trackMessage(message);
+      } catch (error) {
+        console.error(`❌ Activity tracking error: ${error.message}`);
       }
     }
 
