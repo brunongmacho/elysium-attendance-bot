@@ -109,6 +109,11 @@ const COMMAND_ALIASES = {
   "!commands": "!help",
   "!cmds": "!help",
 
+  // Fun commands
+  "!8ball": "!eightball",
+  "!8b": "!eightball",
+  "!magic": "!eightball",
+
   // Leaderboard commands
   "!leadatt": "!leaderboardattendance",
   "!leadbid": "!leaderboardbidding",
@@ -1357,6 +1362,49 @@ const commandHandlers = {
       .setTimestamp();
 
     await message.reply({ embeds: [embed] });
+  },
+
+  // =========================================================================
+  // 8BALL COMMAND - Magic 8-Ball for fun predictions
+  // =========================================================================
+  eightball: async (message, member, args) => {
+    const question = args && args.length > 0 ? args.join(" ") : null;
+
+    if (!question) {
+      return await message.reply("🎱 You need to ask a question! Usage: `!8ball <your question>`");
+    }
+
+    const responses = [
+      // Affirmative responses
+      "It is certain.",
+      "It is decidedly so.",
+      "Without a doubt.",
+      "Yes - definitely.",
+      "You may rely on it.",
+      "As I see it, yes.",
+      "Most likely.",
+      "Outlook good.",
+      "Yes.",
+      "Signs point to yes.",
+
+      // Non-committal responses
+      "Reply hazy, try again.",
+      "Ask again later.",
+      "Better not tell you now.",
+      "Cannot predict now.",
+      "Concentrate and ask again.",
+
+      // Negative responses
+      "Don't count on it.",
+      "My reply is no.",
+      "My sources say no.",
+      "Outlook not so good.",
+      "Very doubtful."
+    ];
+
+    const response = responses[Math.floor(Math.random() * responses.length)];
+
+    await message.reply(`🎱 **${response}**`);
   },
 
   // =========================================================================
