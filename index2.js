@@ -2550,8 +2550,23 @@ const commandHandlers = {
     try {
       // Permission check is done in routing logic
       console.log(`📅 ${member.user.username} manually triggered monthly report`);
-      await message.reply({ content: "📊 Generating monthly report...", failIfNotExists: false });
+
+      const statusMsg = await message.reply({ content: "📊 Generating monthly report...", failIfNotExists: false });
+
       await leaderboardSystem.sendMonthlyReport();
+
+      // Get both channel names for the confirmation message
+      const [adminLogsChannel, guildAnnouncementChannel] = await Promise.all([
+        client.channels.fetch(config.admin_logs_channel_id).catch(() => null),
+        client.channels.fetch(config.guild_announcement_channel_id).catch(() => null)
+      ]);
+
+      const channels = [];
+      if (adminLogsChannel) channels.push(`<#${adminLogsChannel.id}>`);
+      if (guildAnnouncementChannel) channels.push(`<#${guildAnnouncementChannel.id}>`);
+
+      const channelList = channels.length > 0 ? channels.join(' and ') : 'target channels';
+      await statusMsg.edit({ content: `✅ Monthly report sent to ${channelList}!` }).catch(() => {});
       console.log(`✅ Monthly report command completed successfully`);
     } catch (error) {
       console.error(`❌ Error in monthlyreport command:`, error);
