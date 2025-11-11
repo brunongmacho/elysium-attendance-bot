@@ -963,28 +963,28 @@ async function sendMonthlyReport() {
 
     console.log('📅 Generating monthly report...');
 
-    // Get both admin-logs and guild announcement channels
-    const [adminLogsChannel, guildAnnouncementChannel] = await Promise.all([
+    // Get both admin-logs and guild chat (elysium commands) channels
+    const [adminLogsChannel, guildChatChannel] = await Promise.all([
       client.channels.fetch(config.admin_logs_channel_id).catch((err) => {
         console.error('❌ Error fetching admin logs channel:', err);
         return null;
       }),
-      client.channels.fetch(config.guild_announcement_channel_id).catch((err) => {
-        console.error('❌ Error fetching guild announcement channel:', err);
+      client.channels.fetch(config.elysium_commands_channel_id).catch((err) => {
+        console.error('❌ Error fetching guild chat channel:', err);
         return null;
       })
     ]);
 
-    if (!adminLogsChannel && !guildAnnouncementChannel) {
-      console.error(`❌ Neither admin logs nor guild announcement channels found`);
+    if (!adminLogsChannel && !guildChatChannel) {
+      console.error(`❌ Neither admin logs nor guild chat channels found`);
       return;
     }
 
     if (adminLogsChannel) {
       console.log(`📍 Will send monthly report to admin logs: ${adminLogsChannel.name} (${adminLogsChannel.id})`);
     }
-    if (guildAnnouncementChannel) {
-      console.log(`📍 Will send monthly report to guild announcement: ${guildAnnouncementChannel.name} (${guildAnnouncementChannel.id})`);
+    if (guildChatChannel) {
+      console.log(`📍 Will send monthly report to guild chat: ${guildChatChannel.name} (${guildChatChannel.id})`);
     }
 
     // Fetch leaderboard data
@@ -1109,28 +1109,28 @@ async function sendMonthlyReport() {
       );
     }
 
-    if (guildAnnouncementChannel) {
-      console.log(`🔍 Guild announcement channel type: ${guildAnnouncementChannel.type}, isTextBased: ${guildAnnouncementChannel.isTextBased()}`);
+    if (guildChatChannel) {
+      console.log(`🔍 Guild chat channel type: ${guildChatChannel.type}, isTextBased: ${guildChatChannel.isTextBased()}`);
       sendPromises.push(
-        guildAnnouncementChannel.send({ embeds: [embed] })
+        guildChatChannel.send({ embeds: [embed] })
           .then((msg) => {
-            console.log(`✅ Monthly report sent to guild announcement - Message ID: ${msg.id}`);
-            return { channel: 'guild-announcement', success: true, messageId: msg.id };
+            console.log(`✅ Monthly report sent to guild chat - Message ID: ${msg.id}`);
+            return { channel: 'guild-chat', success: true, messageId: msg.id };
           })
           .catch((err) => {
-            console.error('❌ Error sending to guild announcement:', err);
+            console.error('❌ Error sending to guild chat:', err);
             console.error('❌ Error details:', {
               message: err.message,
               code: err.code,
               httpStatus: err.httpStatus,
-              channelId: guildAnnouncementChannel.id,
-              channelName: guildAnnouncementChannel.name
+              channelId: guildChatChannel.id,
+              channelName: guildChatChannel.name
             });
-            return { channel: 'guild-announcement', success: false, error: err.message };
+            return { channel: 'guild-chat', success: false, error: err.message };
           })
       );
     } else {
-      console.warn('⚠️ Guild announcement channel is null/undefined');
+      console.warn('⚠️ Guild chat channel is null/undefined');
     }
 
     const results = await Promise.all(sendPromises);
