@@ -963,11 +963,28 @@ async function sendMonthlyReport() {
 
     console.log('📅 Generating monthly report...');
 
-    // Get admin-logs channel
-    const channel = await client.channels.fetch(config.admin_logs_channel_id).catch(() => null);
-    if (!channel) {
-      console.error('❌ Admin logs channel not found for monthly report');
+    // Get both admin-logs and guild announcement channels
+    const [adminLogsChannel, guildAnnouncementChannel] = await Promise.all([
+      client.channels.fetch(config.admin_logs_channel_id).catch((err) => {
+        console.error('❌ Error fetching admin logs channel:', err);
+        return null;
+      }),
+      client.channels.fetch(config.guild_announcement_channel_id).catch((err) => {
+        console.error('❌ Error fetching guild announcement channel:', err);
+        return null;
+      })
+    ]);
+
+    if (!adminLogsChannel && !guildAnnouncementChannel) {
+      console.error(`❌ Neither admin logs nor guild announcement channels found`);
       return;
+    }
+
+    if (adminLogsChannel) {
+      console.log(`📍 Will send monthly report to admin logs: ${adminLogsChannel.name} (${adminLogsChannel.id})`);
+    }
+    if (guildAnnouncementChannel) {
+      console.log(`📍 Will send monthly report to guild announcement: ${guildAnnouncementChannel.name} (${guildAnnouncementChannel.id})`);
     }
 
     // Fetch leaderboard data
@@ -1061,9 +1078,46 @@ async function sendMonthlyReport() {
     embed.setFooter({ text: 'Next monthly report: Last day of next month at 11:59pm GMT+8' });
     embed.setTimestamp();
 
-    // Send the report
-    await channel.send({ embeds: [embed] });
-    console.log(`✅ Monthly report sent successfully for ${monthName}`);
+    // Send the report to both channels
+    console.log(`📤 Attempting to send monthly report embed...`);
+
+    const sendPromises = [];
+    if (adminLogsChannel) {
+      sendPromises.push(
+        adminLogsChannel.send({ embeds: [embed] })
+          .then((msg) => {
+            console.log(`✅ Monthly report sent to admin logs - Message ID: ${msg.id}`);
+            return { channel: 'admin-logs', success: true, messageId: msg.id };
+          })
+          .catch((err) => {
+            console.error('❌ Error sending to admin logs:', err);
+            return { channel: 'admin-logs', success: false, error: err.message };
+          })
+      );
+    }
+
+    if (guildAnnouncementChannel) {
+      sendPromises.push(
+        guildAnnouncementChannel.send({ embeds: [embed] })
+          .then((msg) => {
+            console.log(`✅ Monthly report sent to guild announcement - Message ID: ${msg.id}`);
+            return { channel: 'guild-announcement', success: true, messageId: msg.id };
+          })
+          .catch((err) => {
+            console.error('❌ Error sending to guild announcement:', err);
+            return { channel: 'guild-announcement', success: false, error: err.message };
+          })
+      );
+    }
+
+    const results = await Promise.all(sendPromises);
+    const successCount = results.filter(r => r.success).length;
+
+    if (successCount > 0) {
+      console.log(`✅ Monthly report sent successfully for ${monthName} to ${successCount} channel(s)`);
+    } else {
+      console.error('❌ Failed to send monthly report to any channels');
+    }
 
   } catch (error) {
     console.error('❌ Error sending monthly report:', error);
