@@ -587,13 +587,40 @@ const COMMANDS = {
     weeklyreport: {
       usage: "!weeklyreport",
       description: "Force send weekly leaderboard report (auto-sent Saturday 11:59 PM)",
-      aliases: ["!weekly"],
+      aliases: ["!weekly", "!week"],
       adminOnly: true,
       details: [
         "• Manual trigger",
         "• Same format as automatic report",
         "• Posts to designated channel",
         "• **Scheduled**: Auto-runs Saturday 11:59 PM"
+      ]
+    },
+    monthlyreport: {
+      usage: "!monthlyreport",
+      description: "Force send monthly leaderboard report (auto-sent last day of month 11:59 PM)",
+      aliases: ["!monthly", "!month"],
+      adminOnly: true,
+      details: [
+        "• Manual trigger for monthly report",
+        "• Comprehensive monthly statistics",
+        "• Top performers and trends",
+        "• Month-over-month analysis",
+        "• **Scheduled**: Auto-runs last day of month 11:59 PM GMT+8"
+      ]
+    },
+    activity: {
+      usage: "!activity [week]",
+      description: "Display guild activity heatmap for optimal event scheduling",
+      aliases: ["!heatmap", "!activityheatmap", "!guildactivity"],
+      adminOnly: false,
+      details: [
+        "• 24-hour activity visualization (ASCII heatmap)",
+        "• Peak activity time identification",
+        "• Optimal event scheduling recommendations",
+        "• Use `!activity week` for weekly patterns",
+        "• Shows message frequency by hour (GMT+8)",
+        "• Helps schedule events when members are most active"
       ]
     }
   },

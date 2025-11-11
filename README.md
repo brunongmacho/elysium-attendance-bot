@@ -243,14 +243,21 @@ Automatically manages rotation for bosses shared across 5 guilds:
 
 ---
 
-### 📊 Leaderboard System
+### 📊 Leaderboard & Analytics System
 
-**Automated Rankings:**
+**Automated Rankings & Reports:**
 - 🏆 **Attendance Leaderboard** - Top 10 by points
 - 🏆 **Bidding Leaderboard** - Top 10 by remaining points
-- 🏆 **Weekly Reports** - Auto-sent Saturday 11:59 PM
+- 🏆 **Weekly Reports** - Auto-sent Saturday 11:59 PM GMT+8
+- 🏆 **Monthly Reports** - Auto-sent last day of month 11:59 PM GMT+8 (NEW)
 - 🏆 **Visual progress bars** with percentages
 - 🏆 **Real-time statistics** with live updates
+
+**Activity Analytics:**
+- 📊 **Activity Heatmap** - 24-hour guild activity visualization (NEW)
+- 📊 **Peak time identification** - Find when members are most active
+- 📊 **Event scheduling optimizer** - Schedule events at optimal times
+- 📊 **Weekly patterns** - Track activity trends over time
 
 **Commands:**
 ```
@@ -258,6 +265,8 @@ Automatically manages rotation for bosses shared across 5 guilds:
 !leaderboardbidding       # Show bidding rankings
 !leaderboards             # Show both
 !weeklyreport             # Force weekly report
+!monthlyreport            # Force monthly report (admin only)
+!activity [week]          # Guild activity heatmap
 ```
 
 ---
@@ -475,14 +484,23 @@ npm start
 !bootstraplearning        # Re-analyze historical data (aliases: !bootstrap, !learnhistory)
 ```
 
-### **📊 Leaderboard Commands**
+### **📊 Leaderboard & Analytics Commands**
 
 ```bash
 !leaderboardattendance    # Attendance rankings (aliases: !lbattendance, !lba, !leadatt)
 !leaderboardbidding       # Bidding rankings (aliases: !lbbidding, !lbb, !leadbid)
 !leaderboards             # Show both (aliases: !lb, !leaderboard)
 !weeklyreport             # Force weekly report - admin only (aliases: !weekly, !week)
+!monthlyreport            # Force monthly report - admin only (aliases: !monthly, !month)
+!activity [week]          # Guild activity heatmap (aliases: !heatmap, !guildactivity)
 ```
+
+**Activity Heatmap Features:**
+- 24-hour activity visualization using ASCII heatmap
+- Peak activity time identification
+- Optimal event scheduling recommendations
+- Use `!activity week` for weekly patterns
+- Helps schedule events when members are most active
 
 ### **🔄 Boss Rotation Commands** (Admin Only)
 
@@ -1017,6 +1035,9 @@ A: Verify webhook URL is correct and Apps Script is deployed. Check triggers are
 - ⚡ Up to 100x faster column lookups (local caching vs repeated queries)
 - ⚡ 4-5x faster thread cleanup (parallel batch processing)
 - ⚡ 2-3x faster spawn creation (concurrent API calls)
+- ⚡ Multi-level cache system (L1/L2/L3) - 30-50% API call reduction
+- ⚡ Request batching - prevents rate limiting, intelligent queue management
+- ⚡ Parallel sheet operations - 2-3x speedup on bulk operations
 - 📉 Memory usage reduced from 115MB to ~100MB
 - 📉 Google Sheets calls reduced by 25% (10min → 15min sync)
 
@@ -1024,7 +1045,8 @@ A: Verify webhook URL is correct and Apps Script is deployed. Check triggers are
 - 🤖 Statistical Intelligence Engine with predictive analytics
 - 🔔 Proactive monitoring system with automated alerts
 - 🧠 Pattern-learning NLP system with multi-language support
-- 📊 Advanced leaderboard system with weekly reports
+- 📊 Advanced leaderboard system with weekly and monthly reports
+- 📊 Activity heatmap - 24-hour visualization for optimal event scheduling
 - 🚨 Comprehensive emergency recovery toolkit
 - 💬 Natural language command parsing (English, Filipino, Tagalog)
 
