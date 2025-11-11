@@ -2547,10 +2547,16 @@ const commandHandlers = {
   },
 
   monthlyreport: async (message, member) => {
-    // Permission check is done in routing logic
-    console.log(`📅 ${member.user.username} manually triggered monthly report`);
-    await message.reply({ content: "📊 Generating monthly report...", failIfNotExists: false });
-    await leaderboardSystem.sendMonthlyReport();
+    try {
+      // Permission check is done in routing logic
+      console.log(`📅 ${member.user.username} manually triggered monthly report`);
+      await message.reply({ content: "📊 Generating monthly report...", failIfNotExists: false });
+      await leaderboardSystem.sendMonthlyReport();
+      console.log(`✅ Monthly report command completed successfully`);
+    } catch (error) {
+      console.error(`❌ Error in monthlyreport command:`, error);
+      await message.reply(`❌ Error generating monthly report: ${error.message}`).catch(() => {});
+    }
   },
 
   // ==========================================
@@ -2558,12 +2564,18 @@ const commandHandlers = {
   // ==========================================
 
   activity: async (message, member) => {
-    // Permission check is done in routing logic
-    const args = message.content.trim().split(/\s+/).slice(1);
-    const mode = args[0]?.toLowerCase();
+    try {
+      // Permission check is done in routing logic
+      const args = message.content.trim().split(/\s+/).slice(1);
+      const mode = args[0]?.toLowerCase();
 
-    console.log(`📊 ${member.user.username} requested activity heatmap${mode ? ` (${mode})` : ''}`);
-    await activityHeatmap.displayActivityHeatmap(message, mode);
+      console.log(`📊 ${member.user.username} requested activity heatmap${mode ? ` (${mode})` : ''}`);
+      await activityHeatmap.displayActivityHeatmap(message, mode);
+      console.log(`✅ Activity heatmap command completed successfully`);
+    } catch (error) {
+      console.error(`❌ Error in activity command:`, error);
+      await message.reply(`❌ Error generating activity heatmap: ${error.message}`).catch(() => {});
+    }
   },
 
   // =========================================================================
