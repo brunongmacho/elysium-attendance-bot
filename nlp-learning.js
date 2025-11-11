@@ -1589,7 +1589,7 @@ class NLPLearningSystem {
           // Force garbage collection if available (helps with memory pressure)
           if (global.gc) {
             global.gc();
-            console.log('🧹 [NLP Learning] Triggered GC after successful sync');
+            // Removed verbose GC logging
           }
 
           // Success - break out of retry loop

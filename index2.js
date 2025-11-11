@@ -4186,16 +4186,16 @@ client.once(Events.ClientReady, async () => {
       // Run garbage collection
       global.gc();
 
-      // Log memory stats (only if memory is high to reduce log spam)
-      if (memoryPressure > 70 || rssMB > 350) {
+      // Reduced logging spam - only log if memory is critically high
+      if (memoryPressure > 90 || rssMB > 400) {
         console.log(
           `🧹 GC: Heap ${heapUsedMB}MB/${heapTotalMB}MB (${Math.round(memoryPressure)}%) | RSS: ${rssMB}MB`
         );
       }
 
-      // Aggressive GC if memory pressure is high (>70%)
+      // Aggressive GC if memory pressure is high (>85%)
       // Only log warning once per hour to reduce spam
-      if (memoryPressure > 70) {
+      if (memoryPressure > 85) {
         const now = Date.now();
         const oneHour = 60 * 60 * 1000;
 

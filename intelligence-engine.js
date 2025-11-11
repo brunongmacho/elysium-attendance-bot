@@ -112,6 +112,9 @@ class IntelligenceEngine {
       ttl: 30 * 60 * 1000,        // 30-minute cache TTL
     };
 
+    // Per-boss prediction cache (prevents spam when checking rotation bosses every 5 min)
+    this.bossPredictionCache = new Map(); // Map<bossName, {prediction, timestamp, ttl}>
+
     // Boss spawn configuration (timer and schedule-based spawns)
     this.bossSpawnConfig = this.loadBossSpawnConfig();
 
@@ -191,6 +194,37 @@ class IntelligenceEngine {
     }
 
     return null;
+  }
+
+  /**
+   * Quick check if boss spawn is likely within a time window (uses cache, no API call)
+   * Used to avoid expensive predictions when boss is definitely far from spawning
+   * @param {string} bossName - Boss name
+   * @param {number} maxHoursAway - Max hours away to consider "soon" (default: 2 hours)
+   * @returns {boolean} True if spawn might be within window (or unknown), false if definitely far away
+   */
+  isSpawnLikelySoon(bossName, maxHoursAway = 2) {
+    try {
+      const cacheKey = bossName.toLowerCase();
+      const cached = this.bossPredictionCache.get(cacheKey);
+
+      // If we have a cached prediction, use it for quick check
+      if (cached && cached.prediction && cached.prediction.predictedTime) {
+        const now = new Date();
+        const predictedTime = new Date(cached.prediction.predictedTime);
+        const hoursUntilSpawn = (predictedTime - now) / (1000 * 60 * 60);
+
+        // If spawn is definitely far away (>maxHoursAway), return false
+        // Add 1 hour buffer for prediction variance
+        return hoursUntilSpawn <= (maxHoursAway + 1);
+      }
+
+      // No cached data - assume spawn might be soon (don't skip the check)
+      return true;
+    } catch (error) {
+      // On error, assume spawn might be soon (safer to check than skip)
+      return true;
+    }
   }
 
   /**
@@ -877,6 +911,18 @@ class IntelligenceEngine {
    */
   async predictNextSpawnTime(bossName = null) {
     try {
+      // Check per-boss cache first (if specific boss requested)
+      if (bossName) {
+        const cacheKey = bossName.toLowerCase();
+        const cached = this.bossPredictionCache.get(cacheKey);
+        const now = Date.now();
+
+        if (cached && (now - cached.timestamp) < cached.ttl) {
+          // Cache hit - return cached prediction without API call
+          return cached.prediction;
+        }
+      }
+
       // Fetch historical spawn data from attendance sheets
       const response = await this.sheetAPI.call('getAllWeeklyAttendance', {});
       const allSheets = response?.sheets || [];
@@ -914,7 +960,17 @@ class IntelligenceEngine {
 
       // If boss name specified, predict that specific boss
       if (bossName) {
-        return await this.predictSpecificBoss(spawnHistory, bossName);
+        const prediction = await this.predictSpecificBoss(spawnHistory, bossName);
+
+        // Cache the prediction (5-minute TTL for boss rotation checks)
+        const cacheKey = bossName.toLowerCase();
+        this.bossPredictionCache.set(cacheKey, {
+          prediction: prediction,
+          timestamp: Date.now(),
+          ttl: 5 * 60 * 1000, // 5 minutes (matches rotation check interval)
+        });
+
+        return prediction;
       }
 
       // NEW SMART LOGIC: Predict which boss spawns next
@@ -1111,7 +1167,7 @@ class IntelligenceEngine {
     let usingConfiguredTimer = false;
     if (bossSpawnType && bossSpawnType.type === 'timer') {
       const configuredInterval = bossSpawnType.config.spawnIntervalHours;
-      console.log(`[INTELLIGENCE] Boss "${bossName}" has configured timer: ${configuredInterval}h (historical: ${predictedInterval.toFixed(2)}h)`);
+      // Removed verbose logging - only log on errors or warnings
 
       // Blend configured interval with historical data for accuracy
       // If historical data is close to configured (within 15%), trust historical more
@@ -1121,11 +1177,9 @@ class IntelligenceEngine {
       if (percentDiff < 0.15) {
         // Historical data matches config well, use 70% historical, 30% config
         predictedInterval = (predictedInterval * 0.7) + (configuredInterval * 0.3);
-        console.log(`[INTELLIGENCE] Historical data matches config (${(percentDiff * 100).toFixed(1)}% diff), blended: ${predictedInterval.toFixed(2)}h`);
       } else {
         // Historical data differs significantly, trust config more (70% config, 30% historical)
         predictedInterval = (configuredInterval * 0.7) + (predictedInterval * 0.3);
-        console.log(`[INTELLIGENCE] Historical data differs (${(percentDiff * 100).toFixed(1)}% diff), using config-weighted: ${predictedInterval.toFixed(2)}h`);
       }
       usingConfiguredTimer = true;
     }
@@ -1149,7 +1203,7 @@ class IntelligenceEngine {
       const consistencyFactor = Math.max(0, 1 - (stdDev / medianInterval));
       const confidenceBoost = 15 * consistencyFactor;
       baseConfidence = Math.min(95, baseConfidence + confidenceBoost);
-      console.log(`[INTELLIGENCE] Confidence boosted by ${confidenceBoost.toFixed(1)} points for configured timer`);
+      // Removed verbose logging
     }
 
     // Adjust confidence based on time since last spawn (recency penalty)

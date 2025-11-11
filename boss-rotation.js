@@ -501,7 +501,13 @@ async function checkUpcomingSpawns() {
     // Check each rotating boss
     for (const bossName of ROTATING_BOSSES) {
       try {
-        // Get spawn prediction
+        // Quick check: Skip if spawn is definitely far away (>2 hours)
+        // This uses cached data and avoids expensive API calls for distant spawns
+        if (!intelligenceEngine.isSpawnLikelySoon(bossName, 2)) {
+          continue; // Boss is 24+ hours away, skip expensive prediction
+        }
+
+        // Get spawn prediction (uses cache if available)
         const prediction = await intelligenceEngine.predictNextSpawnTime(bossName);
 
         if (prediction.error) {
