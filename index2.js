@@ -1624,6 +1624,9 @@ const commandHandlers = {
               // Auto-increment boss rotation if it's a rotating boss
               await bossRotation.handleBossKill(spawnInfo.boss);
 
+              // Delete rotation warning message to avoid flooding
+              await bossRotation.deleteRotationWarning(spawnInfo.boss);
+
               await thread
                 .send(
                   `✅ Attendance submitted successfully! Archiving thread...`
@@ -1851,6 +1854,9 @@ const commandHandlers = {
         if (resp.ok) {
           // Auto-increment boss rotation if it's a rotating boss
           await bossRotation.handleBossKill(spawnInfo.boss);
+
+          // Delete rotation warning message to avoid flooding
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
 
           await message.channel.send(
             `✅ **Attendance submitted successfully!**\n\n` +
@@ -5124,6 +5130,9 @@ client.on(Events.MessageCreate, async (message) => {
           // Auto-increment boss rotation if it's a rotating boss
           await bossRotation.handleBossKill(spawnInfo.boss);
 
+          // Delete rotation warning message to avoid flooding
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+
           await message.channel.send(
             `✅ Attendance submitted successfully! (${spawnInfo.members.length} members)`
           );
@@ -5653,6 +5662,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
           // Auto-increment boss rotation if it's a rotating boss
           await bossRotation.handleBossKill(spawnInfo.boss);
 
+          // Delete rotation warning message to avoid flooding
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+
           await interaction.channel.send(`✅ Attendance submitted! Archiving...`);
 
           if (spawnInfo.confirmThreadId) {
@@ -5932,6 +5944,9 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         if (resp.ok) {
           // Auto-increment boss rotation if it's a rotating boss
           await bossRotation.handleBossKill(spawnInfo.boss);
+
+          // Delete rotation warning message to avoid flooding
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
 
           await msg.channel.send(`✅ Attendance submitted! Archiving...`);
 

@@ -251,6 +251,14 @@ async function forceCloseAllAttendance(message) {
         await thread.send(`${EMOJI.EMERGENCY} **EMERGENCY CLOSURE** by admin ${message.author.username}`);
         await attendance.cleanupAllThreadReactions(thread);
         await thread.setArchived(true, "Emergency closure by admin");
+
+        // Delete rotation warning if this was a rotating boss thread
+        const spawnInfo = activeSpawns[threadId];
+        if (spawnInfo && spawnInfo.boss) {
+          const bossRotation = require('./boss-rotation');
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+        }
+
         closedCount++;
       } catch (err) {
         console.error(`Failed to close thread ${threadId}:`, err.message);

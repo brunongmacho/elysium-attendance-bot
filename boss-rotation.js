@@ -63,6 +63,12 @@ const CACHE_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 let warnedSpawns = {};
 
 /**
+ * Track rotation warning messages for cleanup when thread closes
+ * Format: { "Amentis": { messageId: "123456", channelId: "789012" }, ... }
+ */
+let rotationWarningMessages = {};
+
+/**
  * Spawn warning monitoring timer
  */
 let spawnMonitorTimer = null;
@@ -409,12 +415,57 @@ async function sendRotationWarning(bossName, predictedSpawnTime) {
       )
       .setTimestamp();
 
-    await channel.send({ content: '@everyone', embeds: [embed] });
+    const sentMessage = await channel.send({ content: '@everyone', embeds: [embed] });
+
+    // Store message ID for cleanup when thread closes
+    rotationWarningMessages[bossName] = {
+      messageId: sentMessage.id,
+      channelId: channel.id
+    };
 
     console.log(`✅ Sent rotation warning for ${bossName} (our turn, spawning in ~15 mins)`);
 
   } catch (err) {
     console.error(`❌ Error sending rotation warning for ${bossName}:`, err.message);
+  }
+}
+
+/**
+ * Delete rotation warning message when thread closes (cleanup to avoid flooding)
+ * @param {string} bossName - Name of the boss whose warning should be deleted
+ */
+async function deleteRotationWarning(bossName) {
+  try {
+    // Check if this boss has a rotation warning message
+    if (!isRotatingBoss(bossName)) {
+      return; // Not a rotating boss, no warning to delete
+    }
+
+    const warningInfo = rotationWarningMessages[bossName];
+    if (!warningInfo) {
+      return; // No warning message stored for this boss
+    }
+
+    // Fetch and delete the message
+    try {
+      const channel = await client.channels.fetch(warningInfo.channelId);
+      if (channel) {
+        const message = await channel.messages.fetch(warningInfo.messageId);
+        if (message) {
+          await message.delete();
+          console.log(`🗑️ Deleted rotation warning for ${bossName} (thread closed)`);
+        }
+      }
+    } catch (err) {
+      // Message might already be deleted or not found
+      console.log(`⚠️ Could not delete rotation warning for ${bossName}: ${err.message}`);
+    }
+
+    // Remove from tracking
+    delete rotationWarningMessages[bossName];
+
+  } catch (err) {
+    console.error(`❌ Error deleting rotation warning for ${bossName}:`, err.message);
   }
 }
 
@@ -578,6 +629,7 @@ module.exports = {
   incrementRotation,
   setRotation,
   sendRotationWarning,
+  deleteRotationWarning,
   handleBossKill,
   isRotatingBoss,
   getRotatingBosses,
