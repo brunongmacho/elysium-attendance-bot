@@ -43,9 +43,10 @@ let client = null;
 let intelligenceEngine = null; // Reference to intelligence engine for spawn predictions
 
 /**
- * Rotating bosses that use the 5-guild system
+ * Rotating bosses list (dynamically loaded from Google Sheets)
+ * Updated on initialization and cache refresh
  */
-const ROTATING_BOSSES = ['Amentis', 'General Aquleus', 'Baron Braudmore'];
+let ROTATING_BOSSES = ['Amentis', 'General Aquleus', 'Baron Braudmore']; // Default fallback
 
 /**
  * In-memory cache of rotation status (refreshed from sheets periodically)
@@ -60,6 +61,12 @@ const CACHE_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
  * Format: { "Amentis-2025-01-15T10:30": true }
  */
 let warnedSpawns = {};
+
+/**
+ * Track rotation warning messages for cleanup when thread closes
+ * Format: { "Amentis": { messageId: "123456", channelId: "789012" }, ... }
+ */
+let rotationWarningMessages = {};
 
 /**
  * Spawn warning monitoring timer
@@ -119,6 +126,25 @@ async function ensureRotationSheetExists() {
     }
   } catch (err) {
     console.error('❌ Error ensuring BossRotation sheet:', err.message);
+  }
+}
+
+/**
+ * Fetches the list of all rotating bosses from Google Sheets
+ * Updates the ROTATING_BOSSES array dynamically
+ */
+async function fetchRotatingBosses() {
+  try {
+    const result = await sheetAPI.call('getAllRotatingBosses');
+
+    if (result.status === 'ok' && result.bosses && result.bosses.length > 0) {
+      ROTATING_BOSSES = result.bosses;
+      console.log(`✅ Loaded ${result.bosses.length} rotating bosses: ${result.bosses.join(', ')}`);
+    } else {
+      console.warn('⚠️ No rotating bosses found in sheet, using default list');
+    }
+  } catch (err) {
+    console.error('❌ Error fetching rotating bosses:', err.message);
   }
 }
 
@@ -184,6 +210,9 @@ async function getRotationStatus(bossName, useCache = true) {
 async function refreshRotationCache() {
   try {
     console.log('🔄 Refreshing rotation cache...');
+
+    // Fetch latest list of rotating bosses from sheet
+    await fetchRotatingBosses();
 
     for (const boss of ROTATING_BOSSES) {
       const rotation = await getRotationStatus(boss, false); // Force fetch from sheets
@@ -263,8 +292,8 @@ async function setRotation(bossName, newIndex) {
       return { success: false, message: `${bossName} is not a rotating boss` };
     }
 
-    if (newIndex < 1 || newIndex > 5) {
-      return { success: false, message: 'Index must be between 1 and 5' };
+    if (newIndex < 1) {
+      return { success: false, message: 'Index must be >= 1' };
     }
 
     console.log(`⚙️ Manually setting ${normalizedName} rotation to index ${newIndex}...`);
@@ -386,12 +415,57 @@ async function sendRotationWarning(bossName, predictedSpawnTime) {
       )
       .setTimestamp();
 
-    await channel.send({ content: '@everyone', embeds: [embed] });
+    const sentMessage = await channel.send({ content: '@everyone', embeds: [embed] });
+
+    // Store message ID for cleanup when thread closes
+    rotationWarningMessages[bossName] = {
+      messageId: sentMessage.id,
+      channelId: channel.id
+    };
 
     console.log(`✅ Sent rotation warning for ${bossName} (our turn, spawning in ~15 mins)`);
 
   } catch (err) {
     console.error(`❌ Error sending rotation warning for ${bossName}:`, err.message);
+  }
+}
+
+/**
+ * Delete rotation warning message when thread closes (cleanup to avoid flooding)
+ * @param {string} bossName - Name of the boss whose warning should be deleted
+ */
+async function deleteRotationWarning(bossName) {
+  try {
+    // Check if this boss has a rotation warning message
+    if (!isRotatingBoss(bossName)) {
+      return; // Not a rotating boss, no warning to delete
+    }
+
+    const warningInfo = rotationWarningMessages[bossName];
+    if (!warningInfo) {
+      return; // No warning message stored for this boss
+    }
+
+    // Fetch and delete the message
+    try {
+      const channel = await client.channels.fetch(warningInfo.channelId);
+      if (channel) {
+        const message = await channel.messages.fetch(warningInfo.messageId);
+        if (message) {
+          await message.delete();
+          console.log(`🗑️ Deleted rotation warning for ${bossName} (thread closed)`);
+        }
+      }
+    } catch (err) {
+      // Message might already be deleted or not found
+      console.log(`⚠️ Could not delete rotation warning for ${bossName}: ${err.message}`);
+    }
+
+    // Remove from tracking
+    delete rotationWarningMessages[bossName];
+
+  } catch (err) {
+    console.error(`❌ Error deleting rotation warning for ${bossName}:`, err.message);
   }
 }
 
@@ -555,6 +629,7 @@ module.exports = {
   incrementRotation,
   setRotation,
   sendRotationWarning,
+  deleteRotationWarning,
   handleBossKill,
   isRotatingBoss,
   getRotatingBosses,

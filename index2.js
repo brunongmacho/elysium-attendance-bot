@@ -90,6 +90,7 @@ const { NLPLearningSystem } = require('./nlp-learning.js'); // NLP Learning Syst
 const eventReminders = require('./event-reminders.js'); // Game Event Reminder System
 const bossRotation = require('./boss-rotation.js'); // Boss Rotation System (5-guild tracking)
 const activityHeatmap = require('./activity-heatmap.js'); // Activity Heatmap System
+const crashRecovery = require('./utils/crash-recovery.js'); // Crash Recovery System (state persistence)
 
 /**
  * Command alias mapping for shorthand commands.
@@ -1632,6 +1633,9 @@ const commandHandlers = {
               // Auto-increment boss rotation if it's a rotating boss
               await bossRotation.handleBossKill(spawnInfo.boss);
 
+              // Delete rotation warning message to avoid flooding
+              await bossRotation.deleteRotationWarning(spawnInfo.boss);
+
               await thread
                 .send(
                   `✅ Attendance submitted successfully! Archiving thread...`
@@ -1859,6 +1863,9 @@ const commandHandlers = {
         if (resp.ok) {
           // Auto-increment boss rotation if it's a rotating boss
           await bossRotation.handleBossKill(spawnInfo.boss);
+
+          // Delete rotation warning message to avoid flooding
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
 
           await message.channel.send(
             `✅ **Attendance submitted successfully!**\n\n` +
@@ -4167,6 +4174,8 @@ client.once(Events.ClientReady, async () => {
 
   // Register GC task (every 5 minutes)
   if (global.gc) {
+    let lastMemoryWarning = 0; // Track last memory warning to prevent log spam
+
     scheduler.registerTask('gc-management', async () => {
       const memUsage = process.memoryUsage();
       const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
@@ -4177,21 +4186,37 @@ client.once(Events.ClientReady, async () => {
       // Run garbage collection
       global.gc();
 
-      // Log memory stats
-      console.log(
-        `🧹 GC: Heap ${heapUsedMB}MB/${heapTotalMB}MB (${Math.round(memoryPressure)}%) | RSS: ${rssMB}MB`
-      );
+      // Log memory stats (only if memory is high to reduce log spam)
+      if (memoryPressure > 70 || rssMB > 350) {
+        console.log(
+          `🧹 GC: Heap ${heapUsedMB}MB/${heapTotalMB}MB (${Math.round(memoryPressure)}%) | RSS: ${rssMB}MB`
+        );
+      }
 
       // Aggressive GC if memory pressure is high (>70%)
+      // Only log warning once per hour to reduce spam
       if (memoryPressure > 70) {
-        console.warn(`⚠️ HIGH MEMORY PRESSURE (${Math.round(memoryPressure)}%) - Running aggressive GC`);
+        const now = Date.now();
+        const oneHour = 60 * 60 * 1000;
+
+        if (now - lastMemoryWarning > oneHour) {
+          console.warn(`⚠️ HIGH MEMORY PRESSURE (${Math.round(memoryPressure)}%) - Running aggressive GC`);
+          lastMemoryWarning = now;
+        }
+
         global.gc();
         global.gc(); // Second pass for aggressive collection
       }
 
-      // Alert if approaching Koyeb 512MB limit
+      // Alert if approaching Koyeb 512MB limit (rate limited to once per hour)
       if (rssMB > 400) {
-        console.error(`🚨 MEMORY ALERT: ${rssMB}MB RSS (Limit: 512MB) - Consider restarting`);
+        const now = Date.now();
+        const oneHour = 60 * 60 * 1000;
+
+        if (now - lastMemoryWarning > oneHour) {
+          console.error(`🚨 MEMORY ALERT: ${rssMB}MB RSS (Limit: 512MB) - Consider restarting`);
+          lastMemoryWarning = now;
+        }
       }
     }, 5 * 60 * 1000); // Every 5 minutes
   } else {
@@ -4203,7 +4228,22 @@ client.once(Events.ClientReady, async () => {
 
   // INITIALIZE EVENT REMINDER SYSTEM
   console.log("🎯 Initializing game event reminder system...");
-  await eventReminders.initializeEventReminders(client, config, sheetAPI);
+  await eventReminders.initializeEventReminders(client, config, sheetAPI, attendance);
+
+  // INITIALIZE CRASH RECOVERY SYSTEM
+  console.log("🔄 Initializing crash recovery system...");
+  await crashRecovery.initialize(client, config);
+
+  // Link crash recovery to other systems
+  leaderboardSystem.init(client, config, discordCache, crashRecovery);
+  scheduler.setCrashRecovery(crashRecovery);
+
+  // Check for missed weekly report
+  if (await crashRecovery.checkMissedWeeklyReport()) {
+    console.log("📊 Sending missed weekly report...");
+    await leaderboardSystem.sendWeeklyReport();
+    await crashRecovery.markWeeklyReportCompleted();
+  }
 
   console.log("✅ Bot initialization complete and ready for operations!");
 });
@@ -5044,6 +5084,16 @@ client.on(Events.MessageCreate, async (message) => {
               if (originalMsg)
                 await attendance.removeAllReactionsWithRetry(originalMsg);
 
+              // Remove/disable verification buttons from the bot's reply message
+              if (pending.verificationMsgId) {
+                const verificationMsg = await message.channel.messages
+                  .fetch(pending.verificationMsgId)
+                  .catch(() => null);
+                if (verificationMsg && verificationMsg.components.length > 0) {
+                  await verificationMsg.edit({ components: [] }).catch(() => {});
+                }
+              }
+
               delete pendingVerifications[msgId];
             }
 
@@ -5116,6 +5166,24 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         spawnInfo.members.push(username);
+
+        // Find and disable verification buttons for this user
+        const pendingInThread = Object.entries(pendingVerifications).filter(
+          ([msgId, p]) => p.threadId === message.channel.id && normalizeUsername(p.author) === normalizeUsername(username)
+        );
+
+        for (const [msgId, pending] of pendingInThread) {
+          if (pending.verificationMsgId) {
+            const verificationMsg = await message.channel.messages
+              .fetch(pending.verificationMsgId)
+              .catch(() => null);
+            if (verificationMsg && verificationMsg.components.length > 0) {
+              await verificationMsg.edit({ components: [] }).catch(() => {});
+            }
+          }
+          delete pendingVerifications[msgId];
+        }
+        attendance.setPendingVerifications(pendingVerifications);
 
         await message.reply(
           `✅ **${username}** manually verified by ${message.author.username}`
@@ -5242,6 +5310,9 @@ client.on(Events.MessageCreate, async (message) => {
         if (resp.ok) {
           // Auto-increment boss rotation if it's a rotating boss
           await bossRotation.handleBossKill(spawnInfo.boss);
+
+          // Delete rotation warning message to avoid flooding
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
 
           await message.channel.send(
             `✅ Attendance submitted successfully! (${spawnInfo.members.length} members)`
@@ -5772,6 +5843,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
           // Auto-increment boss rotation if it's a rotating boss
           await bossRotation.handleBossKill(spawnInfo.boss);
 
+          // Delete rotation warning message to avoid flooding
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+
           await interaction.channel.send(`✅ Attendance submitted! Archiving...`);
 
           if (spawnInfo.confirmThreadId) {
@@ -6051,6 +6125,9 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         if (resp.ok) {
           // Auto-increment boss rotation if it's a rotating boss
           await bossRotation.handleBossKill(spawnInfo.boss);
+
+          // Delete rotation warning message to avoid flooding
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
 
           await msg.channel.send(`✅ Attendance submitted! Archiving...`);
 

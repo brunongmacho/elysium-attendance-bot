@@ -205,11 +205,17 @@ function doPost(e) {
     if (action === 'saveEventReminders') return saveEventReminders(data);
     if (action === 'loadEventReminders') return loadEventReminders(data);
 
-    // Boss Rotation actions (5-guild rotation tracking)
+    // Boss Rotation actions (dynamic guild rotation tracking)
+    if (action === 'getAllRotatingBosses') return getAllRotatingBosses();
     if (action === 'getBossRotation') return getBossRotation(data);
     if (action === 'incrementBossRotation') return incrementBossRotation(data);
     if (action === 'setBossRotation') return setBossRotation(data);
     if (action === 'ensureBossRotationSheetExists') return ensureBossRotationSheetExists();
+
+    // Crash Recovery actions (system state persistence for crash recovery)
+    if (action === 'ensureRecoverySheet') return ensureRecoverySheet(data);
+    if (action === 'saveRecoveryState') return saveRecoveryState(data);
+    if (action === 'loadRecoveryState') return loadRecoveryState(data);
 
     Logger.log(`❌ Unknown: ${action}`);
     return createResponse('error', 'Unknown action: ' + action);
@@ -5603,6 +5609,46 @@ function ensureBossRotationSheetExists() {
 }
 
 /**
+ * Get list of all rotating bosses from the BossRotation sheet
+ * @returns {Object} Response with array of boss names
+ */
+function getAllRotatingBosses() {
+  try {
+    // Ensure sheet exists first
+    ensureBossRotationSheetExists();
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const sheet = ss.getSheetByName('BossRotation');
+
+    if (!sheet) {
+      return createResponse('error', 'BossRotation sheet not found');
+    }
+
+    const dataValues = sheet.getDataRange().getValues();
+    const bosses = [];
+
+    // Skip header row, read all boss names from column A
+    for (let i = 1; i < dataValues.length; i++) {
+      const bossName = dataValues[i][0]?.toString().trim();
+      if (bossName) {
+        bosses.push(bossName);
+      }
+    }
+
+    Logger.log(`✅ Found ${bosses.length} rotating bosses: ${bosses.join(', ')}`);
+
+    return createResponse('ok', 'Rotating bosses fetched', {
+      bosses: bosses,
+      count: bosses.length
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error getting rotating bosses: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
  * Get rotation status for a specific boss
  * @param {Object} data - Contains bossName
  * @returns {Object} Response with rotation data
@@ -5646,18 +5692,26 @@ function getBossRotation(data) {
     }
 
     const currentIndex = parseInt(bossRow[1]) || 1;
-    const guilds = [
-      bossRow[2] || 'Guild1',
-      bossRow[3] || 'Guild2',
-      bossRow[4] || 'Guild3',
-      bossRow[5] || 'Guild4',
-      bossRow[6] || 'Guild5'
-    ];
 
-    const currentGuild = guilds[currentIndex - 1];
+    // Dynamically read all guild columns (starting from column 3 onwards)
+    const guilds = [];
+    for (let i = 2; i < bossRow.length; i++) {
+      const guildName = bossRow[i]?.toString().trim();
+      if (guildName) {
+        guilds.push(guildName);
+      }
+    }
+
+    // If no guilds found, default to 5 guilds
+    if (guilds.length === 0) {
+      guilds.push('ELYSIUM', 'Guild2', 'Guild3', 'Guild4', 'Guild5');
+    }
+
+    const guildCount = guilds.length;
+    const currentGuild = guilds[currentIndex - 1] || guilds[0];
     const isOurTurn = (currentIndex === 1); // ELYSIUM is always Guild1
 
-    Logger.log(`✅ Rotation for ${bossName}: Index ${currentIndex} (${currentGuild}) - ${isOurTurn ? 'OUR TURN' : 'NOT OUR TURN'}`);
+    Logger.log(`✅ Rotation for ${bossName}: Index ${currentIndex} (${currentGuild}) - ${isOurTurn ? 'OUR TURN' : 'NOT OUR TURN'} [${guildCount} guilds]`);
 
     return createResponse('ok', 'Rotation status fetched', {
       isRotating: true,
@@ -5666,7 +5720,8 @@ function getBossRotation(data) {
       currentGuild: currentGuild,
       isOurTurn: isOurTurn,
       guilds: guilds,
-      nextGuild: guilds[currentIndex % 5] // Next guild after this kill
+      guildCount: guildCount,
+      nextGuild: guilds[currentIndex % guildCount] // Next guild after this kill (dynamic)
     });
 
   } catch (err) {
@@ -5715,25 +5770,34 @@ function incrementBossRotation(data) {
       return createResponse('ok', 'Boss not in rotation system', { updated: false });
     }
 
-    // Get current index and increment (1→2→3→4→5→1)
+    // Get current index
     const currentIndex = parseInt(dataValues[rowIndex - 1][1]) || 1;
-    const newIndex = (currentIndex % 5) + 1; // Loops: 1→2, 2→3, 3→4, 4→5, 5→1
+
+    // Dynamically read all guild columns
+    const guilds = [];
+    for (let i = 2; i < dataValues[rowIndex - 1].length; i++) {
+      const guildName = dataValues[rowIndex - 1][i]?.toString().trim();
+      if (guildName) {
+        guilds.push(guildName);
+      }
+    }
+
+    // If no guilds found, default to 5 guilds
+    if (guilds.length === 0) {
+      guilds.push('ELYSIUM', 'Guild2', 'Guild3', 'Guild4', 'Guild5');
+    }
+
+    const guildCount = guilds.length;
+    // Increment with dynamic guild count: 1→2→3...→N→1
+    const newIndex = (currentIndex % guildCount) + 1;
 
     // Update the sheet
     sheet.getRange(rowIndex, 2).setValue(newIndex);
 
-    const guilds = [
-      dataValues[rowIndex - 1][2],
-      dataValues[rowIndex - 1][3],
-      dataValues[rowIndex - 1][4],
-      dataValues[rowIndex - 1][5],
-      dataValues[rowIndex - 1][6]
-    ];
+    const oldGuild = guilds[currentIndex - 1] || guilds[0];
+    const newGuild = guilds[newIndex - 1] || guilds[0];
 
-    const oldGuild = guilds[currentIndex - 1];
-    const newGuild = guilds[newIndex - 1];
-
-    Logger.log(`✅ ${bossName} rotation: ${currentIndex} (${oldGuild}) → ${newIndex} (${newGuild})`);
+    Logger.log(`✅ ${bossName} rotation: ${currentIndex} (${oldGuild}) → ${newIndex} (${newGuild}) [${guildCount} guilds]`);
 
     return createResponse('ok', 'Rotation incremented', {
       bossName: bossName,
@@ -5741,6 +5805,7 @@ function incrementBossRotation(data) {
       newIndex: newIndex,
       oldGuild: oldGuild,
       newGuild: newGuild,
+      guildCount: guildCount,
       isNowOurTurn: (newIndex === 1)
     });
 
@@ -5760,8 +5825,8 @@ function setBossRotation(data) {
     const bossName = (data.bossName || '').toString().trim();
     const newIndex = parseInt(data.newIndex);
 
-    if (!bossName || !newIndex || newIndex < 1 || newIndex > 5) {
-      return createResponse('error', 'Invalid parameters (bossName required, newIndex must be 1-5)');
+    if (!bossName || !newIndex || newIndex < 1) {
+      return createResponse('error', 'Invalid parameters (bossName required, newIndex must be >= 1)');
     }
 
     // Ensure sheet exists first
@@ -5792,29 +5857,212 @@ function setBossRotation(data) {
 
     const currentIndex = parseInt(dataValues[rowIndex - 1][1]) || 1;
 
+    // Dynamically read all guild columns
+    const guilds = [];
+    for (let i = 2; i < dataValues[rowIndex - 1].length; i++) {
+      const guildName = dataValues[rowIndex - 1][i]?.toString().trim();
+      if (guildName) {
+        guilds.push(guildName);
+      }
+    }
+
+    // If no guilds found, default to 5 guilds
+    if (guilds.length === 0) {
+      guilds.push('ELYSIUM', 'Guild2', 'Guild3', 'Guild4', 'Guild5');
+    }
+
+    const guildCount = guilds.length;
+
+    // Validate newIndex against actual guild count
+    if (newIndex > guildCount) {
+      return createResponse('error', `Invalid index ${newIndex} (must be 1-${guildCount})`);
+    }
+
     // Update the sheet
     sheet.getRange(rowIndex, 2).setValue(newIndex);
 
-    const guilds = [
-      dataValues[rowIndex - 1][2],
-      dataValues[rowIndex - 1][3],
-      dataValues[rowIndex - 1][4],
-      dataValues[rowIndex - 1][5],
-      dataValues[rowIndex - 1][6]
-    ];
+    const currentGuild = guilds[newIndex - 1] || guilds[0];
 
-    Logger.log(`✅ ${bossName} rotation manually set: ${currentIndex} → ${newIndex} (${guilds[newIndex - 1]})`);
+    Logger.log(`✅ ${bossName} rotation manually set: ${currentIndex} → ${newIndex} (${currentGuild}) [${guildCount} guilds]`);
 
     return createResponse('ok', 'Rotation set successfully', {
       bossName: bossName,
       oldIndex: currentIndex,
       newIndex: newIndex,
-      currentGuild: guilds[newIndex - 1],
+      currentGuild: currentGuild,
+      guildCount: guildCount,
       isOurTurn: (newIndex === 1)
     });
 
   } catch (err) {
     Logger.log('❌ Error setting boss rotation: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+// ===========================================================
+// CRASH RECOVERY SYSTEM
+// ===========================================================
+
+/**
+ * Ensures the _RecoveryState sheet exists, creates if missing
+ * @param {Object} data - Request data
+ * @returns {Object} Response object
+ */
+function ensureRecoverySheet(data) {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    let sheet = ss.getSheetByName('_RecoveryState');
+
+    if (!sheet) {
+      Logger.log('📝 Creating _RecoveryState sheet...');
+
+      sheet = ss.insertSheet('_RecoveryState');
+
+      // Set up headers
+      const headers = ['Category', 'State JSON', 'Last Updated'];
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+      // Format headers
+      sheet.getRange(1, 1, 1, headers.length)
+        .setBackground('#4a86e8')
+        .setFontColor('#ffffff')
+        .setFontWeight('bold')
+        .setHorizontalAlignment('center');
+
+      // Set column widths
+      sheet.setColumnWidth(1, 150); // Category
+      sheet.setColumnWidth(2, 600); // State JSON
+      sheet.setColumnWidth(3, 180); // Last Updated
+
+      // Add initial categories
+      const categories = [
+        ['auction', '{}', Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'MM/dd/yyyy HH:mm:ss')],
+        ['leaderboard', '{}', Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'MM/dd/yyyy HH:mm:ss')],
+        ['scheduler', '{}', Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'MM/dd/yyyy HH:mm:ss')]
+      ];
+
+      sheet.getRange(2, 1, categories.length, 3).setValues(categories);
+
+      Logger.log('✅ _RecoveryState sheet created successfully');
+
+      return createResponse('ok', 'Recovery sheet created', { created: true });
+    }
+
+    Logger.log('✅ _RecoveryState sheet already exists');
+    return createResponse('ok', 'Recovery sheet exists', { exists: true });
+
+  } catch (err) {
+    Logger.log('❌ Error ensuring recovery sheet: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Save recovery state to _RecoveryState sheet
+ * @param {Object} data - {category: string, state: Object}
+ * @returns {Object} Response object
+ */
+function saveRecoveryState(data) {
+  try {
+    const category = data.category || '';
+    const state = data.state || {};
+
+    if (!category) {
+      return createResponse('error', 'Missing category parameter');
+    }
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    let sheet = ss.getSheetByName('_RecoveryState');
+
+    if (!sheet) {
+      // Create sheet if it doesn't exist
+      const createResult = ensureRecoverySheet({});
+      if (createResult.status !== 'ok') {
+        return createResult;
+      }
+      sheet = ss.getSheetByName('_RecoveryState');
+    }
+
+    // Find category row
+    const dataRange = sheet.getDataRange();
+    const dataValues = dataRange.getValues();
+
+    let rowIndex = -1;
+    for (let i = 1; i < dataValues.length; i++) {
+      if (dataValues[i][0] === category) {
+        rowIndex = i + 1; // +1 for 1-indexed
+        break;
+      }
+    }
+
+    const stateJSON = JSON.stringify(state);
+    const timestamp = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'MM/dd/yyyy HH:mm:ss');
+
+    if (rowIndex > 0) {
+      // Update existing row
+      sheet.getRange(rowIndex, 2).setValue(stateJSON);
+      sheet.getRange(rowIndex, 3).setValue(timestamp);
+    } else {
+      // Add new row
+      sheet.appendRow([category, stateJSON, timestamp]);
+    }
+
+    Logger.log(`✅ Recovery state saved: ${category}`);
+
+    return createResponse('ok', 'Recovery state saved', {
+      category: category,
+      timestamp: timestamp
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error saving recovery state: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Load recovery state from _RecoveryState sheet
+ * @param {Object} data - Request data (optional category filter)
+ * @returns {Object} Response object with state data
+ */
+function loadRecoveryState(data) {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const sheet = ss.getSheetByName('_RecoveryState');
+
+    if (!sheet) {
+      Logger.log('ℹ️ _RecoveryState sheet does not exist');
+      return createResponse('ok', 'No recovery state found', { state: {} });
+    }
+
+    const dataRange = sheet.getDataRange();
+    const dataValues = dataRange.getValues();
+
+    const state = {};
+
+    // Start from row 2 (skip headers)
+    for (let i = 1; i < dataValues.length; i++) {
+      const category = dataValues[i][0];
+      const stateJSON = dataValues[i][1];
+      const timestamp = dataValues[i][2];
+
+      if (category && stateJSON) {
+        try {
+          state[category] = JSON.parse(stateJSON);
+        } catch (parseErr) {
+          Logger.log(`⚠️ Failed to parse state for ${category}: ${parseErr.toString()}`);
+          state[category] = {};
+        }
+      }
+    }
+
+    Logger.log(`✅ Recovery state loaded (${Object.keys(state).length} categories)`);
+
+    return createResponse('ok', 'Recovery state loaded', { state: state });
+
+  } catch (err) {
+    Logger.log('❌ Error loading recovery state: ' + err.toString());
     return createResponse('error', err.toString());
   }
 }
