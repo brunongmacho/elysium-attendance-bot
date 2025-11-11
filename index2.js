@@ -89,6 +89,7 @@ const { NLPHandler } = require('./nlp-handler.js'); // Natural Language Processi
 const { NLPLearningSystem } = require('./nlp-learning.js'); // NLP Learning System (self-improving)
 const eventReminders = require('./event-reminders.js'); // Game Event Reminder System
 const bossRotation = require('./boss-rotation.js'); // Boss Rotation System (5-guild tracking)
+const crashRecovery = require('./utils/crash-recovery.js'); // Crash Recovery System (state persistence)
 
 /**
  * Command alias mapping for shorthand commands.
@@ -4187,6 +4188,21 @@ client.once(Events.ClientReady, async () => {
   // INITIALIZE EVENT REMINDER SYSTEM
   console.log("🎯 Initializing game event reminder system...");
   await eventReminders.initializeEventReminders(client, config, sheetAPI, attendance);
+
+  // INITIALIZE CRASH RECOVERY SYSTEM
+  console.log("🔄 Initializing crash recovery system...");
+  await crashRecovery.initialize(client, config);
+
+  // Link crash recovery to other systems
+  leaderboardSystem.init(client, config, discordCache, crashRecovery);
+  scheduler.setCrashRecovery(crashRecovery);
+
+  // Check for missed weekly report
+  if (await crashRecovery.checkMissedWeeklyReport()) {
+    console.log("📊 Sending missed weekly report...");
+    await leaderboardSystem.sendWeeklyReport();
+    await crashRecovery.markWeeklyReportCompleted();
+  }
 
   console.log("✅ Bot initialization complete and ready for operations!");
 });

@@ -21,6 +21,7 @@
 
 const tasks = new Map();
 const taskHistory = new Map();
+let crashRecovery = null; // Crash recovery module reference
 
 /**
  * Register a periodic task
@@ -72,6 +73,13 @@ async function executeTask(name) {
     await task.fn();
     task.lastRun = Date.now();
     task.errorCount = 0; // Reset on success
+
+    // Save task execution to crash recovery
+    if (crashRecovery) {
+      crashRecovery.saveSchedulerTaskExecution(name, task.lastRun).catch(err => {
+        console.error(`⚠️ [SCHEDULER] Failed to save task execution to crash recovery:`, err.message);
+      });
+    }
   } catch (error) {
     task.errorCount++;
     console.error(`❌ [SCHEDULER] Task ${name} failed (errors: ${task.errorCount}):`, error.message);
@@ -108,6 +116,15 @@ function schedulerTick() {
 
 let schedulerTimer = null;
 const TICK_INTERVAL = 30000; // 30 seconds
+
+/**
+ * Set crash recovery module reference
+ * @param {Object} crashRecoveryModule - Crash recovery module
+ */
+function setCrashRecovery(crashRecoveryModule) {
+  crashRecovery = crashRecoveryModule;
+  console.log('✅ [SCHEDULER] Crash recovery linked to maintenance scheduler');
+}
 
 /**
  * Start the unified scheduler
@@ -176,4 +193,5 @@ module.exports = {
   stopScheduler,
   getStats,
   executeTask, // For manual execution
+  setCrashRecovery, // Set crash recovery module reference
 };

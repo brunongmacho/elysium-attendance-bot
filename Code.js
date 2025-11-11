@@ -212,6 +212,11 @@ function doPost(e) {
     if (action === 'setBossRotation') return setBossRotation(data);
     if (action === 'ensureBossRotationSheetExists') return ensureBossRotationSheetExists();
 
+    // Crash Recovery actions (system state persistence for crash recovery)
+    if (action === 'ensureRecoverySheet') return ensureRecoverySheet(data);
+    if (action === 'saveRecoveryState') return saveRecoveryState(data);
+    if (action === 'loadRecoveryState') return loadRecoveryState(data);
+
     Logger.log(`❌ Unknown: ${action}`);
     return createResponse('error', 'Unknown action: ' + action);
 
@@ -5891,6 +5896,173 @@ function setBossRotation(data) {
 
   } catch (err) {
     Logger.log('❌ Error setting boss rotation: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+// ===========================================================
+// CRASH RECOVERY SYSTEM
+// ===========================================================
+
+/**
+ * Ensures the _RecoveryState sheet exists, creates if missing
+ * @param {Object} data - Request data
+ * @returns {Object} Response object
+ */
+function ensureRecoverySheet(data) {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    let sheet = ss.getSheetByName('_RecoveryState');
+
+    if (!sheet) {
+      Logger.log('📝 Creating _RecoveryState sheet...');
+
+      sheet = ss.insertSheet('_RecoveryState');
+
+      // Set up headers
+      const headers = ['Category', 'State JSON', 'Last Updated'];
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+      // Format headers
+      sheet.getRange(1, 1, 1, headers.length)
+        .setBackground('#4a86e8')
+        .setFontColor('#ffffff')
+        .setFontWeight('bold')
+        .setHorizontalAlignment('center');
+
+      // Set column widths
+      sheet.setColumnWidth(1, 150); // Category
+      sheet.setColumnWidth(2, 600); // State JSON
+      sheet.setColumnWidth(3, 180); // Last Updated
+
+      // Add initial categories
+      const categories = [
+        ['auction', '{}', Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'MM/dd/yyyy HH:mm:ss')],
+        ['leaderboard', '{}', Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'MM/dd/yyyy HH:mm:ss')],
+        ['scheduler', '{}', Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'MM/dd/yyyy HH:mm:ss')]
+      ];
+
+      sheet.getRange(2, 1, categories.length, 3).setValues(categories);
+
+      Logger.log('✅ _RecoveryState sheet created successfully');
+
+      return createResponse('ok', 'Recovery sheet created', { created: true });
+    }
+
+    Logger.log('✅ _RecoveryState sheet already exists');
+    return createResponse('ok', 'Recovery sheet exists', { exists: true });
+
+  } catch (err) {
+    Logger.log('❌ Error ensuring recovery sheet: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Save recovery state to _RecoveryState sheet
+ * @param {Object} data - {category: string, state: Object}
+ * @returns {Object} Response object
+ */
+function saveRecoveryState(data) {
+  try {
+    const category = data.category || '';
+    const state = data.state || {};
+
+    if (!category) {
+      return createResponse('error', 'Missing category parameter');
+    }
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    let sheet = ss.getSheetByName('_RecoveryState');
+
+    if (!sheet) {
+      // Create sheet if it doesn't exist
+      const createResult = ensureRecoverySheet({});
+      if (createResult.status !== 'ok') {
+        return createResult;
+      }
+      sheet = ss.getSheetByName('_RecoveryState');
+    }
+
+    // Find category row
+    const dataRange = sheet.getDataRange();
+    const dataValues = dataRange.getValues();
+
+    let rowIndex = -1;
+    for (let i = 1; i < dataValues.length; i++) {
+      if (dataValues[i][0] === category) {
+        rowIndex = i + 1; // +1 for 1-indexed
+        break;
+      }
+    }
+
+    const stateJSON = JSON.stringify(state);
+    const timestamp = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'MM/dd/yyyy HH:mm:ss');
+
+    if (rowIndex > 0) {
+      // Update existing row
+      sheet.getRange(rowIndex, 2).setValue(stateJSON);
+      sheet.getRange(rowIndex, 3).setValue(timestamp);
+    } else {
+      // Add new row
+      sheet.appendRow([category, stateJSON, timestamp]);
+    }
+
+    Logger.log(`✅ Recovery state saved: ${category}`);
+
+    return createResponse('ok', 'Recovery state saved', {
+      category: category,
+      timestamp: timestamp
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error saving recovery state: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Load recovery state from _RecoveryState sheet
+ * @param {Object} data - Request data (optional category filter)
+ * @returns {Object} Response object with state data
+ */
+function loadRecoveryState(data) {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const sheet = ss.getSheetByName('_RecoveryState');
+
+    if (!sheet) {
+      Logger.log('ℹ️ _RecoveryState sheet does not exist');
+      return createResponse('ok', 'No recovery state found', { state: {} });
+    }
+
+    const dataRange = sheet.getDataRange();
+    const dataValues = dataRange.getValues();
+
+    const state = {};
+
+    // Start from row 2 (skip headers)
+    for (let i = 1; i < dataValues.length; i++) {
+      const category = dataValues[i][0];
+      const stateJSON = dataValues[i][1];
+      const timestamp = dataValues[i][2];
+
+      if (category && stateJSON) {
+        try {
+          state[category] = JSON.parse(stateJSON);
+        } catch (parseErr) {
+          Logger.log(`⚠️ Failed to parse state for ${category}: ${parseErr.toString()}`);
+          state[category] = {};
+        }
+      }
+    }
+
+    Logger.log(`✅ Recovery state loaded (${Object.keys(state).length} categories)`);
+
+    return createResponse('ok', 'Recovery state loaded', { state: state });
+
+  } catch (err) {
+    Logger.log('❌ Error loading recovery state: ' + err.toString());
     return createResponse('error', err.toString());
   }
 }
