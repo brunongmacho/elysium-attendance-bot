@@ -5517,6 +5517,22 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
+    // =========================================================================
+    // MEMBER COMMANDS IN ELYSIUM COMMANDS CHANNEL (Guild Chat)
+    // =========================================================================
+    // Fun commands available to all members in guild chat
+    if (inElysiumCommandsChannel) {
+      const memberCmd = resolveCommandAlias(rawCmd);
+      const args = message.content.trim().split(/\s+/).slice(1);
+
+      // !8ball command - Magic 8-Ball predictions
+      if (memberCmd === "!eightball") {
+        console.log(`🎱 8ball command detected in guild chat by ${member.user.username}`);
+        await commandHandlers.eightball(message, member, args);
+        return;
+      }
+    }
+
     // Admin-only commands in admin logs
     if (!userIsAdmin) return;
 
