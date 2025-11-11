@@ -64,6 +64,17 @@ const GAME_EVENTS = {
     description: '**GUILD WAR** is starting soon! Get ready!',
     reminderOffsetMinutes: 20, // Remind 20 min before (gives players time to prepare)
   },
+  gvg: {
+    name: '⚔️ GvG (Guild vs Guild)',
+    days: [5, 6, 0], // Friday, Saturday, Sunday (same as Guild War)
+    startTime: { hour: 12, minute: 25 }, // Actual event time
+    durationMinutes: 3, // GvG duration (12:25 - 12:28)
+    color: 0xf39c12, // Orange
+    description: '**GvG (Guild vs Guild)** is starting soon! Get ready to attend!',
+    reminderOffsetMinutes: 20, // Remind 20 min before (12:05)
+    createAttendanceThread: true, // Special flag to create attendance thread
+    attendanceAutoCloseMinutes: 20, // Auto-close thread 20 min after event starts (12:45)
+  },
 };
 
 /**
@@ -127,6 +138,7 @@ let queueReminderTimers = {};
 let client = null;
 let config = null;
 let sheetAPI = null;
+let attendance = null; // For creating GvG attendance threads
 
 // ============================================================================
 // SCHEDULING HELPERS
@@ -238,6 +250,166 @@ function formatGMT8(date) {
 // ============================================================================
 
 /**
+ * Create GvG attendance thread when GvG reminder is sent
+ * @param {Object} event - GvG event configuration
+ * @param {Date} eventTime - GvG start time
+ * @param {Message} reminderMessage - The reminder message that was sent
+ * @returns {Promise<void>}
+ */
+async function createGvGAttendanceThread(event, eventTime, reminderMessage) {
+  try {
+    console.log(`🎯 [GVG] Creating attendance thread for ${event.name}`);
+
+    // Get attendance channel
+    const attChannel = await client.channels.fetch(config.attendance_channel_id);
+    if (!attChannel) {
+      console.error(`❌ [GVG] Attendance channel not found`);
+      return;
+    }
+
+    // Format timestamp for thread name (GMT+8)
+    const gmt8Time = new Date(eventTime.getTime() + TIMEZONE_OFFSET);
+    const month = String(gmt8Time.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(gmt8Time.getUTCDate()).padStart(2, '0');
+    const hours = String(gmt8Time.getUTCHours()).padStart(2, '0');
+    const minutes = String(gmt8Time.getUTCMinutes()).padStart(2, '0');
+    const timestamp = `${month}-${day} ${hours}:${minutes}`;
+
+    // Create thread
+    const thread = await attChannel.threads.create({
+      name: `GvG ${timestamp}`,
+      autoArchiveDuration: 60,
+      reason: 'GvG attendance thread (auto-created by event reminder)'
+    });
+
+    console.log(`✅ [GVG] Created thread: GvG ${timestamp} (${thread.id})`);
+
+    // Send initial message in thread
+    const embed = new EmbedBuilder()
+      .setColor(event.color)
+      .setTitle(`📋 GvG Attendance - ${timestamp}`)
+      .setDescription(
+        `**Guild vs Guild attendance tracking**\n\n` +
+        `⏰ **Event Time:** <t:${Math.floor(eventTime.getTime() / 1000)}:F>\n` +
+        `📸 **Post your attendance screenshot** to be verified\n` +
+        `✅ **Admins will verify** your attendance\n` +
+        `🎁 **Points:** 10 bidding points per attendance\n\n` +
+        `⏱️ **Thread auto-closes:** <t:${Math.floor((eventTime.getTime() + event.attendanceAutoCloseMinutes * 60 * 1000) / 1000)}:R>`
+      )
+      .setTimestamp();
+
+    await thread.send({ embeds: [embed] });
+
+    // Register the spawn with attendance system
+    const spawnInfo = {
+      boss: 'GvG', // Use 'GvG' as the "boss" name for attendance tracking
+      date: `${gmt8Time.getUTCFullYear()}-${month}-${day}`,
+      time: `${hours}:${minutes}`,
+      timestamp: timestamp,
+      members: [],
+      closed: false,
+      createdAt: Date.now(),
+      confirmThreadId: null // GvG doesn't need confirmation thread
+    };
+
+    const activeSpawns = attendance.getActiveSpawns();
+    activeSpawns[thread.id] = spawnInfo;
+    attendance.setActiveSpawns(activeSpawns);
+
+    // Save state
+    await attendance.saveAttendanceStateToSheet(false);
+
+    // Schedule auto-close (20 min after event starts = 12:45)
+    const autoCloseDelay = event.attendanceAutoCloseMinutes * 60 * 1000;
+    setTimeout(async () => {
+      await autoCloseGvGThread(thread.id);
+    }, autoCloseDelay);
+
+    console.log(`⏱️ [GVG] Thread will auto-close in ${event.attendanceAutoCloseMinutes} minutes`);
+
+  } catch (error) {
+    console.error(`❌ [GVG] Failed to create attendance thread:`, error.message);
+  }
+}
+
+/**
+ * Auto-close GvG attendance thread and submit to sheets
+ * @param {string} threadId - Thread ID
+ * @returns {Promise<void>}
+ */
+async function autoCloseGvGThread(threadId) {
+  try {
+    const activeSpawns = attendance.getActiveSpawns();
+    const spawnInfo = activeSpawns[threadId];
+
+    if (!spawnInfo || spawnInfo.closed) {
+      console.log(`⚠️ [GVG] Thread ${threadId} already closed or not found`);
+      return;
+    }
+
+    console.log(`⏰ [GVG] Auto-closing thread ${threadId}...`);
+
+    const thread = await client.channels.fetch(threadId);
+    if (!thread) {
+      console.error(`❌ [GVG] Thread ${threadId} not found`);
+      return;
+    }
+
+    // Mark as closed
+    spawnInfo.closed = true;
+    attendance.setActiveSpawns(activeSpawns);
+
+    // Send closing message
+    await thread.send(`⏰ **Auto-closing GvG attendance thread**\nSubmitting ${spawnInfo.members.length} members to Google Sheets...`);
+
+    // Submit to Google Sheets
+    if (spawnInfo.members.length > 0) {
+      const payload = {
+        action: 'submitAttendance',
+        boss: 'GvG',
+        date: spawnInfo.date,
+        time: spawnInfo.time,
+        timestamp: spawnInfo.timestamp,
+        members: spawnInfo.members
+      };
+
+      const resp = await attendance.postToSheet(payload);
+
+      if (resp.ok) {
+        await thread.send(`✅ Attendance submitted successfully! (${spawnInfo.members.length} members)\nArchiving thread...`);
+        console.log(`✅ [GVG] Submitted ${spawnInfo.members.length} members`);
+      } else {
+        await thread.send(`⚠️ Failed to submit attendance: ${resp.text || resp.err}\n\n**Members list (for manual entry):**\n${spawnInfo.members.join(', ')}`);
+        console.error(`❌ [GVG] Failed to submit attendance:`, resp.text || resp.err);
+      }
+    } else {
+      await thread.send(`⚠️ Thread closed with no verified members. No data submitted.`);
+      console.log(`⚠️ [GVG] No members to submit`);
+    }
+
+    // Clean up reactions
+    await attendance.cleanupAllThreadReactions(thread);
+
+    // Archive thread
+    await thread.setArchived(true, 'GvG attendance auto-close');
+
+    // Clean up state
+    delete activeSpawns[threadId];
+    const activeColumns = attendance.getActiveColumns();
+    delete activeColumns[`GvG|${spawnInfo.timestamp}`];
+    attendance.setActiveColumns(activeColumns);
+
+    // Save state
+    await attendance.saveAttendanceStateToSheet(false);
+
+    console.log(`✅ [GVG] Thread ${threadId} closed and archived`);
+
+  } catch (error) {
+    console.error(`❌ [GVG] Error auto-closing thread:`, error.message);
+  }
+}
+
+/**
  * Send event reminder to guild chat
  * @param {Object} event - Event configuration
  * @param {Date} eventTime - Event start time (UTC)
@@ -305,6 +477,11 @@ async function sendEventReminder(event, eventTime) {
     // Schedule deletion
     const deleteDelay = deleteAt - now.getTime();
     setTimeout(() => deleteEventReminder(message.id), deleteDelay);
+
+    // Create attendance thread if event requires it (GvG)
+    if (event.createAttendanceThread && attendance) {
+      await createGvGAttendanceThread(event, eventTime, message);
+    }
 
   } catch (error) {
     console.error(`❌ [EVENT REMINDER] Failed to send reminder for ${event.name}:`, error.message);
@@ -765,10 +942,11 @@ async function loadActiveReminders() {
  * @param {SheetAPI} sheetAPIInstance - Google Sheets API instance
  * @returns {Promise<void>}
  */
-async function initializeEventReminders(discordClient, botConfig, sheetAPIInstance) {
+async function initializeEventReminders(discordClient, botConfig, sheetAPIInstance, attendanceModule = null) {
   client = discordClient;
   config = botConfig;
   sheetAPI = sheetAPIInstance;
+  attendance = attendanceModule; // For GvG attendance threads
 
   console.log('🎯 [EVENT REMINDER] Initializing game event reminder system...');
 

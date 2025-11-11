@@ -1624,6 +1624,9 @@ const commandHandlers = {
               // Auto-increment boss rotation if it's a rotating boss
               await bossRotation.handleBossKill(spawnInfo.boss);
 
+              // Delete rotation warning message to avoid flooding
+              await bossRotation.deleteRotationWarning(spawnInfo.boss);
+
               await thread
                 .send(
                   `✅ Attendance submitted successfully! Archiving thread...`
@@ -1851,6 +1854,9 @@ const commandHandlers = {
         if (resp.ok) {
           // Auto-increment boss rotation if it's a rotating boss
           await bossRotation.handleBossKill(spawnInfo.boss);
+
+          // Delete rotation warning message to avoid flooding
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
 
           await message.channel.send(
             `✅ **Attendance submitted successfully!**\n\n` +
@@ -4162,7 +4168,7 @@ client.once(Events.ClientReady, async () => {
 
   // INITIALIZE EVENT REMINDER SYSTEM
   console.log("🎯 Initializing game event reminder system...");
-  await eventReminders.initializeEventReminders(client, config, sheetAPI);
+  await eventReminders.initializeEventReminders(client, config, sheetAPI, attendance);
 
   console.log("✅ Bot initialization complete and ready for operations!");
 });
@@ -4993,6 +4999,16 @@ client.on(Events.MessageCreate, async (message) => {
               if (originalMsg)
                 await attendance.removeAllReactionsWithRetry(originalMsg);
 
+              // Remove/disable verification buttons from the bot's reply message
+              if (pending.verificationMsgId) {
+                const verificationMsg = await message.channel.messages
+                  .fetch(pending.verificationMsgId)
+                  .catch(() => null);
+                if (verificationMsg && verificationMsg.components.length > 0) {
+                  await verificationMsg.edit({ components: [] }).catch(() => {});
+                }
+              }
+
               delete pendingVerifications[msgId];
             }
 
@@ -5065,6 +5081,24 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         spawnInfo.members.push(username);
+
+        // Find and disable verification buttons for this user
+        const pendingInThread = Object.entries(pendingVerifications).filter(
+          ([msgId, p]) => p.threadId === message.channel.id && normalizeUsername(p.author) === normalizeUsername(username)
+        );
+
+        for (const [msgId, pending] of pendingInThread) {
+          if (pending.verificationMsgId) {
+            const verificationMsg = await message.channel.messages
+              .fetch(pending.verificationMsgId)
+              .catch(() => null);
+            if (verificationMsg && verificationMsg.components.length > 0) {
+              await verificationMsg.edit({ components: [] }).catch(() => {});
+            }
+          }
+          delete pendingVerifications[msgId];
+        }
+        attendance.setPendingVerifications(pendingVerifications);
 
         await message.reply(
           `✅ **${username}** manually verified by ${message.author.username}`
@@ -5191,6 +5225,9 @@ client.on(Events.MessageCreate, async (message) => {
         if (resp.ok) {
           // Auto-increment boss rotation if it's a rotating boss
           await bossRotation.handleBossKill(spawnInfo.boss);
+
+          // Delete rotation warning message to avoid flooding
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
 
           await message.channel.send(
             `✅ Attendance submitted successfully! (${spawnInfo.members.length} members)`
@@ -5721,6 +5758,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
           // Auto-increment boss rotation if it's a rotating boss
           await bossRotation.handleBossKill(spawnInfo.boss);
 
+          // Delete rotation warning message to avoid flooding
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+
           await interaction.channel.send(`✅ Attendance submitted! Archiving...`);
 
           if (spawnInfo.confirmThreadId) {
@@ -6000,6 +6040,9 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         if (resp.ok) {
           // Auto-increment boss rotation if it's a rotating boss
           await bossRotation.handleBossKill(spawnInfo.boss);
+
+          // Delete rotation warning message to avoid flooding
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
 
           await msg.channel.send(`✅ Attendance submitted! Archiving...`);
 
