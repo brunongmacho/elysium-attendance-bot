@@ -993,6 +993,14 @@ async function sendMonthlyReport() {
       fetchBiddingLeaderboard()
     ]);
 
+    // DEBUG: Log the bidding data structure
+    console.log('📊 Bidding data structure:', JSON.stringify({
+      totalPointsDistributed: biddingData.totalPointsDistributed,
+      totalPointsConsumed: biddingData.totalPointsConsumed,
+      leaderboardCount: biddingData.leaderboard?.length,
+      sampleMember: biddingData.leaderboard?.[0]
+    }, null, 2));
+
     // Get current month info (GMT+8)
     const now = new Date();
     const gmt8Time = new Date(now.getTime() + (8 * 60 * 60 * 1000));
@@ -1102,6 +1110,7 @@ async function sendMonthlyReport() {
     }
 
     if (guildAnnouncementChannel) {
+      console.log(`🔍 Guild announcement channel type: ${guildAnnouncementChannel.type}, isTextBased: ${guildAnnouncementChannel.isTextBased()}`);
       sendPromises.push(
         guildAnnouncementChannel.send({ embeds: [embed] })
           .then((msg) => {
@@ -1110,9 +1119,18 @@ async function sendMonthlyReport() {
           })
           .catch((err) => {
             console.error('❌ Error sending to guild announcement:', err);
+            console.error('❌ Error details:', {
+              message: err.message,
+              code: err.code,
+              httpStatus: err.httpStatus,
+              channelId: guildAnnouncementChannel.id,
+              channelName: guildAnnouncementChannel.name
+            });
             return { channel: 'guild-announcement', success: false, error: err.message };
           })
       );
+    } else {
+      console.warn('⚠️ Guild announcement channel is null/undefined');
     }
 
     const results = await Promise.all(sendPromises);
