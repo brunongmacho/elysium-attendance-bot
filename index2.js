@@ -3829,6 +3829,11 @@ client.once(Events.ClientReady, async () => {
   discordCache = new DiscordCache(client, config);
   console.log('✅ Discord channel cache initialized');
 
+  // INITIALIZE MULTI-LEVEL CACHE CLEANUP
+  const cacheManager = require('./utils/cache-manager');
+  cacheManager.startCacheCleanup();
+  console.log('✅ Multi-level cache cleanup scheduler started');
+
   // INITIALIZE AUCTION CACHE (100% uptime guarantee)
   const auctionCache = require('./utils/auction-cache');
   await auctionCache.init();
