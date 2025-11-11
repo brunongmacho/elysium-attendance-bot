@@ -56,6 +56,7 @@ let config = null;  // Bot configuration from config.json
 let client = null;  // Discord.js client instance
 let sheetAPI = null;  // Unified Google Sheets API client
 let discordCache = null;  // Discord channel cache
+let crashRecovery = null;  // Crash recovery system
 
 // ============================================================================
 // INITIALIZATION
@@ -68,15 +69,18 @@ let discordCache = null;  // Discord channel cache
  *
  * @param {Client} discordClient - Discord.js client instance
  * @param {Object} botConfig - Bot configuration object from config.json
+ * @param {Object} cache - Discord cache instance
+ * @param {Object} crashRecoveryModule - Crash recovery module (optional)
  *
  * @example
- * init(client, config);
+ * init(client, config, cache, crashRecovery);
  */
-function init(discordClient, botConfig, cache = null) {
+function init(discordClient, botConfig, cache = null, crashRecoveryModule = null) {
   client = discordClient;
   config = botConfig;
   sheetAPI = new SheetAPI(botConfig.sheet_webhook_url);
   discordCache = cache;
+  crashRecovery = crashRecoveryModule;
 }
 
 // ============================================================================
@@ -777,6 +781,11 @@ async function sendWeeklyReport() {
       await elysiumCommandsChannel.send({ embeds: [embed] });
       console.log('✅ Weekly report sent to ELYSIUM commands channel');
     }
+
+    // Mark weekly report as completed in crash recovery
+    if (crashRecovery) {
+      await crashRecovery.markWeeklyReportCompleted();
+    }
   } catch (error) {
     console.error('❌ Error sending weekly report:', error);
   }
@@ -889,6 +898,13 @@ function scheduleWeeklyReport() {
     const hours = Math.floor(delay / 1000 / 60 / 60);
 
     console.log(`📅 Next weekly report scheduled for: ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${hours} hours)`);
+
+    // Save schedule to crash recovery
+    if (crashRecovery) {
+      crashRecovery.saveLeaderboardReportSchedule(nextSaturdayUTC).catch(err => {
+        console.error('⚠️ Failed to save report schedule to crash recovery:', err.message);
+      });
+    }
 
     // Schedule the report
     weeklyReportTimer = setTimeout(async () => {
