@@ -106,7 +106,7 @@ const LEARNING_CONFIG = {
 
   // Storage
   storage: {
-    syncInterval: 5 * 60 * 1000,   // Sync to Google Sheets every 5 minutes
+    syncInterval: 30 * 60 * 1000,  // Sync to Google Sheets every 30 minutes (reduced from 5 min to reduce load)
     maxRecentMessages: 100,        // Keep last 100 messages for context
     maxUnrecognizedPhrases: 50,    // Track top 50 unrecognized phrases
   },
@@ -1563,7 +1563,7 @@ class NLPLearningSystem {
           };
 
           const response = await axios.post(`${sheetsUrl}?action=syncNLPLearning`, payload, {
-            timeout: 45000, // Increased timeout to 45s to reduce failures
+            timeout: 120000, // 120s timeout (increased from 45s to handle larger syncs)
             headers: { 'Content-Type': 'application/json' },
             maxContentLength: 10 * 1024 * 1024, // 10MB limit
           });
@@ -1602,7 +1602,10 @@ class NLPLearningSystem {
 
           if ((isRateLimitError || isTimeoutError) && !isLastAttempt) {
             const delay = baseDelay * Math.pow(2, attempt); // Exponential backoff: 2s, 4s
-            console.warn(`🧠 [NLP Learning] ${isTimeoutError ? 'Timeout' : 'Rate limit'}. Retrying in ${delay/1000}s... (Attempt ${attempt + 1}/${maxRetries})`);
+            // Only log retry on first attempt to reduce log spam
+            if (attempt === 0) {
+              console.warn(`🧠 [NLP Learning] ${isTimeoutError ? 'Timeout' : 'Rate limit'}. Retrying silently with backoff...`);
+            }
             await new Promise(resolve => setTimeout(resolve, delay));
             continue; // Retry
           }
