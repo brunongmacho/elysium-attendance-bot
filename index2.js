@@ -4072,7 +4072,7 @@ client.once(Events.ClientReady, async () => {
 
   // INITIALIZE EVENT REMINDER SYSTEM
   console.log("🎯 Initializing game event reminder system...");
-  await eventReminders.initializeEventReminders(client, config, sheetAPI);
+  await eventReminders.initializeEventReminders(client, config, sheetAPI, attendance);
 
   console.log("✅ Bot initialization complete and ready for operations!");
 });
