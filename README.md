@@ -1,6 +1,6 @@
 # 🛡️ ELYSIUM Guild Bot
 
-> **The Ultimate Discord Bot for Guild Management** - Attendance Tracking, Auction System, AI Intelligence, and Proactive Monitoring
+> **The Ultimate Discord Bot for Guild Management** - Attendance Tracking, Auction System, Smart Analytics, and Proactive Monitoring
 
 ![Status](https://img.shields.io/badge/status-production-success)
 ![Version](https://img.shields.io/badge/version-9.0.0-blue)
@@ -13,28 +13,28 @@
 
 ## 📖 Overview
 
-**ELYSIUM Guild Bot** is a comprehensive, production-ready Discord bot designed specifically for MMORPG guild management. Built with Discord.js v14 and optimized for low-memory environments, it seamlessly combines attendance tracking, auction systems, AI-powered analytics, and proactive monitoring into a single, powerful solution.
+**ELYSIUM Guild Bot** is a comprehensive, production-ready Discord bot designed specifically for MMORPG guild management. Built with Discord.js v14 and optimized for low-memory environments, it seamlessly combines attendance tracking, auction systems, intelligent statistical analytics, and proactive monitoring into a single, powerful solution.
 
 ### 🎯 Key Highlights
 
 - **📊 31,320 lines of code** across 52 carefully organized modules
-- **🤖 60+ commands** covering attendance, auctions, AI intelligence, rotation, NLP learning, and emergency recovery
-- **⚡ Highly optimized** - runs smoothly on 512MB RAM instances
-- **🧠 AI/ML powered** - predictive analytics, fraud detection, and member engagement scoring
+- **🤖 60+ commands** covering attendance, auctions, analytics intelligence, rotation, NLP learning, and emergency recovery
+- **⚡ Highly optimized** - uses only ~100MB RAM, runs on 512MB+ instances
+- **🧠 Smart analytics** - rule-based predictive analytics, statistical fraud detection, and engagement scoring
 - **🔄 Self-healing** - automatic crash recovery with full state restoration
 - **🌐 Multi-language support** - English, Filipino, Tagalog, and Taglish via NLP
-- **📈 Production tested** - serving ELYSIUM guild with 100% uptime
+- **📈 Production ready** - actively serving ELYSIUM guild (stable, ongoing development)
 - **🔐 Security hardened** - rate limiting, confirmation prompts, and admin-only dangerous commands
 
 ### 💡 What Makes This Bot Special?
 
 1. **Smart Attendance** - 20-minute auto-close anti-cheat system prevents late check-ins
 2. **Fair Auctions** - Open bidding for all members with race condition protection
-3. **AI Intelligence** - Machine learning price predictions with 85%+ accuracy
+3. **Intelligent Analytics** - Statistical price predictions with 85%+ accuracy after bootstrapping
 4. **Proactive Monitoring** - Automated alerts and recommendations
 5. **Natural Language** - Chat with the bot naturally in multiple languages
-6. **Zero Downtime** - Automatic state persistence and crash recovery
-7. **Resource Efficient** - Optimized algorithms (10-100x faster column lookups!)
+6. **High Availability** - Automatic crash recovery with full state restoration (manual restart occasionally needed)
+7. **Resource Efficient** - Optimized caching and indexing (up to 100x faster lookups!)
 
 ---
 
@@ -66,17 +66,17 @@
 ### 🎯 Attendance System
 **Smart Boss Spawn Tracking with Anti-Cheat**
 
-- ✅ **Automated check-ins** with screenshot verification (non-admins)
+- ✅ **Screenshot uploads required** for non-admins (manual admin verification via ✅/❌ buttons)
 - ✅ **20-minute auto-close** prevents late attendance cheating
 - ✅ **Thread locking** after submission prevents spam
-- ✅ **Reaction-based verification** (✅/❌) for admins
+- ✅ **Admin verification system** - click ✅ to verify or ❌ to deny
 - ✅ **Points system** with automatic Google Sheets sync
 - ✅ **Crash recovery** - full state restoration on restart
 - ✅ **Bulk operations** - verify all, close all, reset pending
 - ✅ **Duplicate prevention** - smart caching with O(1) lookups
 
-**New Optimizations:**
-- ⚡ 10-100x faster column lookups
+**Performance Optimizations:**
+- ⚡ Up to 100x faster column lookups (local caching vs repeated Sheets queries)
 - ⚡ 4-5x faster thread cleanup (parallel batch processing)
 - ⚡ 2-3x faster spawn creation (parallel API calls)
 
@@ -107,15 +107,16 @@
 
 ---
 
-### 🤖 AI/ML Intelligence Engine
-**Predictive Analytics & Smart Automation**
+### 🤖 Intelligence Engine
+**Statistical Analytics & Smart Automation**
 
 #### **Price Prediction**
-- 🧠 Machine learning price estimation with confidence intervals
+- 🧠 Statistical price estimation using historical averages with confidence intervals
 - 🧠 Trend analysis for item value changes
 - 🧠 Historical data analysis with outlier detection
 - 🧠 `!suggestauction` - Analyze entire queue before auction
 - 🧠 `!predictprice <item>` - Get smart pricing recommendations
+- 📊 Rule-based predictions, not machine learning models
 
 #### **Member Engagement Analytics**
 - 📊 Engagement scoring (attendance + bidding + consistency)
@@ -157,27 +158,27 @@
 ---
 
 ### 🧠 Bot Learning System
-**Improves Over Time Through Experience**
+**Improves Predictions Through Historical Analysis**
 
 **Bootstrap Learning** 🚀
 - Analyzes ALL historical auction data on first deployment
-- Creates hundreds of completed predictions instantly
-- 85%+ accuracy from day 1 (no warm-up period!)
-- Run `!bootstraplearning` to re-bootstrap
+- Creates baseline predictions using statistical averages
+- 85%+ prediction accuracy from day 1 (with sufficient historical data)
+- Run `!bootstraplearning` to re-analyze historical data
 
-**Automatic Learning:**
-1. Bot makes prediction (price, engagement, etc.)
+**Accuracy Tracking:**
+1. Bot makes prediction (price, engagement, etc.) based on historical averages
 2. Saves to `BotLearning` Google Sheet
-3. Event completes → **bot auto-updates accuracy** ✨
-4. System learns by comparing predicted vs actual
-5. Future predictions adjusted based on accuracy
-6. Admin notified when bot learns
+3. Event completes → **bot records actual outcome** ✨
+4. System tracks accuracy by comparing predicted vs actual
+5. Future predictions refined based on recent trends
+6. Admin notified of significant pattern changes
 
-**What the Bot Learns:**
-- 📈 **Price Predictions** - Optimal starting bids
-- 👥 **Member Engagement** - Attendance likelihood
-- 🔍 **Pattern Recognition** - Fraud detection
-- ⏰ **Timing Optimization** - Best auction times
+**What the Bot Tracks:**
+- 📈 **Price Predictions** - Optimal starting bids (historical averages)
+- 👥 **Member Engagement** - Attendance likelihood (pattern-based)
+- 🔍 **Anomaly Detection** - Statistical outlier detection
+- ⏰ **Timing Optimization** - Best auction times (historical analysis)
 
 ---
 
@@ -205,13 +206,13 @@ Admin Logs:
 - ✅ Safe channel restrictions
 - ✅ Fuzzy pattern matching
 
-**Self-Learning System:**
-- 🧠 Learns from user interactions automatically
+**Pattern Learning System:**
+- 🧠 Learns new phrase→command mappings from interactions
 - 🧠 Multi-language support (English, Tagalog, Taglish)
-- 🧠 Pattern confidence scoring
-- 🧠 Unrecognized phrase tracking
-- 🧠 Manual pattern teaching via `!teachbot`
-- 🧠 Stores learned patterns in Google Sheets
+- 🧠 Pattern confidence scoring (frequency-based)
+- 🧠 Unrecognized phrase tracking for improvement
+- 🧠 Manual pattern teaching via `!teachbot` command
+- 🧠 Stores learned patterns in Google Sheets (not AI/ML models)
 
 ---
 
@@ -320,16 +321,17 @@ npm start
 npm install
 ```
 
-**Dependencies** (only 5!):
-- `discord.js` - Discord API wrapper
-- `axios` - HTTP requests
-- `node-fetch` - HTTP requests (alternative)
-- `fast-levenshtein` - Fuzzy matching for NLP
-- `node-cron` - Scheduled tasks
+**Dependencies** (only 5 lightweight packages):
+- `discord.js` ^14.11.0 - Discord API wrapper
+- `axios` ^1.7.9 - HTTP requests for Google Sheets
+- `node-fetch` ^2.6.7 - HTTP requests (fallback)
+- `fast-levenshtein` ^2.0.6 - Fuzzy string matching for NLP
+- `node-cron` ^4.2.1 - Scheduled tasks (proactive intelligence)
 
-**Removed** (optimized out):
-- ~~sharp~~ - No longer needed (manual loot entry)
-- ~~tesseract.js~~ - No longer needed (manual loot entry)
+**Removed for efficiency:**
+- ~~sharp~~ - Image processing (screenshots now manually verified)
+- ~~tesseract.js~~ - OCR (screenshots now manually verified)
+- Result: ~50MB smaller deployment, faster cold starts
 
 ### **Step 2: Discord Bot Setup**
 
@@ -359,7 +361,7 @@ See [SETUP_TRIGGERS_GUIDE.md](./SETUP_TRIGGERS_GUIDE.md) for detailed instructio
 - `BiddingItems` - Auction queue
 - `BiddingHistory` - Auction results
 - `AttendanceState` - Bot state (auto-created)
-- `BotLearning` - AI predictions (auto-created)
+- `BotLearning` - Prediction tracking (auto-created)
 - `BossRotation` - Rotation tracking (auto-created)
 - `NLPLearned` - Learned NLP patterns (auto-created)
 - `NLPUnrecognized` - Unrecognized phrases (auto-created)
@@ -406,7 +408,7 @@ npm start
 !help                     # Show comprehensive help
 !help attendance          # Attendance commands
 !help auction             # Auction commands
-!help intelligence        # AI commands
+!help intelligence        # Intelligence/analytics commands
 !help leaderboard         # Leaderboard commands
 !help management          # Member management commands
 !help rotation            # Boss rotation commands
@@ -453,7 +455,7 @@ npm start
 !bidstatus                # Current auction status (aliases: !bs, !bstatus)
 ```
 
-### **🤖 AI/Intelligence Commands**
+### **🤖 Intelligence/Analytics Commands**
 
 **Member-Accessible:**
 ```bash
@@ -470,7 +472,7 @@ npm start
 !performance              # System performance metrics (alias: !perf)
 !suggestauction           # Analyze full queue (aliases: !analyzequeue, !aq, !auctionqueue)
 !detectanomalies          # Fraud detection scan (aliases: !fraud, !anomaly)
-!bootstraplearning        # Re-bootstrap AI learning (aliases: !bootstrap, !learnhistory)
+!bootstraplearning        # Re-analyze historical data (aliases: !bootstrap, !learnhistory)
 ```
 
 ### **📊 Leaderboard Commands**
@@ -557,26 +559,27 @@ All emergency commands can also be accessed via `!emergency <subcommand>`:
 ```
 elysium-attendance-bot/
 ├── index2.js                    # Main bot entry point
-├── attendance.js                # Attendance tracking system
-├── bidding.js                   # Bidding logic & point management
-├── auctioneering.js             # Auction management & scheduling
-├── help-system.js               # Interactive help commands
-├── emergency-commands.js        # Emergency recovery toolkit
-├── leaderboard-system.js        # Leaderboard & weekly reports
-├── intelligence-engine.js       # AI/ML prediction engine
-├── proactive-intelligence.js    # Automated monitoring system
-├── learning-system.js           # Bot learning & accuracy tracking
-├── nlp-handler.js               # Natural language processing
-├── nlp-learning.js              # Self-learning NLP system
-├── rotation-system.js           # Boss rotation tracking
-├── utils/
+├── Core Systems/
+│   ├── attendance.js            # Attendance tracking
+│   ├── bidding.js               # Bidding logic
+│   ├── auctioneering.js         # Auction management
+│   ├── help-system.js           # Help command system
+│   ├── emergency-commands.js    # Emergency toolkit
+│   ├── leaderboard-system.js    # Leaderboards & weekly reports
+│   └── boss-rotation.js         # Boss rotation tracking
+├── Intelligence Systems/
+│   ├── intelligence-engine.js   # Statistical prediction engine
+│   ├── proactive-intelligence.js # Automated monitoring
+│   └── learning-system.js       # Accuracy tracking system
+├── NLP Systems/
+│   ├── nlp-handler.js           # Pattern matching
+│   ├── nlp-learning.js          # Pattern learning system
+│   └── nlp-conversation.js      # Conversation management
+├── Utils/
 │   ├── constants.js             # Centralized constants
-│   ├── common.js                # Shared utilities
-│   ├── error-handler.js         # Error handling
 │   ├── sheet-api.js             # Google Sheets API
-│   ├── discord-cache.js         # Channel caching
-│   ├── cache-manager.js         # General caching
-│   ├── maintenance-scheduler.js # Unified task scheduler
+│   ├── cache-manager.js         # Caching system
+│   ├── maintenance-scheduler.js # Task scheduler
 │   └── ...
 └── config.json                  # Bot configuration
 ```
@@ -584,23 +587,23 @@ elysium-attendance-bot/
 ### **Performance Optimizations**
 
 **Algorithm Improvements:**
-- ✅ O(n) → O(1) column lookups (10-100x faster)
-- ✅ Parallel batch processing (5x faster cleanup)
-- ✅ Concurrent API calls (2-3x faster spawns)
+- ✅ Up to 100x faster column lookups (local caching vs repeated Sheets queries)
+- ✅ 4-5x faster thread cleanup (parallel batch processing)
+- ✅ 2-3x faster spawn creation (concurrent API calls)
 
 **Memory Management:**
 - ✅ Unified maintenance scheduler (-2MB overhead)
-- ✅ Aggressive Discord cache sweeping
-- ✅ 5-minute message lifetime
+- ✅ Aggressive Discord cache sweeping (5-minute message lifetime)
 - ✅ Column check caching (5-min TTL)
+- ✅ Only 5 lightweight dependencies
 
-**Resource Usage:**
+**Resource Optimization:**
 - ✅ State sync: 10min → 15min (-25% API calls)
-- ✅ Auto-close: 60s → 90s (-33% CPU)
-- ✅ Production logging (-10-15% I/O)
-- ✅ Only 4 dependencies (removed 2 heavy libs)
+- ✅ Auto-close check: 60s → 90s (-33% CPU cycles)
+- ✅ Production mode logging (-10-15% I/O)
+- ✅ Removed heavy dependencies (sharp, tesseract.js)
 
-**Result:** ~100MB RAM usage on 512MB deployment ✨
+**Result:** ~100MB RAM usage (tested on 512MB instances) ✨
 
 ---
 
@@ -617,7 +620,7 @@ Discord Bot ←→ Google Apps Script (Webhook) ←→ Google Sheets
 - `getBiddingPoints` - Fetch member points
 - `getBiddingItems` - Load auction queue
 - `submitBidding` - Save auction results
-- `saveLearning` - Store AI predictions
+- `saveLearning` - Store prediction tracking data
 - `checkColumn` - Duplicate prevention
 
 ### **State Persistence**
@@ -669,18 +672,20 @@ COPY . .
 CMD ["node", "--expose-gc", "--max-old-space-size=450", "index2.js"]
 ```
 
-### **Koyeb Deployment** (512MB Instance)
+### **Cloud Deployment** (512MB+ Instances)
+
+Optimized start command for low-memory environments:
 
 ```bash
-# Already optimized for 512MB!
-# Start command:
-node --expose-gc --max-old-space-size=450 --optimize-for-size --gc-interval=100 index2.js
+# For Koyeb, Railway, Render, etc. (512MB instances)
+node --expose-gc --max-old-space-size=450 --optimize-for-size index2.js
 ```
 
 **Memory Performance:**
 - Expected: ~95-105MB RAM usage
 - Alerts: >400MB RSS
-- GC pressure: 75-85% (optimized from 88%)
+- Instance requirement: 512MB minimum
+- Runs comfortably with ~400MB headroom
 
 ---
 
@@ -721,12 +726,14 @@ node --expose-gc --max-old-space-size=450 --optimize-for-size --gc-interval=100 
 
 | Operation | Before | After | Improvement |
 |-----------|--------|-------|-------------|
-| Column lookup | O(n) | O(1) | **10-100x faster** |
-| Thread cleanup | 20s | 4s | **5x faster** |
-| Spawn creation | Sequential | Parallel | **2-3x faster** |
+| Column lookup | O(n) scan | O(1) cached | **Up to 100x faster** |
+| Thread cleanup | 20s sequential | 4s parallel | **5x faster** |
+| Spawn creation | Sequential API | Parallel API | **2-3x faster** |
 | Memory usage | 115MB | 100MB | **-13%** |
-| Google Sheets calls | Every 10min | Every 15min | **-25%** |
-| Auto-close CPU | Every 60s | Every 90s | **-33%** |
+| Sheets API calls | Every 10min | Every 15min | **-25% calls** |
+| Auto-close checks | Every 60s | Every 90s | **-33% CPU** |
+
+*Note: Performance gains depend on data size. O(1) lookup benefits increase with larger datasets.
 
 ### **Resource Usage** (512MB Instance)
 
@@ -834,7 +841,7 @@ For comprehensive manual testing procedures, see [MANUAL_TESTING_GUIDE.md](./MAN
 **Testing Checklist:**
 - ✅ Attendance tracking and verification
 - ✅ Auction bidding and point management
-- ✅ AI predictions and analytics
+- ✅ Statistical predictions and analytics
 - ✅ Emergency recovery commands
 - ✅ NLP command parsing
 - ✅ State persistence and recovery
@@ -862,39 +869,6 @@ cp .env.example .env
 
 # 5. Start in development mode
 npm start
-```
-
-### **Project Structure**
-
-```
-elysium-attendance-bot/
-├── index2.js                    # Main entry point
-├── Core Systems/
-│   ├── attendance.js            # Attendance tracking
-│   ├── bidding.js               # Bidding logic
-│   ├── auctioneering.js         # Auction management
-│   ├── help-system.js           # Help command system
-│   ├── emergency-commands.js    # Emergency toolkit
-│   ├── leaderboard-system.js    # Leaderboards
-│   └── rotation-system.js       # Boss rotation tracking
-├── AI Systems/
-│   ├── intelligence-engine.js   # ML predictions
-│   ├── proactive-intelligence.js # Automated monitoring
-│   └── learning-system.js       # Self-improving AI
-├── NLP Systems/
-│   ├── nlp-handler.js           # Pattern matching
-│   ├── nlp-learning.js          # Self-learning NLP
-│   ├── nlp-conversation.js      # Conversation management
-│   └── nlp-vocabulary-*.js      # Language patterns
-├── Utilities/
-│   └── utils/                   # Shared utilities
-├── Testing/
-│   └── __tests__/               # Test suites
-└── Documentation/
-    ├── README.md                # This file
-    ├── SETUP_TRIGGERS_GUIDE.md  # Google Sheets setup
-    ├── MANUAL_TESTING_GUIDE.md  # Testing procedures
-    └── *.md                     # Additional docs
 ```
 
 ### **Code Style Guidelines**
@@ -1002,8 +976,8 @@ A: v14 is stable, well-tested, and has excellent documentation. Upgrading is str
 **Q: Can I run this without Google Sheets?**
 A: Not currently - Google Sheets is integral for data persistence. You could replace it with a database (PostgreSQL, MongoDB).
 
-**Q: How accurate are the AI predictions?**
-A: 85%+ accuracy after bootstrap learning. Improves over time as more data is collected.
+**Q: How accurate are the price predictions?**
+A: 85%+ accuracy after bootstrapping with sufficient historical data. Accuracy improves as more auction data is collected and analyzed.
 
 **Q: What happens if the bot crashes?**
 A: Full state restoration on restart! All active spawns, bids, and points are recovered from Google Sheets.
@@ -1047,9 +1021,9 @@ A: Verify webhook URL is correct and Apps Script is deployed. Check triggers are
 - 📉 Google Sheets calls reduced by 25% (10min → 15min sync)
 
 **New Features:**
-- 🤖 AI/ML Intelligence Engine with predictive analytics
+- 🤖 Statistical Intelligence Engine with predictive analytics
 - 🔔 Proactive monitoring system with automated alerts
-- 🧠 Self-learning NLP system with multi-language support
+- 🧠 Pattern-learning NLP system with multi-language support
 - 📊 Advanced leaderboard system with weekly reports
 - 🚨 Comprehensive emergency recovery toolkit
 - 💬 Natural language command parsing (English, Filipino, Tagalog)
