@@ -2556,14 +2556,14 @@ const commandHandlers = {
       await leaderboardSystem.sendMonthlyReport();
 
       // Get both channel names for the confirmation message
-      const [adminLogsChannel, guildAnnouncementChannel] = await Promise.all([
+      const [adminLogsChannel, guildChatChannel] = await Promise.all([
         client.channels.fetch(config.admin_logs_channel_id).catch(() => null),
-        client.channels.fetch(config.guild_announcement_channel_id).catch(() => null)
+        client.channels.fetch(config.elysium_commands_channel_id).catch(() => null)
       ]);
 
       const channels = [];
       if (adminLogsChannel) channels.push(`<#${adminLogsChannel.id}>`);
-      if (guildAnnouncementChannel) channels.push(`<#${guildAnnouncementChannel.id}>`);
+      if (guildChatChannel) channels.push(`<#${guildChatChannel.id}>`);
 
       const channelList = channels.length > 0 ? channels.join(' and ') : 'target channels';
       await statusMsg.edit({ content: `✅ Monthly report sent to ${channelList}!` }).catch(() => {});
