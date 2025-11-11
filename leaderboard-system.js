@@ -1057,19 +1057,24 @@ async function sendMonthlyReport() {
       });
     }
 
-    // Add top 3 bidders (most points remaining = least spent)
+    // Add top 3 bidders (most points consumed = highest spenders)
     if (biddingData.leaderboard && biddingData.leaderboard.length > 0) {
-      const top3Bidding = biddingData.leaderboard
+      // Sort by most points consumed (highest spenders first)
+      const sortedByConsumed = [...biddingData.leaderboard]
+        .sort((a, b) => (b.pointsConsumed || 0) - (a.pointsConsumed || 0));
+
+      const top3Bidding = sortedByConsumed
         .slice(0, 3)
         .map((p, i) => {
           const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
-          const consumed = (biddingData.totalPointsDistributed / biddingData.leaderboard.length) - p.points;
-          return `${medal} **${p.name}** - ${Math.round(consumed)} points spent`;
+          const consumed = p.pointsConsumed || 0;
+          const remaining = p.pointsLeft || 0;
+          return `${medal} **${p.name}** - ${consumed} points spent (${remaining} left)`;
         })
         .join('\n');
 
       embed.addFields({
-        name: '💎 Top Bidders',
+        name: '💎 Top Bidders (Most Spent)',
         value: top3Bidding,
         inline: false
       });
