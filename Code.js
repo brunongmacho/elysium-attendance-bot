@@ -3156,14 +3156,16 @@ function getMemberStats(data) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
     // ==========================================
-    // GET BIDDING DATA
+    // GET BIDDING DATA (Case-insensitive search)
     // ==========================================
     const biddingSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
     let biddingData = { left: 0, consumed: 0, total: 0, consumptionRate: 0 };
 
     if (biddingSheet && biddingSheet.getLastRow() > 1) {
       const biddingValues = biddingSheet.getDataRange().getValues();
-      const memberRow = biddingValues.find(row => row[0] && row[0].toString().trim() === memberName);
+      const memberRow = biddingValues.find(row =>
+        row[0] && row[0].toString().trim().toLowerCase() === memberName.toLowerCase()
+      );
 
       if (memberRow) {
         const left = memberRow[1] || 0;
@@ -3196,7 +3198,7 @@ function getMemberStats(data) {
       const bossCounts = {};
       const totalSpawns = logValues.filter(row => row[3] && row[3].toString().trim()).length;
 
-      // Filter rows where member attended
+      // Filter rows where member attended (case-insensitive)
       for (let i = 0; i < logValues.length; i++) {
         const boss = (logValues[i][1] || '').toString().trim();
         const timestamp = logValues[i][0];
@@ -3205,7 +3207,10 @@ function getMemberStats(data) {
         if (membersStr) {
           const members = membersStr.split(',').map(m => m.trim());
 
-          if (members.includes(memberName)) {
+          // Case-insensitive member search
+          const memberFound = members.some(m => m.toLowerCase() === memberName.toLowerCase());
+
+          if (memberFound) {
             const points = getBossPointValue(boss);
 
             memberAttendance.push({
@@ -3269,7 +3274,7 @@ function getMemberStats(data) {
         .sort((a, b) => b.points - a.points);
 
       totalMembers = members.length;
-      const memberIndex = members.findIndex(m => m.name === memberName);
+      const memberIndex = members.findIndex(m => m.name.toLowerCase() === memberName.toLowerCase());
 
       if (memberIndex >= 0) {
         rank = memberIndex + 1;
