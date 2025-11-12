@@ -1,23 +1,16 @@
-# Node / build
+# Existing gitignore content preserved
 node_modules/
-dist/
-build/
-
-# Local clasp auth
-.clasprc.json
-.clasp.json
-.claspignore
-
-# env / logs
-*.env
+package-lock.json
+.env
+config.json
 *.log
 
-# system / editor
-.DS_Store
-.vscode/
-
-# backup files
-*.backup
-
-node_modules
-elysium-attendance-bot.code-workspace
+# ML Service
+ml-service/__pycache__/
+ml-service/**/__pycache__/
+ml-service/*.pyc
+ml-service/**/*.pyc
+ml-service/.env
+ml-service/saved_models/*
+!ml-service/saved_models/.gitkeep
+ml-service/data/

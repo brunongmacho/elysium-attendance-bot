@@ -91,6 +91,7 @@ const eventReminders = require('./event-reminders.js'); // Game Event Reminder S
 const bossRotation = require('./boss-rotation.js'); // Boss Rotation System (5-guild tracking)
 const activityHeatmap = require('./activity-heatmap.js'); // Activity Heatmap System
 const crashRecovery = require('./utils/crash-recovery.js'); // Crash Recovery System (state persistence)
+const { MLIntegration } = require('./ml-integration.js'); // ML Integration (spawn prediction + NLP enhancement)
 
 /**
  * Command alias mapping for shorthand commands.
@@ -494,6 +495,14 @@ let nlpHandler = null;
  * @type {NLPLearningSystem}
  */
 let nlpLearningSystem = null;
+
+/**
+ * ML Integration for enhanced spawn predictions and NLP conversation
+ * Provides ML-powered spawn time predictions with confidence intervals
+ * Enhances NLP with context awareness and sentiment analysis
+ * @type {MLIntegration}
+ */
+let mlIntegration = null;
 
 /**
  * Flag indicating bot is currently recovering from a crash
@@ -1719,6 +1728,23 @@ const commandHandlers = {
       ? `🔴 Active: **${biddingState.a.item}** (${biddingState.a.curBid}pts)`
       : `🟢 Queue: ${biddingState.q.length} item(s)`;
 
+    // Get ML statistics if available
+    let mlStats = null;
+    let mlStatusText = '⚠️ Disabled';
+    if (mlIntegration) {
+      try {
+        mlStats = await mlIntegration.getStats();
+        if (mlStats && mlStats.enabled) {
+          const patternsCount = mlStats.spawn?.patternsLearned || 0;
+          mlStatusText = patternsCount > 0
+            ? `✅ Active - ${patternsCount} boss patterns learned`
+            : `🟡 Learning - No patterns yet`;
+        }
+      } catch (mlError) {
+        mlStatusText = `⚠️ Error: ${mlError.message}`;
+      }
+    }
+
     const embed = new EmbedBuilder()
       .setColor(0x00ff00)
       .setTitle("📊 Bot Status")
@@ -1745,7 +1771,8 @@ const commandHandlers = {
           value: spawnListText + moreSpawns,
           inline: false,
         },
-        { name: "💰 Bidding System", value: biddingStatus, inline: false }
+        { name: "💰 Bidding System", value: biddingStatus, inline: false },
+        { name: "🤖 ML Spawn Predictor", value: mlStatusText, inline: false }
       )
       .setFooter({ text: `Requested by ${member.user.username}` })
       .setTimestamp();
@@ -4045,6 +4072,21 @@ const commandHandlers = {
     try {
       const prediction = await intelligenceEngine.predictNextSpawnTime(bossName);
 
+      // 🤖 ENHANCE WITH ML - Get tighter confidence windows and accuracy scoring
+      let mlEnhancement = null;
+      if (mlIntegration && prediction && !prediction.error) {
+        try {
+          mlEnhancement = await mlIntegration.enhanceSpawnPrediction(
+            prediction.bossName,
+            prediction.lastSpawnTime,
+            prediction.avgIntervalHours || 24
+          );
+          console.log(`[ML] Enhanced ${prediction.bossName}: ${mlEnhancement ? 'Success' : 'N/A'}`);
+        } catch (mlError) {
+          console.warn('[ML] Enhancement failed, using standard prediction:', mlError.message);
+        }
+      }
+
       if (prediction.error) {
         await message.reply(`⚠️ ${prediction.error}`);
         return;
@@ -4080,6 +4122,15 @@ const commandHandlers = {
             value: `${prediction.basedOnSpawns} historical spawns`,
             inline: true,
           },
+          // 🤖 ML CONFIDENCE WINDOW - Shows tighter time window from ML analysis
+          ...(mlEnhancement && mlEnhancement.method === 'ml'
+            ? [{
+                name: '🤖 ML Window',
+                value: `±${Math.round(mlEnhancement.confidenceInterval.windowMinutes / 2)}min (${(mlEnhancement.confidence * 100).toFixed(0)}%)`,
+                inline: true,
+              }]
+            : []
+          ),
           {
             name: '⏱️ Spawn Type',
             value: prediction.spawnType === 'schedule'
@@ -4115,7 +4166,13 @@ const commandHandlers = {
           },
           {
             name: '🧠 AI Insight',
-            value: prediction.spawnType === 'schedule'
+            value: mlEnhancement && mlEnhancement.method === 'ml'
+              ? `🤖 **ML-Enhanced Prediction**\n` +
+                `Spawn Window: ${new Date(mlEnhancement.confidenceInterval.earliest).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: config.timezone })} - ` +
+                `${new Date(mlEnhancement.confidenceInterval.latest).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: config.timezone })}\n` +
+                `✅ ML Model trained on ${mlEnhancement.stats?.sampleSize || prediction.basedOnSpawns} spawns\n` +
+                `Accuracy: ${(mlEnhancement.confidence * 100).toFixed(0)}% confident based on historical variance`
+              : prediction.spawnType === 'schedule'
               ? `**${prediction.bossName}** uses a fixed weekly schedule. ${prediction.scheduleInfo || 'Next spawn calculated from schedule.'}`
               : prediction.usingConfiguredTimer
               ? `**${prediction.bossName}** has a **${prediction.avgIntervalHours.toFixed(1)}-hour** spawn timer. Prediction blends configured timer with ${prediction.basedOnSpawns} historical spawns for accuracy.`
@@ -4144,8 +4201,11 @@ const commandHandlers = {
         });
       }
 
-      embed.setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
-        .setTimestamp();
+      embed.setFooter({
+        text: mlEnhancement && mlEnhancement.method === 'ml'
+          ? `Requested by ${member.user.username} • 🤖 ML-Enhanced • ${(mlEnhancement.confidence * 100).toFixed(0)}% Accurate`
+          : `Requested by ${member.user.username} • Intelligence Engine`
+      }).setTimestamp();
 
       await message.reply({ embeds: [embed] });
       console.log(
@@ -4248,7 +4308,7 @@ const commandHandlers = {
     const subcommand = args[0]?.toLowerCase();
 
     try {
-      // !rotation status - Show all rotation statuses
+      // !rotation status - Show all rotation statuses with ML predictions
       if (!subcommand || subcommand === 'status') {
         const rotations = await bossRotation.getAllRotations();
         const rotatingBosses = bossRotation.getRotatingBosses();
@@ -4261,7 +4321,7 @@ const commandHandlers = {
         const embed = new EmbedBuilder()
           .setColor(0x4a90e8)
           .setTitle('🔄 Boss Rotation Status')
-          .setDescription('Current rotation for 5-guild system')
+          .setDescription('Current rotation for 5-guild system with ML-enhanced spawn predictions')
           .setTimestamp();
 
         for (const boss of rotatingBosses) {
@@ -4269,9 +4329,37 @@ const commandHandlers = {
           if (rotation) {
             const emoji = rotation.isOurTurn ? '🟢' : '🔴';
             const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
+
+            // Get ML-enhanced spawn prediction
+            let spawnInfo = '';
+            try {
+              const prediction = await intelligenceEngine.predictNextSpawnTime(boss);
+              if (prediction && !prediction.error) {
+                // Try to get ML enhancement
+                let mlEnhancement = null;
+                if (mlIntegration) {
+                  mlEnhancement = await mlIntegration.enhanceSpawnPrediction(
+                    prediction.bossName,
+                    prediction.lastSpawnTime,
+                    prediction.avgIntervalHours || 24
+                  );
+                }
+
+                const spawnTimestamp = Math.floor(prediction.predictedTime.getTime() / 1000);
+                const mlWindow = mlEnhancement && mlEnhancement.method === 'ml'
+                  ? ` (±${Math.round(mlEnhancement.confidenceInterval.windowMinutes / 2)}min 🤖)`
+                  : '';
+
+                spawnInfo = `\n📍 Next Spawn: <t:${spawnTimestamp}:R>${mlWindow}`;
+              }
+            } catch (predError) {
+              // Silently skip prediction if it fails
+              console.warn(`[Rotation] Failed to predict ${boss}:`, predError.message);
+            }
+
             embed.addFields({
               name: `${emoji} ${boss}`,
-              value: `Guild ${rotation.currentIndex}/5 - **${status}**\nNext: ${rotation.guilds[rotation.currentIndex % 5]}`,
+              value: `Guild ${rotation.currentIndex}/5 - **${status}**\nNext: ${rotation.guilds[rotation.currentIndex % 5]}${spawnInfo}`,
               inline: false
             });
           }
@@ -4520,6 +4608,11 @@ client.once(Events.ClientReady, async () => {
   nlpHandler = new NLPHandler(config);
   nlpLearningSystem = new NLPLearningSystem();
   await nlpLearningSystem.initialize(client);
+
+  // Initialize ML Integration for enhanced spawn predictions and NLP
+  console.log('🤖 Initializing ML Integration...');
+  mlIntegration = new MLIntegration(config, sheetAPI);
+  console.log('✅ ML Integration initialized - Learning from historical data...');
 
   console.log("🔄 Running state recovery...");
   isRecovering = true;
