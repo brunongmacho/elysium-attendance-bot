@@ -328,15 +328,14 @@ const COMMANDS = {
     },
     bid: {
       usage: "!bid <amount>",
-      description: "Place bid on current auction item (or just type: \"bid 500\")",
+      description: "Place bid on current auction item (instant bidding - or just type: \"bid 500\")",
       aliases: ["!b"],
       adminOnly: false,
       details: [
-        "• 10-second confirmation window",
+        "• **Instant bidding** - immediate placement",
         "• Points validation",
         "• Self-overbid support",
         "• 3-second rate limit",
-        "• **Auto-pause** if bid in last 10s",
         "• **NLP support**: \"bid 500\" or \"offer 300 pts\""
       ]
     },
