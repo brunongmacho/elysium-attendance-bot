@@ -1668,7 +1668,14 @@ const commandHandlers = {
         const [date, time] = ts.split(" ");
         const [month, day, year] = date.split("/");
         const [hour, minute] = time.split(":");
-        return new Date(`20${year}`, month - 1, day, hour, minute).getTime();
+        // Convert strings to numbers for proper date parsing
+        return new Date(
+          2000 + parseInt(year),
+          parseInt(month) - 1,
+          parseInt(day),
+          parseInt(hour),
+          parseInt(minute)
+        ).getTime();
       };
       return parseTimestamp(a[1].timestamp) - parseTimestamp(b[1].timestamp);
     });
@@ -1678,7 +1685,15 @@ const commandHandlers = {
         const [date, time] = info.timestamp.split(" ");
         const [month, day, year] = date.split("/");
         const [hour, minute] = time.split(":");
-        return new Date(`20${year}`, month - 1, day, hour, minute).getTime();
+        // Convert strings to numbers and create Date object
+        // This ensures proper date calculation regardless of server timezone
+        return new Date(
+          2000 + parseInt(year),
+          parseInt(month) - 1,
+          parseInt(day),
+          parseInt(hour),
+          parseInt(minute)
+        ).getTime();
       })();
 
       const ageMs = Date.now() - spawnTime;
