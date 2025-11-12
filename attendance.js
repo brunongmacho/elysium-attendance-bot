@@ -390,11 +390,17 @@ async function createSpawnThreads(
   triggerSource,
   noAutoClose = false  // NEW: Optional flag to disable autoclose for maintenance threads
 ) {
+  // Validate boss exists in bossPoints
+  if (!bossPoints[bossName]) {
+    console.error(`❌ Unknown boss: ${bossName}`);
+    return { success: false, error: `Unknown boss: ${bossName}` };
+  }
+
   // Fetch required guild and channels
   const mainGuild = await client.guilds
     .fetch(config.main_guild_id)
     .catch(() => null);
-  if (!mainGuild) return;
+  if (!mainGuild) return { success: false, error: 'Failed to fetch guild' };
 
   // Batch fetch channels in parallel for faster execution
   const [attChannel, adminLogs] = await Promise.all([
@@ -402,7 +408,7 @@ async function createSpawnThreads(
     mainGuild.channels.fetch(config.admin_logs_channel_id).catch(() => null),
   ]);
 
-  if (!attChannel || !adminLogs) return;
+  if (!attChannel || !adminLogs) return { success: false, error: 'Failed to fetch channels' };
 
   // Prevent duplicate spawns by checking if column already exists
   const columnExists = await checkColumnExists(bossName, fullTimestamp);
@@ -410,7 +416,7 @@ async function createSpawnThreads(
     await adminLogs.send(
       `⚠️ **BLOCKED SPAWN:** ${bossName} at ${fullTimestamp}\nColumn already exists.`
     );
-    return;
+    return { success: false, error: 'Column already exists (duplicate spawn)' };
   }
 
   const threadTitle = `[${dateStr} ${timeStr}] ${bossName}`;
@@ -429,7 +435,7 @@ async function createSpawnThreads(
     }),
   ]);
 
-  if (!attThread) return;
+  if (!attThread) return { success: false, error: 'Failed to create attendance thread' };
 
   // Register spawn in state tracking
   activeSpawns[attThread.id] = {
@@ -519,6 +525,9 @@ async function createSpawnThreads(
     // Silent fail on learning updates (not critical to spawn creation)
     console.log(`[LEARNING] Error updating spawn prediction: ${learningErr.message}`);
   }
+
+  // Return success object for maintenance command
+  return { success: true, threadId: attThread.id };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
