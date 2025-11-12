@@ -1267,6 +1267,85 @@ async function startCountdownDeletion(message, botMessage, stats, member, update
   }, updateInterval * 1000);
 }
 
+/**
+ * Clean up old stats and mypoints messages on bot startup
+ * Prevents channel clutter from messages that didn't auto-delete before restart
+ */
+async function cleanupStaleStatsMessages() {
+  try {
+    console.log('🧹 Cleaning up stale stats/mypoints messages...');
+
+    const commandsChannel = await discordCache.getChannel('elysium_commands_channel_id');
+    if (!commandsChannel) {
+      console.warn('⚠️ Could not find elysium-commands channel for cleanup');
+      return;
+    }
+
+    // Fetch last 100 messages
+    const messages = await commandsChannel.messages.fetch({ limit: 100 });
+    let deletedCount = 0;
+
+    for (const [, message] of messages) {
+      let shouldDelete = false;
+
+      // Check if it's a bot message with stats/mypoints embed
+      if (message.author.id === client.user.id) {
+        // Check if it's a stats or mypoints message
+        if (message.embeds && message.embeds.length > 0) {
+          const embed = message.embeds[0];
+          const title = embed.title || '';
+
+          // Delete stats and mypoints messages
+          if (title.includes('Member Stats') || title.includes('Your Points')) {
+            shouldDelete = true;
+          }
+        }
+
+        // Also delete loading messages like "⏳ Fetching stats for..."
+        if (message.content && message.content.includes('⏳ Fetching stats for')) {
+          shouldDelete = true;
+        }
+      }
+
+      // Check if it's a user command message (!stats or !mypoints)
+      if (message.content) {
+        const content = message.content.trim().toLowerCase();
+        const isStatsCommand = content.startsWith('!stats') ||
+                               content.startsWith('!profile') ||
+                               content.startsWith('!stat') ||
+                               content.startsWith('!info') ||
+                               content.startsWith('!mystats');
+        const isPointsCommand = content.startsWith('!mypoints') ||
+                                content.startsWith('!pts') ||
+                                content.startsWith('!mypts') ||
+                                content.startsWith('!mp');
+
+        if (isStatsCommand || isPointsCommand) {
+          shouldDelete = true;
+        }
+      }
+
+      // Delete the message if it matches any criteria
+      if (shouldDelete) {
+        try {
+          await message.delete();
+          deletedCount++;
+        } catch (e) {
+          console.warn(`⚠️ Could not delete message ${message.id}: ${e.message}`);
+        }
+      }
+    }
+
+    if (deletedCount > 0) {
+      console.log(`✅ Cleaned up ${deletedCount} stale stats/mypoints message(s)`);
+    } else {
+      console.log('✅ No stale stats/mypoints messages to clean up');
+    }
+  } catch (error) {
+    console.error('❌ Error cleaning up stale messages:', error.message);
+  }
+}
+
 // =====================================================================
 // SECTION 7: CONFIRMATION UTILITIES
 // =====================================================================
@@ -4428,6 +4507,11 @@ client.once(Events.ClientReady, async () => {
   const sweep3 = await attendance.validateStateConsistency(client);
 
   isRecovering = false;
+
+  // ═══════════════════════════════════════════════════════
+  // CLEANUP STALE STATS/MYPOINTS MESSAGES
+  // ═══════════════════════════════════════════════════════
+  await cleanupStaleStatsMessages();
 
   // ═══════════════════════════════════════════════════════
   // RECOVERY SUMMARY (CONSOLE ONLY - Discord logging disabled to prevent spam)
