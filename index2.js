@@ -116,6 +116,12 @@ const COMMAND_ALIASES = {
   "!sampal": "!slap",
   "!hampas": "!slap",
 
+  // Member info commands
+  "!profile": "!stats",
+  "!stat": "!stats",
+  "!info": "!stats",
+  "!mystats": "!stats",
+
   // Leaderboard commands
   "!leadatt": "!leaderboardattendance",
   "!leadbid": "!leaderboardbidding",
@@ -432,6 +438,15 @@ let lastSheetCall = 0;
  * @type {number}
  */
 let lastOverrideTime = 0;
+
+/**
+ * Cache for member stats to reduce Google Sheets API calls
+ * @type {Map<string, {data: Object, timestamp: number}>}
+ * Format: { memberName: { data: statsObject, timestamp: Date.now() } }
+ * Cache duration: 5 minutes (300000ms)
+ */
+const statsCache = new Map();
+const STATS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Timestamp when last auction ended (for cooldown enforcement)
@@ -1073,6 +1088,117 @@ function stopBiddingChannelCleanupSchedule() {
 }
 
 // =====================================================================
+// STATS HELPER FUNCTIONS
+// =====================================================================
+
+/**
+ * Builds a Discord embed for member stats
+ * @param {Object} stats - Stats data from Google Sheets
+ * @param {GuildMember} member - Discord guild member
+ * @returns {EmbedBuilder} Formatted stats embed
+ */
+function buildStatsEmbed(stats, member) {
+  const { memberName, attendance, bidding, rank, totalMembers } = stats;
+
+  // Calculate percentile
+  const percentile = totalMembers > 0 ? Math.round((1 - (rank / totalMembers)) * 100) : 0;
+
+  // Choose embed color based on rank
+  const color = getColorByRank(rank);
+
+  const embed = new EmbedBuilder()
+    .setColor(color)
+    .setTitle(`📊 Member Stats - ${memberName}`)
+    .setThumbnail(member.user.displayAvatarURL())
+    .setTimestamp();
+
+  // COMPACT FORMAT - Inline fields for key metrics
+  embed.addFields(
+    {
+      name: '🎯 Attendance',
+      value: `**${attendance.total}** kills\n**${attendance.points}** pts\n**${attendance.rate}%** rate`,
+      inline: true
+    },
+    {
+      name: '💰 Points',
+      value: `**${bidding.left}** left\n**${bidding.consumed}** spent\n**${bidding.consumptionRate}%** used`,
+      inline: true
+    },
+    {
+      name: '📊 Ranking',
+      value: `**#${rank}** ${getRankEmoji(rank)}\n**${attendance.streak}** days ${attendance.streak > 0 ? '🔥' : ''}\n${getActivityLevel(attendance.rate)}`,
+      inline: true
+    }
+  );
+
+  // Recent Activity - only show top 5
+  if (attendance.recentBosses && attendance.recentBosses.length > 0) {
+    const recent = attendance.recentBosses
+      .slice(0, 5)
+      .map(b => `${b.boss} (${b.points}pts)`)
+      .join(' • ');
+
+    embed.addFields({
+      name: '📅 Recent Activity',
+      value: recent,
+      inline: false
+    });
+  }
+
+  // Footer with favorite boss
+  if (attendance.favoriteBoss) {
+    embed.setFooter({
+      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • Top ${percentile}%`
+    });
+  } else {
+    embed.setFooter({
+      text: `Top ${percentile}%`
+    });
+  }
+
+  return embed;
+}
+
+/**
+ * Get embed color based on rank
+ * @param {number} rank - Member's rank
+ * @returns {number} Hex color code
+ */
+function getColorByRank(rank) {
+  if (rank === 1) return 0xFFD700; // Gold
+  if (rank === 2) return 0xC0C0C0; // Silver
+  if (rank === 3) return 0xCD7F32; // Bronze
+  if (rank <= 10) return 0x00D9FF; // Cyan
+  return 0x5865F2; // Blurple
+}
+
+/**
+ * Get rank emoji based on position
+ * @param {number} rank - Member's rank
+ * @returns {string} Emoji representation
+ */
+function getRankEmoji(rank) {
+  if (rank === 1) return '🥇';
+  if (rank === 2) return '🥈';
+  if (rank === 3) return '🥉';
+  if (rank <= 10) return '⭐';
+  return '';
+}
+
+/**
+ * Get activity level description based on attendance rate
+ * @param {number} rate - Attendance rate percentage
+ * @returns {string} Activity level description
+ */
+function getActivityLevel(rate) {
+  if (rate >= 90) return 'Very Active ⭐⭐⭐';
+  if (rate >= 75) return 'Active ⭐⭐';
+  if (rate >= 50) return 'Moderate ⭐';
+  if (rate > 0) return 'Casual';
+  return 'Inactive';
+}
+
+// =====================================================================
 // SECTION 7: CONFIRMATION UTILITIES
 // =====================================================================
 /**
@@ -1444,6 +1570,61 @@ const commandHandlers = {
     const action = actions[Math.floor(Math.random() * actions.length)];
 
     await message.reply(`👊 **${action} ${target}** gamit ang **${object}**!`);
+  },
+
+  // =========================================================================
+  // STATS COMMAND - Show member statistics
+  // =========================================================================
+  stats: async (message, member, args) => {
+    let targetMember = member;
+    let targetName = member.displayName; // Use displayName for Google Sheets matching
+
+    // Parse target from args
+    if (args.length > 0) {
+      if (message.mentions.members.size > 0) {
+        targetMember = message.mentions.members.first();
+        targetName = targetMember.displayName;
+      } else {
+        targetName = args.join(" ");
+      }
+    }
+
+    // Check cache first
+    const cached = statsCache.get(targetName);
+    if (cached && (Date.now() - cached.timestamp < STATS_CACHE_DURATION)) {
+      console.log(`📦 Using cached stats for ${targetName}`);
+      const embed = buildStatsEmbed(cached.data, targetMember);
+      return await message.reply({ embeds: [embed] });
+    }
+
+    // Show loading message
+    const loadingMsg = await message.reply(`⏳ Fetching stats for **${targetName}**...`);
+
+    try {
+      // Fetch stats from Google Sheets
+      const result = await sheetAPI.call('getMemberStats', { memberName: targetName });
+
+      if (result.status !== 'ok') {
+        await loadingMsg.edit(`❌ Could not find stats for **${targetName}**`);
+        return;
+      }
+
+      // Cache the result
+      statsCache.set(targetName, {
+        data: result,
+        timestamp: Date.now()
+      });
+
+      // Build and send embed
+      const embed = buildStatsEmbed(result, targetMember);
+      await loadingMsg.edit({ content: null, embeds: [embed] });
+
+      console.log(`✅ Stats sent for ${targetName}`);
+
+    } catch (error) {
+      console.error('Stats error:', error);
+      await loadingMsg.edit("❌ Error fetching stats. Please try again later.");
+    }
   },
 
   // =========================================================================
@@ -2385,14 +2566,15 @@ const commandHandlers = {
 
         for (const bossName of maintenanceBosses) {
           try {
-            // Create the thread using attendance module
+            // Create the thread using attendance module with noAutoClose flag
             const result = await attendance.createSpawnThreads(
               client,
               bossName,
               `${month}/${day}/${year.toString().slice(-2)}`,
               `${hours}:${minutes}`,
               formattedTimestamp,
-              "manual"
+              "manual",
+              true  // noAutoClose = true for maintenance threads
             );
 
             if (result && result.success) {
@@ -5565,6 +5747,13 @@ client.on(Events.MessageCreate, async (message) => {
       if (memberCmd === "!slap") {
         console.log(`👊 Slap command detected in guild chat by ${member.user.username}`);
         await commandHandlers.slap(message, member, args);
+        return;
+      }
+
+      // !stats command - Show member statistics
+      if (memberCmd === "!stats") {
+        console.log(`📊 Stats command detected in guild chat by ${member.user.username}`);
+        await commandHandlers.stats(message, member, args);
         return;
       }
     }

@@ -387,7 +387,8 @@ async function createSpawnThreads(
   dateStr,
   timeStr,
   fullTimestamp,
-  triggerSource
+  triggerSource,
+  noAutoClose = false  // NEW: Optional flag to disable autoclose for maintenance threads
 ) {
   // Fetch required guild and channels
   const mainGuild = await client.guilds
@@ -440,21 +441,27 @@ async function createSpawnThreads(
     confirmThreadId: confirmThread ? confirmThread.id : null,
     closed: false,
     createdAt: Date.now(), // Track when thread was created for auto-close
+    noAutoClose: noAutoClose, // NEW: Flag to exempt from autoclose (for maintenance threads)
   };
 
   // Register in activeColumns for duplicate prevention (use normalized key for O(1) lookup)
   const normalizedKey = `${bossName.toUpperCase()}|${normalizeTimestamp(fullTimestamp)}`;
   activeColumns[normalizedKey] = attThread.id;
 
-  // Calculate auto-close timestamp (20 minutes from now)
+  // Calculate auto-close timestamp (20 minutes from now) or show no autoclose
   const autoCloseTime = Date.now() + (20 * 60 * 1000);
   const autoCloseTimestamp = Math.floor(autoCloseTime / 1000);
 
+  // Create description based on autoclose setting
+  const descriptionText = noAutoClose
+    ? `Boss detected! Please check in below.\n\n🔓 **No auto-close** (maintenance spawn - close manually when done)`
+    : `Boss detected! Please check in below.\n\n⏰ **Auto-closes <t:${autoCloseTimestamp}:R>** to prevent cheating.`;
+
   // Create and send attendance instructions embed
   const embed = new EmbedBuilder()
-    .setColor(0xffd700)
+    .setColor(noAutoClose ? 0x9b59b6 : 0xffd700) // Purple for maintenance, gold for normal
     .setTitle(`🎯 ${bossName}`)
-    .setDescription(`Boss detected! Please check in below.\n\n⏰ **Auto-closes <t:${autoCloseTimestamp}:R>** to prevent cheating.`)
+    .setDescription(descriptionText)
     .addFields(
       {
         name: "📸 How to Check In",
@@ -470,7 +477,7 @@ async function createSpawnThreads(
       { name: "📅 Date", value: dateStr, inline: true },
       {
         name: "⏱️ Attendance Window",
-        value: "20 minutes (then auto-closes)",
+        value: noAutoClose ? "No limit (maintenance)" : "20 minutes (then auto-closes)",
         inline: false,
       }
     )
@@ -1272,8 +1279,8 @@ async function checkAndAutoCloseThreads(client) {
     for (const [threadId, spawnInfo] of Object.entries(activeSpawns)) {
       checked++;
 
-      // Skip if already closed or no creation timestamp
-      if (spawnInfo.closed || !spawnInfo.createdAt) continue;
+      // Skip if already closed, no creation timestamp, or exempt from autoclose (maintenance)
+      if (spawnInfo.closed || !spawnInfo.createdAt || spawnInfo.noAutoClose) continue;
 
       const threadAge = now - spawnInfo.createdAt;
 
