@@ -2566,14 +2566,15 @@ const commandHandlers = {
 
         for (const bossName of maintenanceBosses) {
           try {
-            // Create the thread using attendance module
+            // Create the thread using attendance module with noAutoClose flag
             const result = await attendance.createSpawnThreads(
               client,
               bossName,
               `${month}/${day}/${year.toString().slice(-2)}`,
               `${hours}:${minutes}`,
               formattedTimestamp,
-              "manual"
+              "manual",
+              true  // noAutoClose = true for maintenance threads
             );
 
             if (result && result.success) {
