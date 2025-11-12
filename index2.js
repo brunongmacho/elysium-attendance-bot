@@ -312,6 +312,17 @@ const client = new Client({
   // Partials - handle uncached entities
   partials: [Partials.Channel, Partials.Message, Partials.Reaction],
 
+  // WebSocket options - increase timeouts to handle network instability
+  ws: {
+    handshakeTimeout: 60000, // 60 seconds (default is 30s)
+  },
+
+  // REST options - increase timeout for API requests
+  rest: {
+    timeout: 60000, // 60 seconds timeout for REST API requests
+    retries: 5,     // Retry failed requests up to 5 times
+  },
+
   // Memory optimization: Sweep caches regularly to manage 512MB RAM limit
   // Optimized for fast message cleanup while maintaining reaction functionality
   sweepers: {
@@ -6604,13 +6615,53 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 // ERROR HANDLING
 // ==========================================
 
-client.on(Events.Error, (error) =>
-  console.error("❌ Discord client error:", error)
-);
+// Handle Discord client errors
+client.on(Events.Error, (error) => {
+  console.error("❌ Discord client error:", error);
+  // Don't crash on client errors - Discord.js will handle reconnection
+});
 
-process.on("unhandledRejection", (error) =>
-  console.error("❌ Unhandled promise rejection:", error)
-);
+// Handle WebSocket/Shard errors (including timeout errors)
+client.on(Events.ShardError, (error, shardId) => {
+  console.error(`❌ WebSocket error on shard ${shardId}:`, error.message);
+  // Don't crash - Discord.js will automatically attempt to reconnect
+  if (error.message.includes('timeout')) {
+    console.log(`⏱️ Shard ${shardId} timed out, waiting for automatic reconnection...`);
+  }
+});
+
+// Handle shard disconnections
+client.on(Events.ShardDisconnect, (event, shardId) => {
+  console.warn(`⚠️ Shard ${shardId} disconnected (code: ${event.code})`);
+});
+
+// Handle shard reconnection attempts
+client.on(Events.ShardReconnecting, (shardId) => {
+  console.log(`🔄 Shard ${shardId} is reconnecting...`);
+});
+
+// Handle shard resume (successful reconnection)
+client.on(Events.ShardResume, (shardId, replayedEvents) => {
+  console.log(`✅ Shard ${shardId} resumed (replayed ${replayedEvents} events)`);
+});
+
+// Handle unhandled promise rejections without crashing
+process.on("unhandledRejection", (error) => {
+  console.error("❌ Unhandled promise rejection:", error);
+  // Log but don't crash - allow the bot to continue operating
+  // Koyeb will automatically restart if the process exits
+});
+
+// Handle uncaught exceptions
+process.on("uncaughtException", (error) => {
+  console.error("❌ Uncaught exception:", error);
+  // For critical errors, we may need to exit and let Koyeb restart
+  if (error.message && error.message.includes('FATAL')) {
+    console.error("💥 Fatal error detected, exiting for restart...");
+    process.exit(1);
+  }
+  // Otherwise, try to continue
+});
 
 process.on("SIGTERM", () => {
   console.log("🛑 SIGTERM received, shutting down gracefully...");
