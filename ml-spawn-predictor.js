@@ -240,30 +240,60 @@ class MLSpawnPredictor {
         }
       }
 
-      // Apply outlier filtering using IQR method (same as your intelligence-engine.js)
-      // This removes anomalous gaps (e.g., maintenance, guild break periods)
+      // ENHANCED OUTLIER FILTERING FOR MAINTENANCE SPAWNS
+      // Maintenance can cause forced respawns (very short intervals)
+      // This two-pass filtering removes maintenance-related anomalies
       if (intervals.length >= 5) {
+        const originalCount = intervals.length;
+
+        // PASS 1: Remove extreme short intervals (maintenance spawns)
+        // Calculate median first
         const sortedIntervals = [...intervals].sort((a, b) => a - b);
+        const medianIndex = Math.floor(sortedIntervals.length / 2);
+        const median = sortedIntervals.length % 2 === 0
+          ? (sortedIntervals[medianIndex - 1] + sortedIntervals[medianIndex]) / 2
+          : sortedIntervals[medianIndex];
 
-        // Calculate quartiles
-        const q1Index = Math.floor(sortedIntervals.length * 0.25);
-        const q3Index = Math.floor(sortedIntervals.length * 0.75);
-        const q1 = sortedIntervals[q1Index];
-        const q3 = sortedIntervals[q3Index];
-        const iqr = q3 - q1;
+        // Remove intervals < 50% of median (likely maintenance)
+        // Also remove intervals < 6 hours (definitely maintenance/error)
+        const minInterval = Math.max(6, median * 0.5);
+        const withoutMaintenance = intervals.filter(interval => interval >= minInterval);
 
-        // Filter outliers beyond 1.5 * IQR
-        if (iqr > 0) {
-          const lowerBound = q1 - (1.5 * iqr);
-          const upperBound = q3 + (1.5 * iqr);
-          const filteredIntervals = intervals.filter(
-            interval => interval >= lowerBound && interval <= upperBound
-          );
+        // PASS 2: IQR filtering on remaining data
+        if (withoutMaintenance.length >= 5) {
+          const sorted = [...withoutMaintenance].sort((a, b) => a - b);
 
-          // Only use filtered if we kept at least 60% of data
-          if (filteredIntervals.length >= Math.ceil(intervals.length * 0.6)) {
-            intervals.splice(0, intervals.length, ...filteredIntervals);
-            console.log(`   Filtered ${killTimes.length - filteredIntervals.length} outliers using IQR method`);
+          // Calculate quartiles
+          const q1Index = Math.floor(sorted.length * 0.25);
+          const q3Index = Math.floor(sorted.length * 0.75);
+          const q1 = sorted[q1Index];
+          const q3 = sorted[q3Index];
+          const iqr = q3 - q1;
+
+          // More aggressive IQR filtering (1.5x → 1.2x for tighter bounds)
+          if (iqr > 0) {
+            const lowerBound = q1 - (1.2 * iqr);
+            const upperBound = q3 + (1.2 * iqr);
+            const filteredIntervals = withoutMaintenance.filter(
+              interval => interval >= lowerBound && interval <= upperBound
+            );
+
+            // Use filtered data if we kept at least 50% (was 60%)
+            if (filteredIntervals.length >= Math.ceil(intervals.length * 0.5)) {
+              intervals.splice(0, intervals.length, ...filteredIntervals);
+              intervalData.splice(0, intervalData.length,
+                ...intervalData.filter(d =>
+                  d.interval >= minInterval &&
+                  d.interval >= lowerBound &&
+                  d.interval <= upperBound
+                )
+              );
+
+              const removedCount = originalCount - intervals.length;
+              if (removedCount > 0) {
+                console.log(`   🔧 Filtered ${removedCount} outliers (${Math.round(removedCount / originalCount * 100)}% - likely maintenance spawns)`);
+              }
+            }
           }
         }
       }
