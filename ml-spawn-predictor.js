@@ -52,16 +52,30 @@ class MLSpawnPredictor {
     // Load historical data if needed
     await this.ensureDataLoaded();
 
-    // Get learned pattern for this boss
-    const pattern = this.learnedPatterns.get(bossName);
+    // Normalize boss name for lookup (case-insensitive, trim spaces)
+    const normalizedName = this.normalizeBossName(bossName);
 
-    if (!pattern || pattern.sampleSize < 3) {
+    // Get learned pattern for this boss (try normalized first, then original)
+    let pattern = this.learnedPatterns.get(normalizedName);
+    if (!pattern) {
+      pattern = this.learnedPatterns.get(bossName);
+    }
+
+    // Require minimum 5 samples for ML prediction (higher accuracy threshold)
+    if (!pattern || pattern.sampleSize < 5) {
       // Not enough data, use configured interval
       return this.basicPrediction(bossName, lastKillTime, configuredInterval);
     }
 
     // ML-powered prediction using learned variance
     return this.mlPrediction(bossName, lastKillTime, pattern);
+  }
+
+  /**
+   * Normalize boss name for consistent lookups
+   */
+  normalizeBossName(name) {
+    return name.trim().toLowerCase();
   }
 
   /**
@@ -88,23 +102,32 @@ class MLSpawnPredictor {
   }
 
   /**
-   * ML-powered prediction using historical patterns
+   * ML-powered prediction using historical patterns with weighted learning
    */
   mlPrediction(bossName, lastKillTime, pattern) {
-    const { meanInterval, stdDev, confidence, sampleSize } = pattern;
+    const { meanInterval, stdDev, confidence, sampleSize, coefficientOfVariation } = pattern;
 
-    // Calculate predicted spawn time using learned mean
+    // Calculate predicted spawn time using weighted learned mean
     const spawnTime = new Date(lastKillTime.getTime() + meanInterval * 60 * 60 * 1000);
 
-    // Confidence interval: 1.96 * stdDev for 95% confidence
-    const windowHours = 1.96 * stdDev;
+    // Confidence interval: Use adaptive z-score based on consistency
+    // For very consistent spawns (low CV), use tighter interval
+    // For inconsistent spawns (high CV), use wider interval
+    let zScore = 1.96; // Default 95% confidence interval
+
+    if (coefficientOfVariation !== undefined) {
+      if (coefficientOfVariation < 0.03) {
+        zScore = 1.64; // 90% CI for very consistent (tighter window)
+      } else if (coefficientOfVariation > 0.15) {
+        zScore = 2.33; // 98% CI for inconsistent (wider window)
+      }
+    }
+
+    const windowHours = zScore * stdDev;
     const windowMinutes = windowHours * 60;
 
-    // Adjust confidence based on sample size and consistency
-    let adjustedConfidence = confidence;
-    if (sampleSize >= 10) adjustedConfidence += 0.05;
-    if (sampleSize >= 20) adjustedConfidence += 0.05;
-    adjustedConfidence = Math.min(adjustedConfidence, 0.98);
+    // Use base confidence from pattern (already optimized in learning phase)
+    const adjustedConfidence = Math.min(confidence, 0.98);
 
     return {
       bossName,
@@ -116,11 +139,12 @@ class MLSpawnPredictor {
         windowMinutes: Math.round(windowMinutes * 2),
       },
       method: 'ml',
-      message: `ML prediction based on ${sampleSize} historical spawns`,
+      message: `ML prediction based on ${sampleSize} historical spawns (weighted by recency)`,
       stats: {
         meanInterval: meanInterval.toFixed(2),
         stdDev: stdDev.toFixed(2),
         sampleSize,
+        cv: coefficientOfVariation ? (coefficientOfVariation * 100).toFixed(1) + '%' : 'N/A',
       },
     };
   }
@@ -166,7 +190,7 @@ class MLSpawnPredictor {
     console.log(`📊 Loaded ${spawnHistory.length} total spawn records from all sheets`);
 
     // Group by boss and calculate intervals
-    const bossKills = new Map(); // bossName -> [killTimes]
+    const bossKills = new Map(); // normalizedBossName -> {name, killTimes}
 
     for (const spawn of spawnHistory) {
       const bossName = spawn.boss;
@@ -174,21 +198,32 @@ class MLSpawnPredictor {
 
       if (!bossName || !timestamp || isNaN(timestamp.getTime())) continue;
 
-      if (!bossKills.has(bossName)) {
-        bossKills.set(bossName, []);
+      // Normalize boss name for consistent grouping
+      const normalizedName = this.normalizeBossName(bossName);
+
+      if (!bossKills.has(normalizedName)) {
+        bossKills.set(normalizedName, {
+          name: bossName, // Keep original name for display
+          killTimes: []
+        });
       }
-      bossKills.get(bossName).push(timestamp);
+      bossKills.get(normalizedName).killTimes.push(timestamp);
     }
 
-    // Calculate intervals between consecutive kills
-    for (const [bossName, killTimes] of bossKills.entries()) {
+    // Calculate intervals between consecutive kills with weighted learning
+    for (const [normalizedName, bossData] of bossKills.entries()) {
+      const killTimes = bossData.killTimes;
+      const bossName = bossData.name;
+
       if (killTimes.length < 2) continue;
 
       // Sort by time
       killTimes.sort((a, b) => a - b);
 
-      // Calculate intervals
+      // Calculate intervals with timestamps for weighted learning
       const intervals = [];
+      const intervalData = []; // Store interval + timestamp for weighting
+
       for (let i = 1; i < killTimes.length; i++) {
         const intervalMs = killTimes[i] - killTimes[i - 1];
         const intervalHours = intervalMs / (1000 * 60 * 60);
@@ -197,6 +232,11 @@ class MLSpawnPredictor {
         // Allow up to 3 days (72h) for most bosses, 7 days (168h) for weekly bosses
         if (intervalHours >= 1 && intervalHours <= 168) {
           intervals.push(intervalHours);
+          intervalData.push({
+            interval: intervalHours,
+            timestamp: killTimes[i], // More recent timestamp
+            age: Date.now() - killTimes[i].getTime() // Age in ms
+          });
         }
       }
 
@@ -230,38 +270,68 @@ class MLSpawnPredictor {
 
       if (intervals.length < 2) continue;
 
-      // Calculate statistics
-      const mean = intervals.reduce((sum, val) => sum + val, 0) / intervals.length;
-      const variance =
-        intervals.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / intervals.length;
-      const stdDev = Math.sqrt(variance);
+      // Calculate weighted statistics (recent spawns = higher weight)
+      // Use exponential decay: weight = e^(-age / halflife)
+      // Halflife = 30 days (spawns from 30 days ago have 50% weight)
+      const halfLifeMs = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
+
+      let weightedSum = 0;
+      let totalWeight = 0;
+
+      for (const data of intervalData) {
+        // Calculate exponential weight (more recent = higher weight)
+        const weight = Math.exp(-data.age / halfLifeMs);
+        weightedSum += data.interval * weight;
+        totalWeight += weight;
+      }
+
+      const weightedMean = weightedSum / totalWeight;
+
+      // Calculate weighted variance
+      let weightedVarianceSum = 0;
+      for (const data of intervalData) {
+        const weight = Math.exp(-data.age / halfLifeMs);
+        weightedVarianceSum += weight * Math.pow(data.interval - weightedMean, 2);
+      }
+      const weightedVariance = weightedVarianceSum / totalWeight;
+      const weightedStdDev = Math.sqrt(weightedVariance);
 
       // Calculate coefficient of variation (consistency metric)
-      const cv = stdDev / mean;
+      const cv = weightedStdDev / weightedMean;
 
-      // Confidence based on consistency and sample size
-      let confidence = 0.70; // Base confidence
-      if (cv < 0.05) confidence += 0.15; // Very consistent
-      else if (cv < 0.10) confidence += 0.10; // Consistent
+      // Enhanced confidence calculation based on multiple factors
+      let confidence = 0.65; // Base confidence
+
+      // Consistency bonus (lower CV = more consistent)
+      if (cv < 0.03) confidence += 0.20; // Extremely consistent
+      else if (cv < 0.05) confidence += 0.15; // Very consistent
+      else if (cv < 0.08) confidence += 0.12; // Consistent
+      else if (cv < 0.10) confidence += 0.08; // Moderately consistent
       else if (cv < 0.15) confidence += 0.05; // Somewhat consistent
 
-      if (intervals.length >= 10) confidence += 0.05;
+      // Sample size bonus (more data = more confident)
+      if (intervals.length >= 30) confidence += 0.10;
+      else if (intervals.length >= 20) confidence += 0.08;
+      else if (intervals.length >= 15) confidence += 0.06;
+      else if (intervals.length >= 10) confidence += 0.04;
+      else if (intervals.length >= 5) confidence += 0.02;
 
-      confidence = Math.min(confidence, 0.95);
+      confidence = Math.min(confidence, 0.98); // Cap at 98% (never 100%)
 
-      // Store learned pattern
-      this.learnedPatterns.set(bossName, {
-        meanInterval: mean,
-        stdDev,
+      // Store learned pattern with normalized name
+      this.learnedPatterns.set(normalizedName, {
+        meanInterval: weightedMean,
+        stdDev: weightedStdDev,
         confidence,
         sampleSize: intervals.length,
         lastUpdated: new Date(),
+        coefficientOfVariation: cv,
       });
 
-      const windowMinutes = Math.round(stdDev * 60 * 1.96); // 95% confidence interval in minutes
+      const windowMinutes = Math.round(weightedStdDev * 60 * 1.96); // 95% confidence interval in minutes
 
       console.log(
-        `✅ ${bossName}: ${mean.toFixed(2)}h ±${windowMinutes}min window (${intervals.length} spawns, ${(confidence * 100).toFixed(0)}% confidence, CV: ${(cv * 100).toFixed(1)}%)`
+        `✅ ${bossName}: ${weightedMean.toFixed(2)}h ±${windowMinutes}min window (${intervals.length} spawns, ${(confidence * 100).toFixed(0)}% confidence, CV: ${(cv * 100).toFixed(1)}%)`
       );
     }
 
