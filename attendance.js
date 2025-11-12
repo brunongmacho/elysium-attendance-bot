@@ -390,6 +390,12 @@ async function createSpawnThreads(
   triggerSource,
   noAutoClose = false  // NEW: Optional flag to disable autoclose for maintenance threads
 ) {
+  // Validate boss exists in bossPoints
+  if (!bossPoints[bossName]) {
+    console.error(`❌ Unknown boss: ${bossName}`);
+    return { success: false, error: `Unknown boss: ${bossName}` };
+  }
+
   // Fetch required guild and channels
   const mainGuild = await client.guilds
     .fetch(config.main_guild_id)

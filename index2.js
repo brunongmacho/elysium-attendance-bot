@@ -2848,7 +2848,13 @@ const commandHandlers = {
           }
         }
 
-        // Send summary
+        // Send summary with truncation handling for Discord embed limits (max 1024 chars per field)
+        let resultsText = results.join("\n");
+        if (resultsText.length > 1024) {
+          // Truncate and add "..." indicator
+          resultsText = resultsText.substring(0, 1000) + "\n... (truncated)";
+        }
+
         const summary = new EmbedBuilder()
           .setColor(successCount > 0 ? 0x00ff00 : 0xff0000)
           .setTitle(`✅ Maintenance Threads Created`)
@@ -2858,7 +2864,7 @@ const commandHandlers = {
           )
           .addFields({
             name: "📋 Results",
-            value: results.join("\n"),
+            value: resultsText || "No results",
             inline: false,
           })
           .setFooter({ text: `Executed by ${member.user.username}` })
@@ -5010,7 +5016,7 @@ client.on(Events.MessageCreate, async (message) => {
             console.log(`⏰ Using current timestamp: ${fullTimestamp}`);
           }
 
-          await attendance.createSpawnThreads(
+          const result = await attendance.createSpawnThreads(
             client,
             bossName,
             dateStr,
@@ -5018,6 +5024,13 @@ client.on(Events.MessageCreate, async (message) => {
             fullTimestamp,
             "timer"
           );
+
+          if (!result || !result.success) {
+            const errorMsg = result && result.error ? result.error : 'Unknown error';
+            console.error(`❌ Failed to create spawn thread for ${bossName}: ${errorMsg}`);
+          } else {
+            console.log(`✅ Successfully created spawn thread for ${bossName} (thread ID: ${result.threadId})`);
+          }
         }
         return;
       }
@@ -6208,7 +6221,7 @@ client.on(Events.MessageCreate, async (message) => {
           `🔧 Manual spawn creation: ${bossName} at ${fullTimestamp} by ${message.author.username}`
         );
 
-        await attendance.createSpawnThreads(
+        const result = await attendance.createSpawnThreads(
           client,
           bossName,
           dateStr,
@@ -6217,10 +6230,24 @@ client.on(Events.MessageCreate, async (message) => {
           "timer"
         );
 
+        if (!result || !result.success) {
+          const errorMsg = result && result.error ? result.error : 'Unknown error';
+          await message.reply(
+            `❌ **Failed to create spawn thread!**\n\n` +
+              `**Boss:** ${bossName}\n` +
+              `**Time:** ${fullTimestamp}\n` +
+              `**Error:** ${errorMsg}\n\n` +
+              `Please try again or contact an admin.`
+          );
+          console.error(`❌ Failed to create manual spawn thread for ${bossName}: ${errorMsg}`);
+          return;
+        }
+
         await message.reply(
           `✅ **Spawn thread created successfully!**\n\n` +
             `**Boss:** ${bossName}\n` +
-            `**Time:** ${fullTimestamp}\n\n` +
+            `**Time:** ${fullTimestamp}\n` +
+            `**Thread ID:** ${result.threadId}\n\n` +
             `Members can now check in!`
         );
 
