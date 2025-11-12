@@ -127,28 +127,50 @@ class MLSpawnPredictor {
 
   /**
    * Learn patterns from historical spawn data
+   * Fetches from ALL weekly attendance sheets (same method as intelligence-engine.js)
    */
   async learnPatterns() {
-    console.log('🤖 Learning spawn patterns from ALL historical data...');
+    console.log('🤖 Learning spawn patterns from ALL historical sheets...');
 
-    // Get ALL attendance data (no time limit - use everything!)
-    // This gives us maximum sample size for best accuracy
-    const attendanceData = await this.sheetAPI.getAttendanceHistory({ days: 999999 });
+    // Get ALL attendance data from all weekly sheets
+    // Same method as intelligence-engine.js uses
+    const response = await this.sheetAPI.call('getAllWeeklyAttendance', {});
+    const allSheets = response?.sheets || [];
 
-    if (!attendanceData || attendanceData.length === 0) {
-      console.log('⚠️ No historical data to learn from');
+    if (allSheets.length === 0) {
+      console.log('⚠️ No historical sheets found');
       return;
     }
 
-    console.log(`📊 Loaded ${attendanceData.length} historical spawn records`);
-  }
+    console.log(`📊 Found ${allSheets.length} weekly attendance sheets`);
+
+    // Extract all spawn timestamps from all sheets
+    const spawnHistory = [];
+    for (const sheet of allSheets) {
+      const columns = sheet.columns || [];
+      for (const col of columns) {
+        if (col.boss && col.timestamp) {
+          spawnHistory.push({
+            boss: col.boss,
+            timestamp: new Date(col.timestamp),
+          });
+        }
+      }
+    }
+
+    if (spawnHistory.length === 0) {
+      console.log('⚠️ No spawn data found in sheets');
+      return;
+    }
+
+    console.log(`📊 Loaded ${spawnHistory.length} total spawn records from all sheets`);
 
     // Group by boss and calculate intervals
     const bossKills = new Map(); // bossName -> [killTimes]
 
-    for (const record of attendanceData) {
-      const bossName = record.bossName || record.boss_name;
-      const timestamp = new Date(record.timestamp || record.date_time);
+    for (const spawn of spawnHistory) {
+      const bossName = spawn.boss;
+      const timestamp = spawn.timestamp;
 
       if (!bossName || !timestamp || isNaN(timestamp.getTime())) continue;
 
