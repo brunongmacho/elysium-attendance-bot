@@ -129,15 +129,19 @@ class MLSpawnPredictor {
    * Learn patterns from historical spawn data
    */
   async learnPatterns() {
-    console.log('🤖 Learning spawn patterns from historical data...');
+    console.log('🤖 Learning spawn patterns from ALL historical data...');
 
-    // Get attendance data (contains kill times)
-    const attendanceData = await this.sheetAPI.getAttendanceHistory({ days: 90 });
+    // Get ALL attendance data (no time limit - use everything!)
+    // This gives us maximum sample size for best accuracy
+    const attendanceData = await this.sheetAPI.getAttendanceHistory({ days: 999999 });
 
     if (!attendanceData || attendanceData.length === 0) {
       console.log('⚠️ No historical data to learn from');
       return;
     }
+
+    console.log(`📊 Loaded ${attendanceData.length} historical spawn records`);
+  }
 
     // Group by boss and calculate intervals
     const bossKills = new Map(); // bossName -> [killTimes]
@@ -167,9 +171,38 @@ class MLSpawnPredictor {
         const intervalMs = killTimes[i] - killTimes[i - 1];
         const intervalHours = intervalMs / (1000 * 60 * 60);
 
-        // Filter out unrealistic intervals (< 1 hour or > 7 days)
+        // Filter out unrealistic intervals
+        // Allow up to 3 days (72h) for most bosses, 7 days (168h) for weekly bosses
         if (intervalHours >= 1 && intervalHours <= 168) {
           intervals.push(intervalHours);
+        }
+      }
+
+      // Apply outlier filtering using IQR method (same as your intelligence-engine.js)
+      // This removes anomalous gaps (e.g., maintenance, guild break periods)
+      if (intervals.length >= 5) {
+        const sortedIntervals = [...intervals].sort((a, b) => a - b);
+
+        // Calculate quartiles
+        const q1Index = Math.floor(sortedIntervals.length * 0.25);
+        const q3Index = Math.floor(sortedIntervals.length * 0.75);
+        const q1 = sortedIntervals[q1Index];
+        const q3 = sortedIntervals[q3Index];
+        const iqr = q3 - q1;
+
+        // Filter outliers beyond 1.5 * IQR
+        if (iqr > 0) {
+          const lowerBound = q1 - (1.5 * iqr);
+          const upperBound = q3 + (1.5 * iqr);
+          const filteredIntervals = intervals.filter(
+            interval => interval >= lowerBound && interval <= upperBound
+          );
+
+          // Only use filtered if we kept at least 60% of data
+          if (filteredIntervals.length >= Math.ceil(intervals.length * 0.6)) {
+            intervals.splice(0, intervals.length, ...filteredIntervals);
+            console.log(`   Filtered ${killTimes.length - filteredIntervals.length} outliers using IQR method`);
+          }
         }
       }
 
@@ -203,10 +236,10 @@ class MLSpawnPredictor {
         lastUpdated: new Date(),
       });
 
+      const windowMinutes = Math.round(stdDev * 60 * 1.96); // 95% confidence interval in minutes
+
       console.log(
-        `✅ Learned pattern for ${bossName}: ${mean.toFixed(2)}h ±${stdDev.toFixed(
-          2
-        )}h (${intervals.length} samples, ${(confidence * 100).toFixed(0)}% confidence)`
+        `✅ ${bossName}: ${mean.toFixed(2)}h ±${windowMinutes}min window (${intervals.length} spawns, ${(confidence * 100).toFixed(0)}% confidence, CV: ${(cv * 100).toFixed(1)}%)`
       );
     }
 
