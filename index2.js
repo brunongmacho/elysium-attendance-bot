@@ -1100,17 +1100,29 @@ function stopBiddingChannelCleanupSchedule() {
 function buildStatsEmbed(stats, member) {
   const { memberName, attendance, bidding, rank, totalMembers } = stats;
 
-  // Calculate percentile
-  const percentile = totalMembers > 0 ? Math.round((1 - (rank / totalMembers)) * 100) : 0;
+  // Calculate percentile (handle null/0 rank)
+  const validRank = rank && rank > 0 ? rank : totalMembers;
+  const percentile = totalMembers > 0 ? Math.round((1 - (validRank / totalMembers)) * 100) : 0;
 
   // Choose embed color based on rank
-  const color = getColorByRank(rank);
+  const color = getColorByRank(validRank);
 
   const embed = new EmbedBuilder()
     .setColor(color)
     .setTitle(`📊 Member Stats - ${memberName}`)
-    .setThumbnail(member.user.displayAvatarURL())
     .setTimestamp();
+
+  // Only set thumbnail if we have a valid member object
+  if (member && member.user) {
+    embed.setThumbnail(member.user.displayAvatarURL());
+  }
+
+  // Format rank display
+  const rankDisplay = rank && rank > 0 ? `**#${rank}** ${getRankEmoji(rank)}` : `**Unranked**`;
+
+  // Format streak display (singular vs plural)
+  const streakText = attendance.streak === 1 ? '1 day' : `${attendance.streak} days`;
+  const streakDisplay = attendance.streak > 0 ? `**${streakText}** 🔥` : `**${streakText}**`;
 
   // COMPACT FORMAT - Inline fields for key metrics
   embed.addFields(
@@ -1126,7 +1138,7 @@ function buildStatsEmbed(stats, member) {
     },
     {
       name: '📊 Ranking',
-      value: `**#${rank}** ${getRankEmoji(rank)}\n**${attendance.streak}** days ${attendance.streak > 0 ? '🔥' : ''}\n${getActivityLevel(attendance.rate)}`,
+      value: `${rankDisplay}\n${streakDisplay}\n${getActivityLevel(attendance.rate)}`,
       inline: true
     }
   );
@@ -1145,14 +1157,15 @@ function buildStatsEmbed(stats, member) {
     });
   }
 
-  // Footer with favorite boss
+  // Footer with favorite boss and percentile
+  const percentileText = percentile > 0 ? `Top ${percentile}%` : 'New Member';
   if (attendance.favoriteBoss) {
     embed.setFooter({
-      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • Top ${percentile}%`
+      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText}`
     });
   } else {
     embed.setFooter({
-      text: `Top ${percentile}%`
+      text: percentileText
     });
   }
 
@@ -1585,7 +1598,24 @@ const commandHandlers = {
         targetMember = message.mentions.members.first();
         targetName = targetMember.displayName;
       } else {
+        // User provided a name without @mention
         targetName = args.join(" ");
+
+        // Try to find the member in the guild by displayName
+        const guild = message.guild;
+        if (guild) {
+          const foundMember = guild.members.cache.find(
+            m => m.displayName.toLowerCase() === targetName.toLowerCase() ||
+                 m.user.username.toLowerCase() === targetName.toLowerCase()
+          );
+
+          if (foundMember) {
+            targetMember = foundMember;
+          } else {
+            // Member not in cache, set to null to avoid using wrong avatar
+            targetMember = null;
+          }
+        }
       }
     }
 

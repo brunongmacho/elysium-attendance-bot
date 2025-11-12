@@ -3253,7 +3253,7 @@ function getMemberStats(data) {
     // GET RANK
     // ==========================================
     const totalAttendanceSheet = ss.getSheetByName('TOTAL ATTENDANCE');
-    let rank = 0;
+    let rank = null;
     let totalMembers = 0;
 
     if (totalAttendanceSheet && totalAttendanceSheet.getLastRow() > 1) {
@@ -3270,10 +3270,30 @@ function getMemberStats(data) {
 
       totalMembers = members.length;
       const memberIndex = members.findIndex(m => m.name === memberName);
-      rank = memberIndex >= 0 ? memberIndex + 1 : 0;
+
+      if (memberIndex >= 0) {
+        rank = memberIndex + 1;
+      } else {
+        // Member not in TOTAL ATTENDANCE sheet yet - use their actual attendance points
+        // Insert them in sorted position based on their points
+        let insertPosition = 0;
+        for (let i = 0; i < members.length; i++) {
+          if (attendanceData.points > members[i].points) {
+            break;
+          }
+          insertPosition++;
+        }
+        rank = insertPosition + 1;
+        totalMembers = members.length + 1; // Include this member in total count
+        Logger.log(`⚠️ ${memberName} not found in TOTAL ATTENDANCE, calculated rank: ${rank} (${attendanceData.points} pts)`);
+      }
+    } else {
+      // No TOTAL ATTENDANCE sheet or it's empty
+      rank = 1;
+      totalMembers = 1;
     }
 
-    Logger.log(`✅ Fetched stats for ${memberName}: Rank #${rank}, ${attendanceData.total} attendance, ${biddingData.left} points left`);
+    Logger.log(`✅ Fetched stats for ${memberName}: Rank #${rank}, ${attendanceData.total} attendance, ${attendanceData.points} pts`);
 
     return createResponse('ok', 'Member stats fetched', {
       memberName: memberName,
@@ -3291,21 +3311,67 @@ function getMemberStats(data) {
 
 /**
  * Helper: Get boss point value from boss name
+ * Updated with complete boss list matching boss_points.json
  */
 function getBossPointValue(bossName) {
-  const bossPoints = {
-    'Kundun': 3,
-    'Selupan': 5,
-    'Red Dragon': 4,
-    'Maya': 8,
-    'Nightmare': 10,
-    'Medusa': 12,
-    'Balgass': 15,
-    'Gorgon': 18,
-    'Gaion': 20
+  if (!bossName) return 1;
+
+  // Normalize boss name for case-insensitive matching
+  const normalizedName = bossName.toString().trim().toUpperCase();
+
+  // Complete boss points map (from boss_points.json)
+  const bossPointsMap = {
+    'VENATUS': 1,
+    'VIORENT': 1,
+    'EGO': 1,
+    'CLEMANTIS': 1,
+    'LIVERA': 1,
+    'ARANEO': 1,
+    'UNDOMIEL': 1,
+    'SAPHIRUS': 1,
+    'NEUTRO': 1,
+    'LADY DALIA': 1,
+    'DALIA': 1,
+    'GENERAL AQULEUS': 1,
+    'AQULEUS': 1,
+    'AQUELEUS': 1,
+    'THYMELE': 1,
+    'AMENTIS': 1,
+    'BARON BRAUDMORE': 1,
+    'BRAUDMORE': 1,
+    'MILAVY': 2,
+    'WANNITAS': 2,
+    'METUS': 2,
+    'DUPLICAN': 2,
+    'SHULIAR': 2,
+    'RINGOR': 2,
+    'RODERICK': 2,
+    'GARETH': 2,
+    'TITORE': 2,
+    'LARBA': 2,
+    'CATENA': 3,
+    'AURAQ': 3,
+    'SECRETA': 3,
+    'ORDO': 3,
+    'ASTA': 3,
+    'SUPORE': 3,
+    'CHAIFLOCK': 3,
+    'BENJI': 3,
+    'KUNDUN': 3,
+    'SELUPAN': 5,
+    'RED DRAGON': 4,
+    'MAYA': 8,
+    'NIGHTMARE': 10,
+    'MEDUSA': 12,
+    'BALGASS': 15,
+    'GORGON': 18,
+    'GAION': 20,
+    'GUILD BOSS': 0,
+    'GUILDBOSS': 0,
+    'GB': 0
   };
 
-  return bossPoints[bossName] || 1;
+  return bossPointsMap[normalizedName] || 1;
 }
 
 /**
