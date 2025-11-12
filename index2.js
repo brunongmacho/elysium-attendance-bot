@@ -1117,8 +1117,10 @@ function buildStatsEmbed(stats, member, countdown = 30) {
     embed.setThumbnail(member.user.displayAvatarURL());
   }
 
-  // Format rank display
-  const rankDisplay = rank && rank > 0 ? `**#${rank}** ${getRankEmoji(rank)}` : `**Unranked**`;
+  // Format rank display with savage titles
+  const rankNumber = rank && rank > 0 ? `#${rank}` : `Unranked`;
+  const rankTitle = getRankTitle(rank, attendance);
+  const rankDisplay = rank && rank > 0 ? `**${rankNumber}**\n${rankTitle}` : rankTitle;
 
   // Format streak display (singular vs plural)
   const streakText = attendance.streak === 1 ? '1 day' : `${attendance.streak} days`;
@@ -1185,6 +1187,84 @@ function getColorByRank(rank) {
   if (rank === 3) return 0xCD7F32; // Bronze
   if (rank <= 10) return 0x00D9FF; // Cyan
   return 0x5865F2; // Blurple
+}
+
+/**
+ * Get savage/rewarding rank title based on position
+ * @param {number} rank - Member's rank
+ * @param {Object} attendance - Attendance data
+ * @returns {string} Title text
+ */
+function getRankTitle(rank, attendance) {
+  // Special case: No attendance
+  if (!attendance || attendance.total === 0) {
+    return "👻 Ghost Member (Do You Even Exist?)";
+  }
+
+  // Special case: Unranked
+  if (!rank || rank <= 0) {
+    return "🌱 Fresh Meat (Newbie)";
+  }
+
+  // RANK #1 - THE ABSOLUTE GOD
+  if (rank === 1) return "👑 GOD OF ELYSIUM 👑";
+
+  // TOP 2-3 - LEGENDARY STATUS
+  if (rank === 2) return "🥈 ATTENDANCE DEMON 🥈";
+  if (rank === 3) return "🥉 GUILD BACKBONE 🥉";
+
+  // ELITE 4-6 - INSANE DEDICATION
+  if (rank === 4) return "⚡ ULTIMATE TRYHARD ⚡";
+  if (rank === 5) return "💎 DIAMOND GRINDER 💎";
+  if (rank === 6) return "🔱 NO SLEEP WARRIOR 🔱";
+
+  // VERY HIGH 7-10 - SUPER ACTIVE
+  if (rank === 7) return "🔥 ATTENDANCE DEMON 🔥";
+  if (rank === 8) return "💪 GIGACHAD MEMBER 💪";
+  if (rank === 9) return "⭐ SWEATLORD SUPREME ⭐";
+  if (rank === 10) return "🎯 TOP 10 BEAST 🎯";
+
+  // HIGH 11-15 - VERY CONSISTENT
+  if (rank >= 11 && rank <= 12) return "⚔️ Elite Sweeper";
+  if (rank >= 13 && rank <= 15) return "🌟 Hardcore Regular";
+
+  // UPPER MID 16-20 - ACTIVE
+  if (rank >= 16 && rank <= 17) return "🎖️ Professional Grinder";
+  if (rank >= 18 && rank <= 20) return "📈 Rising Star";
+
+  // MID 21-25 - SOLID MEMBER
+  if (rank >= 21 && rank <= 23) return "💼 Solid Contributor";
+  if (rank >= 24 && rank <= 25) return "🎮 Active Member";
+
+  // LOWER MID 26-30 - DECENT
+  if (rank >= 26 && rank <= 28) return "😎 Chill Gamer";
+  if (rank >= 29 && rank <= 30) return "🌊 Wave Rider";
+
+  // REGULAR 31-35 - AVERAGE
+  if (rank >= 31 && rank <= 33) return "🌿 Grass Toucher (Has a Life)";
+  if (rank >= 34 && rank <= 35) return "☕ Coffee Break Enjoyer";
+
+  // CASUAL 36-40 - PART-TIMER
+  if (rank >= 36 && rank <= 38) return "📱 Part-Time Player";
+  if (rank >= 39 && rank <= 40) return "🍃 Breeze Cruiser";
+
+  // LOW 41-45 - SAVAGE ZONE BEGINS
+  if (rank >= 41 && rank <= 43) return "💀 Bench Warmer";
+  if (rank >= 44 && rank <= 45) return "🎪 Guild Mascot";
+
+  // VERY LOW 46-48 - BRUTAL HONESTY
+  if (rank === 46) return "👻 Professional AFK";
+  if (rank === 47) return "🦥 Sloth Mode Activated";
+  if (rank === 48) return "🪦 Barely Alive";
+
+  // BOTTOM 2 - ULTIMATE ROAST
+  if (rank === 49) return "🤡 Second to Dead Last";
+  if (rank === 50) return "🗿 THE ANCHOR (Congrats on Last Place!)";
+
+  // Fallback for ranks beyond 50
+  if (rank > 50) return "🗿 Beyond the Abyss";
+
+  return "📊 Member";
 }
 
 /**
