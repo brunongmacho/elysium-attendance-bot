@@ -1728,6 +1728,23 @@ const commandHandlers = {
       ? `🔴 Active: **${biddingState.a.item}** (${biddingState.a.curBid}pts)`
       : `🟢 Queue: ${biddingState.q.length} item(s)`;
 
+    // Get ML statistics if available
+    let mlStats = null;
+    let mlStatusText = '⚠️ Disabled';
+    if (mlIntegration) {
+      try {
+        mlStats = await mlIntegration.getStats();
+        if (mlStats && mlStats.enabled) {
+          const patternsCount = mlStats.spawn?.patternsLearned || 0;
+          mlStatusText = patternsCount > 0
+            ? `✅ Active - ${patternsCount} boss patterns learned`
+            : `🟡 Learning - No patterns yet`;
+        }
+      } catch (mlError) {
+        mlStatusText = `⚠️ Error: ${mlError.message}`;
+      }
+    }
+
     const embed = new EmbedBuilder()
       .setColor(0x00ff00)
       .setTitle("📊 Bot Status")
@@ -1754,7 +1771,8 @@ const commandHandlers = {
           value: spawnListText + moreSpawns,
           inline: false,
         },
-        { name: "💰 Bidding System", value: biddingStatus, inline: false }
+        { name: "💰 Bidding System", value: biddingStatus, inline: false },
+        { name: "🤖 ML Spawn Predictor", value: mlStatusText, inline: false }
       )
       .setFooter({ text: `Requested by ${member.user.username}` })
       .setTimestamp();
@@ -4290,7 +4308,7 @@ const commandHandlers = {
     const subcommand = args[0]?.toLowerCase();
 
     try {
-      // !rotation status - Show all rotation statuses
+      // !rotation status - Show all rotation statuses with ML predictions
       if (!subcommand || subcommand === 'status') {
         const rotations = await bossRotation.getAllRotations();
         const rotatingBosses = bossRotation.getRotatingBosses();
@@ -4303,7 +4321,7 @@ const commandHandlers = {
         const embed = new EmbedBuilder()
           .setColor(0x4a90e8)
           .setTitle('🔄 Boss Rotation Status')
-          .setDescription('Current rotation for 5-guild system')
+          .setDescription('Current rotation for 5-guild system with ML-enhanced spawn predictions')
           .setTimestamp();
 
         for (const boss of rotatingBosses) {
@@ -4311,9 +4329,37 @@ const commandHandlers = {
           if (rotation) {
             const emoji = rotation.isOurTurn ? '🟢' : '🔴';
             const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
+
+            // Get ML-enhanced spawn prediction
+            let spawnInfo = '';
+            try {
+              const prediction = await intelligenceEngine.predictNextSpawnTime(boss);
+              if (prediction && !prediction.error) {
+                // Try to get ML enhancement
+                let mlEnhancement = null;
+                if (mlIntegration) {
+                  mlEnhancement = await mlIntegration.enhanceSpawnPrediction(
+                    prediction.bossName,
+                    prediction.lastSpawnTime,
+                    prediction.avgIntervalHours || 24
+                  );
+                }
+
+                const spawnTimestamp = Math.floor(prediction.predictedTime.getTime() / 1000);
+                const mlWindow = mlEnhancement && mlEnhancement.method === 'ml'
+                  ? ` (±${Math.round(mlEnhancement.confidenceInterval.windowMinutes / 2)}min 🤖)`
+                  : '';
+
+                spawnInfo = `\n📍 Next Spawn: <t:${spawnTimestamp}:R>${mlWindow}`;
+              }
+            } catch (predError) {
+              // Silently skip prediction if it fails
+              console.warn(`[Rotation] Failed to predict ${boss}:`, predError.message);
+            }
+
             embed.addFields({
               name: `${emoji} ${boss}`,
-              value: `Guild ${rotation.currentIndex}/5 - **${status}**\nNext: ${rotation.guilds[rotation.currentIndex % 5]}`,
+              value: `Guild ${rotation.currentIndex}/5 - **${status}**\nNext: ${rotation.guilds[rotation.currentIndex % 5]}${spawnInfo}`,
               inline: false
             });
           }
