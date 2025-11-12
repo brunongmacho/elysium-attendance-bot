@@ -1097,7 +1097,7 @@ function stopBiddingChannelCleanupSchedule() {
  * @param {GuildMember} member - Discord guild member
  * @returns {EmbedBuilder} Formatted stats embed
  */
-function buildStatsEmbed(stats, member) {
+function buildStatsEmbed(stats, member, countdown = 30) {
   const { memberName, attendance, bidding, rank, totalMembers } = stats;
 
   // Calculate percentile (handle null/0 rank)
@@ -1159,13 +1159,15 @@ function buildStatsEmbed(stats, member) {
 
   // Footer with favorite boss and percentile
   const percentileText = percentile > 0 ? `Top ${percentile}%` : 'New Member';
+  const countdownText = countdown > 0 ? ` • Auto-deletes in ${countdown}s` : '';
+
   if (attendance.favoriteBoss) {
     embed.setFooter({
-      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText} • Auto-deletes in 30s`
+      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText}${countdownText}`
     });
   } else {
     embed.setFooter({
-      text: `${percentileText} • Auto-deletes in 30s`
+      text: `${percentileText}${countdownText}`
     });
   }
 
@@ -1209,6 +1211,60 @@ function getActivityLevel(rate) {
   if (rate >= 50) return 'Moderate ⭐';
   if (rate > 0) return 'Casual';
   return 'Inactive';
+}
+
+/**
+ * Start a live countdown deletion for a message with embed
+ * Updates the message every 5 seconds to show remaining time, then deletes
+ *
+ * @param {Message} message - Original user message to delete
+ * @param {Message} botMessage - Bot's reply message to update and delete
+ * @param {EmbedBuilder} baseEmbed - Base embed to update (will be cloned)
+ * @param {Function} updateEmbedFooter - Function to update embed footer with countdown
+ *                                       Should accept (embed, countdown) and return updated embed
+ * @param {number} duration - Total duration in seconds (default: 30)
+ */
+async function startCountdownDeletion(message, botMessage, stats, member, updateFunction, duration = 30) {
+  let remainingTime = duration;
+
+  // Delete user's command message immediately
+  try {
+    await errorHandler.safeDelete(message, 'message deletion');
+  } catch (e) {
+    console.warn(`⚠️ Could not delete user message: ${e.message}`);
+  }
+
+  // Update every 5 seconds: 30s, 25s, 20s, 15s, 10s, 5s
+  const updateInterval = 5;
+  const countdownTimer = setInterval(async () => {
+    remainingTime -= updateInterval;
+
+    if (remainingTime <= 0) {
+      // Time's up - delete the message
+      clearInterval(countdownTimer);
+      try {
+        await errorHandler.safeDelete(botMessage, 'message deletion');
+      } catch (e) {
+        console.warn(`⚠️ Could not delete bot message: ${e.message}`);
+      }
+      return;
+    }
+
+    // Update the embed with new countdown
+    try {
+      const updatedEmbed = updateFunction(stats, member, remainingTime);
+      await botMessage.edit({ embeds: [updatedEmbed] });
+    } catch (e) {
+      console.warn(`⚠️ Could not update countdown: ${e.message}`);
+      // If update fails, just delete the message
+      clearInterval(countdownTimer);
+      try {
+        await errorHandler.safeDelete(botMessage, 'message deletion');
+      } catch (deleteErr) {
+        console.warn(`⚠️ Could not delete bot message: ${deleteErr.message}`);
+      }
+    }
+  }, updateInterval * 1000);
 }
 
 // =====================================================================
@@ -1623,20 +1679,11 @@ const commandHandlers = {
     const cached = statsCache.get(targetName);
     if (cached && (Date.now() - cached.timestamp < STATS_CACHE_DURATION)) {
       console.log(`📦 Using cached stats for ${targetName}`);
-      const embed = buildStatsEmbed(cached.data, targetMember);
+      const embed = buildStatsEmbed(cached.data, targetMember, 30);
       const statsMsg = await message.reply({ embeds: [embed] });
 
-      // Delete user's command message
-      try {
-        await errorHandler.safeDelete(message, 'message deletion');
-      } catch (e) {
-        console.warn(`⚠️ Could not delete user message: ${e.message}`);
-      }
-
-      // Auto-delete bot response after 30 seconds
-      setTimeout(async () => {
-        await errorHandler.safeDelete(statsMsg, 'message deletion');
-      }, 30000);
+      // Start countdown deletion
+      startCountdownDeletion(message, statsMsg, cached.data, targetMember, buildStatsEmbed, 30);
 
       return;
     }
@@ -1660,20 +1707,11 @@ const commandHandlers = {
       });
 
       // Build and send embed
-      const embed = buildStatsEmbed(result, targetMember);
+      const embed = buildStatsEmbed(result, targetMember, 30);
       await loadingMsg.edit({ content: null, embeds: [embed] });
 
-      // Delete user's command message
-      try {
-        await errorHandler.safeDelete(message, 'message deletion');
-      } catch (e) {
-        console.warn(`⚠️ Could not delete user message: ${e.message}`);
-      }
-
-      // Auto-delete bot response after 30 seconds
-      setTimeout(async () => {
-        await errorHandler.safeDelete(loadingMsg, 'message deletion');
-      }, 30000);
+      // Start countdown deletion
+      startCountdownDeletion(message, loadingMsg, result, targetMember, buildStatsEmbed, 30);
 
       console.log(`✅ Stats sent for ${targetName}`);
 

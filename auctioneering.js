@@ -2711,21 +2711,12 @@ async function handleMyPoints(message, biddingModule, config) {
   } else {
     ptsMsg = await message.channel.send({
       embeds: [
-        new EmbedBuilder()
-          .setColor(0x00ff00)
-          .setTitle(`${EMOJI.BID} Your Points`)
-          .setDescription(`**${u}**`)
-          .addFields({
-            name: `${EMOJI.CHART} Available Points`,
-            value: `${userPts} pts`,
-            inline: true,
-          })
-          .setFooter({ text: "Auto-deletes in 30s" })
-          .setTimestamp(),
+        buildMyPointsEmbed(u, userPts, 30)
       ],
     });
   }
 
+  // Delete user's command message immediately
   try {
     await errorHandler.safeDelete(message, 'message deletion');
   } catch (e) {
@@ -2734,9 +2725,80 @@ async function handleMyPoints(message, biddingModule, config) {
     );
   }
 
-  setTimeout(async () => {
-    await errorHandler.safeDelete(ptsMsg, 'message deletion');
-  }, 30000);
+  // Start countdown deletion (only for success case)
+  if (userPts !== null && userPts !== undefined) {
+    startMyPointsCountdown(ptsMsg, u, userPts, 30);
+  } else {
+    // Error message - just delete after 30s without countdown
+    setTimeout(async () => {
+      await errorHandler.safeDelete(ptsMsg, 'message deletion');
+    }, 30000);
+  }
+}
+
+/**
+ * Build the MyPoints embed with dynamic countdown
+ * @param {string} username - User's display name
+ * @param {number} points - User's available points
+ * @param {number} countdown - Countdown seconds
+ * @returns {EmbedBuilder}
+ */
+function buildMyPointsEmbed(username, points, countdown = 30) {
+  const countdownText = countdown > 0 ? `Auto-deletes in ${countdown}s` : 'Deleting...';
+
+  return new EmbedBuilder()
+    .setColor(0x00ff00)
+    .setTitle(`${EMOJI.BID} Your Points`)
+    .setDescription(`**${username}**`)
+    .addFields({
+      name: `${EMOJI.CHART} Available Points`,
+      value: `${points} pts`,
+      inline: true,
+    })
+    .setFooter({ text: countdownText })
+    .setTimestamp();
+}
+
+/**
+ * Start live countdown for MyPoints message
+ * @param {Message} botMessage - Bot's message to update and delete
+ * @param {string} username - User's display name
+ * @param {number} points - User's points
+ * @param {number} duration - Duration in seconds
+ */
+async function startMyPointsCountdown(botMessage, username, points, duration = 30) {
+  let remainingTime = duration;
+  const updateInterval = 5; // Update every 5 seconds
+
+  const countdownTimer = setInterval(async () => {
+    remainingTime -= updateInterval;
+
+    if (remainingTime <= 0) {
+      // Time's up - delete the message
+      clearInterval(countdownTimer);
+      try {
+        await errorHandler.safeDelete(botMessage, 'message deletion');
+      } catch (e) {
+        console.warn(`${EMOJI.WARNING} Could not delete bot message: ${e.message}`);
+      }
+      return;
+    }
+
+    // Update the embed with new countdown
+    try {
+      const updatedEmbed = buildMyPointsEmbed(username, points, remainingTime);
+      await botMessage.edit({ embeds: [updatedEmbed] });
+    } catch (e) {
+      console.warn(`${EMOJI.WARNING} Could not update countdown: ${e.message}`);
+      // If update fails, just delete the message
+      clearInterval(countdownTimer);
+      try {
+        await errorHandler.safeDelete(botMessage, 'message deletion');
+      } catch (deleteErr) {
+        console.warn(`${EMOJI.WARNING} Could not delete bot message: ${deleteErr.message}`);
+      }
+    }
+  }, updateInterval * 1000);
 }
 
 /**
