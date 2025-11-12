@@ -1161,11 +1161,11 @@ function buildStatsEmbed(stats, member) {
   const percentileText = percentile > 0 ? `Top ${percentile}%` : 'New Member';
   if (attendance.favoriteBoss) {
     embed.setFooter({
-      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText}`
+      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText} • Auto-deletes in 30s`
     });
   } else {
     embed.setFooter({
-      text: percentileText
+      text: `${percentileText} • Auto-deletes in 30s`
     });
   }
 
@@ -1624,7 +1624,21 @@ const commandHandlers = {
     if (cached && (Date.now() - cached.timestamp < STATS_CACHE_DURATION)) {
       console.log(`📦 Using cached stats for ${targetName}`);
       const embed = buildStatsEmbed(cached.data, targetMember);
-      return await message.reply({ embeds: [embed] });
+      const statsMsg = await message.reply({ embeds: [embed] });
+
+      // Delete user's command message
+      try {
+        await errorHandler.safeDelete(message, 'message deletion');
+      } catch (e) {
+        console.warn(`⚠️ Could not delete user message: ${e.message}`);
+      }
+
+      // Auto-delete bot response after 30 seconds
+      setTimeout(async () => {
+        await errorHandler.safeDelete(statsMsg, 'message deletion');
+      }, 30000);
+
+      return;
     }
 
     // Show loading message
@@ -1648,6 +1662,18 @@ const commandHandlers = {
       // Build and send embed
       const embed = buildStatsEmbed(result, targetMember);
       await loadingMsg.edit({ content: null, embeds: [embed] });
+
+      // Delete user's command message
+      try {
+        await errorHandler.safeDelete(message, 'message deletion');
+      } catch (e) {
+        console.warn(`⚠️ Could not delete user message: ${e.message}`);
+      }
+
+      // Auto-delete bot response after 30 seconds
+      setTimeout(async () => {
+        await errorHandler.safeDelete(loadingMsg, 'message deletion');
+      }, 30000);
 
       console.log(`✅ Stats sent for ${targetName}`);
 
