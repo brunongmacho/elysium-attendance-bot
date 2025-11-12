@@ -201,19 +201,26 @@ class SheetAPI {
    * const points = await api.call('getBiddingPoints');
    * const result = await api.call('saveAuctionResults', { items: [...] });
    */
-    /**
+     /**
    * Make an API call to Google Sheets (Koyeb-stable version)
    */
   async call(action, data = {}, callOptions = {}) {
     const options = { ...this.options, ...callOptions };
     const startTime = Date.now();
-    const { fetch } = await import("undici");
+    const { fetch, Agent } = await import("undici");
+
+    // Custom agent with longer connect timeout (30s)
+    const agent = new Agent({
+      connect: {
+        timeout: 30000, // default 10 000 ms → now 30 000 ms
+      },
+    });
 
     if (options.enableCircuitBreaker && !checkCircuitBreaker()) {
       const error = new Error(
         `Circuit breaker is OPEN. Wait ${Math.round(circuitBreaker.resetTimeout / 1000)}s before retry.`
       );
-      error.code = 'CIRCUIT_BREAKER_OPEN';
+      error.code = "CIRCUIT_BREAKER_OPEN";
       throw error;
     }
 
@@ -243,6 +250,7 @@ class SheetAPI {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action, ...data }),
           signal: controller.signal,
+          dispatcher: agent, // use custom agent with longer connect timeout
         });
 
         clearTimeout(timeoutId);
@@ -262,7 +270,6 @@ class SheetAPI {
         return result;
 
       } catch (error) {
-        // Handle undici network errors (Cloudflare timeouts, TLS delays)
         const transientErrors = [
           "UND_ERR_CONNECT_TIMEOUT",
           "UND_ERR_HEADERS_TIMEOUT",
@@ -273,8 +280,11 @@ class SheetAPI {
           "TimeoutError"
         ];
 
-        const isTransient = transientErrors.some(code => error.code?.includes(code) || error.message.includes(code));
-        const isRateLimitError = error.message.includes("HTTP 429") || error.message.includes("Too Many Requests");
+        const isTransient = transientErrors.some(
+          code => error.code?.includes(code) || error.message.includes(code)
+        );
+        const isRateLimitError =
+          error.message.includes("HTTP 429") || error.message.includes("Too Many Requests");
 
         if (isRateLimitError && !isRateLimited) {
           isRateLimited = true;
@@ -282,8 +292,8 @@ class SheetAPI {
           console.log("⚠️ Rate limit detected. Switching to extended retry strategy...");
         }
 
-        if (error.name === "AbortError") {
-          console.error(`⏱️ Timeout on ${action} (${options.timeout}ms)`);
+        if (isTransient || error.name === "AbortError") {
+          console.warn(`⚠️ Transient network issue (${error.code || error.name}): retrying...`);
         } else {
           console.error(`❌ API error on ${action}: ${error.message}`);
         }
@@ -293,11 +303,12 @@ class SheetAPI {
         const maxDelay = isRateLimited ? options.rateLimitMaxDelay : options.maxDelay;
         const delay = calculateBackoff(attemptForBackoff, baseDelay, maxDelay, isRateLimited);
 
-        console.log(`⏳ Retrying in ${Math.round(delay / 1000)}s... (${attemptForBackoff + 1}/${maxRetries})`);
+        console.log(`⏳ Waiting ${Math.round(delay / 1000)}s before retry (${attemptForBackoff + 1}/${maxRetries})...`);
         await sleep(delay);
       }
     }
   }
+
 
 
   // ========================================================================
