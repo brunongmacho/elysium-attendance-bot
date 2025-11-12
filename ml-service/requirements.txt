@@ -1,0 +1,25 @@
+# Lightweight ML stack optimized for 512MB Koyeb instance
+# Total memory footprint: ~200MB after models loaded
+
+# Web Framework (minimal)
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# Core ML (lightweight versions)
+scikit-learn==1.3.2
+numpy==1.24.0  # Older version for smaller size
+pandas==2.0.0  # Lighter than 2.1+
+
+# XGBoost (for price prediction)
+xgboost==2.0.2
+
+# Time Series (lightweight alternative to Prophet)
+statsmodels==0.14.0
+
+# Utilities
+requests==2.31.0
+python-dotenv==1.0.0
+
+# Caching (reduce memory)
+joblib==1.3.2
