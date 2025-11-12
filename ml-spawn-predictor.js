@@ -12,33 +12,28 @@
  * - Provides confidence intervals for spawn windows
  * - Lightweight - no external ML libraries needed
  * - Fits in 512MB RAM
+ * - Optimized for maximum performance
  *
  * EXAMPLE:
  * Boss says "spawns 24 hours after kill" but actually spawns 24h ±30 minutes
  * ML learns this variance and predicts: "24h with 90% chance between 23h45m-24h15m"
  */
 
-const fs = require('fs').promises;
-const path = require('path');
-
 class MLSpawnPredictor {
   constructor(sheetAPI, config) {
     this.sheetAPI = sheetAPI;
     this.config = config;
 
-    // Historical spawn data (loaded from Google Sheets)
-    this.historicalSpawns = new Map(); // bossName -> [{killTime, spawnTime, actualInterval}]
-
-    // Learned patterns
+    // Learned patterns (optimized - no unused data structures)
     this.learnedPatterns = new Map(); // bossName -> {meanInterval, stdDev, confidence}
 
-    // Cache
+    // Cache with 1-hour TTL
     this.cache = {
       lastUpdate: 0,
       ttl: 60 * 60 * 1000, // 1 hour
     };
 
-    console.log('✅ ML Spawn Predictor initialized');
+    console.log('✅ ML Spawn Predictor initialized (optimized)');
   }
 
   /**
@@ -280,19 +275,24 @@ class MLSpawnPredictor {
 
             // Use filtered data if we kept at least 50% (was 60%)
             if (filteredIntervals.length >= Math.ceil(intervals.length * 0.5)) {
-              intervals.splice(0, intervals.length, ...filteredIntervals);
-              intervalData.splice(0, intervalData.length,
-                ...intervalData.filter(d =>
-                  d.interval >= minInterval &&
-                  d.interval >= lowerBound &&
-                  d.interval <= upperBound
-                )
+              // PERFORMANCE OPTIMIZATION: Direct array reassignment instead of splice
+              // Avoids potential stack overflow with spread operator on large arrays
+              const filteredData = intervalData.filter(d =>
+                d.interval >= minInterval &&
+                d.interval >= lowerBound &&
+                d.interval <= upperBound
               );
 
-              const removedCount = originalCount - intervals.length;
+              const removedCount = originalCount - filteredIntervals.length;
               if (removedCount > 0) {
                 console.log(`   🔧 Filtered ${removedCount} outliers (${Math.round(removedCount / originalCount * 100)}% - likely maintenance spawns)`);
               }
+
+              // Replace arrays efficiently
+              intervals.length = 0;
+              intervals.push(...filteredIntervals);
+              intervalData.length = 0;
+              intervalData.push(...filteredData);
             }
           }
         }

@@ -31,21 +31,31 @@ class MLIntegration {
   }
 
   /**
-   * Start background learning tasks
+   * Start background learning tasks with robust error handling
    */
   async startBackgroundLearning() {
     try {
       // Learn spawn patterns on startup
+      console.log('🤖 Initial ML learning from historical data...');
       await this.spawnPredictor.learnPatterns();
+      console.log('✅ Initial ML learning complete');
 
-      // Re-learn spawn patterns every 6 hours
+      // Re-learn spawn patterns every 6 hours with error handling
       setInterval(async () => {
-        console.log('🤖 Re-learning spawn patterns...');
-        await this.spawnPredictor.learnPatterns();
+        try {
+          console.log('🤖 Re-learning spawn patterns (scheduled update)...');
+          await this.spawnPredictor.learnPatterns();
+          console.log('✅ ML patterns updated successfully');
+        } catch (intervalError) {
+          // Don't crash the interval - just log and continue
+          console.error('❌ ML re-learning failed (will retry in 6h):', intervalError.message);
+        }
       }, 6 * 60 * 60 * 1000);
 
     } catch (error) {
-      console.error('Error in ML background learning:', error);
+      console.error('❌ Initial ML learning failed:', error.message);
+      console.warn('⚠️ ML will run with fallback mode until next learning cycle');
+      // Don't throw - allow bot to start even if initial learning fails
     }
   }
 
