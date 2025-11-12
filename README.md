@@ -30,12 +30,12 @@
 ### 💡 What Makes This Bot Special?
 
 1. **Smart Attendance** - 20-minute auto-close anti-cheat system prevents late check-ins
-2. **Fair Auctions** - Open bidding for all members with race condition protection
+2. **Fair Auctions** - Instant bidding for all members with race condition protection
 3. **Intelligent Analytics** - Statistical price predictions with 85%+ accuracy after bootstrapping
 4. **Proactive Monitoring** - Automated alerts and recommendations
 5. **Natural Language** - Chat with the bot naturally in multiple languages
-6. **High Availability** - Automatic crash recovery with full state restoration (manual restart occasionally needed)
-7. **Resource Efficient** - Optimized caching and indexing (up to 100x faster lookups!)
+6. **High Availability** - Automatic crash recovery with full state restoration
+7. **Performance Optimized** - Multi-level caching, request batching, and parallel operations
 
 ---
 
@@ -75,11 +75,7 @@
 - ✅ **Crash recovery** - full state restoration on restart
 - ✅ **Bulk operations** - verify all, close all, reset pending
 - ✅ **Duplicate prevention** - smart caching with O(1) lookups
-
-**Performance Optimizations:**
-- ⚡ Up to 100x faster column lookups (local caching vs repeated Sheets queries)
-- ⚡ 4-5x faster thread cleanup (parallel batch processing)
-- ⚡ 2-3x faster spawn creation (parallel API calls)
+- ✅ **Highly optimized** - see [Performance](#-performance) section for benchmarks
 
 ---
 
@@ -147,7 +143,14 @@
 | **Engagement Digest** | Mon 9 AM | Admin Logs | Weekly at-risk member report |
 | **Anomaly Digest** | Daily 6 PM | Admin Logs | Fraud/suspicious pattern alerts |
 | **Weekly Summary** | Sun 8 PM | Guild Announcement | Motivational recap + top performers |
+| **Weekly Reports** | Sat 11:59 PM | Admin Logs + Guild Chat | Leaderboard rankings summary |
+| **Monthly Reports** | Last day 11:59 PM | Admin Logs + Guild Chat | Monthly statistics & top performers |
 | **Milestone Celebrations** | Hourly | Guild Announcement | 500/1000/2000/5000 point milestones |
+
+**Channel Configuration:**
+- **Admin Logs** = `admin_logs_channel_id` - For admin notifications and monitoring
+- **Guild Chat** = `elysium_commands_channel_id` - Where members see reports and interact
+- **Guild Announcement** = `guild_announcement_channel_id` - For public celebrations
 
 **Error Handling:**
 - ✅ Automatic retry on failures
@@ -646,45 +649,35 @@ elysium-attendance-bot/
 │   ├── auctioneering.js         # Auction management
 │   ├── help-system.js           # Help command system
 │   ├── emergency-commands.js    # Emergency toolkit
-│   ├── leaderboard-system.js    # Leaderboards & weekly reports
-│   └── boss-rotation.js         # Boss rotation tracking
+│   ├── leaderboard-system.js    # Leaderboards, weekly & monthly reports
+│   ├── boss-rotation.js         # Boss rotation tracking
+│   ├── activity-heatmap.js      # Activity visualization & heatmaps
+│   └── crash-recovery.js        # Automatic crash recovery
 ├── Intelligence Systems/
 │   ├── intelligence-engine.js   # Statistical prediction engine
-│   ├── proactive-intelligence.js # Automated monitoring
-│   └── learning-system.js       # Accuracy tracking system
+│   ├── proactive-intelligence.js # Automated monitoring & alerts
+│   └── learning-system.js       # Prediction accuracy tracking
 ├── NLP Systems/
-│   ├── nlp-handler.js           # Pattern matching
+│   ├── nlp-handler.js           # Pattern matching & parsing
 │   ├── nlp-learning.js          # Pattern learning system
-│   └── nlp-conversation.js      # Conversation management
+│   ├── nlp-conversation.js      # Conversation management
+│   ├── nlp-vocabulary.js        # English vocabulary
+│   ├── nlp-vocabulary-tagalog.js # Tagalog vocabulary
+│   └── nlp-vocabulary-taglish.js # Taglish vocabulary
 ├── Utils/
 │   ├── constants.js             # Centralized constants
-│   ├── sheet-api.js             # Google Sheets API
-│   ├── cache-manager.js         # Caching system
-│   ├── maintenance-scheduler.js # Task scheduler
-│   └── ...
+│   ├── sheet-api.js             # Google Sheets API wrapper
+│   ├── cache-manager.js         # Multi-level L1/L2/L3 caching
+│   ├── request-batcher.js       # Request batching & rate limiting
+│   ├── parallel-sheets.js       # Parallel sheet operations
+│   ├── maintenance-scheduler.js # Unified task scheduler
+│   ├── discord-cache.js         # Discord channel caching
+│   ├── error-handler.js         # Centralized error handling
+│   └── common.js                # Utility functions
 └── config.json                  # Bot configuration
 ```
 
-### **Performance Optimizations**
-
-**Algorithm Improvements:**
-- ✅ Up to 100x faster column lookups (local caching vs repeated Sheets queries)
-- ✅ 4-5x faster thread cleanup (parallel batch processing)
-- ✅ 2-3x faster spawn creation (concurrent API calls)
-
-**Memory Management:**
-- ✅ Unified maintenance scheduler (-2MB overhead)
-- ✅ Aggressive Discord cache sweeping (5-minute message lifetime)
-- ✅ Column check caching (5-min TTL)
-- ✅ Only 5 lightweight dependencies
-
-**Resource Optimization:**
-- ✅ State sync: 10min → 15min (-25% API calls)
-- ✅ Auto-close check: 60s → 90s (-33% CPU cycles)
-- ✅ Production mode logging (-10-15% I/O)
-- ✅ Removed heavy dependencies (sharp, tesseract.js)
-
-**Result:** ~100MB RAM usage (tested on 512MB instances) ✨
+**Note:** For detailed performance metrics, see the [⚡ Performance Optimization Systems](#-performance-optimization-systems) and [📈 Performance](#-performance) sections.
 
 ---
 
@@ -1087,6 +1080,17 @@ A: Check `!diagnostics` for issues. Garbage collection runs every 5 minutes. Res
 
 **Q: Google Sheets sync failing**
 A: Verify webhook URL is correct and Apps Script is deployed. Check triggers are active in Apps Script console.
+
+### **Deprecated Features**
+
+**Q: What happened to the loot system?**
+A: The loot system has been deprecated and disabled. Manual loot entry is now used instead of automated tracking.
+
+**Q: What happened to bid confirmations?**
+A: Bid confirmations (10-second acceptance window) have been removed in favor of instant bidding for faster auction flow.
+
+**Q: What happened to the smart pause system?**
+A: The smart pause system (auto-pause on last-10-second bids) has been deprecated. Auctions now follow standard countdown timers.
 
 ---
 
