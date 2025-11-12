@@ -2431,8 +2431,6 @@ function getForDistribution(data) {
  */
 function getTotalAttendance(data) {
   try {
-    Logger.log('📊 Fetching total attendance data...');
-
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('TOTAL ATTENDANCE');
 
@@ -2445,8 +2443,18 @@ function getTotalAttendance(data) {
       return createResponse('ok', 'No data in TOTAL ATTENDANCE', { members: [] });
     }
 
+    // Add pagination support to prevent timeouts
+    const startRow = (data && data.startRow) || 2;
+    const maxRows = (data && data.maxRows) || 500; // Limit to 500 rows per request
+    const endRow = Math.min(lastRow, startRow + maxRows - 1);
+    const numRows = endRow - startRow + 1;
+
+    if (numRows <= 0) {
+      return createResponse('ok', 'No more data', { members: [], hasMore: false });
+    }
+
     // Get columns: Username (A), Total Attendance (B)
-    const dataRange = sheet.getRange(2, 1, lastRow - 1, 2);
+    const dataRange = sheet.getRange(startRow, 1, numRows, 2);
     const values = dataRange.getValues();
 
     const members = [];
@@ -2463,8 +2471,11 @@ function getTotalAttendance(data) {
       }
     }
 
-    Logger.log(`✅ Fetched attendance for ${members.length} members`);
-    return createResponse('ok', 'Attendance data fetched', { members });
+    return createResponse('ok', 'Attendance data fetched', {
+      members,
+      hasMore: endRow < lastRow,
+      nextStartRow: endRow + 1
+    });
 
   } catch (err) {
     Logger.log('❌ Error fetching attendance: ' + err.toString());
@@ -5663,21 +5674,32 @@ function updateStreakData(data) {
  */
 function getGuildMilestones(data) {
   try {
-    Logger.log('📊 Getting guild milestones...');
-
     const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
     const sheet = ss.getSheetByName('GuildMilestones');
 
     if (!sheet) {
-      Logger.log('⚠️ GuildMilestones sheet not found, returning empty array');
       return createResponse('ok', 'No guild milestones', { data: [] });
     }
 
-    const dataValues = sheet.getDataRange().getValues();
-    const headers = dataValues[0];
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+
+    if (lastRow < 2 || lastCol < 1) {
+      return createResponse('ok', 'No guild milestones data', { data: [] });
+    }
+
+    // Add limits to prevent reading entire sheet
+    const maxRows = Math.min(lastRow - 1, 100); // Limit to 100 milestones
+    const maxCols = Math.min(lastCol, 10); // Limit columns to 10
+
+    // Get headers
+    const headers = sheet.getRange(1, 1, 1, maxCols).getValues()[0];
+
+    // Get data with limits
+    const dataValues = sheet.getRange(2, 1, maxRows, maxCols).getValues();
     const milestones = [];
 
-    for (let i = 1; i < dataValues.length; i++) {
+    for (let i = 0; i < dataValues.length; i++) {
       const row = {};
       headers.forEach((header, idx) => {
         row[header] = dataValues[i][idx];
@@ -5685,7 +5707,6 @@ function getGuildMilestones(data) {
       milestones.push(row);
     }
 
-    Logger.log(`✅ Found ${milestones.length} guild milestones`);
     return createResponse('ok', 'Guild milestones fetched', { data: milestones });
 
   } catch (err) {

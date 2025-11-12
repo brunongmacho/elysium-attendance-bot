@@ -201,155 +201,115 @@ class SheetAPI {
    * const points = await api.call('getBiddingPoints');
    * const result = await api.call('saveAuctionResults', { items: [...] });
    */
+     /**
+   * Make an API call to Google Sheets (Koyeb-stable version)
+   */
   async call(action, data = {}, callOptions = {}) {
     const options = { ...this.options, ...callOptions };
     const startTime = Date.now();
+    const { fetch, Agent } = await import("undici");
 
-    // Check circuit breaker
+    // Custom agent with longer connect timeout (30s)
+    const agent = new Agent({
+      connect: {
+        timeout: 30000, // default 10 000 ms → now 30 000 ms
+      },
+    });
+
     if (options.enableCircuitBreaker && !checkCircuitBreaker()) {
       const error = new Error(
-        `Circuit breaker is OPEN. Too many recent failures. ` +
-        `Wait ${Math.round(circuitBreaker.resetTimeout / 1000)}s before retry.`
+        `Circuit breaker is OPEN. Wait ${Math.round(circuitBreaker.resetTimeout / 1000)}s before retry.`
       );
-      error.code = 'CIRCUIT_BREAKER_OPEN';
+      error.code = "CIRCUIT_BREAKER_OPEN";
       throw error;
     }
 
     metrics.totalRequests++;
 
-    // Track if we've hit rate limits
     let isRateLimited = false;
     let rateLimitAttempts = 0;
     let normalAttempts = 0;
 
-    // Retry loop - use different max retries for rate limits
     while (true) {
       const currentAttempt = isRateLimited ? rateLimitAttempts : normalAttempts;
       const maxRetries = isRateLimited ? options.rateLimitMaxRetries : options.maxRetries;
 
-      // Check if we've exceeded max retries
       if (currentAttempt >= maxRetries) {
         recordFailure();
-        const errorType = isRateLimited ? ' (rate limit)' : '';
-        throw new Error(`API call failed after ${maxRetries} attempts${errorType}: Last error was a retry limit`);
+        throw new Error(`API call failed after ${maxRetries} attempts.`);
       }
 
       try {
-        // Only log retries and important events (reduced spam)
-        if (!options.silent) {
-          if (normalAttempts > 0 || rateLimitAttempts > 0) {
-            // Log retries
-            const retryNum = isRateLimited ? rateLimitAttempts : normalAttempts;
-            console.log(`🔄 Retry ${retryNum}/${maxRetries}: ${action}`);
-            metrics.totalRetries++;
-          }
-          // Removed verbose "📤 API call" logging for normal requests
-        }
+        if (isRateLimited) rateLimitAttempts++; else normalAttempts++;
 
-        // Increment attempt counter
-        if (isRateLimited) {
-          rateLimitAttempts++;
-        } else {
-          normalAttempts++;
-        }
-
-        // Make request with timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), options.timeout);
 
         const response = await fetch(this.webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action, ...data }),
           signal: controller.signal,
+          dispatcher: agent, // use custom agent with longer connect timeout
         });
 
         clearTimeout(timeoutId);
 
-        // Check HTTP status
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
-        // Parse response
         const result = await response.json();
+        if (result.status === "error") throw new Error(result.message || "Sheet operation failed");
 
-        // Check application-level status
-        if (result.status === 'error') {
-          throw new Error(result.message || 'Sheet operation failed');
-        }
-
-        // Success!
         const duration = Date.now() - startTime;
         metrics.avgResponseTime = Math.round(
           (metrics.avgResponseTime * (metrics.successfulRequests - 1) + duration) /
-          metrics.successfulRequests
+          Math.max(1, metrics.successfulRequests)
         );
         metrics.lastRequestTime = Date.now();
-
         recordSuccess();
-
-        // Removed verbose success logging (only log retries and errors)
         return result;
 
       } catch (error) {
-        // Check if this is a rate limit error (HTTP 429)
-        const isRateLimitError = error.message.includes('HTTP 429') ||
-                                  error.message.includes('rate limit') ||
-                                  error.message.includes('Too Many Requests');
+        const transientErrors = [
+          "UND_ERR_CONNECT_TIMEOUT",
+          "UND_ERR_HEADERS_TIMEOUT",
+          "UND_ERR_SOCKET",
+          "ECONNRESET",
+          "ECONNREFUSED",
+          "FetchError",
+          "TimeoutError"
+        ];
 
-        // If we hit a rate limit, switch to rate limit mode
+        const isTransient = transientErrors.some(
+          code => error.code?.includes(code) || error.message.includes(code)
+        );
+        const isRateLimitError =
+          error.message.includes("HTTP 429") || error.message.includes("Too Many Requests");
+
         if (isRateLimitError && !isRateLimited) {
           isRateLimited = true;
           rateLimitAttempts = 0;
-          console.log(`⚠️ Rate limit detected (HTTP 429). Switching to extended retry strategy...`);
-          console.log(`📊 Will retry up to ${options.rateLimitMaxRetries} times with longer delays (${options.rateLimitBaseDelay / 1000}s base)`);
+          console.log("⚠️ Rate limit detected. Switching to extended retry strategy...");
         }
 
-        const currentAttempt = isRateLimited ? rateLimitAttempts : normalAttempts;
-        const maxRetries = isRateLimited ? options.rateLimitMaxRetries : options.maxRetries;
-        const isLastAttempt = currentAttempt >= maxRetries;
-
-        // Handle abort/timeout - create new error instead of modifying read-only property
-        let errorToHandle = error;
-        if (error.name === 'AbortError') {
-          console.error(`⏱️ Timeout on ${action} (${options.timeout}ms)`);
-          errorToHandle = new Error(`Request timeout after ${options.timeout}ms`);
-          errorToHandle.name = 'TimeoutError';
-          errorToHandle.originalError = error;
+        if (isTransient || error.name === "AbortError") {
+          console.warn(`⚠️ Transient network issue (${error.code || error.name}): retrying...`);
+        } else {
+          console.error(`❌ API error on ${action}: ${error.message}`);
         }
 
-        // Log error
-        console.error(`❌ API error on ${action}: ${errorToHandle.message}`);
-
-        // If last attempt, fail
-        if (isLastAttempt) {
-          recordFailure();
-          const errorType = isRateLimited ? ' (rate limit)' : '';
-          throw new Error(`API call failed after ${maxRetries} attempts${errorType}: ${errorToHandle.message}`);
-        }
-
-        // Calculate backoff delay - use rate limit settings if applicable
+        const attemptForBackoff = isRateLimited ? rateLimitAttempts : normalAttempts;
         const baseDelay = isRateLimited ? options.rateLimitBaseDelay : options.baseDelay;
         const maxDelay = isRateLimited ? options.rateLimitMaxDelay : options.maxDelay;
-        const attemptForBackoff = isRateLimited ? rateLimitAttempts : normalAttempts;
+        const delay = calculateBackoff(attemptForBackoff, baseDelay, maxDelay, isRateLimited);
 
-        const delay = calculateBackoff(
-          attemptForBackoff,
-          baseDelay,
-          maxDelay,
-          isRateLimited
-        );
-
-        const nextAttempt = currentAttempt + 1;
-        console.log(`⏳ Waiting ${Math.round(delay / 1000)}s before retry (attempt ${nextAttempt}/${maxRetries})...`);
+        console.log(`⏳ Waiting ${Math.round(delay / 1000)}s before retry (${attemptForBackoff + 1}/${maxRetries})...`);
         await sleep(delay);
       }
     }
-
-    // Should never reach here
-    throw new Error('Unexpected error in API call');
   }
+
+
 
   // ========================================================================
   // LEARNING SYSTEM METHODS

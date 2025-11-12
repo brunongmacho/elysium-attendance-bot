@@ -67,9 +67,8 @@ try {
   ENGLISH_VOCABULARY = require('./nlp-vocabulary').ENGLISH_WORDS || [];
   TAGALOG_VOCABULARY = require('./nlp-vocabulary-tagalog').TAGALOG_WORDS || [];
   TAGLISH_VOCABULARY = require('./nlp-vocabulary-taglish').TAGLISH_PHRASES || [];
-  console.log(`📚 [NLP] Loaded ${ENGLISH_VOCABULARY.length} English, ${TAGALOG_VOCABULARY.length} Tagalog, ${TAGLISH_VOCABULARY.length} Taglish terms`);
 } catch (error) {
-  console.log('📚 [NLP] Using built-in vocabulary (extended files not found)');
+  // Using built-in vocabulary
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -257,18 +256,11 @@ class NLPLearningSystem {
     // Initialize conversational AI with config and SheetAPI for stat-based roasts
     this.conversationalAI = new ConversationalAI(this, this.config, this.sheetAPI);
 
-    console.log('🧠 [NLP Learning] Initializing system...');
-
     // Load learned patterns from Google Sheets
     await this.loadFromGoogleSheets();
 
     // Start periodic sync timer
     this.startSyncTimer();
-
-    console.log(`🧠 [NLP Learning] Loaded ${this.learnedPatterns.size} patterns, ${this.userPreferences.size} user profiles`);
-    console.log('🧠 [NLP Learning] Passive learning enabled (learns from all messages)');
-    console.log('🧠 [NLP Learning] Active in: admin-logs, auction threads, @mentions');
-    console.log('🔥 [NLP Learning] Stat-based trash talk system enabled!');
 
     return this;
   }
@@ -320,7 +312,6 @@ class NLPLearningSystem {
 
     // Validate message structure to prevent null reference errors
     if (!message || !message.author || !message.content || !message.channel) {
-      console.warn('🧠 [NLP Learning] Invalid message structure, skipping learning');
       return;
     }
 
@@ -372,7 +363,6 @@ class NLPLearningSystem {
     // CRITICAL: Check for insults BEFORE command interpretation
     // Insults should be handled as conversation, not commands
     if (this.isInsult(content)) {
-      console.log(`🚫 [NLP Learning] Detected insult, routing to conversation handler: "${content}"`);
       return null; // Let it fall through to conversation handling
     }
 
@@ -1507,16 +1497,14 @@ class NLPLearningSystem {
       }
 
       this.lastSync = new Date();
-      console.log(`🧠 [NLP Learning] Loaded from Google Sheets: ${this.learnedPatterns.size} patterns, ${this.userPreferences.size} users, ${this.negativePatterns.size} negative patterns`);
     } catch (error) {
-      console.warn('🧠 [NLP Learning] Failed to load from Google Sheets:', error.message);
+      console.error('❌ [NLP Learning] Failed to load from Sheets:', error.message);
     }
   }
 
   async syncToGoogleSheets() {
     // Prevent concurrent syncs (reduces memory pressure)
     if (this.isSyncing) {
-      console.log('🧠 [NLP Learning] Sync already in progress, skipping...');
       return;
     }
 
@@ -1570,21 +1558,11 @@ class NLPLearningSystem {
 
           // Check if sync was actually successful
           if (response.data && response.data.success === false) {
-            console.error('🧠 [NLP Learning] Sync returned error:', response.data.message);
+            console.error('❌ [NLP Learning] Sync error:', response.data.message);
             return;
           }
 
           this.lastSync = new Date();
-          console.log(`🧠 [NLP Learning] Synced ${patterns.length} patterns, ${preferences.length} users, ${negativePatterns.length} negative patterns to Google Sheets`);
-
-          if (response.data && response.data.results) {
-            const r = response.data.results;
-            console.log(`🧠 [NLP Learning] Patterns: ${r.patterns.created} created, ${r.patterns.updated} updated`);
-            console.log(`🧠 [NLP Learning] Preferences: ${r.preferences.created} created, ${r.preferences.updated} updated`);
-            if (r.negativePatterns) {
-              console.log(`🧠 [NLP Learning] Negative Patterns: ${r.negativePatterns.created} created, ${r.negativePatterns.updated} updated`);
-            }
-          }
 
           // Force garbage collection if available (helps with memory pressure)
           if (global.gc) {
