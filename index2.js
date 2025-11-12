@@ -1097,7 +1097,7 @@ function stopBiddingChannelCleanupSchedule() {
  * @param {GuildMember} member - Discord guild member
  * @returns {EmbedBuilder} Formatted stats embed
  */
-function buildStatsEmbed(stats, member) {
+function buildStatsEmbed(stats, member, countdown = 30) {
   const { memberName, attendance, bidding, rank, totalMembers } = stats;
 
   // Calculate percentile (handle null/0 rank)
@@ -1159,13 +1159,15 @@ function buildStatsEmbed(stats, member) {
 
   // Footer with favorite boss and percentile
   const percentileText = percentile > 0 ? `Top ${percentile}%` : 'New Member';
+  const countdownText = countdown > 0 ? ` • Auto-deletes in ${countdown}s` : '';
+
   if (attendance.favoriteBoss) {
     embed.setFooter({
-      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText}`
+      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText}${countdownText}`
     });
   } else {
     embed.setFooter({
-      text: percentileText
+      text: `${percentileText}${countdownText}`
     });
   }
 
@@ -1209,6 +1211,139 @@ function getActivityLevel(rate) {
   if (rate >= 50) return 'Moderate ⭐';
   if (rate > 0) return 'Casual';
   return 'Inactive';
+}
+
+/**
+ * Start a live countdown deletion for a message with embed
+ * Updates the message every 5 seconds to show remaining time, then deletes
+ *
+ * @param {Message} message - Original user message to delete
+ * @param {Message} botMessage - Bot's reply message to update and delete
+ * @param {EmbedBuilder} baseEmbed - Base embed to update (will be cloned)
+ * @param {Function} updateEmbedFooter - Function to update embed footer with countdown
+ *                                       Should accept (embed, countdown) and return updated embed
+ * @param {number} duration - Total duration in seconds (default: 30)
+ */
+async function startCountdownDeletion(message, botMessage, stats, member, updateFunction, duration = 30) {
+  let remainingTime = duration;
+
+  // Delete user's command message immediately
+  try {
+    await errorHandler.safeDelete(message, 'message deletion');
+  } catch (e) {
+    console.warn(`⚠️ Could not delete user message: ${e.message}`);
+  }
+
+  // Update every 5 seconds: 30s, 25s, 20s, 15s, 10s, 5s
+  const updateInterval = 5;
+  const countdownTimer = setInterval(async () => {
+    remainingTime -= updateInterval;
+
+    if (remainingTime <= 0) {
+      // Time's up - delete the message
+      clearInterval(countdownTimer);
+      try {
+        await errorHandler.safeDelete(botMessage, 'message deletion');
+      } catch (e) {
+        console.warn(`⚠️ Could not delete bot message: ${e.message}`);
+      }
+      return;
+    }
+
+    // Update the embed with new countdown
+    try {
+      const updatedEmbed = updateFunction(stats, member, remainingTime);
+      await botMessage.edit({ embeds: [updatedEmbed] });
+    } catch (e) {
+      console.warn(`⚠️ Could not update countdown: ${e.message}`);
+      // If update fails, just delete the message
+      clearInterval(countdownTimer);
+      try {
+        await errorHandler.safeDelete(botMessage, 'message deletion');
+      } catch (deleteErr) {
+        console.warn(`⚠️ Could not delete bot message: ${deleteErr.message}`);
+      }
+    }
+  }, updateInterval * 1000);
+}
+
+/**
+ * Clean up old stats and mypoints messages on bot startup
+ * Prevents channel clutter from messages that didn't auto-delete before restart
+ */
+async function cleanupStaleStatsMessages() {
+  try {
+    console.log('🧹 Cleaning up stale stats/mypoints messages...');
+
+    const commandsChannel = await discordCache.getChannel('elysium_commands_channel_id');
+    if (!commandsChannel) {
+      console.warn('⚠️ Could not find elysium-commands channel for cleanup');
+      return;
+    }
+
+    // Fetch last 100 messages
+    const messages = await commandsChannel.messages.fetch({ limit: 100 });
+    let deletedCount = 0;
+
+    for (const [, message] of messages) {
+      let shouldDelete = false;
+
+      // Check if it's a bot message with stats/mypoints embed
+      if (message.author.id === client.user.id) {
+        // Check if it's a stats or mypoints message
+        if (message.embeds && message.embeds.length > 0) {
+          const embed = message.embeds[0];
+          const title = embed.title || '';
+
+          // Delete stats and mypoints messages
+          if (title.includes('Member Stats') || title.includes('Your Points')) {
+            shouldDelete = true;
+          }
+        }
+
+        // Also delete loading messages like "⏳ Fetching stats for..."
+        if (message.content && message.content.includes('⏳ Fetching stats for')) {
+          shouldDelete = true;
+        }
+      }
+
+      // Check if it's a user command message (!stats or !mypoints)
+      if (message.content) {
+        const content = message.content.trim().toLowerCase();
+        const isStatsCommand = content.startsWith('!stats') ||
+                               content.startsWith('!profile') ||
+                               content.startsWith('!stat') ||
+                               content.startsWith('!info') ||
+                               content.startsWith('!mystats');
+        const isPointsCommand = content.startsWith('!mypoints') ||
+                                content.startsWith('!pts') ||
+                                content.startsWith('!mypts') ||
+                                content.startsWith('!mp');
+
+        if (isStatsCommand || isPointsCommand) {
+          shouldDelete = true;
+        }
+      }
+
+      // Delete the message if it matches any criteria
+      if (shouldDelete) {
+        try {
+          await message.delete();
+          deletedCount++;
+        } catch (e) {
+          console.warn(`⚠️ Could not delete message ${message.id}: ${e.message}`);
+        }
+      }
+    }
+
+    if (deletedCount > 0) {
+      console.log(`✅ Cleaned up ${deletedCount} stale stats/mypoints message(s)`);
+    } else {
+      console.log('✅ No stale stats/mypoints messages to clean up');
+    }
+  } catch (error) {
+    console.error('❌ Error cleaning up stale messages:', error.message);
+  }
 }
 
 // =====================================================================
@@ -1623,8 +1758,13 @@ const commandHandlers = {
     const cached = statsCache.get(targetName);
     if (cached && (Date.now() - cached.timestamp < STATS_CACHE_DURATION)) {
       console.log(`📦 Using cached stats for ${targetName}`);
-      const embed = buildStatsEmbed(cached.data, targetMember);
-      return await message.reply({ embeds: [embed] });
+      const embed = buildStatsEmbed(cached.data, targetMember, 30);
+      const statsMsg = await message.reply({ embeds: [embed] });
+
+      // Start countdown deletion
+      startCountdownDeletion(message, statsMsg, cached.data, targetMember, buildStatsEmbed, 30);
+
+      return;
     }
 
     // Show loading message
@@ -1646,8 +1786,11 @@ const commandHandlers = {
       });
 
       // Build and send embed
-      const embed = buildStatsEmbed(result, targetMember);
+      const embed = buildStatsEmbed(result, targetMember, 30);
       await loadingMsg.edit({ content: null, embeds: [embed] });
+
+      // Start countdown deletion
+      startCountdownDeletion(message, loadingMsg, result, targetMember, buildStatsEmbed, 30);
 
       console.log(`✅ Stats sent for ${targetName}`);
 
@@ -4364,6 +4507,11 @@ client.once(Events.ClientReady, async () => {
   const sweep3 = await attendance.validateStateConsistency(client);
 
   isRecovering = false;
+
+  // ═══════════════════════════════════════════════════════
+  // CLEANUP STALE STATS/MYPOINTS MESSAGES
+  // ═══════════════════════════════════════════════════════
+  await cleanupStaleStatsMessages();
 
   // ═══════════════════════════════════════════════════════
   // RECOVERY SUMMARY (CONSOLE ONLY - Discord logging disabled to prevent spam)
