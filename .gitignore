@@ -20,3 +20,4 @@ build/
 *.backup
 
 node_modules
+elysium-attendance-bot.code-workspace
