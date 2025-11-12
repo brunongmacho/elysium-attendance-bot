@@ -2798,8 +2798,9 @@ const commandHandlers = {
         `**Spawn time:** 5 minutes from now\n\n` +
         `Click ✅ Confirm or ❌ Cancel button below.`,
       async (confirmMsg) => {
-        // Get current time + 5 minutes
-        const spawnDate = new Date(Date.now() + 5 * 60 * 1000);
+        // Get current time + 5 minutes in Manila timezone
+        const now = new Date(Date.now() + 5 * 60 * 1000);
+        const spawnDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
         const year = spawnDate.getFullYear();
         const month = String(spawnDate.getMonth() + 1).padStart(2, "0");
         const day = String(spawnDate.getDate()).padStart(2, "0");
@@ -2834,28 +2835,9 @@ const commandHandlers = {
               successCount++;
               results.push(`✅ ${bossName}`);
             } else {
-              // Try direct thread creation if attendance module fails
-              const attChannel = await discordCache.getChannel('attendance_channel_id');
-              const spawnMessage = `⚠️ ${bossName} will spawn in 5 minutes! (${formattedTimestamp}) @everyone`;
-
-              const thread = await attChannel.threads.create({
-                name: `[${month}/${day}/${year
-                  .toString()
-                  .slice(-2)} ${hours}:${minutes}] ${bossName}`,
-                autoArchiveDuration: config.auto_archive_minutes || 60,
-                message: {
-                  content: spawnMessage,
-                },
-                reason: `Maintenance spawn by ${member.user.username}`,
-              });
-
-              if (thread) {
-                successCount++;
-                results.push(`✅ ${bossName}`);
-              } else {
-                failCount++;
-                results.push(`❌ ${bossName} - Failed to create thread`);
-              }
+              failCount++;
+              const errorMsg = result && result.error ? result.error : 'Unknown error';
+              results.push(`❌ ${bossName} - ${errorMsg}`);
             }
 
             // Small delay to avoid rate limits
