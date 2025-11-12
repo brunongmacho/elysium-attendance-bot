@@ -4397,22 +4397,17 @@ const commandHandlers = {
  */
 client.once(Events.ClientReady, async () => {
   console.log(`✅ Bot logged in as ${client.user.tag}`);
-  console.log(`📊 Tracking ${Object.keys(bossPoints).length} bosses`);
-  console.log(`🟢 Main Guild: ${config.main_guild_id}`);
-  console.log(`⏰ Timer Server: ${config.timer_server_id}`);
-  console.log(`🤖 Version: ${BOT_VERSION}`);
+  console.log(`📊 Tracking ${Object.keys(bossPoints).length} bosses | Guild: ${config.main_guild_id} | Version: ${BOT_VERSION}`);
 
   // Attach config to client for module access
   client.config = config;
 
   // INITIALIZE DISCORD CHANNEL CACHE (60-80% API call reduction)
   discordCache = new DiscordCache(client, config);
-  console.log('✅ Discord channel cache initialized');
 
   // INITIALIZE MULTI-LEVEL CACHE CLEANUP
   const cacheManager = require('./utils/cache-manager');
   cacheManager.startCacheCleanup();
-  console.log('✅ Multi-level cache cleanup scheduler started');
 
   // INITIALIZE AUCTION CACHE (100% uptime guarantee)
   const auctionCache = require('./utils/auction-cache');
@@ -4420,26 +4415,18 @@ client.once(Events.ClientReady, async () => {
 
   // INITIALIZE INTELLIGENCE ENGINE FIRST (needed by other modules)
   intelligenceEngine = new IntelligenceEngine(client, config, sheetAPI);
-  console.log('🤖 Intelligence Engine initialized (AI/ML powered features enabled)');
 
   // 🚀 AUTO-BOOTSTRAP LEARNING FROM HISTORY (First Deployment)
-  console.log('🔍 Checking if learning system needs bootstrap...');
   try {
     const needsCheck = await sheetAPI.call('needsBootstrap', {});
     if (needsCheck.status === 'ok' && needsCheck.needsBootstrap) {
-      console.log('🚀 [FIRST DEPLOYMENT] Bootstrapping learning from historical data...');
-      console.log('   This will analyze ALL auction history and create predictions.');
-      console.log('   The bot will start SMART instead of learning from scratch!');
+      console.log('🚀 [FIRST DEPLOYMENT] Bootstrapping learning system from historical data...');
 
       const bootstrapResult = await sheetAPI.call('bootstrapLearning', {});
 
       if (bootstrapResult.status === 'ok') {
         const { predictionsCreated, uniqueItems, averageAccuracy } = bootstrapResult;
-        console.log(`✅ [BOOTSTRAP SUCCESS]`);
-        console.log(`   📊 Predictions Created: ${predictionsCreated}`);
-        console.log(`   🎯 Unique Items Learned: ${uniqueItems}`);
-        console.log(`   🎓 Starting Accuracy: ${averageAccuracy}%`);
-        console.log(`   🧠 Bot is now SMART and ready to make accurate predictions!`);
+        console.log(`✅ Bootstrap complete: ${predictionsCreated} predictions, ${uniqueItems} items, ${averageAccuracy}% accuracy`);
 
         // Send notification to admin logs
         const adminLogsChannel = await discordCache.getChannel('admin_logs_channel_id');
@@ -4487,242 +4474,57 @@ client.once(Events.ClientReady, async () => {
       } else {
         console.log(`⚠️ [BOOTSTRAP FAILED] ${bootstrapResult.message}`);
       }
-    } else {
-      console.log('✅ Learning system already bootstrapped (skipping)');
     }
   } catch (bootstrapError) {
-    console.error('❌ Error during bootstrap check:', bootstrapError);
-    console.log('   Bot will continue without bootstrap (learning from future auctions)');
+    console.error('❌ Bootstrap check failed:', bootstrapError.message);
   }
 
   // INITIALIZE ALL MODULES IN CORRECT ORDER
-  attendance.initialize(config, bossPoints, isAdmin, discordCache, intelligenceEngine); // Pass intelligenceEngine for learning system
+  attendance.initialize(config, bossPoints, isAdmin, discordCache, intelligenceEngine);
   helpSystem.initialize(config, isAdmin, BOT_VERSION);
-  auctioneering.initialize(config, isAdmin, bidding, discordCache, intelligenceEngine); // Pass intelligenceEngine
+  auctioneering.initialize(config, isAdmin, bidding, discordCache, intelligenceEngine);
   bidding.initializeBidding(config, isAdmin, auctioneering, discordCache);
-  auctioneering.setPostToSheet(attendance.postToSheet); // Use attendance module's postToSheet
-  // lootSystem.initialize(config, bossPoints, isAdmin); // DISABLED: manual loot entry
-  emergencyCommands.initialize(
-    config,
-    attendance,
-    bidding,
-    auctioneering,
-    isAdmin,
-    discordCache
-  );
-  leaderboardSystem.init(client, config, discordCache); // Initialize leaderboard system
-
-  // INITIALIZE ACTIVITY HEATMAP SYSTEM
+  auctioneering.setPostToSheet(attendance.postToSheet);
+  emergencyCommands.initialize(config, attendance, bidding, auctioneering, isAdmin, discordCache);
+  leaderboardSystem.init(client, config, discordCache);
   activityHeatmap.init(client, config);
-  console.log('📊 Activity Heatmap System initialized');
-
-  // INITIALIZE BOSS ROTATION SYSTEM (5-guild rotation tracking)
   bossRotation.initialize(config, client, intelligenceEngine);
-  console.log('🔄 Boss Rotation System initialized (Amentis, General Aquleus, Baron Braudmore)');
-
-  // INITIALIZE PROACTIVE INTELLIGENCE (Auto-notifications & monitoring)
   proactiveIntelligence = new ProactiveIntelligence(client, config, intelligenceEngine);
   await proactiveIntelligence.initialize();
-  console.log('🔔 Proactive Intelligence initialized (5 scheduled monitoring tasks active)');
-
-  // INITIALIZE NLP HANDLER (Natural language processing)
   nlpHandler = new NLPHandler(config);
-  console.log('💬 NLP Handler initialized (admin logs + auction threads)');
-
-  // INITIALIZE NLP LEARNING SYSTEM (Self-improving natural language understanding)
   nlpLearningSystem = new NLPLearningSystem();
   await nlpLearningSystem.initialize(client);
-  console.log('🧠 NLP Learning System initialized (mention-based activation, passive learning enabled)');
 
-  console.log("\n╔═══════════════════════════════════════════════════════╗");
-  console.log("║         🔄 BOT STATE RECOVERY (3-SWEEP SYSTEM)   ║");
-  console.log("╚═══════════════════════════════════════════════════════╝\n");
-
+  console.log("🔄 Running state recovery...");
   isRecovering = true;
 
-  // Recover bidding state first
   await recoverBotStateOnStartup(client, config);
-
-  // ═══════════════════════════════════════════════════════
-  // SWEEP 1: Enhanced Thread Recovery (PRIORITY)
-  // ═══════════════════════════════════════════════════════
   const sweep1 = await attendance.recoverStateFromThreads(client);
-
-  // ═══════════════════════════════════════════════════════
-  // SWEEP 2: Google Sheets Fallback (Fill Gaps)
-  // ═══════════════════════════════════════════════════════
-  console.log("\n═══════════════════════════════════════════════════════");
-  console.log("💾 SWEEP 2: GOOGLE SHEETS STATE RECOVERY");
-  console.log("═══════════════════════════════════════════════════════");
 
   let sweep2LoadedState = false;
   if (!sweep1.success || sweep1.recovered === 0) {
-    console.log("⚠️ Sweep 1 found no threads, attempting Sheets recovery...");
     sweep2LoadedState = await attendance.loadAttendanceStateFromSheet();
-
-    if (sweep2LoadedState) {
-      console.log("✅ SWEEP 2: State loaded from Google Sheets");
-    } else {
-      console.log("⚠️ SWEEP 2: No saved state found in Sheets");
-    }
-  } else {
-    console.log("✅ SWEEP 2: Skipped (Sweep 1 found active threads)");
   }
 
-  // ═══════════════════════════════════════════════════════
-  // SWEEP 3: Cross-Reference Validation
-  // ═══════════════════════════════════════════════════════
   const sweep3 = await attendance.validateStateConsistency(client);
-
   isRecovering = false;
 
-  // ═══════════════════════════════════════════════════════
-  // CLEANUP STALE STATS/MYPOINTS MESSAGES
-  // ═══════════════════════════════════════════════════════
   await cleanupStaleStatsMessages();
 
-  // ═══════════════════════════════════════════════════════
-  // RECOVERY SUMMARY (CONSOLE ONLY - Discord logging disabled to prevent spam)
-  // ═══════════════════════════════════════════════════════
-  // Recovery summary is now only logged to console to prevent Discord spam
-  // If you need to re-enable Discord notifications, uncomment the code below
+  const recoveryStatus = sweep1.recovered || 0;
+  const discrepancies = sweep3 ?
+    (sweep3.threadsWithoutColumns?.length || 0) +
+    (sweep3.columnsWithoutThreads?.length || 0) +
+    (sweep3.duplicateColumns?.length || 0) : 0;
 
-  /* DISABLED: Recovery summary Discord notification
-  const adminLogs = await discordCache.getChannel('admin_logs_channel_id').catch(() => null);
+  console.log(`✅ Recovery complete: ${recoveryStatus} spawns, ${discrepancies} discrepancies`);
 
-  if (adminLogs) {
-    const embed = new EmbedBuilder()
-      .setColor(sweep1.success ? 0x00ff00 : 0xffa500)
-      .setTitle("🔄 Bot State Recovery Complete")
-      .setDescription("3-Sweep recovery system executed")
-      .addFields(
-        {
-          name: "📋 Sweep 1: Thread Recovery",
-          value: sweep1.success
-            ? `✅ **Success**\n` +
-              `├─ Spawns: ${sweep1.recovered}\n` +
-              `├─ Pending verifications: ${sweep1.pending}\n` +
-              `├─ Pending closures: ${sweep1.confirmations}\n` +
-              `└─ Reactions re-added: ${sweep1.reactionsAdded || 0}`
-            : `❌ **Failed:** ${sweep1.error || "Unknown error"}`,
-          inline: false,
-        },
-        {
-          name: "💾 Sweep 2: Sheets Recovery",
-          value: sweep2LoadedState
-            ? "✅ Loaded from Google Sheets"
-            : sweep1.success
-            ? "⏭️ Skipped (threads found)"
-            : "⚠️ No saved state",
-          inline: false,
-        },
-        {
-          name: "🔍 Sweep 3: Validation",
-          value: sweep3
-            ? `${
-                sweep3.threadsWithoutColumns.length +
-                  sweep3.columnsWithoutThreads.length +
-                  sweep3.duplicateColumns.length ===
-                0
-                  ? "✅"
-                  : "⚠️"
-              } **Discrepancies Found:**\n` +
-              `├─ Threads without columns: ${sweep3.threadsWithoutColumns.length}\n` +
-              `├─ Columns without threads: ${sweep3.columnsWithoutThreads.length}\n` +
-              `└─ Duplicate columns: ${sweep3.duplicateColumns.length}`
-            : "❌ Validation failed",
-          inline: false,
-        }
-      )
-      .setFooter({ text: "Bot is now ready for operations" })
-      .setTimestamp();
-
-    // Add discrepancy details if found
-    if (sweep3) {
-      if (sweep3.threadsWithoutColumns.length > 0) {
-        const list = sweep3.threadsWithoutColumns
-          .slice(0, 5)
-          .map(
-            (t) =>
-              `• **${t.boss}** (${t.timestamp}) - ${t.members} members - <#${t.threadId}>`
-          )
-          .join("\n");
-        embed.addFields({
-          name: "⚠️ Threads Without Columns",
-          value:
-            list +
-            (sweep3.threadsWithoutColumns.length > 5
-              ? `\n*+${sweep3.threadsWithoutColumns.length - 5} more...*`
-              : ""),
-          inline: false,
-        });
-      }
-
-      if (sweep3.columnsWithoutThreads.length > 0) {
-        const list = sweep3.columnsWithoutThreads
-          .slice(0, 5)
-          .map((c) => `• **${c.boss}** (${c.timestamp}) - Column ${c.column}`)
-          .join("\n");
-        embed.addFields({
-          name: "⚠️ Columns Without Threads",
-          value:
-            list +
-            (sweep3.columnsWithoutThreads.length > 5
-              ? `\n*+${sweep3.columnsWithoutThreads.length - 5} more...*`
-              : "") +
-            "\n\n*These may be closed threads. Manually verify if needed.*",
-          inline: false,
-        });
-      }
-
-      if (sweep3.duplicateColumns.length > 0) {
-        const list = sweep3.duplicateColumns
-          .slice(0, 3)
-          .map(
-            (d) =>
-              `• **${d.boss}** (${d.timestamp}) - Columns: ${d.columns.join(
-                ", "
-              )}`
-          )
-          .join("\n");
-        embed.addFields({
-          name: "⚠️ Duplicate Columns Detected",
-          value:
-            list +
-            (sweep3.duplicateColumns.length > 3
-              ? `\n*+${sweep3.duplicateColumns.length - 3} more...*`
-              : "") +
-            "\n\n*Manually delete duplicate columns from Google Sheets.*",
-          inline: false,
-        });
-      }
-    }
-
-    await adminLogs.send({ embeds: [embed] });
-  }
-  */
-
-  console.log("\n╔═══════════════════════════════════════════════════════╗");
-  console.log("║              ✅ RECOVERY COMPLETE                ║");
-  console.log("╚═══════════════════════════════════════════════════════╝\n");
-
-  // If thread recovery didn't find much, try Google Sheets
-  if (
-    !sweep1.success ||
-    Object.keys(attendance.getActiveSpawns()).length === 0
-  ) {
-    console.log("📊 Attempting to load attendance state from Google Sheets...");
+  if (!sweep1.success || Object.keys(attendance.getActiveSpawns()).length === 0) {
     await attendance.loadAttendanceStateFromSheet();
   }
 
   await bidding.recoverBiddingState(client, config);
-
-  // Start periodic state syncing to Google Sheets (memory optimization for Koyeb)
-  console.log("🔄 Starting periodic state sync to Google Sheets...");
   attendance.schedulePeriodicStateSync();
-
-  // START AUTO-CLOSE SCHEDULER (20-minute thread timeout to prevent cheating)
-  console.log("⏰ Starting auto-close scheduler (20-minute attendance window)...");
   attendance.startAutoCloseScheduler(client);
 
   // Sync state references
@@ -4732,23 +4534,11 @@ client.once(Events.ClientReady, async () => {
   pendingClosures = attendance.getPendingClosures();
   confirmationMessages = attendance.getConfirmationMessages();
 
-  // START BIDDING CHANNEL CLEANUP SCHEDULE
+  // START SCHEDULERS
   startBiddingChannelCleanupSchedule();
-
-  // START WEEKLY REPORT SCHEDULER (3am Monday GMT+8)
-  console.log("📅 Starting weekly report scheduler...");
   leaderboardSystem.scheduleWeeklyReport();
-
-  // START MONTHLY REPORT SCHEDULER (1st of month 11:59pm GMT+8)
-  console.log("📅 Starting monthly report scheduler...");
   leaderboardSystem.scheduleMonthlyReport();
-
-  // START WEEKLY SATURDAY AUCTION SCHEDULER (12:00 PM GMT+8)
-  console.log("🔨 Starting weekly Saturday auction scheduler...");
   auctioneering.scheduleWeeklySaturdayAuction(client, config);
-
-  // START UNIFIED MAINTENANCE SCHEDULER
-  console.log("🚀 Starting unified maintenance scheduler...");
 
   // Register GC task (every 5 minutes)
   if (global.gc) {
@@ -4801,29 +4591,20 @@ client.once(Events.ClientReady, async () => {
     console.warn("⚠️ Garbage collection not available. Run with --expose-gc flag.");
   }
 
-  // Start the scheduler
   scheduler.startScheduler();
 
-  // INITIALIZE EVENT REMINDER SYSTEM
-  console.log("🎯 Initializing game event reminder system...");
   await eventReminders.initializeEventReminders(client, config, sheetAPI, attendance);
-
-  // INITIALIZE CRASH RECOVERY SYSTEM
-  console.log("🔄 Initializing crash recovery system...");
   await crashRecovery.initialize(client, config);
 
-  // Link crash recovery to other systems
   leaderboardSystem.init(client, config, discordCache, crashRecovery);
   scheduler.setCrashRecovery(crashRecovery);
 
-  // Check for missed weekly report
   if (await crashRecovery.checkMissedWeeklyReport()) {
-    console.log("📊 Sending missed weekly report...");
     await leaderboardSystem.sendWeeklyReport();
     await crashRecovery.markWeeklyReportCompleted();
   }
 
-  console.log("✅ Bot initialization complete and ready for operations!");
+  console.log("✅ Bot ready for operations!");
 });
 
 // =====================================================================

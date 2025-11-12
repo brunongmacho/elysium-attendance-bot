@@ -97,6 +97,10 @@ class IntelligenceEngine {
     this.memberProfiles = new Map();    // Member engagement profiles
     this.anomalyLog = [];               // Detected anomalies
 
+    // API call cache to prevent duplicate concurrent calls (reduces timeouts)
+    this.apiCallCache = new Map();      // { endpoint: { data, timestamp, promise } }
+    this.apiCacheTTL = 60000;           // 60 second cache TTL
+
     // ML models (simple statistical models)
     this.priceModel = null;
     this.engagementModel = null;
@@ -131,6 +135,64 @@ class IntelligenceEngine {
 
     // Initialize
     this.initialized = false;
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // API CALL CACHING (Prevents timeout from duplicate concurrent calls)
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Cached API call wrapper to prevent duplicate concurrent requests
+   * @param {string} endpoint - API endpoint name
+   * @param {Object} data - Request data
+   * @param {Object} options - Request options
+   * @returns {Promise} API response
+   */
+  async cachedAPICall(endpoint, data = {}, options = {}) {
+    const cacheKey = `${endpoint}:${JSON.stringify(data)}`;
+    const now = Date.now();
+
+    // Check if we have a cached result
+    const cached = this.apiCallCache.get(cacheKey);
+    if (cached) {
+      // Return cached data if still fresh
+      if (now - cached.timestamp < this.apiCacheTTL) {
+        return cached.data;
+      }
+
+      // Return in-flight promise if already requesting
+      if (cached.promise) {
+        return await cached.promise;
+      }
+    }
+
+    // Create new request and cache the promise
+    const promise = this.sheetAPI.call(endpoint, data, options);
+    this.apiCallCache.set(cacheKey, { promise, timestamp: now });
+
+    try {
+      const result = await promise;
+
+      // Cache the result
+      this.apiCallCache.set(cacheKey, { data: result, timestamp: now });
+
+      // Cleanup old cache entries (prevent memory leak)
+      if (this.apiCallCache.size > 50) {
+        const entriesToDelete = [];
+        for (const [key, value] of this.apiCallCache.entries()) {
+          if (now - value.timestamp > this.apiCacheTTL) {
+            entriesToDelete.push(key);
+          }
+        }
+        entriesToDelete.forEach(key => this.apiCallCache.delete(key));
+      }
+
+      return result;
+    } catch (error) {
+      // Remove failed promise from cache
+      this.apiCallCache.delete(cacheKey);
+      throw error;
+    }
   }
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -640,7 +702,7 @@ class IntelligenceEngine {
       if (cachedData.attendanceData) {
         attendanceData = cachedData.attendanceData;
       } else {
-        const attendanceResponse = await this.sheetAPI.call('getTotalAttendance', {});
+        const attendanceResponse = await this.cachedAPICall('getTotalAttendance', {});
         attendanceData = attendanceResponse?.members ?? [];
       }
 
@@ -1487,21 +1549,18 @@ class IntelligenceEngine {
   async analyzeAllMembersEngagement() {
     try {
       // Fetch all data ONCE instead of per-member (massive performance improvement)
-      console.log('[INTELLIGENCE] Fetching data for all members (optimized batch fetch)...');
-
+      // Use cached API calls to prevent timeouts from duplicate concurrent requests
       const [biddingResponse, attendanceResponse, weeklyAttendanceResponse, auctionResponse] = await Promise.all([
-        this.sheetAPI.call('getBiddingPoints', {}),
-        this.sheetAPI.call('getTotalAttendance', {}),
-        this.sheetAPI.call('getAllWeeklyAttendance', {}),
-        this.sheetAPI.call('getForDistribution', {}, { timeout: 60000 }),
+        this.cachedAPICall('getBiddingPoints', {}),
+        this.cachedAPICall('getTotalAttendance', {}),
+        this.cachedAPICall('getAllWeeklyAttendance', {}),
+        this.cachedAPICall('getForDistribution', {}, { timeout: 60000 }),
       ]);
 
       const biddingData = biddingResponse?.members ?? [];
       const attendanceData = attendanceResponse?.members ?? [];
       const weeklyAttendance = weeklyAttendanceResponse || {};
       const auctionData = auctionResponse?.items ?? [];
-
-      console.log(`[INTELLIGENCE] Processing ${biddingData.length} members with cached data...`);
 
       // Create cached data object to pass to each analysis
       const cachedData = {
@@ -1692,8 +1751,8 @@ class IntelligenceEngine {
   async detectAttendanceAnomalies() {
     try {
       const [attendanceResponse, biddingResponse] = await Promise.all([
-        this.sheetAPI.call('getTotalAttendance', {}),
-        this.sheetAPI.call('getBiddingPoints', {}),
+        this.cachedAPICall('getTotalAttendance', {}),
+        this.cachedAPICall('getBiddingPoints', {}),
       ]);
       const attendanceData = attendanceResponse?.members ?? [];
       const biddingData = biddingResponse?.members ?? [];

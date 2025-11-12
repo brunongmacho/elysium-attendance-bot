@@ -871,29 +871,18 @@ class ProactiveIntelligence {
    */
   async checkMilestones() {
     try {
-      console.log('🤖 [PROACTIVE] ═══════════════════════════════════════');
-      console.log('🤖 [PROACTIVE] Starting milestone check...');
-
       if (!PROACTIVE_CONFIG.features.celebrateMilestones) {
-        console.log('⚠️ [PROACTIVE] Milestone celebrations are DISABLED in config');
         return;
       }
 
-      console.log('✅ [PROACTIVE] Milestone celebrations ENABLED');
-
       // Fetch BOTH attendance and bidding data
-      console.log('📊 [PROACTIVE] Fetching total attendance data...');
       const attendanceResponse = await this.intelligence.sheetAPI.call('getTotalAttendance', {});
       const attendanceData = attendanceResponse?.data?.members || attendanceResponse?.members || [];
-      console.log(`📊 [PROACTIVE] Found ${attendanceData.length} members in attendance data`);
 
-      console.log('📊 [PROACTIVE] Fetching bidding points data...');
       const biddingResponse = await this.intelligence.sheetAPI.call('getBiddingPoints', {});
       const biddingData = biddingResponse?.data?.members || biddingResponse?.members || [];
-      console.log(`📊 [PROACTIVE] Found ${biddingData.length} members in bidding data`);
 
       if (attendanceData.length === 0 && biddingData.length === 0) {
-        console.log('⚠️ [PROACTIVE] No data found, skipping milestone check');
         return;
       }
 
@@ -910,13 +899,10 @@ class ProactiveIntelligence {
       });
 
       // Fetch milestone history from Google Sheets
-      console.log('📊 [PROACTIVE] Fetching milestone history...');
       const historyResponse = await this.intelligence.sheetAPI.call('getMilestoneHistory', {});
       const milestoneHistory = historyResponse?.milestoneHistory || {};
-      console.log(`📊 [PROACTIVE] Found ${Object.keys(milestoneHistory).length} members in milestone history`);
 
       // Get channels for tiered routing
-      console.log('📺 [PROACTIVE] Getting channels...');
       const guildAnnouncementChannel = await getChannelById(
         this.client,
         this.config.guild_announcement_channel_id
@@ -927,18 +913,15 @@ class ProactiveIntelligence {
         this.config.elysium_commands_channel_id
       );
 
-      console.log(`📺 [PROACTIVE] Guild announcement channel: ${guildAnnouncementChannel ? guildAnnouncementChannel.name : 'NOT FOUND'}`);
-      console.log(`📺 [PROACTIVE] Guild chat channel: ${guildChatChannel ? guildChatChannel.name : 'NOT FOUND'}`);
-
       if (!guildAnnouncementChannel || !guildChatChannel) {
-        console.error('❌ [PROACTIVE] Required channels not found - ABORTING');
+        console.error('❌ [PROACTIVE] Required channels not found');
         return;
       }
 
       // Get guild for member lookups
       const guild = this.client.guilds.cache.get(this.config.main_guild_id);
       if (!guild) {
-        console.error('❌ [PROACTIVE] Main guild not found - ABORTING');
+        console.error('❌ [PROACTIVE] Main guild not found');
         return;
       }
 
@@ -949,9 +932,6 @@ class ProactiveIntelligence {
       const attendanceMilestoneArray = [...ATTENDANCE_MILESTONES.minor, ...ATTENDANCE_MILESTONES.major].sort((a, b) => a - b);
       const biddingMilestoneArray = [...BIDDING_MILESTONES.minor, ...BIDDING_MILESTONES.major].sort((a, b) => a - b);
 
-      console.log(`🎯 [PROACTIVE] Attendance milestones: ${attendanceMilestoneArray.join(', ')}`);
-      console.log(`💰 [PROACTIVE] Bidding milestones: ${biddingMilestoneArray.join(', ')}`);
-
       // Track stats
       let membersChecked = 0;
       let milestonesFound = 0;
@@ -961,9 +941,6 @@ class ProactiveIntelligence {
         attendance: {},
         bidding: {}
       };
-
-      // Check ATTENDANCE milestones
-      console.log('🔍 [PROACTIVE] Checking ATTENDANCE milestones...');
       for (const member of attendanceData) {
         membersChecked++;
         const totalPoints = member.attendancePoints || 0;
@@ -986,11 +963,6 @@ class ProactiveIntelligence {
         // If found new milestone, ADD TO GROUP (don't announce yet)
         if (latestMilestone) {
           milestonesFound++;
-          console.log(`🎉 [PROACTIVE] NEW ATTENDANCE MILESTONE!`);
-          console.log(`   - Member: ${nickname}`);
-          console.log(`   - Type: ATTENDANCE`);
-          console.log(`   - Current Points: ${totalPoints}`);
-          console.log(`   - New Milestone: ${latestMilestone}`);
 
           // Find Discord user for mention
           const discordMember = await this.findGuildMember(guild, nickname);
@@ -1066,13 +1038,11 @@ class ProactiveIntelligence {
       let milestonesQueued = 0;
 
       // Queue ATTENDANCE milestones
-      console.log('📌 [PROACTIVE] Queueing ATTENDANCE milestones...');
       for (const [milestoneStr, achievers] of Object.entries(milestoneGroups.attendance)) {
         const milestone = parseInt(milestoneStr);
 
         try {
           for (const achiever of achievers) {
-            // Queue milestone for batch announcement
             await this.queueMilestone('attendance', {
               nickname: achiever.nickname,
               milestone: milestone,
@@ -1081,7 +1051,6 @@ class ProactiveIntelligence {
               discordMember: achiever.discordMember
             });
 
-            // Update Google Sheets with delay to prevent rate limiting
             await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: achiever.nickname,
               milestone: milestone,
@@ -1089,25 +1058,21 @@ class ProactiveIntelligence {
               milestoneType: 'attendance'
             }, { silent: true });
 
-            // Add small delay between API calls to prevent rate limiting
             await new Promise(resolve => setTimeout(resolve, 500));
           }
 
           milestonesQueued += achievers.length;
-          console.log(`   - ✅ Queued ${achievers.length} members at ${milestone} ATTENDANCE milestone`);
         } catch (error) {
-          console.error(`   - ❌ Error queueing ATTENDANCE milestone ${milestone}:`, error);
+          console.error(`❌ [PROACTIVE] Error queueing ATTENDANCE milestone ${milestone}:`, error.message);
         }
       }
 
       // Queue BIDDING milestones
-      console.log('📌 [PROACTIVE] Queueing BIDDING milestones...');
       for (const [milestoneStr, achievers] of Object.entries(milestoneGroups.bidding)) {
         const milestone = parseInt(milestoneStr);
 
         try {
           for (const achiever of achievers) {
-            // Queue milestone for batch announcement
             await this.queueMilestone('bidding', {
               nickname: achiever.nickname,
               milestone: milestone,
@@ -1116,7 +1081,6 @@ class ProactiveIntelligence {
               discordMember: achiever.discordMember
             });
 
-            // Update Google Sheets with delay to prevent rate limiting
             await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
               nickname: achiever.nickname,
               milestone: milestone,
@@ -1124,23 +1088,18 @@ class ProactiveIntelligence {
               milestoneType: 'bidding'
             }, { silent: true });
 
-            // Add small delay between API calls to prevent rate limiting
             await new Promise(resolve => setTimeout(resolve, 500));
           }
 
           milestonesQueued += achievers.length;
-          console.log(`   - ✅ Queued ${achievers.length} members at ${milestone} BIDDING milestone`);
         } catch (error) {
-          console.error(`   - ❌ Error queueing BIDDING milestone ${milestone}:`, error);
+          console.error(`❌ [PROACTIVE] Error queueing BIDDING milestone ${milestone}:`, error.message);
         }
       }
 
-      console.log('🤖 [PROACTIVE] ═══════════════════════════════════════');
-      console.log(`🤖 [PROACTIVE] Milestone check complete`);
-      console.log(`   - Members checked: ${membersChecked}`);
-      console.log(`   - New milestones found: ${milestonesFound}`);
-      console.log(`   - Milestones queued: ${milestonesQueued}`);
-      console.log('🤖 [PROACTIVE] ═══════════════════════════════════════');
+      if (milestonesQueued > 0) {
+        console.log(`🎉 [PROACTIVE] Queued ${milestonesQueued} new milestones`);
+      }
 
     } catch (error) {
       console.error('❌ [PROACTIVE] CRITICAL ERROR checking milestones:', error);
@@ -1156,13 +1115,9 @@ class ProactiveIntelligence {
    */
   async ensureMilestoneTabsExist() {
     try {
-      console.log('[PROACTIVE] Ensuring milestone tabs exist in Google Sheets...');
-      const response = await this.intelligence.sheetAPI.call('ensureMilestoneTabsExist', {});
-      if (response.success) {
-        console.log('✅ [PROACTIVE] Milestone tabs verified/created');
-      }
+      await this.intelligence.sheetAPI.call('ensureMilestoneTabsExist', {});
     } catch (error) {
-      console.error('[PROACTIVE] Error ensuring milestone tabs:', error);
+      console.error('[PROACTIVE] Error ensuring milestone tabs:', error.message);
     }
   }
 
@@ -1684,16 +1639,12 @@ class ProactiveIntelligence {
       for (const threshold of PROACTIVE_CONFIG.thresholds.milestonePoints.guildWide.totalAttendance) {
         if (totalAttendance >= threshold && !isAchieved('attendance', threshold)) {
           milestonesFound++;
-          console.log(`🎉 [PROACTIVE] Guild reached ${threshold} total attendance!`);
-
-          // Queue milestone
           await this.queueMilestone('guildWide', {
             milestoneType: 'attendance',
             threshold,
             totalValue: totalAttendance
           });
 
-          // Record in Google Sheets
           await this.intelligence.sheetAPI.call('recordGuildMilestone', {
             milestoneType: 'attendance',
             threshold,
@@ -1702,9 +1653,6 @@ class ProactiveIntelligence {
         }
       }
 
-      // ═══════════════════════════════════════════════════════════════
-      // Check Total Bidding
-      // ═══════════════════════════════════════════════════════════════
       const biddingResponse = await this.intelligence.sheetAPI.call('getBiddingPoints', {});
       const biddingData = biddingResponse?.data?.members || biddingResponse?.members || [];
       const totalBidding = biddingData.reduce((sum, m) => sum + ((m.pointsLeft || 0) + (m.pointsConsumed || 0)), 0);
@@ -1712,16 +1660,12 @@ class ProactiveIntelligence {
       for (const threshold of PROACTIVE_CONFIG.thresholds.milestonePoints.guildWide.totalBidding) {
         if (totalBidding >= threshold && !isAchieved('bidding', threshold)) {
           milestonesFound++;
-          console.log(`🎉 [PROACTIVE] Guild reached ${threshold} total bidding!`);
-
-          // Queue milestone
           await this.queueMilestone('guildWide', {
             milestoneType: 'bidding',
             threshold,
             totalValue: totalBidding
           });
 
-          // Record in Google Sheets
           await this.intelligence.sheetAPI.call('recordGuildMilestone', {
             milestoneType: 'bidding',
             threshold,
@@ -1730,9 +1674,6 @@ class ProactiveIntelligence {
         }
       }
 
-      // ═══════════════════════════════════════════════════════════════
-      // Check Active Members Count
-      // ═══════════════════════════════════════════════════════════════
       const analysis = await this.intelligence.analyzeAllMembersEngagement();
       if (!analysis.error) {
         const activeCount = analysis.active || 0;
@@ -1740,16 +1681,12 @@ class ProactiveIntelligence {
         for (const threshold of PROACTIVE_CONFIG.thresholds.milestonePoints.guildWide.activeMembers) {
           if (activeCount >= threshold && !isAchieved('activeMembers', threshold)) {
             milestonesFound++;
-            console.log(`🎉 [PROACTIVE] Guild reached ${threshold} active members!`);
-
-            // Queue milestone
             await this.queueMilestone('guildWide', {
               milestoneType: 'activeMembers',
               threshold,
               totalValue: activeCount
             });
 
-            // Record in Google Sheets
             await this.intelligence.sheetAPI.call('recordGuildMilestone', {
               milestoneType: 'activeMembers',
               threshold,
@@ -1759,7 +1696,9 @@ class ProactiveIntelligence {
         }
       }
 
-      console.log(`✅ [PROACTIVE] Guild-wide check complete: ${milestonesFound} new milestones`);
+      if (milestonesFound > 0) {
+        console.log(`🎉 [PROACTIVE] Guild-wide: ${milestonesFound} new milestones`);
+      }
 
     } catch (error) {
       console.error('[PROACTIVE] Error checking guild-wide milestones:', error);
@@ -1815,16 +1754,12 @@ class ProactiveIntelligence {
 
         if (highestMilestone) {
           milestonesFound++;
-          console.log(`🎉 [PROACTIVE] ${nickname} reached ${highestMilestone} days tenure`);
-
-          // Queue milestone
           await this.queueMilestone('tenure', {
             nickname,
             milestone: highestMilestone,
             days: daysAsMember
           });
 
-          // Update Google Sheets
           await this.intelligence.sheetAPI.call('updateMilestoneHistory', {
             nickname,
             milestone: highestMilestone,
@@ -1834,7 +1769,9 @@ class ProactiveIntelligence {
         }
       }
 
-      console.log(`✅ [PROACTIVE] Tenure check complete: ${milestonesFound} new milestones`);
+      if (milestonesFound > 0) {
+        console.log(`🎉 [PROACTIVE] Tenure: ${milestonesFound} new milestones`);
+      }
 
     } catch (error) {
       console.error('[PROACTIVE] Error checking tenure milestones:', error);
@@ -1847,18 +1784,14 @@ class ProactiveIntelligence {
    */
   async checkCalendarDayStreaks() {
     try {
-      console.log('📅 [PROACTIVE] Checking calendar day streaks...');
-
       // Calculate yesterday's date range
       const now = new Date();
       const yesterdayStart = new Date(now);
       yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-      yesterdayStart.setHours(3, 1, 0, 0); // 3:01 AM yesterday
+      yesterdayStart.setHours(3, 1, 0, 0);
 
       const yesterdayEnd = new Date(now);
-      yesterdayEnd.setHours(3, 0, 0, 0); // 3:00 AM today
-
-      console.log(`📊 [PROACTIVE] Checking spawns from ${yesterdayStart.toISOString()} to ${yesterdayEnd.toISOString()}`);
+      yesterdayEnd.setHours(3, 0, 0, 0);
 
       // Get all weekly attendance data
       const response = await this.intelligence.sheetAPI.call('getAllWeeklyAttendance', {});
