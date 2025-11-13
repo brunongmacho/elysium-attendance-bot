@@ -4098,6 +4098,17 @@ const commandHandlers = {
       const hoursUntil = timeUntilSpawn / (1000 * 60 * 60);
       const daysUntil = Math.floor(hoursUntil / 24);
       const remainingHours = Math.floor(hoursUntil % 24);
+      const remainingMinutes = Math.floor((hoursUntil % 1) * 60);
+
+      // Format time display: show minutes if < 1 hour
+      let timeUntilText;
+      if (daysUntil > 0) {
+        timeUntilText = `${daysUntil}d ${remainingHours}h`;
+      } else if (remainingHours > 0) {
+        timeUntilText = `${remainingHours}h ${remainingMinutes}m`;
+      } else {
+        timeUntilText = `${remainingMinutes}m`;
+      }
 
       // Build title based on whether specific boss or "next boss"
       const title = bossName
@@ -4109,7 +4120,7 @@ const commandHandlers = {
         .setTitle(title)
         .setDescription(
           `🎯 **Predicted Next Spawn:** <t:${Math.floor(prediction.predictedTime.getTime() / 1000)}:F>\n` +
-          `⏰ **Time Until Spawn:** ${daysUntil > 0 ? `${daysUntil}d ` : ''}${remainingHours}h`
+          `⏰ **Time Until Spawn:** ${timeUntilText}`
         )
         .addFields(
           {
@@ -4189,7 +4200,18 @@ const commandHandlers = {
             const hoursUntilBoss = (bossTime - now) / (1000 * 60 * 60);
             const daysUntilBoss = Math.floor(hoursUntilBoss / 24);
             const remainingHoursBoss = Math.floor(hoursUntilBoss % 24);
-            const timeText = daysUntilBoss > 0 ? `${daysUntilBoss}d ${remainingHoursBoss}h` : `${remainingHoursBoss}h`;
+            const remainingMinutesBoss = Math.floor((hoursUntilBoss % 1) * 60);
+
+            // Format time: show minutes if < 1 hour
+            let timeText;
+            if (daysUntilBoss > 0) {
+              timeText = `${daysUntilBoss}d ${remainingHoursBoss}h`;
+            } else if (remainingHoursBoss > 0) {
+              timeText = `${remainingHoursBoss}h ${remainingMinutesBoss}m`;
+            } else {
+              timeText = `${remainingMinutesBoss}m`;
+            }
+
             return `• **${boss.boss}** - in ~${timeText} (${boss.confidence.toFixed(0)}% confidence)`;
           })
           .join('\n');
