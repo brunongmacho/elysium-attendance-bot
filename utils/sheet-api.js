@@ -31,10 +31,10 @@
 // ============================================================================
 
 const DEFAULT_OPTIONS = {
-  maxRetries: 3,
+  maxRetries: 5, // Increased from 3 for better resilience on Koyeb
   baseDelay: 3000, // 3 seconds (increased from 2)
   maxDelay: 45000, // 45 seconds (increased from 30)
-  timeout: 30000,  // 30 seconds
+  timeout: 60000,  // 60 seconds (increased from 30 for Koyeb stability)
   enableCircuitBreaker: true,
   // Rate limit specific settings
   rateLimitMaxRetries: 7, // More retries for rate limits (increased from 5)
@@ -209,11 +209,16 @@ class SheetAPI {
     const startTime = Date.now();
     const { fetch, Agent } = await import("undici");
 
-    // Custom agent with longer connect timeout (30s)
+    // Custom agent with longer connect timeout (60s) and body/headers timeouts
+    // This prevents ConnectTimeoutError on unstable networks like Koyeb
     const agent = new Agent({
       connect: {
-        timeout: 30000, // default 10 000 ms → now 30 000 ms
+        timeout: 60000, // 60 seconds (increased from 30s for Koyeb stability)
       },
+      bodyTimeout: 60000,    // 60 seconds for reading response body
+      headersTimeout: 60000, // 60 seconds for receiving response headers
+      keepAliveTimeout: 10000, // Keep connections alive for reuse
+      keepAliveMaxTimeout: 30000,
     });
 
     if (options.enableCircuitBreaker && !checkCircuitBreaker()) {
@@ -273,21 +278,26 @@ class SheetAPI {
         const transientErrors = [
           "UND_ERR_CONNECT_TIMEOUT",
           "UND_ERR_HEADERS_TIMEOUT",
+          "UND_ERR_BODY_TIMEOUT",
           "UND_ERR_SOCKET",
           "ECONNRESET",
           "ECONNREFUSED",
+          "ETIMEDOUT",
+          "ENETUNREACH",
           "FetchError",
-          "TimeoutError"
+          "TimeoutError",
+          "ConnectTimeoutError",
+          "Connect Timeout Error"
         ];
 
         const errorCode = error.code || '';
         const errorMessage = error.message || '';
         
         const isTransient = transientErrors.some(
-          code => errorCode.includes(code) || errorMessage.includes(code)
+          code => error.code?.includes(code) || error.message.includes(code)
         );
         const isRateLimitError =
-          errorMessage.includes("HTTP 429") || errorMessage.includes("Too Many Requests");
+          error.message.includes("HTTP 429") || error.message.includes("Too Many Requests");
 
         if (isRateLimitError && !isRateLimited) {
           isRateLimited = true;

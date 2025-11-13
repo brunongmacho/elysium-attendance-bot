@@ -91,6 +91,7 @@ const eventReminders = require('./event-reminders.js'); // Game Event Reminder S
 const bossRotation = require('./boss-rotation.js'); // Boss Rotation System (5-guild tracking)
 const activityHeatmap = require('./activity-heatmap.js'); // Activity Heatmap System
 const crashRecovery = require('./utils/crash-recovery.js'); // Crash Recovery System (state persistence)
+const { MLIntegration } = require('./ml-integration.js'); // ML Integration (spawn prediction + NLP enhancement)
 
 /**
  * Command alias mapping for shorthand commands.
@@ -108,6 +109,7 @@ const COMMAND_ALIASES = {
   "!?": "!help",
   "!commands": "!help",
   "!cmds": "!help",
+  "!nm": "!newmember",
 
   // Fun commands
   "!8ball": "!eightball",
@@ -312,6 +314,17 @@ const client = new Client({
   // Partials - handle uncached entities
   partials: [Partials.Channel, Partials.Message, Partials.Reaction],
 
+  // WebSocket options - increase timeouts to handle network instability
+  ws: {
+    handshakeTimeout: 60000, // 60 seconds (default is 30s)
+  },
+
+  // REST options - increase timeout for API requests
+  rest: {
+    timeout: 60000, // 60 seconds timeout for REST API requests
+    retries: 5,     // Retry failed requests up to 5 times
+  },
+
   // Memory optimization: Sweep caches regularly to manage 512MB RAM limit
   // Optimized for fast message cleanup while maintaining reaction functionality
   sweepers: {
@@ -483,6 +496,14 @@ let nlpHandler = null;
  * @type {NLPLearningSystem}
  */
 let nlpLearningSystem = null;
+
+/**
+ * ML Integration for enhanced spawn predictions and NLP conversation
+ * Provides ML-powered spawn time predictions with confidence intervals
+ * Enhances NLP with context awareness and sentiment analysis
+ * @type {MLIntegration}
+ */
+let mlIntegration = null;
 
 /**
  * Flag indicating bot is currently recovering from a crash
@@ -1632,6 +1653,231 @@ const commandHandlers = {
   },
 
   // =========================================================================
+  // NEW MEMBER GUIDE - Comprehensive instructions for new members
+  // =========================================================================
+  newmember: async (message, member) => {
+    // Overview embed
+    const overviewEmbed = new EmbedBuilder()
+      .setColor('#00ff00')
+      .setTitle('📚 Welcome to Elysium! New Member Guide')
+      .setDescription(
+        '**Welcome to the guild!** This guide will teach you everything you need to know about:\n\n' +
+        '1️⃣ **Boss Attendance** - How to get credit for boss kills\n' +
+        '2️⃣ **Auctions** - How to bid on boss loot\n\n' +
+        'Read both sections carefully to avoid mistakes!'
+      )
+      .setTimestamp();
+
+    // Boss Attendance Guide
+    const attendanceEmbed = new EmbedBuilder()
+      .setColor('#3498db')
+      .setTitle('1️⃣ Boss Attendance - Step by Step Guide')
+      .setDescription(
+        '**When a boss spawns, here\'s what you need to do to get attendance credit:**'
+      )
+      .addFields(
+        {
+          name: '📋 STEP 1: Find the Boss Thread',
+          value:
+            '• The bot automatically creates a thread in the attendance channel\n' +
+            '• Thread name format: `[MM/DD/YY HH:MM] Boss Name`\n' +
+            '• Example: `[11/13/25 14:30] General Aquleus`\n' +
+            '• Look for the newest thread with the boss you killed',
+          inline: false
+        },
+        {
+          name: '✅ STEP 2: Post Keyword + Screenshot (ONE MESSAGE)',
+          value:
+            '• In ONE message, type keyword AND attach screenshot:\n' +
+            '  • **Keywords:** `present`, `here`, `attending`, `join`, `checkin`\n' +
+            '  • Common typos are auto-corrected (prsnt, hre, etc.)\n' +
+            '• **CRITICAL:** Keyword and screenshot MUST be in the SAME message!\n' +
+            '• After posting, the bot will reply with verification buttons',
+          inline: false
+        },
+        {
+          name: '📸 STEP 3: Screenshot Requirements',
+          value:
+            '**Your screenshot MUST show:**\n' +
+            '✓ Your character name visible\n' +
+            '✓ Boss name visible on screen\n' +
+            '✓ Combat log or damage numbers (preferred)\n' +
+            '✓ Game timestamp/time visible\n\n' +
+            '**DO NOT:**\n' +
+            '❌ Use fake or old screenshots\n' +
+            '❌ Use someone else\'s screenshot\n' +
+            '❌ Post screenshot in separate message',
+          inline: false
+        },
+        {
+          name: '⏳ STEP 4: Wait for Admin Verification',
+          value:
+            '• Bot will reply with ✅ **Verify** and ❌ **Deny** buttons\n' +
+            '• Admin will review your screenshot and click:\n' +
+            '  • ✅ **Verify** → You get attendance credit!\n' +
+            '  • ❌ **Deny** → Screenshot rejected, you must resubmit\n' +
+            '• Check the thread to see if you were verified\n' +
+            '• Green embed = ✅ Verified | Red embed = ❌ Denied',
+          inline: false
+        },
+        {
+          name: '⏰ Important Time Limits',
+          value:
+            '• Threads **auto-close after 20 minutes**\n' +
+            '• Submit ASAP after killing the boss\n' +
+            '• Late submissions will be rejected\n' +
+            '• If thread closes before verification, contact admin',
+          inline: false
+        },
+        {
+          name: '⚠️ Common Mistakes to Avoid',
+          value:
+            '❌ Posting "present" first, then screenshot separately\n' +
+            '❌ Posting in the wrong boss thread\n' +
+            '❌ Posting in main attendance channel (not the thread)\n' +
+            '❌ Submitting after thread closes (20 min)\n' +
+            '✅ Type keyword + attach screenshot in ONE message\n' +
+            '✅ Post in the correct boss thread\n' +
+            '✅ Submit within 20 minutes',
+          inline: false
+        }
+      );
+
+    // Auction Guide
+    const auctionEmbed = new EmbedBuilder()
+      .setColor('#f39c12')
+      .setTitle('2️⃣ Auctions - Step by Step Guide')
+      .setDescription(
+        '**When loot drops from a boss, items are auctioned to guild members:**'
+      )
+      .addFields(
+        {
+          name: '🔨 STEP 1: Watch for Auction Threads',
+          value:
+            '• Admins create auction threads in the bidding channel\n' +
+            '• Thread name shows the item being auctioned\n' +
+            '• Pay attention to:\n' +
+            '  📦 **Item name** (e.g., "Arcana Mace +5")\n' +
+            '  💰 **Starting bid** (minimum bid required)\n' +
+            '  ⏱️ **Timer** (how long you have to bid)',
+          inline: false
+        },
+        {
+          name: '💵 STEP 2: Place Your Bid',
+          value:
+            '• **MUST be used inside the auction thread!**\n' +
+            '• Use command: **`!bid <amount>`**\n' +
+            '• Example: `!bid 1000` (bids 1000 points)\n' +
+            '• Your bid must be higher than current highest bid\n' +
+            '• Bot will confirm if successful or show error',
+          inline: false
+        },
+        {
+          name: '📊 STEP 3: Check Your Points',
+          value:
+            '• Use **`!mypoints`** in bidding channel (main, not thread)\n' +
+            '• Shows your total available points\n' +
+            '• Also shows: **`!mp`**, **`!pts`**, **`!mypts`** (aliases)\n' +
+            '• Make sure you have enough points before bidding!',
+          inline: false
+        },
+        {
+          name: '📋 STEP 4: Check Bid Status',
+          value:
+            '• Use **`!bidstatus`** in bidding channel\n' +
+            '• Shows all active auctions\n' +
+            '• Displays current highest bidder\n' +
+            '• Shows time remaining on each auction',
+          inline: false
+        },
+        {
+          name: '🎯 STEP 5: Winning the Auction',
+          value:
+            '• Highest bidder when timer expires wins!\n' +
+            '• Winner announced in the auction thread\n' +
+            '• Points automatically deducted from your balance\n' +
+            '• Coordinate with admins to receive your item\n' +
+            '• Item will be distributed in-game',
+          inline: false
+        },
+        {
+          name: '💡 Smart Bidding Tips',
+          value:
+            '✅ **Check `!mypoints` first** - Don\'t bid more than you have\n' +
+            '✅ **Bid in small increments** - Save points\n' +
+            '✅ **Watch the timer** - Last-minute bids can win\n' +
+            '✅ **Know item values** - Ask experienced members\n' +
+            '✅ **Bid only in auction threads** - Main channel won\'t work\n' +
+            '❌ **Don\'t bid on items you can\'t use**\n' +
+            '❌ **Bids are binding** - Can\'t cancel after placing',
+          inline: false
+        },
+        {
+          name: '📋 Available Auction Commands',
+          value:
+            '**In auction threads:**\n' +
+            '• **`!bid <amount>`** - Place a bid (ONLY in threads)\n\n' +
+            '**In main bidding channel:**\n' +
+            '• **`!mypoints`** / **`!mp`** - Check your points\n' +
+            '• **`!bidstatus`** - View active auctions\n\n' +
+            '**Aliases that work:**\n' +
+            '• `!b <amount>` = `!bid <amount>`\n' +
+            '• `!pts`, `!mypts` = `!mypoints`',
+          inline: false
+        }
+      );
+
+    // Additional Tips
+    const tipsEmbed = new EmbedBuilder()
+      .setColor('#9b59b6')
+      .setTitle('💎 Additional Tips for New Members')
+      .addFields(
+        {
+          name: '🎮 How to Earn Points',
+          value:
+            '• Attend boss kills (submit attendance screenshots)\n' +
+            '• Each verified attendance = points added\n' +
+            '• More attendance = more points to bid\n' +
+            '• Check leaderboards: `!leaderboardattendance`\n' +
+            '• Be active and help guild members!',
+          inline: false
+        },
+        {
+          name: '📞 Need Help?',
+          value:
+            '• Type **`!help`** to see all available commands\n' +
+            '• Ask admins if you\'re unsure about anything\n' +
+            '• Read pinned messages in each channel\n' +
+            '• Other members are friendly - don\'t hesitate to ask!',
+          inline: false
+        },
+        {
+          name: '⚡ Quick Command Reference',
+          value:
+            '**Attendance:**\n' +
+            '• Type `present` + attach screenshot (ONE message)\n' +
+            '• Typos auto-corrected: `prsnt`, `hre`, etc.\n\n' +
+            '**Auctions:**\n' +
+            '• `!bid <amount>` - Bid in auction thread\n' +
+            '• `!mypoints` - Check your points\n' +
+            '• `!bidstatus` - View active auctions\n\n' +
+            '**Info:**\n' +
+            '• `!help` - Full command list\n' +
+            '• `!nm` or `!newmember` - This guide\n' +
+            '• `!leaderboardattendance` - Attendance rankings',
+          inline: false
+        }
+      )
+      .setFooter({ text: 'Good luck and have fun in Elysium! 🎉' })
+      .setTimestamp();
+
+    // Send all embeds
+    await message.reply({
+      embeds: [overviewEmbed, attendanceEmbed, auctionEmbed, tipsEmbed]
+    });
+  },
+
+  // =========================================================================
   // STATUS COMMAND - Displays bot health and active operations
   // =========================================================================
   status: async (message, member) => {
@@ -1657,7 +1903,14 @@ const commandHandlers = {
         const [date, time] = ts.split(" ");
         const [month, day, year] = date.split("/");
         const [hour, minute] = time.split(":");
-        return new Date(`20${year}`, month - 1, day, hour, minute).getTime();
+        // Convert strings to numbers for proper date parsing
+        return new Date(
+          2000 + parseInt(year),
+          parseInt(month) - 1,
+          parseInt(day),
+          parseInt(hour),
+          parseInt(minute)
+        ).getTime();
       };
       return parseTimestamp(a[1].timestamp) - parseTimestamp(b[1].timestamp);
     });
@@ -1667,7 +1920,15 @@ const commandHandlers = {
         const [date, time] = info.timestamp.split(" ");
         const [month, day, year] = date.split("/");
         const [hour, minute] = time.split(":");
-        return new Date(`20${year}`, month - 1, day, hour, minute).getTime();
+        // Convert strings to numbers and create Date object
+        // This ensures proper date calculation regardless of server timezone
+        return new Date(
+          2000 + parseInt(year),
+          parseInt(month) - 1,
+          parseInt(day),
+          parseInt(hour),
+          parseInt(minute)
+        ).getTime();
       })();
 
       const ageMs = Date.now() - spawnTime;
@@ -1692,6 +1953,23 @@ const commandHandlers = {
     const biddingStatus = biddingState.a
       ? `🔴 Active: **${biddingState.a.item}** (${biddingState.a.curBid}pts)`
       : `🟢 Queue: ${biddingState.q.length} item(s)`;
+
+    // Get ML statistics if available
+    let mlStats = null;
+    let mlStatusText = '⚠️ Disabled';
+    if (mlIntegration) {
+      try {
+        mlStats = await mlIntegration.getStats();
+        if (mlStats && mlStats.enabled) {
+          const patternsCount = mlStats.spawn?.patternsLearned || 0;
+          mlStatusText = patternsCount > 0
+            ? `✅ Active - ${patternsCount} boss patterns learned`
+            : `🟡 Learning - No patterns yet`;
+        }
+      } catch (mlError) {
+        mlStatusText = `⚠️ Error: ${mlError.message}`;
+      }
+    }
 
     const embed = new EmbedBuilder()
       .setColor(0x00ff00)
@@ -1719,7 +1997,8 @@ const commandHandlers = {
           value: spawnListText + moreSpawns,
           inline: false,
         },
-        { name: "💰 Bidding System", value: biddingStatus, inline: false }
+        { name: "💰 Bidding System", value: biddingStatus, inline: false },
+        { name: "🤖 ML Spawn Predictor", value: mlStatusText, inline: false }
       )
       .setFooter({ text: `Requested by ${member.user.username}` })
       .setTimestamp();
@@ -2798,15 +3077,31 @@ const commandHandlers = {
         `**Spawn time:** 5 minutes from now\n\n` +
         `Click ✅ Confirm or ❌ Cancel button below.`,
       async (confirmMsg) => {
-        // Get current time + 5 minutes in Manila timezone
-        const now = new Date(Date.now() + 5 * 60 * 1000);
-        const spawnDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-        const year = spawnDate.getFullYear();
-        const month = String(spawnDate.getMonth() + 1).padStart(2, "0");
-        const day = String(spawnDate.getDate()).padStart(2, "0");
-        const hours = String(spawnDate.getHours()).padStart(2, "0");
-        const minutes = String(spawnDate.getMinutes()).padStart(2, "0");
-        const formattedTimestamp = `${year}-${month}-${day} ${hours}:${minutes}`;
+        // Get current time + 5 minutes in Manila timezone (GMT+8)
+        // IMPORTANT: Properly handle GMT+8 timezone conversion
+        const futureTime = new Date(Date.now() + 5 * 60 * 1000);
+
+        // Use Intl.DateTimeFormat to get components directly in Manila timezone
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Manila',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+
+        const parts = formatter.formatToParts(futureTime);
+        const year = parts.find(p => p.type === 'year').value;
+        const month = parts.find(p => p.type === 'month').value;
+        const day = parts.find(p => p.type === 'day').value;
+        const hours = parts.find(p => p.type === 'hour').value;
+        const minutes = parts.find(p => p.type === 'minute').value;
+        const yearShort = year.slice(-2);
+
+        // Format: MM/DD/YY HH:MM (required by createSpawnThreads)
+        const formattedTimestamp = `${month}/${day}/${yearShort} ${hours}:${minutes}`;
 
         await message.reply(
           `🔄 **Creating maintenance spawn threads...**\n\n` +
@@ -2824,7 +3119,7 @@ const commandHandlers = {
             const result = await attendance.createSpawnThreads(
               client,
               bossName,
-              `${month}/${day}/${year.toString().slice(-2)}`,
+              `${month}/${day}/${yearShort}`,
               `${hours}:${minutes}`,
               formattedTimestamp,
               "manual",
@@ -4019,6 +4314,24 @@ const commandHandlers = {
     try {
       const prediction = await intelligenceEngine.predictNextSpawnTime(bossName);
 
+      // 🤖 ENHANCE WITH ML - Get tighter confidence windows and accuracy scoring
+      // SKIP ML for schedule-based bosses (they use static 99% confidence)
+      let mlEnhancement = null;
+      if (mlIntegration && prediction && !prediction.error && prediction.spawnType !== 'schedule') {
+        try {
+          mlEnhancement = await mlIntegration.enhanceSpawnPrediction(
+            prediction.bossName,
+            prediction.lastSpawnTime,
+            prediction.avgIntervalHours || 24
+          );
+          console.log(`[ML] Enhanced ${prediction.bossName}: ${mlEnhancement ? 'Success' : 'N/A'}`);
+        } catch (mlError) {
+          console.warn('[ML] Enhancement failed, using standard prediction:', mlError.message);
+        }
+      } else if (prediction && prediction.spawnType === 'schedule') {
+        console.log(`[ML] Skipping ML enhancement for schedule-based boss: ${prediction.bossName} (using static 99% confidence)`);
+      }
+
       if (prediction.error) {
         await message.reply(`⚠️ ${prediction.error}`);
         return;
@@ -4030,6 +4343,17 @@ const commandHandlers = {
       const hoursUntil = timeUntilSpawn / (1000 * 60 * 60);
       const daysUntil = Math.floor(hoursUntil / 24);
       const remainingHours = Math.floor(hoursUntil % 24);
+      const remainingMinutes = Math.floor((hoursUntil % 1) * 60);
+
+      // Format time display: show minutes if < 1 hour
+      let timeUntilText;
+      if (daysUntil > 0) {
+        timeUntilText = `${daysUntil}d ${remainingHours}h`;
+      } else if (remainingHours > 0) {
+        timeUntilText = `${remainingHours}h ${remainingMinutes}m`;
+      } else {
+        timeUntilText = `${remainingMinutes}m`;
+      }
 
       // Build title based on whether specific boss or "next boss"
       const title = bossName
@@ -4041,7 +4365,7 @@ const commandHandlers = {
         .setTitle(title)
         .setDescription(
           `🎯 **Predicted Next Spawn:** <t:${Math.floor(prediction.predictedTime.getTime() / 1000)}:F>\n` +
-          `⏰ **Time Until Spawn:** ${daysUntil > 0 ? `${daysUntil}d ` : ''}${remainingHours}h`
+          `⏰ **Time Until Spawn:** ${timeUntilText}`
         )
         .addFields(
           {
@@ -4054,6 +4378,15 @@ const commandHandlers = {
             value: `${prediction.basedOnSpawns} historical spawns`,
             inline: true,
           },
+          // 🤖 ML CONFIDENCE WINDOW - Shows tighter time window from ML analysis
+          ...(mlEnhancement && mlEnhancement.method === 'ml'
+            ? [{
+                name: '🤖 ML Window',
+                value: `±${Math.round(mlEnhancement.confidenceInterval.windowMinutes / 2)}min (${(mlEnhancement.confidence * 100).toFixed(0)}%)`,
+                inline: true,
+              }]
+            : []
+          ),
           {
             name: '⏱️ Spawn Type',
             value: prediction.spawnType === 'schedule'
@@ -4089,7 +4422,13 @@ const commandHandlers = {
           },
           {
             name: '🧠 AI Insight',
-            value: prediction.spawnType === 'schedule'
+            value: mlEnhancement && mlEnhancement.method === 'ml'
+              ? `🤖 **ML-Enhanced Prediction**\n` +
+                `Spawn Window: ${new Date(mlEnhancement.confidenceInterval.earliest).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: config.timezone })} - ` +
+                `${new Date(mlEnhancement.confidenceInterval.latest).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: config.timezone })}\n` +
+                `✅ ML Model trained on ${mlEnhancement.stats?.sampleSize || prediction.basedOnSpawns} spawns\n` +
+                `Accuracy: ${(mlEnhancement.confidence * 100).toFixed(0)}% confident based on historical variance`
+              : prediction.spawnType === 'schedule'
               ? `**${prediction.bossName}** uses a fixed weekly schedule. ${prediction.scheduleInfo || 'Next spawn calculated from schedule.'}`
               : prediction.usingConfiguredTimer
               ? `**${prediction.bossName}** has a **${prediction.avgIntervalHours.toFixed(1)}-hour** spawn timer. Prediction blends configured timer with ${prediction.basedOnSpawns} historical spawns for accuracy.`
@@ -4106,7 +4445,18 @@ const commandHandlers = {
             const hoursUntilBoss = (bossTime - now) / (1000 * 60 * 60);
             const daysUntilBoss = Math.floor(hoursUntilBoss / 24);
             const remainingHoursBoss = Math.floor(hoursUntilBoss % 24);
-            const timeText = daysUntilBoss > 0 ? `${daysUntilBoss}d ${remainingHoursBoss}h` : `${remainingHoursBoss}h`;
+            const remainingMinutesBoss = Math.floor((hoursUntilBoss % 1) * 60);
+
+            // Format time: show minutes if < 1 hour
+            let timeText;
+            if (daysUntilBoss > 0) {
+              timeText = `${daysUntilBoss}d ${remainingHoursBoss}h`;
+            } else if (remainingHoursBoss > 0) {
+              timeText = `${remainingHoursBoss}h ${remainingMinutesBoss}m`;
+            } else {
+              timeText = `${remainingMinutesBoss}m`;
+            }
+
             return `• **${boss.boss}** - in ~${timeText} (${boss.confidence.toFixed(0)}% confidence)`;
           })
           .join('\n');
@@ -4118,8 +4468,11 @@ const commandHandlers = {
         });
       }
 
-      embed.setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
-        .setTimestamp();
+      embed.setFooter({
+        text: mlEnhancement && mlEnhancement.method === 'ml'
+          ? `Requested by ${member.user.username} • 🤖 ML-Enhanced • ${(mlEnhancement.confidence * 100).toFixed(0)}% Accurate`
+          : `Requested by ${member.user.username} • Intelligence Engine`
+      }).setTimestamp();
 
       await message.reply({ embeds: [embed] });
       console.log(
@@ -4222,7 +4575,7 @@ const commandHandlers = {
     const subcommand = args[0]?.toLowerCase();
 
     try {
-      // !rotation status - Show all rotation statuses
+      // !rotation status - Show all rotation statuses with ML predictions
       if (!subcommand || subcommand === 'status') {
         const rotations = await bossRotation.getAllRotations();
         const rotatingBosses = bossRotation.getRotatingBosses();
@@ -4235,7 +4588,7 @@ const commandHandlers = {
         const embed = new EmbedBuilder()
           .setColor(0x4a90e8)
           .setTitle('🔄 Boss Rotation Status')
-          .setDescription('Current rotation for 5-guild system')
+          .setDescription('Current rotation for 5-guild system with ML-enhanced spawn predictions')
           .setTimestamp();
 
         for (const boss of rotatingBosses) {
@@ -4243,9 +4596,37 @@ const commandHandlers = {
           if (rotation) {
             const emoji = rotation.isOurTurn ? '🟢' : '🔴';
             const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
+
+            // Get ML-enhanced spawn prediction
+            let spawnInfo = '';
+            try {
+              const prediction = await intelligenceEngine.predictNextSpawnTime(boss);
+              if (prediction && !prediction.error) {
+                // Try to get ML enhancement (skip for schedule-based bosses)
+                let mlEnhancement = null;
+                if (mlIntegration && prediction.spawnType !== 'schedule') {
+                  mlEnhancement = await mlIntegration.enhanceSpawnPrediction(
+                    prediction.bossName,
+                    prediction.lastSpawnTime,
+                    prediction.avgIntervalHours || 24
+                  );
+                }
+
+                const spawnTimestamp = Math.floor(prediction.predictedTime.getTime() / 1000);
+                const mlWindow = mlEnhancement && mlEnhancement.method === 'ml'
+                  ? ` (±${Math.round(mlEnhancement.confidenceInterval.windowMinutes / 2)}min 🤖)`
+                  : '';
+
+                spawnInfo = `\n📍 Next Spawn: <t:${spawnTimestamp}:R>${mlWindow}`;
+              }
+            } catch (predError) {
+              // Silently skip prediction if it fails
+              console.warn(`[Rotation] Failed to predict ${boss}:`, predError.message);
+            }
+
             embed.addFields({
               name: `${emoji} ${boss}`,
-              value: `Guild ${rotation.currentIndex}/5 - **${status}**\nNext: ${rotation.guilds[rotation.currentIndex % 5]}`,
+              value: `Guild ${rotation.currentIndex}/5 - **${status}**\nNext: ${rotation.guilds[rotation.currentIndex % 5]}${spawnInfo}`,
               inline: false
             });
           }
@@ -4494,6 +4875,11 @@ client.once(Events.ClientReady, async () => {
   nlpHandler = new NLPHandler(config);
   nlpLearningSystem = new NLPLearningSystem();
   await nlpLearningSystem.initialize(client);
+
+  // Initialize ML Integration for enhanced spawn predictions and NLP
+  console.log('🤖 Initializing ML Integration...');
+  mlIntegration = new MLIntegration(config, sheetAPI);
+  console.log('✅ ML Integration initialized - Learning from historical data...');
 
   console.log("🔄 Running state recovery...");
   isRecovering = true;
@@ -5097,6 +5483,21 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
+    // New member guide (anyone can use, anywhere except spawn threads)
+    if (resolvedCmd === "!newmember") {
+      if (
+        message.channel.isThread() &&
+        message.channel.parentId === config.attendance_channel_id
+      ) {
+        await message.reply(
+          "⚠️ Please use `!newmember` in guild chat or admin logs to avoid cluttering spawn threads."
+        );
+        return;
+      }
+      await commandHandlers.newmember(message, member);
+      return;
+    }
+
     // Leaderboard commands (admin only OR ELYSIUM role in ELYSIUM commands channel, anywhere except spawn threads)
     if (
       resolvedCmd === "!leaderboardattendance" ||
@@ -5292,6 +5693,7 @@ client.on(Events.MessageCreate, async (message) => {
     // =========================================================================
     // Handles member attendance in spawn threads
     // Keywords: "present", "here", "join", "checkin", "check-in"
+    // Also handles common misspellings with fuzzy matching
     if (
       message.channel.isThread() &&
       message.channel.parentId === config.attendance_channel_id
@@ -5303,10 +5705,79 @@ client.on(Events.MessageCreate, async (message) => {
       const content = message.content.trim().toLowerCase();
       const keyword = content.split(/\s+/)[0];
 
-      // Check if message is a check-in keyword
-      if (
-        ["present", "here", "join", "checkin", "check-in"].includes(keyword)
-      ) {
+      // Helper function: Check if keyword matches attendance keywords (with fuzzy matching)
+      const isAttendanceKeyword = (word) => {
+        // Exact matches
+        const exactKeywords = ["present", "here", "join", "checkin", "check-in", "attending"];
+        if (exactKeywords.includes(word)) return true;
+
+        // Common misspellings (comprehensive list)
+        const misspellings = {
+          // "present" misspellings
+          "prsnt": "present", "presnt": "present", "presen": "present",
+          "preent": "present", "prsetn": "present", "preasent": "present",
+          "prasent": "present", "presemt": "present", "presetn": "present",
+          "prresent": "present", "pressent": "present", "prezent": "present",
+          "prsnts": "present", "prsntt": "present", "pesent": "present",
+          "prsent": "present", "prresent": "present",
+
+          // "here" misspellings
+          "hre": "here", "her": "here", "heer": "here", "herre": "here",
+          "heere": "here", "hrre": "here", "hhere": "here",
+
+          // "attending" misspellings
+          "atending": "attending", "attending": "attending", "attnding": "attending",
+          "attendng": "attending", "attening": "attending", "atending": "attending",
+          "attednign": "attending", "attneding": "attending",
+
+          // "join" misspellings
+          "jon": "join", "jion": "join", "jojn": "join", "joiin": "join",
+
+          // "checkin" misspellings
+          "chekin": "checkin", "chckin": "checkin", "checkn": "checkin",
+          "checin": "checkin", "chkin": "checkin"
+        };
+
+        if (misspellings[word]) {
+          console.log(`✏️ Auto-corrected "${word}" → "${misspellings[word]}"`);
+          return true;
+        }
+
+        // Levenshtein distance check for close matches (1-2 character difference)
+        const calculateDistance = (a, b) => {
+          const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
+
+          for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
+          for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+
+          for (let j = 1; j <= b.length; j++) {
+            for (let i = 1; i <= a.length; i++) {
+              const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
+              matrix[j][i] = Math.min(
+                matrix[j][i - 1] + 1,
+                matrix[j - 1][i] + 1,
+                matrix[j - 1][i - 1] + indicator
+              );
+            }
+          }
+
+          return matrix[b.length][a.length];
+        };
+
+        // Check distance to each keyword (allow 1-2 character difference)
+        for (const validKeyword of exactKeywords) {
+          const distance = calculateDistance(word, validKeyword);
+          if (distance <= 2 && word.length >= 3) {
+            console.log(`✏️ Fuzzy matched "${word}" → "${validKeyword}" (distance: ${distance})`);
+            return true;
+          }
+        }
+
+        return false;
+      };
+
+      // Check if message is a check-in keyword (with fuzzy matching)
+      if (isAttendanceKeyword(keyword)) {
         // Ignore bot check-ins (bots can't attend spawns)
         // This allows reading bot messages in threads without letting them check in
         if (message.author.bot) return;
@@ -6604,13 +7075,53 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 // ERROR HANDLING
 // ==========================================
 
-client.on(Events.Error, (error) =>
-  console.error("❌ Discord client error:", error)
-);
+// Handle Discord client errors
+client.on(Events.Error, (error) => {
+  console.error("❌ Discord client error:", error);
+  // Don't crash on client errors - Discord.js will handle reconnection
+});
 
-process.on("unhandledRejection", (error) =>
-  console.error("❌ Unhandled promise rejection:", error)
-);
+// Handle WebSocket/Shard errors (including timeout errors)
+client.on(Events.ShardError, (error, shardId) => {
+  console.error(`❌ WebSocket error on shard ${shardId}:`, error.message);
+  // Don't crash - Discord.js will automatically attempt to reconnect
+  if (error.message.includes('timeout')) {
+    console.log(`⏱️ Shard ${shardId} timed out, waiting for automatic reconnection...`);
+  }
+});
+
+// Handle shard disconnections
+client.on(Events.ShardDisconnect, (event, shardId) => {
+  console.warn(`⚠️ Shard ${shardId} disconnected (code: ${event.code})`);
+});
+
+// Handle shard reconnection attempts
+client.on(Events.ShardReconnecting, (shardId) => {
+  console.log(`🔄 Shard ${shardId} is reconnecting...`);
+});
+
+// Handle shard resume (successful reconnection)
+client.on(Events.ShardResume, (shardId, replayedEvents) => {
+  console.log(`✅ Shard ${shardId} resumed (replayed ${replayedEvents} events)`);
+});
+
+// Handle unhandled promise rejections without crashing
+process.on("unhandledRejection", (error) => {
+  console.error("❌ Unhandled promise rejection:", error);
+  // Log but don't crash - allow the bot to continue operating
+  // Koyeb will automatically restart if the process exits
+});
+
+// Handle uncaught exceptions
+process.on("uncaughtException", (error) => {
+  console.error("❌ Uncaught exception:", error);
+  // For critical errors, we may need to exit and let Koyeb restart
+  if (error.message && error.message.includes('FATAL')) {
+    console.error("💥 Fatal error detected, exiting for restart...");
+    process.exit(1);
+  }
+  // Otherwise, try to continue
+});
 
 process.on("SIGTERM", () => {
   console.log("🛑 SIGTERM received, shutting down gracefully...");

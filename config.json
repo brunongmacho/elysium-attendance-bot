@@ -21,5 +21,8 @@
   "week_start": "Sunday",
   "sheet_webhook_url": "https://script.google.com/macros/s/AKfycbyUzmDjlSOP31bVUJHS9EetV5jT_aYwf6vC7m1F0Ik1fC8mmfofh8gKYZYLZ5qWIkbI/exec",
   "timezone": "Asia/Manila",
-  "auto_archive_minutes": 60
+  "auto_archive_minutes": 60,
+  "ml_service_url": "http://elysium-ml-service:8000",
+  "ml_enabled": true,
+  "ml_fallback_enabled": true
 }
