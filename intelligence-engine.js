@@ -1253,7 +1253,16 @@ class IntelligenceEngine {
 
     // Predict next spawn time
     const lastSpawn = spawns[spawns.length - 1].timestamp;
-    const predictedNextSpawn = new Date(lastSpawn.getTime() + (predictedInterval * 60 * 60 * 1000));
+    const now = new Date();
+
+    // Calculate predicted spawn, accounting for multiple cycles if needed
+    let predictedNextSpawn = new Date(lastSpawn.getTime() + (predictedInterval * 60 * 60 * 1000));
+
+    // CRITICAL FIX: If predicted time is in the past, keep adding intervals until we get a future time
+    // This handles cases where the boss has already spawned multiple times since last recorded spawn
+    while (predictedNextSpawn < now) {
+      predictedNextSpawn = new Date(predictedNextSpawn.getTime() + (predictedInterval * 60 * 60 * 1000));
+    }
 
     // Calculate confidence based on consistency of intervals
     let baseConfidence = this.calculateSpawnConfidence(intervalsToUse.length, stdDev, medianInterval);
@@ -1269,7 +1278,6 @@ class IntelligenceEngine {
     }
 
     // Adjust confidence based on time since last spawn (recency penalty)
-    const now = new Date();
     const timeSinceLastSpawn = (now - lastSpawn) / (1000 * 60 * 60); // hours
     const percentOfInterval = timeSinceLastSpawn / predictedInterval;
 
