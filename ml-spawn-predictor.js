@@ -310,7 +310,19 @@ class MLSpawnPredictor {
         totalWeight += weight;
       }
 
+      // SAFETY: Guard against division by zero (edge case: all data extremely old)
+      if (totalWeight === 0 || !isFinite(totalWeight)) {
+        console.warn(`⚠️ ${bossName}: totalWeight is ${totalWeight}, skipping ML learning for this boss`);
+        continue;
+      }
+
       const weightedMean = weightedSum / totalWeight;
+
+      // SAFETY: Validate weighted mean
+      if (!isFinite(weightedMean) || weightedMean <= 0) {
+        console.warn(`⚠️ ${bossName}: invalid weighted mean ${weightedMean}, skipping`);
+        continue;
+      }
 
       // Calculate weighted variance
       let weightedVarianceSum = 0;
@@ -321,8 +333,20 @@ class MLSpawnPredictor {
       const weightedVariance = weightedVarianceSum / totalWeight;
       const weightedStdDev = Math.sqrt(weightedVariance);
 
+      // SAFETY: Validate standard deviation
+      if (!isFinite(weightedStdDev) || weightedStdDev < 0) {
+        console.warn(`⚠️ ${bossName}: invalid std dev ${weightedStdDev}, skipping`);
+        continue;
+      }
+
       // Calculate coefficient of variation (consistency metric)
       const cv = weightedStdDev / weightedMean;
+
+      // SAFETY: Validate CV
+      if (!isFinite(cv) || cv < 0) {
+        console.warn(`⚠️ ${bossName}: invalid CV ${cv}, skipping`);
+        continue;
+      }
 
       // Enhanced confidence calculation based on multiple factors
       let confidence = 0.65; // Base confidence
@@ -342,6 +366,12 @@ class MLSpawnPredictor {
       else if (intervals.length >= 5) confidence += 0.02;
 
       confidence = Math.min(confidence, 0.98); // Cap at 98% (never 100%)
+
+      // FINAL SAFETY: Validate all values before storing
+      if (!isFinite(confidence) || confidence < 0 || confidence > 1) {
+        console.warn(`⚠️ ${bossName}: invalid confidence ${confidence}, skipping`);
+        continue;
+      }
 
       // Store learned pattern with normalized name
       this.learnedPatterns.set(normalizedName, {

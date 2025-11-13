@@ -13,6 +13,7 @@ class MLIntegration {
   constructor(config, sheetAPI) {
     this.config = config;
     this.enabled = config.ml_enabled !== false; // Default true
+    this.learningInterval = null; // Store interval ID for cleanup
 
     if (this.enabled) {
       console.log('🤖 Initializing ML spawn prediction...');
@@ -41,7 +42,7 @@ class MLIntegration {
       console.log('✅ Initial ML learning complete');
 
       // Re-learn spawn patterns every 6 hours with error handling
-      setInterval(async () => {
+      this.learningInterval = setInterval(async () => {
         try {
           console.log('🤖 Re-learning spawn patterns (scheduled update)...');
           await this.spawnPredictor.learnPatterns();
@@ -56,6 +57,17 @@ class MLIntegration {
       console.error('❌ Initial ML learning failed:', error.message);
       console.warn('⚠️ ML will run with fallback mode until next learning cycle');
       // Don't throw - allow bot to start even if initial learning fails
+    }
+  }
+
+  /**
+   * Cleanup method to stop background tasks (prevents memory leaks)
+   */
+  cleanup() {
+    if (this.learningInterval) {
+      clearInterval(this.learningInterval);
+      this.learningInterval = null;
+      console.log('🧹 ML learning interval cleared');
     }
   }
 
