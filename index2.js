@@ -5661,6 +5661,7 @@ client.on(Events.MessageCreate, async (message) => {
     // =========================================================================
     // Handles member attendance in spawn threads
     // Keywords: "present", "here", "join", "checkin", "check-in"
+    // Also handles common misspellings with fuzzy matching
     if (
       message.channel.isThread() &&
       message.channel.parentId === config.attendance_channel_id
@@ -5672,10 +5673,79 @@ client.on(Events.MessageCreate, async (message) => {
       const content = message.content.trim().toLowerCase();
       const keyword = content.split(/\s+/)[0];
 
-      // Check if message is a check-in keyword
-      if (
-        ["present", "here", "join", "checkin", "check-in"].includes(keyword)
-      ) {
+      // Helper function: Check if keyword matches attendance keywords (with fuzzy matching)
+      const isAttendanceKeyword = (word) => {
+        // Exact matches
+        const exactKeywords = ["present", "here", "join", "checkin", "check-in", "attending"];
+        if (exactKeywords.includes(word)) return true;
+
+        // Common misspellings (comprehensive list)
+        const misspellings = {
+          // "present" misspellings
+          "prsnt": "present", "presnt": "present", "presen": "present",
+          "preent": "present", "prsetn": "present", "preasent": "present",
+          "prasent": "present", "presemt": "present", "presetn": "present",
+          "prresent": "present", "pressent": "present", "prezent": "present",
+          "prsnts": "present", "prsntt": "present", "pesent": "present",
+          "prsent": "present", "prresent": "present",
+
+          // "here" misspellings
+          "hre": "here", "her": "here", "heer": "here", "herre": "here",
+          "heere": "here", "hrre": "here", "hhere": "here",
+
+          // "attending" misspellings
+          "atending": "attending", "attending": "attending", "attnding": "attending",
+          "attendng": "attending", "attening": "attending", "atending": "attending",
+          "attednign": "attending", "attneding": "attending",
+
+          // "join" misspellings
+          "jon": "join", "jion": "join", "jojn": "join", "joiin": "join",
+
+          // "checkin" misspellings
+          "chekin": "checkin", "chckin": "checkin", "checkn": "checkin",
+          "checin": "checkin", "chkin": "checkin"
+        };
+
+        if (misspellings[word]) {
+          console.log(`✏️ Auto-corrected "${word}" → "${misspellings[word]}"`);
+          return true;
+        }
+
+        // Levenshtein distance check for close matches (1-2 character difference)
+        const calculateDistance = (a, b) => {
+          const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
+
+          for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
+          for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+
+          for (let j = 1; j <= b.length; j++) {
+            for (let i = 1; i <= a.length; i++) {
+              const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
+              matrix[j][i] = Math.min(
+                matrix[j][i - 1] + 1,
+                matrix[j - 1][i] + 1,
+                matrix[j - 1][i - 1] + indicator
+              );
+            }
+          }
+
+          return matrix[b.length][a.length];
+        };
+
+        // Check distance to each keyword (allow 1-2 character difference)
+        for (const validKeyword of exactKeywords) {
+          const distance = calculateDistance(word, validKeyword);
+          if (distance <= 2 && word.length >= 3) {
+            console.log(`✏️ Fuzzy matched "${word}" → "${validKeyword}" (distance: ${distance})`);
+            return true;
+          }
+        }
+
+        return false;
+      };
+
+      // Check if message is a check-in keyword (with fuzzy matching)
+      if (isAttendanceKeyword(keyword)) {
         // Ignore bot check-ins (bots can't attend spawns)
         // This allows reading bot messages in threads without letting them check in
         if (message.author.bot) return;
