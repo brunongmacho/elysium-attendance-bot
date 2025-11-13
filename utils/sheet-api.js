@@ -278,26 +278,21 @@ class SheetAPI {
         const transientErrors = [
           "UND_ERR_CONNECT_TIMEOUT",
           "UND_ERR_HEADERS_TIMEOUT",
-          "UND_ERR_BODY_TIMEOUT",
           "UND_ERR_SOCKET",
           "ECONNRESET",
           "ECONNREFUSED",
-          "ETIMEDOUT",
-          "ENETUNREACH",
           "FetchError",
-          "TimeoutError",
-          "ConnectTimeoutError",
-          "Connect Timeout Error"
+          "TimeoutError"
         ];
 
         const errorCode = error.code || '';
         const errorMessage = error.message || '';
         
         const isTransient = transientErrors.some(
-          code => error.code?.includes(code) || error.message.includes(code)
+          code => errorCode.includes(code) || errorMessage.includes(code)
         );
         const isRateLimitError =
-          error.message.includes("HTTP 429") || error.message.includes("Too Many Requests");
+          errorMessage.includes("HTTP 429") || errorMessage.includes("Too Many Requests");
 
         if (isRateLimitError && !isRateLimited) {
           isRateLimited = true;
