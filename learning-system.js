@@ -174,19 +174,23 @@ class LearningSystem {
     const enriched = { ...baseFeatures };
 
     // TEMPORAL CONTEXT (when prediction was made)
+    // All temporal data uses Asia/Manila timezone (GMT+8) to match game server
     if (LEARNING_CONFIG.INCLUDE_TEMPORAL_CONTEXT) {
       const now = new Date();
+      const nowInManila = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+      const dayOfWeek = nowInManila.getDay();
+
       enriched.temporal = {
         timestamp: now.toISOString(),
         timestampUnix: now.getTime(),
-        dayOfWeek: now.getDay(), // 0 = Sunday, 6 = Saturday
-        dayName: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][now.getDay()],
-        hour: now.getHours(),
-        isWeekend: now.getDay() === 0 || now.getDay() === 6,
-        isAuctionDay: now.getDay() === 6, // Saturday
-        weekOfYear: this.getWeekNumber(now),
-        monthOfYear: now.getMonth() + 1,
-        quarterOfYear: Math.floor(now.getMonth() / 3) + 1,
+        dayOfWeek: dayOfWeek, // 0 = Sunday, 6 = Saturday (Manila time)
+        dayName: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeek],
+        hour: nowInManila.getHours(),
+        isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
+        isAuctionDay: dayOfWeek === 6, // Saturday (Manila time)
+        weekOfYear: this.getWeekNumber(nowInManila),
+        monthOfYear: nowInManila.getMonth() + 1,
+        quarterOfYear: Math.floor(nowInManila.getMonth() / 3) + 1,
       };
     }
 

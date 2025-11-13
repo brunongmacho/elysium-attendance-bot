@@ -1292,9 +1292,10 @@ class ProactiveIntelligence {
 
       let totalAnnounced = 0;
 
-      // Calculate week range for logging
+      // Calculate week range for logging (Manila timezone GMT+8)
       const now = new Date();
-      const weekStart = new Date(now);
+      const nowInManila = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+      const weekStart = new Date(nowInManila);
       weekStart.setHours(3, 1, 0, 0);
       const dayOfWeek = weekStart.getDay();
       const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
@@ -1784,13 +1785,14 @@ class ProactiveIntelligence {
    */
   async checkCalendarDayStreaks() {
     try {
-      // Calculate yesterday's date range
+      // Calculate yesterday's date range (Manila timezone GMT+8)
       const now = new Date();
-      const yesterdayStart = new Date(now);
+      const nowInManila = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+      const yesterdayStart = new Date(nowInManila);
       yesterdayStart.setDate(yesterdayStart.getDate() - 1);
       yesterdayStart.setHours(3, 1, 0, 0);
 
-      const yesterdayEnd = new Date(now);
+      const yesterdayEnd = new Date(nowInManila);
       yesterdayEnd.setHours(3, 0, 0, 0);
 
       // Get all weekly attendance data
@@ -1902,15 +1904,16 @@ class ProactiveIntelligence {
     try {
       console.log('⭐ [PROACTIVE] Checking perfect attendance week...');
 
-      // Calculate this week's date range (Monday 3:01 AM to Sunday 11:59 PM)
+      // Calculate this week's date range (Monday 3:01 AM to Sunday 11:59 PM) in Manila timezone (GMT+8)
       const now = new Date();
-      const weekStart = new Date(now);
+      const nowInManila = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+      const weekStart = new Date(nowInManila);
       weekStart.setHours(3, 1, 0, 0);
       const dayOfWeek = weekStart.getDay();
       const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
       weekStart.setDate(weekStart.getDate() - daysToMonday);
 
-      const weekEnd = new Date(now);
+      const weekEnd = new Date(nowInManila);
       weekEnd.setHours(23, 59, 0, 0);
 
       console.log(`📊 [PROACTIVE] Checking spawns from ${weekStart.toISOString()} to ${weekEnd.toISOString()}`);
