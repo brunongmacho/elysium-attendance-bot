@@ -92,6 +92,7 @@ const bossRotation = require('./boss-rotation.js'); // Boss Rotation System (5-g
 const activityHeatmap = require('./activity-heatmap.js'); // Activity Heatmap System
 const crashRecovery = require('./utils/crash-recovery.js'); // Crash Recovery System (state persistence)
 const { MLIntegration } = require('./ml-integration.js'); // ML Integration (spawn prediction + NLP enhancement)
+const memberLore = JSON.parse(fs.readFileSync("./member-lore.json")); // Member lore data
 
 /**
  * Command alias mapping for shorthand commands.
@@ -1176,6 +1177,16 @@ function buildStatsEmbed(stats, member, countdown = 30) {
     embed.addFields({
       name: '📅 Recent Activity',
       value: recent,
+      inline: false
+    });
+  }
+
+  // 🎭 ADD MEMBER LORE IF AVAILABLE
+  const lore = memberLore[memberName];
+  if (lore) {
+    embed.addFields({
+      name: `⚔️ ${lore.class}`,
+      value: `**Weapon:** ${lore.weapon}\n*${lore.lore}*`,
       inline: false
     });
   }
