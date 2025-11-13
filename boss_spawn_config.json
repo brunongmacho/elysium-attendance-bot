@@ -1,5 +1,6 @@
 {
   "timerBasedBosses": {
+    "_note": "Timer-based bosses use DYNAMIC predictions with ML learning. Spawn time is calculated from last kill time + configured interval, adjusted by historical data and variance patterns. Confidence varies 0-95% based on consistency.",
     "Venatus": {
       "spawnIntervalHours": 10,
       "description": "Spawns 10 hours after being killed"
@@ -90,6 +91,7 @@
     }
   },
   "scheduleBasedBosses": {
+    "_note": "Schedule-based bosses use STATIC 99% confidence predictions. Spawn times are predetermined and do not depend on kill time. No ML learning is applied to these bosses.",
     "Clemantis": {
       "schedules": [
         {
