@@ -74,6 +74,29 @@ class MLSpawnPredictor {
   }
 
   /**
+   * Get configured spawn interval for a boss from boss_spawn_config.json
+   * Used for smart maintenance detection
+   */
+  getConfiguredInterval(bossName, bossSpawnConfig) {
+    if (!bossSpawnConfig) return null;
+
+    const normalizedName = this.normalizeBossName(bossName);
+
+    // Check timer-based bosses
+    if (bossSpawnConfig.timerBasedBosses) {
+      for (const [configBoss, config] of Object.entries(bossSpawnConfig.timerBasedBosses)) {
+        if (this.normalizeBossName(configBoss) === normalizedName) {
+          return config.spawnIntervalHours;
+        }
+      }
+    }
+
+    // Schedule-based bosses don't have fixed intervals (they spawn at specific times)
+    // So return null for them - they won't use maintenance detection
+    return null;
+  }
+
+  /**
    * Basic prediction (fallback when no ML data)
    */
   basicPrediction(bossName, lastKillTime, configuredInterval) {
@@ -151,6 +174,17 @@ class MLSpawnPredictor {
   async learnPatterns() {
     console.log('🤖 Learning spawn patterns from ALL historical sheets...');
 
+    // Load boss spawn configuration for maintenance detection
+    let bossSpawnConfig = null;
+    try {
+      const fs = require('fs').promises;
+      const configData = await fs.readFile('boss_spawn_config.json', 'utf8');
+      bossSpawnConfig = JSON.parse(configData);
+      console.log('✅ Loaded boss spawn config for smart maintenance detection');
+    } catch (error) {
+      console.warn('⚠️ Could not load boss_spawn_config.json - maintenance detection disabled:', error.message);
+    }
+
     // Get ALL attendance data from all weekly sheets
     // Same method as intelligence-engine.js uses
     const response = await this.sheetAPI.call('getAllWeeklyAttendance', {});
@@ -219,12 +253,29 @@ class MLSpawnPredictor {
       const intervals = [];
       const intervalData = []; // Store interval + timestamp for weighting
 
+      // Get configured interval for smart maintenance detection
+      const configuredInterval = this.getConfiguredInterval(bossName, bossSpawnConfig);
+      let maintenanceCount = 0;
+
       for (let i = 1; i < killTimes.length; i++) {
         const intervalMs = killTimes[i] - killTimes[i - 1];
         const intervalHours = intervalMs / (1000 * 60 * 60);
 
-        // Filter out unrealistic intervals
-        // Allow up to 3 days (72h) for most bosses, 7 days (168h) for weekly bosses
+        // SMART MAINTENANCE DETECTION
+        // If we have a configured interval, check if this spawn was maintenance
+        if (configuredInterval) {
+          // Maintenance threshold: interval < 70% of configured interval
+          const maintenanceThreshold = configuredInterval * 0.7;
+
+          if (intervalHours < maintenanceThreshold) {
+            // This is a maintenance spawn - skip it!
+            maintenanceCount++;
+            continue;
+          }
+        }
+
+        // Filter out unrealistic intervals as final safety check
+        // Allow up to 7 days (168h) for weekly bosses
         if (intervalHours >= 1 && intervalHours <= 168) {
           intervals.push(intervalHours);
           intervalData.push({
@@ -235,67 +286,9 @@ class MLSpawnPredictor {
         }
       }
 
-      // ENHANCED OUTLIER FILTERING FOR MAINTENANCE SPAWNS
-      // Maintenance can cause forced respawns (very short intervals)
-      // This two-pass filtering removes maintenance-related anomalies
-      if (intervals.length >= 5) {
-        const originalCount = intervals.length;
-
-        // PASS 1: Remove extreme short intervals (maintenance spawns)
-        // Calculate median first
-        const sortedIntervals = [...intervals].sort((a, b) => a - b);
-        const medianIndex = Math.floor(sortedIntervals.length / 2);
-        const median = sortedIntervals.length % 2 === 0
-          ? (sortedIntervals[medianIndex - 1] + sortedIntervals[medianIndex]) / 2
-          : sortedIntervals[medianIndex];
-
-        // Remove intervals < 50% of median (likely maintenance)
-        // Also remove intervals < 6 hours (definitely maintenance/error)
-        const minInterval = Math.max(6, median * 0.5);
-        const withoutMaintenance = intervals.filter(interval => interval >= minInterval);
-
-        // PASS 2: IQR filtering on remaining data
-        if (withoutMaintenance.length >= 5) {
-          const sorted = [...withoutMaintenance].sort((a, b) => a - b);
-
-          // Calculate quartiles
-          const q1Index = Math.floor(sorted.length * 0.25);
-          const q3Index = Math.floor(sorted.length * 0.75);
-          const q1 = sorted[q1Index];
-          const q3 = sorted[q3Index];
-          const iqr = q3 - q1;
-
-          // More aggressive IQR filtering (1.5x → 1.2x for tighter bounds)
-          if (iqr > 0) {
-            const lowerBound = q1 - (1.2 * iqr);
-            const upperBound = q3 + (1.2 * iqr);
-            const filteredIntervals = withoutMaintenance.filter(
-              interval => interval >= lowerBound && interval <= upperBound
-            );
-
-            // Use filtered data if we kept at least 50% (was 60%)
-            if (filteredIntervals.length >= Math.ceil(intervals.length * 0.5)) {
-              // PERFORMANCE OPTIMIZATION: Direct array reassignment instead of splice
-              // Avoids potential stack overflow with spread operator on large arrays
-              const filteredData = intervalData.filter(d =>
-                d.interval >= minInterval &&
-                d.interval >= lowerBound &&
-                d.interval <= upperBound
-              );
-
-              const removedCount = originalCount - filteredIntervals.length;
-              if (removedCount > 0) {
-                console.log(`   🔧 Filtered ${removedCount} outliers (${Math.round(removedCount / originalCount * 100)}% - likely maintenance spawns)`);
-              }
-
-              // Replace arrays efficiently
-              intervals.length = 0;
-              intervals.push(...filteredIntervals);
-              intervalData.length = 0;
-              intervalData.push(...filteredData);
-            }
-          }
-        }
+      // Log maintenance spawns detected
+      if (maintenanceCount > 0) {
+        console.log(`   🔧 Filtered ${maintenanceCount} maintenance spawns for ${bossName} (${Math.round(maintenanceCount / (killTimes.length - 1) * 100)}%)`);
       }
 
       if (intervals.length < 2) continue;
