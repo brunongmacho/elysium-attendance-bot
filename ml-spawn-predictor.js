@@ -261,14 +261,16 @@ class MLSpawnPredictor {
         const intervalMs = killTimes[i] - killTimes[i - 1];
         const intervalHours = intervalMs / (1000 * 60 * 60);
 
-        // SMART MAINTENANCE DETECTION
-        // If we have a configured interval, check if this spawn was maintenance
+        // SMART MAINTENANCE DETECTION (handles both early and late spawns)
+        // Maintenance affects spawns in two ways:
+        // 1. EARLY: Boss forced to spawn early during maintenance
+        // 2. LATE: Boss that should spawn during maintenance gets delayed until after (typically +4h)
         if (configuredInterval) {
-          // Maintenance threshold: interval < 70% of configured interval
-          const maintenanceThreshold = configuredInterval * 0.7;
+          const earlyThreshold = configuredInterval * 0.7;  // Early spawn: < 70% of configured
+          const lateThreshold = configuredInterval + 4;     // Late spawn: > configured + 4h (maintenance duration)
 
-          if (intervalHours < maintenanceThreshold) {
-            // This is a maintenance spawn - skip it!
+          if (intervalHours < earlyThreshold || intervalHours > lateThreshold) {
+            // This is a maintenance-affected spawn - skip it!
             maintenanceCount++;
             continue;
           }
