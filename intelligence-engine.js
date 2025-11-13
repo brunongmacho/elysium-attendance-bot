@@ -1349,9 +1349,10 @@ class IntelligenceEngine {
 
   /**
    * Predict spawn for schedule-based boss (fixed day/time spawns)
+   * Uses STATIC 99% confidence - no ML learning needed for predetermined schedules
    * @param {Object} bossSpawnType - Boss spawn type info
-   * @param {Array} spawns - Historical spawns (for learning system)
-   * @returns {Promise<Object>} Prediction with time and confidence
+   * @param {Array} spawns - Historical spawns (for lastSpawnTime only)
+   * @returns {Promise<Object>} Prediction with time and 99% confidence
    */
   async predictScheduledBoss(bossSpawnType, spawns) {
     const bossName = bossSpawnType.name;
@@ -1369,28 +1370,10 @@ class IntelligenceEngine {
       };
     }
 
-    // For schedule-based bosses, confidence is very high (90%)
-    // since spawn times are fixed and don't depend on kill time
-    const baseConfidence = 90;
-
-    // Slight adjustment based on historical accuracy (learning system)
-    const adjustedConfidence = await this.learningSystem.adjustConfidence('spawn_prediction', baseConfidence);
-
-    // Save prediction for future learning
-    const features = {
-      bossName: bossName,
-      historicalSpawns: spawns.length,
-      spawnType: 'schedule',
-      scheduleCount: scheduleConfig.schedules.length,
-    };
-
-    await this.learningSystem.savePrediction(
-      'spawn_prediction',
-      bossName,
-      nextSpawnTime.toISOString(),
-      adjustedConfidence,
-      features
-    );
+    // For schedule-based bosses, use STATIC 99% confidence
+    // These bosses spawn at fixed day/time regardless of kill time
+    // No learning system needed - the schedule is predetermined and unchanging
+    const confidence = 99;
 
     // For schedule-based bosses, the range is very tight (±30 minutes for server time variance)
     const rangeHours = 0.5; // 30 minutes
@@ -1404,7 +1387,7 @@ class IntelligenceEngine {
       predictedTime: nextSpawnTime,
       earliestTime,
       latestTime,
-      confidence: adjustedConfidence,
+      confidence: confidence, // Static 99% - no ML adjustment needed
       avgIntervalHours: null, // Not applicable for schedule-based
       lastSpawnTime: lastSpawn,
       basedOnSpawns: spawns.length,
