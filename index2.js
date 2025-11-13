@@ -1120,6 +1120,7 @@ function stopBiddingChannelCleanupSchedule() {
  * @returns {EmbedBuilder} Formatted stats embed
  */
 // Replace buildStatsEmbed function (around line 1117-1199)
+// Replace buildStatsEmbed function (around line 1117-1199)
 function buildStatsEmbed(stats, member, countdown = 30) {
   const { memberName, attendance, bidding, rank, totalMembers } = stats;
 
@@ -1183,8 +1184,12 @@ function buildStatsEmbed(stats, member, countdown = 30) {
   }
 
   // 🎭 ADD MEMBER LORE IF AVAILABLE
-  // CRITICAL FIX: Use memberName from stats (the actual name from sheets)
-  const lore = memberLore[memberName];
+  // CRITICAL FIX: Case-insensitive lookup for lore
+  const loreKey = Object.keys(memberLore).find(
+    key => key.toLowerCase() === memberName.toLowerCase()
+  );
+  const lore = loreKey ? memberLore[loreKey] : null;
+
   if (lore) {
     embed.addFields({
       name: `⚔️ ${lore.class}`,
@@ -1192,7 +1197,7 @@ function buildStatsEmbed(stats, member, countdown = 30) {
       inline: false
     });
   } else {
-    console.log(`ℹ️ No lore found for: ${memberName}`);
+    console.log(`ℹ️ No lore found for: ${memberName} (checked ${Object.keys(memberLore).length} entries)`);
   }
 
   // Footer with favorite boss and percentile
