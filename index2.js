@@ -1679,56 +1679,66 @@ const commandHandlers = {
         {
           name: '📋 STEP 1: Find the Boss Thread',
           value:
-            '• A new thread will be created in the attendance channel\n' +
+            '• The bot automatically creates a thread in the attendance channel\n' +
             '• Thread name format: `[MM/DD/YY HH:MM] Boss Name`\n' +
-            '• Example: `[11/13/25 14:30] General Aquleus`',
+            '• Example: `[11/13/25 14:30] General Aquleus`\n' +
+            '• Look for the newest thread with the boss you killed',
           inline: false
         },
         {
-          name: '✅ STEP 2: Post Present + Screenshot Together',
+          name: '✅ STEP 2: Post Keyword + Screenshot (ONE MESSAGE)',
           value:
-            '• In the boss thread, **type the keyword AND attach your screenshot in ONE message**\n' +
-            '• Keywords: `present`, `here`, or `attending`\n' +
-            '• Example: Type "present" and attach your screenshot in the same message\n' +
-            '• **IMPORTANT:** Both keyword and screenshot must be in the SAME message',
+            '• In ONE message, type keyword AND attach screenshot:\n' +
+            '  • **Keywords:** `present`, `here`, `attending`, `join`, `checkin`\n' +
+            '  • Common typos are auto-corrected (prsnt, hre, etc.)\n' +
+            '• **CRITICAL:** Keyword and screenshot MUST be in the SAME message!\n' +
+            '• After posting, the bot will reply with verification buttons',
           inline: false
         },
         {
           name: '📸 STEP 3: Screenshot Requirements',
           value:
-            '• Your screenshot must show:\n' +
-            '  ✓ Your character near the boss\n' +
-            '  ✓ Boss name visible\n' +
-            '  ✓ Combat log/damage (if possible)\n' +
-            '• After posting, the bot will add ✅ and ❌ buttons to your message',
+            '**Your screenshot MUST show:**\n' +
+            '✓ Your character name visible\n' +
+            '✓ Boss name visible on screen\n' +
+            '✓ Combat log or damage numbers (preferred)\n' +
+            '✓ Game timestamp/time visible\n\n' +
+            '**DO NOT:**\n' +
+            '❌ Use fake or old screenshots\n' +
+            '❌ Use someone else\'s screenshot\n' +
+            '❌ Post screenshot in separate message',
           inline: false
         },
         {
           name: '⏳ STEP 4: Wait for Admin Verification',
           value:
-            '• An admin will review your screenshot\n' +
-            '• If valid: Admin clicks ✅ → You get attendance credit!\n' +
-            '• If invalid: Admin clicks ❌ → You need to resubmit\n' +
-            '• Check the thread to see if you were verified',
+            '• Bot will reply with ✅ **Verify** and ❌ **Deny** buttons\n' +
+            '• Admin will review your screenshot and click:\n' +
+            '  • ✅ **Verify** → You get attendance credit!\n' +
+            '  • ❌ **Deny** → Screenshot rejected, you must resubmit\n' +
+            '• Check the thread to see if you were verified\n' +
+            '• Green embed = ✅ Verified | Red embed = ❌ Denied',
           inline: false
         },
         {
-          name: '⚠️ IMPORTANT RULES',
+          name: '⏰ Important Time Limits',
           value:
-            '❌ **Don\'t post screenshots in the main channel**\n' +
-            '❌ **Don\'t post in the wrong boss thread**\n' +
-            '❌ **Don\'t use fake/old screenshots**\n' +
-            '✅ **Only post in the correct boss thread**\n' +
-            '✅ **Upload screenshot right after killing boss**\n' +
-            '✅ **One screenshot per boss kill**',
+            '• Threads **auto-close after 20 minutes**\n' +
+            '• Submit ASAP after killing the boss\n' +
+            '• Late submissions will be rejected\n' +
+            '• If thread closes before verification, contact admin',
           inline: false
         },
         {
-          name: '⏰ Time Limit',
+          name: '⚠️ Common Mistakes to Avoid',
           value:
-            '• Threads auto-close after **20 minutes**\n' +
-            '• Submit your screenshot before the thread closes!\n' +
-            '• Late submissions may not be accepted',
+            '❌ Posting "present" first, then screenshot separately\n' +
+            '❌ Posting in the wrong boss thread\n' +
+            '❌ Posting in main attendance channel (not the thread)\n' +
+            '❌ Submitting after thread closes (20 min)\n' +
+            '✅ Type keyword + attach screenshot in ONE message\n' +
+            '✅ Post in the correct boss thread\n' +
+            '✅ Submit within 20 minutes',
           inline: false
         }
       );
@@ -1742,60 +1752,77 @@ const commandHandlers = {
       )
       .addFields(
         {
-          name: '🔨 STEP 1: Watch for Auction Announcements',
+          name: '🔨 STEP 1: Watch for Auction Threads',
           value:
-            '• Admins will announce items in the auction channel\n' +
+            '• Admins create auction threads in the bidding channel\n' +
+            '• Thread name shows the item being auctioned\n' +
             '• Pay attention to:\n' +
             '  📦 **Item name** (e.g., "Arcana Mace +5")\n' +
-            '  💰 **Starting bid** (minimum bid amount)\n' +
-            '  ⏱️ **Auction duration** (how long you can bid)',
+            '  💰 **Starting bid** (minimum bid required)\n' +
+            '  ⏱️ **Timer** (how long you have to bid)',
           inline: false
         },
         {
           name: '💵 STEP 2: Place Your Bid',
           value:
+            '• **MUST be used inside the auction thread!**\n' +
             '• Use command: **`!bid <amount>`**\n' +
-            '• Example: `!bid 1000` (bids 1000 gold)\n' +
-            '• Your bid must be higher than the current highest bid\n' +
-            '• You\'ll get a confirmation message if successful',
+            '• Example: `!bid 1000` (bids 1000 points)\n' +
+            '• Your bid must be higher than current highest bid\n' +
+            '• Bot will confirm if successful or show error',
           inline: false
         },
         {
-          name: '📊 STEP 3: Check Current Bids',
+          name: '📊 STEP 3: Check Your Points',
           value:
-            '• Use **`!bids`** to see all active auctions\n' +
-            '• Shows:\n' +
-            '  🏆 Current highest bidder\n' +
-            '  💰 Current highest bid\n' +
-            '  ⏰ Time remaining',
+            '• Use **`!mypoints`** in bidding channel (main, not thread)\n' +
+            '• Shows your total available points\n' +
+            '• Also shows: **`!mp`**, **`!pts`**, **`!mypts`** (aliases)\n' +
+            '• Make sure you have enough points before bidding!',
           inline: false
         },
         {
-          name: '🎯 STEP 4: Winning the Auction',
+          name: '📋 STEP 4: Check Bid Status',
           value:
-            '• If you have the highest bid when time expires, you win!\n' +
-            '• Winner will be announced in the channel\n' +
-            '• Coordinate with admins to collect your item\n' +
-            '• Payment is deducted from your DKP/gold balance',
+            '• Use **`!bidstatus`** in bidding channel\n' +
+            '• Shows all active auctions\n' +
+            '• Displays current highest bidder\n' +
+            '• Shows time remaining on each auction',
           inline: false
         },
         {
-          name: '💡 Bidding Tips',
+          name: '🎯 STEP 5: Winning the Auction',
           value:
-            '✅ **Check your balance first** - Don\'t bid more than you have\n' +
-            '✅ **Bid in increments** - Small increases save gold\n' +
+            '• Highest bidder when timer expires wins!\n' +
+            '• Winner announced in the auction thread\n' +
+            '• Points automatically deducted from your balance\n' +
+            '• Coordinate with admins to receive your item\n' +
+            '• Item will be distributed in-game',
+          inline: false
+        },
+        {
+          name: '💡 Smart Bidding Tips',
+          value:
+            '✅ **Check `!mypoints` first** - Don\'t bid more than you have\n' +
+            '✅ **Bid in small increments** - Save points\n' +
             '✅ **Watch the timer** - Last-minute bids can win\n' +
-            '✅ **Know item values** - Don\'t overpay!\n' +
-            '❌ **Don\'t bid on items you don\'t need**\n' +
-            '❌ **Don\'t cancel bids** - Bids are binding!',
+            '✅ **Know item values** - Ask experienced members\n' +
+            '✅ **Bid only in auction threads** - Main channel won\'t work\n' +
+            '❌ **Don\'t bid on items you can\'t use**\n' +
+            '❌ **Bids are binding** - Can\'t cancel after placing',
           inline: false
         },
         {
-          name: '📋 Other Auction Commands',
+          name: '📋 Available Auction Commands',
           value:
-            '• **`!mybids`** - See your active bids\n' +
-            '• **`!balance`** - Check your DKP/gold balance\n' +
-            '• **`!auctionhistory`** - See past auctions',
+            '**In auction threads:**\n' +
+            '• **`!bid <amount>`** - Place a bid (ONLY in threads)\n\n' +
+            '**In main bidding channel:**\n' +
+            '• **`!mypoints`** / **`!mp`** - Check your points\n' +
+            '• **`!bidstatus`** - View active auctions\n\n' +
+            '**Aliases that work:**\n' +
+            '• `!b <amount>` = `!bid <amount>`\n' +
+            '• `!pts`, `!mypts` = `!mypoints`',
           inline: false
         }
       );
@@ -1806,36 +1833,38 @@ const commandHandlers = {
       .setTitle('💎 Additional Tips for New Members')
       .addFields(
         {
-          name: '🎮 General Guild Tips',
+          name: '🎮 How to Earn Points',
           value:
-            '• Be active in boss spawns to earn DKP/gold\n' +
-            '• Help other members when they need it\n' +
-            '• Follow admin instructions during raids\n' +
-            '• Ask questions if you\'re unsure about anything!',
+            '• Attend boss kills (submit attendance screenshots)\n' +
+            '• Each verified attendance = points added\n' +
+            '• More attendance = more points to bid\n' +
+            '• Check leaderboards: `!leaderboardattendance`\n' +
+            '• Be active and help guild members!',
           inline: false
         },
         {
           name: '📞 Need Help?',
           value:
             '• Type **`!help`** to see all available commands\n' +
-            '• Ask admins or experienced members for guidance\n' +
+            '• Ask admins if you\'re unsure about anything\n' +
             '• Read pinned messages in each channel\n' +
-            '• Don\'t be afraid to ask questions!',
+            '• Other members are friendly - don\'t hesitate to ask!',
           inline: false
         },
         {
           name: '⚡ Quick Command Reference',
           value:
             '**Attendance:**\n' +
-            '• Type `present` + attach screenshot in ONE message\n' +
-            '• Both must be in the same message!\n\n' +
+            '• Type `present` + attach screenshot (ONE message)\n' +
+            '• Typos auto-corrected: `prsnt`, `hre`, etc.\n\n' +
             '**Auctions:**\n' +
-            '• `!bid <amount>` - Place a bid\n' +
-            '• `!bids` - View active auctions\n' +
-            '• `!mybids` - View your bids\n\n' +
+            '• `!bid <amount>` - Bid in auction thread\n' +
+            '• `!mypoints` - Check your points\n' +
+            '• `!bidstatus` - View active auctions\n\n' +
             '**Info:**\n' +
             '• `!help` - Full command list\n' +
-            '• `!nm` or `!newmember` - This guide',
+            '• `!nm` or `!newmember` - This guide\n' +
+            '• `!leaderboardattendance` - Attendance rankings',
           inline: false
         }
       )
