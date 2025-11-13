@@ -4566,7 +4566,7 @@ const commandHandlers = {
    * Usage: !rotation status | !rotation set <boss> <index> | !rotation increment <boss>
    */
   rotation: async (message, member) => {
-    if (!isAdmin(member, config)) {
+    if (!isAdmin(member)) {
       await message.reply('❌ Admin-only command.');
       return;
     }
@@ -4636,11 +4636,18 @@ const commandHandlers = {
       }
       // !rotation set <boss> <index> - Manually set rotation
       else if (subcommand === 'set') {
-        const bossName = args[1];
-        const newIndex = parseInt(args[2]);
+        // Parse boss name (can be multi-word like "Baron Braudmore")
+        // Last arg should be the index, everything else is the boss name
+        if (args.length < 3) {
+          await message.reply('❌ Usage: `!rotation set <boss> <index>`\nExample: `!rotation set Baron Braudmore 1`');
+          return;
+        }
 
-        if (!bossName || !newIndex) {
-          await message.reply('❌ Usage: `!rotation set <boss> <index>`\nExample: `!rotation set Amentis 1`');
+        const newIndex = parseInt(args[args.length - 1]); // Last arg is the index
+        const rawBossName = args.slice(1, -1).join(' '); // Everything between subcommand and index
+
+        if (!rawBossName || isNaN(newIndex)) {
+          await message.reply('❌ Usage: `!rotation set <boss> <index>`\nExample: `!rotation set Baron Braudmore 1`');
           return;
         }
 
@@ -4649,7 +4656,14 @@ const commandHandlers = {
           return;
         }
 
-        await message.reply(`⚙️ Setting ${bossName} rotation to index ${newIndex}...`);
+        // Use fuzzy matching to find the correct boss name
+        const bossName = findBossMatch(rawBossName, bossPoints);
+        if (!bossName) {
+          await message.reply(`❌ Unknown boss: "${rawBossName}"\n💡 Try: Amentis, Baron Braudmore, or General Aquleus`);
+          return;
+        }
+
+        await message.reply(`⚙️ Setting **${bossName}** rotation to index ${newIndex}...`);
 
         const result = await bossRotation.setRotation(bossName, newIndex);
 
@@ -4667,14 +4681,23 @@ const commandHandlers = {
       }
       // !rotation increment <boss> - Manually advance rotation
       else if (subcommand === 'increment' || subcommand === 'inc') {
-        const bossName = args[1];
-
-        if (!bossName) {
-          await message.reply('❌ Usage: `!rotation increment <boss>`\nExample: `!rotation increment Amentis`');
+        // Parse boss name (can be multi-word like "Baron Braudmore")
+        // Everything after the subcommand is the boss name
+        if (args.length < 2) {
+          await message.reply('❌ Usage: `!rotation increment <boss>`\nExample: `!rotation increment Baron Braudmore`');
           return;
         }
 
-        await message.reply(`🔄 Advancing ${bossName} rotation...`);
+        const rawBossName = args.slice(1).join(' '); // Join all remaining args
+
+        // Use fuzzy matching to find the correct boss name
+        const bossName = findBossMatch(rawBossName, bossPoints);
+        if (!bossName) {
+          await message.reply(`❌ Unknown boss: "${rawBossName}"\n💡 Try: Amentis, Baron Braudmore, or General Aquleus`);
+          return;
+        }
+
+        await message.reply(`🔄 Advancing **${bossName}** rotation...`);
 
         const result = await bossRotation.incrementRotation(bossName);
 
@@ -4729,10 +4752,13 @@ const commandHandlers = {
         await message.reply(
           `❌ Unknown subcommand: ${subcommand}\n\n` +
           `**Valid commands:**\n` +
-          `• \`!rotation status\` - Show all rotation statuses\n` +
+          `• \`!rotation\` or \`!rotation status\` - Show all rotation statuses\n` +
           `• \`!rotation set <boss> <index>\` - Set rotation (1-5)\n` +
+          `  Example: \`!rotation set Baron Braudmore 3\`\n` +
           `• \`!rotation increment <boss>\` - Advance rotation\n` +
-          `• \`!rotation refresh\` - Reload boss data from Google Sheets`
+          `  Example: \`!rotation inc General Aquleus\`\n` +
+          `• \`!rotation refresh\` - Reload boss data from Google Sheets\n\n` +
+          `💡 **Tip:** Boss names support fuzzy matching! Try "baron", "braud", or "aquleus"`
         );
       }
     } catch (error) {
