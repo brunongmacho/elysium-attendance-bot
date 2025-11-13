@@ -291,7 +291,7 @@ class SheetAPI {
         ];
 
         const isTransient = transientErrors.some(
-          code => error.code?.includes(code) || error.message?.includes(code) || error.name?.includes(code)
+          code => String(error.code || '')?.includes(code) || error.message?.includes(code) || error.name?.includes(code)
         );
         const isRateLimitError =
           error.message?.includes("HTTP 429") || error.message?.includes("Too Many Requests");
