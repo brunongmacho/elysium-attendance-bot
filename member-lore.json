@@ -1,0 +1,267 @@
+{
+  "AmielJohn": {
+    "weapon": "Bow",
+    "class": "Snack Archer",
+    "lore": "Fires arrows while snacking. Hits sometimes; appetite always. Has been seen using beef jerky as emergency ammo."
+  },
+  "ans2pid": {
+    "weapon": "Crossbow",
+    "class": "Chaos Ranger",
+    "lore": "Plays tactical chess with crossbow... mostly hits scenery. The trees have a restraining order."
+  },
+  "Azryth": {
+    "weapon": "Dual Dagger",
+    "class": "Vampire Assassin",
+    "lore": "Throws daggers stylishly; debates bat supremacy with Batghost mid-combo. Currently losing the argument."
+  },
+  "Batghost": {
+    "weapon": "Staff",
+    "class": "Phantom Sorcerer",
+    "lore": "Haunts the battlefield. Mostly scares teammates, enemies occasionally. Voted 'Most Likely to Make Allies Scream' three years running."
+  },
+  "Draxiimov": {
+    "weapon": "Bow",
+    "class": "Meme Archer",
+    "lore": "Shoots arrows of chaos; monsters die laughing instead of fighting. Weaponized cringe so powerful it violates the Geneva Convention."
+  },
+  "Goblok": {
+    "weapon": "Greatsword",
+    "class": "Goblin Warrior (Leader)",
+    "lore": "Wields a massive greatsword... and wisdom rarely. Leads raids in unpredictable patterns. GPS has given up on providing directions."
+  },
+  "Hesucrypto": {
+    "weapon": "Crossbow",
+    "class": "Crypto Ranger (Vice)",
+    "lore": "Shoots arrows of investment advice. Gold golems spawn randomly. Lost more guild funds than battles, somehow still Vice Leader."
+  },
+  "Iguro": {
+    "weapon": "Crossbow",
+    "class": "Portal Sniper",
+    "lore": "Crossbow shots teleport unpredictably; allies dodge or join enemies. Has accidentally recruited three bosses to the guild."
+  },
+  "Inihaw": {
+    "weapon": "Battle Shield",
+    "class": "Pyro Guardian (Vice)",
+    "lore": "Defends allies while firing grills of doom. Battlefield doubles as BBQ. Enemies die from heart disease before combat damage."
+  },
+  "Jalo": {
+    "weapon": "Bow",
+    "class": "Lore Archer",
+    "lore": "Arrows and useless facts fly simultaneously; accuracy optional. Once lectured a dragon about its poor dental hygiene mid-fight. Dragon fled."
+  },
+  "LXRDGRIM": {
+    "weapon": "Bow",
+    "class": "Reaper Marksman",
+    "lore": "Shoots arrows that hug and confuse; brooding optional. Enemies request therapy after encounters. Brooding still mandatory."
+  },
+  "ShionXT": {
+    "weapon": "Sword and Shield",
+    "class": "Reluctant Knight",
+    "lore": "Swings sword, barely blocks; heroic poses included for flair. Has mastered the art of looking epic while accomplishing nothing."
+  },
+  "zadaku": {
+    "weapon": "Sword and Shield",
+    "class": "Shadow Paladin",
+    "lore": "Blocks and schemes; usually forgets the plan mid-battle. Has 47 half-completed strategies and zero completed victories."
+  },
+  "Andrina": {
+    "weapon": "Crossbow",
+    "class": "Shadow Ranger",
+    "lore": "Shoots from darkness; sometimes hits the wrong side... but looks cool doing it. Style points awarded, victory points questionable."
+  },
+  "BabyDoge": {
+    "weapon": "Bow",
+    "class": "Bark Archer",
+    "lore": "Arrows bark; morale boosts and chaos ensue. Every shot sounds like a motivational chihuahua. Enemies confused. Allies inspired?"
+  },
+  "BronnyJames": {
+    "weapon": "Crossbow",
+    "class": "Pyro Ranger",
+    "lore": "Tries to set everything on fire with bolts; succeeds occasionally... accidentally. Guild insurance premiums have tripled."
+  },
+  "Byakko": {
+    "weapon": "Crossbow",
+    "class": "Roaring Hunter",
+    "lore": "Terrifies enemies with bolts and booming roars. Volume: max. Accuracy: variable. Intimidation: effective. Hearing loss: inevitable."
+  },
+  "Carrera": {
+    "weapon": "Crossbow",
+    "class": "Wind Ranger",
+    "lore": "Fast bolts, rarely hits target, style guaranteed. Moves so fast even their own arrows can't keep up. Physics weeps."
+  },
+  "CheeseCakee": {
+    "weapon": "Bow",
+    "class": "Dessert Archer",
+    "lore": "Shoots cakes that explode on contact. Sweet, deadly, and surprisingly moist. Bosses die diabetic and satisfied."
+  },
+  "Chunchunmaru": {
+    "weapon": "Greatsword",
+    "class": "Beast Warrior",
+    "lore": "Swings massive sword; mounted chaos included. Named sword after... that. Enemies die laughing. Strategy working as intended."
+  },
+  "CobRa": {
+    "weapon": "Bow",
+    "class": "Stealth Archer",
+    "lore": "Shoots arrows while setting traps; stealth optional. Once trapped self for three hours. Enemy felt bad and left."
+  },
+  "Daleee": {
+    "weapon": "Battle Staff",
+    "class": "Bard Mage",
+    "lore": "Casts spells that buff allies... unintentionally. Meant to curse boss, accidentally made teammates immortal. Happy accidents only."
+  },
+  "EoriuX": {
+    "weapon": "Dual Dagger",
+    "class": "Silent Assassin",
+    "lore": "Strikes fast; mostly hits self by accident. Owns more bandages than weapons. Tetanus shots on speed dial."
+  },
+  "erwarrr": {
+    "weapon": "Staff",
+    "class": "Warcry Mage",
+    "lore": "Spells mixed with screams; morale questionable. Volume compensates for spell accuracy. Enemies surrender to stop the noise."
+  },
+  "Evand3r": {
+    "weapon": "Staff",
+    "class": "Trinket Mage",
+    "lore": "Uses shiny objects as magical weapons; results vary. Once defeated a boss with a spoon. Refuses to explain how or why."
+  },
+  "Fever": {
+    "weapon": "Bow",
+    "class": "Chaos Archer",
+    "lore": "Arrows spread confusion; monsters unsure what's happening. Chaos field so strong reality.exe has stopped responding."
+  },
+  "Gehrmann": {
+    "weapon": "Barehands",
+    "class": "Obscure Brawler",
+    "lore": "Punches ideas and enemies equally; chaos guaranteed. Philosophy major turned fighter. Enemies defeated by existential crisis."
+  },
+  "Hercules": {
+    "weapon": "Dual Dagger",
+    "class": "Dancing Assassin",
+    "lore": "Fights and dances; enemies confused, allies too. Guild unsure if he's fighting or auditioning. Bosses die entertained."
+  },
+  "IZANAGI": {
+    "weapon": "Greatsword",
+    "class": "Shadow Warrior",
+    "lore": "Massive sword swings; brooding heroics optional. Has three facial expressions: brood, brood harder, occasional brood with hint of smile."
+  },
+  "JEBER89": {
+    "weapon": "Battle Shield",
+    "class": "Button Guardian",
+    "lore": "Blocks attacks; presses imaginary buttons that occasionally work. Shield has QTE minigame only he can see. Critics rate gameplay 7/10."
+  },
+  "M1ssy": {
+    "weapon": "Bow",
+    "class": "Rogue Archer",
+    "lore": "Shoots arrows; chaos guaranteed, snacks mandatory. Will pause mid-battle for snack break. Priorities: snacks, chaos, victory (in that order)."
+  },
+  "Maria": {
+    "weapon": "Barehands",
+    "class": "Twin Brawler",
+    "lore": "Punches everything; debates with Marsha11 over loot mid-fight. Has landed more arguments than punches. Winning both battles."
+  },
+  "Marsha11": {
+    "weapon": "Sword and Shield",
+    "class": "Twin Knight",
+    "lore": "Blocks and argues with Maria constantly; guild morale rises anyway. Fights synchronized: 50% combat, 50% sibling rivalry. Entertainment value: priceless."
+  },
+  "MOTHRA": {
+    "weapon": "Battle Shield",
+    "class": "Colossus Guardian",
+    "lore": "Shield ready; giant-scale destruction inevitable. Defensive stance causes more collateral damage than enemy attacks. Guild rebuilds monthly."
+  },
+  "Munchyy": {
+    "weapon": "Bow",
+    "class": "Stealth Archer",
+    "lore": "Shoots arrows after meals; deadly and polite. Sends apology notes with every kill. Enemies die confused but respected."
+  },
+  "Nyegerls": {
+    "weapon": "Barehands",
+    "class": "Wild Brawler",
+    "lore": "Punches and casts spells unpredictably; chaos ensues. Multiclassed accidentally. Still doesn't know which class. Neither do enemies."
+  },
+  "OneCrit": {
+    "weapon": "Sword and Shield",
+    "class": "Critical Knight",
+    "lore": "Blocks and swings; critical hits land randomly on friend or foe. RNG incarnate. Teammates wear helmets near him. Just in case."
+  },
+  "Pinchy": {
+    "weapon": "Staff",
+    "class": "Tiny Mage",
+    "lore": "Staff attacks; pinches enemies magically. Small but terrifying. Bosses fear the pinch. Guild medics fear carpal tunnel epidemic."
+  },
+  "PotatoCheese": {
+    "weapon": "Bow",
+    "class": "Spud Archer",
+    "lore": "Shoots potatoes that buff allies; delicious chaos. Arrows provide +10 carbs, +5 morale. Side effects: comfort, mild confusion, sudden hunger."
+  },
+  "Seoo": {
+    "weapon": "Bow",
+    "class": "Spy Archer",
+    "lore": "Stealthy shots; trips over shadows. Master of stealth. Except walking. And breathing quietly. And existing subtly. Perfect spy material."
+  },
+  "Varys": {
+    "weapon": "Wand",
+    "class": "Whisper Mage",
+    "lore": "Knows all secrets; shares some at random. Guild gossip network administrator. Information accuracy: 60%. Entertainment value: 100%."
+  },
+  "Snowy": {
+    "weapon": "Greatsword",
+    "class": "Frost Warrior",
+    "lore": "Swings greatsword; freezes enemies... sometimes allies too. Friendly fire incidents: classified. Apologies: seasonal. Frostbite: constant."
+  },
+  "Wandote": {
+    "weapon": "Wand",
+    "class": "Wand Mage",
+    "lore": "Spells cast themselves... unpredictably. Wand has sentience and attitude. Wizard argues with weapon daily. Wand winning most debates."
+  },
+  "xLunox": {
+    "weapon": "Greatsword",
+    "class": "Lunar Warrior",
+    "lore": "Moonlit swings; dramatic entrances required. Cannot attack without entrance music. Battles delayed 3-5 minutes for proper ambiance. Worth it."
+  },
+  "ZenP4kTo": {
+    "weapon": "Bow",
+    "class": "Monster Archer",
+    "lore": "Arrows inspire enemies accidentally; chaos guaranteed. Motivational speaker energy with terrible aim. Bosses receive confidence boost. Guild confused."
+  },
+  "Ztig": {
+    "weapon": "Crossbow",
+    "class": "Berserk Ranger",
+    "lore": "Shoots wildly; friend or foe unclear. Friendly fire rate: impressive. Accuracy: concerning. Banned from three raids. Showed up anyway."
+  },
+  "dmzPapa": {
+    "weapon": "Staff",
+    "class": "Guild Patriarch Mage",
+    "lore": "Magic mixed with parental guidance; naps mandatory. Casts fireball, then lectures about responsibility. Bosses defeated by dad jokes. Effective but painful."
+  },
+  "Exitium": {
+    "weapon": "Crossbow",
+    "class": "Theatrical Ranger",
+    "lore": "Shoots arrows with flair; dramatic exits optional. Every shot has soliloquy. Enemies die waiting for monologue to end. Encore demanded."
+  },
+  "azlamey": {
+    "weapon": "Dagger",
+    "class": "Saboteur Assassin",
+    "lore": "Master of accidental disasters. Sabotages missions unintentionally. Guild suspects double agent. Reality: just really unlucky. Or talented?"
+  },
+  "Skadushy": {
+    "weapon": "Dagger",
+    "class": "Shadow Assassin",
+    "lore": "Snacks shadows instead of fighting. Diet plan unclear. Effectiveness questionable. Shadows terrified. Doctor recommended balanced diet including actual food."
+  },
+  "Mervzs": {
+    "weapon": "Orb",
+    "class": "Collector Mage",
+    "lore": "Purpose unknown; potentially dangerous. Collects shiny orbs. Maybe spells? Maybe decorative? Guild doesn't ask. Too afraid of answer."
+  },
+  "Crestia": {
+    "weapon": "Staff",
+    "class": "Calm Mage",
+    "lore": "Ignored often; decisive when least expected. Silent 99% of time. That 1%? Saves entire raid. Then returns to silence. Legend."
+  },
+  "Sweeney": {
+    "weapon": "Wand + Dagger",
+    "class": "Chaotic Neutral",
+    "lore": "Friend or foe? Identity questionable. Alignment changes hourly. Guild has conspiracy board dedicated to tracking loyalty. Board inconclusive. Probably fine."
+  }
+}
