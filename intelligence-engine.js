@@ -291,6 +291,7 @@ class IntelligenceEngine {
 
   /**
    * Calculate next spawn time for schedule-based boss
+   * Schedule times are in Asia/Manila timezone (GMT+8)
    * @param {Object} scheduleConfig - Boss schedule configuration
    * @returns {Date} Next spawn time
    */
@@ -305,30 +306,45 @@ class IntelligenceEngine {
     const upcomingSpawns = [];
 
     for (const schedule of schedules) {
-      const [hours, minutes] = schedule.time.split(':').map(Number);
-      const dayOfWeek = schedule.dayOfWeek;
+      const [scheduleHours, scheduleMinutes] = schedule.time.split(':').map(Number);
+      const scheduleDayOfWeek = schedule.dayOfWeek;
 
-      // Calculate next occurrence of this schedule
-      const nextSpawn = new Date(now);
-      const currentDay = nextSpawn.getDay();
+      // Get current date/time components in Manila timezone
+      const nowInManila = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+      const currentDayInManila = nowInManila.getDay();
+      const currentYear = nowInManila.getFullYear();
+      const currentMonth = nowInManila.getMonth();
+      const currentDate = nowInManila.getDate();
 
-      // Days until next occurrence
-      let daysUntil = dayOfWeek - currentDay;
+      // Calculate days until next occurrence
+      let daysUntil = scheduleDayOfWeek - currentDayInManila;
       if (daysUntil < 0) {
         daysUntil += 7;
       } else if (daysUntil === 0) {
         // If it's today, check if the time has passed
-        const todaySpawnTime = new Date(now);
-        todaySpawnTime.setHours(hours, minutes, 0, 0);
+        const currentHour = nowInManila.getHours();
+        const currentMinute = nowInManila.getMinutes();
+        const currentTimeInMinutes = currentHour * 60 + currentMinute;
+        const scheduleTimeInMinutes = scheduleHours * 60 + scheduleMinutes;
 
-        if (now >= todaySpawnTime) {
+        if (currentTimeInMinutes >= scheduleTimeInMinutes) {
           // Time has passed, next spawn is next week
           daysUntil = 7;
         }
       }
 
-      nextSpawn.setDate(nextSpawn.getDate() + daysUntil);
-      nextSpawn.setHours(hours, minutes, 0, 0);
+      // Build an ISO string for the spawn time in Manila timezone
+      // Format: YYYY-MM-DDTHH:MM:SS+08:00
+      const spawnDate = new Date(currentYear, currentMonth, currentDate + daysUntil);
+      const spawnYear = spawnDate.getFullYear();
+      const spawnMonth = String(spawnDate.getMonth() + 1).padStart(2, '0');
+      const spawnDay = String(spawnDate.getDate()).padStart(2, '0');
+      const spawnHour = String(scheduleHours).padStart(2, '0');
+      const spawnMinute = String(scheduleMinutes).padStart(2, '0');
+
+      // Create ISO string with Manila timezone offset (+08:00)
+      const isoString = `${spawnYear}-${spawnMonth}-${spawnDay}T${spawnHour}:${spawnMinute}:00+08:00`;
+      const nextSpawn = new Date(isoString);
 
       upcomingSpawns.push(nextSpawn);
     }
