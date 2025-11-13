@@ -1685,22 +1685,22 @@ const commandHandlers = {
           inline: false
         },
         {
-          name: '✅ STEP 2: Mark Yourself Present',
+          name: '✅ STEP 2: Post Present + Screenshot Together',
           value:
-            '• Type **`present`** in the thread (lowercase works too)\n' +
-            '• You can also type **`here`** or **`attending`**\n' +
-            '• The bot will reply asking for your screenshot',
+            '• In the boss thread, **type the keyword AND attach your screenshot in ONE message**\n' +
+            '• Keywords: `present`, `here`, or `attending`\n' +
+            '• Example: Type "present" and attach your screenshot in the same message\n' +
+            '• **IMPORTANT:** Both keyword and screenshot must be in the SAME message',
           inline: false
         },
         {
-          name: '📸 STEP 3: Upload Your Screenshot',
+          name: '📸 STEP 3: Screenshot Requirements',
           value:
-            '• Take a screenshot showing:\n' +
+            '• Your screenshot must show:\n' +
             '  ✓ Your character near the boss\n' +
             '  ✓ Boss name visible\n' +
             '  ✓ Combat log/damage (if possible)\n' +
-            '• Upload the screenshot in the **same thread**\n' +
-            '• The bot will add ✅ and ❌ buttons to your screenshot',
+            '• After posting, the bot will add ✅ and ❌ buttons to your message',
           inline: false
         },
         {
@@ -1827,8 +1827,8 @@ const commandHandlers = {
           name: '⚡ Quick Command Reference',
           value:
             '**Attendance:**\n' +
-            '• `present` - Mark yourself present\n' +
-            '• (Upload screenshot after)\n\n' +
+            '• Type `present` + attach screenshot in ONE message\n' +
+            '• Both must be in the same message!\n\n' +
             '**Auctions:**\n' +
             '• `!bid <amount>` - Place a bid\n' +
             '• `!bids` - View active auctions\n' +
@@ -5448,6 +5448,21 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
       await commandHandlers.help(message, member);
+      return;
+    }
+
+    // New member guide (anyone can use, anywhere except spawn threads)
+    if (resolvedCmd === "!newmember") {
+      if (
+        message.channel.isThread() &&
+        message.channel.parentId === config.attendance_channel_id
+      ) {
+        await message.reply(
+          "⚠️ Please use `!newmember` in guild chat or admin logs to avoid cluttering spawn threads."
+        );
+        return;
+      }
+      await commandHandlers.newmember(message, member);
       return;
     }
 
