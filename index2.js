@@ -4315,8 +4315,9 @@ const commandHandlers = {
       const prediction = await intelligenceEngine.predictNextSpawnTime(bossName);
 
       // 🤖 ENHANCE WITH ML - Get tighter confidence windows and accuracy scoring
+      // SKIP ML for schedule-based bosses (they use static 99% confidence)
       let mlEnhancement = null;
-      if (mlIntegration && prediction && !prediction.error) {
+      if (mlIntegration && prediction && !prediction.error && prediction.spawnType !== 'schedule') {
         try {
           mlEnhancement = await mlIntegration.enhanceSpawnPrediction(
             prediction.bossName,
@@ -4327,6 +4328,8 @@ const commandHandlers = {
         } catch (mlError) {
           console.warn('[ML] Enhancement failed, using standard prediction:', mlError.message);
         }
+      } else if (prediction && prediction.spawnType === 'schedule') {
+        console.log(`[ML] Skipping ML enhancement for schedule-based boss: ${prediction.bossName} (using static 99% confidence)`);
       }
 
       if (prediction.error) {
@@ -4599,9 +4602,9 @@ const commandHandlers = {
             try {
               const prediction = await intelligenceEngine.predictNextSpawnTime(boss);
               if (prediction && !prediction.error) {
-                // Try to get ML enhancement
+                // Try to get ML enhancement (skip for schedule-based bosses)
                 let mlEnhancement = null;
-                if (mlIntegration) {
+                if (mlIntegration && prediction.spawnType !== 'schedule') {
                   mlEnhancement = await mlIntegration.enhanceSpawnPrediction(
                     prediction.bossName,
                     prediction.lastSpawnTime,
