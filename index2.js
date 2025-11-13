@@ -4566,7 +4566,7 @@ const commandHandlers = {
    * Usage: !rotation status | !rotation set <boss> <index> | !rotation increment <boss>
    */
   rotation: async (message, member) => {
-    if (!isAdmin(member, config)) {
+    if (!isAdmin(member)) {
       await message.reply('❌ Admin-only command.');
       return;
     }
