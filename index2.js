@@ -2859,7 +2859,9 @@ const commandHandlers = {
         const day = String(spawnDate.getDate()).padStart(2, "0");
         const hours = String(spawnDate.getHours()).padStart(2, "0");
         const minutes = String(spawnDate.getMinutes()).padStart(2, "0");
-        const formattedTimestamp = `${year}-${month}-${day} ${hours}:${minutes}`;
+        const yearShort = year.toString().slice(-2);
+        // Format: MM/DD/YY HH:MM (required by createSpawnThreads)
+        const formattedTimestamp = `${month}/${day}/${yearShort} ${hours}:${minutes}`;
 
         await message.reply(
           `🔄 **Creating maintenance spawn threads...**\n\n` +
@@ -2877,7 +2879,7 @@ const commandHandlers = {
             const result = await attendance.createSpawnThreads(
               client,
               bossName,
-              `${month}/${day}/${year.toString().slice(-2)}`,
+              `${month}/${day}/${yearShort}`,
               `${hours}:${minutes}`,
               formattedTimestamp,
               "manual",
