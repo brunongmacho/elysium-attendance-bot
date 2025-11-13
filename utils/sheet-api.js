@@ -274,27 +274,25 @@ class SheetAPI {
         recordSuccess();
         return result;
 
-      } catch (error) {
+            } catch (error) {
         const transientErrors = [
           "UND_ERR_CONNECT_TIMEOUT",
           "UND_ERR_HEADERS_TIMEOUT",
-          "UND_ERR_BODY_TIMEOUT",
           "UND_ERR_SOCKET",
           "ECONNRESET",
           "ECONNREFUSED",
-          "ETIMEDOUT",
-          "ENETUNREACH",
           "FetchError",
-          "TimeoutError",
-          "ConnectTimeoutError",
-          "Connect Timeout Error"
+          "TimeoutError"
         ];
 
+        const errorCode = error.code || '';
+        const errorMessage = error.message || '';
+        
         const isTransient = transientErrors.some(
-          code => String(error.code || '')?.includes(code) || error.message?.includes(code) || error.name?.includes(code)
+          code => errorCode.includes(code) || errorMessage.includes(code)
         );
         const isRateLimitError =
-          error.message?.includes("HTTP 429") || error.message?.includes("Too Many Requests");
+          errorMessage.includes("HTTP 429") || errorMessage.includes("Too Many Requests");
 
         if (isRateLimitError && !isRateLimited) {
           isRateLimited = true;
@@ -303,9 +301,9 @@ class SheetAPI {
         }
 
         if (isTransient || error.name === "AbortError") {
-          console.warn(`⚠️ Transient network issue (${error.code || error.name}): retrying...`);
+          console.warn(`⚠️ Transient network issue (${errorCode || error.name}): retrying...`);
         } else {
-          console.error(`❌ API error on ${action}: ${error.message}`);
+          console.error(`❌ API error on ${action}: ${errorMessage}`);
         }
 
         const attemptForBackoff = isRateLimited ? rateLimitAttempts : normalAttempts;
