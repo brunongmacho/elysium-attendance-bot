@@ -1119,6 +1119,7 @@ function stopBiddingChannelCleanupSchedule() {
  * @param {GuildMember} member - Discord guild member
  * @returns {EmbedBuilder} Formatted stats embed
  */
+// Replace buildStatsEmbed function (around line 1117-1199)
 function buildStatsEmbed(stats, member, countdown = 30) {
   const { memberName, attendance, bidding, rank, totalMembers } = stats;
 
@@ -1134,7 +1135,7 @@ function buildStatsEmbed(stats, member, countdown = 30) {
     .setTitle(`📊 Member Stats - ${memberName}`)
     .setTimestamp();
 
-  // Only set thumbnail if we have a valid member object
+  // Set thumbnail if we have a valid member object
   if (member && member.user) {
     embed.setThumbnail(member.user.displayAvatarURL());
   }
@@ -1182,6 +1183,7 @@ function buildStatsEmbed(stats, member, countdown = 30) {
   }
 
   // 🎭 ADD MEMBER LORE IF AVAILABLE
+  // CRITICAL FIX: Use memberName from stats (the actual name from sheets)
   const lore = memberLore[memberName];
   if (lore) {
     embed.addFields({
@@ -1189,6 +1191,8 @@ function buildStatsEmbed(stats, member, countdown = 30) {
       value: `**Weapon:** ${lore.weapon}\n*${lore.lore}*`,
       inline: false
     });
+  } else {
+    console.log(`ℹ️ No lore found for: ${memberName}`);
   }
 
   // Footer with favorite boss and percentile
@@ -2093,82 +2097,122 @@ const commandHandlers = {
   // =========================================================================
   // STATS COMMAND - Show member statistics
   // =========================================================================
-  stats: async (message, member, args) => {
-    let targetMember = member;
-    let targetName = member.displayName; // Use displayName for Google Sheets matching
+  // Replace the !stats command handler (around line 1380-1469)
+stats: async (message, member, args) => {
+  let targetMember = member;
+  let targetName = member.displayName; // Use displayName for Google Sheets matching
+  let searchName = targetName; // Name to search with (for fuzzy matching)
 
-    // Parse target from args
-    if (args.length > 0) {
-      if (message.mentions.members.size > 0) {
-        targetMember = message.mentions.members.first();
-        targetName = targetMember.displayName;
-      } else {
-        // User provided a name without @mention
-        targetName = args.join(" ");
+  // Parse target from args
+  if (args.length > 0) {
+    if (message.mentions.members.size > 0) {
+      // Handle @mention - use their displayName
+      targetMember = message.mentions.members.first();
+      targetName = targetMember.displayName;
+      searchName = targetName;
+    } else {
+      // User provided a name without @mention - use fuzzy matching
+      searchName = args.join(" ");
 
-        // Try to find the member in the guild by displayName
-        const guild = message.guild;
-        if (guild) {
-          const foundMember = guild.members.cache.find(
-            m => m.displayName.toLowerCase() === targetName.toLowerCase() ||
-                 m.user.username.toLowerCase() === targetName.toLowerCase()
-          );
+      // Try exact match first in guild cache
+      const guild = message.guild;
+      if (guild) {
+        const foundMember = guild.members.cache.find(
+          m => m.displayName.toLowerCase() === searchName.toLowerCase() ||
+               m.user.username.toLowerCase() === searchName.toLowerCase()
+        );
 
-          if (foundMember) {
-            targetMember = foundMember;
-          } else {
-            // Member not in cache, set to null to avoid using wrong avatar
-            targetMember = null;
-          }
+        if (foundMember) {
+          targetMember = foundMember;
+          targetName = foundMember.displayName;
+        } else {
+          // No exact match - will try fuzzy matching with Google Sheets
+          targetMember = null;
+          targetName = searchName;
         }
+      } else {
+        targetName = searchName;
       }
     }
+  }
 
-    // Check cache first
-    const cached = statsCache.get(targetName);
-    if (cached && (Date.now() - cached.timestamp < STATS_CACHE_DURATION)) {
-      console.log(`📦 Using cached stats for ${targetName}`);
-      const embed = buildStatsEmbed(cached.data, targetMember, 30);
-      const statsMsg = await message.reply({ embeds: [embed] });
+  // Check cache first (use normalized name for cache key)
+  const cacheKey = targetName.toLowerCase().trim();
+  const cached = statsCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < STATS_CACHE_DURATION)) {
+    console.log(`📦 Using cached stats for ${targetName}`);
+    
+    // CRITICAL FIX: Try to find member by the actual name returned from sheets
+    if (!targetMember && message.guild) {
+      const actualName = cached.data.memberName;
+      const foundMember = message.guild.members.cache.find(
+        m => m.displayName.toLowerCase() === actualName.toLowerCase() ||
+             m.user.username.toLowerCase() === actualName.toLowerCase()
+      );
+      if (foundMember) {
+        targetMember = foundMember;
+      }
+    }
+    
+    const embed = buildStatsEmbed(cached.data, targetMember, 30);
+    const statsMsg = await message.reply({ embeds: [embed] });
 
-      // Start countdown deletion
-      startCountdownDeletion(message, statsMsg, cached.data, targetMember, buildStatsEmbed, 30);
+    // Start countdown deletion
+    startCountdownDeletion(message, statsMsg, cached.data, targetMember, buildStatsEmbed, 30);
 
+    return;
+  }
+
+  // Show loading message
+  const loadingMsg = await message.reply(`⏳ Fetching stats for **${targetName}**...`);
+
+  try {
+    // Fetch stats from Google Sheets (with fuzzy matching support)
+    const result = await sheetAPI.call('getMemberStats', { memberName: targetName });
+
+    if (result.status !== 'ok') {
+      await loadingMsg.edit(`❌ Could not find stats for **${targetName}**`);
       return;
     }
 
-    // Show loading message
-    const loadingMsg = await message.reply(`⏳ Fetching stats for **${targetName}**...`);
+    // CRITICAL FIX: Get the actual member name returned from sheets (for fuzzy match cases)
+    const actualMemberName = result.memberName;
 
-    try {
-      // Fetch stats from Google Sheets
-      const result = await sheetAPI.call('getMemberStats', { memberName: targetName });
-
-      if (result.status !== 'ok') {
-        await loadingMsg.edit(`❌ Could not find stats for **${targetName}**`);
-        return;
+    // CRITICAL FIX: Try to find the actual Discord member by the returned name
+    if (message.guild) {
+      const foundMember = message.guild.members.cache.find(
+        m => m.displayName.toLowerCase() === actualMemberName.toLowerCase() ||
+             m.user.username.toLowerCase() === actualMemberName.toLowerCase()
+      );
+      if (foundMember) {
+        targetMember = foundMember;
+        console.log(`✅ Found Discord member for ${actualMemberName}: ${foundMember.displayName}`);
+      } else {
+        console.log(`⚠️ Could not find Discord member for ${actualMemberName}, using original member`);
       }
-
-      // Cache the result
-      statsCache.set(targetName, {
-        data: result,
-        timestamp: Date.now()
-      });
-
-      // Build and send embed
-      const embed = buildStatsEmbed(result, targetMember, 30);
-      await loadingMsg.edit({ content: null, embeds: [embed] });
-
-      // Start countdown deletion
-      startCountdownDeletion(message, loadingMsg, result, targetMember, buildStatsEmbed, 30);
-
-      console.log(`✅ Stats sent for ${targetName}`);
-
-    } catch (error) {
-      console.error('Stats error:', error);
-      await loadingMsg.edit("❌ Error fetching stats. Please try again later.");
     }
-  },
+
+    // Cache the result (use the actual name from sheets for cache key)
+    const actualCacheKey = actualMemberName.toLowerCase().trim();
+    statsCache.set(actualCacheKey, {
+      data: result,
+      timestamp: Date.now()
+    });
+
+    // Build and send embed (now with proper targetMember for lore lookup)
+    const embed = buildStatsEmbed(result, targetMember, 30);
+    await loadingMsg.edit({ content: null, embeds: [embed] });
+
+    // Start countdown deletion
+    startCountdownDeletion(message, loadingMsg, result, targetMember, buildStatsEmbed, 30);
+
+    console.log(`✅ Stats sent for ${actualMemberName} (searched: ${targetName})`);
+
+  } catch (error) {
+    console.error('Stats error:', error);
+    await loadingMsg.edit("❌ Error fetching stats. Please try again later.");
+  }
+},
 
   // =========================================================================
   // CLEARSTATE COMMAND - Emergency state reset
