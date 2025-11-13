@@ -2851,15 +2851,31 @@ const commandHandlers = {
         `**Spawn time:** 5 minutes from now\n\n` +
         `Click ✅ Confirm or ❌ Cancel button below.`,
       async (confirmMsg) => {
-        // Get current time + 5 minutes in Manila timezone
-        const now = new Date(Date.now() + 5 * 60 * 1000);
-        const spawnDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-        const year = spawnDate.getFullYear();
-        const month = String(spawnDate.getMonth() + 1).padStart(2, "0");
-        const day = String(spawnDate.getDate()).padStart(2, "0");
-        const hours = String(spawnDate.getHours()).padStart(2, "0");
-        const minutes = String(spawnDate.getMinutes()).padStart(2, "0");
-        const formattedTimestamp = `${year}-${month}-${day} ${hours}:${minutes}`;
+        // Get current time + 5 minutes in Manila timezone (GMT+8)
+        // IMPORTANT: Properly handle GMT+8 timezone conversion
+        const futureTime = new Date(Date.now() + 5 * 60 * 1000);
+
+        // Use Intl.DateTimeFormat to get components directly in Manila timezone
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Manila',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+
+        const parts = formatter.formatToParts(futureTime);
+        const year = parts.find(p => p.type === 'year').value;
+        const month = parts.find(p => p.type === 'month').value;
+        const day = parts.find(p => p.type === 'day').value;
+        const hours = parts.find(p => p.type === 'hour').value;
+        const minutes = parts.find(p => p.type === 'minute').value;
+        const yearShort = year.slice(-2);
+
+        // Format: MM/DD/YY HH:MM (required by createSpawnThreads)
+        const formattedTimestamp = `${month}/${day}/${yearShort} ${hours}:${minutes}`;
 
         await message.reply(
           `🔄 **Creating maintenance spawn threads...**\n\n` +
@@ -2877,7 +2893,7 @@ const commandHandlers = {
             const result = await attendance.createSpawnThreads(
               client,
               bossName,
-              `${month}/${day}/${year.toString().slice(-2)}`,
+              `${month}/${day}/${yearShort}`,
               `${hours}:${minutes}`,
               formattedTimestamp,
               "manual",

@@ -74,6 +74,29 @@ class MLSpawnPredictor {
   }
 
   /**
+   * Get configured spawn interval for a boss from boss_spawn_config.json
+   * Used for smart maintenance detection
+   */
+  getConfiguredInterval(bossName, bossSpawnConfig) {
+    if (!bossSpawnConfig) return null;
+
+    const normalizedName = this.normalizeBossName(bossName);
+
+    // Check timer-based bosses
+    if (bossSpawnConfig.timerBasedBosses) {
+      for (const [configBoss, config] of Object.entries(bossSpawnConfig.timerBasedBosses)) {
+        if (this.normalizeBossName(configBoss) === normalizedName) {
+          return config.spawnIntervalHours;
+        }
+      }
+    }
+
+    // Schedule-based bosses don't have fixed intervals (they spawn at specific times)
+    // So return null for them - they won't use maintenance detection
+    return null;
+  }
+
+  /**
    * Basic prediction (fallback when no ML data)
    */
   basicPrediction(bossName, lastKillTime, configuredInterval) {
@@ -151,6 +174,17 @@ class MLSpawnPredictor {
   async learnPatterns() {
     console.log('🤖 Learning spawn patterns from ALL historical sheets...');
 
+    // Load boss spawn configuration for maintenance detection
+    let bossSpawnConfig = null;
+    try {
+      const fs = require('fs').promises;
+      const configData = await fs.readFile('boss_spawn_config.json', 'utf8');
+      bossSpawnConfig = JSON.parse(configData);
+      console.log('✅ Loaded boss spawn config for smart maintenance detection');
+    } catch (error) {
+      console.warn('⚠️ Could not load boss_spawn_config.json - maintenance detection disabled:', error.message);
+    }
+
     // Get ALL attendance data from all weekly sheets
     // Same method as intelligence-engine.js uses
     const response = await this.sheetAPI.call('getAllWeeklyAttendance', {});
@@ -219,12 +253,31 @@ class MLSpawnPredictor {
       const intervals = [];
       const intervalData = []; // Store interval + timestamp for weighting
 
+      // Get configured interval for smart maintenance detection
+      const configuredInterval = this.getConfiguredInterval(bossName, bossSpawnConfig);
+      let maintenanceCount = 0;
+
       for (let i = 1; i < killTimes.length; i++) {
         const intervalMs = killTimes[i] - killTimes[i - 1];
         const intervalHours = intervalMs / (1000 * 60 * 60);
 
-        // Filter out unrealistic intervals
-        // Allow up to 3 days (72h) for most bosses, 7 days (168h) for weekly bosses
+        // SMART MAINTENANCE DETECTION (handles both early and late spawns)
+        // Maintenance affects spawns in two ways:
+        // 1. EARLY: Boss forced to spawn early during maintenance
+        // 2. LATE: Boss that should spawn during maintenance gets delayed until after (typically +4h)
+        if (configuredInterval) {
+          const earlyThreshold = configuredInterval * 0.7;  // Early spawn: < 70% of configured
+          const lateThreshold = configuredInterval + 4;     // Late spawn: > configured + 4h (maintenance duration)
+
+          if (intervalHours < earlyThreshold || intervalHours > lateThreshold) {
+            // This is a maintenance-affected spawn - skip it!
+            maintenanceCount++;
+            continue;
+          }
+        }
+
+        // Filter out unrealistic intervals as final safety check
+        // Allow up to 7 days (168h) for weekly bosses
         if (intervalHours >= 1 && intervalHours <= 168) {
           intervals.push(intervalHours);
           intervalData.push({
@@ -235,67 +288,9 @@ class MLSpawnPredictor {
         }
       }
 
-      // ENHANCED OUTLIER FILTERING FOR MAINTENANCE SPAWNS
-      // Maintenance can cause forced respawns (very short intervals)
-      // This two-pass filtering removes maintenance-related anomalies
-      if (intervals.length >= 5) {
-        const originalCount = intervals.length;
-
-        // PASS 1: Remove extreme short intervals (maintenance spawns)
-        // Calculate median first
-        const sortedIntervals = [...intervals].sort((a, b) => a - b);
-        const medianIndex = Math.floor(sortedIntervals.length / 2);
-        const median = sortedIntervals.length % 2 === 0
-          ? (sortedIntervals[medianIndex - 1] + sortedIntervals[medianIndex]) / 2
-          : sortedIntervals[medianIndex];
-
-        // Remove intervals < 50% of median (likely maintenance)
-        // Also remove intervals < 6 hours (definitely maintenance/error)
-        const minInterval = Math.max(6, median * 0.5);
-        const withoutMaintenance = intervals.filter(interval => interval >= minInterval);
-
-        // PASS 2: IQR filtering on remaining data
-        if (withoutMaintenance.length >= 5) {
-          const sorted = [...withoutMaintenance].sort((a, b) => a - b);
-
-          // Calculate quartiles
-          const q1Index = Math.floor(sorted.length * 0.25);
-          const q3Index = Math.floor(sorted.length * 0.75);
-          const q1 = sorted[q1Index];
-          const q3 = sorted[q3Index];
-          const iqr = q3 - q1;
-
-          // More aggressive IQR filtering (1.5x → 1.2x for tighter bounds)
-          if (iqr > 0) {
-            const lowerBound = q1 - (1.2 * iqr);
-            const upperBound = q3 + (1.2 * iqr);
-            const filteredIntervals = withoutMaintenance.filter(
-              interval => interval >= lowerBound && interval <= upperBound
-            );
-
-            // Use filtered data if we kept at least 50% (was 60%)
-            if (filteredIntervals.length >= Math.ceil(intervals.length * 0.5)) {
-              // PERFORMANCE OPTIMIZATION: Direct array reassignment instead of splice
-              // Avoids potential stack overflow with spread operator on large arrays
-              const filteredData = intervalData.filter(d =>
-                d.interval >= minInterval &&
-                d.interval >= lowerBound &&
-                d.interval <= upperBound
-              );
-
-              const removedCount = originalCount - filteredIntervals.length;
-              if (removedCount > 0) {
-                console.log(`   🔧 Filtered ${removedCount} outliers (${Math.round(removedCount / originalCount * 100)}% - likely maintenance spawns)`);
-              }
-
-              // Replace arrays efficiently
-              intervals.length = 0;
-              intervals.push(...filteredIntervals);
-              intervalData.length = 0;
-              intervalData.push(...filteredData);
-            }
-          }
-        }
+      // Log maintenance spawns detected
+      if (maintenanceCount > 0) {
+        console.log(`   🔧 Filtered ${maintenanceCount} maintenance spawns for ${bossName} (${Math.round(maintenanceCount / (killTimes.length - 1) * 100)}%)`);
       }
 
       if (intervals.length < 2) continue;
@@ -315,7 +310,19 @@ class MLSpawnPredictor {
         totalWeight += weight;
       }
 
+      // SAFETY: Guard against division by zero (edge case: all data extremely old)
+      if (totalWeight === 0 || !isFinite(totalWeight)) {
+        console.warn(`⚠️ ${bossName}: totalWeight is ${totalWeight}, skipping ML learning for this boss`);
+        continue;
+      }
+
       const weightedMean = weightedSum / totalWeight;
+
+      // SAFETY: Validate weighted mean
+      if (!isFinite(weightedMean) || weightedMean <= 0) {
+        console.warn(`⚠️ ${bossName}: invalid weighted mean ${weightedMean}, skipping`);
+        continue;
+      }
 
       // Calculate weighted variance
       let weightedVarianceSum = 0;
@@ -326,8 +333,20 @@ class MLSpawnPredictor {
       const weightedVariance = weightedVarianceSum / totalWeight;
       const weightedStdDev = Math.sqrt(weightedVariance);
 
+      // SAFETY: Validate standard deviation
+      if (!isFinite(weightedStdDev) || weightedStdDev < 0) {
+        console.warn(`⚠️ ${bossName}: invalid std dev ${weightedStdDev}, skipping`);
+        continue;
+      }
+
       // Calculate coefficient of variation (consistency metric)
       const cv = weightedStdDev / weightedMean;
+
+      // SAFETY: Validate CV
+      if (!isFinite(cv) || cv < 0) {
+        console.warn(`⚠️ ${bossName}: invalid CV ${cv}, skipping`);
+        continue;
+      }
 
       // Enhanced confidence calculation based on multiple factors
       let confidence = 0.65; // Base confidence
@@ -347,6 +366,12 @@ class MLSpawnPredictor {
       else if (intervals.length >= 5) confidence += 0.02;
 
       confidence = Math.min(confidence, 0.98); // Cap at 98% (never 100%)
+
+      // FINAL SAFETY: Validate all values before storing
+      if (!isFinite(confidence) || confidence < 0 || confidence > 1) {
+        console.warn(`⚠️ ${bossName}: invalid confidence ${confidence}, skipping`);
+        continue;
+      }
 
       // Store learned pattern with normalized name
       this.learnedPatterns.set(normalizedName, {
