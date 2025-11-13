@@ -109,6 +109,7 @@ const COMMAND_ALIASES = {
   "!?": "!help",
   "!commands": "!help",
   "!cmds": "!help",
+  "!nm": "!newmember",
 
   // Fun commands
   "!8ball": "!eightball",
@@ -1649,6 +1650,202 @@ const commandHandlers = {
   help: async (message, member) => {
     const args = message.content.trim().split(/\s+/).slice(1);
     await helpSystem.handleHelp(message, args, member);
+  },
+
+  // =========================================================================
+  // NEW MEMBER GUIDE - Comprehensive instructions for new members
+  // =========================================================================
+  newmember: async (message, member) => {
+    // Overview embed
+    const overviewEmbed = new EmbedBuilder()
+      .setColor('#00ff00')
+      .setTitle('📚 Welcome to Elysium! New Member Guide')
+      .setDescription(
+        '**Welcome to the guild!** This guide will teach you everything you need to know about:\n\n' +
+        '1️⃣ **Boss Attendance** - How to get credit for boss kills\n' +
+        '2️⃣ **Auctions** - How to bid on boss loot\n\n' +
+        'Read both sections carefully to avoid mistakes!'
+      )
+      .setTimestamp();
+
+    // Boss Attendance Guide
+    const attendanceEmbed = new EmbedBuilder()
+      .setColor('#3498db')
+      .setTitle('1️⃣ Boss Attendance - Step by Step Guide')
+      .setDescription(
+        '**When a boss spawns, here\'s what you need to do to get attendance credit:**'
+      )
+      .addFields(
+        {
+          name: '📋 STEP 1: Find the Boss Thread',
+          value:
+            '• A new thread will be created in the attendance channel\n' +
+            '• Thread name format: `[MM/DD/YY HH:MM] Boss Name`\n' +
+            '• Example: `[11/13/25 14:30] General Aquleus`',
+          inline: false
+        },
+        {
+          name: '✅ STEP 2: Mark Yourself Present',
+          value:
+            '• Type **`present`** in the thread (lowercase works too)\n' +
+            '• You can also type **`here`** or **`attending`**\n' +
+            '• The bot will reply asking for your screenshot',
+          inline: false
+        },
+        {
+          name: '📸 STEP 3: Upload Your Screenshot',
+          value:
+            '• Take a screenshot showing:\n' +
+            '  ✓ Your character near the boss\n' +
+            '  ✓ Boss name visible\n' +
+            '  ✓ Combat log/damage (if possible)\n' +
+            '• Upload the screenshot in the **same thread**\n' +
+            '• The bot will add ✅ and ❌ buttons to your screenshot',
+          inline: false
+        },
+        {
+          name: '⏳ STEP 4: Wait for Admin Verification',
+          value:
+            '• An admin will review your screenshot\n' +
+            '• If valid: Admin clicks ✅ → You get attendance credit!\n' +
+            '• If invalid: Admin clicks ❌ → You need to resubmit\n' +
+            '• Check the thread to see if you were verified',
+          inline: false
+        },
+        {
+          name: '⚠️ IMPORTANT RULES',
+          value:
+            '❌ **Don\'t post screenshots in the main channel**\n' +
+            '❌ **Don\'t post in the wrong boss thread**\n' +
+            '❌ **Don\'t use fake/old screenshots**\n' +
+            '✅ **Only post in the correct boss thread**\n' +
+            '✅ **Upload screenshot right after killing boss**\n' +
+            '✅ **One screenshot per boss kill**',
+          inline: false
+        },
+        {
+          name: '⏰ Time Limit',
+          value:
+            '• Threads auto-close after **20 minutes**\n' +
+            '• Submit your screenshot before the thread closes!\n' +
+            '• Late submissions may not be accepted',
+          inline: false
+        }
+      );
+
+    // Auction Guide
+    const auctionEmbed = new EmbedBuilder()
+      .setColor('#f39c12')
+      .setTitle('2️⃣ Auctions - Step by Step Guide')
+      .setDescription(
+        '**When loot drops from a boss, items are auctioned to guild members:**'
+      )
+      .addFields(
+        {
+          name: '🔨 STEP 1: Watch for Auction Announcements',
+          value:
+            '• Admins will announce items in the auction channel\n' +
+            '• Pay attention to:\n' +
+            '  📦 **Item name** (e.g., "Arcana Mace +5")\n' +
+            '  💰 **Starting bid** (minimum bid amount)\n' +
+            '  ⏱️ **Auction duration** (how long you can bid)',
+          inline: false
+        },
+        {
+          name: '💵 STEP 2: Place Your Bid',
+          value:
+            '• Use command: **`!bid <amount>`**\n' +
+            '• Example: `!bid 1000` (bids 1000 gold)\n' +
+            '• Your bid must be higher than the current highest bid\n' +
+            '• You\'ll get a confirmation message if successful',
+          inline: false
+        },
+        {
+          name: '📊 STEP 3: Check Current Bids',
+          value:
+            '• Use **`!bids`** to see all active auctions\n' +
+            '• Shows:\n' +
+            '  🏆 Current highest bidder\n' +
+            '  💰 Current highest bid\n' +
+            '  ⏰ Time remaining',
+          inline: false
+        },
+        {
+          name: '🎯 STEP 4: Winning the Auction',
+          value:
+            '• If you have the highest bid when time expires, you win!\n' +
+            '• Winner will be announced in the channel\n' +
+            '• Coordinate with admins to collect your item\n' +
+            '• Payment is deducted from your DKP/gold balance',
+          inline: false
+        },
+        {
+          name: '💡 Bidding Tips',
+          value:
+            '✅ **Check your balance first** - Don\'t bid more than you have\n' +
+            '✅ **Bid in increments** - Small increases save gold\n' +
+            '✅ **Watch the timer** - Last-minute bids can win\n' +
+            '✅ **Know item values** - Don\'t overpay!\n' +
+            '❌ **Don\'t bid on items you don\'t need**\n' +
+            '❌ **Don\'t cancel bids** - Bids are binding!',
+          inline: false
+        },
+        {
+          name: '📋 Other Auction Commands',
+          value:
+            '• **`!mybids`** - See your active bids\n' +
+            '• **`!balance`** - Check your DKP/gold balance\n' +
+            '• **`!auctionhistory`** - See past auctions',
+          inline: false
+        }
+      );
+
+    // Additional Tips
+    const tipsEmbed = new EmbedBuilder()
+      .setColor('#9b59b6')
+      .setTitle('💎 Additional Tips for New Members')
+      .addFields(
+        {
+          name: '🎮 General Guild Tips',
+          value:
+            '• Be active in boss spawns to earn DKP/gold\n' +
+            '• Help other members when they need it\n' +
+            '• Follow admin instructions during raids\n' +
+            '• Ask questions if you\'re unsure about anything!',
+          inline: false
+        },
+        {
+          name: '📞 Need Help?',
+          value:
+            '• Type **`!help`** to see all available commands\n' +
+            '• Ask admins or experienced members for guidance\n' +
+            '• Read pinned messages in each channel\n' +
+            '• Don\'t be afraid to ask questions!',
+          inline: false
+        },
+        {
+          name: '⚡ Quick Command Reference',
+          value:
+            '**Attendance:**\n' +
+            '• `present` - Mark yourself present\n' +
+            '• (Upload screenshot after)\n\n' +
+            '**Auctions:**\n' +
+            '• `!bid <amount>` - Place a bid\n' +
+            '• `!bids` - View active auctions\n' +
+            '• `!mybids` - View your bids\n\n' +
+            '**Info:**\n' +
+            '• `!help` - Full command list\n' +
+            '• `!nm` or `!newmember` - This guide',
+          inline: false
+        }
+      )
+      .setFooter({ text: 'Good luck and have fun in Elysium! 🎉' })
+      .setTimestamp();
+
+    // Send all embeds
+    await message.reply({
+      embeds: [overviewEmbed, attendanceEmbed, auctionEmbed, tipsEmbed]
+    });
   },
 
   // =========================================================================
