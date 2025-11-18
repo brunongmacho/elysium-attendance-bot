@@ -69,6 +69,7 @@ const {
 // External dependencies
 const fs = require("fs");             // File system operations
 const http = require("http");         // HTTP server for health checks
+const levenshtein = require("fast-levenshtein"); // Fuzzy string matching
 
 // Internal modules - Core systems
 const bidding = require("./bidding.js");                    // Auction bidding logic
@@ -285,13 +286,6 @@ const bossPoints = JSON.parse(fs.readFileSync("./boss_points.json"));
  * @type {Object.<string, Array<string>>}
  */
 const slapResponses = JSON.parse(fs.readFileSync("./slap-responses.json"));
-
-/**
- * Member lore data loaded from member-lore.json
- * Contains weapon, class, and comedic lore for each guild member
- * @type {Object.<string, {weapon: string, class: string, lore: string}>}
- */
-const memberLore = JSON.parse(fs.readFileSync("./member-lore.json"));
 
 // =====================================================================
 // SECTION 2: DISCORD CLIENT INITIALIZATION
@@ -1121,13 +1115,98 @@ function stopBiddingChannelCleanupSchedule() {
 // =====================================================================
 
 /**
+ * Find best matching member using fuzzy search
+ * @param {string} searchName - Name to search for
+ * @param {Guild} guild - Discord guild
+ * @returns {Object|null} { member, matchedName, confidence } or null
+ */
+function findBestMemberMatch(searchName, guild) {
+  if (!searchName || !guild) return null;
+
+  const normalizedSearch = searchName.toLowerCase().trim();
+  const members = Array.from(guild.members.cache.values());
+
+  let bestMatch = null;
+  let bestScore = Infinity;
+  let matchType = null;
+
+  for (const member of members) {
+    const displayName = member.displayName.toLowerCase();
+    const username = member.user.username.toLowerCase();
+
+    // Exact match (case insensitive) - highest priority
+    if (displayName === normalizedSearch || username === normalizedSearch) {
+      return {
+        member: member,
+        matchedName: member.displayName,
+        confidence: 100,
+        matchType: 'exact'
+      };
+    }
+
+    // Starts with match - second priority
+    if (displayName.startsWith(normalizedSearch) || username.startsWith(normalizedSearch)) {
+      const matchedName = displayName.startsWith(normalizedSearch) ? member.displayName : member.user.username;
+      return {
+        member: member,
+        matchedName: matchedName,
+        confidence: 90,
+        matchType: 'prefix'
+      };
+    }
+
+    // Contains match - third priority
+    if (displayName.includes(normalizedSearch) || username.includes(normalizedSearch)) {
+      if (!bestMatch || matchType !== 'contains') {
+        bestMatch = member;
+        bestScore = 0;
+        matchType = 'contains';
+      }
+    }
+
+    // Fuzzy match using Levenshtein distance - last resort
+    if (!bestMatch || matchType === 'fuzzy') {
+      const displayDistance = levenshtein.get(normalizedSearch, displayName);
+      const usernameDistance = levenshtein.get(normalizedSearch, username);
+      const minDistance = Math.min(displayDistance, usernameDistance);
+
+      if (minDistance < bestScore) {
+        bestScore = minDistance;
+        bestMatch = member;
+        matchType = 'fuzzy';
+      }
+    }
+  }
+
+  // Return best match if found
+  if (bestMatch) {
+    // Calculate confidence based on distance (lower distance = higher confidence)
+    let confidence;
+    if (matchType === 'contains') {
+      confidence = 75;
+    } else if (matchType === 'fuzzy') {
+      // Confidence inversely proportional to distance
+      // Distance of 0 = 100%, distance of 10+ = ~0%
+      confidence = Math.max(0, Math.min(100, 100 - (bestScore * 10)));
+    }
+
+    return {
+      member: bestMatch,
+      matchedName: bestMatch.displayName,
+      confidence: confidence,
+      matchType: matchType
+    };
+  }
+
+  return null;
+}
+
+/**
  * Builds a Discord embed for member stats
  * @param {Object} stats - Stats data from Google Sheets
  * @param {GuildMember} member - Discord guild member
  * @returns {EmbedBuilder} Formatted stats embed
  */
-// Replace buildStatsEmbed function (around line 1117-1199)
-// Replace buildStatsEmbed function (around line 1117-1199)
 function buildStatsEmbed(stats, member, countdown = 30) {
   const { memberName, attendance, bidding, rank, totalMembers } = stats;
 
@@ -2113,40 +2192,40 @@ const commandHandlers = {
 stats: async (message, member, args) => {
   let targetMember = member;
   let targetName = member.displayName; // Use displayName for Google Sheets matching
-  let searchName = targetName; // Name to search with (for fuzzy matching)
+  let matchInfo = null;
 
   // Parse target from args
   if (args.length > 0) {
     if (message.mentions.members.size > 0) {
-      // Handle @mention - use their displayName
+      // @mention provided - highest priority
       targetMember = message.mentions.members.first();
       targetName = targetMember.displayName;
-      searchName = targetName;
     } else {
       // User provided a name without @mention - use fuzzy matching
-      searchName = args.join(" ");
-
-      // Try exact match first in guild cache
+      const searchName = args.join(" ");
       const guild = message.guild;
-      if (guild) {
-        const foundMember = guild.members.cache.find(
-          m => m.displayName.toLowerCase() === searchName.toLowerCase() ||
-               m.user.username.toLowerCase() === searchName.toLowerCase()
-        );
 
-        if (foundMember) {
-          targetMember = foundMember;
-          targetName = foundMember.displayName;
+      if (guild) {
+        matchInfo = findBestMemberMatch(searchName, guild);
+
+        if (matchInfo) {
+          targetMember = matchInfo.member;
+          targetName = matchInfo.matchedName;
+
+          // Log match quality for debugging
+          console.log(`🔍 Stats fuzzy match: "${searchName}" → "${targetName}" (${matchInfo.matchType}, ${matchInfo.confidence}% confidence)`);
         } else {
-          // No exact match - will try fuzzy matching with Google Sheets
-          targetMember = null;
+          // No match found - use raw search name for Google Sheets lookup
           targetName = searchName;
+          targetMember = null;
+          console.log(`⚠️ Stats: No Discord match found for "${searchName}", trying Google Sheets...`);
         }
       } else {
         targetName = searchName;
       }
     }
   }
+  // If no args provided, show own stats (already set to member above)
 
   // Check cache first (use normalized name for cache key)
   const cacheKey = targetName.toLowerCase().trim();
