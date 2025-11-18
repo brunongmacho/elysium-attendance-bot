@@ -84,6 +84,7 @@ const { SheetAPI } = require('./utils/sheet-api');          // Unified Google Sh
 const { DiscordCache } = require('./utils/discord-cache');  // Channel caching system
 const { normalizeUsername, findBossMatch } = require('./utils/common');    // Username normalization and boss matching
 const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images'); // Boss images utility
+const { addGuildFooter, addGuildThumbnail, addGuildAuthor } = require('./utils/embed-branding'); // Guild branding utility
 const scheduler = require('./utils/maintenance-scheduler'); // Unified maintenance scheduler
 const { IntelligenceEngine } = require('./intelligence-engine.js'); // AI/ML Intelligence Engine
 const { ProactiveIntelligence } = require('./proactive-intelligence.js'); // Proactive Monitoring
@@ -4698,6 +4699,12 @@ stats: async (message, member, args) => {
       if (bossImageURL) {
         embed.setThumbnail(bossImageURL);
       }
+
+      // Add guild branding to footer (preserving existing footer text)
+      const footerText = mlEnhancement && mlEnhancement.method === 'ml'
+        ? `Requested by ${member.user.username} • 🤖 ML-Enhanced • ${(mlEnhancement.confidence * 100).toFixed(0)}% Accurate`
+        : `Requested by ${member.user.username} • Intelligence Engine`;
+      addGuildFooter(embed, message.guild, footerText);
 
       // Prepare message payload with boss image attachment
       const messagePayload = { embeds: [embed] };

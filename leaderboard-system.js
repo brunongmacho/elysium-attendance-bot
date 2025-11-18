@@ -44,6 +44,7 @@
 
 const { EmbedBuilder } = require('discord.js');
 const { SheetAPI } = require('./utils/sheet-api');
+const { addGuildThumbnail } = require('./utils/embed-branding');
 
 // ============================================================================
 // MODULE STATE
@@ -259,6 +260,9 @@ async function displayAttendanceLeaderboard(message) {
       .setDescription(`**Current Week:** ${data.weekName || 'N/A'}\n**Total Members:** ${data.leaderboard.length}`)
       .setTimestamp();
 
+    // Add guild branding
+    addGuildThumbnail(embed, message.guild);
+
     // Get top 10 members
     const topMembers = data.leaderboard.slice(0, 10);
     let leaderboardText = '';
@@ -369,6 +373,9 @@ async function displayBiddingLeaderboard(message) {
       .setDescription(`**Total Members:** ${data.leaderboard.length}`)
       .setTimestamp();
 
+    // Add guild branding
+    addGuildThumbnail(embed, message.guild);
+
     // Top 10 members by points left
     const topMembers = data.leaderboard.slice(0, 10);
     let leaderboardText = '';
@@ -446,6 +453,9 @@ async function displayCombinedLeaderboards(message) {
       .setTitle('🏆 ELYSIUM Leaderboards')
       .setDescription('**Combined Attendance & Bidding Rankings**')
       .setTimestamp();
+
+    // Add guild branding
+    addGuildThumbnail(embed, message.guild);
 
     // Add Attendance Leaderboard
     if (attData && attData.leaderboard && attData.leaderboard.length > 0) {
@@ -590,6 +600,9 @@ async function sendWeeklyReport() {
       .setTitle('📊 Weekly Report')
       .setDescription(`**Week:** ${data.weekName || 'N/A'}\n**Report Generated:** ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`)
       .setTimestamp();
+
+    // Add guild branding
+    addGuildThumbnail(embed, adminLogsChannel.guild);
 
     // ==========================================
     // NEW: WEEK-SPECIFIC STATISTICS (Sunday-Saturday)
@@ -1090,6 +1103,9 @@ async function sendMonthlyReport() {
 
     embed.setFooter({ text: 'Next monthly report: Last day of next month at 11:59pm GMT+8' });
     embed.setTimestamp();
+
+    // Add guild branding
+    addGuildThumbnail(embed, adminLogsChannel.guild);
 
     // Send the report to both channels
     console.log(`📤 Attempting to send monthly report embed...`);

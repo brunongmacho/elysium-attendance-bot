@@ -33,6 +33,7 @@
 const { EmbedBuilder } = require('discord.js');
 const { SheetAPI } = require('./utils/sheet-api');
 const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images');
+const { addGuildFooter } = require('./utils/embed-branding');
 
 // ============================================================================
 // MODULE STATE
@@ -422,6 +423,9 @@ async function sendRotationWarning(bossName, predictedSpawnTime) {
     if (bossImageURL) {
       embed.setThumbnail(bossImageURL);
     }
+
+    // Add guild branding to footer
+    addGuildFooter(embed, channel.guild, 'ELYSIUM Rotation System');
 
     const messagePayload = { content: '@everyone', embeds: [embed] };
     if (bossImage) {
