@@ -2028,21 +2028,34 @@ const commandHandlers = {
         const [date, time] = info.timestamp.split(" ");
         const [month, day, year] = date.split("/");
         const [hour, minute] = time.split(":");
-        // Convert strings to numbers and create Date object
-        // This ensures proper date calculation regardless of server timezone
-        return new Date(
+
+        // FIXED: Parse Manila timezone timestamp correctly
+        // The timestamp is in Manila time (UTC+8), but we need to create a UTC Date object
+        // Subtract 8 hours (28800000ms) to convert Manila time to UTC
+        const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+
+        return Date.UTC(
           2000 + parseInt(year),
           parseInt(month) - 1,
           parseInt(day),
           parseInt(hour),
           parseInt(minute)
-        ).getTime();
+        ) - MANILA_OFFSET_MS;
       })();
 
       const ageMs = Date.now() - spawnTime;
       const ageHours = Math.floor(ageMs / 3600000);
       const ageMinutes = Math.floor((ageMs % 3600000) / 60000);
-      const ageText = ageHours > 0 ? `${ageHours}h ago` : `${ageMinutes}m ago`;
+
+      // Handle negative ages (future spawns) gracefully
+      let ageText;
+      if (ageMs < 0) {
+        const futureHours = Math.floor(Math.abs(ageMs) / 3600000);
+        const futureMinutes = Math.floor((Math.abs(ageMs) % 3600000) / 60000);
+        ageText = futureHours > 0 ? `in ${futureHours}h` : `in ${futureMinutes}m`;
+      } else {
+        ageText = ageHours > 0 ? `${ageHours}h ago` : `${ageMinutes}m ago`;
+      }
 
       return `${i + 1}. **${info.boss}** (${info.timestamp}) - ${
         info.members.length
