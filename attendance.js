@@ -947,7 +947,11 @@ async function validateStateConsistency(client) {
             const [_, month, day, year, hour, minute] = match;
             // Construct full year (assume 20xx for years 00-99)
             const fullYear = 2000 + parseInt(year);
-            const colTime = new Date(fullYear, parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute)).getTime();
+
+            // FIXED: Parse Manila timezone timestamp correctly
+            // The timestamp is in Manila time (UTC+8), convert to UTC for comparison
+            const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+            const colTime = Date.UTC(fullYear, parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute)) - MANILA_OFFSET_MS;
 
             if (colTime > threeHoursAgo) {
               discrepancies.columnsWithoutThreads.push({

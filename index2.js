@@ -2011,14 +2011,18 @@ const commandHandlers = {
         const [date, time] = ts.split(" ");
         const [month, day, year] = date.split("/");
         const [hour, minute] = time.split(":");
-        // Convert strings to numbers for proper date parsing
-        return new Date(
+
+        // FIXED: Parse Manila timezone timestamp correctly
+        // The timestamp is in Manila time (UTC+8), convert to UTC for comparison
+        const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+
+        return Date.UTC(
           2000 + parseInt(year),
           parseInt(month) - 1,
           parseInt(day),
           parseInt(hour),
           parseInt(minute)
-        ).getTime();
+        ) - MANILA_OFFSET_MS;
       };
       return parseTimestamp(a[1].timestamp) - parseTimestamp(b[1].timestamp);
     });
