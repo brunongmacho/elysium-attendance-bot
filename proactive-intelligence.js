@@ -1313,7 +1313,7 @@ class ProactiveIntelligence {
         for (const [milestone, achievers] of Object.entries(grouped)) {
           const milestoneNum = parseInt(milestone);
           const isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.attendance.major.includes(milestoneNum);
-          const channel = isMajor ? guildAnnouncementChannel : guildChatChannel;
+          const channel = guildChatChannel;
 
           const embed = await this.createGroupedMilestoneEmbed(
             achievers,
@@ -1353,7 +1353,7 @@ class ProactiveIntelligence {
         for (const [milestone, achievers] of Object.entries(grouped)) {
           const milestoneNum = parseInt(milestone);
           const isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.bidding.major.includes(milestoneNum);
-          const channel = isMajor ? guildAnnouncementChannel : guildChatChannel;
+          const channel = guildChatChannel;
 
           const embed = await this.createGroupedMilestoneEmbed(
             achievers,
@@ -1393,7 +1393,7 @@ class ProactiveIntelligence {
         for (const [milestone, achievers] of Object.entries(grouped)) {
           const milestoneNum = parseInt(milestone);
           const isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.engagement.major.includes(milestoneNum);
-          const channel = isMajor ? guildAnnouncementChannel : guildChatChannel;
+          const channel = guildChatChannel;
 
           const embed = this.createEngagementMilestoneEmbed(achievers, milestoneNum, isMajor);
 
@@ -1426,7 +1426,7 @@ class ProactiveIntelligence {
         for (const milestone of this.milestoneQueue.guildWide) {
           const embed = this.createGuildWideMilestoneEmbed(milestone);
 
-          await guildAnnouncementChannel.send({ embeds: [embed] });
+          await guildChatChannel.send({ embeds: [embed] });
 
           // Log to weekly milestone log
           await this.intelligence.sheetAPI.call('logWeeklyMilestone', {
@@ -1475,7 +1475,7 @@ class ProactiveIntelligence {
               isMajor = PROACTIVE_CONFIG.thresholds.milestonePoints.tenure.major.includes(milestoneNum);
             }
 
-            const channel = isMajor ? guildAnnouncementChannel : guildChatChannel;
+            const channel = guildChatChannel;
 
             const embed = this.createStreakMilestoneEmbed(achievers, milestoneNum, streakType, isMajor);
 
