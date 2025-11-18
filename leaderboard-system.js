@@ -590,6 +590,11 @@ async function sendWeeklyReport(targetChannel = null) {
 
     if (targetChannel) {
       // Manual trigger: only send to the channel where command was invoked
+      // Validate that targetChannel is a valid channel object
+      if (!targetChannel || typeof targetChannel.send !== 'function') {
+        console.error('❌ Invalid targetChannel provided:', targetChannel);
+        return;
+      }
       console.log(`📍 Sending weekly report to specific channel: ${targetChannel.name || targetChannel.id}`);
     } else {
       // Scheduled trigger: send to both admin logs and guild chat
