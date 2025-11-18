@@ -31,5 +31,6 @@
   "Supore": {"points":3, "aliases":["supore"]},
   "Chaiflock": {"points":3, "aliases":["chaiflock"]},
   "Benji": {"points":3, "aliases":["benji"]},
-  "Guild Boss": {"points": 0, "aliases": ["guild boss", "guildboss", "gb"]}
+  "Guild Boss": {"points": 15, "aliases": ["guild boss", "guildboss", "gb"]},
+  "GvG": {"points": 5, "aliases": ["gvg", "guild vs guild", "guild war pvp"]}
 }

@@ -286,6 +286,13 @@ const bossPoints = JSON.parse(fs.readFileSync("./boss_points.json"));
  */
 const slapResponses = JSON.parse(fs.readFileSync("./slap-responses.json"));
 
+/**
+ * Member lore data loaded from member-lore.json
+ * Contains weapon, class, and comedic lore for each guild member
+ * @type {Object.<string, {weapon: string, class: string, lore: string}>}
+ */
+const memberLore = JSON.parse(fs.readFileSync("./member-lore.json"));
+
 // =====================================================================
 // SECTION 2: DISCORD CLIENT INITIALIZATION
 // =====================================================================

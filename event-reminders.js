@@ -75,6 +75,17 @@ const GAME_EVENTS = {
     createAttendanceThread: true, // Special flag to create attendance thread
     attendanceAutoCloseMinutes: 20, // Auto-close thread 20 min after event starts (12:45)
   },
+  guildBoss: {
+    name: '⚔️ Guild Boss',
+    days: [1], // Monday only
+    startTime: { hour: 21, minute: 0 }, // 21:00 (9:00 PM) GMT+8
+    durationMinutes: 5, // Guild Boss duration (21:00 - 21:05)
+    color: 0xe74c3c, // Red
+    description: '**Guild Boss** is starting soon! Attend for 15 bidding points!',
+    reminderOffsetMinutes: 20, // Remind 20 min before (20:40)
+    createAttendanceThread: true, // Create attendance thread
+    attendanceAutoCloseMinutes: 30, // Auto-close thread 30 min after event starts (21:30)
+  },
 };
 
 /**
@@ -250,20 +261,27 @@ function formatGMT8(date) {
 // ============================================================================
 
 /**
- * Create GvG attendance thread when GvG reminder is sent
- * @param {Object} event - GvG event configuration
- * @param {Date} eventTime - GvG start time
+ * Create event attendance thread (for GvG, Guild Boss, etc.)
+ * @param {Object} event - Event configuration
+ * @param {Date} eventTime - Event start time
  * @param {Message} reminderMessage - The reminder message that was sent
  * @returns {Promise<void>}
  */
 async function createGvGAttendanceThread(event, eventTime, reminderMessage) {
   try {
-    console.log(`🎯 [GVG] Creating attendance thread for ${event.name}`);
+    // Determine event type and configuration
+    const isGvG = event.name.includes('GvG');
+    const isGuildBoss = event.name.includes('Guild Boss');
+    const eventType = isGvG ? 'GvG' : isGuildBoss ? 'Guild Boss' : 'Event';
+    const eventPoints = isGvG ? 5 : isGuildBoss ? 15 : 10;
+    const logTag = isGvG ? 'GVG' : isGuildBoss ? 'GUILD BOSS' : 'EVENT';
+
+    console.log(`🎯 [${logTag}] Creating attendance thread for ${event.name}`);
 
     // Get attendance channel
     const attChannel = await client.channels.fetch(config.attendance_channel_id);
     if (!attChannel) {
-      console.error(`❌ [GVG] Attendance channel not found`);
+      console.error(`❌ [${logTag}] Attendance channel not found`);
       return;
     }
 
@@ -275,25 +293,31 @@ async function createGvGAttendanceThread(event, eventTime, reminderMessage) {
     const minutes = String(gmt8Time.getUTCMinutes()).padStart(2, '0');
     const timestamp = `${month}-${day} ${hours}:${minutes}`;
 
-    // Create thread
+    // Create thread with appropriate name
     const thread = await attChannel.threads.create({
-      name: `GvG ${timestamp}`,
+      name: `${eventType} ${timestamp}`,
       autoArchiveDuration: 60,
-      reason: 'GvG attendance thread (auto-created by event reminder)'
+      reason: `${eventType} attendance thread (auto-created by event reminder)`
     });
 
-    console.log(`✅ [GVG] Created thread: GvG ${timestamp} (${thread.id})`);
+    console.log(`✅ [${logTag}] Created thread: ${eventType} ${timestamp} (${thread.id})`);
 
-    // Send initial message in thread
+    // Send initial message in thread with appropriate description
+    const eventDescription = isGvG
+      ? '**Guild vs Guild attendance tracking**'
+      : isGuildBoss
+      ? '**Guild Boss attendance tracking**'
+      : '**Event attendance tracking**';
+
     const embed = new EmbedBuilder()
       .setColor(event.color)
-      .setTitle(`📋 GvG Attendance - ${timestamp}`)
+      .setTitle(`📋 ${eventType} Attendance - ${timestamp}`)
       .setDescription(
-        `**Guild vs Guild attendance tracking**\n\n` +
+        `${eventDescription}\n\n` +
         `⏰ **Event Time:** <t:${Math.floor(eventTime.getTime() / 1000)}:F>\n` +
         `📸 **Post your attendance screenshot** to be verified\n` +
         `✅ **Admins will verify** your attendance\n` +
-        `🎁 **Points:** 10 bidding points per attendance\n\n` +
+        `🎁 **Points:** ${eventPoints} bidding points per attendance\n\n` +
         `⏱️ **Thread auto-closes:** <t:${Math.floor((eventTime.getTime() + event.attendanceAutoCloseMinutes * 60 * 1000) / 1000)}:R>`
       )
       .setTimestamp();
@@ -302,14 +326,14 @@ async function createGvGAttendanceThread(event, eventTime, reminderMessage) {
 
     // Register the spawn with attendance system
     const spawnInfo = {
-      boss: 'GvG', // Use 'GvG' as the "boss" name for attendance tracking
+      boss: eventType, // Use event type as the "boss" name for attendance tracking
       date: `${gmt8Time.getUTCFullYear()}-${month}-${day}`,
       time: `${hours}:${minutes}`,
       timestamp: timestamp,
       members: [],
       closed: false,
       createdAt: Date.now(),
-      confirmThreadId: null // GvG doesn't need confirmation thread
+      confirmThreadId: null // Auto-events don't need confirmation thread
     };
 
     const activeSpawns = attendance.getActiveSpawns();
@@ -319,16 +343,16 @@ async function createGvGAttendanceThread(event, eventTime, reminderMessage) {
     // Save state
     await attendance.saveAttendanceStateToSheet(false);
 
-    // Schedule auto-close (20 min after event starts = 12:45)
+    // Schedule auto-close
     const autoCloseDelay = event.attendanceAutoCloseMinutes * 60 * 1000;
     setTimeout(async () => {
       await autoCloseGvGThread(thread.id);
     }, autoCloseDelay);
 
-    console.log(`⏱️ [GVG] Thread will auto-close in ${event.attendanceAutoCloseMinutes} minutes`);
+    console.log(`⏱️ [${logTag}] Thread will auto-close in ${event.attendanceAutoCloseMinutes} minutes`);
 
   } catch (error) {
-    console.error(`❌ [GVG] Failed to create attendance thread:`, error.message);
+    console.error(`❌ [EVENT] Failed to create attendance thread:`, error.message);
   }
 }
 
@@ -855,6 +879,16 @@ function scheduleAllEvents() {
   // Schedule Guild War (Fri, Sat, Sun)
   GAME_EVENTS.guildWar.days.forEach((day, index) => {
     scheduleEventReminder(`guildWar_${day}`, GAME_EVENTS.guildWar, day);
+  });
+
+  // Schedule GvG (Fri, Sat, Sun) - Creates attendance thread
+  GAME_EVENTS.gvg.days.forEach((day, index) => {
+    scheduleEventReminder(`gvg_${day}`, GAME_EVENTS.gvg, day);
+  });
+
+  // Schedule Guild Boss (Monday only) - Creates attendance thread
+  GAME_EVENTS.guildBoss.days.forEach((day, index) => {
+    scheduleEventReminder(`guildBoss_${day}`, GAME_EVENTS.guildBoss, day);
   });
 
   // Schedule Daily Events (World Boss)
