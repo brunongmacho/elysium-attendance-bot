@@ -96,6 +96,5 @@ function getGuildIconURL(guild) {
 module.exports = {
   addGuildFooter,
   addGuildThumbnail,
-  addGuildAuthor,
-  getGuildIconURL
+  addGuildAuthor
 };
