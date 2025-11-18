@@ -5842,12 +5842,22 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
 
-      // If invoked in guild chat by non-admin, redirect to BOT-COMMANDS
-      if (inElysiumCommandsChannel && !inBotCommandsChannel && !userIsAdmin) {
-        await message.reply(
-          `⚠️ **Please use bot commands in <#${config.bot_manual_channel_id}>**\n` +
-          `Guild chat is reserved for announcements and scheduled reports. Thank you! 🙏`
-        );
+      // If invoked in guild chat, redirect response to BOT-COMMANDS (for both admins and members)
+      if (inElysiumCommandsChannel && !inBotCommandsChannel) {
+        // Fetch BOT-COMMANDS channel
+        const guild = message.guild;
+        const botCommandsChannel = await guild.channels.fetch(config.bot_manual_channel_id).catch(() => null);
+
+        if (botCommandsChannel) {
+          // Send redirect message in BOT-COMMANDS channel
+          await botCommandsChannel.send(
+            `📢 ${member.user}, please use bot commands here! You tried to use \`${rawCmd}\` in guild chat.\n` +
+            `Guild chat is reserved for announcements. 🙏`
+          );
+
+          // React to original message with redirect emoji
+          await message.react('➡️').catch(() => {});
+        }
         return;
       }
 
@@ -5904,12 +5914,22 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
 
-      // If invoked in guild chat by non-admin, redirect to BOT-COMMANDS
-      if (inElysiumCommandsChannel && !inBotCommandsChannel && !userIsAdmin) {
-        await message.reply(
-          `⚠️ **Please use bot commands in <#${config.bot_manual_channel_id}>**\n` +
-          `Guild chat is reserved for announcements and scheduled reports. Thank you! 🙏`
-        );
+      // If invoked in guild chat, redirect response to BOT-COMMANDS (for both admins and members)
+      if (inElysiumCommandsChannel && !inBotCommandsChannel) {
+        // Fetch BOT-COMMANDS channel
+        const guild = message.guild;
+        const botCommandsChannel = await guild.channels.fetch(config.bot_manual_channel_id).catch(() => null);
+
+        if (botCommandsChannel) {
+          // Send redirect message in BOT-COMMANDS channel
+          await botCommandsChannel.send(
+            `📢 ${member.user}, please use bot commands here! You tried to use \`${rawCmd}\` in guild chat.\n` +
+            `Guild chat is reserved for announcements. 🙏`
+          );
+
+          // React to original message with redirect emoji
+          await message.react('➡️').catch(() => {});
+        }
         return;
       }
 
@@ -6652,12 +6672,21 @@ client.on(Events.MessageCreate, async (message) => {
       const isMemberCommand = ["!eightball", "!slap", "!stats"].includes(memberCmd);
 
       if (isMemberCommand) {
-        // If invoked in guild chat (not admin), redirect to BOT-COMMANDS
-        if (inElysiumCommandsChannel && !inBotCommandsChannel && !userIsAdmin) {
-          await message.reply(
-            `⚠️ **Please use bot commands in <#${config.bot_manual_channel_id}>**\n` +
-            `Guild chat is reserved for announcements and scheduled reports. Thank you! 🙏`
-          );
+        // If invoked in guild chat, redirect response to BOT-COMMANDS (for both admins and members)
+        if (inElysiumCommandsChannel && !inBotCommandsChannel) {
+          // Fetch BOT-COMMANDS channel
+          const botCommandsChannel = await guild.channels.fetch(config.bot_manual_channel_id).catch(() => null);
+
+          if (botCommandsChannel) {
+            // Send redirect message in BOT-COMMANDS channel
+            await botCommandsChannel.send(
+              `📢 ${member.user}, please use bot commands here! You tried to use \`${rawCmd}\` in guild chat.\n` +
+              `Guild chat is reserved for announcements. 🙏`
+            );
+
+            // React to original message with redirect emoji
+            await message.react('➡️').catch(() => {});
+          }
           return;
         }
 
