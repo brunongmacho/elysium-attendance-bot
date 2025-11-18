@@ -3551,8 +3551,16 @@ stats: async (message, member, args) => {
 
   weeklyreport: async (message, member) => {
     // Permission check is done in routing logic
-    console.log(`📅 ${member.user.username} manually triggered weekly report`);
+    console.log(`📅 ${member.user.username} manually triggered weekly report in channel: ${message.channel?.name || message.channel?.id}`);
     await message.reply({ content: "📊 Generating weekly report...", failIfNotExists: false });
+
+    // Validate channel before passing
+    if (!message.channel) {
+      console.error('❌ message.channel is null/undefined');
+      await message.reply({ content: "❌ Error: Unable to determine channel for report", failIfNotExists: false });
+      return;
+    }
+
     // Pass the channel where the command was invoked so report is sent only there
     await leaderboardSystem.sendWeeklyReport(message.channel);
   },
