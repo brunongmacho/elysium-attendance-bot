@@ -5821,7 +5821,7 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
-    // Leaderboard commands (admin only OR ELYSIUM role in ELYSIUM commands channel, anywhere except spawn threads)
+    // Leaderboard commands (admin only OR ELYSIUM role in BOT-COMMANDS channel, anywhere except spawn threads)
     if (
       resolvedCmd === "!leaderboardattendance" ||
       resolvedCmd === "!leaderboardbidding" ||
@@ -5830,11 +5830,24 @@ client.on(Events.MessageCreate, async (message) => {
       resolvedCmd === "!monthlyreport" ||
       resolvedCmd === "!activity"
     ) {
-      // Check permissions: either admin OR ELYSIUM role in ELYSIUM commands channel
-      const hasPermission = userIsAdmin || (hasElysiumRole(member) && inElysiumCommandsChannel);
+      // Define bot commands channel (reuse from above if already defined)
+      const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
+        (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
+
+      // Check permissions: either admin OR ELYSIUM role in BOT-COMMANDS channel
+      const hasPermission = userIsAdmin || (hasElysiumRole(member) && (inBotCommandsChannel || inElysiumCommandsChannel));
 
       if (!hasPermission) {
-        await message.reply("❌ Only admins or ELYSIUM members (in guild chat) can use leaderboard commands.");
+        await message.reply("❌ Only admins or ELYSIUM members can use leaderboard commands.");
+        return;
+      }
+
+      // If invoked in guild chat by non-admin, redirect to BOT-COMMANDS
+      if (inElysiumCommandsChannel && !inBotCommandsChannel && !userIsAdmin) {
+        await message.reply(
+          `⚠️ **Please use bot commands in <#${config.bot_manual_channel_id}>**\n` +
+          `Guild chat is reserved for announcements and scheduled reports. Thank you! 🙏`
+        );
         return;
       }
 
@@ -5843,7 +5856,7 @@ client.on(Events.MessageCreate, async (message) => {
         message.channel.parentId === config.attendance_channel_id
       ) {
         await message.reply(
-          "⚠️ Please use leaderboard commands in admin logs channel to avoid cluttering spawn threads."
+          "⚠️ Please use leaderboard commands in BOT-COMMANDS channel to avoid cluttering spawn threads."
         );
         return;
       }
@@ -5865,7 +5878,7 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     // =========================================================================
-    // INTELLIGENCE ENGINE COMMANDS - Member-Accessible (Guild Chat + Admin Logs)
+    // INTELLIGENCE ENGINE COMMANDS - Member-Accessible (BOT-COMMANDS + Admin Logs)
     // =========================================================================
     // Member-friendly prediction & analytics commands
     if (
@@ -5875,14 +5888,27 @@ client.on(Events.MessageCreate, async (message) => {
       resolvedCmd === "!engagement" ||
       resolvedCmd === "!analyzeengagement"
     ) {
+      // Define bot commands channel (reuse from above if already defined)
+      const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
+        (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
+
       // Check permissions: either admin OR ELYSIUM role in allowed channels
-      const inAllowedChannel = inElysiumCommandsChannel || inAdminLogs;
+      const inAllowedChannel = inBotCommandsChannel || inElysiumCommandsChannel || inAdminLogs;
       const hasPermission = userIsAdmin || (hasElysiumRole(member) && inAllowedChannel);
 
       if (!hasPermission) {
         await message.reply(
-          "❌ Intelligence commands are available to ELYSIUM members in guild chat or admin logs.\n" +
-          "💡 **Tip:** Mention me in guild chat (e.g., `@bot when is next spawn?`)"
+          "❌ Intelligence commands are available to ELYSIUM members in BOT-COMMANDS or admin logs.\n" +
+          "💡 **Tip:** Mention me in BOT-COMMANDS (e.g., `@bot when is next spawn?`)"
+        );
+        return;
+      }
+
+      // If invoked in guild chat by non-admin, redirect to BOT-COMMANDS
+      if (inElysiumCommandsChannel && !inBotCommandsChannel && !userIsAdmin) {
+        await message.reply(
+          `⚠️ **Please use bot commands in <#${config.bot_manual_channel_id}>**\n` +
+          `Guild chat is reserved for announcements and scheduled reports. Thank you! 🙏`
         );
         return;
       }
@@ -5893,7 +5919,7 @@ client.on(Events.MessageCreate, async (message) => {
         message.channel.parentId === config.attendance_channel_id
       ) {
         await message.reply(
-          "⚠️ Please use intelligence commands in guild chat or admin logs to avoid cluttering spawn threads."
+          "⚠️ Please use intelligence commands in BOT-COMMANDS or admin logs to avoid cluttering spawn threads."
         );
         return;
       }
@@ -6611,32 +6637,51 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     // =========================================================================
-    // MEMBER COMMANDS IN ELYSIUM COMMANDS CHANNEL (Guild Chat)
+    // MEMBER COMMANDS IN BOT-COMMANDS CHANNEL
     // =========================================================================
-    // Fun commands available to all members in guild chat
-    if (inElysiumCommandsChannel) {
+    // Define bot commands channel
+    const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
+      (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
+
+    // Fun commands available to all members in BOT-COMMANDS channel
+    if (inBotCommandsChannel || inElysiumCommandsChannel) {
       const memberCmd = resolveCommandAlias(rawCmd);
       const args = message.content.trim().split(/\s+/).slice(1);
 
-      // !8ball command - Magic 8-Ball predictions
-      if (memberCmd === "!eightball") {
-        console.log(`🎱 8ball command detected in guild chat by ${member.user.username}`);
-        await commandHandlers.eightball(message, member, args);
-        return;
-      }
+      // Check if this is a member command
+      const isMemberCommand = ["!eightball", "!slap", "!stats"].includes(memberCmd);
 
-      // !slap command - Slap someone with a random object
-      if (memberCmd === "!slap") {
-        console.log(`👊 Slap command detected in guild chat by ${member.user.username}`);
-        await commandHandlers.slap(message, member, args);
-        return;
-      }
+      if (isMemberCommand) {
+        // If invoked in guild chat (not admin), redirect to BOT-COMMANDS
+        if (inElysiumCommandsChannel && !inBotCommandsChannel && !userIsAdmin) {
+          await message.reply(
+            `⚠️ **Please use bot commands in <#${config.bot_manual_channel_id}>**\n` +
+            `Guild chat is reserved for announcements and scheduled reports. Thank you! 🙏`
+          );
+          return;
+        }
 
-      // !stats command - Show member statistics
-      if (memberCmd === "!stats") {
-        console.log(`📊 Stats command detected in guild chat by ${member.user.username}`);
-        await commandHandlers.stats(message, member, args);
-        return;
+        // Execute command (in BOT-COMMANDS or if admin)
+        // !8ball command - Magic 8-Ball predictions
+        if (memberCmd === "!eightball") {
+          console.log(`🎱 8ball command detected by ${member.user.username}`);
+          await commandHandlers.eightball(message, member, args);
+          return;
+        }
+
+        // !slap command - Slap someone with a random object
+        if (memberCmd === "!slap") {
+          console.log(`👊 Slap command detected by ${member.user.username}`);
+          await commandHandlers.slap(message, member, args);
+          return;
+        }
+
+        // !stats command - Show member statistics
+        if (memberCmd === "!stats") {
+          console.log(`📊 Stats command detected by ${member.user.username}`);
+          await commandHandlers.stats(message, member, args);
+          return;
+        }
       }
     }
 
