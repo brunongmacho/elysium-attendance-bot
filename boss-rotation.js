@@ -32,6 +32,7 @@
 
 const { EmbedBuilder } = require('discord.js');
 const { SheetAPI } = require('./utils/sheet-api');
+const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images');
 
 // ============================================================================
 // MODULE STATE
@@ -415,7 +416,19 @@ async function sendRotationWarning(bossName, predictedSpawnTime) {
       )
       .setTimestamp();
 
-    const sentMessage = await channel.send({ content: '@everyone', embeds: [embed] });
+    // Add boss image if available
+    const bossImage = getBossImageAttachment(bossName);
+    const bossImageURL = getBossImageAttachmentURL(bossName);
+    if (bossImageURL) {
+      embed.setThumbnail(bossImageURL);
+    }
+
+    const messagePayload = { content: '@everyone', embeds: [embed] };
+    if (bossImage) {
+      messagePayload.files = [bossImage];
+    }
+
+    const sentMessage = await channel.send(messagePayload);
 
     // Store message ID for cleanup when thread closes
     rotationWarningMessages[bossName] = {
