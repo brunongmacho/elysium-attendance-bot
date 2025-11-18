@@ -1373,7 +1373,7 @@ async function checkAndAutoCloseThreads(client) {
           console.log(`   ⚠️ Column already exists for ${spawnInfo.boss} at ${spawnInfo.timestamp}, skipping submission`);
 
           await thread.send(
-            `⏰ **AUTO-CLOSED (30 minutes elapsed)**\n\n` +
+            `⏰ **AUTO-CLOSED (${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes elapsed)**\n\n` +
             `Attendance already submitted for this spawn.\n` +
             `Thread will be archived now.`
           ).catch(() => {});
@@ -1397,7 +1397,7 @@ async function checkAndAutoCloseThreads(client) {
 
           // Lock and archive the thread to prevent spam
           await thread.setLocked(true, "Auto-locked - duplicate prevented").catch(() => {});
-          await thread.setArchived(true, "Auto-closed after 30 minutes - duplicate prevented").catch(() => {});
+          await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - duplicate prevented`).catch(() => {});
 
           // Clean up state
           delete activeSpawns[threadId];
@@ -1419,7 +1419,7 @@ async function checkAndAutoCloseThreads(client) {
             console.log(`   ⚠️ No members to submit (0 verified). Skipping Google Sheets submission...`);
 
             await thread.send(
-              `⏰ **AUTO-CLOSED (30 minutes elapsed)**\n\n` +
+              `⏰ **AUTO-CLOSED (${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes elapsed)**\n\n` +
               `Attendance window closed. No members verified - no data submitted to Google Sheets.`
             ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
 
@@ -1441,8 +1441,8 @@ async function checkAndAutoCloseThreads(client) {
             }
 
             // Lock and archive the thread
-            await thread.setLocked(true, "Auto-locked after 30 minutes - no members").catch(() => {});
-            await thread.setArchived(true, "Auto-closed after 30 minutes - no members").catch(() => {});
+            await thread.setLocked(true, `Auto-locked after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - no members`).catch(() => {});
+            await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - no members`).catch(() => {});
 
             // Clean up state
             delete activeSpawns[threadId];
@@ -1458,7 +1458,7 @@ async function checkAndAutoCloseThreads(client) {
             // Members exist - proceed with submission
             // Notify in thread
             await thread.send(
-              `⏰ **AUTO-CLOSED (30 minutes elapsed)**\n\n` +
+              `⏰ **AUTO-CLOSED (${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes elapsed)**\n\n` +
               `Attendance window closed to prevent cheating.\n` +
               `${spawnInfo.members.length} member(s) verified and submitting to Google Sheets...`
             ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
@@ -1516,15 +1516,15 @@ async function checkAndAutoCloseThreads(client) {
               if (confirmThread) {
                 await confirmThread.send(
                   `⏰ **AUTO-CLOSED**: ${spawnInfo.boss} (${spawnInfo.timestamp})\n` +
-                  `${spawnInfo.members.length} members submitted after 30-minute window`
+                  `${spawnInfo.members.length} members submitted after ${TIMING.THREAD_AUTO_CLOSE_MINUTES}-minute window`
                 ).catch(() => {});
                 await confirmThread.delete().catch(() => {});
               }
             }
 
             // Lock and archive the thread to prevent spam
-            await thread.setLocked(true, "Auto-locked after 30 minutes").catch(() => {});
-            await thread.setArchived(true, "Auto-closed after 30 minutes").catch(() => {});
+            await thread.setLocked(true, `Auto-locked after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes`).catch(() => {});
+            await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes`).catch(() => {});
 
             // Clean up state
             delete activeSpawns[threadId];
