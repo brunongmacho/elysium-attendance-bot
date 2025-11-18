@@ -92,6 +92,7 @@ const bossRotation = require('./boss-rotation.js'); // Boss Rotation System (5-g
 const activityHeatmap = require('./activity-heatmap.js'); // Activity Heatmap System
 const crashRecovery = require('./utils/crash-recovery.js'); // Crash Recovery System (state persistence)
 const { MLIntegration } = require('./ml-integration.js'); // ML Integration (spawn prediction + NLP enhancement)
+const memberLore = JSON.parse(fs.readFileSync("./member-lore.json")); // Member lore data
 
 /**
  * Command alias mapping for shorthand commands.
@@ -1125,6 +1126,8 @@ function stopBiddingChannelCleanupSchedule() {
  * @param {GuildMember} member - Discord guild member
  * @returns {EmbedBuilder} Formatted stats embed
  */
+// Replace buildStatsEmbed function (around line 1117-1199)
+// Replace buildStatsEmbed function (around line 1117-1199)
 function buildStatsEmbed(stats, member, countdown = 30) {
   const { memberName, attendance, bidding, rank, totalMembers } = stats;
 
@@ -1140,7 +1143,7 @@ function buildStatsEmbed(stats, member, countdown = 30) {
     .setTitle(`📊 Member Stats - ${memberName}`)
     .setTimestamp();
 
-  // Only set thumbnail if we have a valid member object
+  // Set thumbnail if we have a valid member object
   if (member && member.user) {
     embed.setThumbnail(member.user.displayAvatarURL());
   }
@@ -1187,23 +1190,21 @@ function buildStatsEmbed(stats, member, countdown = 30) {
     });
   }
 
-  // Member Lore - Add character backstory if available
-  const loreData = memberLore[memberName];
-  if (loreData) {
-    const loreField = `**${loreData.weapon}** • *${loreData.class}*\n${loreData.lore}`;
+  // 🎭 ADD MEMBER LORE IF AVAILABLE
+  // CRITICAL FIX: Case-insensitive lookup for lore
+  const loreKey = Object.keys(memberLore).find(
+    key => key.toLowerCase() === memberName.toLowerCase()
+  );
+  const lore = loreKey ? memberLore[loreKey] : null;
+
+  if (lore) {
     embed.addFields({
-      name: '📖 Member Lore',
-      value: loreField,
+      name: `⚔️ ${lore.class}`,
+      value: `**Weapon:** ${lore.weapon}\n*${lore.lore}*`,
       inline: false
     });
   } else {
-    // Fallback for new members without lore
-    const fallbackLore = "A mysterious warrior joins the guild. Legend yet to be written... or they're just really good at staying under the radar.";
-    embed.addFields({
-      name: '📖 Member Lore',
-      value: fallbackLore,
-      inline: false
-    });
+    console.log(`ℹ️ No lore found for: ${memberName} (checked ${Object.keys(memberLore).length} entries)`);
   }
 
   // Footer with favorite boss and percentile
@@ -2108,82 +2109,122 @@ const commandHandlers = {
   // =========================================================================
   // STATS COMMAND - Show member statistics
   // =========================================================================
-  stats: async (message, member, args) => {
-    let targetMember = member;
-    let targetName = member.displayName; // Use displayName for Google Sheets matching
+  // Replace the !stats command handler (around line 1380-1469)
+stats: async (message, member, args) => {
+  let targetMember = member;
+  let targetName = member.displayName; // Use displayName for Google Sheets matching
+  let searchName = targetName; // Name to search with (for fuzzy matching)
 
-    // Parse target from args
-    if (args.length > 0) {
-      if (message.mentions.members.size > 0) {
-        targetMember = message.mentions.members.first();
-        targetName = targetMember.displayName;
-      } else {
-        // User provided a name without @mention
-        targetName = args.join(" ");
+  // Parse target from args
+  if (args.length > 0) {
+    if (message.mentions.members.size > 0) {
+      // Handle @mention - use their displayName
+      targetMember = message.mentions.members.first();
+      targetName = targetMember.displayName;
+      searchName = targetName;
+    } else {
+      // User provided a name without @mention - use fuzzy matching
+      searchName = args.join(" ");
 
-        // Try to find the member in the guild by displayName
-        const guild = message.guild;
-        if (guild) {
-          const foundMember = guild.members.cache.find(
-            m => m.displayName.toLowerCase() === targetName.toLowerCase() ||
-                 m.user.username.toLowerCase() === targetName.toLowerCase()
-          );
+      // Try exact match first in guild cache
+      const guild = message.guild;
+      if (guild) {
+        const foundMember = guild.members.cache.find(
+          m => m.displayName.toLowerCase() === searchName.toLowerCase() ||
+               m.user.username.toLowerCase() === searchName.toLowerCase()
+        );
 
-          if (foundMember) {
-            targetMember = foundMember;
-          } else {
-            // Member not in cache, set to null to avoid using wrong avatar
-            targetMember = null;
-          }
+        if (foundMember) {
+          targetMember = foundMember;
+          targetName = foundMember.displayName;
+        } else {
+          // No exact match - will try fuzzy matching with Google Sheets
+          targetMember = null;
+          targetName = searchName;
         }
+      } else {
+        targetName = searchName;
       }
     }
+  }
 
-    // Check cache first
-    const cached = statsCache.get(targetName);
-    if (cached && (Date.now() - cached.timestamp < STATS_CACHE_DURATION)) {
-      console.log(`📦 Using cached stats for ${targetName}`);
-      const embed = buildStatsEmbed(cached.data, targetMember, 30);
-      const statsMsg = await message.reply({ embeds: [embed] });
+  // Check cache first (use normalized name for cache key)
+  const cacheKey = targetName.toLowerCase().trim();
+  const cached = statsCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < STATS_CACHE_DURATION)) {
+    console.log(`📦 Using cached stats for ${targetName}`);
+    
+    // CRITICAL FIX: Try to find member by the actual name returned from sheets
+    if (!targetMember && message.guild) {
+      const actualName = cached.data.memberName;
+      const foundMember = message.guild.members.cache.find(
+        m => m.displayName.toLowerCase() === actualName.toLowerCase() ||
+             m.user.username.toLowerCase() === actualName.toLowerCase()
+      );
+      if (foundMember) {
+        targetMember = foundMember;
+      }
+    }
+    
+    const embed = buildStatsEmbed(cached.data, targetMember, 30);
+    const statsMsg = await message.reply({ embeds: [embed] });
 
-      // Start countdown deletion
-      startCountdownDeletion(message, statsMsg, cached.data, targetMember, buildStatsEmbed, 30);
+    // Start countdown deletion
+    startCountdownDeletion(message, statsMsg, cached.data, targetMember, buildStatsEmbed, 30);
 
+    return;
+  }
+
+  // Show loading message
+  const loadingMsg = await message.reply(`⏳ Fetching stats for **${targetName}**...`);
+
+  try {
+    // Fetch stats from Google Sheets (with fuzzy matching support)
+    const result = await sheetAPI.call('getMemberStats', { memberName: targetName });
+
+    if (result.status !== 'ok') {
+      await loadingMsg.edit(`❌ Could not find stats for **${targetName}**`);
       return;
     }
 
-    // Show loading message
-    const loadingMsg = await message.reply(`⏳ Fetching stats for **${targetName}**...`);
+    // CRITICAL FIX: Get the actual member name returned from sheets (for fuzzy match cases)
+    const actualMemberName = result.memberName;
 
-    try {
-      // Fetch stats from Google Sheets
-      const result = await sheetAPI.call('getMemberStats', { memberName: targetName });
-
-      if (result.status !== 'ok') {
-        await loadingMsg.edit(`❌ Could not find stats for **${targetName}**`);
-        return;
+    // CRITICAL FIX: Try to find the actual Discord member by the returned name
+    if (message.guild) {
+      const foundMember = message.guild.members.cache.find(
+        m => m.displayName.toLowerCase() === actualMemberName.toLowerCase() ||
+             m.user.username.toLowerCase() === actualMemberName.toLowerCase()
+      );
+      if (foundMember) {
+        targetMember = foundMember;
+        console.log(`✅ Found Discord member for ${actualMemberName}: ${foundMember.displayName}`);
+      } else {
+        console.log(`⚠️ Could not find Discord member for ${actualMemberName}, using original member`);
       }
-
-      // Cache the result
-      statsCache.set(targetName, {
-        data: result,
-        timestamp: Date.now()
-      });
-
-      // Build and send embed
-      const embed = buildStatsEmbed(result, targetMember, 30);
-      await loadingMsg.edit({ content: null, embeds: [embed] });
-
-      // Start countdown deletion
-      startCountdownDeletion(message, loadingMsg, result, targetMember, buildStatsEmbed, 30);
-
-      console.log(`✅ Stats sent for ${targetName}`);
-
-    } catch (error) {
-      console.error('Stats error:', error);
-      await loadingMsg.edit("❌ Error fetching stats. Please try again later.");
     }
-  },
+
+    // Cache the result (use the actual name from sheets for cache key)
+    const actualCacheKey = actualMemberName.toLowerCase().trim();
+    statsCache.set(actualCacheKey, {
+      data: result,
+      timestamp: Date.now()
+    });
+
+    // Build and send embed (now with proper targetMember for lore lookup)
+    const embed = buildStatsEmbed(result, targetMember, 30);
+    await loadingMsg.edit({ content: null, embeds: [embed] });
+
+    // Start countdown deletion
+    startCountdownDeletion(message, loadingMsg, result, targetMember, buildStatsEmbed, 30);
+
+    console.log(`✅ Stats sent for ${actualMemberName} (searched: ${targetName})`);
+
+  } catch (error) {
+    console.error('Stats error:', error);
+    await loadingMsg.edit("❌ Error fetching stats. Please try again later.");
+  }
+},
 
   // =========================================================================
   // CLEARSTATE COMMAND - Emergency state reset
@@ -4592,7 +4633,7 @@ const commandHandlers = {
    * Usage: !rotation status | !rotation set <boss> <index> | !rotation increment <boss>
    */
   rotation: async (message, member) => {
-    if (!isAdmin(member, config)) {
+    if (!isAdmin(member)) {
       await message.reply('❌ Admin-only command.');
       return;
     }
@@ -4662,11 +4703,18 @@ const commandHandlers = {
       }
       // !rotation set <boss> <index> - Manually set rotation
       else if (subcommand === 'set') {
-        const bossName = args[1];
-        const newIndex = parseInt(args[2]);
+        // Parse boss name (can be multi-word like "Baron Braudmore")
+        // Last arg should be the index, everything else is the boss name
+        if (args.length < 3) {
+          await message.reply('❌ Usage: `!rotation set <boss> <index>`\nExample: `!rotation set Baron Braudmore 1`');
+          return;
+        }
 
-        if (!bossName || !newIndex) {
-          await message.reply('❌ Usage: `!rotation set <boss> <index>`\nExample: `!rotation set Amentis 1`');
+        const newIndex = parseInt(args[args.length - 1]); // Last arg is the index
+        const rawBossName = args.slice(1, -1).join(' '); // Everything between subcommand and index
+
+        if (!rawBossName || isNaN(newIndex)) {
+          await message.reply('❌ Usage: `!rotation set <boss> <index>`\nExample: `!rotation set Baron Braudmore 1`');
           return;
         }
 
@@ -4675,7 +4723,14 @@ const commandHandlers = {
           return;
         }
 
-        await message.reply(`⚙️ Setting ${bossName} rotation to index ${newIndex}...`);
+        // Use fuzzy matching to find the correct boss name
+        const bossName = findBossMatch(rawBossName, bossPoints);
+        if (!bossName) {
+          await message.reply(`❌ Unknown boss: "${rawBossName}"\n💡 Try: Amentis, Baron Braudmore, or General Aquleus`);
+          return;
+        }
+
+        await message.reply(`⚙️ Setting **${bossName}** rotation to index ${newIndex}...`);
 
         const result = await bossRotation.setRotation(bossName, newIndex);
 
@@ -4693,14 +4748,23 @@ const commandHandlers = {
       }
       // !rotation increment <boss> - Manually advance rotation
       else if (subcommand === 'increment' || subcommand === 'inc') {
-        const bossName = args[1];
-
-        if (!bossName) {
-          await message.reply('❌ Usage: `!rotation increment <boss>`\nExample: `!rotation increment Amentis`');
+        // Parse boss name (can be multi-word like "Baron Braudmore")
+        // Everything after the subcommand is the boss name
+        if (args.length < 2) {
+          await message.reply('❌ Usage: `!rotation increment <boss>`\nExample: `!rotation increment Baron Braudmore`');
           return;
         }
 
-        await message.reply(`🔄 Advancing ${bossName} rotation...`);
+        const rawBossName = args.slice(1).join(' '); // Join all remaining args
+
+        // Use fuzzy matching to find the correct boss name
+        const bossName = findBossMatch(rawBossName, bossPoints);
+        if (!bossName) {
+          await message.reply(`❌ Unknown boss: "${rawBossName}"\n💡 Try: Amentis, Baron Braudmore, or General Aquleus`);
+          return;
+        }
+
+        await message.reply(`🔄 Advancing **${bossName}** rotation...`);
 
         const result = await bossRotation.incrementRotation(bossName);
 
@@ -4755,10 +4819,13 @@ const commandHandlers = {
         await message.reply(
           `❌ Unknown subcommand: ${subcommand}\n\n` +
           `**Valid commands:**\n` +
-          `• \`!rotation status\` - Show all rotation statuses\n` +
+          `• \`!rotation\` or \`!rotation status\` - Show all rotation statuses\n` +
           `• \`!rotation set <boss> <index>\` - Set rotation (1-5)\n` +
+          `  Example: \`!rotation set Baron Braudmore 3\`\n` +
           `• \`!rotation increment <boss>\` - Advance rotation\n` +
-          `• \`!rotation refresh\` - Reload boss data from Google Sheets`
+          `  Example: \`!rotation inc General Aquleus\`\n` +
+          `• \`!rotation refresh\` - Reload boss data from Google Sheets\n\n` +
+          `💡 **Tip:** Boss names support fuzzy matching! Try "baron", "braud", or "aquleus"`
         );
       }
     } catch (error) {
