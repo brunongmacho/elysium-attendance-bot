@@ -58,6 +58,7 @@ const { EmbedBuilder } = require("discord.js");
 const { SheetAPI } = require('./utils/sheet-api');
 const bossRotation = require('./boss-rotation.js');
 const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images');
+const { addGuildFooter } = require('./utils/embed-branding');
 const {
   getCurrentTimestamp,
   getSundayOfWeek,
@@ -497,6 +498,9 @@ async function createSpawnThreads(
   if (bossImageURL) {
     embed.setThumbnail(bossImageURL);
   }
+
+  // Add guild branding to footer (preserving existing footer text)
+  addGuildFooter(embed, mainGuild, 'Admins: type "close" to finalize early');
 
   // Prepare message payload with boss image attachment
   const messagePayload = { content: "@everyone", embeds: [embed] };
