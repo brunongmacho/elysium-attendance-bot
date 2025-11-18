@@ -456,8 +456,8 @@ async function createSpawnThreads(
   const normalizedKey = `${bossName.toUpperCase()}|${normalizeTimestamp(fullTimestamp)}`;
   activeColumns[normalizedKey] = attThread.id;
 
-  // Calculate auto-close timestamp (30 minutes from now) or show no autoclose
-  const autoCloseTime = Date.now() + (30 * 60 * 1000);
+  // Calculate auto-close timestamp using TIMING constant
+  const autoCloseTime = Date.now() + (TIMING.THREAD_AUTO_CLOSE_MINUTES * 60 * 1000);
   const autoCloseTimestamp = Math.floor(autoCloseTime / 1000);
 
   // Create description based on autoclose setting
@@ -485,7 +485,7 @@ async function createSpawnThreads(
       { name: "📅 Date", value: dateStr, inline: true },
       {
         name: "⏱️ Attendance Window",
-        value: noAutoClose ? "No limit (maintenance)" : "30 minutes (then auto-closes)",
+        value: noAutoClose ? "No limit (maintenance)" : `${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes (then auto-closes)`,
         inline: false,
       }
     )
