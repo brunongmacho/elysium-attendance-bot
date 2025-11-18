@@ -633,8 +633,14 @@ async function sendWeeklyReport(targetChannel = null) {
         if (weekAtt.topAttendees && weekAtt.topAttendees.length > 0) {
           weekAttText += `\n**Top 5 Attendees This Week:**\n`;
           weekAtt.topAttendees.slice(0, 5).forEach((member, index) => {
+            if (!member || typeof member !== 'object') {
+              console.warn('⚠️ Invalid member object in weekAtt.topAttendees:', member);
+              return;
+            }
             const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-            weekAttText += `${medal} ${member.name} - ${member.points} pts\n`;
+            const memberName = member.name || member.username || 'Unknown';
+            const memberPoints = member.points || 0;
+            weekAttText += `${medal} ${memberName} - ${memberPoints} pts\n`;
           });
         }
 
@@ -652,8 +658,14 @@ async function sendWeeklyReport(targetChannel = null) {
         if (weekBid.topSpenders && weekBid.topSpenders.length > 0) {
           weekBidText += `\n**Top 5 Spenders This Week:**\n`;
           weekBid.topSpenders.slice(0, 5).forEach((member, index) => {
+            if (!member || typeof member !== 'object') {
+              console.warn('⚠️ Invalid member object in weekBid.topSpenders:', member);
+              return;
+            }
             const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-            weekBidText += `${medal} ${member.name} - ${member.consumed} pts consumed\n`;
+            const memberName = member.name || member.username || 'Unknown';
+            const memberConsumed = member.consumed || 0;
+            weekBidText += `${medal} ${memberName} - ${memberConsumed} pts consumed\n`;
           });
         }
 
@@ -681,8 +693,14 @@ async function sendWeeklyReport(targetChannel = null) {
         if (lastWeekAtt.topAttendees && lastWeekAtt.topAttendees.length > 0) {
           lastWeekAttText += `\n**Top 5 Attendees Last Week:**\n`;
           lastWeekAtt.topAttendees.slice(0, 5).forEach((member, index) => {
+            if (!member || typeof member !== 'object') {
+              console.warn('⚠️ Invalid member object in lastWeekAtt.topAttendees:', member);
+              return;
+            }
             const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-            lastWeekAttText += `${medal} ${member.name} - ${member.points} pts\n`;
+            const memberName = member.name || member.username || 'Unknown';
+            const memberPoints = member.points || 0;
+            lastWeekAttText += `${medal} ${memberName} - ${memberPoints} pts\n`;
           });
         }
 
@@ -700,8 +718,14 @@ async function sendWeeklyReport(targetChannel = null) {
         if (lastWeekBid.topSpenders && lastWeekBid.topSpenders.length > 0) {
           lastWeekBidText += `\n**Top 5 Spenders Last Week:**\n`;
           lastWeekBid.topSpenders.slice(0, 5).forEach((member, index) => {
+            if (!member || typeof member !== 'object') {
+              console.warn('⚠️ Invalid member object in lastWeekBid.topSpenders:', member);
+              return;
+            }
             const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-            lastWeekBidText += `${medal} ${member.name} - ${member.consumed} pts consumed\n`;
+            const memberName = member.name || member.username || 'Unknown';
+            const memberConsumed = member.consumed || 0;
+            lastWeekBidText += `${medal} ${memberName} - ${memberConsumed} pts consumed\n`;
           });
         }
 
@@ -727,8 +751,14 @@ async function sendWeeklyReport(targetChannel = null) {
       if (att.topAttendees && att.topAttendees.length > 0) {
         attText += `\n**Top 3 Attendees (All-Time):**\n`;
         att.topAttendees.slice(0, 3).forEach((member, index) => {
+          if (!member || typeof member !== 'object') {
+            console.warn('⚠️ Invalid member object in att.topAttendees:', member);
+            return;
+          }
           const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
-          attText += `${medal} ${member.name} - ${member.points} pts\n`;
+          const memberName = member.name || member.username || 'Unknown';
+          const memberPoints = member.points || 0;
+          attText += `${medal} ${memberName} - ${memberPoints} pts\n`;
         });
       }
 
@@ -770,8 +800,14 @@ async function sendWeeklyReport(targetChannel = null) {
       if (bid.topSpenders && bid.topSpenders.length > 0) {
         bidText += `\n**Top 3 Spenders (All-Time):**\n`;
         bid.topSpenders.slice(0, 3).forEach((member, index) => {
+          if (!member || typeof member !== 'object') {
+            console.warn('⚠️ Invalid member object in bid.topSpenders:', member);
+            return;
+          }
           const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
-          bidText += `${medal} ${member.name} - ${member.consumed} pts consumed\n`;
+          const memberName = member.name || member.username || 'Unknown';
+          const memberConsumed = member.consumed || 0;
+          bidText += `${medal} ${memberName} - ${memberConsumed} pts consumed\n`;
         });
       }
 
@@ -786,7 +822,13 @@ async function sendWeeklyReport(targetChannel = null) {
     if (data.mostActive && data.mostActive.length > 0) {
       let activeText = '';
       data.mostActive.slice(0, 5).forEach((member, index) => {
-        activeText += `${index + 1}. **${member.name}** - Activity Score: ${member.score}\n`;
+        if (!member || typeof member !== 'object') {
+          console.warn('⚠️ Invalid member object in data.mostActive:', member);
+          return;
+        }
+        const memberName = member.name || member.username || 'Unknown';
+        const memberScore = member.score || 0;
+        activeText += `${index + 1}. **${memberName}** - Activity Score: ${memberScore}\n`;
       });
 
       embed.addFields({
