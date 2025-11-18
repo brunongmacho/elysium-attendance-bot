@@ -285,6 +285,13 @@ const bossPoints = JSON.parse(fs.readFileSync("./boss_points.json"));
  */
 const slapResponses = JSON.parse(fs.readFileSync("./slap-responses.json"));
 
+/**
+ * Member lore data loaded from member-lore.json
+ * Contains weapon, class, and comedic lore for each guild member
+ * @type {Object.<string, {weapon: string, class: string, lore: string}>}
+ */
+const memberLore = JSON.parse(fs.readFileSync("./member-lore.json"));
+
 // =====================================================================
 // SECTION 2: DISCORD CLIENT INITIALIZATION
 // =====================================================================
@@ -1176,6 +1183,25 @@ function buildStatsEmbed(stats, member, countdown = 30) {
     embed.addFields({
       name: '📅 Recent Activity',
       value: recent,
+      inline: false
+    });
+  }
+
+  // Member Lore - Add character backstory if available
+  const loreData = memberLore[memberName];
+  if (loreData) {
+    const loreField = `**${loreData.weapon}** • *${loreData.class}*\n${loreData.lore}`;
+    embed.addFields({
+      name: '📖 Member Lore',
+      value: loreField,
+      inline: false
+    });
+  } else {
+    // Fallback for new members without lore
+    const fallbackLore = "A mysterious warrior joins the guild. Legend yet to be written... or they're just really good at staying under the radar.";
+    embed.addFields({
+      name: '📖 Member Lore',
+      value: fallbackLore,
       inline: false
     });
   }
