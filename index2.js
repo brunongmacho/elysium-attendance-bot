@@ -5837,32 +5837,80 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
-    // Help command (anywhere except spawn threads)
+    // Help command (anyone can use in BOT-COMMANDS or admin logs, not spawn threads)
     if (resolvedCmd === "!help") {
+      // Define bot commands channel
+      const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
+        (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
+
       if (
         message.channel.isThread() &&
         message.channel.parentId === config.attendance_channel_id
       ) {
         await message.reply(
-          "⚠️ Please use `!help` in admin logs channel to avoid cluttering spawn threads."
+          "⚠️ Please use `!help` in BOT-COMMANDS channel to avoid cluttering spawn threads."
         );
         return;
       }
+
+      // If invoked in guild chat, redirect to BOT-COMMANDS
+      if (inElysiumCommandsChannel && !inBotCommandsChannel && !inAdminLogs) {
+        // Send redirect message in guild chat that auto-deletes after 30 seconds
+        const redirectMsg = await message.reply(
+          `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
+          `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
+        ).catch(() => null);
+
+        // Delete both messages after 30 seconds
+        setTimeout(async () => {
+          if (redirectMsg) {
+            await redirectMsg.delete().catch(() => {});
+          }
+          await message.delete().catch(() => {});
+        }, 30000);
+
+        return;
+      }
+
       await commandHandlers.help(message, member);
       return;
     }
 
-    // New member guide (anyone can use, anywhere except spawn threads)
+    // New member guide (anyone can use in BOT-COMMANDS or admin logs, not spawn threads)
     if (resolvedCmd === "!newmember") {
+      // Define bot commands channel
+      const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
+        (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
+
       if (
         message.channel.isThread() &&
         message.channel.parentId === config.attendance_channel_id
       ) {
         await message.reply(
-          "⚠️ Please use `!newmember` in guild chat or admin logs to avoid cluttering spawn threads."
+          "⚠️ Please use `!newmember` in BOT-COMMANDS channel to avoid cluttering spawn threads."
         );
         return;
       }
+
+      // If invoked in guild chat, redirect to BOT-COMMANDS
+      if (inElysiumCommandsChannel && !inBotCommandsChannel && !inAdminLogs) {
+        // Send redirect message in guild chat that auto-deletes after 30 seconds
+        const redirectMsg = await message.reply(
+          `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
+          `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
+        ).catch(() => null);
+
+        // Delete both messages after 30 seconds
+        setTimeout(async () => {
+          if (redirectMsg) {
+            await redirectMsg.delete().catch(() => {});
+          }
+          await message.delete().catch(() => {});
+        }, 30000);
+
+        return;
+      }
+
       await commandHandlers.newmember(message, member);
       return;
     }
@@ -6050,7 +6098,7 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     // =========================================================================
-    // NLP LEARNING SYSTEM COMMANDS (Admin only)
+    // NLP LEARNING SYSTEM COMMANDS (Admin only, except !myprofile)
     // =========================================================================
     if (
       resolvedCmd === "!nlpstats" ||
@@ -6071,9 +6119,35 @@ client.on(Events.MessageCreate, async (message) => {
         message.channel.parentId === config.attendance_channel_id
       ) {
         await message.reply(
-          "⚠️ Please use NLP commands in admin logs channel to avoid cluttering spawn threads."
+          "⚠️ Please use NLP commands in BOT-COMMANDS channel to avoid cluttering spawn threads."
         );
         return;
+      }
+
+      // !myprofile is member-accessible, redirect from guild chat to BOT-COMMANDS
+      if (resolvedCmd === "!myprofile") {
+        // Define bot commands channel
+        const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
+          (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
+
+        // If invoked in guild chat, redirect to BOT-COMMANDS
+        if (inElysiumCommandsChannel && !inBotCommandsChannel && !inAdminLogs) {
+          // Send redirect message in guild chat that auto-deletes after 30 seconds
+          const redirectMsg = await message.reply(
+            `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
+            `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
+          ).catch(() => null);
+
+          // Delete both messages after 30 seconds
+          setTimeout(async () => {
+            if (redirectMsg) {
+              await redirectMsg.delete().catch(() => {});
+            }
+            await message.delete().catch(() => {});
+          }, 30000);
+
+          return;
+        }
       }
 
       if (!nlpLearningSystem) {
