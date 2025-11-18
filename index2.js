@@ -5742,17 +5742,17 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     // ✅ HANDLE !MYPOINTS AND ALIASES - BIDDING CHANNEL OR BOT-COMMANDS CHANNEL (NOT DURING AUCTION)
+    // Define bot commands channel first
+    const inBotCommandsChannelForPoints = message.channel.id === config.bot_manual_channel_id ||
+      (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
+
     if (
       resolvedCmd === "!mypoints" &&
-      (inBiddingChannel || inElysiumCommandsChannel) &&
+      (inBiddingChannel || inElysiumCommandsChannel || inBotCommandsChannelForPoints) &&
       !message.channel.isThread()
     ) {
-      // Define bot commands channel
-      const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
-        (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
-
       // If invoked in guild chat, redirect to BOT-COMMANDS
-      if (inElysiumCommandsChannel && !inBiddingChannel && !inBotCommandsChannel) {
+      if (inElysiumCommandsChannel && !inBiddingChannel && !inBotCommandsChannelForPoints) {
         // Send redirect message in guild chat that auto-deletes after 30 seconds
         const redirectMsg = await message.reply(
           `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
@@ -5777,13 +5777,13 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     // ✅ HANDLE !BIDSTATUS AND ALIASES - BIDDING CHANNEL OR BOT-COMMANDS CHANNEL
-    if (resolvedCmd === "!bidstatus" && (inBiddingChannel || inElysiumCommandsChannel)) {
-      // Define bot commands channel
-      const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
-        (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
+    // Define bot commands channel first
+    const inBotCommandsChannelForBidStatus = message.channel.id === config.bot_manual_channel_id ||
+      (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
 
+    if (resolvedCmd === "!bidstatus" && (inBiddingChannel || inElysiumCommandsChannel || inBotCommandsChannelForBidStatus)) {
       // If invoked in guild chat, redirect to BOT-COMMANDS
-      if (inElysiumCommandsChannel && !inBiddingChannel && !inBotCommandsChannel) {
+      if (inElysiumCommandsChannel && !inBiddingChannel && !inBotCommandsChannelForBidStatus) {
         // Send redirect message in guild chat that auto-deletes after 30 seconds
         const redirectMsg = await message.reply(
           `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
