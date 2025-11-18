@@ -293,7 +293,7 @@ async function createGvGAttendanceThread(event, eventTime, reminderMessage) {
         `⏰ **Event Time:** <t:${Math.floor(eventTime.getTime() / 1000)}:F>\n` +
         `📸 **Post your attendance screenshot** to be verified\n` +
         `✅ **Admins will verify** your attendance\n` +
-        `🎁 **Points:** 10 bidding points per attendance\n\n` +
+        `🎁 **Points:** 5 bidding points per attendance\n\n` +
         `⏱️ **Thread auto-closes:** <t:${Math.floor((eventTime.getTime() + event.attendanceAutoCloseMinutes * 60 * 1000) / 1000)}:R>`
       )
       .setTimestamp();
@@ -855,6 +855,11 @@ function scheduleAllEvents() {
   // Schedule Guild War (Fri, Sat, Sun)
   GAME_EVENTS.guildWar.days.forEach((day, index) => {
     scheduleEventReminder(`guildWar_${day}`, GAME_EVENTS.guildWar, day);
+  });
+
+  // Schedule GvG (Fri, Sat, Sun) - Creates attendance thread
+  GAME_EVENTS.gvg.days.forEach((day, index) => {
+    scheduleEventReminder(`gvg_${day}`, GAME_EVENTS.gvg, day);
   });
 
   // Schedule Daily Events (World Boss)
