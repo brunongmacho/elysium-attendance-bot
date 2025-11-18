@@ -1035,6 +1035,7 @@ async function validateStateConsistency(client) {
 
 let lastAttendanceStateSyncTime = 0;                     // Last sync timestamp
 const ATTENDANCE_STATE_SYNC_INTERVAL = 15 * 60 * 1000;   // 15 minutes (optimized from 10)
+const MIN_FORCE_SYNC_INTERVAL = 60 * 1000;               // Minimum 60 seconds even for forceSync
 const STATE_CLEANUP_INTERVAL = 30 * 60 * 1000;           // 30 minutes
 const STALE_ENTRY_AGE = 24 * 60 * 60 * 1000;             // 24 hours
 const MAX_PENDING_VERIFICATIONS = 100;                   // Prevent unbounded growth
@@ -1071,7 +1072,15 @@ async function saveAttendanceStateToSheet(forceSync = false) {
   }
 
   const now = Date.now();
-  const shouldSync = forceSync || (now - lastAttendanceStateSyncTime > ATTENDANCE_STATE_SYNC_INTERVAL);
+  const timeSinceLastSync = now - lastAttendanceStateSyncTime;
+
+  // Even forceSync respects minimum interval to prevent rate limiting
+  if (forceSync && timeSinceLastSync < MIN_FORCE_SYNC_INTERVAL) {
+    console.log(`⏳ [ATTENDANCE] Skipping forceSync (${Math.ceil((MIN_FORCE_SYNC_INTERVAL - timeSinceLastSync)/1000)}s remaining)`);
+    return false;
+  }
+
+  const shouldSync = forceSync || (timeSinceLastSync > ATTENDANCE_STATE_SYNC_INTERVAL);
 
   if (!shouldSync) {
     return false;
