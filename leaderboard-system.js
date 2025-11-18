@@ -585,9 +585,21 @@ async function sendWeeklyReport(targetChannel = null) {
         console.error('❌ Invalid targetChannel provided:', targetChannel);
         return;
       }
-      console.log(`📍 Sending weekly report to specific channel: ${targetChannel.name || targetChannel.id}`);
+
+      // Additional validation for Discord channel properties
+      if (!targetChannel.id) {
+        console.error('❌ targetChannel missing id property');
+        return;
+      }
+
+      console.log(`📍 Sending weekly report to specific channel: ${targetChannel.name || targetChannel.id} (type: ${targetChannel.type})`);
     } else {
       // Scheduled trigger: send to both admin logs and guild chat
+      if (!discordCache) {
+        console.error('❌ discordCache is not initialized');
+        return;
+      }
+
       adminLogsChannel = await discordCache.getChannel('admin_logs_channel_id');
       elysiumCommandsChannel = config.elysium_commands_channel_id
         ? await discordCache.getChannel('elysium_commands_channel_id').catch(() => null)
@@ -789,8 +801,26 @@ async function sendWeeklyReport(targetChannel = null) {
     // Send to appropriate channel(s)
     if (targetChannel) {
       // Manual trigger: send only to the channel where command was invoked
-      await targetChannel.send({ embeds: [embed] });
-      console.log(`✅ Weekly report sent to ${targetChannel.name || targetChannel.id}`);
+      try {
+        console.log(`🔍 Attempting to send to channel. Properties:`, {
+          id: targetChannel.id,
+          name: targetChannel.name,
+          type: targetChannel.type,
+          guildId: targetChannel.guildId,
+          hasGuild: !!targetChannel.guild
+        });
+        await targetChannel.send({ embeds: [embed] });
+        console.log(`✅ Weekly report sent to ${targetChannel.name || targetChannel.id}`);
+      } catch (sendError) {
+        console.error(`❌ Error sending to targetChannel:`, sendError);
+        console.error(`Channel details:`, {
+          id: targetChannel?.id,
+          name: targetChannel?.name,
+          type: targetChannel?.type,
+          constructor: targetChannel?.constructor?.name
+        });
+        throw sendError;
+      }
     } else {
       // Scheduled trigger: send to both admin logs and guild chat
       await adminLogsChannel.send({ embeds: [embed] });
