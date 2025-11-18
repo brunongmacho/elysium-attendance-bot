@@ -5741,20 +5741,66 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
-    // ✅ HANDLE !MYPOINTS AND ALIASES - BIDDING CHANNEL OR ELYSIUM COMMANDS CHANNEL (NOT DURING AUCTION)
+    // ✅ HANDLE !MYPOINTS AND ALIASES - BIDDING CHANNEL OR BOT-COMMANDS CHANNEL (NOT DURING AUCTION)
     if (
       resolvedCmd === "!mypoints" &&
       (inBiddingChannel || inElysiumCommandsChannel) &&
       !message.channel.isThread()
     ) {
+      // Define bot commands channel
+      const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
+        (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
+
+      // If invoked in guild chat, redirect to BOT-COMMANDS
+      if (inElysiumCommandsChannel && !inBiddingChannel && !inBotCommandsChannel) {
+        // Send redirect message in guild chat that auto-deletes after 30 seconds
+        const redirectMsg = await message.reply(
+          `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
+          `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
+        ).catch(() => null);
+
+        // Delete both messages after 30 seconds
+        setTimeout(async () => {
+          if (redirectMsg) {
+            await redirectMsg.delete().catch(() => {});
+          }
+          await message.delete().catch(() => {});
+        }, 30000);
+
+        return;
+      }
+
       const args = message.content.trim().split(/\s+/).slice(1);
       console.log(`🎯 My points command (${rawCmd}): ${resolvedCmd}`);
       await commandHandlers.mypoints(message, member);
       return;
     }
 
-    // ✅ HANDLE !BIDSTATUS AND ALIASES
-    if (resolvedCmd === "!bidstatus" && inBiddingChannel) {
+    // ✅ HANDLE !BIDSTATUS AND ALIASES - BIDDING CHANNEL OR BOT-COMMANDS CHANNEL
+    if (resolvedCmd === "!bidstatus" && (inBiddingChannel || inElysiumCommandsChannel)) {
+      // Define bot commands channel
+      const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
+        (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
+
+      // If invoked in guild chat, redirect to BOT-COMMANDS
+      if (inElysiumCommandsChannel && !inBiddingChannel && !inBotCommandsChannel) {
+        // Send redirect message in guild chat that auto-deletes after 30 seconds
+        const redirectMsg = await message.reply(
+          `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
+          `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
+        ).catch(() => null);
+
+        // Delete both messages after 30 seconds
+        setTimeout(async () => {
+          if (redirectMsg) {
+            await redirectMsg.delete().catch(() => {});
+          }
+          await message.delete().catch(() => {});
+        }, 30000);
+
+        return;
+      }
+
       const args = message.content.trim().split(/\s+/).slice(1);
       console.log(`🎯 Bidding status command (${rawCmd}): ${resolvedCmd}`);
       await commandHandlers.bidstatus(message, member);
@@ -5842,22 +5888,22 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
 
-      // If invoked in guild chat, redirect response to BOT-COMMANDS (for both admins and members)
+      // If invoked in guild chat, redirect to BOT-COMMANDS (for both admins and members)
       if (inElysiumCommandsChannel && !inBotCommandsChannel) {
-        // Fetch BOT-COMMANDS channel
-        const guild = message.guild;
-        const botCommandsChannel = await guild.channels.fetch(config.bot_manual_channel_id).catch(() => null);
+        // Send redirect message in guild chat that auto-deletes after 30 seconds
+        const redirectMsg = await message.reply(
+          `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
+          `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
+        ).catch(() => null);
 
-        if (botCommandsChannel) {
-          // Send redirect message in BOT-COMMANDS channel
-          await botCommandsChannel.send(
-            `📢 ${member.user}, please use bot commands here! You tried to use \`${rawCmd}\` in guild chat.\n` +
-            `Guild chat is reserved for announcements. 🙏`
-          );
+        // Delete both messages after 30 seconds
+        setTimeout(async () => {
+          if (redirectMsg) {
+            await redirectMsg.delete().catch(() => {});
+          }
+          await message.delete().catch(() => {});
+        }, 30000);
 
-          // React to original message with redirect emoji
-          await message.react('➡️').catch(() => {});
-        }
         return;
       }
 
@@ -5914,22 +5960,22 @@ client.on(Events.MessageCreate, async (message) => {
         return;
       }
 
-      // If invoked in guild chat, redirect response to BOT-COMMANDS (for both admins and members)
+      // If invoked in guild chat, redirect to BOT-COMMANDS (for both admins and members)
       if (inElysiumCommandsChannel && !inBotCommandsChannel) {
-        // Fetch BOT-COMMANDS channel
-        const guild = message.guild;
-        const botCommandsChannel = await guild.channels.fetch(config.bot_manual_channel_id).catch(() => null);
+        // Send redirect message in guild chat that auto-deletes after 30 seconds
+        const redirectMsg = await message.reply(
+          `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
+          `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
+        ).catch(() => null);
 
-        if (botCommandsChannel) {
-          // Send redirect message in BOT-COMMANDS channel
-          await botCommandsChannel.send(
-            `📢 ${member.user}, please use bot commands here! You tried to use \`${rawCmd}\` in guild chat.\n` +
-            `Guild chat is reserved for announcements. 🙏`
-          );
+        // Delete both messages after 30 seconds
+        setTimeout(async () => {
+          if (redirectMsg) {
+            await redirectMsg.delete().catch(() => {});
+          }
+          await message.delete().catch(() => {});
+        }, 30000);
 
-          // React to original message with redirect emoji
-          await message.react('➡️').catch(() => {});
-        }
         return;
       }
 
@@ -6672,21 +6718,22 @@ client.on(Events.MessageCreate, async (message) => {
       const isMemberCommand = ["!eightball", "!slap", "!stats"].includes(memberCmd);
 
       if (isMemberCommand) {
-        // If invoked in guild chat, redirect response to BOT-COMMANDS (for both admins and members)
+        // If invoked in guild chat, redirect to BOT-COMMANDS (for both admins and members)
         if (inElysiumCommandsChannel && !inBotCommandsChannel) {
-          // Fetch BOT-COMMANDS channel
-          const botCommandsChannel = await guild.channels.fetch(config.bot_manual_channel_id).catch(() => null);
+          // Send redirect message in guild chat that auto-deletes after 30 seconds
+          const redirectMsg = await message.reply(
+            `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
+            `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
+          ).catch(() => null);
 
-          if (botCommandsChannel) {
-            // Send redirect message in BOT-COMMANDS channel
-            await botCommandsChannel.send(
-              `📢 ${member.user}, please use bot commands here! You tried to use \`${rawCmd}\` in guild chat.\n` +
-              `Guild chat is reserved for announcements. 🙏`
-            );
+          // Delete both messages after 30 seconds
+          setTimeout(async () => {
+            if (redirectMsg) {
+              await redirectMsg.delete().catch(() => {});
+            }
+            await message.delete().catch(() => {});
+          }, 30000);
 
-            // React to original message with redirect emoji
-            await message.react('➡️').catch(() => {});
-          }
           return;
         }
 
