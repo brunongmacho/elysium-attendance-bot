@@ -69,6 +69,7 @@ const {
 // External dependencies
 const fs = require("fs");             // File system operations
 const http = require("http");         // HTTP server for health checks
+const levenshtein = require("fast-levenshtein"); // Fuzzy string matching
 
 // Internal modules - Core systems
 const bidding = require("./bidding.js");                    // Auction bidding logic
@@ -285,13 +286,6 @@ const bossPoints = JSON.parse(fs.readFileSync("./boss_points.json"));
  * @type {Object.<string, Array<string>>}
  */
 const slapResponses = JSON.parse(fs.readFileSync("./slap-responses.json"));
-
-/**
- * Member lore data loaded from member-lore.json
- * Contains weapon, class, and comedic lore for each guild member
- * @type {Object.<string, {weapon: string, class: string, lore: string}>}
- */
-const memberLore = JSON.parse(fs.readFileSync("./member-lore.json"));
 
 // =====================================================================
 // SECTION 2: DISCORD CLIENT INITIALIZATION
@@ -1121,13 +1115,98 @@ function stopBiddingChannelCleanupSchedule() {
 // =====================================================================
 
 /**
+ * Find best matching member using fuzzy search
+ * @param {string} searchName - Name to search for
+ * @param {Guild} guild - Discord guild
+ * @returns {Object|null} { member, matchedName, confidence } or null
+ */
+function findBestMemberMatch(searchName, guild) {
+  if (!searchName || !guild) return null;
+
+  const normalizedSearch = searchName.toLowerCase().trim();
+  const members = Array.from(guild.members.cache.values());
+
+  let bestMatch = null;
+  let bestScore = Infinity;
+  let matchType = null;
+
+  for (const member of members) {
+    const displayName = member.displayName.toLowerCase();
+    const username = member.user.username.toLowerCase();
+
+    // Exact match (case insensitive) - highest priority
+    if (displayName === normalizedSearch || username === normalizedSearch) {
+      return {
+        member: member,
+        matchedName: member.displayName,
+        confidence: 100,
+        matchType: 'exact'
+      };
+    }
+
+    // Starts with match - second priority
+    if (displayName.startsWith(normalizedSearch) || username.startsWith(normalizedSearch)) {
+      const matchedName = displayName.startsWith(normalizedSearch) ? member.displayName : member.user.username;
+      return {
+        member: member,
+        matchedName: matchedName,
+        confidence: 90,
+        matchType: 'prefix'
+      };
+    }
+
+    // Contains match - third priority
+    if (displayName.includes(normalizedSearch) || username.includes(normalizedSearch)) {
+      if (!bestMatch || matchType !== 'contains') {
+        bestMatch = member;
+        bestScore = 0;
+        matchType = 'contains';
+      }
+    }
+
+    // Fuzzy match using Levenshtein distance - last resort
+    if (!bestMatch || matchType === 'fuzzy') {
+      const displayDistance = levenshtein.get(normalizedSearch, displayName);
+      const usernameDistance = levenshtein.get(normalizedSearch, username);
+      const minDistance = Math.min(displayDistance, usernameDistance);
+
+      if (minDistance < bestScore) {
+        bestScore = minDistance;
+        bestMatch = member;
+        matchType = 'fuzzy';
+      }
+    }
+  }
+
+  // Return best match if found
+  if (bestMatch) {
+    // Calculate confidence based on distance (lower distance = higher confidence)
+    let confidence;
+    if (matchType === 'contains') {
+      confidence = 75;
+    } else if (matchType === 'fuzzy') {
+      // Confidence inversely proportional to distance
+      // Distance of 0 = 100%, distance of 10+ = ~0%
+      confidence = Math.max(0, Math.min(100, 100 - (bestScore * 10)));
+    }
+
+    return {
+      member: bestMatch,
+      matchedName: bestMatch.displayName,
+      confidence: confidence,
+      matchType: matchType
+    };
+  }
+
+  return null;
+}
+
+/**
  * Builds a Discord embed for member stats
  * @param {Object} stats - Stats data from Google Sheets
  * @param {GuildMember} member - Discord guild member
  * @returns {EmbedBuilder} Formatted stats embed
  */
-// Replace buildStatsEmbed function (around line 1117-1199)
-// Replace buildStatsEmbed function (around line 1117-1199)
 function buildStatsEmbed(stats, member, countdown = 30) {
   const { memberName, attendance, bidding, rank, totalMembers } = stats;
 
@@ -2113,40 +2192,40 @@ const commandHandlers = {
 stats: async (message, member, args) => {
   let targetMember = member;
   let targetName = member.displayName; // Use displayName for Google Sheets matching
-  let searchName = targetName; // Name to search with (for fuzzy matching)
+  let matchInfo = null;
 
   // Parse target from args
   if (args.length > 0) {
     if (message.mentions.members.size > 0) {
-      // Handle @mention - use their displayName
+      // @mention provided - highest priority
       targetMember = message.mentions.members.first();
       targetName = targetMember.displayName;
-      searchName = targetName;
     } else {
       // User provided a name without @mention - use fuzzy matching
-      searchName = args.join(" ");
-
-      // Try exact match first in guild cache
+      const searchName = args.join(" ");
       const guild = message.guild;
-      if (guild) {
-        const foundMember = guild.members.cache.find(
-          m => m.displayName.toLowerCase() === searchName.toLowerCase() ||
-               m.user.username.toLowerCase() === searchName.toLowerCase()
-        );
 
-        if (foundMember) {
-          targetMember = foundMember;
-          targetName = foundMember.displayName;
+      if (guild) {
+        matchInfo = findBestMemberMatch(searchName, guild);
+
+        if (matchInfo) {
+          targetMember = matchInfo.member;
+          targetName = matchInfo.matchedName;
+
+          // Log match quality for debugging
+          console.log(`🔍 Stats fuzzy match: "${searchName}" → "${targetName}" (${matchInfo.matchType}, ${matchInfo.confidence}% confidence)`);
         } else {
-          // No exact match - will try fuzzy matching with Google Sheets
-          targetMember = null;
+          // No match found - use raw search name for Google Sheets lookup
           targetName = searchName;
+          targetMember = null;
+          console.log(`⚠️ Stats: No Discord match found for "${searchName}", trying Google Sheets...`);
         }
       } else {
         targetName = searchName;
       }
     }
   }
+  // If no args provided, show own stats (already set to member above)
 
   // Check cache first (use normalized name for cache key)
   const cacheKey = targetName.toLowerCase().trim();
@@ -2480,23 +2559,66 @@ stats: async (message, member, args) => {
                 `📍 Mass close: ${spawnInfo.boss} at ${spawnInfo.timestamp} (0 members - no submission)`
               );
             } else {
-              // Members exist - proceed with submission
-              await message.channel.send(
-                `   ├─ 📊 Submitting ${spawnInfo.members.length} member(s) to Google Sheets...`
-              );
+              // Members exist - check for duplicates before submitting
+              const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
 
-              const payload = {
-                action: "submitAttendance",
-                boss: spawnInfo.boss,
-                date: spawnInfo.date,
-                time: spawnInfo.time,
-                timestamp: spawnInfo.timestamp,
-                members: spawnInfo.members,
-              };
+              if (columnExists) {
+                console.log(`⚠️ Duplicate prevented: ${spawnInfo.boss} at ${spawnInfo.timestamp} already exists`);
 
-              const resp = await attendance.postToSheet(payload);
+                await message.channel.send(
+                  `   ⚠️ **Attendance already submitted!** Closing thread without duplicate submission.`
+                );
 
-              if (resp.ok) {
+                // Skip submission, just close and clean up
+                if (spawnInfo.confirmThreadId) {
+                  const confirmThread = await guild.channels
+                    .fetch(spawnInfo.confirmThreadId)
+                    .catch(() => null);
+                  if (confirmThread) {
+                    await confirmThread.send(
+                      `⚠️ Duplicate prevented: **${spawnInfo.boss}** (${spawnInfo.timestamp})`
+                    );
+                    await errorHandler.safeDelete(confirmThread, 'message deletion');
+                  }
+                }
+
+                await thread
+                  .setLocked(true, `Mass locked by ${member.user.username} (duplicate prevented)`)
+                  .catch(() => {});
+                await thread
+                  .setArchived(true, `Mass close by ${member.user.username} (duplicate prevented)`)
+                  .catch(() => {});
+
+                delete activeSpawns[threadId];
+                delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+                delete confirmationMessages[threadId];
+
+                successCount++;
+                results.push(
+                  `⚠️ **${spawnInfo.boss}** - Duplicate prevented (column already exists)`
+                );
+
+                console.log(
+                  `📍 Mass close: ${spawnInfo.boss} at ${spawnInfo.timestamp} (duplicate prevented)`
+                );
+              } else {
+                // No duplicate - proceed with submission
+                await message.channel.send(
+                  `   ├─ 📊 Submitting ${spawnInfo.members.length} member(s) to Google Sheets...`
+                );
+
+                const payload = {
+                  action: "submitAttendance",
+                  boss: spawnInfo.boss,
+                  date: spawnInfo.date,
+                  time: spawnInfo.time,
+                  timestamp: spawnInfo.timestamp,
+                  members: spawnInfo.members,
+                };
+
+                const resp = await attendance.postToSheet(payload);
+
+                if (resp.ok) {
               // Auto-increment boss rotation if it's a rotating boss
               await bossRotation.handleBossKill(spawnInfo.boss);
 
@@ -2625,6 +2747,7 @@ stats: async (message, member, args) => {
                 );
               }
             }
+              } // End of duplicate check else block
             } // End of members.length > 0 check
 
             const operationTime = Date.now() - operationStartTime;
@@ -2712,6 +2835,20 @@ stats: async (message, member, args) => {
         `This will submit to Google Sheets WITHOUT closing the thread.\n\n` +
         `Click ✅ Confirm or ❌ Cancel button below.`,
       async (confirmMsg) => {
+        // Check for duplicate column before submitting
+        const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
+
+        if (columnExists) {
+          console.log(`⚠️ Duplicate prevented: ${spawnInfo.boss} at ${spawnInfo.timestamp} already exists`);
+
+          await message.channel.send(
+            `⚠️ **Attendance already submitted for this spawn!**\n\n` +
+              `Column already exists in Google Sheets. Submission cancelled to prevent duplicate.`
+          );
+
+          return;
+        }
+
         await message.channel.send(
           `📊 Submitting ${spawnInfo.members.length} members to Google Sheets...`
         );
@@ -4372,11 +4509,24 @@ stats: async (message, member, args) => {
       }
     }
 
-    await message.reply(
-      bossName
-        ? `🤖 Analyzing spawn patterns for **${bossName}**...`
-        : `🤖 Analyzing general boss spawn patterns...`
-    );
+    // Send initial analysis message with error handling for deleted messages
+    try {
+      await message.reply(
+        bossName
+          ? `🤖 Analyzing spawn patterns for **${bossName}**...`
+          : `🤖 Analyzing general boss spawn patterns...`
+      );
+    } catch (replyError) {
+      // If reply fails (message deleted), send to channel instead
+      if (replyError.code === 50035 || replyError.code === 10008) {
+        await message.channel.send(
+          bossName
+            ? `🤖 Analyzing spawn patterns for **${bossName}**...`
+            : `🤖 Analyzing general boss spawn patterns...`
+        );
+      }
+      // Continue even if initial message fails
+    }
 
     try {
       const prediction = await intelligenceEngine.predictNextSpawnTime(bossName);
@@ -4541,14 +4691,34 @@ stats: async (message, member, args) => {
           : `Requested by ${member.user.username} • Intelligence Engine`
       }).setTimestamp();
 
-      await message.reply({ embeds: [embed] });
+      // Send prediction embed with error handling for deleted messages
+      try {
+        await message.reply({ embeds: [embed] });
+      } catch (replyError) {
+        // If reply fails (message deleted), send to channel instead
+        if (replyError.code === 50035 || replyError.code === 10008) {
+          await message.channel.send({ embeds: [embed] });
+        } else {
+          throw replyError;
+        }
+      }
+
       console.log(
         `🤖 [INTELLIGENCE] Spawn prediction for ${bossName || 'any boss'}: ` +
         `${prediction.bossName} at ${prediction.predictedTime.toISOString()} (${confidence.toFixed(1)}% confidence)`
       );
     } catch (error) {
       console.error('[INTELLIGENCE] Error predicting spawn:', error);
-      await message.reply(`❌ Error analyzing spawn data: ${error.message}`);
+
+      // Send error message with fallback for deleted messages
+      try {
+        await message.reply(`❌ Error analyzing spawn data: ${error.message}`);
+      } catch (replyError) {
+        if (replyError.code === 50035 || replyError.code === 10008) {
+          await message.channel.send(`❌ Error analyzing spawn data: ${error.message}`);
+        }
+        // Silently fail if both reply and send fail
+      }
     }
   },
 
@@ -6168,20 +6338,32 @@ client.on(Events.MessageCreate, async (message) => {
         );
 
         if (pendingInThread.length > 0) {
-          const pendingList = pendingInThread
+          // Limit to first 10 to avoid exceeding 2000 char Discord message limit
+          const maxShow = 10;
+          const toShow = pendingInThread.slice(0, maxShow);
+          const remaining = pendingInThread.length - maxShow;
+
+          const pendingList = toShow
             .map(([msgId, p]) => {
               const messageLink = `https://discord.com/channels/${guild.id}/${message.channel.id}/${msgId}`;
-              return `• **${p.author}** - [View Message](${messageLink})`;
+              return `• **${p.author}** - [View](${messageLink})`;
             })
             .join("\n");
 
-          await message.reply(
+          let warningMessage =
             `⚠️ **Cannot close spawn!**\n\n` +
-              `There are **${pendingInThread.length} pending verification(s)**:\n\n` +
-              `${pendingList}\n\n` +
-              `Please verify (✅) or deny (❌) all check-ins first, then type \`close\` again.\n\n` +
-              `💡 Or use \`!resetpending\` to clear them.`
-          );
+            `There are **${pendingInThread.length} pending verification(s)**:\n\n` +
+            `${pendingList}`;
+
+          if (remaining > 0) {
+            warningMessage += `\n\n...and **${remaining} more**.`;
+          }
+
+          warningMessage +=
+            `\n\nPlease verify (✅) or deny (❌) all check-ins first, then type \`close\` again.\n\n` +
+            `💡 Or use \`!resetpending\` to clear them.`;
+
+          await message.reply(warningMessage);
           return;
         }
 
@@ -6238,12 +6420,54 @@ client.on(Events.MessageCreate, async (message) => {
         );
         pendingInThread.forEach((msgId) => delete pendingVerifications[msgId]);
 
+        spawnInfo.closed = true;
+
+        // Check for duplicate column before submitting
+        const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
+
+        if (columnExists) {
+          console.log(`⚠️ Duplicate prevented: ${spawnInfo.boss} at ${spawnInfo.timestamp} already exists`);
+
+          await message.reply(
+            `⚠️ **Attendance already submitted for this spawn!**\n\n` +
+              `Column already exists in Google Sheets. Closing thread without duplicate submission.`
+          );
+
+          // Skip submission, just close and clean up
+          if (spawnInfo.confirmThreadId) {
+            const confirmThread = await guild.channels
+              .fetch(spawnInfo.confirmThreadId)
+              .catch(() => null);
+            if (confirmThread) {
+              await confirmThread.send(
+                `⚠️ Duplicate prevented: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - Column already exists`
+              );
+              await confirmThread.delete().catch(console.error);
+            }
+          }
+
+          await message.channel
+            .setLocked(true, `Force locked by ${message.author.username} (duplicate prevented)`)
+            .catch(console.error);
+          await message.channel
+            .setArchived(true, `Force closed by ${message.author.username} (duplicate prevented)`)
+            .catch(console.error);
+
+          delete activeSpawns[message.channel.id];
+          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+          delete confirmationMessages[message.channel.id];
+
+          attendance.setActiveSpawns(activeSpawns);
+          attendance.setActiveColumns(activeColumns);
+          attendance.setConfirmationMessages(confirmationMessages);
+
+          return;
+        }
+
         await message.reply(
           `⚠️ **FORCE CLOSING** spawn **${spawnInfo.boss}**...\n` +
             `Submitting ${spawnInfo.members.length} members (ignoring ${pendingInThread.length} pending verifications)`
         );
-
-        spawnInfo.closed = true;
 
         const payload = {
           action: "submitAttendance",
@@ -6816,6 +7040,51 @@ client.on(Events.InteractionCreate, async (interaction) => {
           components: [disabledRow]
         });
 
+        // Check for duplicate column before submitting
+        const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
+
+        if (columnExists) {
+          console.log(`⚠️ Duplicate prevented: ${spawnInfo.boss} at ${spawnInfo.timestamp} already exists`);
+
+          await interaction.followUp({
+            content: `⚠️ **Attendance already submitted for this spawn!**\n\nColumn already exists in Google Sheets. Closing thread without duplicate submission.`,
+            ephemeral: false
+          });
+
+          // Skip submission, just close and clean up
+          if (spawnInfo.confirmThreadId) {
+            const confirmThread = await guild.channels
+              .fetch(spawnInfo.confirmThreadId)
+              .catch(() => null);
+            if (confirmThread) {
+              await confirmThread.send(
+                `⚠️ Duplicate prevented: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - Column already exists`
+              );
+              await errorHandler.safeDelete(confirmThread, 'message deletion');
+            }
+          }
+
+          // Lock and archive the thread
+          await interaction.channel
+            .setLocked(true, `Locked by ${user.username} (duplicate prevented)`)
+            .catch(() => {});
+          await interaction.channel
+            .setArchived(true, `Closed by ${user.username} (duplicate prevented)`)
+            .catch(() => {});
+
+          delete activeSpawns[closePending.threadId];
+          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+          delete pendingClosures[msg.id];
+          delete confirmationMessages[closePending.threadId];
+
+          attendance.setActiveSpawns(activeSpawns);
+          attendance.setActiveColumns(activeColumns);
+          attendance.setPendingClosures(pendingClosures);
+          attendance.setConfirmationMessages(confirmationMessages);
+
+          return;
+        }
+
         await interaction.followUp({
           content: `🔒 Closing spawn **${spawnInfo.boss}**... Submitting ${spawnInfo.members.length} members...`,
           ephemeral: false
@@ -7099,6 +7368,52 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 
         spawnInfo.closed = true;
         attendance.setActiveSpawns(activeSpawns); // Sync
+
+        // Check for duplicate column before submitting
+        const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
+
+        if (columnExists) {
+          console.log(`⚠️ Duplicate prevented: ${spawnInfo.boss} at ${spawnInfo.timestamp} already exists`);
+
+          await msg.channel.send(
+            `⚠️ **Attendance already submitted for this spawn!**\n\n` +
+              `Column already exists in Google Sheets. Closing thread without duplicate submission.`
+          );
+
+          await attendance.removeAllReactionsWithRetry(msg);
+
+          // Skip submission, just close and clean up
+          if (spawnInfo.confirmThreadId) {
+            const confirmThread = await guild.channels
+              .fetch(spawnInfo.confirmThreadId)
+              .catch(() => null);
+            if (confirmThread) {
+              await confirmThread.send(
+                `⚠️ Duplicate prevented: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - Column already exists`
+              );
+              await errorHandler.safeDelete(confirmThread, 'message deletion');
+            }
+          }
+
+          await msg.channel
+            .setLocked(true, `Locked by ${user.username} (duplicate prevented)`)
+            .catch(() => {});
+          await msg.channel
+            .setArchived(true, `Closed by ${user.username} (duplicate prevented)`)
+            .catch(() => {});
+
+          delete activeSpawns[closePending.threadId];
+          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+          delete pendingClosures[msg.id];
+          delete confirmationMessages[closePending.threadId];
+
+          attendance.setActiveSpawns(activeSpawns);
+          attendance.setActiveColumns(activeColumns);
+          attendance.setPendingClosures(pendingClosures);
+          attendance.setConfirmationMessages(confirmationMessages);
+
+          return;
+        }
 
         await msg.channel.send(
           `🔒 Closing spawn **${spawnInfo.boss}**... Submitting ${spawnInfo.members.length} members...`
