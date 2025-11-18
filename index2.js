@@ -4691,9 +4691,11 @@ stats: async (message, member, args) => {
               console.warn(`[Rotation] Failed to predict ${boss}:`, predError.message);
             }
 
+            const guildCount = rotation.guilds ? rotation.guilds.length : 5;
+
             embed.addFields({
               name: `${emoji} ${boss}`,
-              value: `Guild ${rotation.currentIndex}/5 - **${status}**\nNext: ${rotation.guilds[rotation.currentIndex % 5]}${spawnInfo}`,
+              value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**\nNext: ${rotation.guilds[rotation.currentIndex % guildCount]}${spawnInfo}`,
               inline: false
             });
           }
@@ -4718,15 +4720,26 @@ stats: async (message, member, args) => {
           return;
         }
 
-        if (newIndex < 1 || newIndex > 5) {
-          await message.reply('❌ Index must be between 1 and 5');
-          return;
-        }
-
         // Use fuzzy matching to find the correct boss name
         const bossName = findBossMatch(rawBossName, bossPoints);
         if (!bossName) {
           await message.reply(`❌ Unknown boss: "${rawBossName}"\n💡 Try: Amentis, Baron Braudmore, or General Aquleus`);
+          return;
+        }
+
+        // Get rotation data to check guild count for this specific boss
+        const rotations = await bossRotation.getAllRotations();
+        const rotation = rotations[bossName];
+
+        if (!rotation) {
+          await message.reply(`❌ **${bossName}** is not a rotating boss`);
+          return;
+        }
+
+        const guildCount = rotation.guilds ? rotation.guilds.length : 5;
+
+        if (newIndex < 1 || newIndex > guildCount) {
+          await message.reply(`❌ Index must be between 1 and ${guildCount} for **${bossName}** (${guildCount}-guild rotation)`);
           return;
         }
 
