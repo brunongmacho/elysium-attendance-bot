@@ -57,6 +57,7 @@
 const { EmbedBuilder } = require("discord.js");
 const { SheetAPI } = require('./utils/sheet-api');
 const bossRotation = require('./boss-rotation.js');
+const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images');
 const {
   getCurrentTimestamp,
   getSundayOfWeek,
@@ -490,9 +491,22 @@ async function createSpawnThreads(
     .setFooter({ text: 'Admins: type "close" to finalize early' })
     .setTimestamp();
 
+  // Add boss image if available
+  const bossImage = getBossImageAttachment(bossName);
+  const bossImageURL = getBossImageAttachmentURL(bossName);
+  if (bossImageURL) {
+    embed.setThumbnail(bossImageURL);
+  }
+
+  // Prepare message payload with boss image attachment
+  const messagePayload = { content: "@everyone", embeds: [embed] };
+  if (bossImage) {
+    messagePayload.files = [bossImage];
+  }
+
   // Batch send notifications in parallel for faster execution
   const notifications = [
-    attThread.send({ content: "@everyone", embeds: [embed] }),
+    attThread.send(messagePayload),
   ];
 
   if (confirmThread) {

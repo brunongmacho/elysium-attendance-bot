@@ -83,6 +83,7 @@ const errorHandler = require('./utils/error-handler');      // Centralized error
 const { SheetAPI } = require('./utils/sheet-api');          // Unified Google Sheets API
 const { DiscordCache } = require('./utils/discord-cache');  // Channel caching system
 const { normalizeUsername, findBossMatch } = require('./utils/common');    // Username normalization and boss matching
+const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images'); // Boss images utility
 const scheduler = require('./utils/maintenance-scheduler'); // Unified maintenance scheduler
 const { IntelligenceEngine } = require('./intelligence-engine.js'); // AI/ML Intelligence Engine
 const { ProactiveIntelligence } = require('./proactive-intelligence.js'); // Proactive Monitoring
@@ -4691,13 +4692,26 @@ stats: async (message, member, args) => {
           : `Requested by ${member.user.username} • Intelligence Engine`
       }).setTimestamp();
 
+      // Add boss image if available
+      const bossImage = getBossImageAttachment(prediction.bossName);
+      const bossImageURL = getBossImageAttachmentURL(prediction.bossName);
+      if (bossImageURL) {
+        embed.setThumbnail(bossImageURL);
+      }
+
+      // Prepare message payload with boss image attachment
+      const messagePayload = { embeds: [embed] };
+      if (bossImage) {
+        messagePayload.files = [bossImage];
+      }
+
       // Send prediction embed with error handling for deleted messages
       try {
-        await message.reply({ embeds: [embed] });
+        await message.reply(messagePayload);
       } catch (replyError) {
         // If reply fails (message deleted), send to channel instead
         if (replyError.code === 50035 || replyError.code === 10008) {
-          await message.channel.send({ embeds: [embed] });
+          await message.channel.send(messagePayload);
         } else {
           throw replyError;
         }
