@@ -556,7 +556,7 @@ async function displayCombinedLeaderboards(message) {
  * // Manual trigger
  * await sendWeeklyReport();
  */
-async function sendWeeklyReport() {
+async function sendWeeklyReport(targetChannel = null) {
   try {
     // Validate initialization
     if (!client || !config) {
@@ -574,15 +574,24 @@ async function sendWeeklyReport() {
       return;
     }
 
-    // Get admin-logs channel and ELYSIUM commands channel
-    const adminLogsChannel = await discordCache.getChannel('admin_logs_channel_id');
-    const elysiumCommandsChannel = config.elysium_commands_channel_id
-      ? await discordCache.getChannel('elysium_commands_channel_id').catch(() => null)
-      : null;
+    // If targetChannel is provided, use it exclusively; otherwise use default channels
+    let adminLogsChannel = null;
+    let elysiumCommandsChannel = null;
 
-    if (!adminLogsChannel) {
-      console.error('❌ Admin logs channel not found');
-      return;
+    if (targetChannel) {
+      // Manual trigger: only send to the channel where command was invoked
+      console.log(`📍 Sending weekly report to specific channel: ${targetChannel.name || targetChannel.id}`);
+    } else {
+      // Scheduled trigger: send to both admin logs and guild chat
+      adminLogsChannel = await discordCache.getChannel('admin_logs_channel_id');
+      elysiumCommandsChannel = config.elysium_commands_channel_id
+        ? await discordCache.getChannel('elysium_commands_channel_id').catch(() => null)
+        : null;
+
+      if (!adminLogsChannel) {
+        console.error('❌ Admin logs channel not found');
+        return;
+      }
     }
 
     const embed = new EmbedBuilder()
@@ -772,19 +781,26 @@ async function sendWeeklyReport() {
 
     embed.setFooter({ text: 'Generated automatically every Saturday at 11:59pm GMT+8' });
 
-    // Send to admin logs channel
-    await adminLogsChannel.send({ embeds: [embed] });
-    console.log('✅ Weekly report sent to admin logs channel');
+    // Send to appropriate channel(s)
+    if (targetChannel) {
+      // Manual trigger: send only to the channel where command was invoked
+      await targetChannel.send({ embeds: [embed] });
+      console.log(`✅ Weekly report sent to ${targetChannel.name || targetChannel.id}`);
+    } else {
+      // Scheduled trigger: send to both admin logs and guild chat
+      await adminLogsChannel.send({ embeds: [embed] });
+      console.log('✅ Weekly report sent to admin logs channel');
 
-    // Also send to ELYSIUM commands channel if configured
-    if (elysiumCommandsChannel) {
-      await elysiumCommandsChannel.send({ embeds: [embed] });
-      console.log('✅ Weekly report sent to ELYSIUM commands channel');
-    }
+      // Also send to ELYSIUM commands channel if configured
+      if (elysiumCommandsChannel) {
+        await elysiumCommandsChannel.send({ embeds: [embed] });
+        console.log('✅ Weekly report sent to ELYSIUM commands channel');
+      }
 
-    // Mark weekly report as completed in crash recovery
-    if (crashRecovery) {
-      await crashRecovery.markWeeklyReportCompleted();
+      // Mark weekly report as completed in crash recovery (only for scheduled reports)
+      if (crashRecovery) {
+        await crashRecovery.markWeeklyReportCompleted();
+      }
     }
   } catch (error) {
     console.error('❌ Error sending weekly report:', error);

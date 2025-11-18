@@ -3553,7 +3553,8 @@ stats: async (message, member, args) => {
     // Permission check is done in routing logic
     console.log(`📅 ${member.user.username} manually triggered weekly report`);
     await message.reply({ content: "📊 Generating weekly report...", failIfNotExists: false });
-    await leaderboardSystem.sendWeeklyReport();
+    // Pass the channel where the command was invoked so report is sent only there
+    await leaderboardSystem.sendWeeklyReport(message.channel);
   },
 
   monthlyreport: async (message, member) => {
