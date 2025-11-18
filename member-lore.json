@@ -263,5 +263,20 @@
     "weapon": "Wand + Dagger",
     "class": "Chaotic Neutral",
     "lore": "Friend or foe? Identity questionable. Alignment changes hourly. Guild has conspiracy board dedicated to tracking loyalty. Board inconclusive. Probably fine."
+  },
+  "Riku": {
+    "weapon": "???",
+    "class": "Mystery Warrior",
+    "lore": "Weapon unknown. Fighting style undefined. Somehow effective. Guild debates if they're genius or just lucky. Bosses fear them regardless. Results speak louder than documentation."
+  },
+  "jiR0": {
+    "weapon": "???",
+    "class": "Enigma Class",
+    "lore": "Combat method classified. Enemies defeated by unknown means. Guild has theories: magic? stealth? intimidation? Reality: nobody dares ask. Too effective to question."
+  },
+  "Maia": {
+    "weapon": "???",
+    "class": "Unidentified Combatant",
+    "lore": "Weapon choice remains elusive. Shows up, wins battles, refuses to elaborate. Guild gave up documenting combat style. Just grateful they're on our side. Probably."
   }
 }
