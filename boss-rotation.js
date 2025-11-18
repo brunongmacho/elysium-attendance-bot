@@ -651,7 +651,6 @@ module.exports = {
   refreshRotationCache,
   incrementRotation,
   setRotation,
-  sendRotationWarning,
   deleteRotationWarning,
   handleBossKill,
   isRotatingBoss,

@@ -159,8 +159,6 @@ function getAvailableBossImages() {
 // ============================================================================
 
 module.exports = {
-  getBossImagePath,
-  hasBossImage,
   getBossImageAttachment,
   getBossImageAttachmentURL,
   getAvailableBossImages,

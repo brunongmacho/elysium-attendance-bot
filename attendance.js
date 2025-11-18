@@ -456,8 +456,8 @@ async function createSpawnThreads(
   const normalizedKey = `${bossName.toUpperCase()}|${normalizeTimestamp(fullTimestamp)}`;
   activeColumns[normalizedKey] = attThread.id;
 
-  // Calculate auto-close timestamp (30 minutes from now) or show no autoclose
-  const autoCloseTime = Date.now() + (30 * 60 * 1000);
+  // Calculate auto-close timestamp using TIMING constant
+  const autoCloseTime = Date.now() + (TIMING.THREAD_AUTO_CLOSE_MINUTES * 60 * 1000);
   const autoCloseTimestamp = Math.floor(autoCloseTime / 1000);
 
   // Create description based on autoclose setting
@@ -485,7 +485,7 @@ async function createSpawnThreads(
       { name: "📅 Date", value: dateStr, inline: true },
       {
         name: "⏱️ Attendance Window",
-        value: noAutoClose ? "No limit (maintenance)" : "30 minutes (then auto-closes)",
+        value: noAutoClose ? "No limit (maintenance)" : `${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes (then auto-closes)`,
         inline: false,
       }
     )
@@ -1035,6 +1035,7 @@ async function validateStateConsistency(client) {
 
 let lastAttendanceStateSyncTime = 0;                     // Last sync timestamp
 const ATTENDANCE_STATE_SYNC_INTERVAL = 15 * 60 * 1000;   // 15 minutes (optimized from 10)
+const MIN_FORCE_SYNC_INTERVAL = 60 * 1000;               // Minimum 60 seconds even for forceSync
 const STATE_CLEANUP_INTERVAL = 30 * 60 * 1000;           // 30 minutes
 const STALE_ENTRY_AGE = 24 * 60 * 60 * 1000;             // 24 hours
 const MAX_PENDING_VERIFICATIONS = 100;                   // Prevent unbounded growth
@@ -1071,7 +1072,15 @@ async function saveAttendanceStateToSheet(forceSync = false) {
   }
 
   const now = Date.now();
-  const shouldSync = forceSync || (now - lastAttendanceStateSyncTime > ATTENDANCE_STATE_SYNC_INTERVAL);
+  const timeSinceLastSync = now - lastAttendanceStateSyncTime;
+
+  // Even forceSync respects minimum interval to prevent rate limiting
+  if (forceSync && timeSinceLastSync < MIN_FORCE_SYNC_INTERVAL) {
+    console.log(`⏳ [ATTENDANCE] Skipping forceSync (${Math.ceil((MIN_FORCE_SYNC_INTERVAL - timeSinceLastSync)/1000)}s remaining)`);
+    return false;
+  }
+
+  const shouldSync = forceSync || (timeSinceLastSync > ATTENDANCE_STATE_SYNC_INTERVAL);
 
   if (!shouldSync) {
     return false;
@@ -1373,7 +1382,7 @@ async function checkAndAutoCloseThreads(client) {
           console.log(`   ⚠️ Column already exists for ${spawnInfo.boss} at ${spawnInfo.timestamp}, skipping submission`);
 
           await thread.send(
-            `⏰ **AUTO-CLOSED (30 minutes elapsed)**\n\n` +
+            `⏰ **AUTO-CLOSED (${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes elapsed)**\n\n` +
             `Attendance already submitted for this spawn.\n` +
             `Thread will be archived now.`
           ).catch(() => {});
@@ -1397,7 +1406,7 @@ async function checkAndAutoCloseThreads(client) {
 
           // Lock and archive the thread to prevent spam
           await thread.setLocked(true, "Auto-locked - duplicate prevented").catch(() => {});
-          await thread.setArchived(true, "Auto-closed after 30 minutes - duplicate prevented").catch(() => {});
+          await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - duplicate prevented`).catch(() => {});
 
           // Clean up state
           delete activeSpawns[threadId];
@@ -1419,7 +1428,7 @@ async function checkAndAutoCloseThreads(client) {
             console.log(`   ⚠️ No members to submit (0 verified). Skipping Google Sheets submission...`);
 
             await thread.send(
-              `⏰ **AUTO-CLOSED (30 minutes elapsed)**\n\n` +
+              `⏰ **AUTO-CLOSED (${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes elapsed)**\n\n` +
               `Attendance window closed. No members verified - no data submitted to Google Sheets.`
             ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
 
@@ -1441,8 +1450,8 @@ async function checkAndAutoCloseThreads(client) {
             }
 
             // Lock and archive the thread
-            await thread.setLocked(true, "Auto-locked after 30 minutes - no members").catch(() => {});
-            await thread.setArchived(true, "Auto-closed after 30 minutes - no members").catch(() => {});
+            await thread.setLocked(true, `Auto-locked after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - no members`).catch(() => {});
+            await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - no members`).catch(() => {});
 
             // Clean up state
             delete activeSpawns[threadId];
@@ -1458,7 +1467,7 @@ async function checkAndAutoCloseThreads(client) {
             // Members exist - proceed with submission
             // Notify in thread
             await thread.send(
-              `⏰ **AUTO-CLOSED (30 minutes elapsed)**\n\n` +
+              `⏰ **AUTO-CLOSED (${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes elapsed)**\n\n` +
               `Attendance window closed to prevent cheating.\n` +
               `${spawnInfo.members.length} member(s) verified and submitting to Google Sheets...`
             ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
@@ -1516,15 +1525,15 @@ async function checkAndAutoCloseThreads(client) {
               if (confirmThread) {
                 await confirmThread.send(
                   `⏰ **AUTO-CLOSED**: ${spawnInfo.boss} (${spawnInfo.timestamp})\n` +
-                  `${spawnInfo.members.length} members submitted after 30-minute window`
+                  `${spawnInfo.members.length} members submitted after ${TIMING.THREAD_AUTO_CLOSE_MINUTES}-minute window`
                 ).catch(() => {});
                 await confirmThread.delete().catch(() => {});
               }
             }
 
             // Lock and archive the thread to prevent spam
-            await thread.setLocked(true, "Auto-locked after 30 minutes").catch(() => {});
-            await thread.setArchived(true, "Auto-closed after 30 minutes").catch(() => {});
+            await thread.setLocked(true, `Auto-locked after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes`).catch(() => {});
+            await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes`).catch(() => {});
 
             // Clean up state
             delete activeSpawns[threadId];

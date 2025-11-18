@@ -60,6 +60,74 @@ let recoveryState = {
 };
 
 // ============================================================================
+// DEBOUNCE SYSTEM FOR API RATE LIMITING
+// ============================================================================
+
+// Pending state saves (batched)
+let pendingSaves = new Map();
+let saveDebounceTimer = null;
+const SAVE_DEBOUNCE_MS = 5000; // 5 seconds debounce
+const MIN_SAVE_INTERVAL_MS = 30000; // Minimum 30 seconds between saves
+let lastSaveTime = 0;
+
+/**
+ * Debounced save function - batches multiple saves into one API call
+ * @param {string} category - Category to save (auction, leaderboard, scheduler)
+ * @param {Object} state - State to save
+ */
+function debouncedSave(category, state) {
+  pendingSaves.set(category, state);
+
+  // Clear existing timer
+  if (saveDebounceTimer) {
+    clearTimeout(saveDebounceTimer);
+  }
+
+  // Set new timer to batch saves
+  saveDebounceTimer = setTimeout(async () => {
+    const now = Date.now();
+
+    // Check minimum interval
+    if (now - lastSaveTime < MIN_SAVE_INTERVAL_MS) {
+      const waitTime = MIN_SAVE_INTERVAL_MS - (now - lastSaveTime);
+      console.log(`⏳ [CRASH RECOVERY] Waiting ${Math.ceil(waitTime/1000)}s before saving (rate limit)`);
+      saveDebounceTimer = setTimeout(() => executeBatchSave(), waitTime);
+      return;
+    }
+
+    await executeBatchSave();
+  }, SAVE_DEBOUNCE_MS);
+}
+
+/**
+ * Execute batched saves to Google Sheets
+ */
+async function executeBatchSave() {
+  if (pendingSaves.size === 0) return;
+
+  const savesToExecute = new Map(pendingSaves);
+  pendingSaves.clear();
+  lastSaveTime = Date.now();
+
+  for (const [category, state] of savesToExecute) {
+    try {
+      await sheetAPI.call('saveRecoveryState', {
+        category,
+        state,
+      }, { silent: true });
+      console.log(`💾 [CRASH RECOVERY] Saved ${category} state (batched)`);
+    } catch (error) {
+      console.error(`⚠️ [CRASH RECOVERY] Failed to save ${category} state:`, error.message);
+    }
+
+    // Small delay between saves if multiple
+    if (savesToExecute.size > 1) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+}
+
+// ============================================================================
 // INITIALIZATION
 // ============================================================================
 
@@ -144,12 +212,8 @@ async function saveAuctionRecoveryState(auctionState) {
       lastSaved: Date.now(),
     };
 
-    await sheetAPI.call('saveRecoveryState', {
-      category: 'auction',
-      state: recoveryState.auction,
-    }, { silent: true });
-
-    console.log('💾 [CRASH RECOVERY] Saved auction state');
+    // Use debounced save to prevent rate limiting
+    debouncedSave('auction', recoveryState.auction);
   } catch (error) {
     console.error('⚠️ [CRASH RECOVERY] Failed to save auction state:', error.message);
   }
@@ -236,12 +300,9 @@ async function clearAuctionRecoveryState() {
       lastSaved: Date.now(),
     };
 
-    await sheetAPI.call('saveRecoveryState', {
-      category: 'auction',
-      state: recoveryState.auction,
-    }, { silent: true });
-
-    console.log('🗑️ [CRASH RECOVERY] Cleared auction state');
+    // Use debounced save to prevent rate limiting
+    debouncedSave('auction', recoveryState.auction);
+    console.log('🗑️ [CRASH RECOVERY] Clearing auction state (debounced)');
   } catch (error) {
     console.error('⚠️ [CRASH RECOVERY] Failed to clear auction state:', error.message);
   }
@@ -264,12 +325,8 @@ async function saveLeaderboardReportSchedule(nextReportTime) {
       lastSaved: Date.now(),
     };
 
-    await sheetAPI.call('saveRecoveryState', {
-      category: 'leaderboard',
-      state: recoveryState.leaderboard,
-    }, { silent: true });
-
-    console.log('💾 [CRASH RECOVERY] Saved leaderboard report schedule');
+    // Use debounced save to prevent rate limiting
+    debouncedSave('leaderboard', recoveryState.leaderboard);
   } catch (error) {
     console.error('⚠️ [CRASH RECOVERY] Failed to save leaderboard schedule:', error.message);
   }
@@ -284,12 +341,9 @@ async function markWeeklyReportCompleted() {
     recoveryState.leaderboard.lastWeeklyReport = Date.now();
     recoveryState.leaderboard.lastSaved = Date.now();
 
-    await sheetAPI.call('saveRecoveryState', {
-      category: 'leaderboard',
-      state: recoveryState.leaderboard,
-    }, { silent: true });
-
-    console.log('✅ [CRASH RECOVERY] Marked weekly report as completed');
+    // Use debounced save to prevent rate limiting
+    debouncedSave('leaderboard', recoveryState.leaderboard);
+    console.log('✅ [CRASH RECOVERY] Marked weekly report as completed (debounced)');
   } catch (error) {
     console.error('⚠️ [CRASH RECOVERY] Failed to mark weekly report:', error.message);
   }
@@ -358,12 +412,8 @@ async function saveSchedulerTaskExecution(taskName, lastRun) {
 
     recoveryState.scheduler.lastSaved = Date.now();
 
-    await sheetAPI.call('saveRecoveryState', {
-      category: 'scheduler',
-      state: recoveryState.scheduler,
-    }, { silent: true });
-
-    // Removed verbose logging - only log errors
+    // Use debounced save to prevent rate limiting
+    debouncedSave('scheduler', recoveryState.scheduler);
   } catch (error) {
     console.error(`⚠️ [CRASH RECOVERY] Failed to save scheduler task ${taskName}:`, error.message);
   }
