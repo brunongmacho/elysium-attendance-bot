@@ -673,12 +673,12 @@ async function startAuctioneering(client, config, channel) {
         `Please update \`config.bidding_channel_id\` with the correct channel ID.`;
 
       // Try to send to the command channel
-      await channel.send(errorMsg).catch(() => {});
+      await channel.send(errorMsg).catch(errorHandler.safeCatch('send bidding channel config error'));
       return;
     }
   } catch (err) {
     console.error(`❌ Failed to fetch bidding channel:`, err);
-    await channel.send(`❌ Failed to fetch bidding channel: ${err.message}`).catch(() => {});
+    await channel.send(`❌ Failed to fetch bidding channel: ${err.message}`).catch(errorHandler.safeCatch('send fetch bidding channel error'));
     return;
   }
 
@@ -905,7 +905,7 @@ async function startAuctioneering(client, config, channel) {
         .send(
           `❌ Failed to start auction. Please try again or contact an admin.`
         )
-        .catch(() => {});
+        .catch(errorHandler.safeCatch('send auction start failure message'));
     }
   }, 30000); // 30 seconds preview
 }
@@ -3073,7 +3073,7 @@ async function handleCancelItem(message) {
         .setDescription('Confirmation expired')
         .setTimestamp();
 
-      await canMsg.edit({ embeds: [timeoutEmbed], components: [disabledCancelRow] }).catch(() => {});
+      await canMsg.edit({ embeds: [timeoutEmbed], components: [disabledCancelRow] }).catch(errorHandler.safeCatch('edit cancel confirmation timeout'));
     }
   });
 }
@@ -3242,7 +3242,7 @@ async function handleSkipItem(message) {
         .setDescription('Confirmation expired')
         .setTimestamp();
 
-      await skpMsg.edit({ embeds: [timeoutEmbed], components: [disabledSkipRow] }).catch(() => {});
+      await skpMsg.edit({ embeds: [timeoutEmbed], components: [disabledSkipRow] }).catch(errorHandler.safeCatch('edit skip confirmation timeout'));
     }
   });
 }
@@ -3358,7 +3358,7 @@ async function handleForceSubmitResults(message, config, biddingModule) {
         .setDescription('Confirmation expired')
         .setTimestamp();
 
-      await fsMsg.edit({ embeds: [timeoutEmbed], components: [disabledRow] }).catch(() => {});
+      await fsMsg.edit({ embeds: [timeoutEmbed], components: [disabledRow] }).catch(errorHandler.safeCatch('edit forcesubmit confirmation timeout'));
     }
   });
 }
@@ -3426,7 +3426,7 @@ async function endAuctionSession(client, config, channel) {
         if (typeof currentThread.setArchived === "function") {
           await currentThread
             .setArchived(true, "Session ended by admin")
-            .catch(() => {});
+            .catch(errorHandler.safeCatch('archive thread on session end'));
         }
       }
     } catch (err) {

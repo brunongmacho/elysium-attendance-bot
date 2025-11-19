@@ -2701,7 +2701,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             .setDescription('Confirmation expired')
             .setTimestamp();
 
-          await fsMsg.edit({ embeds: [timeoutEmbed], components: [disabledRow] }).catch(() => {});
+          await errorHandler.safeEdit(fsMsg, { embeds: [timeoutEmbed], components: [disabledRow] }, 'force sell confirmation timeout');
         }
       });
       break;
@@ -2803,7 +2803,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             .setDescription('Confirmation expired')
             .setTimestamp();
 
-          await canMsg.edit({ embeds: [timeoutEmbed], components: [disabledCancelRow] }).catch(() => {});
+          await errorHandler.safeEdit(canMsg, { embeds: [timeoutEmbed], components: [disabledCancelRow] }, 'cancel item confirmation timeout');
         }
       });
       break;
@@ -2904,7 +2904,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             .setDescription('Confirmation expired')
             .setTimestamp();
 
-          await skpMsg.edit({ embeds: [timeoutEmbed], components: [disabledSkipRow] }).catch(() => {});
+          await errorHandler.safeEdit(skpMsg, { embeds: [timeoutEmbed], components: [disabledSkipRow] }, 'skip item confirmation timeout');
         }
       });
       break;
@@ -3107,7 +3107,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             .setDescription('Confirmation expired')
             .setTimestamp();
 
-          await fixMsg.edit({ embeds: [timeoutEmbed], components: [disabledFixRow] }).catch(() => {});
+          await errorHandler.safeEdit(fixMsg, { embeds: [timeoutEmbed], components: [disabledFixRow] }, 'fix points confirmation timeout');
         }
       });
       break;
@@ -3841,7 +3841,7 @@ module.exports = {
     if (!member) return;
 
     if (p.userId !== user.id) {
-      await reaction.users.remove(user.id).catch(() => {});
+      await reaction.users.remove(user.id).catch(err => errorHandler.silentError(err, 'remove unauthorized user reaction'));
       return;
     }
 
@@ -3856,8 +3856,8 @@ module.exports = {
         await reaction.message.channel.send(
           `❌ <@${user.id}> Auction no longer active`
         );
-        await reaction.message.reactions.removeAll().catch(() => {});
-        await reaction.message.delete().catch(() => {});
+        await errorHandler.safeRemoveReactions(reaction.message, 'auctioneering inactive auction cleanup');
+        await errorHandler.safeDelete(reaction.message, 'auctioneering inactive auction cleanup');
         delete st.pc[reaction.message.id];
         save();
         return;
@@ -3867,8 +3867,8 @@ module.exports = {
         await reaction.message.channel.send(
           `❌ <@${user.id}> Bid invalid. Current: ${currentItem.curBid}pts`
         );
-        await reaction.message.reactions.removeAll().catch(() => {});
-        await reaction.message.delete().catch(() => {});
+        await errorHandler.safeRemoveReactions(reaction.message, 'auctioneering invalid bid cleanup');
+        await errorHandler.safeDelete(reaction.message, 'auctioneering invalid bid cleanup');
         delete st.pc[reaction.message.id];
         save();
         return;
@@ -3902,8 +3902,8 @@ module.exports = {
               ),
           ],
         });
-        await reaction.message.reactions.removeAll().catch(() => {});
-        await reaction.message.delete().catch(() => {});
+        await errorHandler.safeRemoveReactions(reaction.message, 'auctioneering higher bid pending cleanup');
+        await errorHandler.safeDelete(reaction.message, 'auctioneering higher bid pending cleanup');
         delete st.pc[reaction.message.id];
         save();
         return;
@@ -4021,7 +4021,7 @@ module.exports = {
             }),
         ],
       }, 'message edit');
-      await reaction.message.reactions.removeAll().catch(() => {});
+      await errorHandler.safeRemoveReactions(reaction.message, 'auctioneering bid confirmation cleanup');
 
       await reaction.message.channel.send({
         embeds: [
@@ -4040,7 +4040,7 @@ module.exports = {
       });
 
       setTimeout(
-        async () => await reaction.message.delete().catch(() => {}),
+        async () => await errorHandler.safeDelete(reaction.message, 'auctioneering bid confirmation delayed delete'),
         5000
       );
       if (p.origMsgId) {
@@ -4067,8 +4067,8 @@ module.exports = {
       await reaction.message.channel.send(
         `❌ <@${user.id}> Auction no longer active`
       );
-      await reaction.message.reactions.removeAll().catch(() => {});
-      await reaction.message.delete().catch(() => {});
+      await errorHandler.safeRemoveReactions(reaction.message, 'auction inactive cleanup');
+      await errorHandler.safeDelete(reaction.message, 'auction inactive cleanup');
       delete st.pc[reaction.message.id];
       save();
 
@@ -4085,8 +4085,8 @@ module.exports = {
       await reaction.message.channel.send(
         `❌ <@${user.id}> Bid invalid. Current: ${a.curBid}pts`
       );
-      await reaction.message.reactions.removeAll().catch(() => {});
-      await reaction.message.delete().catch(() => {});
+      await errorHandler.safeRemoveReactions(reaction.message, 'auction invalid bid cleanup');
+      await errorHandler.safeDelete(reaction.message, 'auction invalid bid cleanup');
       delete st.pc[reaction.message.id];
       save();
 
@@ -4127,8 +4127,8 @@ module.exports = {
             ),
         ],
       });
-      await reaction.message.reactions.removeAll().catch(() => {});
-      await reaction.message.delete().catch(() => {});
+      await errorHandler.safeRemoveReactions(reaction.message, 'auction higher bid pending cleanup');
+      await errorHandler.safeDelete(reaction.message, 'auction higher bid pending cleanup');
       delete st.pc[reaction.message.id];
       save();
 
@@ -4241,7 +4241,7 @@ module.exports = {
           }),
       ],
     }, 'message edit');
-    await reaction.message.reactions.removeAll().catch(() => {});
+    await errorHandler.safeRemoveReactions(reaction.message, 'bid confirmation cleanup');
 
     await reaction.message.channel.send({
       embeds: [
@@ -4260,7 +4260,7 @@ module.exports = {
     });
 
     setTimeout(
-      async () => await reaction.message.delete().catch(() => {}),
+      async () => await errorHandler.safeDelete(reaction.message, 'bid confirmation delayed delete'),
       5000
     );
     if (p.origMsgId) {
@@ -4319,7 +4319,7 @@ module.exports = {
       isAdm = isAdmFunc(member, config);
 
     if (!isOwner && !isAdm) {
-      await reaction.users.remove(user.id).catch(() => {});
+      await reaction.users.remove(user.id).catch(err => errorHandler.silentError(err, 'remove unauthorized cancel reaction'));
       return;
     }
 
@@ -4331,9 +4331,9 @@ module.exports = {
           .setDescription("Not placed"),
       ],
     }, 'message edit');
-    await reaction.message.reactions.removeAll().catch(() => {});
+    await errorHandler.safeRemoveReactions(reaction.message, 'cancel bid cleanup');
     setTimeout(
-      async () => await reaction.message.delete().catch(() => {}),
+      async () => await errorHandler.safeDelete(reaction.message, 'cancel bid delayed delete'),
       3000
     );
 

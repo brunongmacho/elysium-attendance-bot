@@ -59,6 +59,7 @@ const { SheetAPI } = require('./utils/sheet-api');
 const bossRotation = require('./boss-rotation.js');
 const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images');
 const { addGuildFooter } = require('./utils/embed-branding');
+const errorHandler = require('./utils/error-handler');
 const {
   getCurrentTimestamp,
   getSundayOfWeek,
@@ -1381,11 +1382,12 @@ async function checkAndAutoCloseThreads(client) {
           // Column already exists - skip submission but still clean up thread
           console.log(`   ⚠️ Column already exists for ${spawnInfo.boss} at ${spawnInfo.timestamp}, skipping submission`);
 
-          await thread.send(
+          await errorHandler.safeSend(thread,
             `⏰ **AUTO-CLOSED (${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes elapsed)**\n\n` +
             `Attendance already submitted for this spawn.\n` +
-            `Thread will be archived now.`
-          ).catch(() => {});
+            `Thread will be archived now.`,
+            'auto-close duplicate notification'
+          );
 
           // Clean up reactions
           await cleanupAllThreadReactions(thread);
@@ -1396,17 +1398,18 @@ async function checkAndAutoCloseThreads(client) {
               .fetch(spawnInfo.confirmThreadId)
               .catch(() => null);
             if (confirmThread) {
-              await confirmThread.send(
+              await errorHandler.safeSend(confirmThread,
                 `⏰ **AUTO-CLOSED**: ${spawnInfo.boss} (${spawnInfo.timestamp})\n` +
-                `Attendance already submitted (duplicate prevented)`
-              ).catch(() => {});
-              await confirmThread.delete().catch(() => {});
+                `Attendance already submitted (duplicate prevented)`,
+                'auto-close duplicate confirm notification'
+              );
+              await errorHandler.safeDelete(confirmThread, 'delete confirm thread duplicate');
             }
           }
 
           // Lock and archive the thread to prevent spam
-          await thread.setLocked(true, "Auto-locked - duplicate prevented").catch(() => {});
-          await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - duplicate prevented`).catch(() => {});
+          await thread.setLocked(true, "Auto-locked - duplicate prevented").catch(err => errorHandler.silentError(err, 'lock thread duplicate'));
+          await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - duplicate prevented`).catch(err => errorHandler.silentError(err, 'archive thread duplicate'));
 
           // Clean up state
           delete activeSpawns[threadId];
@@ -1441,17 +1444,18 @@ async function checkAndAutoCloseThreads(client) {
                 .fetch(spawnInfo.confirmThreadId)
                 .catch(() => null);
               if (confirmThread) {
-                await confirmThread.send(
+                await errorHandler.safeSend(confirmThread,
                   `⏰ **AUTO-CLOSED**: ${spawnInfo.boss} (${spawnInfo.timestamp})\n` +
-                  `0 members (no submission - thread closed without data)`
-                ).catch(() => {});
-                await confirmThread.delete().catch(() => {});
+                  `0 members (no submission - thread closed without data)`,
+                  'auto-close no members confirm notification'
+                );
+                await errorHandler.safeDelete(confirmThread, 'delete confirm thread no members');
               }
             }
 
             // Lock and archive the thread
-            await thread.setLocked(true, `Auto-locked after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - no members`).catch(() => {});
-            await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - no members`).catch(() => {});
+            await thread.setLocked(true, `Auto-locked after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - no members`).catch(err => errorHandler.silentError(err, 'lock thread no members'));
+            await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - no members`).catch(err => errorHandler.silentError(err, 'archive thread no members'));
 
             // Clean up state
             delete activeSpawns[threadId];
@@ -1480,9 +1484,10 @@ async function checkAndAutoCloseThreads(client) {
                 membersCount: spawnInfo.members ? spawnInfo.members.length : 'MISSING'
               });
 
-              await thread.send(
-                `⚠️ **Error**: Cannot submit attendance due to missing data. Please contact an admin.`
-              ).catch(() => {});
+              await errorHandler.safeSend(thread,
+                `⚠️ **Error**: Cannot submit attendance due to missing data. Please contact an admin.`,
+                'auto-close invalid data notification'
+              );
 
               // Clean up and skip
               delete activeSpawns[threadId];
@@ -1509,10 +1514,11 @@ async function checkAndAutoCloseThreads(client) {
             // Auto-increment boss rotation if it's a rotating boss
             await bossRotation.handleBossKill(spawnInfo.boss);
 
-            await thread.send(
+            await errorHandler.safeSend(thread,
               `✅ Attendance submitted! (${spawnInfo.members.length} members)\n` +
-              `Thread will be archived now.`
-            ).catch(() => {});
+              `Thread will be archived now.`,
+              'auto-close success notification'
+            );
 
             // Clean up reactions
             await cleanupAllThreadReactions(thread);
@@ -1523,17 +1529,18 @@ async function checkAndAutoCloseThreads(client) {
                 .fetch(spawnInfo.confirmThreadId)
                 .catch(() => null);
               if (confirmThread) {
-                await confirmThread.send(
+                await errorHandler.safeSend(confirmThread,
                   `⏰ **AUTO-CLOSED**: ${spawnInfo.boss} (${spawnInfo.timestamp})\n` +
-                  `${spawnInfo.members.length} members submitted after ${TIMING.THREAD_AUTO_CLOSE_MINUTES}-minute window`
-                ).catch(() => {});
-                await confirmThread.delete().catch(() => {});
+                  `${spawnInfo.members.length} members submitted after ${TIMING.THREAD_AUTO_CLOSE_MINUTES}-minute window`,
+                  'auto-close success confirm notification'
+                );
+                await errorHandler.safeDelete(confirmThread, 'delete confirm thread success');
               }
             }
 
             // Lock and archive the thread to prevent spam
-            await thread.setLocked(true, `Auto-locked after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes`).catch(() => {});
-            await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes`).catch(() => {});
+            await thread.setLocked(true, `Auto-locked after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes`).catch(err => errorHandler.silentError(err, 'lock thread success'));
+            await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes`).catch(err => errorHandler.silentError(err, 'archive thread success'));
 
             // Clean up state
             delete activeSpawns[threadId];
@@ -1548,13 +1555,14 @@ async function checkAndAutoCloseThreads(client) {
           } else {
             console.log(`   ❌ Failed to submit attendance: ${resp.text || resp.err}`);
 
-            await thread.send(
+            await errorHandler.safeSend(thread,
               `⚠️ **AUTO-CLOSE FAILED**\n\n` +
               `Could not submit to Google Sheets.\n` +
               `Error: ${resp.text || resp.err}\n\n` +
               `**Members (${spawnInfo.members.length}):** ${spawnInfo.members.join(", ")}\n\n` +
-              `Please manually update the sheet.`
-            ).catch(() => {});
+              `Please manually update the sheet.`,
+              'auto-close failure notification'
+            );
 
             // Don't delete state if submission failed, so admin can retry
           }

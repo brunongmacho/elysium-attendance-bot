@@ -307,7 +307,7 @@ async function forceCloseAllAttendance(message) {
       await conf.edit({
         embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })],
         components: [disabledRow]
-      }).catch(() => {});
+      }).catch(errorHandler.safeCatch('emergency closeall timeout edit'));
     }
   });
 }
@@ -524,7 +524,7 @@ async function forceEndAuction(message) {
       await conf.edit({
         embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })],
         components: [disabledRow]
-      }).catch(() => {});
+      }).catch(errorHandler.safeCatch('emergency endauction timeout edit'));
     }
   });
 }
@@ -651,7 +651,7 @@ async function unlockAllPoints(message) {
       await conf.edit({
         embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })],
         components: [disabledRow]
-      }).catch(() => {});
+      }).catch(errorHandler.safeCatch('emergency unlock timeout edit'));
     }
   });
 }
@@ -792,7 +792,7 @@ async function clearPendingConfirmations(message) {
       await conf.edit({
         embeds: [EmbedBuilder.from(confirmEmbed).setFooter({ text: "Timed out" })],
         components: [disabledRow]
-      }).catch(() => {});
+      }).catch(errorHandler.safeCatch('emergency clearbids timeout edit'));
     }
   });
 }

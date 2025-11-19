@@ -86,6 +86,7 @@ const { normalizeUsername, findBossMatch } = require('./utils/common');    // Us
 const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images'); // Boss images utility
 const { addGuildFooter, addGuildThumbnail } = require('./utils/embed-branding'); // Guild branding utility
 const scheduler = require('./utils/maintenance-scheduler'); // Unified maintenance scheduler
+const timerRegistry = require('./utils/timer-registry'); // Centralized timer tracking
 const { IntelligenceEngine } = require('./intelligence-engine.js'); // AI/ML Intelligence Engine
 const { ProactiveIntelligence } = require('./proactive-intelligence.js'); // Proactive Monitoring
 const { NLPHandler } = require('./nlp-handler.js'); // Natural Language Processing
@@ -96,159 +97,15 @@ const activityHeatmap = require('./activity-heatmap.js'); // Activity Heatmap Sy
 const crashRecovery = require('./utils/crash-recovery.js'); // Crash Recovery System (state persistence)
 const { MLIntegration } = require('./ml-integration.js'); // ML Integration (spawn prediction + NLP enhancement)
 const memberLore = JSON.parse(fs.readFileSync("./member-lore.json")); // Member lore data
+const { COMMAND_ALIASES, resolveCommandAlias } = require('./config/command-aliases'); // Command alias mapping
 
-/**
- * Command alias mapping for shorthand commands.
- * Maps user-friendly shortcuts to canonical command names.
- *
- * @type {Object.<string, string>}
- * @constant
- *
- * @example
- * "!st" -> "!status"
- * "!b" -> "!bid"
- */
-const COMMAND_ALIASES = {
-  // Help commands
-  "!?": "!help",
-  "!commands": "!help",
-  "!cmds": "!help",
-  "!nm": "!newmember",
+// =====================================================================
+// SECTION 1B: COMMAND ALIASES (moved to config/command-aliases.js)
+// =====================================================================
+// The COMMAND_ALIASES constant has been extracted to ./config/command-aliases.js
+// for better maintainability. Import above provides access to both
+// COMMAND_ALIASES and resolveCommandAlias function.
 
-  // Fun commands
-  "!8ball": "!eightball",
-  "!8b": "!eightball",
-  "!magic": "!eightball",
-  "!sampal": "!slap",
-  "!hampas": "!slap",
-
-  // Member info commands
-  "!profile": "!stats",
-  "!stat": "!stats",
-  "!info": "!stats",
-  "!mystats": "!stats",
-
-  // Leaderboard commands
-  "!leadatt": "!leaderboardattendance",
-  "!leadbid": "!leaderboardbidding",
-  "!lbattendance": "!leaderboardattendance",
-  "!lba": "!leaderboardattendance",
-  "!lbbidding": "!leaderboardbidding",
-  "!lbb": "!leaderboardbidding",
-  "!leaderboard": "!leaderboards",  // FIX: Map singular to plural for NLP compatibility
-  "!lb": "!leaderboards",
-  "!week": "!weeklyreport",
-  "!weekly": "!weeklyreport",
-  "!month": "!monthlyreport",
-  "!monthly": "!monthlyreport",
-
-  // Activity heatmap commands
-  "!heatmap": "!activity",
-  "!activityheatmap": "!activity",
-  "!guildactivity": "!activity",
-
-  // Attendance commands (admin)
-  "!st": "!status",
-  "!attendancestatus": "!status",  // NLP: Map attendance status queries to general status
-  "!addth": "!addthread",
-  "!v": "!verify",
-  "!vall": "!verifyall",
-  "!resetpend": "!resetpending",
-  "!fs": "!forcesubmit",
-  "!fc": "!forceclose",
-  "!debug": "!debugthread",
-  "!closeall": "!closeallthread",
-  "!clear": "!clearstate",
-  "!maint": "!maintenance",
-
-  // Bidding commands (admin)
-  "!ql": "!queuelist",
-  "!queue": "!queuelist",
-  "!start": "!startauction",
-  "!auction": "!startauction",  // FIX: Add !auction alias
-  "!startauc": "!startauction",
-  "!resetb": "!resetbids",
-  "!forcesubmit": "!forcesubmitresults",
-  "!fixlocked": "!fixlockedpoints",
-  "!audit": "!auctionaudit",
-  "!resetauc": "!resetauction",
-  "!recover": "!recoverauction",
-
-  // Emergency commands (admin) - Standalone commands
-  "!emerg": "!emergency",
-  "!forceclosethread": "!forceclosethread",
-  "!fct": "!forceclosethread",
-  "!forcecloseallthreads": "!forcecloseallthreads",
-  "!fcat": "!forcecloseallthreads",
-  "!forceendauction": "!forceendauction",
-  "!fea": "!forceendauction",
-  "!unlockallpoints": "!unlockallpoints",
-  "!unlock": "!unlockallpoints",
-  "!clearallbids": "!clearallbids",
-  "!clearbids": "!clearallbids",
-  "!diagnostics": "!diagnostics",
-  "!diag": "!diagnostics",
-  "!forcesync": "!forcesync",
-  "!fsync": "!forcesync",
-  "!testmilestones": "!testmilestones",
-  "!tm": "!testmilestones",
-
-  // Intelligence engine commands (admin)
-  "!predict": "!predictprice",
-  "!suggestprice": "!predictprice",
-  "!suggestauction": "!analyzequeue",
-  "!aq": "!analyzequeue",
-  "!auctionqueue": "!analyzequeue",
-  "!bootstrap": "!bootstraplearning",
-  "!learnhistory": "!bootstraplearning",
-  "!engage": "!engagement",
-  "!analyze": "!engagement",  // FIX: Change from !analyzeengagement to !engagement (single member)
-  "!analyzeall": "!analyzeengagement",  // NEW: For all members analysis
-  "!guildanalyze": "!analyzeengagement",
-  "!anomaly": "!detectanomalies",
-  "!fraud": "!detectanomalies",
-  "!recommend": "!recommendations",
-  "!suggest": "!recommendations",
-  "!perf": "!performance",
-  "!nextspawn": "!predictspawn",
-  "!whennext": "!predictspawn",
-  "!spawntimer": "!predictspawn",
-  "!predatt": "!predictattendance",  // NEW: Short alias for predictattendance
-
-  // Member management commands (admin)
-  "!removemem": "!removemember",
-  "!rmmember": "!removemember",
-  "!delmember": "!removemember",
-
-  // Bidding commands (member)
-  "!b": "!bid",
-  "!bstatus": "!bidstatus",
-  "!bs": "!bidstatus",
-  "!pts": "!mypoints",
-  "!mypts": "!mypoints",
-  "!mp": "!mypoints",
-
-  // Auctioneering commands
-  "!auc-start": "!startauction",
-  "!begin-auction": "!startauction",
-  "!auc-pause": "!pause",
-  "!pauseauction": "!pause",  // FIX: Add !pauseauction alias
-  "!hold": "!pause",
-  "!auc-resume": "!resume",
-  "!resumeauction": "!resume",  // FIX: Add !resumeauction alias
-  "!continue": "!resume",
-  "!auc-stop": "!stop",
-  "!end-item": "!stop",
-  "!auc-extend": "!extend",
-  "!ext": "!extend",
-  "!auc-now": "!startauctionnow",
-
-  // Auction control commands
-  "!cancel": "!cancelitem",
-  "!cancelitem": "!cancelitem",
-  "!skip": "!skipitem",
-  "!skipitem": "!skipitem",
-};
 
 // =====================================================================
 // CONFIGURATION LOADING
@@ -718,24 +575,8 @@ async function moveQueueItemsToSheet(config, queueItems) {
   }
 }
 
-/**
- * Resolves command aliases to their canonical command names.
- *
- * Converts shorthand commands (e.g., "!b", "!st") to their full forms
- * (e.g., "!bid", "!status") using the COMMAND_ALIASES mapping.
- * If no alias exists, returns the command unchanged.
- *
- * @param {string} cmd - Command string to resolve
- * @returns {string} Canonical command name or original if no alias exists
- *
- * @example
- * resolveCommandAlias("!b") // Returns "!bid"
- * resolveCommandAlias("!help") // Returns "!help" (no alias)
- */
-function resolveCommandAlias(cmd) {
-  const lowerCmd = cmd.toLowerCase();
-  return COMMAND_ALIASES[lowerCmd] || lowerCmd;
-}
+// resolveCommandAlias function has been moved to ./config/command-aliases.js
+// It is imported at the top of this file.
 
 /**
  * Checks if a guild member has admin privileges.
@@ -927,7 +768,7 @@ async function cleanupBiddingChannel() {
                 // Must unarchive first, then lock, then re-archive
                 await thread
                   .setArchived(false, "Temporary unarchive for locking")
-                  .catch(() => {});
+                  .catch(err => errorHandler.silentError(err, 'thread unarchive for locking'));
 
                 // Small delay after unarchiving
                 await new Promise((resolve) => setTimeout(resolve, 300));
@@ -946,7 +787,7 @@ async function cleanupBiddingChannel() {
 
                 await thread
                   .setArchived(true, "Bidding channel cleanup")
-                  .catch(() => {});
+                  .catch(err => errorHandler.silentError(err, 'thread re-archive after locking'));
                 threadsLocked++;
                 console.log(`🔒 Locked archived: ${thread.name}`);
 
@@ -1689,7 +1530,7 @@ async function awaitConfirmation(
         collector.stop();
       } catch (err) {
         console.error(`❌ [BUTTON] Error handling button click: ${err.message}`);
-        await interaction.reply({ content: `❌ An error occurred: ${err.message}`, ephemeral: true }).catch(() => {});
+        await interaction.reply({ content: `❌ An error occurred: ${err.message}`, ephemeral: true }).catch(err => errorHandler.silentError(err, 'button error interaction reply'));
       }
     });
 
@@ -1715,8 +1556,8 @@ async function awaitConfirmation(
           disabledCancelButton
         );
 
-        await confirmMsg.edit({ components: [disabledRow] }).catch(() => {});
-        await message.reply("⏱️ Confirmation timed out.").catch(() => {});
+        await errorHandler.safeEdit(confirmMsg, { components: [disabledRow] }, 'confirmation timeout disable buttons');
+        await message.reply("⏱️ Confirmation timed out.").catch(err => errorHandler.silentError(err, 'confirmation timeout reply'));
       }
     });
   } catch (err) {
@@ -2478,7 +2319,7 @@ stats: async (message, member, args) => {
 
               const reactionPromises = fetchedMessages.map((result) => {
                 if (result.status === "fulfilled" && result.value) {
-                  return result.value.reactions.removeAll().catch(() => {});
+                  return result.value.reactions.removeAll().catch(err => errorHandler.silentError(err, 'auto-verify reaction cleanup'));
                 }
                 return Promise.resolve();
               });
@@ -2534,7 +2375,7 @@ stats: async (message, member, args) => {
                     .send(
                       `⚠️ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - 0 members (no submission)`
                     )
-                    .catch(() => {});
+                    .catch(err => errorHandler.silentError(err, 'confirm thread zero members notification'));
                   await errorHandler.safeDelete(confirmThread, 'message deletion');
                 }
               }
@@ -2558,7 +2399,7 @@ stats: async (message, member, args) => {
               // Archive the thread
               await thread
                 .setArchived(true, `Mass close by ${member.user.username}`)
-                .catch(() => {});
+                .catch(err => errorHandler.silentError(err, 'mass close archive empty thread'));
 
               // Clean up state
               delete activeSpawns[threadId];
@@ -2603,10 +2444,10 @@ stats: async (message, member, args) => {
 
                 await thread
                   .setLocked(true, `Mass locked by ${member.user.username} (duplicate prevented)`)
-                  .catch(() => {});
+                  .catch(err => errorHandler.silentError(err, 'mass close lock duplicate thread'));
                 await thread
                   .setArchived(true, `Mass close by ${member.user.username} (duplicate prevented)`)
-                  .catch(() => {});
+                  .catch(err => errorHandler.silentError(err, 'mass close archive duplicate thread'));
 
                 delete activeSpawns[threadId];
                 delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -2663,7 +2504,7 @@ stats: async (message, member, args) => {
                     .send(
                       `✅ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - ${spawnInfo.members.length} members recorded`
                     )
-                    .catch(() => {});
+                    .catch(err => errorHandler.silentError(err, 'confirm thread spawn closed notification'));
                   await errorHandler.safeDelete(confirmThread, 'message deletion');
                 }
               }
@@ -2685,7 +2526,7 @@ stats: async (message, member, args) => {
 
               await thread
                 .setArchived(true, `Mass close by ${member.user.username}`)
-                .catch(() => {});
+                .catch(err => errorHandler.silentError(err, 'mass close archive thread'));
 
               delete activeSpawns[threadId];
               delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -2727,7 +2568,7 @@ stats: async (message, member, args) => {
 
                 await thread
                   .setArchived(true, `Mass close by ${member.user.username}`)
-                  .catch(() => {});
+                  .catch(err => errorHandler.silentError(err, 'mass close archive thread after retry'));
 
                 delete activeSpawns[threadId];
                 delete activeColumns[
@@ -3229,7 +3070,7 @@ stats: async (message, member, args) => {
 
         const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
-        await confirmMsg.edit({ components: [disabledRow] }).catch(() => {});
+        await errorHandler.safeEdit(confirmMsg, { components: [disabledRow] }, 'auction reset confirmation timeout');
         await message.reply(`⏱️ Confirmation timeout - auction continues`);
       }
     });
@@ -3603,11 +3444,11 @@ stats: async (message, member, args) => {
       if (guildChatChannel) channels.push(`<#${guildChatChannel.id}>`);
 
       const channelList = channels.length > 0 ? channels.join(' and ') : 'target channels';
-      await statusMsg.edit({ content: `✅ Monthly report sent to ${channelList}!` }).catch(() => {});
+      await errorHandler.safeEdit(statusMsg, { content: `✅ Monthly report sent to ${channelList}!` }, 'monthly report status update');
       console.log(`✅ Monthly report command completed successfully`);
     } catch (error) {
       console.error(`❌ Error in monthlyreport command:`, error);
-      await message.reply(`❌ Error generating monthly report: ${error.message}`).catch(() => {});
+      await message.reply(`❌ Error generating monthly report: ${error.message}`).catch(err => errorHandler.silentError(err, 'monthly report error reply'));
     }
   },
 
@@ -3626,7 +3467,7 @@ stats: async (message, member, args) => {
       console.log(`✅ Activity heatmap command completed successfully`);
     } catch (error) {
       console.error(`❌ Error in activity command:`, error);
-      await message.reply(`❌ Error generating activity heatmap: ${error.message}`).catch(() => {});
+      await message.reply(`❌ Error generating activity heatmap: ${error.message}`).catch(err => errorHandler.silentError(err, 'activity heatmap error reply'));
     }
   },
 
@@ -5665,7 +5506,7 @@ client.on(Events.MessageCreate, async (message) => {
       if (!usedLearningSystem && nlpHandler) {
         const contextMessage = nlpHandler.getContextMessage(nlpInterpretation.command, message);
         if (contextMessage) {
-          await message.reply(contextMessage).catch(() => {});
+          await message.reply(contextMessage).catch(err => errorHandler.silentError(err, 'NLP context message reply'));
         }
       }
     } else {
@@ -5762,9 +5603,9 @@ client.on(Events.MessageCreate, async (message) => {
         // Delete both messages after 30 seconds
         setTimeout(async () => {
           if (redirectMsg) {
-            await redirectMsg.delete().catch(() => {});
+            await errorHandler.safeDelete(redirectMsg, 'mypoints redirect cleanup');
           }
-          await message.delete().catch(() => {});
+          await errorHandler.safeDelete(message, 'mypoints original message cleanup');
         }, 30000);
 
         return;
@@ -5793,9 +5634,9 @@ client.on(Events.MessageCreate, async (message) => {
         // Delete both messages after 30 seconds
         setTimeout(async () => {
           if (redirectMsg) {
-            await redirectMsg.delete().catch(() => {});
+            await errorHandler.safeDelete(redirectMsg, 'bidstatus redirect cleanup');
           }
-          await message.delete().catch(() => {});
+          await errorHandler.safeDelete(message, 'bidstatus original message cleanup');
         }, 30000);
 
         return;
@@ -5864,9 +5705,9 @@ client.on(Events.MessageCreate, async (message) => {
         // Delete both messages after 30 seconds
         setTimeout(async () => {
           if (redirectMsg) {
-            await redirectMsg.delete().catch(() => {});
+            await errorHandler.safeDelete(redirectMsg, 'help redirect cleanup');
           }
-          await message.delete().catch(() => {});
+          await errorHandler.safeDelete(message, 'help original message cleanup');
         }, 30000);
 
         return;
@@ -5903,9 +5744,9 @@ client.on(Events.MessageCreate, async (message) => {
         // Delete both messages after 30 seconds
         setTimeout(async () => {
           if (redirectMsg) {
-            await redirectMsg.delete().catch(() => {});
+            await errorHandler.safeDelete(redirectMsg, 'newmember redirect cleanup');
           }
-          await message.delete().catch(() => {});
+          await errorHandler.safeDelete(message, 'newmember original message cleanup');
         }, 30000);
 
         return;
@@ -5947,9 +5788,9 @@ client.on(Events.MessageCreate, async (message) => {
         // Delete both messages after 30 seconds
         setTimeout(async () => {
           if (redirectMsg) {
-            await redirectMsg.delete().catch(() => {});
+            await errorHandler.safeDelete(redirectMsg, 'leaderboard redirect cleanup');
           }
-          await message.delete().catch(() => {});
+          await errorHandler.safeDelete(message, 'leaderboard original message cleanup');
         }, 30000);
 
         return;
@@ -6019,9 +5860,9 @@ client.on(Events.MessageCreate, async (message) => {
         // Delete both messages after 30 seconds
         setTimeout(async () => {
           if (redirectMsg) {
-            await redirectMsg.delete().catch(() => {});
+            await errorHandler.safeDelete(redirectMsg, 'intelligence command redirect cleanup');
           }
-          await message.delete().catch(() => {});
+          await errorHandler.safeDelete(message, 'intelligence command original message cleanup');
         }, 30000);
 
         return;
@@ -6141,9 +5982,9 @@ client.on(Events.MessageCreate, async (message) => {
           // Delete both messages after 30 seconds
           setTimeout(async () => {
             if (redirectMsg) {
-              await redirectMsg.delete().catch(() => {});
+              await errorHandler.safeDelete(redirectMsg, 'NLP admin command redirect cleanup');
             }
-            await message.delete().catch(() => {});
+            await errorHandler.safeDelete(message, 'NLP admin command original message cleanup');
           }, 30000);
 
           return;
@@ -6422,7 +6263,7 @@ client.on(Events.MessageCreate, async (message) => {
                   .fetch(pending.verificationMsgId)
                   .catch(() => null);
                 if (verificationMsg && verificationMsg.components.length > 0) {
-                  await verificationMsg.edit({ components: [] }).catch(() => {});
+                  await errorHandler.safeEdit(verificationMsg, { components: [] }, 'verify all disable buttons');
                 }
               }
 
@@ -6510,7 +6351,7 @@ client.on(Events.MessageCreate, async (message) => {
               .fetch(pending.verificationMsgId)
               .catch(() => null);
             if (verificationMsg && verificationMsg.components.length > 0) {
-              await verificationMsg.edit({ components: [] }).catch(() => {});
+              await errorHandler.safeEdit(verificationMsg, { components: [] }, 'manual verify disable buttons');
             }
           }
           delete pendingVerifications[msgId];
@@ -6803,9 +6644,9 @@ client.on(Events.MessageCreate, async (message) => {
           // Delete both messages after 30 seconds
           setTimeout(async () => {
             if (redirectMsg) {
-              await redirectMsg.delete().catch(() => {});
+              await errorHandler.safeDelete(redirectMsg, 'member command redirect cleanup');
             }
-            await message.delete().catch(() => {});
+            await errorHandler.safeDelete(message, 'member command original message cleanup');
           }, 30000);
 
           return;
@@ -7309,10 +7150,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
           // Lock and archive the thread
           await interaction.channel
             .setLocked(true, `Locked by ${user.username} (duplicate prevented)`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'button close lock duplicate thread'));
           await interaction.channel
             .setArchived(true, `Closed by ${user.username} (duplicate prevented)`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'button close archive duplicate thread'));
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7367,10 +7208,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
           // Lock and archive the thread
           await interaction.channel
             .setLocked(true, `Locked by ${user.username}`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'button close lock thread'));
           await interaction.channel
             .setArchived(true, `Closed by ${user.username}`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'button close archive thread'));
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7404,7 +7245,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   } catch (err) {
     console.error("❌ Button interaction error:", err);
     if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: '⚠️ An error occurred processing your request.', ephemeral: true }).catch(() => {});
+      await interaction.reply({ content: '⚠️ An error occurred processing your request.', ephemeral: true }).catch(err => errorHandler.silentError(err, 'button interaction error reply'));
     }
   }
 });
@@ -7483,7 +7324,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
           await reaction.users.remove(user.id);
           await msg.channel
             .send(`⚠️ <@${user.id}>, this spawn is closed. Reaction removed.`)
-            .then((m) => setTimeout(() => m.delete().catch(() => {}), 5000));
+            .then((m) => setTimeout(() => errorHandler.safeDelete(m, 'closed spawn warning cleanup'), 5000));
         } catch (err) {
           console.error(
             `❌ Failed to send/delete closed spawn message:`,
@@ -7639,10 +7480,10 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 
           await msg.channel
             .setLocked(true, `Locked by ${user.username} (duplicate prevented)`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'reaction close lock duplicate thread'));
           await msg.channel
             .setArchived(true, `Closed by ${user.username} (duplicate prevented)`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'reaction close archive duplicate thread'));
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7698,10 +7539,10 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
           // Lock and archive the thread to prevent spam
           await msg.channel
             .setLocked(true, `Locked by ${user.username}`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'reaction close lock thread'));
           await msg.channel
             .setArchived(true, `Closed by ${user.username}`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'reaction close archive thread'));
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7788,7 +7629,9 @@ process.on("uncaughtException", (error) => {
 
 process.on("SIGTERM", () => {
   console.log("🛑 SIGTERM received, shutting down gracefully...");
-  stopBiddingChannelCleanupSchedule(); // ← ADD THIS
+  stopBiddingChannelCleanupSchedule();
+  scheduler.stopScheduler(); // Stop maintenance scheduler
+  timerRegistry.clearAllTimers(); // Clear all tracked timers
   server.close(() => {
     console.log("🌐 HTTP server closed");
     client.destroy();
@@ -7798,7 +7641,9 @@ process.on("SIGTERM", () => {
 
 process.on("SIGINT", () => {
   console.log("🛑 SIGINT received, shutting down gracefully...");
-  stopBiddingChannelCleanupSchedule(); // ← ADD THIS
+  stopBiddingChannelCleanupSchedule();
+  scheduler.stopScheduler(); // Stop maintenance scheduler
+  timerRegistry.clearAllTimers(); // Clear all tracked timers
   server.close(() => {
     console.log("🌐 HTTP server closed");
     client.destroy();
