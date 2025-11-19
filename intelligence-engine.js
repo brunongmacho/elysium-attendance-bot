@@ -176,8 +176,9 @@ class IntelligenceEngine {
       // Cache the result
       this.apiCallCache.set(cacheKey, { data: result, timestamp: now });
 
-      // Cleanup old cache entries (prevent memory leak)
-      if (this.apiCallCache.size > 50) {
+      // Aggressive cleanup to reduce memory pressure
+      // Clean up expired entries when cache reaches 20 items
+      if (this.apiCallCache.size > 20) {
         const entriesToDelete = [];
         for (const [key, value] of this.apiCallCache.entries()) {
           if (now - value.timestamp > this.apiCacheTTL) {
@@ -185,6 +186,26 @@ class IntelligenceEngine {
           }
         }
         entriesToDelete.forEach(key => this.apiCallCache.delete(key));
+
+        // If still over limit, delete oldest entries
+        if (this.apiCallCache.size > 20) {
+          const entries = [...this.apiCallCache.entries()]
+            .sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
+          const toDelete = entries.slice(0, this.apiCallCache.size - 20);
+          toDelete.forEach(([key]) => this.apiCallCache.delete(key));
+        }
+      }
+
+      // Also cleanup boss prediction cache if too large
+      if (this.bossPredictionCache.size > 30) {
+        const entriesToDelete = [];
+        for (const [key, value] of this.bossPredictionCache.entries()) {
+          const ttl = value.ttl || 300000; // Default 5 min
+          if (now - value.timestamp > ttl) {
+            entriesToDelete.push(key);
+          }
+        }
+        entriesToDelete.forEach(key => this.bossPredictionCache.delete(key));
       }
 
       return result;
@@ -2413,6 +2434,107 @@ class IntelligenceEngine {
     }
 
     return 'other';
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // MEMORY MANAGEMENT
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Clear caches to reduce memory pressure.
+   * Called when system detects high memory usage.
+   * @param {boolean} aggressive - If true, clear all caches; if false, only expired entries
+   */
+  clearCaches(aggressive = false) {
+    const now = Date.now();
+    let cleared = 0;
+
+    if (aggressive) {
+      // Clear all caches completely
+      cleared += this.apiCallCache.size;
+      this.apiCallCache.clear();
+
+      cleared += this.bossPredictionCache.size;
+      this.bossPredictionCache.clear();
+
+      // Reset spawn prediction cache
+      this.spawnPredictionCache.predictions = null;
+      this.spawnPredictionCache.timestamp = 0;
+      cleared++;
+
+      // Clear historical data arrays
+      this.auctionHistory = [];
+      this.attendanceHistory = [];
+      this.anomalyLog = [];
+
+      // Trim performance metrics
+      this.performanceMetrics.memoryUsage = this.performanceMetrics.memoryUsage.slice(-10);
+      this.performanceMetrics.apiLatency = this.performanceMetrics.apiLatency.slice(-10);
+
+      console.log(`🧹 [INTELLIGENCE] Aggressively cleared ${cleared} cache entries`);
+    } else {
+      // Clear only expired entries
+      // API call cache
+      for (const [key, value] of this.apiCallCache.entries()) {
+        if (now - value.timestamp > this.apiCacheTTL) {
+          this.apiCallCache.delete(key);
+          cleared++;
+        }
+      }
+
+      // Boss prediction cache
+      for (const [key, value] of this.bossPredictionCache.entries()) {
+        const ttl = value.ttl || 300000; // Default 5 min
+        if (now - value.timestamp > ttl) {
+          this.bossPredictionCache.delete(key);
+          cleared++;
+        }
+      }
+
+      // Spawn prediction cache
+      if (this.spawnPredictionCache.predictions &&
+          now - this.spawnPredictionCache.timestamp > this.spawnPredictionCache.ttl) {
+        this.spawnPredictionCache.predictions = null;
+        this.spawnPredictionCache.timestamp = 0;
+        cleared++;
+      }
+
+      // Trim old anomaly logs (keep last 100)
+      if (this.anomalyLog.length > 100) {
+        this.anomalyLog = this.anomalyLog.slice(-100);
+      }
+
+      // Trim performance metrics (keep last 50)
+      if (this.performanceMetrics.memoryUsage.length > 50) {
+        this.performanceMetrics.memoryUsage = this.performanceMetrics.memoryUsage.slice(-50);
+      }
+      if (this.performanceMetrics.apiLatency.length > 50) {
+        this.performanceMetrics.apiLatency = this.performanceMetrics.apiLatency.slice(-50);
+      }
+
+      if (cleared > 0) {
+        console.log(`🧹 [INTELLIGENCE] Cleared ${cleared} expired cache entries`);
+      }
+    }
+
+    return cleared;
+  }
+
+  /**
+   * Get cache statistics for monitoring.
+   * @returns {Object} Cache statistics
+   */
+  getCacheStats() {
+    return {
+      apiCallCache: this.apiCallCache.size,
+      bossPredictionCache: this.bossPredictionCache.size,
+      spawnPredictionCached: this.spawnPredictionCache.predictions !== null,
+      auctionHistory: this.auctionHistory.length,
+      attendanceHistory: this.attendanceHistory.length,
+      anomalyLog: this.anomalyLog.length,
+      memoryUsageHistory: this.performanceMetrics.memoryUsage.length,
+      apiLatencyHistory: this.performanceMetrics.apiLatency.length,
+    };
   }
 }
 

@@ -5122,6 +5122,12 @@ client.once(Events.ClientReady, async () => {
           lastMemoryWarning = now;
         }
 
+        // Clear caches before GC to free memory
+        if (intelligenceEngine) {
+          // Use aggressive clearing for very high pressure (>90%)
+          intelligenceEngine.clearCaches(memoryPressure > 90);
+        }
+
         global.gc();
         global.gc(); // Second pass for aggressive collection
       }
