@@ -121,7 +121,7 @@ class IntelligenceEngine {
 
     // Per-boss prediction cache (prevents spam when checking rotation bosses every 5 min)
     this.bossPredictionCache = new Map(); // Map<bossName, {prediction, timestamp, ttl}>
-    this.maxBossCacheSize = 30;         // Max boss cache entries (sized for boss timer feature)
+    this.maxBossCacheSize = 40;         // Max boss cache entries (33 bosses + buffer)
 
     // Boss spawn configuration (timer and schedule-based spawns)
     this.bossSpawnConfig = this.loadBossSpawnConfig();
