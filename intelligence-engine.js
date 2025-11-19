@@ -98,10 +98,10 @@ class IntelligenceEngine {
     this.anomalyLog = [];               // Detected anomalies
 
     // API call cache to prevent duplicate concurrent calls (reduces timeouts)
-    // Optimized for 512MB Koyeb instance - shorter TTL, smaller cache
+    // Optimized for 512MB Koyeb - smaller cache but long TTL to reduce API calls
     this.apiCallCache = new Map();      // { endpoint: { data, timestamp, promise } }
-    this.apiCacheTTL = 30000;           // 30 second cache TTL (reduced from 60s for memory)
-    this.maxCacheSize = 10;             // Max cache entries (reduced from 20 for 512MB RAM)
+    this.apiCacheTTL = 60000;           // 60 second cache TTL (keep long to reduce API calls)
+    this.maxCacheSize = 10;             // Max cache entries (reduced for 512MB RAM)
 
     // ML models (simple statistical models)
     this.priceModel = null;
@@ -111,12 +111,12 @@ class IntelligenceEngine {
     this.learningSystem = new LearningSystem(config, sheetAPIInstance);
 
     // Spawn prediction cache (reduces redundant calculations and API calls)
-    // Optimized for 512MB - shorter TTL
+    // Keep long TTL to reduce API calls
     this.spawnPredictionCache = {
       predictions: null,           // Cached predictions for all bosses
       spawnCount: 0,              // Number of spawns when predictions were made
       timestamp: 0,               // When predictions were cached
-      ttl: 15 * 60 * 1000,        // 15-minute cache TTL (reduced from 30 min for memory)
+      ttl: 30 * 60 * 1000,        // 30-minute cache TTL (keep long to reduce API calls)
     };
 
     // Per-boss prediction cache (prevents spam when checking rotation bosses every 5 min)
