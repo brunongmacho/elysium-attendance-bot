@@ -927,7 +927,7 @@ async function cleanupBiddingChannel() {
                 // Must unarchive first, then lock, then re-archive
                 await thread
                   .setArchived(false, "Temporary unarchive for locking")
-                  .catch(() => {});
+                  .catch(err => errorHandler.silentError(err, 'thread unarchive for locking'));
 
                 // Small delay after unarchiving
                 await new Promise((resolve) => setTimeout(resolve, 300));
@@ -946,7 +946,7 @@ async function cleanupBiddingChannel() {
 
                 await thread
                   .setArchived(true, "Bidding channel cleanup")
-                  .catch(() => {});
+                  .catch(err => errorHandler.silentError(err, 'thread re-archive after locking'));
                 threadsLocked++;
                 console.log(`🔒 Locked archived: ${thread.name}`);
 
@@ -1689,7 +1689,7 @@ async function awaitConfirmation(
         collector.stop();
       } catch (err) {
         console.error(`❌ [BUTTON] Error handling button click: ${err.message}`);
-        await interaction.reply({ content: `❌ An error occurred: ${err.message}`, ephemeral: true }).catch(() => {});
+        await interaction.reply({ content: `❌ An error occurred: ${err.message}`, ephemeral: true }).catch(err => errorHandler.silentError(err, 'button error interaction reply'));
       }
     });
 
@@ -1715,8 +1715,8 @@ async function awaitConfirmation(
           disabledCancelButton
         );
 
-        await confirmMsg.edit({ components: [disabledRow] }).catch(() => {});
-        await message.reply("⏱️ Confirmation timed out.").catch(() => {});
+        await errorHandler.safeEdit(confirmMsg, { components: [disabledRow] }, 'confirmation timeout disable buttons');
+        await message.reply("⏱️ Confirmation timed out.").catch(err => errorHandler.silentError(err, 'confirmation timeout reply'));
       }
     });
   } catch (err) {
@@ -2478,7 +2478,7 @@ stats: async (message, member, args) => {
 
               const reactionPromises = fetchedMessages.map((result) => {
                 if (result.status === "fulfilled" && result.value) {
-                  return result.value.reactions.removeAll().catch(() => {});
+                  return result.value.reactions.removeAll().catch(err => errorHandler.silentError(err, 'auto-verify reaction cleanup'));
                 }
                 return Promise.resolve();
               });
@@ -2534,7 +2534,7 @@ stats: async (message, member, args) => {
                     .send(
                       `⚠️ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - 0 members (no submission)`
                     )
-                    .catch(() => {});
+                    .catch(err => errorHandler.silentError(err, 'confirm thread zero members notification'));
                   await errorHandler.safeDelete(confirmThread, 'message deletion');
                 }
               }
@@ -2558,7 +2558,7 @@ stats: async (message, member, args) => {
               // Archive the thread
               await thread
                 .setArchived(true, `Mass close by ${member.user.username}`)
-                .catch(() => {});
+                .catch(err => errorHandler.silentError(err, 'mass close archive empty thread'));
 
               // Clean up state
               delete activeSpawns[threadId];
@@ -2603,10 +2603,10 @@ stats: async (message, member, args) => {
 
                 await thread
                   .setLocked(true, `Mass locked by ${member.user.username} (duplicate prevented)`)
-                  .catch(() => {});
+                  .catch(err => errorHandler.silentError(err, 'mass close lock duplicate thread'));
                 await thread
                   .setArchived(true, `Mass close by ${member.user.username} (duplicate prevented)`)
-                  .catch(() => {});
+                  .catch(err => errorHandler.silentError(err, 'mass close archive duplicate thread'));
 
                 delete activeSpawns[threadId];
                 delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -2663,7 +2663,7 @@ stats: async (message, member, args) => {
                     .send(
                       `✅ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - ${spawnInfo.members.length} members recorded`
                     )
-                    .catch(() => {});
+                    .catch(err => errorHandler.silentError(err, 'confirm thread spawn closed notification'));
                   await errorHandler.safeDelete(confirmThread, 'message deletion');
                 }
               }
@@ -2685,7 +2685,7 @@ stats: async (message, member, args) => {
 
               await thread
                 .setArchived(true, `Mass close by ${member.user.username}`)
-                .catch(() => {});
+                .catch(err => errorHandler.silentError(err, 'mass close archive thread'));
 
               delete activeSpawns[threadId];
               delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -2727,7 +2727,7 @@ stats: async (message, member, args) => {
 
                 await thread
                   .setArchived(true, `Mass close by ${member.user.username}`)
-                  .catch(() => {});
+                  .catch(err => errorHandler.silentError(err, 'mass close archive thread after retry'));
 
                 delete activeSpawns[threadId];
                 delete activeColumns[
@@ -3229,7 +3229,7 @@ stats: async (message, member, args) => {
 
         const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
-        await confirmMsg.edit({ components: [disabledRow] }).catch(() => {});
+        await errorHandler.safeEdit(confirmMsg, { components: [disabledRow] }, 'auction reset confirmation timeout');
         await message.reply(`⏱️ Confirmation timeout - auction continues`);
       }
     });
@@ -3603,11 +3603,11 @@ stats: async (message, member, args) => {
       if (guildChatChannel) channels.push(`<#${guildChatChannel.id}>`);
 
       const channelList = channels.length > 0 ? channels.join(' and ') : 'target channels';
-      await statusMsg.edit({ content: `✅ Monthly report sent to ${channelList}!` }).catch(() => {});
+      await errorHandler.safeEdit(statusMsg, { content: `✅ Monthly report sent to ${channelList}!` }, 'monthly report status update');
       console.log(`✅ Monthly report command completed successfully`);
     } catch (error) {
       console.error(`❌ Error in monthlyreport command:`, error);
-      await message.reply(`❌ Error generating monthly report: ${error.message}`).catch(() => {});
+      await message.reply(`❌ Error generating monthly report: ${error.message}`).catch(err => errorHandler.silentError(err, 'monthly report error reply'));
     }
   },
 
@@ -3626,7 +3626,7 @@ stats: async (message, member, args) => {
       console.log(`✅ Activity heatmap command completed successfully`);
     } catch (error) {
       console.error(`❌ Error in activity command:`, error);
-      await message.reply(`❌ Error generating activity heatmap: ${error.message}`).catch(() => {});
+      await message.reply(`❌ Error generating activity heatmap: ${error.message}`).catch(err => errorHandler.silentError(err, 'activity heatmap error reply'));
     }
   },
 
@@ -5665,7 +5665,7 @@ client.on(Events.MessageCreate, async (message) => {
       if (!usedLearningSystem && nlpHandler) {
         const contextMessage = nlpHandler.getContextMessage(nlpInterpretation.command, message);
         if (contextMessage) {
-          await message.reply(contextMessage).catch(() => {});
+          await message.reply(contextMessage).catch(err => errorHandler.silentError(err, 'NLP context message reply'));
         }
       }
     } else {
@@ -5762,9 +5762,9 @@ client.on(Events.MessageCreate, async (message) => {
         // Delete both messages after 30 seconds
         setTimeout(async () => {
           if (redirectMsg) {
-            await redirectMsg.delete().catch(() => {});
+            await errorHandler.safeDelete(redirectMsg, 'mypoints redirect cleanup');
           }
-          await message.delete().catch(() => {});
+          await errorHandler.safeDelete(message, 'mypoints original message cleanup');
         }, 30000);
 
         return;
@@ -5793,9 +5793,9 @@ client.on(Events.MessageCreate, async (message) => {
         // Delete both messages after 30 seconds
         setTimeout(async () => {
           if (redirectMsg) {
-            await redirectMsg.delete().catch(() => {});
+            await errorHandler.safeDelete(redirectMsg, 'bidstatus redirect cleanup');
           }
-          await message.delete().catch(() => {});
+          await errorHandler.safeDelete(message, 'bidstatus original message cleanup');
         }, 30000);
 
         return;
@@ -5864,9 +5864,9 @@ client.on(Events.MessageCreate, async (message) => {
         // Delete both messages after 30 seconds
         setTimeout(async () => {
           if (redirectMsg) {
-            await redirectMsg.delete().catch(() => {});
+            await errorHandler.safeDelete(redirectMsg, 'help redirect cleanup');
           }
-          await message.delete().catch(() => {});
+          await errorHandler.safeDelete(message, 'help original message cleanup');
         }, 30000);
 
         return;
@@ -5903,9 +5903,9 @@ client.on(Events.MessageCreate, async (message) => {
         // Delete both messages after 30 seconds
         setTimeout(async () => {
           if (redirectMsg) {
-            await redirectMsg.delete().catch(() => {});
+            await errorHandler.safeDelete(redirectMsg, 'newmember redirect cleanup');
           }
-          await message.delete().catch(() => {});
+          await errorHandler.safeDelete(message, 'newmember original message cleanup');
         }, 30000);
 
         return;
@@ -5947,9 +5947,9 @@ client.on(Events.MessageCreate, async (message) => {
         // Delete both messages after 30 seconds
         setTimeout(async () => {
           if (redirectMsg) {
-            await redirectMsg.delete().catch(() => {});
+            await errorHandler.safeDelete(redirectMsg, 'leaderboard redirect cleanup');
           }
-          await message.delete().catch(() => {});
+          await errorHandler.safeDelete(message, 'leaderboard original message cleanup');
         }, 30000);
 
         return;
@@ -6019,9 +6019,9 @@ client.on(Events.MessageCreate, async (message) => {
         // Delete both messages after 30 seconds
         setTimeout(async () => {
           if (redirectMsg) {
-            await redirectMsg.delete().catch(() => {});
+            await errorHandler.safeDelete(redirectMsg, 'intelligence command redirect cleanup');
           }
-          await message.delete().catch(() => {});
+          await errorHandler.safeDelete(message, 'intelligence command original message cleanup');
         }, 30000);
 
         return;
@@ -6141,9 +6141,9 @@ client.on(Events.MessageCreate, async (message) => {
           // Delete both messages after 30 seconds
           setTimeout(async () => {
             if (redirectMsg) {
-              await redirectMsg.delete().catch(() => {});
+              await errorHandler.safeDelete(redirectMsg, 'NLP admin command redirect cleanup');
             }
-            await message.delete().catch(() => {});
+            await errorHandler.safeDelete(message, 'NLP admin command original message cleanup');
           }, 30000);
 
           return;
@@ -6422,7 +6422,7 @@ client.on(Events.MessageCreate, async (message) => {
                   .fetch(pending.verificationMsgId)
                   .catch(() => null);
                 if (verificationMsg && verificationMsg.components.length > 0) {
-                  await verificationMsg.edit({ components: [] }).catch(() => {});
+                  await errorHandler.safeEdit(verificationMsg, { components: [] }, 'verify all disable buttons');
                 }
               }
 
@@ -6510,7 +6510,7 @@ client.on(Events.MessageCreate, async (message) => {
               .fetch(pending.verificationMsgId)
               .catch(() => null);
             if (verificationMsg && verificationMsg.components.length > 0) {
-              await verificationMsg.edit({ components: [] }).catch(() => {});
+              await errorHandler.safeEdit(verificationMsg, { components: [] }, 'manual verify disable buttons');
             }
           }
           delete pendingVerifications[msgId];
@@ -6803,9 +6803,9 @@ client.on(Events.MessageCreate, async (message) => {
           // Delete both messages after 30 seconds
           setTimeout(async () => {
             if (redirectMsg) {
-              await redirectMsg.delete().catch(() => {});
+              await errorHandler.safeDelete(redirectMsg, 'member command redirect cleanup');
             }
-            await message.delete().catch(() => {});
+            await errorHandler.safeDelete(message, 'member command original message cleanup');
           }, 30000);
 
           return;
@@ -7309,10 +7309,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
           // Lock and archive the thread
           await interaction.channel
             .setLocked(true, `Locked by ${user.username} (duplicate prevented)`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'button close lock duplicate thread'));
           await interaction.channel
             .setArchived(true, `Closed by ${user.username} (duplicate prevented)`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'button close archive duplicate thread'));
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7367,10 +7367,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
           // Lock and archive the thread
           await interaction.channel
             .setLocked(true, `Locked by ${user.username}`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'button close lock thread'));
           await interaction.channel
             .setArchived(true, `Closed by ${user.username}`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'button close archive thread'));
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7404,7 +7404,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   } catch (err) {
     console.error("❌ Button interaction error:", err);
     if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: '⚠️ An error occurred processing your request.', ephemeral: true }).catch(() => {});
+      await interaction.reply({ content: '⚠️ An error occurred processing your request.', ephemeral: true }).catch(err => errorHandler.silentError(err, 'button interaction error reply'));
     }
   }
 });
@@ -7483,7 +7483,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
           await reaction.users.remove(user.id);
           await msg.channel
             .send(`⚠️ <@${user.id}>, this spawn is closed. Reaction removed.`)
-            .then((m) => setTimeout(() => m.delete().catch(() => {}), 5000));
+            .then((m) => setTimeout(() => errorHandler.safeDelete(m, 'closed spawn warning cleanup'), 5000));
         } catch (err) {
           console.error(
             `❌ Failed to send/delete closed spawn message:`,
@@ -7639,10 +7639,10 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 
           await msg.channel
             .setLocked(true, `Locked by ${user.username} (duplicate prevented)`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'reaction close lock duplicate thread'));
           await msg.channel
             .setArchived(true, `Closed by ${user.username} (duplicate prevented)`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'reaction close archive duplicate thread'));
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7698,10 +7698,10 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
           // Lock and archive the thread to prevent spam
           await msg.channel
             .setLocked(true, `Locked by ${user.username}`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'reaction close lock thread'));
           await msg.channel
             .setArchived(true, `Closed by ${user.username}`)
-            .catch(() => {});
+            .catch(err => errorHandler.silentError(err, 'reaction close archive thread'));
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
