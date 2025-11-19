@@ -5111,25 +5111,28 @@ client.once(Events.ClientReady, async () => {
         );
       }
 
-      // Aggressive GC if memory pressure is high (>85%)
-      // Only log warning once per hour to reduce spam
-      if (memoryPressure > 85) {
-        const now = Date.now();
-        const oneHour = 60 * 60 * 1000;
-
-        if (now - lastMemoryWarning > oneHour) {
-          console.warn(`⚠️ HIGH MEMORY PRESSURE (${Math.round(memoryPressure)}%) - Running aggressive GC`);
-          lastMemoryWarning = now;
-        }
-
+      // Proactive cleanup for 512MB Koyeb - trigger at 70% to prevent buildup
+      if (memoryPressure > 70) {
         // Clear caches before GC to free memory
         if (intelligenceEngine) {
-          // Use aggressive clearing for very high pressure (>90%)
-          intelligenceEngine.clearCaches(memoryPressure > 90);
+          // Use aggressive clearing for high pressure (>80%)
+          intelligenceEngine.clearCaches(memoryPressure > 80);
         }
 
         global.gc();
-        global.gc(); // Second pass for aggressive collection
+
+        // Extra GC pass and warning for very high pressure
+        if (memoryPressure > 80) {
+          const now = Date.now();
+          const oneHour = 60 * 60 * 1000;
+
+          if (now - lastMemoryWarning > oneHour) {
+            console.warn(`⚠️ HIGH MEMORY PRESSURE (${Math.round(memoryPressure)}%) - Running aggressive GC`);
+            lastMemoryWarning = now;
+          }
+
+          global.gc(); // Second pass for aggressive collection
+        }
       }
 
       // Alert if approaching Koyeb 512MB limit (rate limited to once per hour)
