@@ -86,6 +86,7 @@ const { normalizeUsername, findBossMatch } = require('./utils/common');    // Us
 const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images'); // Boss images utility
 const { addGuildFooter, addGuildThumbnail } = require('./utils/embed-branding'); // Guild branding utility
 const scheduler = require('./utils/maintenance-scheduler'); // Unified maintenance scheduler
+const timerRegistry = require('./utils/timer-registry'); // Centralized timer tracking
 const { IntelligenceEngine } = require('./intelligence-engine.js'); // AI/ML Intelligence Engine
 const { ProactiveIntelligence } = require('./proactive-intelligence.js'); // Proactive Monitoring
 const { NLPHandler } = require('./nlp-handler.js'); // Natural Language Processing
@@ -7628,7 +7629,9 @@ process.on("uncaughtException", (error) => {
 
 process.on("SIGTERM", () => {
   console.log("🛑 SIGTERM received, shutting down gracefully...");
-  stopBiddingChannelCleanupSchedule(); // ← ADD THIS
+  stopBiddingChannelCleanupSchedule();
+  scheduler.stopScheduler(); // Stop maintenance scheduler
+  timerRegistry.clearAllTimers(); // Clear all tracked timers
   server.close(() => {
     console.log("🌐 HTTP server closed");
     client.destroy();
@@ -7638,7 +7641,9 @@ process.on("SIGTERM", () => {
 
 process.on("SIGINT", () => {
   console.log("🛑 SIGINT received, shutting down gracefully...");
-  stopBiddingChannelCleanupSchedule(); // ← ADD THIS
+  stopBiddingChannelCleanupSchedule();
+  scheduler.stopScheduler(); // Stop maintenance scheduler
+  timerRegistry.clearAllTimers(); // Clear all tracked timers
   server.close(() => {
     console.log("🌐 HTTP server closed");
     client.destroy();
