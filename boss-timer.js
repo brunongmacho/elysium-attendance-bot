@@ -646,6 +646,21 @@ async function handleSpawned(bossName, userId) {
       );
     }
 
+    // Add to recently handled cache to prevent duplicate from external bot
+    const normalizedName = bossName.toLowerCase();
+    const clearTimeoutId = setTimeout(() => {
+      recentlyHandledBosses.delete(normalizedName);
+      console.log(`🗑️ Cleared recently-handled cache for ${bossName}`);
+    }, 15 * 60 * 1000); // 15 minutes
+
+    recentlyHandledBosses.set(normalizedName, {
+      handledAt: new Date(),
+      spawnTime: now,
+      threadId: thread.id,
+      clearTimeoutId
+    });
+    console.log(`📌 Added ${bossName} to recently-handled cache (15min TTL) - Thread: ${thread.id}`);
+
     return {
       success: true,
       threadId: thread.id,
