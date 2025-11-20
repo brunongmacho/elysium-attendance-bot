@@ -5342,6 +5342,15 @@ client.on(Events.MessageCreate, async (message) => {
             `🎯 Boss spawn detected: ${bossName} (from ${message.author.username})`
           );
 
+          // CHECK IF BOSS TIMER HAS THIS BOSS
+          const timerData = bossTimer.getNextSpawn(bossName);
+          if (timerData && timerData.nextSpawn) {
+            console.log(`⏭️ Boss timer has ${bossName} - skipping external bot (timer will handle)`);
+            return; // Timer will create thread at 5-min reminder
+          }
+
+          console.log(`📢 No timer for ${bossName} - creating thread from external bot`);
+
           let dateStr, timeStr, fullTimestamp;
 
           if (timestamp) {
@@ -5365,7 +5374,7 @@ client.on(Events.MessageCreate, async (message) => {
             dateStr,
             timeStr,
             fullTimestamp,
-            "timer"
+            "external_bot"
           );
 
           if (!result || !result.success) {
@@ -5373,6 +5382,21 @@ client.on(Events.MessageCreate, async (message) => {
             console.error(`❌ Failed to create spawn thread for ${bossName}: ${errorMsg}`);
           } else {
             console.log(`✅ Successfully created spawn thread for ${bossName} (thread ID: ${result.threadId})`);
+
+            // ANNOUNCE TO BOSS-SPAWN-ANNOUNCEMENT CHANNEL (since no timer)
+            try {
+              const announcementChannel = await client.channels.fetch(config.bossSpawnAnnouncementChannelId);
+              if (announcementChannel) {
+                const spawnTime = new Date(`${dateStr} ${timeStr}`);
+                const timestamp = Math.floor(spawnTime.getTime() / 1000);
+                await announcementChannel.send(
+                  `🔔 **${bossName}** spawned!\n🕐 Time: <t:${timestamp}:t>\n\n📝 Check in at the attendance thread!\n\n@everyone`
+                );
+                console.log(`📢 Announced ${bossName} spawn to announcement channel`);
+              }
+            } catch (announceError) {
+              console.error(`⚠️ Failed to announce spawn: ${announceError.message}`);
+            }
           }
         }
         return;
