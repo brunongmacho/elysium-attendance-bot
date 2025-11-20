@@ -5360,6 +5360,14 @@ client.on(Events.MessageCreate, async (message) => {
             console.log(`⏰ Using current timestamp: ${fullTimestamp}`);
           }
 
+          // CHECK IF BOSS WAS RECENTLY HANDLED BY TIMER SYSTEM
+          const recentlyHandled = bossTimer.wasRecentlyHandled(bossName);
+          if (recentlyHandled) {
+            const timeSince = Math.round((Date.now() - recentlyHandled.handledAt) / 1000 / 60);
+            console.log(`⏭️ ${bossName} was recently handled by timer (${timeSince}min ago) - skipping external bot to prevent duplicate`);
+            return;
+          }
+
           // CHECK IF BOSS TIMER HAS THIS BOSS
           const timerData = bossTimer.getNextSpawn(bossName);
           if (timerData && timerData.nextSpawn) {

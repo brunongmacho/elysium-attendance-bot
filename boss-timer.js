@@ -48,6 +48,18 @@ const TIMEZONE_OFFSET = 8; // GMT+8
 const bossKillTimes = new Map();
 
 /**
+ * Recently handled bosses - prevents duplicate threads from external bot
+ * Keeps boss in cache for 15 minutes after timer fires
+ *
+ * Map<bossName, {
+ *   handledAt: Date,
+ *   spawnTime: Date,
+ *   clearTimeoutId: setTimeout ID
+ * }>
+ */
+const recentlyHandledBosses = new Map();
+
+/**
  * Boss spawn configuration loaded from JSON
  */
 let bossSpawnConfig = null;
@@ -338,8 +350,22 @@ async function triggerSpawnReminder(bossName, spawnTime) {
 
     await announcementChannel.send(message);
 
-    // Clear from cache (timer completed)
+    // Clear from kill times cache (timer completed)
     bossKillTimes.delete(bossName.toLowerCase());
+
+    // Add to recently handled cache to prevent duplicate from external bot
+    const normalizedName = bossName.toLowerCase();
+    const clearTimeoutId = setTimeout(() => {
+      recentlyHandledBosses.delete(normalizedName);
+      console.log(`🗑️ Cleared recently-handled cache for ${bossName}`);
+    }, 15 * 60 * 1000); // 15 minutes
+
+    recentlyHandledBosses.set(normalizedName, {
+      handledAt: new Date(),
+      spawnTime,
+      clearTimeoutId
+    });
+    console.log(`📌 Added ${bossName} to recently-handled cache (15min TTL)`);
 
     console.log(`✅ Spawn reminder sent for ${bossName}`);
   } catch (error) {
@@ -513,6 +539,14 @@ async function cancelTimer(bossName) {
   // Remove from cache
   bossKillTimes.delete(normalizedName);
 
+  // Clear from recently handled cache if exists
+  const recentlyHandled = recentlyHandledBosses.get(normalizedName);
+  if (recentlyHandled) {
+    clearTimeout(recentlyHandled.clearTimeoutId);
+    recentlyHandledBosses.delete(normalizedName);
+    console.log(`🗑️ Cleared ${bossName} from recently-handled cache`);
+  }
+
   // Remove from Sheets
   try {
     await sheetAPI.call('deleteBossTimerRecovery', { bossName });
@@ -646,6 +680,15 @@ function getAllTimers() {
 
   return { timerBased, scheduleBased };
 }
+/**
+ * Check if boss was recently handled by timer system
+ * @param {string} bossName - Boss name
+ * @returns {Object|null} Recently handled data or null
+ */
+function wasRecentlyHandled(bossName) {
+  const normalizedName = bossName.toLowerCase();
+  return recentlyHandledBosses.get(normalizedName) || null;
+}
 
 // ============================================================================
 // MODULE EXPORTS
@@ -662,5 +705,6 @@ module.exports = {
   getAllTimers,
   findBossName,
   parseKillTime,
+  wasRecentlyHandled,
   bossKillTimes, // Export for monitoring/debugging
 };
