@@ -54,6 +54,7 @@ const bossKillTimes = new Map();
  * Map<bossName, {
  *   handledAt: Date,
  *   spawnTime: Date,
+ *   threadId: string,
  *   clearTimeoutId: setTimeout ID
  * }>
  */
@@ -363,9 +364,10 @@ async function triggerSpawnReminder(bossName, spawnTime) {
     recentlyHandledBosses.set(normalizedName, {
       handledAt: new Date(),
       spawnTime,
+      threadId: thread.id,
       clearTimeoutId
     });
-    console.log(`📌 Added ${bossName} to recently-handled cache (15min TTL)`);
+    console.log(`📌 Added ${bossName} to recently-handled cache (15min TTL) - Thread: ${thread.id}`);
 
     console.log(`✅ Spawn reminder sent for ${bossName}`);
   } catch (error) {
@@ -558,6 +560,105 @@ async function cancelTimer(bossName) {
 }
 
 /**
+ * Handle false alarm - boss didn't spawn as predicted
+ * @param {string} bossName - Boss name
+ * @param {string} userId - User ID who reported false alarm
+ * @returns {Promise<Object>} Result with success status
+ */
+async function handleNoSpawn(bossName, userId) {
+  const normalizedName = bossName.toLowerCase();
+
+  try {
+    // Cancel timer if exists
+    const timerCancelled = await cancelTimer(bossName);
+
+    // Check if boss was recently handled (has thread)
+    const recentlyHandled = recentlyHandledBosses.get(normalizedName);
+
+    if (recentlyHandled && recentlyHandled.threadId) {
+      // Get the thread
+      const guild = await client.guilds.fetch(config.mainGuildId);
+      const attChannel = await guild.channels.fetch(config.attendanceChannelId);
+      const thread = await attChannel.threads.fetch(recentlyHandled.threadId);
+
+      if (thread) {
+        // Post correction in thread
+        await thread.send(`⚠️ **FALSE ALARM - Wrong timer data**\n\nBoss did not spawn as predicted.\nThread cancelled by <@${userId}>\n\n❌ Please ignore this thread.`);
+
+        // Rename thread to mark as cancelled
+        await thread.setName(`[CANCELLED] ${thread.name}`);
+
+        // Lock the thread
+        await thread.setLocked(true);
+        await thread.setArchived(true);
+
+        console.log(`🔒 Locked and archived thread ${thread.id} for ${bossName}`);
+      }
+
+      // Post in announcement channel
+      const announcementChannel = await client.channels.fetch(config.bossSpawnAnnouncementChannelId);
+      if (announcementChannel) {
+        await announcementChannel.send(`❌ **${bossName} spawn cancelled** - Wrong timer data reported by <@${userId}>\n\nPlease wait for actual spawn confirmation.`);
+      }
+
+      // Clear from recently handled cache
+      clearTimeout(recentlyHandled.clearTimeoutId);
+      recentlyHandledBosses.delete(normalizedName);
+    }
+
+    return {
+      success: true,
+      timerCancelled,
+      threadFound: !!recentlyHandled?.threadId
+    };
+  } catch (error) {
+    console.error(`❌ Failed to handle no-spawn for ${bossName}:`, error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Record boss spawned NOW (uses current time as kill time)
+ * @param {string} bossName - Boss name
+ * @param {string} userId - User ID who reported spawn
+ * @returns {Promise<Object>} Result with next spawn info
+ */
+async function handleSpawned(bossName, userId) {
+  const now = new Date();
+
+  try {
+    // Record kill with current time
+    const result = await recordKill(bossName, now, `spawned-by-${userId}`);
+
+    // Post confirmation in announcement channel
+    const announcementChannel = await client.channels.fetch(config.bossSpawnAnnouncementChannelId);
+    if (announcementChannel) {
+      const nextTimestamp = Math.floor(result.nextSpawn.getTime() / 1000);
+      await announcementChannel.send(
+        `✅ **${bossName}** spawned confirmed by <@${userId}>\n` +
+        `🕐 Recorded at: <t:${Math.floor(now.getTime() / 1000)}:t>\n` +
+        `⏰ Next spawn: <t:${nextTimestamp}:F> (<t:${nextTimestamp}:R>)`
+      );
+    }
+
+    return {
+      success: true,
+      nextSpawn: result.nextSpawn,
+      bossName: result.bossName
+    };
+  } catch (error) {
+    console.error(`❌ Failed to handle spawned for ${bossName}:`, error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
  * Reset all timer-based bosses for maintenance
  * @returns {Promise<number>} Number of bosses reset
  */
@@ -700,6 +801,8 @@ module.exports = {
   getNextSpawn,
   getUpcomingSpawns,
   cancelTimer,
+  handleNoSpawn,
+  handleSpawned,
   maintenance,
   clearKills,
   getAllTimers,

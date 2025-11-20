@@ -5478,6 +5478,14 @@ client.on(Events.MessageCreate, async (message) => {
       }
       return await bossTimerCommands.handleClearKills(message);
     }
+    if (content.startsWith('!nospawn ')) {
+      const args = message.content.slice(9).trim().split(/\s+/);
+      return await bossTimerCommands.handleNoSpawn(message, args, config);
+    }
+    if (content.startsWith('!spawned ')) {
+      const args = message.content.slice(9).trim().split(/\s+/);
+      return await bossTimerCommands.handleSpawned(message, args, config);
+    }
 
     const guild = message.guild;
     if (!guild) return;

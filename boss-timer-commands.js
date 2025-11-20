@@ -4,7 +4,8 @@
  * ============================================================================
  *
  * Command handlers for boss timer system.
- * Commands: !killed, !nextspawn, !timers, !unkill, !maintenance, !clearkills
+ * Commands: !killed, !nextspawn, !timers, !unkill, !nospawn, !spawned,
+ *           !maintenance, !clearkills
  *
  * @module boss-timer-commands
  * ============================================================================
@@ -284,6 +285,117 @@ async function handleClearKills(message) {
   }
 }
 
+/**
+ * Handle !nospawn command - boss didn't spawn as predicted
+ * Usage: !nospawn <boss>
+ */
+async function handleNoSpawn(message, args, config) {
+  // Check if in correct channel
+  if (message.channel.id !== config.bossTimerChannelId) {
+    const channel = await message.client.channels.fetch(config.bossTimerChannelId);
+    return message.reply(`⚠️ Please use ${channel} for boss timer commands`);
+  }
+
+  if (args.length < 1) {
+    return message.reply('❌ Usage: `!nospawn <boss>`\nExample: `!nospawn venatus`');
+  }
+
+  // Parse boss name (might be multi-word)
+  const bossInput = args.join(' ');
+  const bossName = bossTimer.findBossName(bossInput);
+
+  if (!bossName) {
+    return message.reply(`❌ Boss "${bossInput}" not found. Use \`!timers\` to see available bosses.`);
+  }
+
+  try {
+    const result = await bossTimer.handleNoSpawn(bossName, message.author.id);
+
+    if (!result.success) {
+      return message.reply(`❌ Error: ${result.error}`);
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(0xe74c3c)
+      .setTitle('❌ False Alarm Reported')
+      .setDescription(`**${bossName}** did not spawn as predicted`)
+      .addFields({
+        name: '✅ Actions Taken',
+        value:
+          (result.timerCancelled ? '• Timer cancelled\n' : '') +
+          (result.threadFound ? '• Attendance thread locked and archived\n' : '') +
+          '• Announcement posted',
+        inline: false
+      })
+      .addFields({
+        name: 'ℹ️ Next Steps',
+        value: 'When boss actually spawns, use `!spawned <boss>` to record the correct time.',
+        inline: false
+      })
+      .setTimestamp();
+
+    await message.reply({ embeds: [embed] });
+  } catch (error) {
+    console.error('Error in !nospawn command:', error);
+    return message.reply(`❌ Error: ${error.message}`);
+  }
+}
+
+/**
+ * Handle !spawned command - record boss spawned NOW
+ * Usage: !spawned <boss>
+ */
+async function handleSpawned(message, args, config) {
+  // Check if in correct channel
+  if (message.channel.id !== config.bossTimerChannelId) {
+    const channel = await message.client.channels.fetch(config.bossTimerChannelId);
+    return message.reply(`⚠️ Please use ${channel} for boss timer commands`);
+  }
+
+  if (args.length < 1) {
+    return message.reply('❌ Usage: `!spawned <boss>`\nExample: `!spawned venatus`');
+  }
+
+  // Parse boss name (might be multi-word)
+  const bossInput = args.join(' ');
+  const bossName = bossTimer.findBossName(bossInput);
+
+  if (!bossName) {
+    return message.reply(`❌ Boss "${bossInput}" not found. Use \`!timers\` to see available bosses.`);
+  }
+
+  try {
+    const result = await bossTimer.handleSpawned(bossName, message.author.id);
+
+    if (!result.success) {
+      return message.reply(`❌ Error: ${result.error}`);
+    }
+
+    const nextTimestamp = Math.floor(result.nextSpawn.getTime() / 1000);
+
+    const embed = new EmbedBuilder()
+      .setColor(0x2ecc71)
+      .setTitle('✅ Boss Spawn Confirmed')
+      .setDescription(`**${bossName}** spawned right now!`)
+      .addFields({
+        name: '⏰ Next Spawn',
+        value: `<t:${nextTimestamp}:F>\n<t:${nextTimestamp}:R>`,
+        inline: false
+      })
+      .addFields({
+        name: 'ℹ️ Reminder',
+        value: 'You will be notified 5 minutes before next spawn.',
+        inline: false
+      })
+      .setTimestamp();
+
+    await message.reply({ embeds: [embed] });
+  } catch (error) {
+    console.error('Error in !spawned command:', error);
+    return message.reply(`❌ Error: ${error.message}`);
+  }
+}
+
 module.exports = {
   handleKilled,
   handleNextSpawn,
@@ -291,4 +403,6 @@ module.exports = {
   handleUnkill,
   handleMaintenance,
   handleClearKills,
+  handleNoSpawn,
+  handleSpawned,
 };
