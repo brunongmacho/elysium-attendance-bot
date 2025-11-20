@@ -621,33 +621,36 @@ async function handleNoSpawn(bossName, userId) {
 }
 
 /**
- * Record boss spawned NOW (uses current time as kill time)
+ * Handle boss spawn confirmation - creates attendance thread
+ * Does NOT record kill time - use !killed for that
  * @param {string} bossName - Boss name
  * @param {string} userId - User ID who reported spawn
- * @returns {Promise<Object>} Result with next spawn info
+ * @returns {Promise<Object>} Result with thread info
  */
 async function handleSpawned(bossName, userId) {
   const now = new Date();
 
   try {
-    // Record kill with current time
-    const result = await recordKill(bossName, now, `spawned-by-${userId}`);
+    // Create attendance thread for current spawn
+    const thread = await attendance.createThreadForBoss(bossName, now);
 
     // Post confirmation in announcement channel
     const announcementChannel = await client.channels.fetch(config.bossSpawnAnnouncementChannelId);
     if (announcementChannel) {
-      const nextTimestamp = Math.floor(result.nextSpawn.getTime() / 1000);
+      const timestamp = Math.floor(now.getTime() / 1000);
       await announcementChannel.send(
         `✅ **${bossName}** spawned confirmed by <@${userId}>\n` +
-        `🕐 Recorded at: <t:${Math.floor(now.getTime() / 1000)}:t>\n` +
-        `⏰ Next spawn: <t:${nextTimestamp}:F> (<t:${nextTimestamp}:R>)`
+        `🕐 Spawn time: <t:${timestamp}:t>\n` +
+        `📝 Attendance thread: ${thread.url}\n\n` +
+        `💡 Use \`!killed ${bossName} <time>\` when boss is killed to track next spawn.`
       );
     }
 
     return {
       success: true,
-      nextSpawn: result.nextSpawn,
-      bossName: result.bossName
+      threadId: thread.id,
+      threadUrl: thread.url,
+      bossName
     };
   } catch (error) {
     console.error(`❌ Failed to handle spawned for ${bossName}:`, error);

@@ -342,7 +342,7 @@ async function handleNoSpawn(message, args, config) {
 }
 
 /**
- * Handle !spawned command - record boss spawned NOW
+ * Handle !spawned command - confirm boss spawned and create attendance thread
  * Usage: !spawned <boss>
  */
 async function handleSpawned(message, args, config) {
@@ -371,20 +371,18 @@ async function handleSpawned(message, args, config) {
       return message.reply(`❌ Error: ${result.error}`);
     }
 
-    const nextTimestamp = Math.floor(result.nextSpawn.getTime() / 1000);
-
     const embed = new EmbedBuilder()
       .setColor(0x2ecc71)
       .setTitle('✅ Boss Spawn Confirmed')
-      .setDescription(`**${bossName}** spawned right now!`)
+      .setDescription(`**${bossName}** has spawned!`)
       .addFields({
-        name: '⏰ Next Spawn',
-        value: `<t:${nextTimestamp}:F>\n<t:${nextTimestamp}:R>`,
+        name: '📝 Attendance Thread',
+        value: `Thread created: <#${result.threadId}>`,
         inline: false
       })
       .addFields({
-        name: 'ℹ️ Reminder',
-        value: 'You will be notified 5 minutes before next spawn.',
+        name: '💡 Next Step',
+        value: `When boss is killed, use \`!killed ${bossName} <time>\` to track next spawn.`,
         inline: false
       })
       .setTimestamp();
