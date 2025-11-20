@@ -6367,5 +6367,285 @@ function loadRecoveryState(data) {
 }
 
 // ===========================================================
+// BOSS TIMER RECOVERY FUNCTIONS
+// ===========================================================
+
+/**
+ * Get boss timer recovery data
+ * @returns {Object} Response with array of boss timer data
+ */
+function getBossTimerRecovery() {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    let sheet = ss.getSheetByName('BossTimerRecovery');
+
+    if (!sheet) {
+      Logger.log('ℹ️ BossTimerRecovery sheet does not exist yet');
+      return createResponse('ok', 'No recovery data found', { data: [] });
+    }
+
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+
+    if (values.length <= 1) {
+      // Only header row or empty
+      return createResponse('ok', 'No recovery data', { data: [] });
+    }
+
+    const data = [];
+    // Start from row 2 (skip header)
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      if (row[0]) { // Has boss name
+        data.push({
+          bossName: row[0],
+          lastKillTime: row[1],
+          nextSpawnTime: row[2],
+          killedBy: row[3] || 'unknown'
+        });
+      }
+    }
+
+    Logger.log(`✅ Loaded ${data.length} boss timer recovery entries`);
+    return createResponse('ok', 'Boss timer recovery data loaded', { data: data });
+
+  } catch (err) {
+    Logger.log('❌ Error getting boss timer recovery: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Save boss timer recovery data
+ * @param {Object} data - {bossName, lastKillTime, nextSpawnTime, killedBy}
+ * @returns {Object} Response object
+ */
+function saveBossTimerRecovery(data) {
+  try {
+    const { bossName, lastKillTime, nextSpawnTime, killedBy } = data;
+
+    if (!bossName || !lastKillTime || !nextSpawnTime) {
+      return createResponse('error', 'Missing required fields');
+    }
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    let sheet = ss.getSheetByName('BossTimerRecovery');
+
+    if (!sheet) {
+      // Create sheet
+      sheet = ss.insertSheet('BossTimerRecovery');
+      sheet.appendRow(['Boss Name', 'Last Kill Time', 'Next Spawn Time', 'Killed By']);
+      sheet.getRange('A1:D1').setFontWeight('bold');
+      Logger.log('📋 Created BossTimerRecovery sheet');
+    }
+
+    // Find existing row for this boss
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+    let rowIndex = -1;
+
+    for (let i = 1; i < values.length; i++) {
+      if (values[i][0] === bossName) {
+        rowIndex = i + 1; // +1 for 1-indexed
+        break;
+      }
+    }
+
+    if (rowIndex > 0) {
+      // Update existing row
+      sheet.getRange(rowIndex, 2).setValue(lastKillTime);
+      sheet.getRange(rowIndex, 3).setValue(nextSpawnTime);
+      sheet.getRange(rowIndex, 4).setValue(killedBy || 'unknown');
+      Logger.log(`✅ Updated boss timer for ${bossName}`);
+    } else {
+      // Append new row
+      sheet.appendRow([bossName, lastKillTime, nextSpawnTime, killedBy || 'unknown']);
+      Logger.log(`✅ Added boss timer for ${bossName}`);
+    }
+
+    return createResponse('ok', 'Boss timer saved', { bossName: bossName });
+
+  } catch (err) {
+    Logger.log('❌ Error saving boss timer recovery: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Bulk save boss timer recovery data (for maintenance mode)
+ * @param {Object} data - {entries: [{bossName, lastKillTime, nextSpawnTime, killedBy}]}
+ * @returns {Object} Response object
+ */
+function bulkSaveBossTimerRecovery(data) {
+  try {
+    const { entries } = data;
+
+    if (!entries || !Array.isArray(entries)) {
+      return createResponse('error', 'Missing or invalid entries array');
+    }
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    let sheet = ss.getSheetByName('BossTimerRecovery');
+
+    if (!sheet) {
+      // Create sheet
+      sheet = ss.insertSheet('BossTimerRecovery');
+      sheet.appendRow(['Boss Name', 'Last Kill Time', 'Next Spawn Time', 'Killed By']);
+      sheet.getRange('A1:D1').setFontWeight('bold');
+      Logger.log('📋 Created BossTimerRecovery sheet');
+    }
+
+    // Get existing data
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+    const bossMap = new Map();
+
+    // Map existing bosses to row indices
+    for (let i = 1; i < values.length; i++) {
+      if (values[i][0]) {
+        bossMap.set(values[i][0], i + 1); // 1-indexed
+      }
+    }
+
+    let updated = 0;
+    let added = 0;
+
+    // Process each entry
+    for (const entry of entries) {
+      const { bossName, lastKillTime, nextSpawnTime, killedBy } = entry;
+
+      if (!bossName || !lastKillTime || !nextSpawnTime) {
+        Logger.log(`⚠️ Skipping invalid entry: ${JSON.stringify(entry)}`);
+        continue;
+      }
+
+      const rowIndex = bossMap.get(bossName);
+
+      if (rowIndex) {
+        // Update existing row
+        sheet.getRange(rowIndex, 2).setValue(lastKillTime);
+        sheet.getRange(rowIndex, 3).setValue(nextSpawnTime);
+        sheet.getRange(rowIndex, 4).setValue(killedBy || 'MAINTENANCE');
+        updated++;
+      } else {
+        // Append new row
+        sheet.appendRow([bossName, lastKillTime, nextSpawnTime, killedBy || 'MAINTENANCE']);
+        added++;
+      }
+    }
+
+    Logger.log(`✅ Bulk save complete: ${updated} updated, ${added} added`);
+
+    return createResponse('ok', 'Bulk save complete', {
+      updated: updated,
+      added: added,
+      total: updated + added
+    });
+
+  } catch (err) {
+    Logger.log('❌ Error bulk saving boss timer recovery: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Delete boss timer recovery data for a boss
+ * @param {Object} data - {bossName}
+ * @returns {Object} Response object
+ */
+function deleteBossTimerRecovery(data) {
+  try {
+    const { bossName } = data;
+
+    if (!bossName) {
+      return createResponse('error', 'Missing bossName parameter');
+    }
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const sheet = ss.getSheetByName('BossTimerRecovery');
+
+    if (!sheet) {
+      return createResponse('ok', 'No recovery sheet exists');
+    }
+
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+
+    // Find row for this boss
+    for (let i = 1; i < values.length; i++) {
+      if (values[i][0] === bossName) {
+        sheet.deleteRow(i + 1); // 1-indexed
+        Logger.log(`✅ Deleted boss timer for ${bossName}`);
+        return createResponse('ok', 'Boss timer deleted', { bossName: bossName });
+      }
+    }
+
+    return createResponse('ok', 'Boss not found', { bossName: bossName });
+
+  } catch (err) {
+    Logger.log('❌ Error deleting boss timer recovery: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Clear boss timer recovery data
+ * @param {Object} data - {type: 'timer-based' | 'all'}
+ * @returns {Object} Response object
+ */
+function clearBossTimerRecovery(data) {
+  try {
+    const { type } = data;
+
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const sheet = ss.getSheetByName('BossTimerRecovery');
+
+    if (!sheet) {
+      return createResponse('ok', 'No recovery sheet exists');
+    }
+
+    if (type === 'all') {
+      // Clear all data (keep header)
+      const lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        sheet.deleteRows(2, lastRow - 1);
+      }
+      Logger.log('✅ Cleared all boss timer recovery data');
+      return createResponse('ok', 'All recovery data cleared');
+    } else if (type === 'timer-based') {
+      // Clear only timer-based bosses
+      // Load boss config to know which are timer-based
+      const timerBosses = [
+        'Venatus', 'Viorent', 'Ego', 'Livera', 'Araneo', 'Undomiel',
+        'Lady Dalia', 'General Aquleus', 'Amentis', 'Baron Braudmore',
+        'Wannitas', 'Metus', 'Duplican', 'Shuliar', 'Gareth', 'Titore',
+        'Larba', 'Catena', 'Secreta', 'Ordo', 'Asta', 'Supore'
+      ];
+
+      const dataRange = sheet.getDataRange();
+      const values = dataRange.getValues();
+
+      let deleted = 0;
+      // Loop backwards to safely delete rows
+      for (let i = values.length - 1; i >= 1; i--) {
+        if (timerBosses.includes(values[i][0])) {
+          sheet.deleteRow(i + 1); // 1-indexed
+          deleted++;
+        }
+      }
+
+      Logger.log(`✅ Cleared ${deleted} timer-based boss entries`);
+      return createResponse('ok', 'Timer-based recovery data cleared', { deleted: deleted });
+    } else {
+      return createResponse('error', 'Invalid type parameter');
+    }
+
+  } catch (err) {
+    Logger.log('❌ Error clearing boss timer recovery: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+// ===========================================================
 // OPTIMIZED SHEET CREATION WITH AUTO-LOGGING
 // ===========================================================

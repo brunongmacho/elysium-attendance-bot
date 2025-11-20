@@ -9,6 +9,8 @@
   "elysium_commands_channel_id": "1401784124922138646",
   "guild_announcement_channel_id": "1401785278972039198",
   "bot_manual_channel_id": "1431640753238442014",
+  "boss_timer_channel_id": "1440868302237728879",
+  "boss_spawn_announcement_channel_id": "1440868364691181648",
   "admin_roles": [
     "GUILD LEADER",
     "ELITE",

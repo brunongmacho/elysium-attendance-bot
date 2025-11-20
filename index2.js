@@ -76,6 +76,8 @@ const bidding = require("./bidding.js");                    // Auction bidding l
 const helpSystem = require("./help-system.js");             // Command help system
 const auctioneering = require("./auctioneering.js");        // Auction management
 const attendance = require("./attendance.js");              // Attendance tracking
+const bossTimer = require("./boss-timer.js");              // Boss timer system
+const bossTimerCommands = require("./boss-timer-commands.js"); // Boss timer commands
 // const lootSystem = require("./loot-system.js");          // Loot distribution (DISABLED: manual loot entry)
 const emergencyCommands = require("./emergency-commands.js"); // Emergency overrides
 const leaderboardSystem = require("./leaderboard-system.js"); // Leaderboards
@@ -5026,6 +5028,7 @@ client.once(Events.ClientReady, async () => {
 
   // INITIALIZE ALL MODULES IN CORRECT ORDER
   attendance.initialize(config, bossPoints, isAdmin, discordCache, intelligenceEngine);
+  await bossTimer.initialize(client, config, sheetAPI, attendance); // Boss timer system
   helpSystem.initialize(config, isAdmin, BOT_VERSION);
   auctioneering.initialize(config, isAdmin, bidding, discordCache, intelligenceEngine);
   bidding.initializeBidding(config, isAdmin, auctioneering, discordCache);
@@ -5390,6 +5393,41 @@ client.on(Events.MessageCreate, async (message) => {
       }
       // All other bot messages are blocked
       return;
+    }
+
+    // Boss timer commands (before other command processing)
+    const content = message.content.toLowerCase();
+    if (content.startsWith('!killed ')) {
+      const args = message.content.slice(8).trim().split(/\s+/);
+      return await bossTimerCommands.handleKilled(message, args, config);
+    }
+    if (content === '!nextspawn') {
+      return await bossTimerCommands.handleNextSpawn(message);
+    }
+    if (content === '!timers') {
+      return await bossTimerCommands.handleTimers(message, config);
+    }
+    if (content.startsWith('!unkill ')) {
+      const args = message.content.slice(8).trim().split(/\s+/);
+      return await bossTimerCommands.handleUnkill(message, args, config);
+    }
+    if (content === '!maintenance') {
+      const guild = message.guild;
+      if (!guild) return;
+      const member = await guild.members.fetch(message.author.id).catch(() => null);
+      if (!member || !isAdmin(member)) {
+        return message.reply('❌ Admin only command');
+      }
+      return await bossTimerCommands.handleMaintenance(message);
+    }
+    if (content === '!clearkills') {
+      const guild = message.guild;
+      if (!guild) return;
+      const member = await guild.members.fetch(message.author.id).catch(() => null);
+      if (!member || !isAdmin(member)) {
+        return message.reply('❌ Admin only command');
+      }
+      return await bossTimerCommands.handleClearKills(message);
     }
 
     const guild = message.guild;
