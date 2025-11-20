@@ -5373,10 +5373,13 @@ client.on(Events.MessageCreate, async (message) => {
               console.log(`⏭️ Timer has ${bossName} and times match (${Math.round(timeDiff)}min diff) - skipping external bot`);
               return; // Timer will handle at 5-min reminder
             } else {
-              // Times are far apart - trust external bot and log warning
+              // Times are far apart - trust external bot and cancel old timer
               console.warn(`⚠️ TIME MISMATCH: Timer expects ${timerTime.toLocaleString()}, external bot says ${externalBotTime.toLocaleString()}`);
               console.warn(`⚠️ Difference: ${Math.round(timeDiff)} minutes - Using external bot spawn time`);
-              // Continue to create thread from external bot
+
+              // Cancel the incorrect timer to prevent duplicate thread
+              await bossTimer.cancelTimer(bossName);
+              console.log(`🗑️ Cancelled incorrect timer for ${bossName}`);
             }
           } else {
             console.log(`📢 No timer for ${bossName} - creating thread from external bot`);
