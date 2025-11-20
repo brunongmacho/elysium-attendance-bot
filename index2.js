@@ -5342,15 +5342,7 @@ client.on(Events.MessageCreate, async (message) => {
             `🎯 Boss spawn detected: ${bossName} (from ${message.author.username})`
           );
 
-          // CHECK IF BOSS TIMER HAS THIS BOSS
-          const timerData = bossTimer.getNextSpawn(bossName);
-          if (timerData && timerData.nextSpawn) {
-            console.log(`⏭️ Boss timer has ${bossName} - skipping external bot (timer will handle)`);
-            return; // Timer will create thread at 5-min reminder
-          }
-
-          console.log(`📢 No timer for ${bossName} - creating thread from external bot`);
-
+          // Parse timestamp from external bot first
           let dateStr, timeStr, fullTimestamp;
 
           if (timestamp) {
@@ -5359,13 +5351,35 @@ client.on(Events.MessageCreate, async (message) => {
             dateStr = `${month}/${day}/${year.substring(2)}`;
             timeStr = timePart;
             fullTimestamp = `${dateStr} ${timeStr}`;
-            console.log(`⏰ Using timestamp from timer: ${fullTimestamp}`);
+            console.log(`⏰ External bot timestamp: ${fullTimestamp}`);
           } else {
             const ts = attendance.getCurrentTimestamp();
             dateStr = ts.date;
             timeStr = ts.time;
             fullTimestamp = ts.full;
             console.log(`⏰ Using current timestamp: ${fullTimestamp}`);
+          }
+
+          // CHECK IF BOSS TIMER HAS THIS BOSS
+          const timerData = bossTimer.getNextSpawn(bossName);
+          if (timerData && timerData.nextSpawn) {
+            // Check if times are close (within 1 hour)
+            const externalBotTime = new Date(`${dateStr} ${timeStr}`);
+            const timerTime = timerData.nextSpawn;
+            const timeDiff = Math.abs(timerTime - externalBotTime) / 1000 / 60; // minutes
+
+            if (timeDiff <= 60) {
+              // Times are close - trust timer
+              console.log(`⏭️ Timer has ${bossName} and times match (${Math.round(timeDiff)}min diff) - skipping external bot`);
+              return; // Timer will handle at 5-min reminder
+            } else {
+              // Times are far apart - trust external bot and log warning
+              console.warn(`⚠️ TIME MISMATCH: Timer expects ${timerTime.toLocaleString()}, external bot says ${externalBotTime.toLocaleString()}`);
+              console.warn(`⚠️ Difference: ${Math.round(timeDiff)} minutes - Using external bot spawn time`);
+              // Continue to create thread from external bot
+            }
+          } else {
+            console.log(`📢 No timer for ${bossName} - creating thread from external bot`);
           }
 
           const result = await attendance.createSpawnThreads(
@@ -5383,14 +5397,14 @@ client.on(Events.MessageCreate, async (message) => {
           } else {
             console.log(`✅ Successfully created spawn thread for ${bossName} (thread ID: ${result.threadId})`);
 
-            // ANNOUNCE TO BOSS-SPAWN-ANNOUNCEMENT CHANNEL (since no timer)
+            // ANNOUNCE TO BOSS-SPAWN-ANNOUNCEMENT CHANNEL (no timer or time mismatch)
             try {
               const announcementChannel = await client.channels.fetch(config.bossSpawnAnnouncementChannelId);
               if (announcementChannel) {
                 const spawnTime = new Date(`${dateStr} ${timeStr}`);
-                const timestamp = Math.floor(spawnTime.getTime() / 1000);
+                const announceTimestamp = Math.floor(spawnTime.getTime() / 1000);
                 await announcementChannel.send(
-                  `🔔 **${bossName}** spawned!\n🕐 Time: <t:${timestamp}:t>\n\n📝 Check in at the attendance thread!\n\n@everyone`
+                  `🔔 **${bossName}** spawned!\n🕐 Time: <t:${announceTimestamp}:t>\n\n📝 Check in at the attendance thread!\n\n@everyone`
                 );
                 console.log(`📢 Announced ${bossName} spawn to announcement channel`);
               }
