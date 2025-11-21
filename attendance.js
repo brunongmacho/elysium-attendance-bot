@@ -424,7 +424,8 @@ async function createSpawnThreads(
 
   // NEW: Prevent duplicate threads for same boss if spawn times are close
   // This allows legitimate new threads when timer was wrong but blocks true duplicates
-  const DUPLICATE_TIME_THRESHOLD_MINUTES = 60; // Block if spawn times within 1 hour
+  // 30 min threshold allows new threads for maintenance-delayed spawns (>30 min delay)
+  const DUPLICATE_TIME_THRESHOLD_MINUTES = 30; // Block if spawn times within 30 min
   for (const [threadId, spawn] of Object.entries(activeSpawns)) {
     if (spawn.boss.toLowerCase() === bossName.toLowerCase() && !spawn.closed) {
       // Compare spawn timestamps (not creation time)

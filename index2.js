@@ -5602,9 +5602,21 @@ client.on(Events.MessageCreate, async (message) => {
 
       if (conversationResponse) {
         console.log(`💬 [NLP Conversation] User: "${message.content.substring(0, 50)}..." → Roasting back`);
-        await message.reply(conversationResponse).catch((error) => {
-          console.error('❌ Error sending conversation response:', error);
-        });
+        // Try to reply, fall back to channel.send if it's a system message
+        try {
+          if (message.system) {
+            await message.channel.send(conversationResponse);
+          } else {
+            await message.reply(conversationResponse);
+          }
+        } catch (error) {
+          // If reply fails (e.g., system message), try sending to channel instead
+          if (error.code === 50035) {
+            await message.channel.send(conversationResponse).catch(console.error);
+          } else {
+            console.error('❌ Error sending conversation response:', error);
+          }
+        }
         return; // Return early - this was handled as conversation
       }
     }
