@@ -126,6 +126,12 @@ async function loadRecoveryAndReschedule() {
       try {
         const nextSpawn = new Date(entry.nextSpawnTime);
 
+        // Skip invalid dates
+        if (!nextSpawn || isNaN(nextSpawn.getTime())) {
+          console.error(`❌ Invalid nextSpawnTime for ${entry.bossName}: ${entry.nextSpawnTime}`);
+          continue;
+        }
+
         // Skip if spawn already passed
         if (nextSpawn < now) {
           console.log(`⏭️ Skipping past spawn: ${entry.bossName} (${nextSpawn.toLocaleString()})`);
@@ -135,8 +141,17 @@ async function loadRecoveryAndReschedule() {
         // Reschedule timer
         const timerId = scheduleReminder(entry.bossName, nextSpawn);
 
+        // Parse killTime (may be null/invalid for directly set spawns)
+        let killTime = null;
+        if (entry.lastKillTime) {
+          const parsed = new Date(entry.lastKillTime);
+          if (!isNaN(parsed.getTime())) {
+            killTime = parsed;
+          }
+        }
+
         bossKillTimes.set(entry.bossName.toLowerCase(), {
-          killTime: new Date(entry.lastKillTime),
+          killTime,
           nextSpawn,
           timerId,
           killedBy: entry.killedBy || 'unknown'
@@ -153,8 +168,10 @@ async function loadRecoveryAndReschedule() {
       // Skip metadata keys like _note
       if (bossName.startsWith('_')) continue;
       const nextSpawn = findNextScheduledTime(bossConfig.schedules);
-      if (nextSpawn) {
+      if (nextSpawn && !isNaN(nextSpawn.getTime())) {
         scheduleReminder(bossName, nextSpawn);
+      } else {
+        console.error(`❌ Invalid scheduled spawn time for ${bossName}`);
       }
     }
 
@@ -520,6 +537,16 @@ async function recordKill(bossName, killTime, killedBy) {
  */
 async function saveRecoveryData(bossName, killTime, nextSpawn, killedBy) {
   try {
+    // Validate dates before saving
+    if (!killTime || isNaN(killTime.getTime())) {
+      console.error(`❌ Invalid killTime for ${bossName}: ${killTime}`);
+      return;
+    }
+    if (!nextSpawn || isNaN(nextSpawn.getTime())) {
+      console.error(`❌ Invalid nextSpawn for ${bossName}: ${nextSpawn}`);
+      return;
+    }
+
     await sheetAPI.call('saveBossTimerRecovery', {
       bossName,
       lastKillTime: killTime.toISOString(),

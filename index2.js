@@ -5379,7 +5379,13 @@ client.on(Events.MessageCreate, async (message) => {
           const timerData = bossTimer.getNextSpawn(bossName);
           if (timerData && timerData.nextSpawn) {
             // Check if times are close (within 1 hour)
-            const externalBotTime = new Date(`${dateStr} ${timeStr}`);
+            // External bot time is in GMT+8 - parse it correctly
+            const [month, day, year] = dateStr.split('/').map(Number);
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            const fullYear = year < 100 ? 2000 + year : year;
+            // Create UTC timestamp from GMT+8 time components
+            const gmt8Timestamp = Date.UTC(fullYear, month - 1, day, hours, minutes, 0, 0);
+            const externalBotTime = new Date(gmt8Timestamp - (8 * 60 * 60 * 1000)); // Convert GMT+8 to UTC
             const timerTime = timerData.nextSpawn;
             const timeDiff = Math.abs(timerTime - externalBotTime) / 1000 / 60; // minutes
 
@@ -5416,7 +5422,12 @@ client.on(Events.MessageCreate, async (message) => {
             console.log(`✅ Successfully created spawn thread for ${bossName} (thread ID: ${result.threadId})`);
 
             // ADD TO RECENTLY HANDLED CACHE to prevent duplicate from external bot
-            const spawnTime = new Date(`${dateStr} ${timeStr}`);
+            // Parse spawn time as GMT+8
+            const [spMonth, spDay, spYear] = dateStr.split('/').map(Number);
+            const [spHours, spMinutes] = timeStr.split(':').map(Number);
+            const spFullYear = spYear < 100 ? 2000 + spYear : spYear;
+            const spGmt8Timestamp = Date.UTC(spFullYear, spMonth - 1, spDay, spHours, spMinutes, 0, 0);
+            const spawnTime = new Date(spGmt8Timestamp - (8 * 60 * 60 * 1000)); // Convert GMT+8 to UTC
             bossTimer.addToRecentlyHandled(bossName, spawnTime, result.threadId);
             console.log(`📌 Added ${bossName} to recently-handled cache (external bot path)`);
 
