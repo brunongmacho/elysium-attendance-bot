@@ -405,6 +405,19 @@ async function triggerSpawnReminder(bossName, spawnTime) {
     addToRecentlyHandled(bossName, spawnTime, thread.id);
     console.log(`📌 Added ${bossName} to recently-handled cache (15min TTL) - Thread: ${thread.id}`);
 
+    // For scheduled bosses, reschedule for next occurrence
+    const bossType = getBossType(bossName);
+    if (bossType === 'schedule') {
+      const bossConfig = bossSpawnConfig.scheduleBasedBosses[bossName];
+      if (bossConfig && bossConfig.schedules) {
+        const nextSpawn = findNextScheduledTime(bossConfig.schedules);
+        if (nextSpawn) {
+          scheduleReminder(bossName, nextSpawn);
+          console.log(`🔄 Rescheduled ${bossName} for next occurrence`);
+        }
+      }
+    }
+
     console.log(`✅ Spawn reminder sent for ${bossName}`);
   } catch (error) {
     console.error(`❌ Failed to trigger spawn reminder for ${bossName}:`, error);
