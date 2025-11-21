@@ -290,30 +290,46 @@ function calculateNextSpawn(bossName, killTime) {
 
 /**
  * Find next scheduled spawn time for schedule-based boss
+ * Schedule times are in GMT+8 (Asia/Manila)
  * @param {Array} schedules - Array of {day, time, dayOfWeek}
- * @returns {Date} Next scheduled spawn time
+ * @returns {Date} Next scheduled spawn time (in UTC)
  */
 function findNextScheduledTime(schedules) {
   const now = new Date();
+  // Get current time in GMT+8 for day/time comparison
+  const gmt8Now = new Date(now.getTime() + TIMEZONE_OFFSET * 60 * 60 * 1000);
   let nextSpawn = null;
 
   for (const schedule of schedules) {
     const [hours, minutes] = schedule.time.split(':').map(Number);
 
-    // Create date for this schedule
-    const spawnDate = new Date();
-    spawnDate.setHours(hours, minutes, 0, 0);
-
-    // Find next occurrence of this day
-    const currentDay = spawnDate.getDay();
+    // Get current date components in GMT+8
+    const currentYear = gmt8Now.getUTCFullYear();
+    const currentMonth = gmt8Now.getUTCMonth();
+    const currentDate = gmt8Now.getUTCDate();
+    const currentDay = gmt8Now.getUTCDay();
     const targetDay = schedule.dayOfWeek;
+
+    // Calculate days until target day
     let daysUntilSpawn = targetDay - currentDay;
 
-    if (daysUntilSpawn < 0 || (daysUntilSpawn === 0 && spawnDate <= now)) {
-      daysUntilSpawn += 7; // Next week
+    // Check if we need to go to next week
+    if (daysUntilSpawn < 0) {
+      daysUntilSpawn += 7;
+    } else if (daysUntilSpawn === 0) {
+      // Same day - check if time has passed
+      const currentHour = gmt8Now.getUTCHours();
+      const currentMinute = gmt8Now.getUTCMinutes();
+      if (hours < currentHour || (hours === currentHour && minutes <= currentMinute)) {
+        daysUntilSpawn = 7; // Next week
+      }
     }
 
-    spawnDate.setDate(spawnDate.getDate() + daysUntilSpawn);
+    // Create spawn date in GMT+8, then convert to UTC
+    const spawnDay = currentDate + daysUntilSpawn;
+    const gmt8Timestamp = Date.UTC(currentYear, currentMonth, spawnDay, hours, minutes, 0, 0);
+    const utcTimestamp = gmt8Timestamp - (TIMEZONE_OFFSET * 60 * 60 * 1000);
+    const spawnDate = new Date(utcTimestamp);
 
     // Keep earliest spawn time
     if (!nextSpawn || spawnDate < nextSpawn) {
