@@ -124,22 +124,13 @@ async function loadRecoveryAndReschedule() {
 
     for (const entry of recoveryData) {
       try {
-        const nextSpawn = new Date(entry.nextSpawnTime);
+        let nextSpawn = new Date(entry.nextSpawnTime);
 
         // Skip invalid dates
         if (!nextSpawn || isNaN(nextSpawn.getTime())) {
           console.error(`❌ Invalid nextSpawnTime for ${entry.bossName}: ${entry.nextSpawnTime}`);
           continue;
         }
-
-        // Skip if spawn already passed
-        if (nextSpawn < now) {
-          console.log(`⏭️ Skipping past spawn: ${entry.bossName} (${formatGMT8(nextSpawn)})`);
-          continue;
-        }
-
-        // Reschedule timer
-        const timerId = scheduleReminder(entry.bossName, nextSpawn);
 
         // Parse killTime (may be null/invalid for directly set spawns)
         let killTime = null;
@@ -149,6 +140,26 @@ async function loadRecoveryAndReschedule() {
             killTime = parsed;
           }
         }
+
+        // If spawn already passed, recalculate to find next future spawn
+        if (nextSpawn < now) {
+          const bossType = getBossType(entry.bossName);
+          if (bossType === 'timer' && killTime) {
+            // Recalculate with auto-forward
+            const result = calculateNextSpawn(entry.bossName, killTime);
+            nextSpawn = result.nextSpawn;
+            console.log(`⏭️ ${entry.bossName}: Past spawn detected, fast-forwarded to ${formatGMT8(nextSpawn)}`);
+
+            // Update sheet with new spawn time
+            saveRecoveryData(entry.bossName, killTime, nextSpawn, entry.killedBy || 'recovery');
+          } else {
+            console.log(`⏭️ Skipping past spawn: ${entry.bossName} (${formatGMT8(nextSpawn)})`);
+            continue;
+          }
+        }
+
+        // Reschedule timer
+        const timerId = scheduleReminder(entry.bossName, nextSpawn);
 
         bossKillTimes.set(entry.bossName.toLowerCase(), {
           killTime,
