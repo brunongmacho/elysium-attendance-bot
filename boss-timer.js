@@ -321,21 +321,11 @@ function parseKillTime(timeStr, dateStr) {
  */
 function calculateNextSpawn(bossName, killTime) {
   const bossType = getBossType(bossName);
-  const now = new Date();
 
   if (bossType === 'timer') {
     // Timer-based: add spawn interval to kill time
     const intervalHours = bossSpawnConfig.timerBasedBosses[bossName].spawnIntervalHours;
-    const intervalMs = intervalHours * 60 * 60 * 1000;
-    let nextSpawn = new Date(killTime.getTime() + intervalMs);
-
-    // If spawn time is in the past, keep adding intervals until it's in the future
-    while (nextSpawn < now) {
-      console.log(`⏭️ ${bossName} spawn ${formatGMT8(nextSpawn)} already passed, adding ${intervalHours}h`);
-      nextSpawn = new Date(nextSpawn.getTime() + intervalMs);
-    }
-
-    return nextSpawn;
+    return new Date(killTime.getTime() + intervalHours * 60 * 60 * 1000);
   } else if (bossType === 'schedule') {
     // Schedule-based: find next scheduled time
     const schedules = bossSpawnConfig.scheduleBasedBosses[bossName].schedules;
