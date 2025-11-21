@@ -15,6 +15,64 @@ const { EmbedBuilder } = require('discord.js');
 const bossTimer = require('./boss-timer');
 
 /**
+ * Parse command args to extract boss name, time, and date
+ * Handles cases where AM/PM is a separate argument (e.g., "09:35 PM")
+ * @param {string[]} args - Command arguments
+ * @returns {{bossName: string, timeArg: string|null, dateArg: string|null}}
+ */
+function parseCommandArgs(args) {
+  let bossNameParts = [];
+  let timeArg = null;
+  let dateArg = null;
+  let i = 0;
+
+  // Helper to check if string looks like a time
+  const isTime = (str) => str && (str.includes(':') || /^\d{1,2}(am|pm)$/i.test(str));
+
+  // Helper to check if string is AM/PM suffix
+  const isAmPm = (str) => str && /^(a\.?m\.?|p\.?m\.?)$/i.test(str);
+
+  // Helper to check if string looks like a date (mm/dd)
+  const isDate = (str) => str && /^\d{1,2}\/\d{1,2}$/.test(str);
+
+  // Collect boss name parts until we hit a time
+  while (i < args.length) {
+    if (isTime(args[i])) {
+      timeArg = args[i];
+      i++;
+      // Check if next arg is AM/PM (separate from time)
+      if (i < args.length && isAmPm(args[i])) {
+        timeArg += args[i]; // Combine: "09:35" + "PM" = "09:35PM"
+        i++;
+      }
+      // Check for optional date
+      if (i < args.length && isDate(args[i])) {
+        dateArg = args[i];
+        i++;
+      }
+      break;
+    } else if (isAmPm(args[i])) {
+      // Standalone AM/PM without time - skip it
+      i++;
+    } else if (isDate(args[i])) {
+      // Date without time
+      dateArg = args[i];
+      i++;
+    } else {
+      // Part of boss name
+      bossNameParts.push(args[i]);
+      i++;
+    }
+  }
+
+  return {
+    bossName: bossNameParts.join(' '),
+    timeArg,
+    dateArg
+  };
+}
+
+/**
  * Handle !killed command
  * Usage: !killed <boss> [time] [mm/dd]
  */
@@ -29,28 +87,8 @@ async function handleKilled(message, args, config) {
     return message.reply('❌ Usage: `!killed <boss> [time] [mm/dd]`\nExample: `!killed venatus 9:15 01/19`');
   }
 
-  // Parse boss name (might be multi-word)
-  let bossNameParts = [args[0]];
-  let timeArg = null;
-  let dateArg = null;
-
-  // Check if second arg is a time or part of boss name
-  if (args.length >= 2) {
-    if (args[1].includes(':') || args[1].includes('am') || args[1].includes('pm')) {
-      // It's a time
-      timeArg = args[1];
-      dateArg = args[2]; // Optional
-    } else {
-      // It's part of boss name
-      bossNameParts.push(args[1]);
-      if (args.length >= 3 && (args[2].includes(':') || args[2].includes('am') || args[2].includes('pm'))) {
-        timeArg = args[2];
-        dateArg = args[3];
-      }
-    }
-  }
-
-  const bossInput = bossNameParts.join(' ');
+  // Parse args (handles "09:35 PM" split across arguments)
+  const { bossName: bossInput, timeArg, dateArg } = parseCommandArgs(args);
   const bossName = bossTimer.findBossName(bossInput);
 
   if (!bossName) {
@@ -385,32 +423,13 @@ async function handleSetBoss(message, args, config) {
     return message.reply('❌ Usage: `!setboss <boss> <time> [mm/dd]`\nExample: `!setboss venatus 19:15` or `!setboss venatus 7:15pm 01/20`');
   }
 
-  // Parse boss name (might be multi-word)
-  let bossNameParts = [args[0]];
-  let timeArg = null;
-  let dateArg = null;
-
-  // Check if second arg is a time or part of boss name
-  if (args.length >= 2) {
-    if (args[1].includes(':') || args[1].toLowerCase().includes('am') || args[1].toLowerCase().includes('pm')) {
-      // It's a time
-      timeArg = args[1];
-      dateArg = args[2]; // Optional
-    } else {
-      // It's part of boss name
-      bossNameParts.push(args[1]);
-      if (args.length >= 3 && (args[2].includes(':') || args[2].toLowerCase().includes('am') || args[2].toLowerCase().includes('pm'))) {
-        timeArg = args[2];
-        dateArg = args[3];
-      }
-    }
-  }
+  // Parse args (handles "09:35 PM" split across arguments)
+  const { bossName: bossInput, timeArg, dateArg } = parseCommandArgs(args);
 
   if (!timeArg) {
     return message.reply('❌ Please provide a spawn time.\nUsage: `!setboss <boss> <time> [mm/dd]`');
   }
 
-  const bossInput = bossNameParts.join(' ');
   const bossName = bossTimer.findBossName(bossInput);
 
   if (!bossName) {

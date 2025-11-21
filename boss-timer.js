@@ -170,23 +170,43 @@ async function loadRecoveryAndReschedule() {
 // ============================================================================
 
 /**
- * Find boss name from user input (case-insensitive, handles multi-word)
+ * Find boss name from user input (case-insensitive, supports partial/fuzzy matching)
  * @param {string} input - User input
  * @returns {string|null} Matched boss name or null
  */
 function findBossName(input) {
   const normalized = input.toLowerCase().trim();
+  const allBosses = [];
 
-  // Check timer-based bosses
+  // Collect all boss names
   for (const boss of Object.keys(bossSpawnConfig.timerBasedBosses)) {
-    if (boss.startsWith('_')) continue; // Skip metadata keys
+    if (!boss.startsWith('_')) allBosses.push(boss);
+  }
+  for (const boss of Object.keys(bossSpawnConfig.scheduleBasedBosses)) {
+    if (!boss.startsWith('_')) allBosses.push(boss);
+  }
+
+  // 1. Exact match (case-insensitive)
+  for (const boss of allBosses) {
     if (boss.toLowerCase() === normalized) return boss;
   }
 
-  // Check schedule-based bosses
-  for (const boss of Object.keys(bossSpawnConfig.scheduleBasedBosses)) {
-    if (boss.startsWith('_')) continue; // Skip metadata keys
-    if (boss.toLowerCase() === normalized) return boss;
+  // 2. Starts with match (e.g., "baron" matches "Baron Braudmore")
+  for (const boss of allBosses) {
+    if (boss.toLowerCase().startsWith(normalized)) return boss;
+  }
+
+  // 3. Contains match (e.g., "braud" matches "Baron Braudmore")
+  for (const boss of allBosses) {
+    if (boss.toLowerCase().includes(normalized)) return boss;
+  }
+
+  // 4. Any word starts with input (e.g., "aquleus" matches "General Aquleus")
+  for (const boss of allBosses) {
+    const words = boss.toLowerCase().split(' ');
+    for (const word of words) {
+      if (word.startsWith(normalized)) return boss;
+    }
   }
 
   return null;
@@ -220,7 +240,8 @@ function getNextScheduledSpawn(bossName) {
 
 /**
  * Parse kill time from user input (times are in GMT+8 / Asia/Manila)
- * @param {string} timeStr - Time string (e.g., "9:15", "21:30", "9:15am", "9:15pm")
+ * Supports formats: "9:15", "21:30", "9:15am", "9:15pm", "9:15 AM", "9:15 PM"
+ * @param {string} timeStr - Time string
  * @param {string} dateStr - Date string (e.g., "01/19", "12/31")
  * @returns {Date} Parsed kill time in UTC
  */
@@ -237,12 +258,21 @@ function parseKillTime(timeStr, dateStr) {
   let minutes = 0;
 
   if (timeStr) {
-    // Handle 12hr format (9:15am, 9:15pm)
-    const isPM = timeStr.toLowerCase().includes('pm');
-    const isAM = timeStr.toLowerCase().includes('am');
-    const cleanTime = timeStr.replace(/[ap]m/i, '');
-    [hours, minutes] = cleanTime.split(':').map(Number);
+    // Normalize the time string - remove spaces around am/pm
+    const normalizedTime = timeStr.trim().toLowerCase();
 
+    // Check for AM/PM (handles "9:15pm", "9:15 pm", "9:15PM", "9:15 PM")
+    const isPM = /p\.?m\.?$/i.test(normalizedTime) || normalizedTime.includes('pm');
+    const isAM = /a\.?m\.?$/i.test(normalizedTime) || normalizedTime.includes('am');
+
+    // Remove am/pm and any surrounding spaces, then extract time
+    const cleanTime = normalizedTime.replace(/\s*(a\.?m\.?|p\.?m\.?)\s*/gi, '').trim();
+    const timeParts = cleanTime.split(':');
+
+    hours = parseInt(timeParts[0], 10) || 0;
+    minutes = parseInt(timeParts[1], 10) || 0;
+
+    // Convert 12-hour to 24-hour format
     if (isPM && hours !== 12) hours += 12;
     if (isAM && hours === 12) hours = 0;
   }
@@ -398,7 +428,7 @@ async function triggerSpawnReminder(bossName, spawnTime) {
     console.log(`🔔 Triggering spawn reminder for ${bossName}`);
 
     // Get announcement channel
-    const announcementChannel = await client.channels.fetch(config.bossSpawnAnnouncementChannelId);
+    const announcementChannel = await client.channels.fetch(config.boss_spawn_announcement_channel_id);
     if (!announcementChannel) {
       console.error('❌ Boss spawn announcement channel not found');
       return;
@@ -697,7 +727,7 @@ async function handleNoSpawn(bossName, userId) {
       }
 
       // Post in announcement channel
-      const announcementChannel = await client.channels.fetch(config.bossSpawnAnnouncementChannelId);
+      const announcementChannel = await client.channels.fetch(config.boss_spawn_announcement_channel_id);
       if (announcementChannel) {
         await announcementChannel.send(`❌ **${bossName} spawn cancelled** - Wrong timer data reported by <@${userId}>\n\nPlease wait for actual spawn confirmation.`);
       }
@@ -752,7 +782,7 @@ async function handleSpawned(bossName, userId) {
     const thread = await attendance.createThreadForBoss(bossName, now);
 
     // Post confirmation in announcement channel
-    const announcementChannel = await client.channels.fetch(config.bossSpawnAnnouncementChannelId);
+    const announcementChannel = await client.channels.fetch(config.boss_spawn_announcement_channel_id);
     if (announcementChannel) {
       const timestamp = Math.floor(now.getTime() / 1000);
       await announcementChannel.send(
