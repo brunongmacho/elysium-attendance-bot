@@ -1660,14 +1660,16 @@ function startAutoCloseScheduler(client) {
  * @returns {Promise<Object>} Thread object
  */
 async function createThreadForBoss(discordClient, bossName, spawnTime) {
-  // Format date and time for thread
+  // Format date and time for thread (GMT+8 / Asia/Manila)
   const dateStr = spawnTime.toLocaleDateString('en-US', {
+    timeZone: 'Asia/Manila',
     month: '2-digit',
     day: '2-digit',
     year: '2-digit'
   }).replace(/\//g, '/'); // MM/DD/YY
 
   const timeStr = spawnTime.toLocaleTimeString('en-US', {
+    timeZone: 'Asia/Manila',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false

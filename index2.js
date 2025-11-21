@@ -5395,7 +5395,7 @@ client.on(Events.MessageCreate, async (message) => {
               return; // Timer will handle at 5-min reminder
             } else {
               // Times are far apart - trust external bot and cancel old timer
-              console.warn(`⚠️ TIME MISMATCH: Timer expects ${timerTime.toLocaleString()}, external bot says ${externalBotTime.toLocaleString()}`);
+              console.warn(`⚠️ TIME MISMATCH: Timer expects ${timerTime.toLocaleString('en-US', { timeZone: 'Asia/Manila' })}, external bot says ${externalBotTime.toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`);
               console.warn(`⚠️ Difference: ${Math.round(timeDiff)} minutes - Using external bot spawn time`);
 
               // Cancel the incorrect timer to prevent duplicate thread

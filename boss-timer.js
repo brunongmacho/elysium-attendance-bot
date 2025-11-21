@@ -134,7 +134,7 @@ async function loadRecoveryAndReschedule() {
 
         // Skip if spawn already passed
         if (nextSpawn < now) {
-          console.log(`⏭️ Skipping past spawn: ${entry.bossName} (${nextSpawn.toLocaleString()})`);
+          console.log(`⏭️ Skipping past spawn: ${entry.bossName} (${formatGMT8(nextSpawn)})`);
           continue;
         }
 
