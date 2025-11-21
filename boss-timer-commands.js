@@ -60,13 +60,41 @@ async function handleKilled(message, args, config) {
   try {
     // Parse kill time
     const killTime = bossTimer.parseKillTime(timeArg, dateArg);
+    const killTimestamp = Math.floor(killTime.getTime() / 1000);
 
-    // Record kill
+    // Check if scheduled boss - they have fixed spawn times
+    const bossType = bossTimer.getBossType(bossName);
+    if (bossType === 'schedule') {
+      // For scheduled bosses, just log the kill and show next scheduled spawn
+      const nextSpawn = bossTimer.getNextScheduledSpawn(bossName);
+      const timestamp = Math.floor(nextSpawn.getTime() / 1000);
+
+      const embed = new EmbedBuilder()
+        .setColor(0x9b59b6)
+        .setTitle('📅 Scheduled Boss Kill Logged')
+        .setDescription(`**${bossName}** killed at <t:${killTimestamp}:t>`)
+        .addFields({
+          name: '📌 Next Scheduled Spawn',
+          value: `<t:${timestamp}:F> - <t:${timestamp}:R>`,
+          inline: false
+        })
+        .addFields({
+          name: 'ℹ️ Note',
+          value: 'This is a scheduled boss - spawn time is fixed regardless of kill time.',
+          inline: false
+        })
+        .setFooter({ text: `Logged by ${message.author.username}` })
+        .setTimestamp();
+
+      await message.reply({ embeds: [embed] });
+      return;
+    }
+
+    // Timer-based boss - record kill and calculate spawn time
     const result = await bossTimer.recordKill(bossName, killTime, message.author.username);
 
     // Send confirmation
     const timestamp = Math.floor(result.nextSpawn.getTime() / 1000);
-    const killTimestamp = Math.floor(killTime.getTime() / 1000);
 
     const embed = new EmbedBuilder()
       .setColor(0x00ff00)
