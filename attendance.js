@@ -422,19 +422,59 @@ async function createSpawnThreads(
     return { success: false, error: 'Column already exists (duplicate spawn)' };
   }
 
-  // NEW: Prevent duplicate threads for same boss within 4 hours (min spawn interval is 10h)
-  const DUPLICATE_PROTECTION_HOURS = 4;
-  const now = Date.now();
+  // NEW: Prevent duplicate threads for same boss if spawn times are close
+  // This allows legitimate new threads when timer was wrong but blocks true duplicates
+  const DUPLICATE_TIME_THRESHOLD_MINUTES = 60; // Block if spawn times within 1 hour
   for (const [threadId, spawn] of Object.entries(activeSpawns)) {
     if (spawn.boss.toLowerCase() === bossName.toLowerCase() && !spawn.closed) {
-      const hoursSinceCreated = (now - spawn.createdAt) / (1000 * 60 * 60);
-      if (hoursSinceCreated < DUPLICATE_PROTECTION_HOURS) {
-        console.log(`⚠️ BLOCKED DUPLICATE: ${bossName} thread already exists (created ${hoursSinceCreated.toFixed(1)}h ago)`);
+      // Compare spawn timestamps (not creation time)
+      // Parse existing thread's timestamp (format: "MM/DD/YY HH:MM")
+      const existingTimestamp = spawn.timestamp;
+      const newTimestamp = fullTimestamp;
+
+      // Simple comparison: if timestamps are identical or very close, block
+      if (existingTimestamp === newTimestamp) {
+        console.log(`⚠️ BLOCKED DUPLICATE: ${bossName} - identical timestamp ${newTimestamp}`);
         await adminLogs.send(
           `⚠️ **BLOCKED DUPLICATE:** ${bossName} at ${fullTimestamp}\n` +
-          `Thread already exists: <#${threadId}> (created ${hoursSinceCreated.toFixed(1)}h ago)`
+          `Thread already exists: <#${threadId}> (same timestamp)`
         );
-        return { success: false, error: `Thread for ${bossName} already exists (created ${hoursSinceCreated.toFixed(1)}h ago)` };
+        return { success: false, error: `Thread for ${bossName} at ${newTimestamp} already exists` };
+      }
+
+      // Parse timestamps to compare time difference
+      try {
+        const parseTimestamp = (ts) => {
+          // Format: "MM/DD/YY HH:MM"
+          const [datePart, timePart] = ts.split(' ');
+          const [month, day, year] = datePart.split('/').map(Number);
+          const [hours, minutes] = timePart.split(':').map(Number);
+          const fullYear = year < 100 ? 2000 + year : year;
+          return new Date(fullYear, month - 1, day, hours, minutes);
+        };
+
+        const existingTime = parseTimestamp(existingTimestamp);
+        const newTime = parseTimestamp(newTimestamp);
+        const timeDiffMinutes = Math.abs(newTime - existingTime) / (1000 * 60);
+
+        if (timeDiffMinutes < DUPLICATE_TIME_THRESHOLD_MINUTES) {
+          console.log(`⚠️ BLOCKED DUPLICATE: ${bossName} - times too close (${timeDiffMinutes.toFixed(0)} min apart)`);
+          await adminLogs.send(
+            `⚠️ **BLOCKED DUPLICATE:** ${bossName} at ${fullTimestamp}\n` +
+            `Thread already exists: <#${threadId}> at ${existingTimestamp} (${timeDiffMinutes.toFixed(0)} min apart)`
+          );
+          return { success: false, error: `Thread for ${bossName} already exists (${timeDiffMinutes.toFixed(0)} min apart)` };
+        } else {
+          // Times are far apart - this is a different spawn event, allow but log
+          console.log(`✅ Allowing new ${bossName} thread - existing at ${existingTimestamp}, new at ${newTimestamp} (${timeDiffMinutes.toFixed(0)} min apart)`);
+        }
+      } catch (parseError) {
+        // If parsing fails, fall back to blocking if created recently
+        const hoursSinceCreated = (Date.now() - spawn.createdAt) / (1000 * 60 * 60);
+        if (hoursSinceCreated < 1) {
+          console.log(`⚠️ BLOCKED DUPLICATE: ${bossName} - created ${hoursSinceCreated.toFixed(1)}h ago (timestamp parse failed)`);
+          return { success: false, error: `Thread for ${bossName} already exists` };
+        }
       }
     }
   }
