@@ -150,6 +150,8 @@ async function loadRecoveryAndReschedule() {
 
     // Schedule reminders for schedule-based bosses
     for (const [bossName, bossConfig] of Object.entries(bossSpawnConfig.scheduleBasedBosses)) {
+      // Skip metadata keys like _note
+      if (bossName.startsWith('_')) continue;
       const nextSpawn = findNextScheduledTime(bossConfig.schedules);
       if (nextSpawn) {
         scheduleReminder(bossName, nextSpawn);
@@ -177,11 +179,13 @@ function findBossName(input) {
 
   // Check timer-based bosses
   for (const boss of Object.keys(bossSpawnConfig.timerBasedBosses)) {
+    if (boss.startsWith('_')) continue; // Skip metadata keys
     if (boss.toLowerCase() === normalized) return boss;
   }
 
   // Check schedule-based bosses
   for (const boss of Object.keys(bossSpawnConfig.scheduleBasedBosses)) {
+    if (boss.startsWith('_')) continue; // Skip metadata keys
     if (boss.toLowerCase() === normalized) return boss;
   }
 
@@ -528,6 +532,8 @@ function getUpcomingSpawns(hours = 24) {
 
   // Schedule-based bosses (always show)
   for (const [bossName, bossConfig] of Object.entries(bossSpawnConfig.scheduleBasedBosses)) {
+    // Skip metadata keys like _note
+    if (bossName.startsWith('_')) continue;
     const nextSpawn = findNextScheduledTime(bossConfig.schedules);
     if (nextSpawn >= now && nextSpawn <= cutoff) {
       upcoming.push({
@@ -725,6 +731,8 @@ async function maintenance() {
 
   // Reset all timer-based bosses
   for (const [bossName, bossConfig] of Object.entries(bossSpawnConfig.timerBasedBosses)) {
+    // Skip metadata keys like _note
+    if (bossName.startsWith('_')) continue;
     const intervalHours = bossConfig.spawnIntervalHours;
     const nextSpawn = new Date(now.getTime() + intervalHours * 60 * 60 * 1000);
 
@@ -784,6 +792,7 @@ async function clearKills() {
 
   // Clear timer-based from cache
   for (const bossName of Object.keys(bossSpawnConfig.timerBasedBosses)) {
+    if (bossName.startsWith('_')) continue; // Skip metadata keys
     bossKillTimes.delete(bossName.toLowerCase());
   }
 
@@ -819,6 +828,8 @@ function getAllTimers() {
 
   // Schedule-based bosses
   for (const [bossName, bossConfig] of Object.entries(bossSpawnConfig.scheduleBasedBosses)) {
+    // Skip metadata keys like _note
+    if (bossName.startsWith('_')) continue;
     const nextSpawn = findNextScheduledTime(bossConfig.schedules);
     scheduleBased.push({
       bossName,
