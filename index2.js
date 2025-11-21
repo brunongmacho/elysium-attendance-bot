@@ -4724,31 +4724,52 @@ stats: async (message, member, args) => {
             const emoji = rotation.isOurTurn ? '🟢' : '🔴';
             const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
 
-            // Get ML-enhanced spawn prediction
+            // Get spawn time - check boss timer first, then fall back to predictions
             let spawnInfo = '';
+            let spawnTimestamp = null;
+            let mlWindow = '';
+            let isFromTimer = false;
+
+            // First, check boss timer for recorded spawn times
             try {
-              const prediction = await intelligenceEngine.predictNextSpawnTime(boss);
-              if (prediction && !prediction.error) {
-                // Try to get ML enhancement (skip for schedule-based bosses)
-                let mlEnhancement = null;
-                if (mlIntegration && prediction.spawnType !== 'schedule') {
-                  mlEnhancement = await mlIntegration.enhanceSpawnPrediction(
-                    prediction.bossName,
-                    prediction.lastSpawnTime,
-                    prediction.avgIntervalHours || 24
-                  );
-                }
-
-                const spawnTimestamp = Math.floor(prediction.predictedTime.getTime() / 1000);
-                const mlWindow = mlEnhancement && mlEnhancement.method === 'ml'
-                  ? ` (±${Math.round(mlEnhancement.confidenceInterval.windowMinutes / 2)}min 🤖)`
-                  : '';
-
-                spawnInfo = `\n📍 Next Spawn: <t:${spawnTimestamp}:R>${mlWindow}`;
+              const timerData = bossTimer.getNextSpawn(boss);
+              if (timerData && timerData.nextSpawn) {
+                spawnTimestamp = Math.floor(timerData.nextSpawn.getTime() / 1000);
+                isFromTimer = true;
               }
-            } catch (predError) {
-              // Silently skip prediction if it fails
-              console.warn(`[Rotation] Failed to predict ${boss}:`, predError.message);
+            } catch (timerError) {
+              // Silently continue to prediction fallback
+            }
+
+            // Fall back to ML prediction if no timer data
+            if (!spawnTimestamp) {
+              try {
+                const prediction = await intelligenceEngine.predictNextSpawnTime(boss);
+                if (prediction && !prediction.error) {
+                  // Try to get ML enhancement (skip for schedule-based bosses)
+                  let mlEnhancement = null;
+                  if (mlIntegration && prediction.spawnType !== 'schedule') {
+                    mlEnhancement = await mlIntegration.enhanceSpawnPrediction(
+                      prediction.bossName,
+                      prediction.lastSpawnTime,
+                      prediction.avgIntervalHours || 24
+                    );
+                  }
+
+                  spawnTimestamp = Math.floor(prediction.predictedTime.getTime() / 1000);
+                  mlWindow = mlEnhancement && mlEnhancement.method === 'ml'
+                    ? ` (±${Math.round(mlEnhancement.confidenceInterval.windowMinutes / 2)}min 🤖)`
+                    : '';
+                }
+              } catch (predError) {
+                // Silently skip prediction if it fails
+                console.warn(`[Rotation] Failed to predict ${boss}:`, predError.message);
+              }
+            }
+
+            if (spawnTimestamp) {
+              const sourceIndicator = isFromTimer ? ' ⏱️' : mlWindow;
+              spawnInfo = `\n📍 Next Spawn: <t:${spawnTimestamp}:R>${sourceIndicator}`;
             }
 
             const guildCount = rotation.guilds ? rotation.guilds.length : 5;
@@ -5036,7 +5057,7 @@ client.once(Events.ClientReady, async () => {
   emergencyCommands.initialize(config, attendance, bidding, auctioneering, isAdmin, discordCache);
   leaderboardSystem.init(client, config, discordCache);
   activityHeatmap.init(client, config);
-  bossRotation.initialize(config, client, intelligenceEngine);
+  bossRotation.initialize(config, client, intelligenceEngine, bossTimer);
   proactiveIntelligence = new ProactiveIntelligence(client, config, intelligenceEngine);
   await proactiveIntelligence.initialize();
   nlpHandler = new NLPHandler(config);
@@ -5602,9 +5623,21 @@ client.on(Events.MessageCreate, async (message) => {
 
       if (conversationResponse) {
         console.log(`💬 [NLP Conversation] User: "${message.content.substring(0, 50)}..." → Roasting back`);
-        await message.reply(conversationResponse).catch((error) => {
-          console.error('❌ Error sending conversation response:', error);
-        });
+        // Try to reply, fall back to channel.send if it's a system message
+        try {
+          if (message.system) {
+            await message.channel.send(conversationResponse);
+          } else {
+            await message.reply(conversationResponse);
+          }
+        } catch (error) {
+          // If reply fails (e.g., system message), try sending to channel instead
+          if (error.code === 50035) {
+            await message.channel.send(conversationResponse).catch(console.error);
+          } else {
+            console.error('❌ Error sending conversation response:', error);
+          }
+        }
         return; // Return early - this was handled as conversation
       }
     }
