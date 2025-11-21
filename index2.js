@@ -5468,6 +5468,9 @@ client.on(Events.MessageCreate, async (message) => {
 
     // Boss timer commands (before other command processing)
     const content = message.content.toLowerCase();
+    const inBossTimerChannel = message.channel.id === config.boss_timer_channel_id;
+
+    // Boss timer channel specific commands
     if (content.startsWith('!killed ')) {
       const args = message.content.slice(8).trim().split(/\s+/);
       return await bossTimerCommands.handleKilled(message, args, config);
@@ -5508,6 +5511,15 @@ client.on(Events.MessageCreate, async (message) => {
     if (content.startsWith('!setboss ')) {
       const args = message.content.slice(9).trim().split(/\s+/);
       return await bossTimerCommands.handleSetBoss(message, args, config);
+    }
+    // !help in boss timer channel shows boss timer help
+    if (content === '!help' && inBossTimerChannel) {
+      return await bossTimerCommands.handleHelp(message);
+    }
+
+    // Block all other commands in boss timer channel
+    if (inBossTimerChannel && content.startsWith('!')) {
+      return message.reply('❌ Only boss timer commands work here. Use `!help` to see available commands.');
     }
 
     const guild = message.guild;
