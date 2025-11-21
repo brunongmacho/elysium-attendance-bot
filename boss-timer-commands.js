@@ -220,7 +220,7 @@ async function handleMaintenance(message) {
       const timestamp = Math.floor(firstSpawn.nextSpawn.getTime() / 1000);
       embed.addFields({
         name: '⏰ First Spawn',
-        value: `**${firstSpawn.bossName}** at <t:${timestamp}:F> - <t:${timestamp}:R}`,
+        value: `**${firstSpawn.bossName}** at <t:${timestamp}:F> - <t:${timestamp}:R>`,
         inline: false
       });
     }
@@ -415,6 +415,14 @@ async function handleSetBoss(message, args, config) {
 
   if (!bossName) {
     return message.reply(`❌ Boss "${bossInput}" not found. Check spelling or use \`!timers\` to see available bosses.`);
+  }
+
+  // Check if scheduled boss - they have fixed spawn times
+  const bossType = bossTimer.getBossType(bossName);
+  if (bossType === 'schedule') {
+    const nextSpawn = bossTimer.getNextScheduledSpawn(bossName);
+    const timestamp = Math.floor(nextSpawn.getTime() / 1000);
+    return message.reply(`⚠️ **${bossName}** is a scheduled boss with fixed spawn times.\nNext spawn: <t:${timestamp}:F> - <t:${timestamp}:R>\n\nUse \`!setboss\` only for timer-based bosses.`);
   }
 
   try {
