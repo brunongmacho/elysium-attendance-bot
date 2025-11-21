@@ -133,12 +133,10 @@ async function handleKilled(message, args, config) {
 
     // Send confirmation
     const timestamp = Math.floor(result.nextSpawn.getTime() / 1000);
-    const now = new Date();
-    const spawnInPast = result.nextSpawn < now;
 
     const embed = new EmbedBuilder()
-      .setColor(spawnInPast ? 0xffa500 : 0x00ff00) // Orange if past, green if future
-      .setTitle(spawnInPast ? '⚠️ Boss Kill Recorded (Spawn Already Passed)' : '✅ Boss Kill Recorded')
+      .setColor(0x00ff00)
+      .setTitle('✅ Boss Kill Recorded')
       .setDescription(`**${result.bossName}** killed at <t:${killTimestamp}:t>`)
       .addFields({
         name: '⏰ Next Spawn',
@@ -146,11 +144,11 @@ async function handleKilled(message, args, config) {
         inline: false
       });
 
-    // Add warning if spawn is in the past
-    if (spawnInPast) {
+    // Add note if spawns were skipped (kill time was old)
+    if (result.skippedSpawns > 0) {
       embed.addFields({
-        name: '⚠️ Action Needed',
-        value: `This spawn already happened! If ${result.bossName} was killed after spawning, please record that kill:\n\`!killed ${bossName.toLowerCase()} <time it was killed>\`\n\nOr set next spawn directly:\n\`!setboss ${bossName.toLowerCase()} <next spawn time>\``,
+        name: 'ℹ️ Note',
+        value: `Skipped ${result.skippedSpawns} past spawn(s) to calculate next future spawn.`,
         inline: false
       });
     }
