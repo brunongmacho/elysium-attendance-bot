@@ -4,8 +4,8 @@
  * ============================================================================
  *
  * Command handlers for boss timer system.
- * Commands: !killed, !setboss, !nextspawn, !timers, !unkill, !nospawn,
- *           !spawned, !maintenance, !clearkills
+ * Commands: !killed, !setboss, !nextspawn, !unkill, !nospawn, !spawned,
+ *           !maintenance, !clearkills
  *
  * @module boss-timer-commands
  * ============================================================================
@@ -132,62 +132,6 @@ async function handleNextSpawn(message) {
     await message.reply({ embeds: [embed] });
   } catch (error) {
     console.error('Error in !nextspawn command:', error);
-    return message.reply(`❌ Error: ${error.message}`);
-  }
-}
-
-/**
- * Handle !timers command (admin)
- */
-async function handleTimers(message, config) {
-  try {
-    const { timerBased, scheduleBased } = bossTimer.getAllTimers();
-
-    const embed = new EmbedBuilder()
-      .setColor(0xff9900)
-      .setTitle('⏱️ Active Boss Timers');
-
-    // Timer-based bosses
-    if (timerBased.length > 0) {
-      let timerText = '';
-      for (const boss of timerBased) {
-        const timestamp = Math.floor(boss.nextSpawn.getTime() / 1000);
-        timerText += `• **${boss.bossName}** - <t:${timestamp}:F> - <t:${timestamp}:R>\n`;
-      }
-      embed.addFields({
-        name: `Timer-Based (${timerBased.length} active)`,
-        value: timerText || 'None',
-        inline: false
-      });
-    } else {
-      embed.addFields({
-        name: 'Timer-Based',
-        value: 'No active timers. Use `!killed` to record boss kills.',
-        inline: false
-      });
-    }
-
-    // Schedule-based bosses
-    let scheduleText = '';
-    for (const boss of scheduleBased.slice(0, 5)) { // Show first 5
-      const timestamp = Math.floor(boss.nextSpawn.getTime() / 1000);
-      scheduleText += `• **${boss.bossName}** - <t:${timestamp}:t>\n`;
-    }
-    if (scheduleBased.length > 5) {
-      scheduleText += `\n...and ${scheduleBased.length - 5} more`;
-    }
-    embed.addFields({
-      name: `Schedule-Based (${scheduleBased.length} total)`,
-      value: scheduleText,
-      inline: false
-    });
-
-    embed.setFooter({ text: 'Use !nextspawn to see upcoming spawns' });
-    embed.setTimestamp();
-
-    await message.reply({ embeds: [embed] });
-  } catch (error) {
-    console.error('Error in !timers command:', error);
     return message.reply(`❌ Error: ${error.message}`);
   }
 }
@@ -487,7 +431,6 @@ async function handleSetBoss(message, args, config) {
 module.exports = {
   handleKilled,
   handleNextSpawn,
-  handleTimers,
   handleUnkill,
   handleMaintenance,
   handleClearKills,

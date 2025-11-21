@@ -5457,9 +5457,6 @@ client.on(Events.MessageCreate, async (message) => {
     if (content === '!nextspawn') {
       return await bossTimerCommands.handleNextSpawn(message);
     }
-    if (content === '!timers') {
-      return await bossTimerCommands.handleTimers(message, config);
-    }
     if (content.startsWith('!unkill ')) {
       const args = message.content.slice(8).trim().split(/\s+/);
       return await bossTimerCommands.handleUnkill(message, args, config);
