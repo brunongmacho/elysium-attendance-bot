@@ -218,6 +218,10 @@ function doPost(e) {
     if (action === 'saveRecoveryState') return saveRecoveryState(data);
     if (action === 'loadRecoveryState') return loadRecoveryState(data);
 
+    // Boss Timer Recovery actions (persist boss kill/spawn times across restarts)
+    if (action === 'getBossTimerRecovery') return getBossTimerRecovery();
+    if (action === 'saveBossTimerRecovery') return saveBossTimerRecovery(data);
+
     Logger.log(`❌ Unknown: ${action}`);
     return createResponse('error', 'Unknown action: ' + action);
 
