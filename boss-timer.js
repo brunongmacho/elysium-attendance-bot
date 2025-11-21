@@ -208,34 +208,47 @@ function getBossType(bossName) {
 // ============================================================================
 
 /**
- * Parse kill time from user input
+ * Parse kill time from user input (times are in GMT+8 / Asia/Manila)
  * @param {string} timeStr - Time string (e.g., "9:15", "21:30", "9:15am", "9:15pm")
  * @param {string} dateStr - Date string (e.g., "01/19", "12/31")
- * @returns {Date} Parsed kill time
+ * @returns {Date} Parsed kill time in UTC
  */
 function parseKillTime(timeStr, dateStr) {
-  let killTime = new Date();
+  // Get current date in GMT+8 for defaults
+  const now = new Date();
+  const gmt8Now = new Date(now.getTime() + TIMEZONE_OFFSET * 60 * 60 * 1000);
+
+  // Start with current date components in GMT+8
+  let year = gmt8Now.getUTCFullYear();
+  let month = gmt8Now.getUTCMonth();
+  let day = gmt8Now.getUTCDate();
+  let hours = 0;
+  let minutes = 0;
 
   if (timeStr) {
     // Handle 12hr format (9:15am, 9:15pm)
     const isPM = timeStr.toLowerCase().includes('pm');
     const isAM = timeStr.toLowerCase().includes('am');
     const cleanTime = timeStr.replace(/[ap]m/i, '');
-    let [hours, minutes] = cleanTime.split(':').map(Number);
+    [hours, minutes] = cleanTime.split(':').map(Number);
 
     if (isPM && hours !== 12) hours += 12;
     if (isAM && hours === 12) hours = 0;
-
-    killTime.setHours(hours, minutes, 0, 0);
   }
 
   if (dateStr) {
     // Parse mm/dd format
-    const [month, day] = dateStr.split('/').map(Number);
-    killTime.setMonth(month - 1, day);
+    const [m, d] = dateStr.split('/').map(Number);
+    month = m - 1;
+    day = d;
   }
 
-  return killTime;
+  // Create timestamp as if it's GMT+8, then convert to UTC
+  // by subtracting the timezone offset
+  const gmt8Timestamp = Date.UTC(year, month, day, hours, minutes, 0, 0);
+  const utcTimestamp = gmt8Timestamp - (TIMEZONE_OFFSET * 60 * 60 * 1000);
+
+  return new Date(utcTimestamp);
 }
 
 // ============================================================================
@@ -305,6 +318,24 @@ function findNextScheduledTime(schedules) {
 // ============================================================================
 
 /**
+ * Format a Date in GMT+8 for display
+ * @param {Date} date - Date to format
+ * @returns {string} Formatted date string in GMT+8
+ */
+function formatGMT8(date) {
+  return date.toLocaleString('en-US', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
+}
+
+/**
  * Schedule 5-minute reminder for boss spawn
  * @param {string} bossName - Boss name
  * @param {Date} spawnTime - Spawn time
@@ -317,7 +348,7 @@ function scheduleReminder(bossName, spawnTime) {
 
   // Skip if reminder time already passed
   if (delay < 0) {
-    console.log(`⏭️ Skipping past reminder for ${bossName} (spawn: ${spawnTime.toLocaleString()})`);
+    console.log(`⏭️ Skipping past reminder for ${bossName} (spawn: ${formatGMT8(spawnTime)})`);
     return null;
   }
 
@@ -325,7 +356,7 @@ function scheduleReminder(bossName, spawnTime) {
     await triggerSpawnReminder(bossName, spawnTime);
   }, delay);
 
-  console.log(`⏰ Scheduled reminder for ${bossName} at ${reminderTime.toLocaleString()} (spawn: ${spawnTime.toLocaleString()})`);
+  console.log(`⏰ Scheduled reminder for ${bossName} at ${formatGMT8(reminderTime)} (spawn: ${formatGMT8(spawnTime)})`);
 
   return timerId;
 }
