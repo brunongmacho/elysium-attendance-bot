@@ -76,6 +76,8 @@ const bidding = require("./bidding.js");                    // Auction bidding l
 const helpSystem = require("./help-system.js");             // Command help system
 const auctioneering = require("./auctioneering.js");        // Auction management
 const attendance = require("./attendance.js");              // Attendance tracking
+const bossTimer = require("./boss-timer.js");              // Boss timer system
+const bossTimerCommands = require("./boss-timer-commands.js"); // Boss timer commands
 // const lootSystem = require("./loot-system.js");          // Loot distribution (DISABLED: manual loot entry)
 const emergencyCommands = require("./emergency-commands.js"); // Emergency overrides
 const leaderboardSystem = require("./leaderboard-system.js"); // Leaderboards
@@ -5026,6 +5028,7 @@ client.once(Events.ClientReady, async () => {
 
   // INITIALIZE ALL MODULES IN CORRECT ORDER
   attendance.initialize(config, bossPoints, isAdmin, discordCache, intelligenceEngine);
+  await bossTimer.initialize(client, config, sheetAPI, attendance); // Boss timer system
   helpSystem.initialize(config, isAdmin, BOT_VERSION);
   auctioneering.initialize(config, isAdmin, bidding, discordCache, intelligenceEngine);
   bidding.initializeBidding(config, isAdmin, auctioneering, discordCache);
@@ -5111,19 +5114,28 @@ client.once(Events.ClientReady, async () => {
         );
       }
 
-      // Aggressive GC if memory pressure is high (>85%)
-      // Only log warning once per hour to reduce spam
-      if (memoryPressure > 85) {
-        const now = Date.now();
-        const oneHour = 60 * 60 * 1000;
-
-        if (now - lastMemoryWarning > oneHour) {
-          console.warn(`⚠️ HIGH MEMORY PRESSURE (${Math.round(memoryPressure)}%) - Running aggressive GC`);
-          lastMemoryWarning = now;
+      // Proactive cleanup for 512MB Koyeb - trigger at 70% to prevent buildup
+      if (memoryPressure > 70) {
+        // Clear caches before GC to free memory
+        if (intelligenceEngine) {
+          // Use aggressive clearing for high pressure (>80%)
+          intelligenceEngine.clearCaches(memoryPressure > 80);
         }
 
         global.gc();
-        global.gc(); // Second pass for aggressive collection
+
+        // Extra GC pass and warning for very high pressure
+        if (memoryPressure > 80) {
+          const now = Date.now();
+          const oneHour = 60 * 60 * 1000;
+
+          if (now - lastMemoryWarning > oneHour) {
+            console.warn(`⚠️ HIGH MEMORY PRESSURE (${Math.round(memoryPressure)}%) - Running aggressive GC`);
+            lastMemoryWarning = now;
+          }
+
+          global.gc(); // Second pass for aggressive collection
+        }
       }
 
       // Alert if approaching Koyeb 512MB limit (rate limited to once per hour)
@@ -5330,6 +5342,7 @@ client.on(Events.MessageCreate, async (message) => {
             `🎯 Boss spawn detected: ${bossName} (from ${message.author.username})`
           );
 
+          // Parse timestamp from external bot first
           let dateStr, timeStr, fullTimestamp;
 
           if (timestamp) {
@@ -5338,7 +5351,7 @@ client.on(Events.MessageCreate, async (message) => {
             dateStr = `${month}/${day}/${year.substring(2)}`;
             timeStr = timePart;
             fullTimestamp = `${dateStr} ${timeStr}`;
-            console.log(`⏰ Using timestamp from timer: ${fullTimestamp}`);
+            console.log(`⏰ External bot timestamp: ${fullTimestamp}`);
           } else {
             const ts = attendance.getCurrentTimestamp();
             dateStr = ts.date;
@@ -5347,13 +5360,46 @@ client.on(Events.MessageCreate, async (message) => {
             console.log(`⏰ Using current timestamp: ${fullTimestamp}`);
           }
 
+          // CHECK IF BOSS WAS RECENTLY HANDLED BY TIMER SYSTEM
+          const recentlyHandled = bossTimer.wasRecentlyHandled(bossName);
+          if (recentlyHandled) {
+            const timeSince = Math.round((Date.now() - recentlyHandled.handledAt) / 1000 / 60);
+            console.log(`⏭️ ${bossName} was recently handled by timer (${timeSince}min ago) - skipping external bot to prevent duplicate`);
+            return;
+          }
+
+          // CHECK IF BOSS TIMER HAS THIS BOSS
+          const timerData = bossTimer.getNextSpawn(bossName);
+          if (timerData && timerData.nextSpawn) {
+            // Check if times are close (within 1 hour)
+            const externalBotTime = new Date(`${dateStr} ${timeStr}`);
+            const timerTime = timerData.nextSpawn;
+            const timeDiff = Math.abs(timerTime - externalBotTime) / 1000 / 60; // minutes
+
+            if (timeDiff <= 60) {
+              // Times are close - trust timer
+              console.log(`⏭️ Timer has ${bossName} and times match (${Math.round(timeDiff)}min diff) - skipping external bot`);
+              return; // Timer will handle at 5-min reminder
+            } else {
+              // Times are far apart - trust external bot and cancel old timer
+              console.warn(`⚠️ TIME MISMATCH: Timer expects ${timerTime.toLocaleString()}, external bot says ${externalBotTime.toLocaleString()}`);
+              console.warn(`⚠️ Difference: ${Math.round(timeDiff)} minutes - Using external bot spawn time`);
+
+              // Cancel the incorrect timer to prevent duplicate thread
+              await bossTimer.cancelTimer(bossName);
+              console.log(`🗑️ Cancelled incorrect timer for ${bossName}`);
+            }
+          } else {
+            console.log(`📢 No timer for ${bossName} - creating thread from external bot`);
+          }
+
           const result = await attendance.createSpawnThreads(
             client,
             bossName,
             dateStr,
             timeStr,
             fullTimestamp,
-            "timer"
+            "external_bot"
           );
 
           if (!result || !result.success) {
@@ -5361,6 +5407,25 @@ client.on(Events.MessageCreate, async (message) => {
             console.error(`❌ Failed to create spawn thread for ${bossName}: ${errorMsg}`);
           } else {
             console.log(`✅ Successfully created spawn thread for ${bossName} (thread ID: ${result.threadId})`);
+
+            // ADD TO RECENTLY HANDLED CACHE to prevent duplicate from external bot
+            const spawnTime = new Date(`${dateStr} ${timeStr}`);
+            bossTimer.addToRecentlyHandled(bossName, spawnTime, result.threadId);
+            console.log(`📌 Added ${bossName} to recently-handled cache (external bot path)`);
+
+            // ANNOUNCE TO BOSS-SPAWN-ANNOUNCEMENT CHANNEL (no timer or time mismatch)
+            try {
+              const announcementChannel = await client.channels.fetch(config.bossSpawnAnnouncementChannelId);
+              if (announcementChannel) {
+                const announceTimestamp = Math.floor(spawnTime.getTime() / 1000);
+                await announcementChannel.send(
+                  `🔔 **${bossName}** spawned!\n🕐 Time: <t:${announceTimestamp}:t>\n\n📝 Check in at the attendance thread!\n\n@everyone`
+                );
+                console.log(`📢 Announced ${bossName} spawn to announcement channel`);
+              }
+            } catch (announceError) {
+              console.error(`⚠️ Failed to announce spawn: ${announceError.message}`);
+            }
           }
         }
         return;
@@ -5381,6 +5446,49 @@ client.on(Events.MessageCreate, async (message) => {
       }
       // All other bot messages are blocked
       return;
+    }
+
+    // Boss timer commands (before other command processing)
+    const content = message.content.toLowerCase();
+    if (content.startsWith('!killed ')) {
+      const args = message.content.slice(8).trim().split(/\s+/);
+      return await bossTimerCommands.handleKilled(message, args, config);
+    }
+    if (content === '!nextspawn') {
+      return await bossTimerCommands.handleNextSpawn(message);
+    }
+    if (content === '!timers') {
+      return await bossTimerCommands.handleTimers(message, config);
+    }
+    if (content.startsWith('!unkill ')) {
+      const args = message.content.slice(8).trim().split(/\s+/);
+      return await bossTimerCommands.handleUnkill(message, args, config);
+    }
+    if (content === '!maintenance') {
+      const guild = message.guild;
+      if (!guild) return;
+      const member = await guild.members.fetch(message.author.id).catch(() => null);
+      if (!member || !isAdmin(member)) {
+        return message.reply('❌ Admin only command');
+      }
+      return await bossTimerCommands.handleMaintenance(message);
+    }
+    if (content === '!clearkills') {
+      const guild = message.guild;
+      if (!guild) return;
+      const member = await guild.members.fetch(message.author.id).catch(() => null);
+      if (!member || !isAdmin(member)) {
+        return message.reply('❌ Admin only command');
+      }
+      return await bossTimerCommands.handleClearKills(message);
+    }
+    if (content.startsWith('!nospawn ')) {
+      const args = message.content.slice(9).trim().split(/\s+/);
+      return await bossTimerCommands.handleNoSpawn(message, args, config);
+    }
+    if (content.startsWith('!spawned ')) {
+      const args = message.content.slice(9).trim().split(/\s+/);
+      return await bossTimerCommands.handleSpawned(message, args, config);
     }
 
     const guild = message.guild;

@@ -1645,6 +1645,66 @@ function startAutoCloseScheduler(client) {
  * - setPendingClosures: Replace pending closures object
  * - setConfirmationMessages: Replace confirmation messages object
  */
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BOSS TIMER INTEGRATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Create attendance thread for boss (called by boss-timer.js)
+ * Simplified wrapper around createSpawnThreads for boss timer integration.
+ *
+ * @param {string} bossName - Boss name from boss_spawn_config.json
+ * @param {Date} spawnTime - Spawn time
+ * @returns {Promise<Object>} Thread object
+ */
+async function createThreadForBoss(bossName, spawnTime) {
+  // Format date and time for thread
+  const dateStr = spawnTime.toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: '2-digit'
+  }).replace(/\//g, '/'); // MM/DD/YY
+
+  const timeStr = spawnTime.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }); // HH:MM
+
+  const fullTimestamp = `${dateStr} ${timeStr}`;
+
+  // Create threads using existing function
+  const result = await createSpawnThreads(
+    client,
+    bossName,
+    dateStr,
+    timeStr,
+    fullTimestamp,
+    'boss_timer',
+    false // noAutoClose = false (normal threads)
+  );
+
+  if (!result.success) {
+    throw new Error(`Failed to create thread for ${bossName}: ${result.error}`);
+  }
+
+  // Return the attendance thread
+  const threadId = Object.keys(activeSpawns).find(
+    id => activeSpawns[id].boss === bossName && activeSpawns[id].timestamp === fullTimestamp
+  );
+
+  if (!threadId) {
+    throw new Error('Thread created but not found in active spawns');
+  }
+
+  const guild = await client.guilds.fetch(config.main_guild_id);
+  const attChannel = await guild.channels.fetch(config.attendance_channel_id);
+  const thread = await attChannel.threads.fetch(threadId);
+
+  return thread;
+}
+
 module.exports = {
   // Core initialization
   initialize,
@@ -1666,6 +1726,7 @@ module.exports = {
 
   // Thread creation and management
   createSpawnThreads,
+  createThreadForBoss, // Boss timer integration
 
   // State recovery
   recoverStateFromThreads,

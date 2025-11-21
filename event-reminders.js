@@ -67,13 +67,13 @@ const GAME_EVENTS = {
   gvg: {
     name: '⚔️ GvG (Guild vs Guild)',
     days: [5, 6, 0], // Friday, Saturday, Sunday (same as Guild War)
-    startTime: { hour: 12, minute: 25 }, // Actual event time
-    durationMinutes: 3, // GvG duration (12:25 - 12:28)
+    startTime: { hour: 19, minute: 25 }, // Actual event time (7:25 PM)
+    durationMinutes: 3, // GvG duration (19:25 - 19:28)
     color: 0xf39c12, // Orange
     description: '**GvG (Guild vs Guild)** is starting soon! Get ready to attend!',
-    reminderOffsetMinutes: 20, // Remind 20 min before (12:05)
+    reminderOffsetMinutes: 20, // Remind 20 min before (19:05)
     createAttendanceThread: true, // Special flag to create attendance thread
-    attendanceAutoCloseMinutes: 20, // Auto-close thread 20 min after event starts (12:45)
+    attendanceAutoCloseMinutes: 20, // Auto-close thread 20 min after event starts (19:45)
   },
   guildBoss: {
     name: '⚔️ Guild Boss',

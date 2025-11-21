@@ -68,6 +68,71 @@ const metrics = {
 };
 
 // ============================================================================
+// REQUEST THROTTLING
+// ============================================================================
+
+/**
+ * Request queue for throttling concurrent API calls.
+ * Prevents rate limiting (HTTP 429) by limiting concurrent requests.
+ */
+const requestQueue = {
+  pending: [],
+  activeCount: 0,
+  maxConcurrent: 2, // Limit to 2 concurrent requests to avoid rate limits
+  inFlightRequests: new Map(), // Track in-flight requests for deduplication
+};
+
+/**
+ * Execute next queued request if under concurrency limit.
+ */
+function processQueue() {
+  while (requestQueue.pending.length > 0 &&
+         requestQueue.activeCount < requestQueue.maxConcurrent) {
+    const next = requestQueue.pending.shift();
+    requestQueue.activeCount++;
+    next.execute();
+  }
+}
+
+/**
+ * Add request to queue and wait for execution.
+ * Also handles request deduplication for identical in-flight requests.
+ *
+ * @param {string} requestKey - Unique key for request deduplication
+ * @param {Function} executeRequest - Function that executes the request
+ * @returns {Promise<any>} Request result
+ */
+function queueRequest(requestKey, executeRequest) {
+  // Check for in-flight request with same key (deduplication)
+  const inFlight = requestQueue.inFlightRequests.get(requestKey);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const promise = new Promise((resolve, reject) => {
+    const execute = async () => {
+      try {
+        const result = await executeRequest();
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      } finally {
+        requestQueue.activeCount--;
+        requestQueue.inFlightRequests.delete(requestKey);
+        processQueue();
+      }
+    };
+
+    requestQueue.pending.push({ execute });
+    processQueue();
+  });
+
+  // Track this request for deduplication
+  requestQueue.inFlightRequests.set(requestKey, promise);
+  return promise;
+}
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
@@ -203,9 +268,31 @@ class SheetAPI {
    */
      /**
    * Make an API call to Google Sheets (Koyeb-stable version)
+   * Now includes request throttling to prevent rate limiting
    */
   async call(action, data = {}, callOptions = {}) {
     const options = { ...this.options, ...callOptions };
+
+    if (options.enableCircuitBreaker && !checkCircuitBreaker()) {
+      const error = new Error(
+        `Circuit breaker is OPEN. Wait ${Math.round(circuitBreaker.resetTimeout / 1000)}s before retry.`
+      );
+      error.code = "CIRCUIT_BREAKER_OPEN";
+      throw error;
+    }
+
+    // Create unique key for request deduplication
+    const requestKey = `${action}:${JSON.stringify(data)}`;
+
+    // Queue the request to limit concurrent calls
+    return queueRequest(requestKey, () => this._executeCall(action, data, options));
+  }
+
+  /**
+   * Internal method to execute the actual API call
+   * @private
+   */
+  async _executeCall(action, data, options) {
     const startTime = Date.now();
     const { fetch, Agent } = await import("undici");
 
@@ -220,14 +307,6 @@ class SheetAPI {
       keepAliveTimeout: 10000, // Keep connections alive for reuse
       keepAliveMaxTimeout: 30000,
     });
-
-    if (options.enableCircuitBreaker && !checkCircuitBreaker()) {
-      const error = new Error(
-        `Circuit breaker is OPEN. Wait ${Math.round(circuitBreaker.resetTimeout / 1000)}s before retry.`
-      );
-      error.code = "CIRCUIT_BREAKER_OPEN";
-      throw error;
-    }
 
     metrics.totalRequests++;
 
@@ -287,7 +366,7 @@ class SheetAPI {
 
         const errorCode = error.code || '';
         const errorMessage = error.message || '';
-        
+
         const isTransient = transientErrors.some(
           code => errorCode.includes(code) || errorMessage.includes(code)
         );
@@ -463,6 +542,19 @@ class SheetAPI {
     metrics.totalRetries = 0;
     metrics.avgResponseTime = 0;
     metrics.lastRequestTime = 0;
+  }
+
+  /**
+   * Get request queue status for monitoring.
+   * @returns {Object} Queue status
+   */
+  getQueueStatus() {
+    return {
+      pendingRequests: requestQueue.pending.length,
+      activeRequests: requestQueue.activeCount,
+      maxConcurrent: requestQueue.maxConcurrent,
+      inFlightDeduplicatedRequests: requestQueue.inFlightRequests.size,
+    };
   }
 }
 
