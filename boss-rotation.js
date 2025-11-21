@@ -43,6 +43,7 @@ let config = null;
 let sheetAPI = null;
 let client = null;
 let intelligenceEngine = null; // Reference to intelligence engine for spawn predictions
+let bossTimerModule = null; // Reference to boss timer for recorded spawn times
 
 /**
  * Rotating bosses list (dynamically loaded from Google Sheets)
@@ -87,10 +88,11 @@ const WARNING_WINDOW_MINUTES = 15; // Warn when spawn is 15-20 mins away
  * @param {Client} discordClient - Discord.js client instance
  * @param {Object} intelligence - Intelligence engine for spawn predictions
  */
-function initialize(cfg, discordClient, intelligence = null) {
+function initialize(cfg, discordClient, intelligence = null, bossTimer = null) {
   config = cfg;
   client = discordClient;
   intelligenceEngine = intelligence;
+  bossTimerModule = bossTimer;
   sheetAPI = new SheetAPI(cfg.sheet_webhook_url);
 
   console.log('✅ Boss Rotation System initialized');
@@ -513,26 +515,45 @@ function startSpawnMonitor() {
  */
 async function checkUpcomingSpawns() {
   try {
-    if (!intelligenceEngine) return;
+    if (!intelligenceEngine && !bossTimerModule) return;
 
     // Check each rotating boss
     for (const bossName of ROTATING_BOSSES) {
       try {
-        // Quick check: Skip if spawn is definitely far away (>2 hours)
-        // This uses cached data and avoids expensive API calls for distant spawns
-        if (!intelligenceEngine.isSpawnLikelySoon(bossName, 2)) {
-          continue; // Boss is 24+ hours away, skip expensive prediction
+        let spawnTime = null;
+        let usingBossTimer = false;
+
+        // Check boss timer first for recorded spawn times
+        if (bossTimerModule) {
+          const timerData = bossTimerModule.getNextSpawn(bossName);
+          if (timerData && timerData.nextSpawn) {
+            spawnTime = timerData.nextSpawn;
+            usingBossTimer = true;
+          }
         }
 
-        // Get spawn prediction (uses cache if available)
-        const prediction = await intelligenceEngine.predictNextSpawnTime(bossName);
+        // Fall back to prediction if no boss timer data
+        if (!spawnTime && intelligenceEngine) {
+          // Quick check: Skip if spawn is definitely far away (>2 hours)
+          // This uses cached data and avoids expensive API calls for distant spawns
+          if (!intelligenceEngine.isSpawnLikelySoon(bossName, 2)) {
+            continue; // Boss is 24+ hours away, skip expensive prediction
+          }
 
-        if (prediction.error) {
-          continue; // Skip if prediction failed
+          // Get spawn prediction (uses cache if available)
+          const prediction = await intelligenceEngine.predictNextSpawnTime(bossName);
+
+          if (prediction.error) {
+            continue; // Skip if prediction failed
+          }
+
+          spawnTime = prediction.predictedTime;
         }
+
+        if (!spawnTime) continue; // No spawn time available
 
         const now = new Date();
-        const predictedTime = prediction.predictedTime;
+        const predictedTime = spawnTime;
         const minutesUntilSpawn = (predictedTime - now) / (1000 * 60);
 
         // Check if spawn is within warning window (15-20 minutes)
