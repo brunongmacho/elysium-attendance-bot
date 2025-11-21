@@ -4,7 +4,7 @@
  * ============================================================================
  *
  * Command handlers for boss timer system.
- * Commands: !killed, !nextspawn, !timers, !unkill, !nospawn, !spawned,
+ * Commands: !killed, !setboss, !nextspawn, !unkill, !nospawn, !spawned,
  *           !maintenance, !clearkills
  *
  * @module boss-timer-commands
@@ -132,62 +132,6 @@ async function handleNextSpawn(message) {
     await message.reply({ embeds: [embed] });
   } catch (error) {
     console.error('Error in !nextspawn command:', error);
-    return message.reply(`❌ Error: ${error.message}`);
-  }
-}
-
-/**
- * Handle !timers command (admin)
- */
-async function handleTimers(message, config) {
-  try {
-    const { timerBased, scheduleBased } = bossTimer.getAllTimers();
-
-    const embed = new EmbedBuilder()
-      .setColor(0xff9900)
-      .setTitle('⏱️ Active Boss Timers');
-
-    // Timer-based bosses
-    if (timerBased.length > 0) {
-      let timerText = '';
-      for (const boss of timerBased) {
-        const timestamp = Math.floor(boss.nextSpawn.getTime() / 1000);
-        timerText += `• **${boss.bossName}** - <t:${timestamp}:F> - <t:${timestamp}:R>\n`;
-      }
-      embed.addFields({
-        name: `Timer-Based (${timerBased.length} active)`,
-        value: timerText || 'None',
-        inline: false
-      });
-    } else {
-      embed.addFields({
-        name: 'Timer-Based',
-        value: 'No active timers. Use `!killed` to record boss kills.',
-        inline: false
-      });
-    }
-
-    // Schedule-based bosses
-    let scheduleText = '';
-    for (const boss of scheduleBased.slice(0, 5)) { // Show first 5
-      const timestamp = Math.floor(boss.nextSpawn.getTime() / 1000);
-      scheduleText += `• **${boss.bossName}** - <t:${timestamp}:t>\n`;
-    }
-    if (scheduleBased.length > 5) {
-      scheduleText += `\n...and ${scheduleBased.length - 5} more`;
-    }
-    embed.addFields({
-      name: `Schedule-Based (${scheduleBased.length} total)`,
-      value: scheduleText,
-      inline: false
-    });
-
-    embed.setFooter({ text: 'Use !nextspawn to see upcoming spawns' });
-    embed.setTimestamp();
-
-    await message.reply({ embeds: [embed] });
-  } catch (error) {
-    console.error('Error in !timers command:', error);
     return message.reply(`❌ Error: ${error.message}`);
   }
 }
@@ -398,13 +342,99 @@ async function handleSpawned(message, args, config) {
   }
 }
 
+/**
+ * Handle !setboss command - set spawn time directly
+ * Usage: !setboss <boss> <time> [mm/dd]
+ */
+async function handleSetBoss(message, args, config) {
+  // Check if in correct channel
+  if (message.channel.id !== config.bossTimerChannelId) {
+    const channel = await message.client.channels.fetch(config.bossTimerChannelId);
+    return message.reply(`⚠️ Please use ${channel} for boss timer commands`);
+  }
+
+  if (args.length < 2) {
+    return message.reply('❌ Usage: `!setboss <boss> <time> [mm/dd]`\nExample: `!setboss venatus 19:15` or `!setboss venatus 7:15pm 01/20`');
+  }
+
+  // Parse boss name (might be multi-word)
+  let bossNameParts = [args[0]];
+  let timeArg = null;
+  let dateArg = null;
+
+  // Check if second arg is a time or part of boss name
+  if (args.length >= 2) {
+    if (args[1].includes(':') || args[1].toLowerCase().includes('am') || args[1].toLowerCase().includes('pm')) {
+      // It's a time
+      timeArg = args[1];
+      dateArg = args[2]; // Optional
+    } else {
+      // It's part of boss name
+      bossNameParts.push(args[1]);
+      if (args.length >= 3 && (args[2].includes(':') || args[2].toLowerCase().includes('am') || args[2].toLowerCase().includes('pm'))) {
+        timeArg = args[2];
+        dateArg = args[3];
+      }
+    }
+  }
+
+  if (!timeArg) {
+    return message.reply('❌ Please provide a spawn time.\nUsage: `!setboss <boss> <time> [mm/dd]`');
+  }
+
+  const bossInput = bossNameParts.join(' ');
+  const bossName = bossTimer.findBossName(bossInput);
+
+  if (!bossName) {
+    return message.reply(`❌ Boss "${bossInput}" not found. Check spelling or use \`!timers\` to see available bosses.`);
+  }
+
+  try {
+    // Parse the spawn time
+    const spawnTime = bossTimer.parseKillTime(timeArg, dateArg);
+
+    // Validate spawn time is in the future
+    if (spawnTime <= new Date()) {
+      return message.reply('❌ Spawn time must be in the future.');
+    }
+
+    const result = await bossTimer.setSpawnTime(bossName, spawnTime, message.author.id);
+
+    const timestamp = Math.floor(result.nextSpawn.getTime() / 1000);
+    const reminderTime = new Date(result.nextSpawn.getTime() - 5 * 60 * 1000);
+    const reminderTimestamp = Math.floor(reminderTime.getTime() / 1000);
+
+    const embed = new EmbedBuilder()
+      .setColor(0x3498db)
+      .setTitle('⏰ Boss Spawn Time Set')
+      .setDescription(`**${bossName}** spawn time set directly`)
+      .addFields({
+        name: '🎯 Spawn Time',
+        value: `<t:${timestamp}:F>\n<t:${timestamp}:R>`,
+        inline: true
+      })
+      .addFields({
+        name: '🔔 Reminder At',
+        value: `<t:${reminderTimestamp}:t> (5 min before)`,
+        inline: true
+      })
+      .setFooter({ text: `Set by ${message.author.username}` })
+      .setTimestamp();
+
+    await message.reply({ embeds: [embed] });
+  } catch (error) {
+    console.error('Error in !setboss command:', error);
+    return message.reply(`❌ Error: ${error.message}`);
+  }
+}
+
 module.exports = {
   handleKilled,
   handleNextSpawn,
-  handleTimers,
   handleUnkill,
   handleMaintenance,
   handleClearKills,
   handleNoSpawn,
   handleSpawned,
+  handleSetBoss,
 };

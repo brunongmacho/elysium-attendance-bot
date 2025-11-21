@@ -5457,9 +5457,6 @@ client.on(Events.MessageCreate, async (message) => {
     if (content === '!nextspawn') {
       return await bossTimerCommands.handleNextSpawn(message);
     }
-    if (content === '!timers') {
-      return await bossTimerCommands.handleTimers(message, config);
-    }
     if (content.startsWith('!unkill ')) {
       const args = message.content.slice(8).trim().split(/\s+/);
       return await bossTimerCommands.handleUnkill(message, args, config);
@@ -5489,6 +5486,10 @@ client.on(Events.MessageCreate, async (message) => {
     if (content.startsWith('!spawned ')) {
       const args = message.content.slice(9).trim().split(/\s+/);
       return await bossTimerCommands.handleSpawned(message, args, config);
+    }
+    if (content.startsWith('!setboss ')) {
+      const args = message.content.slice(9).trim().split(/\s+/);
+      return await bossTimerCommands.handleSetBoss(message, args, config);
     }
 
     const guild = message.guild;
