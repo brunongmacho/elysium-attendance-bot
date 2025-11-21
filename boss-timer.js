@@ -355,18 +355,8 @@ async function triggerSpawnReminder(bossName, spawnTime) {
     bossKillTimes.delete(bossName.toLowerCase());
 
     // Add to recently handled cache to prevent duplicate from external bot
-    const normalizedName = bossName.toLowerCase();
-    const clearTimeoutId = setTimeout(() => {
-      recentlyHandledBosses.delete(normalizedName);
-      console.log(`🗑️ Cleared recently-handled cache for ${bossName}`);
-    }, 15 * 60 * 1000); // 15 minutes
-
-    recentlyHandledBosses.set(normalizedName, {
-      handledAt: new Date(),
-      spawnTime,
-      threadId: thread.id,
-      clearTimeoutId
-    });
+    // Uses shared function that also clears old timeouts
+    addToRecentlyHandled(bossName, spawnTime, thread.id);
     console.log(`📌 Added ${bossName} to recently-handled cache (15min TTL) - Thread: ${thread.id}`);
 
     console.log(`✅ Spawn reminder sent for ${bossName}`);
@@ -663,18 +653,8 @@ async function handleSpawned(bossName, userId) {
     }
 
     // Add to recently handled cache to prevent duplicate from external bot
-    const normalizedName = bossName.toLowerCase();
-    const clearTimeoutId = setTimeout(() => {
-      recentlyHandledBosses.delete(normalizedName);
-      console.log(`🗑️ Cleared recently-handled cache for ${bossName}`);
-    }, 15 * 60 * 1000); // 15 minutes
-
-    recentlyHandledBosses.set(normalizedName, {
-      handledAt: new Date(),
-      spawnTime: now,
-      threadId: thread.id,
-      clearTimeoutId
-    });
+    // Uses shared function that also clears old timeouts
+    addToRecentlyHandled(bossName, now, thread.id);
     console.log(`📌 Added ${bossName} to recently-handled cache (15min TTL) - Thread: ${thread.id}`);
 
     return {
@@ -825,6 +805,37 @@ function wasRecentlyHandled(bossName) {
   return recentlyHandledBosses.get(normalizedName) || null;
 }
 
+/**
+ * Add boss to recently handled cache (for external bot path)
+ * Prevents duplicate threads from multiple external bot announcements
+ * @param {string} bossName - Boss name
+ * @param {Date} spawnTime - Spawn time
+ * @param {string} threadId - Thread ID
+ */
+function addToRecentlyHandled(bossName, spawnTime, threadId) {
+  const normalizedName = bossName.toLowerCase();
+
+  // Clear existing timeout if overwriting (fixes cache overwrite conflict)
+  const existing = recentlyHandledBosses.get(normalizedName);
+  if (existing && existing.clearTimeoutId) {
+    clearTimeout(existing.clearTimeoutId);
+    console.log(`🔄 Cleared old timeout for ${bossName} before overwriting cache`);
+  }
+
+  // Set new cache entry with 15 minute TTL
+  const clearTimeoutId = setTimeout(() => {
+    recentlyHandledBosses.delete(normalizedName);
+    console.log(`🗑️ Cleared recently-handled cache for ${bossName}`);
+  }, 15 * 60 * 1000); // 15 minutes
+
+  recentlyHandledBosses.set(normalizedName, {
+    handledAt: new Date(),
+    spawnTime,
+    threadId,
+    clearTimeoutId
+  });
+}
+
 // ============================================================================
 // MODULE EXPORTS
 // ============================================================================
@@ -843,5 +854,6 @@ module.exports = {
   findBossName,
   parseKillTime,
   wasRecentlyHandled,
+  addToRecentlyHandled,
   bossKillTimes, // Export for monitoring/debugging
 };

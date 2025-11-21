@@ -5408,11 +5408,15 @@ client.on(Events.MessageCreate, async (message) => {
           } else {
             console.log(`✅ Successfully created spawn thread for ${bossName} (thread ID: ${result.threadId})`);
 
+            // ADD TO RECENTLY HANDLED CACHE to prevent duplicate from external bot
+            const spawnTime = new Date(`${dateStr} ${timeStr}`);
+            bossTimer.addToRecentlyHandled(bossName, spawnTime, result.threadId);
+            console.log(`📌 Added ${bossName} to recently-handled cache (external bot path)`);
+
             // ANNOUNCE TO BOSS-SPAWN-ANNOUNCEMENT CHANNEL (no timer or time mismatch)
             try {
               const announcementChannel = await client.channels.fetch(config.bossSpawnAnnouncementChannelId);
               if (announcementChannel) {
-                const spawnTime = new Date(`${dateStr} ${timeStr}`);
                 const announceTimestamp = Math.floor(spawnTime.getTime() / 1000);
                 await announcementChannel.send(
                   `🔔 **${bossName}** spawned!\n🕐 Time: <t:${announceTimestamp}:t>\n\n📝 Check in at the attendance thread!\n\n@everyone`
