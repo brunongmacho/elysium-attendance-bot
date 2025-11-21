@@ -1654,11 +1654,12 @@ function startAutoCloseScheduler(client) {
  * Create attendance thread for boss (called by boss-timer.js)
  * Simplified wrapper around createSpawnThreads for boss timer integration.
  *
+ * @param {Client} discordClient - Discord.js client
  * @param {string} bossName - Boss name from boss_spawn_config.json
  * @param {Date} spawnTime - Spawn time
  * @returns {Promise<Object>} Thread object
  */
-async function createThreadForBoss(bossName, spawnTime) {
+async function createThreadForBoss(discordClient, bossName, spawnTime) {
   // Format date and time for thread
   const dateStr = spawnTime.toLocaleDateString('en-US', {
     month: '2-digit',
@@ -1676,7 +1677,7 @@ async function createThreadForBoss(bossName, spawnTime) {
 
   // Create threads using existing function
   const result = await createSpawnThreads(
-    client,
+    discordClient,
     bossName,
     dateStr,
     timeStr,
@@ -1698,7 +1699,7 @@ async function createThreadForBoss(bossName, spawnTime) {
     throw new Error('Thread created but not found in active spawns');
   }
 
-  const guild = await client.guilds.fetch(config.main_guild_id);
+  const guild = await discordClient.guilds.fetch(config.main_guild_id);
   const attChannel = await guild.channels.fetch(config.attendance_channel_id);
   const thread = await attChannel.threads.fetch(threadId);
 
