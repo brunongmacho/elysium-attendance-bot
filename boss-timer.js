@@ -601,9 +601,9 @@ async function handleNoSpawn(bossName, userId) {
         await announcementChannel.send(`❌ **${bossName} spawn cancelled** - Wrong timer data reported by <@${userId}>\n\nPlease wait for actual spawn confirmation.`);
       }
 
-      // Clear from recently handled cache
-      clearTimeout(recentlyHandled.clearTimeoutId);
-      recentlyHandledBosses.delete(normalizedName);
+      // Keep in recently handled cache to prevent external bot duplicate
+      // Cache will auto-clear after 15 minutes
+      console.log(`📌 Keeping ${bossName} in recently-handled cache to prevent duplicate from external bot`);
     }
 
     return {
@@ -629,8 +629,24 @@ async function handleNoSpawn(bossName, userId) {
  */
 async function handleSpawned(bossName, userId) {
   const now = new Date();
+  const normalizedName = bossName.toLowerCase();
 
   try {
+    // Check if already handled recently (prevent duplicate !spawned calls)
+    const existing = recentlyHandledBosses.get(normalizedName);
+    if (existing) {
+      const timeSince = Math.round((Date.now() - existing.handledAt) / 1000 / 60);
+      console.log(`⚠️ ${bossName} already handled ${timeSince}min ago - returning existing thread`);
+
+      return {
+        success: true,
+        threadId: existing.threadId,
+        threadUrl: `https://discord.com/channels/${config.mainGuildId}/${config.attendanceChannelId}/${existing.threadId}`,
+        bossName,
+        alreadyHandled: true
+      };
+    }
+
     // Create attendance thread for current spawn
     const thread = await attendance.createThreadForBoss(bossName, now);
 

@@ -372,12 +372,16 @@ async function handleSpawned(message, args, config) {
     }
 
     const embed = new EmbedBuilder()
-      .setColor(0x2ecc71)
-      .setTitle('✅ Boss Spawn Confirmed')
-      .setDescription(`**${bossName}** has spawned!`)
+      .setColor(result.alreadyHandled ? 0xf39c12 : 0x2ecc71)
+      .setTitle(result.alreadyHandled ? 'ℹ️ Already Handled' : '✅ Boss Spawn Confirmed')
+      .setDescription(result.alreadyHandled
+        ? `**${bossName}** spawn already recorded!`
+        : `**${bossName}** has spawned!`)
       .addFields({
         name: '📝 Attendance Thread',
-        value: `Thread created: <#${result.threadId}>`,
+        value: result.alreadyHandled
+          ? `Existing thread: <#${result.threadId}>`
+          : `Thread created: <#${result.threadId}>`,
         inline: false
       })
       .addFields({
