@@ -422,6 +422,23 @@ async function createSpawnThreads(
     return { success: false, error: 'Column already exists (duplicate spawn)' };
   }
 
+  // NEW: Prevent duplicate threads for same boss within 4 hours (min spawn interval is 10h)
+  const DUPLICATE_PROTECTION_HOURS = 4;
+  const now = Date.now();
+  for (const [threadId, spawn] of Object.entries(activeSpawns)) {
+    if (spawn.boss.toLowerCase() === bossName.toLowerCase() && !spawn.closed) {
+      const hoursSinceCreated = (now - spawn.createdAt) / (1000 * 60 * 60);
+      if (hoursSinceCreated < DUPLICATE_PROTECTION_HOURS) {
+        console.log(`⚠️ BLOCKED DUPLICATE: ${bossName} thread already exists (created ${hoursSinceCreated.toFixed(1)}h ago)`);
+        await adminLogs.send(
+          `⚠️ **BLOCKED DUPLICATE:** ${bossName} at ${fullTimestamp}\n` +
+          `Thread already exists: <#${threadId}> (created ${hoursSinceCreated.toFixed(1)}h ago)`
+        );
+        return { success: false, error: `Thread for ${bossName} already exists (created ${hoursSinceCreated.toFixed(1)}h ago)` };
+      }
+    }
+  }
+
   const threadTitle = `[${dateStr} ${timeStr}] ${bossName}`;
 
   // Create both threads in parallel for efficiency
