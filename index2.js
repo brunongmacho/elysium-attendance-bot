@@ -4400,12 +4400,56 @@ stats: async (message, member, args) => {
     }
 
     try {
-      const prediction = await intelligenceEngine.predictNextSpawnTime(bossName);
+      let prediction = null;
+      let timerData = null;
+      let usingTimerData = false;
+
+      // Check boss timer first for recorded spawn times (only if specific boss requested)
+      if (bossName) {
+        try {
+          timerData = bossTimer.getNextSpawn(bossName);
+          if (timerData && timerData.nextSpawn) {
+            usingTimerData = true;
+            console.log(`[PREDICTSPAWN] Using boss timer data for ${bossName}`);
+          }
+        } catch (timerError) {
+          // Silently continue to prediction fallback
+        }
+      }
+
+      // If using timer data, build a simpler prediction object
+      if (usingTimerData && timerData) {
+        const now = new Date();
+        const nextSpawn = timerData.nextSpawn;
+        const killTime = timerData.killTime;
+
+        // Calculate interval if we have kill time
+        const intervalMs = nextSpawn.getTime() - killTime.getTime();
+        const intervalHours = intervalMs / (1000 * 60 * 60);
+
+        prediction = {
+          bossName: bossName,
+          predictedTime: nextSpawn,
+          confidence: 95, // High confidence for recorded timer
+          basedOnSpawns: 1,
+          spawnType: 'timer',
+          usingConfiguredTimer: true,
+          avgIntervalHours: intervalHours,
+          lastSpawnTime: killTime,
+          earliestTime: nextSpawn,
+          latestTime: nextSpawn,
+          isFromBossTimer: true // Flag to indicate this is from boss timer
+        };
+      } else {
+        // Fall back to ML prediction
+        prediction = await intelligenceEngine.predictNextSpawnTime(bossName);
+      }
 
       // 🤖 ENHANCE WITH ML - Get tighter confidence windows and accuracy scoring
       // SKIP ML for schedule-based bosses (they use static 99% confidence)
+      // SKIP ML if using boss timer data (already accurate)
       let mlEnhancement = null;
-      if (mlIntegration && prediction && !prediction.error && prediction.spawnType !== 'schedule') {
+      if (!usingTimerData && mlIntegration && prediction && !prediction.error && prediction.spawnType !== 'schedule') {
         try {
           mlEnhancement = await mlIntegration.enhanceSpawnPrediction(
             prediction.bossName,
@@ -4477,7 +4521,9 @@ stats: async (message, member, args) => {
           ),
           {
             name: '⏱️ Spawn Type',
-            value: prediction.spawnType === 'schedule'
+            value: prediction.isFromBossTimer
+              ? '⏱️ Recorded Timer'
+              : prediction.spawnType === 'schedule'
               ? '📅 Fixed Schedule'
               : prediction.usingConfiguredTimer
               ? '⏰ Timer-Based'
@@ -4510,7 +4556,12 @@ stats: async (message, member, args) => {
           },
           {
             name: '🧠 AI Insight',
-            value: mlEnhancement && mlEnhancement.method === 'ml'
+            value: prediction.isFromBossTimer
+              ? `⏱️ **Recorded Timer Data**\n` +
+                `Kill recorded via \`!killed\` command.\n` +
+                `**${prediction.bossName}** has a **${prediction.avgIntervalHours.toFixed(1)}-hour** spawn timer.\n` +
+                `✅ High accuracy - based on actual recorded kill time.`
+              : mlEnhancement && mlEnhancement.method === 'ml'
               ? `🤖 **ML-Enhanced Prediction**\n` +
                 `Spawn Window: ${new Date(mlEnhancement.confidenceInterval.earliest).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: config.timezone })} - ` +
                 `${new Date(mlEnhancement.confidenceInterval.latest).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: config.timezone })}\n` +
