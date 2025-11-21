@@ -124,22 +124,13 @@ async function loadRecoveryAndReschedule() {
 
     for (const entry of recoveryData) {
       try {
-        const nextSpawn = new Date(entry.nextSpawnTime);
+        let nextSpawn = new Date(entry.nextSpawnTime);
 
         // Skip invalid dates
         if (!nextSpawn || isNaN(nextSpawn.getTime())) {
           console.error(`❌ Invalid nextSpawnTime for ${entry.bossName}: ${entry.nextSpawnTime}`);
           continue;
         }
-
-        // Skip if spawn already passed
-        if (nextSpawn < now) {
-          console.log(`⏭️ Skipping past spawn: ${entry.bossName} (${formatGMT8(nextSpawn)})`);
-          continue;
-        }
-
-        // Reschedule timer
-        const timerId = scheduleReminder(entry.bossName, nextSpawn);
 
         // Parse killTime (may be null/invalid for directly set spawns)
         let killTime = null;
@@ -149,6 +140,26 @@ async function loadRecoveryAndReschedule() {
             killTime = parsed;
           }
         }
+
+        // If spawn already passed, recalculate to find next future spawn
+        if (nextSpawn < now) {
+          const bossType = getBossType(entry.bossName);
+          if (bossType === 'timer' && killTime) {
+            // Recalculate with auto-forward
+            const result = calculateNextSpawn(entry.bossName, killTime);
+            nextSpawn = result.nextSpawn;
+            console.log(`⏭️ ${entry.bossName}: Past spawn detected, fast-forwarded to ${formatGMT8(nextSpawn)}`);
+
+            // Update sheet with new spawn time
+            saveRecoveryData(entry.bossName, killTime, nextSpawn, entry.killedBy || 'recovery');
+          } else {
+            console.log(`⏭️ Skipping past spawn: ${entry.bossName} (${formatGMT8(nextSpawn)})`);
+            continue;
+          }
+        }
+
+        // Reschedule timer
+        const timerId = scheduleReminder(entry.bossName, nextSpawn);
 
         bossKillTimes.set(entry.bossName.toLowerCase(), {
           killTime,
@@ -317,19 +328,30 @@ function parseKillTime(timeStr, dateStr) {
  * Calculate next spawn time for a boss
  * @param {string} bossName - Boss name
  * @param {Date} killTime - Kill time
- * @returns {Date} Next spawn time
+ * @returns {Object} { nextSpawn: Date, skippedSpawns: number }
  */
 function calculateNextSpawn(bossName, killTime) {
   const bossType = getBossType(bossName);
+  const now = new Date();
 
   if (bossType === 'timer') {
     // Timer-based: add spawn interval to kill time
     const intervalHours = bossSpawnConfig.timerBasedBosses[bossName].spawnIntervalHours;
-    return new Date(killTime.getTime() + intervalHours * 60 * 60 * 1000);
+    const intervalMs = intervalHours * 60 * 60 * 1000;
+    let nextSpawn = new Date(killTime.getTime() + intervalMs);
+    let skippedSpawns = 0;
+
+    // If spawn time is in the past, keep adding intervals until it's in the future
+    while (nextSpawn < now) {
+      nextSpawn = new Date(nextSpawn.getTime() + intervalMs);
+      skippedSpawns++;
+    }
+
+    return { nextSpawn, skippedSpawns };
   } else if (bossType === 'schedule') {
     // Schedule-based: find next scheduled time
     const schedules = bossSpawnConfig.scheduleBasedBosses[bossName].schedules;
-    return findNextScheduledTime(schedules);
+    return { nextSpawn: findNextScheduledTime(schedules), skippedSpawns: 0 };
   }
 
   throw new Error(`Unknown boss type for ${bossName}`);
@@ -508,8 +530,12 @@ async function recordKill(bossName, killTime, killedBy) {
     console.log(`🔄 Overwriting existing timer for ${bossName}`);
   }
 
-  // Calculate next spawn time
-  const nextSpawn = calculateNextSpawn(bossName, killTime);
+  // Calculate next spawn time (auto-fast-forwards if spawn is in past)
+  const { nextSpawn, skippedSpawns } = calculateNextSpawn(bossName, killTime);
+
+  if (skippedSpawns > 0) {
+    console.log(`⏭️ ${bossName}: Skipped ${skippedSpawns} past spawn(s), next spawn: ${formatGMT8(nextSpawn)}`);
+  }
 
   // Schedule reminder
   const timerId = scheduleReminder(bossName, nextSpawn);
@@ -525,7 +551,7 @@ async function recordKill(bossName, killTime, killedBy) {
   // Save to Sheets with critical retry
   await saveRecoveryData(bossName, killTime, nextSpawn, killedBy);
 
-  return { nextSpawn, bossName };
+  return { nextSpawn, bossName, skippedSpawns };
 }
 
 /**

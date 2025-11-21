@@ -142,7 +142,18 @@ async function handleKilled(message, args, config) {
         name: '⏰ Next Spawn',
         value: `<t:${timestamp}:F> - <t:${timestamp}:R>`,
         inline: false
-      })
+      });
+
+    // Add note if spawns were skipped (kill time was old)
+    if (result.skippedSpawns > 0) {
+      embed.addFields({
+        name: 'ℹ️ Note',
+        value: `Skipped ${result.skippedSpawns} past spawn(s) to calculate next future spawn.`,
+        inline: false
+      });
+    }
+
+    embed
       .setFooter({ text: `Recorded by ${message.author.username}` })
       .setTimestamp();
 
