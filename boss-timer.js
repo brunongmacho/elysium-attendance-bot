@@ -278,12 +278,13 @@ function parseKillTime(timeStr, dateStr) {
   const now = new Date();
   const gmt8Now = new Date(now.getTime() + TIMEZONE_OFFSET * 60 * 60 * 1000);
 
-  // Start with current date components in GMT+8
+  // Start with current date/time components in GMT+8
+  // If no time is provided, use the current time (not midnight)
   let year = gmt8Now.getUTCFullYear();
   let month = gmt8Now.getUTCMonth();
   let day = gmt8Now.getUTCDate();
-  let hours = 0;
-  let minutes = 0;
+  let hours = gmt8Now.getUTCHours();
+  let minutes = gmt8Now.getUTCMinutes();
 
   if (timeStr) {
     // Normalize the time string - remove spaces around am/pm
