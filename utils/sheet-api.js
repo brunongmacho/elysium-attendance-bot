@@ -364,8 +364,8 @@ class SheetAPI {
           "TimeoutError"
         ];
 
-        const errorCode = error.code || '';
-        const errorMessage = error.message || '';
+        const errorCode = String(error.code || '');
+        const errorMessage = String(error.message || '');
 
         const isTransient = transientErrors.some(
           code => errorCode.includes(code) || errorMessage.includes(code)
