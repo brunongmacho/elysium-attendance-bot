@@ -708,8 +708,8 @@ async function handleNoSpawn(bossName, userId) {
 
     if (recentlyHandled && recentlyHandled.threadId) {
       // Get the thread
-      const guild = await client.guilds.fetch(config.mainGuildId);
-      const attChannel = await guild.channels.fetch(config.attendanceChannelId);
+      const guild = await client.guilds.fetch(config.main_guild_id);
+      const attChannel = await guild.channels.fetch(config.attendance_channel_id);
       const thread = await attChannel.threads.fetch(recentlyHandled.threadId);
 
       if (thread) {
@@ -772,7 +772,7 @@ async function handleSpawned(bossName, userId) {
       return {
         success: true,
         threadId: existing.threadId,
-        threadUrl: `https://discord.com/channels/${config.mainGuildId}/${config.attendanceChannelId}/${existing.threadId}`,
+        threadUrl: `https://discord.com/channels/${config.main_guild_id}/${config.attendance_channel_id}/${existing.threadId}`,
         bossName,
         alreadyHandled: true
       };

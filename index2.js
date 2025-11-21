@@ -5422,7 +5422,7 @@ client.on(Events.MessageCreate, async (message) => {
 
             // ANNOUNCE TO BOSS-SPAWN-ANNOUNCEMENT CHANNEL (no timer or time mismatch)
             try {
-              const announcementChannel = await client.channels.fetch(config.bossSpawnAnnouncementChannelId);
+              const announcementChannel = await client.channels.fetch(config.boss_spawn_announcement_channel_id);
               if (announcementChannel) {
                 const announceTimestamp = Math.floor(spawnTime.getTime() / 1000);
                 await announcementChannel.send(
