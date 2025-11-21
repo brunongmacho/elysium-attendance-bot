@@ -420,14 +420,29 @@ async function handleSetBoss(message, args, config) {
   }
 
   if (args.length < 2) {
-    return message.reply('❌ Usage: `!setboss <boss> <time> [mm/dd]`\nExample: `!setboss venatus 19:15` or `!setboss venatus 7:15pm 01/20`');
+    return message.reply('❌ Usage: `!setboss <boss> <time am/pm> [mm/dd]`\nExample: `!setboss venatus 7:15pm` or `!setboss venatus 7:15 PM 01/20`');
   }
 
   // Parse args (handles "09:35 PM" split across arguments)
   const { bossName: bossInput, timeArg, dateArg } = parseCommandArgs(args);
 
   if (!timeArg) {
-    return message.reply('❌ Please provide a spawn time.\nUsage: `!setboss <boss> <time> [mm/dd]`');
+    return message.reply('❌ Please provide a spawn time.\nUsage: `!setboss <boss> <time am/pm> [mm/dd]`');
+  }
+
+  // Require AM/PM for safety (12-hour format only)
+  const hasAmPm = /am|pm/i.test(timeArg);
+  if (!hasAmPm) {
+    // Delete the wrong command message
+    try {
+      await message.delete();
+    } catch (e) {
+      // Ignore if can't delete (permissions)
+    }
+    // Send error mentioning the user
+    const channel = message.channel;
+    await channel.send(`<@${message.author.id}> ❌ Please include **AM** or **PM** in your time!\n\nExample: \`!setboss ${bossInput || 'venatus'} ${timeArg}am\` or \`!setboss ${bossInput || 'venatus'} ${timeArg} PM\``);
+    return;
   }
 
   const bossName = bossTimer.findBossName(bossInput);
