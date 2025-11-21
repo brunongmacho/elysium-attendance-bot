@@ -20,8 +20,8 @@ const bossTimer = require('./boss-timer');
  */
 async function handleKilled(message, args, config) {
   // Check if in correct channel
-  if (message.channel.id !== config.bossTimerChannelId) {
-    const channel = await message.client.channels.fetch(config.bossTimerChannelId);
+  if (message.channel.id !== config.boss_timer_channel_id) {
+    const channel = await message.client.channels.fetch(config.boss_timer_channel_id);
     return message.reply(`⚠️ Please use ${channel} for boss timer commands`);
   }
 
@@ -141,8 +141,8 @@ async function handleNextSpawn(message) {
  */
 async function handleUnkill(message, args, config) {
   // Check if in correct channel
-  if (message.channel.id !== config.bossTimerChannelId) {
-    const channel = await message.client.channels.fetch(config.bossTimerChannelId);
+  if (message.channel.id !== config.boss_timer_channel_id) {
+    const channel = await message.client.channels.fetch(config.boss_timer_channel_id);
     return message.reply(`⚠️ Please use ${channel} for boss timer commands`);
   }
 
@@ -235,8 +235,8 @@ async function handleClearKills(message) {
  */
 async function handleNoSpawn(message, args, config) {
   // Check if in correct channel
-  if (message.channel.id !== config.bossTimerChannelId) {
-    const channel = await message.client.channels.fetch(config.bossTimerChannelId);
+  if (message.channel.id !== config.boss_timer_channel_id) {
+    const channel = await message.client.channels.fetch(config.boss_timer_channel_id);
     return message.reply(`⚠️ Please use ${channel} for boss timer commands`);
   }
 
@@ -291,8 +291,8 @@ async function handleNoSpawn(message, args, config) {
  */
 async function handleSpawned(message, args, config) {
   // Check if in correct channel
-  if (message.channel.id !== config.bossTimerChannelId) {
-    const channel = await message.client.channels.fetch(config.bossTimerChannelId);
+  if (message.channel.id !== config.boss_timer_channel_id) {
+    const channel = await message.client.channels.fetch(config.boss_timer_channel_id);
     return message.reply(`⚠️ Please use ${channel} for boss timer commands`);
   }
 
@@ -348,8 +348,8 @@ async function handleSpawned(message, args, config) {
  */
 async function handleSetBoss(message, args, config) {
   // Check if in correct channel
-  if (message.channel.id !== config.bossTimerChannelId) {
-    const channel = await message.client.channels.fetch(config.bossTimerChannelId);
+  if (message.channel.id !== config.boss_timer_channel_id) {
+    const channel = await message.client.channels.fetch(config.boss_timer_channel_id);
     return message.reply(`⚠️ Please use ${channel} for boss timer commands`);
   }
 
