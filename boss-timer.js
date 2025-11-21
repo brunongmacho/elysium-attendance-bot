@@ -452,7 +452,7 @@ async function triggerSpawnReminder(bossName, spawnTime) {
     }
 
     // Create attendance thread
-    const thread = await attendance.createThreadForBoss(bossName, spawnTime);
+    const thread = await attendance.createThreadForBoss(client, bossName, spawnTime);
 
     // Post reminder to announcement channel
     const timestamp = Math.floor(spawnTime.getTime() / 1000);
@@ -806,7 +806,7 @@ async function handleSpawned(bossName, userId) {
     }
 
     // Create attendance thread for current spawn
-    const thread = await attendance.createThreadForBoss(bossName, now);
+    const thread = await attendance.createThreadForBoss(client, bossName, now);
 
     // Post confirmation in announcement channel
     const announcementChannel = await client.channels.fetch(config.boss_spawn_announcement_channel_id);
