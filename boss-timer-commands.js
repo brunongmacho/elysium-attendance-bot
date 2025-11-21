@@ -509,6 +509,81 @@ async function handleSetBoss(message, args, config) {
   }
 }
 
+/**
+ * Handle !help command for boss timer channel
+ */
+async function handleHelp(message) {
+  const embed = new EmbedBuilder()
+    .setColor(0x5865f2)
+    .setTitle('📋 Boss Timer Commands')
+    .setDescription('Use these commands to track boss spawns and manage timers.\n\n**All times should be in GMT+8 (Philippine Time)**')
+    .addFields(
+      {
+        name: '⚔️ `!killed <boss> <time>`',
+        value: 'Record when a boss was killed to calculate next spawn.\n' +
+               '**Examples:**\n' +
+               '• `!killed venatus 5:27pm`\n' +
+               '• `!killed baron 9:30 AM`\n' +
+               '• `!killed ego 14:30 11/21` *(with date)*',
+        inline: false
+      },
+      {
+        name: '⏰ `!setboss <boss> <spawn time>`',
+        value: 'Manually set the next spawn time for a boss.\n' +
+               '**Requires AM/PM** (12-hour format)\n' +
+               '**Examples:**\n' +
+               '• `!setboss venatus 1:27am`\n' +
+               '• `!setboss gareth 8:00 PM 11/22`',
+        inline: false
+      },
+      {
+        name: '📅 `!nextspawn`',
+        value: 'View all bosses spawning in the next 24 hours.',
+        inline: false
+      },
+      {
+        name: '✅ `!spawned <boss>`',
+        value: 'Confirm a boss has spawned and create attendance thread.\n' +
+               '**Example:** `!spawned venatus`',
+        inline: false
+      },
+      {
+        name: '🚫 `!nospawn <boss>`',
+        value: 'Report that a boss did not spawn (bugged).\n' +
+               '**Example:** `!nospawn venatus`',
+        inline: false
+      },
+      {
+        name: '↩️ `!unkill <boss>`',
+        value: 'Remove a boss from the timer list.\n' +
+               '**Example:** `!unkill venatus`',
+        inline: false
+      },
+      {
+        name: '🔧 `!maintenance` *(Admin)*',
+        value: 'Put all bosses in maintenance mode (creates threads without auto-close).',
+        inline: false
+      },
+      {
+        name: '🗑️ `!clearkills` *(Admin)*',
+        value: 'Clear all recorded kills and timers.',
+        inline: false
+      }
+    )
+    .addFields({
+      name: '💡 Tips',
+      value: '• Times are interpreted as **GMT+8** (Philippine Time)\n' +
+             '• Boss names are fuzzy-matched (e.g., "ven" → "Venatus")\n' +
+             '• If you forgot to `!killed`, the system auto-forwards to next future spawn\n' +
+             '• Scheduled bosses (Auraq, Milavy, Ringor) have fixed spawn times',
+      inline: false
+    })
+    .setFooter({ text: 'Boss Timer System • Only boss timer commands work in this channel' })
+    .setTimestamp();
+
+  await message.reply({ embeds: [embed] });
+}
+
 module.exports = {
   handleKilled,
   handleNextSpawn,
@@ -518,4 +593,5 @@ module.exports = {
   handleNoSpawn,
   handleSpawned,
   handleSetBoss,
+  handleHelp,
 };
