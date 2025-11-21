@@ -52,7 +52,7 @@ async function showNLPStats(message, learningSystem) {
             `**Messages Analyzed:** ${stats.messagesAnalyzed.toLocaleString()}`,
             `**Successful:** ${stats.successfulInterpretations}`,
             `**Failed:** ${stats.failedInterpretations}`,
-            `**Last Sync:** ${stats.lastSync ? stats.lastSync.toLocaleString() : 'Never'}`,
+            `**Last Sync:** ${stats.lastSync ? stats.lastSync.toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : 'Never'}`,
           ].join('\n'),
           inline: true,
         },
@@ -179,7 +179,7 @@ async function showUnrecognized(message, learningSystem) {
       .addFields(
         top20.map((phrase, index) => ({
           name: `${index + 1}. "${phrase.phrase}"`,
-          value: `**Count:** ${phrase.count} | **Users:** ${phrase.userCount} | **Last seen:** ${new Date(phrase.lastSeen).toLocaleString()}`,
+          value: `**Count:** ${phrase.count} | **Users:** ${phrase.userCount} | **Last seen:** ${new Date(phrase.lastSeen).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`,
           inline: false,
         }))
       )
@@ -383,7 +383,7 @@ async function showMyProfile(message, learningSystem) {
           inline: false,
         }
       )
-      .setFooter({ text: `Last updated: ${new Date(profile.lastUpdated).toLocaleString()}` })
+      .setFooter({ text: `Last updated: ${new Date(profile.lastUpdated).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}` })
       .setTimestamp();
 
     await message.reply({ embeds: [embed] });
