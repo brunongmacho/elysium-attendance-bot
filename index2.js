@@ -5490,6 +5490,10 @@ client.on(Events.MessageCreate, async (message) => {
       const args = message.content.slice(9).trim().split(/\s+/);
       return await bossTimerCommands.handleSpawned(message, args, config);
     }
+    if (content.startsWith('!setboss ')) {
+      const args = message.content.slice(9).trim().split(/\s+/);
+      return await bossTimerCommands.handleSetBoss(message, args, config);
+    }
 
     const guild = message.guild;
     if (!guild) return;

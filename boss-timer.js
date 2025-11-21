@@ -436,6 +436,40 @@ async function saveRecoveryData(bossName, killTime, nextSpawn, killedBy) {
   }
 }
 
+/**
+ * Set spawn time directly for a boss (instead of calculating from kill time)
+ * @param {string} bossName - Boss name
+ * @param {Date} spawnTime - Direct spawn time
+ * @param {string} setBy - Username who set the time
+ * @returns {Promise<Object>} Result with spawnTime
+ */
+async function setSpawnTime(bossName, spawnTime, setBy) {
+  const normalizedName = bossName.toLowerCase();
+
+  // Check if boss already has a timer
+  const existing = bossKillTimes.get(normalizedName);
+  if (existing && existing.timerId) {
+    clearTimeout(existing.timerId);
+    console.log(`🔄 Overwriting existing timer for ${bossName}`);
+  }
+
+  // Schedule reminder
+  const timerId = scheduleReminder(bossName, spawnTime);
+
+  // Save to cache (use spawnTime as "killTime" for display purposes)
+  bossKillTimes.set(normalizedName, {
+    killTime: null, // No kill time - directly set spawn
+    nextSpawn: spawnTime,
+    timerId,
+    killedBy: `set-by-${setBy}`
+  });
+
+  // Save to Sheets with critical retry
+  await saveRecoveryData(bossName, new Date(), spawnTime, `set-by-${setBy}`);
+
+  return { nextSpawn: spawnTime, bossName };
+}
+
 // ============================================================================
 // COMMANDS
 // ============================================================================
@@ -843,6 +877,7 @@ function addToRecentlyHandled(bossName, spawnTime, threadId) {
 module.exports = {
   initialize,
   recordKill,
+  setSpawnTime,
   getNextSpawn,
   getUpcomingSpawns,
   cancelTimer,
