@@ -221,6 +221,8 @@ function doPost(e) {
     // Boss Timer Recovery actions (persist boss kill/spawn times across restarts)
     if (action === 'getBossTimerRecovery') return getBossTimerRecovery();
     if (action === 'saveBossTimerRecovery') return saveBossTimerRecovery(data);
+    if (action === 'deleteBossTimerRecovery') return deleteBossTimerRecovery(data);
+    if (action === 'clearBossTimerRecovery') return clearBossTimerRecovery(data);
 
     Logger.log(`❌ Unknown: ${action}`);
     return createResponse('error', 'Unknown action: ' + action);
