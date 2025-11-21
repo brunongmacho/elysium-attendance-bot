@@ -203,6 +203,17 @@ function getBossType(bossName) {
   return null;
 }
 
+/**
+ * Get next scheduled spawn time for a schedule-based boss
+ * @param {string} bossName - Boss name
+ * @returns {Date|null} Next scheduled spawn time
+ */
+function getNextScheduledSpawn(bossName) {
+  const bossConfig = bossSpawnConfig.scheduleBasedBosses[bossName];
+  if (!bossConfig || !bossConfig.schedules) return null;
+  return findNextScheduledTime(bossConfig.schedules);
+}
+
 // ============================================================================
 // TIME PARSING
 // ============================================================================
@@ -932,5 +943,7 @@ module.exports = {
   parseKillTime,
   wasRecentlyHandled,
   addToRecentlyHandled,
+  getBossType,
+  getNextScheduledSpawn,
   bossKillTimes, // Export for monitoring/debugging
 };

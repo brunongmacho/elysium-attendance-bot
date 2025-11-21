@@ -5338,6 +5338,13 @@ client.on(Events.MessageCreate, async (message) => {
             return;
           }
 
+          // Skip scheduled bosses - they have fixed spawn times, no need to track external kills
+          const bossType = bossTimer.getBossType(bossName);
+          if (bossType === 'schedule') {
+            console.log(`⏭️ ${bossName} is a scheduled boss - ignoring external bot announcement`);
+            return;
+          }
+
           console.log(
             `🎯 Boss spawn detected: ${bossName} (from ${message.author.username})`
           );
