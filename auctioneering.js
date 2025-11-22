@@ -4055,6 +4055,42 @@ function scheduleWeeklySaturdayAuction(client, config) {
   console.log(`${EMOJI.SUCCESS} Weekly Saturday auction scheduler initialized (12:00 PM GMT+8)`);
 }
 
+/**
+ * Resets session finalization state and clears Session 2 polling/timers.
+ * Use this when finalization crashed and left sessionFinalized stuck at false.
+ *
+ * @returns {Object} Status object with what was reset
+ */
+function resetSessionState() {
+  const status = {
+    previousFinalized: auctionState.sessionFinalized,
+    previousActive: auctionState.active,
+    clearedPollInterval: false,
+    clearedSession2Timer: false,
+  };
+
+  // Reset the finalization flag
+  auctionState.sessionFinalized = true;
+  auctionState.active = false;
+
+  // Clear Session 2 polling interval if running
+  if (sessionPollInterval) {
+    clearInterval(sessionPollInterval);
+    sessionPollInterval = null;
+    status.clearedPollInterval = true;
+  }
+
+  // Clear Session 2 timer if scheduled
+  if (session2Timer) {
+    clearTimeout(session2Timer);
+    session2Timer = null;
+    status.clearedSession2Timer = true;
+  }
+
+  console.log(`${EMOJI.SUCCESS} Session state reset:`, status);
+  return status;
+}
+
 module.exports = {
   initialize,
   itemEnd,
@@ -4080,5 +4116,6 @@ module.exports = {
   handleForceSubmitResults,
   handleMoveToDistribution,
   scheduleWeeklySaturdayAuction, // Weekly Saturday 12:00 PM GMT+8 auction scheduler
+  resetSessionState, // Reset sessionFinalized flag and clear Session 2 timers
   // getCurrentSessionBoss: () => currentSessionBoss - REMOVED: Not used anywhere
 };

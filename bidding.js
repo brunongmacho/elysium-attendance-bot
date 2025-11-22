@@ -3287,6 +3287,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           auctState.timers = {};
           auctState.paused = false;
           auctState.pausedTime = null;
+          auctState.sessionFinalized = true; // Reset finalization flag to prevent stuck Session 2 polling
 
           // Reset bidding state
           st = {
@@ -3358,6 +3359,32 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       } catch (e) {
         await msg.reply(`${EMOJI.ERROR} Error during reset: ${e.message}`);
       }
+      break;
+    }
+
+    case "!resetsession": {
+      // 🔄 RESET SESSION STATE (lighter than !resetauction)
+      // Use when sessionFinalized is stuck at false after a crash
+      const auctioneering5 = require("./auctioneering.js");
+      const status = auctioneering5.resetSessionState();
+
+      const sessionResetEmbed = new EmbedBuilder()
+        .setColor(COLORS.SUCCESS)
+        .setTitle(`${EMOJI.SUCCESS} Session State Reset`)
+        .setDescription(
+          `**Reset completed:**\n\n` +
+          `• Previous sessionFinalized: ${status.previousFinalized}\n` +
+          `• Previous active: ${status.previousActive}\n` +
+          `• Session 2 polling cleared: ${status.clearedPollInterval ? 'Yes' : 'No'}\n` +
+          `• Session 2 timer cleared: ${status.clearedSession2Timer ? 'Yes' : 'No'}\n\n` +
+          `**Current State:**\n` +
+          `• sessionFinalized: true\n` +
+          `• active: false\n\n` +
+          `You can now start a new auction with \`!startauction\``
+        )
+        .setTimestamp();
+
+      await msg.reply({ embeds: [sessionResetEmbed] });
       break;
     }
 
