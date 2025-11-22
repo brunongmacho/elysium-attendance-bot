@@ -1807,13 +1807,24 @@ async function finalizeSession(client, config, channel) {
     .map((s, i) => `${i + 1}. **${s.item}** 📊: ${s.winner} - ${s.amount}pts`)
     .join("\n");
 
+  // Truncate summary if it exceeds Discord's 1024 character limit for embed fields
+  let truncatedSummary = summary || "No sales";
+  if (truncatedSummary.length > 1024) {
+    // Find a good truncation point (end of a line) within the limit
+    const maxLength = 1000; // Leave room for "... and X more"
+    const truncateAt = truncatedSummary.lastIndexOf('\n', maxLength);
+    const cutPoint = truncateAt > 0 ? truncateAt : maxLength;
+    const remainingItems = soldItems.length - truncatedSummary.substring(0, cutPoint).split('\n').length;
+    truncatedSummary = truncatedSummary.substring(0, cutPoint) + `\n\n*... and ${remainingItems} more items*`;
+  }
+
   const mainEmbed = new EmbedBuilder()
     .setColor(COLORS.SUCCESS)
     .setTitle(`${EMOJI.SUCCESS} Auctioneering Session Complete!`)
     .setDescription(`**${soldItems.length}** item(s) sold`)
     .addFields({
       name: `${EMOJI.LIST} Summary`,
-      value: summary || "No sales",
+      value: truncatedSummary,
       inline: false,
     })
     .setFooter({ text: "Processing results and submitting to sheets..." })
