@@ -131,6 +131,7 @@ function doPost(e) {
     if (action === 'getAttendanceForBoss') return getAttendanceForBoss(data);
     if (action === 'checkColumn') return handleCheckColumn(data);
     if (action === 'submitAttendance') return handleSubmitAttendance(data);
+    if (action === 'overwriteAttendance') return handleOverwriteAttendance(data);
     if (action === 'getAttendanceState') return getAttendanceState(data);
     if (action === 'saveAttendanceState') return saveAttendanceState(data);
     if (action === 'getAllSpawnColumns') return getAllSpawnColumns(data);
@@ -842,6 +843,125 @@ function handleSubmitAttendance(data) {
     }
 
     return createResponse('ok', `Submitted: ${members.length}`, {column: newCol, boss, timestamp, membersCount: members.length});
+  } finally { lock.releaseLock(); }
+}
+
+/**
+ * Handle overwriting existing attendance column (or create new if not exists)
+ * Used by !overrideclose command to update attendance for reopened threads
+ */
+function handleOverwriteAttendance(data) {
+  const boss = (data.boss || '').toString().trim().toUpperCase();
+  const timestamp = (data.timestamp || '').toString().trim();
+  const members = (data.members || []).map(m => m.trim());
+
+  if (!boss || !timestamp || members.length === 0) {
+    return createResponse('error', 'Missing boss, timestamp, or members');
+  }
+
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(30000); } catch (e) { return createResponse('error', 'Lock timeout'); }
+
+  try {
+    const sheet = getCurrentWeekSheet();
+    let lastCol = sheet.getLastColumn();
+    let targetColumn = null;
+
+    const normalizedInputTimestamp = normalizeTimestamp(timestamp);
+
+    if (!normalizedInputTimestamp) {
+      return createResponse('error', 'Invalid timestamp format');
+    }
+
+    // Find existing column
+    if (lastCol >= COLUMNS.FIRST_SPAWN) {
+      const spawnData = sheet.getRange(1, COLUMNS.FIRST_SPAWN, 2, lastCol - COLUMNS.FIRST_SPAWN + 1).getValues();
+      const row1 = spawnData[0], row2 = spawnData[1];
+      for (let i = 0; i < row1.length; i++) {
+        const cellTimestamp = (row1[i] || '').toString().trim();
+        const cellBoss = (row2[i] || '').toString().trim().toUpperCase();
+        const normalizedCellTimestamp = normalizeTimestamp(cellTimestamp);
+
+        if (!normalizedCellTimestamp) continue;
+
+        if (normalizedCellTimestamp === normalizedInputTimestamp && cellBoss === boss) {
+          targetColumn = i + COLUMNS.FIRST_SPAWN;
+          break;
+        }
+      }
+    }
+
+    // If column exists, overwrite it; otherwise create new column
+    const isOverwrite = !!targetColumn;
+    const workingCol = targetColumn || (lastCol + 1);
+
+    // Set header if new column
+    if (!isOverwrite) {
+      sheet.getRange(1, workingCol, 2, 1).setValues([[timestamp],[boss]])
+        .setFontWeight('bold').setBackground('#E8F4F8').setHorizontalAlignment('center');
+      sheet.setColumnWidth(workingCol, 120);
+    }
+
+    const lastRow = sheet.getLastRow();
+    const checkboxRule = SpreadsheetApp.newDataValidation().requireCheckbox().setAllowInvalid(false).build();
+
+    if (lastRow >= 3) {
+      const memberNames = sheet.getRange(3, COLUMNS.MEMBERS, lastRow - 2, 1).getValues().flat();
+      const membersLower = members.map(m => m.toLowerCase());
+      const sheetMembersLower = memberNames.map(m => (m || '').toString().trim().toLowerCase());
+
+      // Add new members if needed (only for new columns or if member doesn't exist)
+      const newMembers = [];
+      let newMembersCount = 0;
+      for (let i = 0; i < members.length; i++) {
+        if (!sheetMembersLower.includes(membersLower[i])) {
+          const newRow = lastRow + newMembersCount + 1;
+          newMembers.push({name: members[i], row: newRow});
+          newMembersCount++;
+        }
+      }
+
+      if (newMembers.length > 0) {
+        const newMemberData = newMembers.map(m => [m.name]);
+        const insertStart = lastRow + 1;
+
+        sheet.getRange(insertStart, COLUMNS.MEMBERS, newMembers.length, 1).setValues(newMemberData);
+
+        if (lastRow >= 3) {
+          const formulas = sheet.getRange(lastRow, 2, 1, 3).getFormulas();
+          for (let i = 0; i < newMembers.length; i++) {
+            sheet.getRange(insertStart + i, 2, 1, 3).setFormulas(formulas);
+          }
+        }
+
+        // Fill FALSE for all previous spawn columns (only up to workingCol-1)
+        if (workingCol > COLUMNS.FIRST_SPAWN) {
+          const falseArray = Array(newMembers.length).fill(null).map(() => Array(workingCol - COLUMNS.FIRST_SPAWN).fill(false));
+          sheet.getRange(insertStart, COLUMNS.FIRST_SPAWN, newMembers.length, workingCol - COLUMNS.FIRST_SPAWN)
+               .setValues(falseArray).setDataValidation(checkboxRule);
+        }
+      }
+
+      // Update attendance column (overwrite or set new)
+      const totalRows = lastRow + newMembersCount;
+      if (totalRows >= 3) {
+        const allMemberNames = sheet.getRange(3, COLUMNS.MEMBERS, totalRows - 2, 1).getValues().flat();
+        const allMembersLower = allMemberNames.map(m => (m || '').toString().trim().toLowerCase());
+        const attendanceData = allMembersLower.map(m => [membersLower.includes(m)]);
+        sheet.getRange(3, workingCol, attendanceData.length, 1).setValues(attendanceData).setDataValidation(checkboxRule);
+      }
+
+    } else {
+      sheet.getRange(3, COLUMNS.MEMBERS, members.length, 1).setValues(members.map(m => [m]));
+      sheet.getRange(3, workingCol, members.length, 1).setValues(members.map(() => [true])).setDataValidation(checkboxRule);
+    }
+
+    logAttendance(SpreadsheetApp.openById(CONFIG.SSHEET_ID), boss, timestamp, members);
+
+    const action = isOverwrite ? 'Overwritten' : 'Submitted';
+    Logger.log(`📊 ${action} attendance: ${boss} at ${timestamp} - ${members.length} members`);
+
+    return createResponse('ok', `${action}: ${members.length}`, {column: workingCol, boss, timestamp, membersCount: members.length, overwritten: isOverwrite});
   } finally { lock.releaseLock(); }
 }
 
