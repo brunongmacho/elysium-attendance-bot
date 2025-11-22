@@ -211,46 +211,58 @@ function normalizeTimestamp(timestamp) {
 // ============================================================================
 
 /**
- * Parse thread name format: [MM/DD/YY HH:MM] Boss Name.
+ * Parse thread name format for attendance threads.
  *
- * Extracts timestamp and boss name from spawn thread names. Thread names
- * follow a strict format where the timestamp is enclosed in square brackets
- * followed by the boss name.
+ * Supports two formats:
+ * 1. Boss spawn threads: [MM/DD/YY HH:MM] Boss Name
+ * 2. Event threads: EventType MM-DD HH:MM (e.g., "GvG 11-22 14:30")
  *
  * @function parseThreadName
  * @param {string} name - Thread name to parse
  * @returns {Object|null} Parsed components or null if format doesn't match
- * @returns {string} returns.date - Date portion (MM/DD/YY)
+ * @returns {string} returns.date - Date portion (MM/DD/YY or MM-DD)
  * @returns {string} returns.time - Time portion (HH:MM)
- * @returns {string} returns.timestamp - Full timestamp (MM/DD/YY HH:MM)
- * @returns {string} returns.boss - Boss name
+ * @returns {string} returns.timestamp - Full timestamp (MM/DD/YY HH:MM or MM-DD HH:MM)
+ * @returns {string} returns.boss - Boss name or event type
  *
  * @example
+ * // Boss spawn format
  * const parsed = parseThreadName("[10/29/25 09:22] Balrog");
- * // {
- * //   date: "10/29/25",
- * //   time: "09:22",
- * //   timestamp: "10/29/25 09:22",
- * //   boss: "Balrog"
- * // }
+ * // { date: "10/29/25", time: "09:22", timestamp: "10/29/25 09:22", boss: "Balrog" }
+ *
+ * @example
+ * // Event format
+ * const parsed = parseThreadName("GvG 11-22 14:30");
+ * // { date: "11-22", time: "14:30", timestamp: "11-22 14:30", boss: "GvG" }
  *
  * parseThreadName("Invalid format"); // null
  */
 function parseThreadName(name) {
-  // Regex pattern: [date time] boss
-  // Group 1: date (MM/DD/YY)
-  // Group 2: time (HH:MM)
-  // Group 3: boss name
-  const match = name.match(/^\[(.*?)\s+(.*?)\]\s+(.+)$/);
+  // Format 1: Boss spawn threads - [date time] boss
+  // Example: "[10/29/25 09:22] Balrog"
+  const bossMatch = name.match(/^\[(.*?)\s+(.*?)\]\s+(.+)$/);
+  if (bossMatch) {
+    return {
+      date: bossMatch[1],
+      time: bossMatch[2],
+      timestamp: `${bossMatch[1]} ${bossMatch[2]}`,
+      boss: bossMatch[3],
+    };
+  }
 
-  if (!match) return null; // Invalid format
+  // Format 2: Event threads - EventType MM-DD HH:MM
+  // Example: "GvG 11-22 14:30" or "Fortress Siege 11-22 14:30"
+  const eventMatch = name.match(/^(.+?)\s+(\d{2}-\d{2})\s+(\d{2}:\d{2})$/);
+  if (eventMatch) {
+    return {
+      date: eventMatch[2],
+      time: eventMatch[3],
+      timestamp: `${eventMatch[2]} ${eventMatch[3]}`,
+      boss: eventMatch[1], // Event type (GvG, Fortress Siege, etc.)
+    };
+  }
 
-  return {
-    date: match[1],
-    time: match[2],
-    timestamp: `${match[1]} ${match[2]}`,
-    boss: match[3],
-  };
+  return null; // Invalid format
 }
 
 // ============================================================================
