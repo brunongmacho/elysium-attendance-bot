@@ -3362,6 +3362,123 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       break;
     }
 
+    case "!submittallyfromsheet": {
+      // 📊 SUBMIT TALLY FROM GOOGLE SHEET DATA
+      // Use when bot restarted and sessionItems are lost but winners are in BiddingItems sheet
+      try {
+        await msg.reply(`${EMOJI.CLOCK} Fetching items from BiddingItems sheet...`);
+
+        // Fetch items from Google Sheets
+        const sheetData = await sheetAPI.call('getBiddingItems');
+
+        if (!sheetData || !sheetData.items || sheetData.items.length === 0) {
+          return await msg.reply(`${EMOJI.ERROR} No items found in BiddingItems sheet`);
+        }
+
+        // Filter items that have winners
+        const itemsWithWinners = sheetData.items.filter(item =>
+          item.winner && item.winner.toString().trim() !== ''
+        );
+
+        if (itemsWithWinners.length === 0) {
+          return await msg.reply(`${EMOJI.ERROR} No items with winners found in BiddingItems sheet`);
+        }
+
+        // Build summary
+        const summary = itemsWithWinners
+          .map((item, i) => `${i + 1}. **${item.item}**: ${item.winner} - ${item.winningBid || item.startPrice}pts`)
+          .join('\n');
+
+        // Truncate if too long
+        let displaySummary = summary;
+        if (displaySummary.length > 1000) {
+          displaySummary = displaySummary.substring(0, 1000) + `\n\n*... and more items*`;
+        }
+
+        const confirmButton = new ButtonBuilder()
+          .setCustomId(`sheettally_confirm_${msg.author.id}_${Date.now()}`)
+          .setLabel(`✅ Submit Tally (${itemsWithWinners.length} items)`)
+          .setStyle(ButtonStyle.Success);
+
+        const cancelButton = new ButtonBuilder()
+          .setCustomId(`sheettally_cancel_${msg.author.id}_${Date.now()}`)
+          .setLabel('❌ Cancel')
+          .setStyle(ButtonStyle.Secondary);
+
+        const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+        const confirmEmbed = new EmbedBuilder()
+          .setColor(COLORS.WARNING)
+          .setTitle(`${EMOJI.WARNING} Submit Tally from Sheet?`)
+          .setDescription(
+            `Found **${itemsWithWinners.length}** items with winners in BiddingItems sheet.\n\n` +
+            `This will deduct points from the following winners:\n\n${displaySummary}`
+          )
+          .setFooter({ text: 'Click to confirm or cancel (30s timeout)' });
+
+        const confirmMsg = await msg.reply({ embeds: [confirmEmbed], components: [row] });
+
+        const collector = confirmMsg.createMessageComponentCollector({
+          componentType: ComponentType.Button,
+          filter: i => i.user.id === msg.author.id,
+          max: 1,
+          time: 30000
+        });
+
+        collector.on('collect', async (interaction) => {
+          const isConfirm = interaction.customId.startsWith('sheettally_confirm_');
+          const disabledRow = createDisabledRow(confirmButton, cancelButton);
+
+          if (isConfirm) {
+            await interaction.update({
+              embeds: [confirmEmbed.setFooter({ text: 'Processing...' })],
+              components: [disabledRow]
+            });
+
+            // Convert to sessionItems format
+            const sessionItems = itemsWithWinners.map(item => ({
+              item: item.item,
+              winner: item.winner,
+              amount: parseInt(item.winningBid) || parseInt(item.startPrice) || 0
+            }));
+
+            // Submit the tally
+            await submitSessionTally(cfg, sessionItems);
+
+            const successEmbed = new EmbedBuilder()
+              .setColor(COLORS.SUCCESS)
+              .setTitle(`${EMOJI.SUCCESS} Tally Submitted`)
+              .setDescription(
+                `Successfully submitted tally for **${sessionItems.length}** items.\n\n` +
+                `Points have been deducted from winners.\n\n` +
+                `**Next step:** Run \`!movetodistribution\` to move items to ForDistribution sheet.`
+              )
+              .setTimestamp();
+
+            await msg.reply({ embeds: [successEmbed] });
+          } else {
+            await interaction.update({
+              embeds: [new EmbedBuilder().setColor(COLORS.ERROR).setTitle(`${EMOJI.ERROR} Cancelled`)],
+              components: [disabledRow]
+            });
+          }
+        });
+
+        collector.on('end', async (collected, reason) => {
+          if (reason === 'time' && collected.size === 0) {
+            const disabledRow = createDisabledRow(confirmButton, cancelButton);
+            await confirmMsg.edit({ components: [disabledRow] });
+            await msg.reply(`${EMOJI.INFO} Tally submission timed out (cancelled)`);
+          }
+        });
+
+      } catch (err) {
+        console.error(`${EMOJI.ERROR} Error in !submittallyfromsheet:`, err);
+        await msg.reply(`${EMOJI.ERROR} Error: ${err.message}`);
+      }
+      break;
+    }
+
     case "!resetsession": {
       // 🔄 RESET SESSION STATE (lighter than !resetauction)
       // Use when sessionFinalized is stuck at false after a crash
