@@ -5287,15 +5287,15 @@ client.on(Events.MessageCreate, async (message) => {
     if (!message.guild) return; // Skip DMs immediately
     if (message.guild.id !== config.main_guild_id && message.guild.id !== config.timer_server_id) return; // Skip wrong guild (allow timer server)
 
-    // 🧠 NLP LEARNING: Passive learning from all messages (learns without responding)
-    // Skip learning from bot messages
-    if (nlpLearningSystem && !message.author.bot) {
-      try {
-        await nlpLearningSystem.learnFromMessage(message);
-      } catch (error) {
-        console.error(`❌ NLP Learning error: ${error.message}`);
-      }
-    }
+    // 🧠 NLP LEARNING: DISABLED - Bot now relies on invoked commands only
+    // To re-enable: uncomment the block below
+    // if (nlpLearningSystem && !message.author.bot) {
+    //   try {
+    //     await nlpLearningSystem.learnFromMessage(message);
+    //   } catch (error) {
+    //     console.error(`❌ NLP Learning error: ${error.message}`);
+    //   }
+    // }
 
     // 📊 ACTIVITY TRACKING: Track message for activity heatmap
     // Skip bot messages for more accurate member activity data
@@ -5666,91 +5666,96 @@ client.on(Events.MessageCreate, async (message) => {
     // Laughter only treated as conversation if replying to bot (common reaction to roasts)
     const isLaughterReply = isLaughter && isReplyToBot;
 
-    if ((hasInsult || isReplyToBot || isLaughterReply) && (botMentioned || isReplyToBot || isLaughterReply) && nlpLearningSystem) {
-      // This is likely an insult/roast/laughter or reply to bot - handle as conversation, not command
-      const detectionReason = isLaughterReply ? 'laughter reply' : (hasInsult ? 'insult pattern' : 'reply to bot');
-      console.log(`🔥 [NLP] Detected ${detectionReason} - skipping command interpretation`);
-      const conversationResponse = await nlpLearningSystem.handleConversation(message);
+    // 🔥 NLP CONVERSATION: DISABLED - Bot now relies on invoked commands only
+    // To re-enable: uncomment the block below
+    // if ((hasInsult || isReplyToBot || isLaughterReply) && (botMentioned || isReplyToBot || isLaughterReply) && nlpLearningSystem) {
+    //   // This is likely an insult/roast/laughter or reply to bot - handle as conversation, not command
+    //   const detectionReason = isLaughterReply ? 'laughter reply' : (hasInsult ? 'insult pattern' : 'reply to bot');
+    //   console.log(`🔥 [NLP] Detected ${detectionReason} - skipping command interpretation`);
+    //   const conversationResponse = await nlpLearningSystem.handleConversation(message);
+    //
+    //   if (conversationResponse) {
+    //     console.log(`💬 [NLP Conversation] User: "${message.content.substring(0, 50)}..." → Roasting back`);
+    //     // Try to reply, fall back to channel.send if it's a system message
+    //     try {
+    //       if (message.system) {
+    //         await message.channel.send(conversationResponse);
+    //       } else {
+    //         await message.reply(conversationResponse);
+    //       }
+    //     } catch (error) {
+    //       // If reply fails (e.g., system message), try sending to channel instead
+    //       if (error.code === 50035) {
+    //         await message.channel.send(conversationResponse).catch(console.error);
+    //       } else {
+    //         console.error('❌ Error sending conversation response:', error);
+    //       }
+    //     }
+    //     return; // Return early - this was handled as conversation
+    //   }
+    // }
 
-      if (conversationResponse) {
-        console.log(`💬 [NLP Conversation] User: "${message.content.substring(0, 50)}..." → Roasting back`);
-        // Try to reply, fall back to channel.send if it's a system message
-        try {
-          if (message.system) {
-            await message.channel.send(conversationResponse);
-          } else {
-            await message.reply(conversationResponse);
-          }
-        } catch (error) {
-          // If reply fails (e.g., system message), try sending to channel instead
-          if (error.code === 50035) {
-            await message.channel.send(conversationResponse).catch(console.error);
-          } else {
-            console.error('❌ Error sending conversation response:', error);
-          }
-        }
-        return; // Return early - this was handled as conversation
-      }
-    }
+    // 🧠 NLP INTERPRETATION: DISABLED - Bot now relies on invoked commands only
+    // To re-enable: uncomment the blocks below
 
-    // Try learning system first (if bot is mentioned or in auction thread)
-    if (nlpLearningSystem && !message.content.trim().startsWith('!')) {
-      const shouldRespond = nlpLearningSystem.shouldRespond(message);
-
-      if (shouldRespond) {
-        nlpInterpretation = await nlpLearningSystem.interpretMessage(message);
-        if (nlpInterpretation) {
-          usedLearningSystem = true;
-          const fuzzyInfo = nlpInterpretation.fuzzyMatch
-            ? ` [fuzzy: "${nlpInterpretation.fuzzyMatch.matched}" ${nlpInterpretation.fuzzyMatch.similarity}]`
-            : '';
-          console.log(`🧠 [NLP Learning] Interpreted: "${message.content}" → ${nlpInterpretation.command} (confidence: ${nlpInterpretation.confidence.toFixed(2)})${fuzzyInfo}`);
-        }
-      }
-    }
-
-    // Fall back to static handler if learning system didn't interpret
-    if (!nlpInterpretation && nlpHandler && !message.content.trim().startsWith('!')) {
-      nlpInterpretation = nlpHandler.interpretMessage(message);
-
-      if (nlpInterpretation) {
-        console.log(`💬 [NLP Static] Interpreted: "${message.content}" → ${nlpInterpretation.command}`);
-      }
-    }
-
-    // Apply interpretation if found
-    if (nlpInterpretation) {
-      // Convert natural language to command format
-      // This allows the rest of the system to process it normally
-      const params = nlpInterpretation.params.join(' ');
-      message.content = `${nlpInterpretation.command}${params ? ' ' + params : ''}`;
-
-      // Optional: Send brief feedback for non-bid commands
-      if (!usedLearningSystem && nlpHandler) {
-        const contextMessage = nlpHandler.getContextMessage(nlpInterpretation.command, message);
-        if (contextMessage) {
-          await message.reply(contextMessage).catch(err => errorHandler.silentError(err, 'NLP context message reply'));
-        }
-      }
-    } else {
-      // No command found - check if bot was mentioned for conversation
-      const botMentioned = message.mentions.users.has(client.user.id);
-
-      if (botMentioned && nlpLearningSystem && !message.content.trim().startsWith('!')) {
-        // Bot was tagged but no command recognized - engage in conversation
-        const conversationResponse = await nlpLearningSystem.handleConversation(message);
-
-        if (conversationResponse) {
-          console.log(`💬 [NLP Conversation] User: "${message.content.substring(0, 50)}..." → Responding`);
-          await message.reply(conversationResponse).catch((error) => {
-            console.error('❌ Error sending conversation response:', error);
-          });
-
-          // Return early - this was a conversation, not a command
-          return;
-        }
-      }
-    }
+    // // Try learning system first (if bot is mentioned or in auction thread)
+    // if (nlpLearningSystem && !message.content.trim().startsWith('!')) {
+    //   const shouldRespond = nlpLearningSystem.shouldRespond(message);
+    //
+    //   if (shouldRespond) {
+    //     nlpInterpretation = await nlpLearningSystem.interpretMessage(message);
+    //     if (nlpInterpretation) {
+    //       usedLearningSystem = true;
+    //       const fuzzyInfo = nlpInterpretation.fuzzyMatch
+    //         ? ` [fuzzy: "${nlpInterpretation.fuzzyMatch.matched}" ${nlpInterpretation.fuzzyMatch.similarity}]`
+    //         : '';
+    //       console.log(`🧠 [NLP Learning] Interpreted: "${message.content}" → ${nlpInterpretation.command} (confidence: ${nlpInterpretation.confidence.toFixed(2)})${fuzzyInfo}`);
+    //     }
+    //   }
+    // }
+    //
+    // // Fall back to static handler if learning system didn't interpret
+    // if (!nlpInterpretation && nlpHandler && !message.content.trim().startsWith('!')) {
+    //   nlpInterpretation = nlpHandler.interpretMessage(message);
+    //
+    //   if (nlpInterpretation) {
+    //     console.log(`💬 [NLP Static] Interpreted: "${message.content}" → ${nlpInterpretation.command}`);
+    //   }
+    // }
+    //
+    // // Apply interpretation if found
+    // if (nlpInterpretation) {
+    //   // Convert natural language to command format
+    //   // This allows the rest of the system to process it normally
+    //   const params = nlpInterpretation.params.join(' ');
+    //   message.content = `${nlpInterpretation.command}${params ? ' ' + params : ''}`;
+    //
+    //   // Optional: Send brief feedback for non-bid commands
+    //   if (!usedLearningSystem && nlpHandler) {
+    //     const contextMessage = nlpHandler.getContextMessage(nlpInterpretation.command, message);
+    //     if (contextMessage) {
+    //       await message.reply(contextMessage).catch(err => errorHandler.silentError(err, 'NLP context message reply'));
+    //     }
+    //   }
+    // } else {
+    //   // No command found - check if bot was mentioned for conversation
+    //   const botMentioned = message.mentions.users.has(client.user.id);
+    //
+    //   if (botMentioned && nlpLearningSystem && !message.content.trim().startsWith('!')) {
+    //     // Bot was tagged but no command recognized - engage in conversation
+    //     const conversationResponse = await nlpLearningSystem.handleConversation(message);
+    //
+    //     if (conversationResponse) {
+    //       console.log(`💬 [NLP Conversation] User: "${message.content.substring(0, 50)}..." → Responding`);
+    //       await message.reply(conversationResponse).catch((error) => {
+    //         console.error('❌ Error sending conversation response:', error);
+    //       });
+    //
+    //       // Return early - this was a conversation, not a command
+    //       return;
+    //     }
+    //   }
+    // }
 
     // ✅ HANDLE !BID AND ALIASES IMMEDIATELY
     const rawCmd = message.content.trim().toLowerCase().split(/\s+/)[0];
