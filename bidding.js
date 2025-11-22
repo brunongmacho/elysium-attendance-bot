@@ -3366,23 +3366,19 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       // 📊 SUBMIT TALLY FROM GOOGLE SHEET DATA
       // Use when bot restarted and sessionItems are lost but winners are in BiddingItems sheet
       try {
-        await msg.reply(`${EMOJI.CLOCK} Fetching items from BiddingItems sheet...`);
+        await msg.reply(`${EMOJI.CLOCK} Fetching items with winners from BiddingItems sheet...`);
 
-        // Fetch items from Google Sheets
-        const sheetData = await sheetAPI.call('getBiddingItems');
+        // Fetch items WITH WINNERS from Google Sheets
+        // Uses getBiddingItemsWithWinners (returns only items with winners)
+        // NOT getBiddingItems (which skips items with winners)
+        const sheetData = await sheetAPI.call('getBiddingItemsWithWinners');
 
         if (!sheetData || !sheetData.items || sheetData.items.length === 0) {
-          return await msg.reply(`${EMOJI.ERROR} No items found in BiddingItems sheet`);
+          return await msg.reply(`${EMOJI.ERROR} No items with winners found in BiddingItems sheet.\n\nMake sure the Winner column (Column D) has values.`);
         }
 
-        // Filter items that have winners
-        const itemsWithWinners = sheetData.items.filter(item =>
-          item.winner && item.winner.toString().trim() !== ''
-        );
-
-        if (itemsWithWinners.length === 0) {
-          return await msg.reply(`${EMOJI.ERROR} No items with winners found in BiddingItems sheet`);
-        }
+        // Items already filtered by the API - all have winners
+        const itemsWithWinners = sheetData.items;
 
         // Build summary
         const summary = itemsWithWinners

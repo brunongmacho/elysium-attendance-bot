@@ -141,6 +141,7 @@ function doPost(e) {
     if (action === 'submitBiddingResults') return handleSubmitBiddingResults(data);
     if (action === 'removeMember') return handleRemoveMember(data);
     if (action === 'getBiddingItems') return getBiddingItems(data);
+    if (action === 'getBiddingItemsWithWinners') return getBiddingItemsWithWinners(data);
     if (action === 'logAuctionResult') return logAuctionResult(data);
     if (action === 'getBotState') return getBotState(data);
     if (action === 'saveBotState') return saveBotState(data);
@@ -961,6 +962,44 @@ function getBiddingItems(data) {
   
   Logger.log(`✅ Fetched ${items.length} items`);
   return createResponse('ok', 'Items fetched', {items});
+}
+
+/**
+ * Get bidding items WITH winners (for tally submission after crash recovery)
+ * Unlike getBiddingItems which skips items with winners, this returns ONLY items with winners
+ */
+function getBiddingItemsWithWinners(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('BiddingItems');
+  if (!sheet) return createResponse('error', 'BiddingItems sheet not found', {items: []});
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return createResponse('ok', 'No items', {items: []});
+
+  const lastCol = sheet.getLastColumn();
+  const dataRange = sheet.getRange(2, 1, lastRow - 1, Math.min(lastCol, 12)).getValues();
+  const items = [];
+
+  dataRange.forEach((row, idx) => {
+    const itemName = (row[0] || '').toString().trim();
+    if (!itemName) return;
+
+    const winner = (row[3] || '').toString().trim();
+    if (!winner) return; // Skip items WITHOUT winners (opposite of getBiddingItems)
+
+    const winningBid = Number(row[4]) || Number(row[1]) || 0; // Column E (Winning Bid) or fallback to Start Price
+
+    items.push({
+      item: itemName,
+      startPrice: Number(row[1]) || 0,
+      winningBid: winningBid,
+      winner: winner,
+      sheetIndex: idx + 2,
+    });
+  });
+
+  Logger.log(`✅ Fetched ${items.length} items with winners`);
+  return createResponse('ok', 'Items with winners fetched', {items});
 }
 
 function getAttendanceForBoss(data) {
