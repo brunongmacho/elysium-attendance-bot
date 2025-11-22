@@ -1037,6 +1037,48 @@ function addToRecentlyHandled(bossName, spawnTime, threadId) {
 }
 
 // ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Format a countdown string with appropriate precision
+ * - Days away: shows "in X days Y hours"
+ * - Hours away: shows "in X hours Y minutes"
+ * - Minutes away: shows "in X minutes"
+ * @param {number} timestamp - Unix timestamp in seconds
+ * @returns {string} Formatted countdown string
+ */
+function formatCountdown(timestamp) {
+  const now = Math.floor(Date.now() / 1000);
+  const diff = timestamp - now;
+
+  if (diff <= 0) {
+    return 'now';
+  }
+
+  const minutes = Math.floor(diff / 60) % 60;
+  const hours = Math.floor(diff / 3600) % 24;
+  const days = Math.floor(diff / 86400);
+
+  if (days > 0) {
+    // More than a day: show days and hours
+    if (hours > 0) {
+      return `in ${days} day${days !== 1 ? 's' : ''} ${hours} hr${hours !== 1 ? 's' : ''}`;
+    }
+    return `in ${days} day${days !== 1 ? 's' : ''}`;
+  } else if (hours > 0) {
+    // Less than a day: show hours and minutes
+    if (minutes > 0) {
+      return `in ${hours} hr${hours !== 1 ? 's' : ''} ${minutes} min${minutes !== 1 ? 's' : ''}`;
+    }
+    return `in ${hours} hr${hours !== 1 ? 's' : ''}`;
+  } else {
+    // Less than an hour: show minutes only
+    return `in ${minutes} min${minutes !== 1 ? 's' : ''}`;
+  }
+}
+
+// ============================================================================
 // MODULE EXPORTS
 // ============================================================================
 
@@ -1058,5 +1100,6 @@ module.exports = {
   addToRecentlyHandled,
   getBossType,
   getNextScheduledSpawn,
+  formatCountdown,
   bossKillTimes, // Export for monitoring/debugging
 };
