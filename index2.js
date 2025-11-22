@@ -2857,6 +2857,336 @@ stats: async (message, member, args) => {
   },
 
   // =========================================================================
+  // OPENTHREAD COMMAND - Reopen a closed attendance thread for manual override
+  // =========================================================================
+  openthread: async (message, member) => {
+    const thread = message.channel;
+
+    // Must be in a thread
+    if (!thread.isThread()) {
+      await message.reply("⚠️ This command must be used inside an attendance thread.");
+      return;
+    }
+
+    // Must be in attendance channel
+    if (thread.parentId !== config.attendance_channel_id) {
+      await message.reply("⚠️ This command only works in attendance threads.");
+      return;
+    }
+
+    // Parse thread name to get boss and timestamp
+    const parsed = attendance.parseThreadName(thread.name);
+    if (!parsed) {
+      await message.reply("⚠️ Could not parse thread name. Expected format: `[MM/DD/YY HH:MM] BOSS_NAME`");
+      return;
+    }
+
+    const bossName = attendance.findBossMatch(parsed.boss);
+    if (!bossName) {
+      await message.reply(`⚠️ Unknown boss: "${parsed.boss}"`);
+      return;
+    }
+
+    // Check if thread is already in activeSpawns and open
+    const existingSpawn = activeSpawns[thread.id];
+    if (existingSpawn && !existingSpawn.closed) {
+      await message.reply("ℹ️ This thread is already open and active.");
+      return;
+    }
+
+    await awaitConfirmation(
+      message,
+      member,
+      `🔓 **Reopen Closed Thread?**\n\n` +
+        `**Boss:** ${bossName}\n` +
+        `**Timestamp:** ${parsed.timestamp}\n\n` +
+        `This will:\n` +
+        `• Unarchive and unlock the thread\n` +
+        `• Re-register the spawn in bot memory\n` +
+        `• Allow new check-ins and re-queue all messages as pending verifications\n` +
+        `• Use \`!overrideclose\` to close and submit (will overwrite existing column if any)\n\n` +
+        `Click ✅ Confirm or ❌ Cancel button below.`,
+      async (confirmMsg) => {
+        const guild = message.guild;
+
+        // Unarchive and unlock the thread
+        try {
+          if (thread.archived) {
+            await thread.setArchived(false, `Reopened by ${member.user.username}`);
+          }
+          if (thread.locked) {
+            await thread.setLocked(false, `Unlocked by ${member.user.username}`);
+          }
+        } catch (err) {
+          await message.reply(`⚠️ Could not unlock/unarchive thread: ${err.message}`);
+          return;
+        }
+
+        // Re-register spawn in activeSpawns
+        activeSpawns[thread.id] = {
+          boss: bossName,
+          date: parsed.date,
+          time: parsed.time,
+          timestamp: parsed.timestamp,
+          members: existingSpawn ? existingSpawn.members : [], // Preserve existing members if any
+          confirmThreadId: existingSpawn ? existingSpawn.confirmThreadId : null,
+          closed: false,
+          createdAt: existingSpawn ? existingSpawn.createdAt : Date.now(),
+          noAutoClose: true, // Prevent auto-close for manually reopened threads
+        };
+
+        // Sync to attendance module
+        attendance.setActiveSpawns(activeSpawns);
+
+        // Scan thread for all check-in messages and add them to pending verifications
+        await message.channel.send(`🔍 Scanning thread for check-in messages...`);
+
+        const messages = await thread.messages.fetch({ limit: 100 }).catch(() => null);
+        let foundCheckIns = 0;
+        let alreadyVerified = 0;
+        const spawnInfo = activeSpawns[thread.id];
+
+        if (messages) {
+          const exactKeywords = ["present", "here", "join", "checkin", "check-in", "attending"];
+
+          for (const [msgId, msg] of messages) {
+            // Skip bot messages
+            if (msg.author.bot) continue;
+
+            const content = msg.content.trim().toLowerCase();
+            const keyword = content.split(/\s+/)[0];
+
+            // Check if it's a check-in message
+            if (exactKeywords.includes(keyword)) {
+              const msgMember = await guild.members.fetch(msg.author.id).catch(() => null);
+              const username = msgMember ? (msgMember.nickname || msg.author.username) : msg.author.username;
+
+              // Check if already verified
+              const isVerified = spawnInfo.members.some(
+                (m) => normalizeUsername(m) === normalizeUsername(username)
+              );
+
+              if (isVerified) {
+                alreadyVerified++;
+                continue;
+              }
+
+              // Check if already in pending verifications
+              if (pendingVerifications[msgId]) {
+                continue;
+              }
+
+              // Add to pending verifications (late check-ins will also be added)
+              pendingVerifications[msgId] = {
+                author: username,
+                authorId: msg.author.id,
+                threadId: thread.id,
+                timestamp: msg.createdTimestamp,
+                verificationMsgId: null, // No button message for re-queued verifications
+              };
+              foundCheckIns++;
+            }
+          }
+        }
+
+        attendance.setPendingVerifications(pendingVerifications);
+
+        await message.reply(
+          `✅ **Thread Reopened!**\n\n` +
+            `**Boss:** ${bossName}\n` +
+            `**Timestamp:** ${parsed.timestamp}\n` +
+            `**Previously Verified:** ${spawnInfo.members.length} member(s)\n` +
+            `**Re-queued for Verification:** ${foundCheckIns} message(s)\n` +
+            `**Already Verified (skipped):** ${alreadyVerified}\n\n` +
+            `📝 You can now:\n` +
+            `• Verify pending check-ins with ✅/❌ buttons or \`!verify @member\`\n` +
+            `• Use \`!verifyall\` to verify all pending at once\n` +
+            `• Use \`!overrideclose\` to close and submit (overwrites existing column if any)\n` +
+            `• Use \`close\` for normal close (will block if column already exists)`
+        );
+
+        console.log(
+          `🔓 Thread reopened: ${bossName} (${parsed.timestamp}) by ${member.user.username} - ${foundCheckIns} pending, ${spawnInfo.members.length} verified`
+        );
+      },
+      async (confirmMsg) => {
+        await message.reply("❌ Open thread canceled.");
+      }
+    );
+  },
+
+  // =========================================================================
+  // OVERRIDECLOSE COMMAND - Close and submit with column overwrite support
+  // =========================================================================
+  overrideclose: async (message, member) => {
+    const spawnInfo = activeSpawns[message.channel.id];
+    if (!spawnInfo) {
+      await message.reply(
+        "⚠️ This thread is not in bot memory. Use `!openthread` first to reopen it."
+      );
+      return;
+    }
+
+    if (spawnInfo.closed) {
+      await message.reply("⚠️ This spawn is already closed.");
+      return;
+    }
+
+    const pendingInThread = Object.entries(pendingVerifications).filter(
+      ([msgId, p]) => p.threadId === message.channel.id
+    );
+
+    // Check if column already exists
+    const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
+    const overwriteWarning = columnExists
+      ? `\n\n⚠️ **Column already exists!** This will OVERWRITE the existing attendance data.`
+      : `\n\n✅ No existing column found. Will create new column.`;
+
+    await awaitConfirmation(
+      message,
+      member,
+      `🔒 **Override Close Spawn?**\n\n` +
+        `**Boss:** ${spawnInfo.boss}\n` +
+        `**Timestamp:** ${spawnInfo.timestamp}\n` +
+        `**Verified Members:** ${spawnInfo.members.length}\n` +
+        `**Pending Verifications:** ${pendingInThread.length}` +
+        overwriteWarning +
+        `\n\n${pendingInThread.length > 0 ? `⚠️ **${pendingInThread.length} pending verification(s) will be AUTO-VERIFIED!**\n\n` : ''}` +
+        `Click ✅ Confirm or ❌ Cancel button below.`,
+      async (confirmMsg) => {
+        const guild = message.guild;
+
+        // Auto-verify all pending check-ins
+        if (pendingInThread.length > 0) {
+          await message.channel.send(`📋 Auto-verifying ${pendingInThread.length} pending check-in(s)...`);
+
+          for (const [msgId, pending] of pendingInThread) {
+            const isDuplicate = spawnInfo.members.some(
+              (m) => normalizeUsername(m) === normalizeUsername(pending.author)
+            );
+
+            if (!isDuplicate) {
+              spawnInfo.members.push(pending.author);
+            }
+
+            delete pendingVerifications[msgId];
+          }
+
+          attendance.setPendingVerifications(pendingVerifications);
+        }
+
+        spawnInfo.closed = true;
+        attendance.setActiveSpawns(activeSpawns);
+
+        // Check if there are any members to submit
+        if (spawnInfo.members.length === 0) {
+          await message.channel.send(
+            `⚠️ **No members to submit!**\n\nClosing thread without Google Sheets submission.`
+          );
+
+          // Clean up
+          if (spawnInfo.confirmThreadId) {
+            const confirmThread = await guild.channels
+              .fetch(spawnInfo.confirmThreadId)
+              .catch(() => null);
+            if (confirmThread) {
+              await confirmThread.send(
+                `⚠️ Override close: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - 0 members`
+              );
+              await errorHandler.safeDelete(confirmThread, 'override close delete confirm thread');
+            }
+          }
+
+          await message.channel.setLocked(true, `Override closed by ${member.user.username}`).catch(err => errorHandler.silentError(err, 'override close lock empty'));
+          await message.channel.setArchived(true, `Override closed by ${member.user.username}`).catch(err => errorHandler.silentError(err, 'override close archive empty'));
+
+          delete activeSpawns[message.channel.id];
+          const cacheKey = `${spawnInfo.boss.toUpperCase()}|${attendance.getCurrentTimestamp().full}`;
+          delete activeColumns[cacheKey];
+          delete confirmationMessages[message.channel.id];
+
+          attendance.setActiveSpawns(activeSpawns);
+          attendance.setActiveColumns(activeColumns);
+          attendance.setConfirmationMessages(confirmationMessages);
+
+          return;
+        }
+
+        await message.channel.send(
+          `📊 Submitting ${spawnInfo.members.length} members to Google Sheets...` +
+            (columnExists ? ` (Overwriting existing column)` : ` (Creating new column)`)
+        );
+
+        // Prepare payload - use different action based on whether column exists
+        const payload = {
+          action: columnExists ? "overwriteAttendance" : "submitAttendance",
+          boss: spawnInfo.boss,
+          date: spawnInfo.date,
+          time: spawnInfo.time,
+          timestamp: spawnInfo.timestamp,
+          members: spawnInfo.members,
+        };
+
+        const resp = await attendance.postToSheet(payload);
+
+        if (resp.ok) {
+          // Auto-increment boss rotation if it's a rotating boss
+          await bossRotation.handleBossKill(spawnInfo.boss);
+
+          await message.channel.send(
+            `✅ **Attendance ${columnExists ? 'overwritten' : 'submitted'} successfully!**\n\n` +
+              `${spawnInfo.members.length} member(s) recorded.\n` +
+              `Archiving thread...`
+          );
+
+          if (spawnInfo.confirmThreadId) {
+            const confirmThread = await guild.channels
+              .fetch(spawnInfo.confirmThreadId)
+              .catch(() => null);
+            if (confirmThread) {
+              await confirmThread.send(
+                `✅ Override close: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - ${spawnInfo.members.length} members ${columnExists ? '(overwritten)' : '(new)'}`
+              );
+              await errorHandler.safeDelete(confirmThread, 'override close delete confirm thread');
+            }
+          }
+
+          // Lock and archive the thread
+          await message.channel
+            .setLocked(true, `Override closed by ${member.user.username}`)
+            .catch(err => errorHandler.silentError(err, 'override close lock thread'));
+          await message.channel
+            .setArchived(true, `Override closed by ${member.user.username}`)
+            .catch(err => errorHandler.silentError(err, 'override close archive thread'));
+
+          // Clean up state
+          delete activeSpawns[message.channel.id];
+          const normalizedKey = `${spawnInfo.boss.toUpperCase()}|${require('./utils/common').normalizeTimestamp(spawnInfo.timestamp)}`;
+          delete activeColumns[normalizedKey];
+          delete confirmationMessages[message.channel.id];
+
+          attendance.setActiveSpawns(activeSpawns);
+          attendance.setActiveColumns(activeColumns);
+          attendance.setConfirmationMessages(confirmationMessages);
+
+          console.log(
+            `🔒 Override close: ${spawnInfo.boss} at ${spawnInfo.timestamp} by ${member.user.username} (${spawnInfo.members.length} members, ${columnExists ? 'overwritten' : 'new'})`
+          );
+        } else {
+          await message.channel.send(
+            `⚠️ **Failed to submit attendance!**\n\n` +
+              `Error: ${resp.text || resp.err}\n\n` +
+              `**Members list (for manual entry):**\n${spawnInfo.members.join(", ")}`
+          );
+        }
+      },
+      async (confirmMsg) => {
+        await message.reply("❌ Override close canceled.");
+      }
+    );
+  },
+
+  // =========================================================================
   // STARTAUCTION COMMAND - Initiates auction session with queue
   // =========================================================================
   startauction: async (message, member) => {
@@ -6817,7 +7147,7 @@ client.on(Events.MessageCreate, async (message) => {
 
       // Thread-specific override commands
       if (
-        ["!forcesubmit", "!debugthread", "!resetpending"].includes(spawnCmd)
+        ["!forcesubmit", "!debugthread", "!resetpending", "!openthread", "!overrideclose"].includes(spawnCmd)
       ) {
         const now = Date.now();
         if (now - lastOverrideTime < TIMING.OVERRIDE_COOLDOWN) {
@@ -6841,6 +7171,10 @@ client.on(Events.MessageCreate, async (message) => {
           await commandHandlers.debugthread(message, member);
         else if (spawnCmd === "!resetpending")
           await commandHandlers.resetpending(message, member);
+        else if (spawnCmd === "!openthread")
+          await commandHandlers.openthread(message, member);
+        else if (spawnCmd === "!overrideclose")
+          await commandHandlers.overrideclose(message, member);
         return;
       }
 
