@@ -3438,6 +3438,10 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
               amount: parseInt(item.winningBid) || parseInt(item.startPrice) || 0
             }));
 
+            // CRITICAL: Load points cache first (required for submitSessionTally)
+            // After bot restart, st.cp is null and tally submission would fail
+            await loadCache(cfg.sheet_webhook_url);
+
             // Submit the tally
             await submitSessionTally(cfg, sessionItems);
 
