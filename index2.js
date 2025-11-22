@@ -2877,13 +2877,17 @@ stats: async (message, member, args) => {
     // Parse thread name to get boss and timestamp
     const parsed = attendance.parseThreadName(thread.name);
     if (!parsed) {
-      await message.reply("⚠️ Could not parse thread name. Expected format: `[MM/DD/YY HH:MM] BOSS_NAME`");
+      await message.reply("⚠️ Could not parse thread name. Expected formats:\n• Boss: `[MM/DD/YY HH:MM] BOSS_NAME`\n• Event: `GvG MM-DD HH:MM` or `Guild Boss MM-DD HH:MM`");
       return;
     }
 
-    const bossName = attendance.findBossMatch(parsed.boss);
+    // Check if it's a known event type (GvG, Guild Boss) or a boss spawn
+    const EVENT_TYPES = ["GvG", "Guild Boss"];
+    const isEventThread = EVENT_TYPES.includes(parsed.boss);
+    const bossName = isEventThread ? parsed.boss : attendance.findBossMatch(parsed.boss);
+
     if (!bossName) {
-      await message.reply(`⚠️ Unknown boss: "${parsed.boss}"`);
+      await message.reply(`⚠️ Unknown boss or event type: "${parsed.boss}"`);
       return;
     }
 
@@ -2894,11 +2898,12 @@ stats: async (message, member, args) => {
       return;
     }
 
+    const typeLabel = isEventThread ? "Event" : "Boss";
     await awaitConfirmation(
       message,
       member,
       `🔓 **Reopen Closed Thread?**\n\n` +
-        `**Boss:** ${bossName}\n` +
+        `**${typeLabel}:** ${bossName}\n` +
         `**Timestamp:** ${parsed.timestamp}\n\n` +
         `This will:\n` +
         `• Unarchive and unlock the thread\n` +
@@ -2993,7 +2998,7 @@ stats: async (message, member, args) => {
 
         await message.reply(
           `✅ **Thread Reopened!**\n\n` +
-            `**Boss:** ${bossName}\n` +
+            `**${typeLabel}:** ${bossName}\n` +
             `**Timestamp:** ${parsed.timestamp}\n` +
             `**Previously Verified:** ${spawnInfo.members.length} member(s)\n` +
             `**Re-queued for Verification:** ${foundCheckIns} message(s)\n` +
