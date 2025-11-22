@@ -198,6 +198,7 @@ let auctionState = {
   timers: {},
   paused: false,
   pausedTime: null,
+  sessionFinalized: true, // Flag to track if finalization (tallies, item moves) is complete
 };
 
 /**
@@ -297,6 +298,7 @@ const EMOJI = {
   TROPHY: "🏆",
   CHART: "📊",
   LOCK: "🔒",
+  BELL: "🔔",
 };
 
 /**
@@ -813,6 +815,7 @@ async function startAuctioneering(client, config, channel) {
 
   // Initialize auction state
   auctionState.active = true;
+  auctionState.sessionFinalized = false; // Will be set to true after tallies/moves complete
   auctionState.sessionItems = allItems;
   auctionState.currentItemIndex = 0;
 
@@ -1804,13 +1807,24 @@ async function finalizeSession(client, config, channel) {
     .map((s, i) => `${i + 1}. **${s.item}** 📊: ${s.winner} - ${s.amount}pts`)
     .join("\n");
 
+  // Truncate summary if it exceeds Discord's 1024 character limit for embed fields
+  let truncatedSummary = summary || "No sales";
+  if (truncatedSummary.length > 1024) {
+    // Find a good truncation point (end of a line) within the limit
+    const maxLength = 1000; // Leave room for "... and X more"
+    const truncateAt = truncatedSummary.lastIndexOf('\n', maxLength);
+    const cutPoint = truncateAt > 0 ? truncateAt : maxLength;
+    const remainingItems = soldItems.length - truncatedSummary.substring(0, cutPoint).split('\n').length;
+    truncatedSummary = truncatedSummary.substring(0, cutPoint) + `\n\n*... and ${remainingItems} more items*`;
+  }
+
   const mainEmbed = new EmbedBuilder()
     .setColor(COLORS.SUCCESS)
     .setTitle(`${EMOJI.SUCCESS} Auctioneering Session Complete!`)
     .setDescription(`**${soldItems.length}** item(s) sold`)
     .addFields({
       name: `${EMOJI.LIST} Summary`,
-      value: summary || "No sales",
+      value: truncatedSummary,
       inline: false,
     })
     .setFooter({ text: "Processing results and submitting to sheets..." })
@@ -2049,6 +2063,11 @@ async function finalizeSession(client, config, channel) {
       console.error(`${EMOJI.ERROR} Failed to clear locked points:`, err);
       // Don't throw - this is cleanup, continue anyway
     }
+
+    // CRITICAL: Mark session as fully finalized AFTER all sheet operations complete
+    // This flag is used by the dual-session scheduler to know when Session 1 is truly done
+    auctionState.sessionFinalized = true;
+    console.log(`${EMOJI.SUCCESS} Session finalization complete (tallies submitted, items moved)`);
   }
 }
 
@@ -3614,6 +3633,246 @@ async function handleMoveToDistribution(message, config, client) {
 let weeklyAuctionTimer = null;
 
 /**
+ * Timer reference for session 2 scheduler.
+ * @type {NodeJS.Timeout|null}
+ */
+let session2Timer = null;
+
+/**
+ * Interval reference for polling session completion.
+ * @type {NodeJS.Timeout|null}
+ */
+let sessionPollInterval = null;
+
+/**
+ * Configuration for dual-session auctions.
+ * @constant {Object}
+ */
+const DUAL_SESSION_CONFIG = {
+  enabled: true, // Enable 2-session auctions
+  restPeriodMinutes: 60, // 1 hour rest between sessions
+  pollIntervalMs: 30000, // Check every 30 seconds if session ended
+  maxPollAttempts: 720, // Max 6 hours of polling (720 * 30s = 6h)
+};
+
+/**
+ * Starts Session 2 of the scheduled auction with refreshed points.
+ * Called automatically 1 hour after Session 1 completes.
+ *
+ * @param {Discord.Client} client - Discord bot client
+ * @param {Object} config - Bot configuration
+ * @returns {Promise<void>}
+ */
+async function startSession2(client, config) {
+  console.log(`${EMOJI.AUCTION} Starting Session 2 of scheduled auction...`);
+
+  try {
+    // Check if an auction is already running (shouldn't happen but safety check)
+    if (auctionState.active) {
+      console.log(`${EMOJI.WARNING} Auction already running, skipping Session 2`);
+      return;
+    }
+
+    // Fetch the bidding channel
+    const biddingChannel = await discordCache.getChannel('bidding_channel_id');
+    if (!biddingChannel) {
+      console.error(`${EMOJI.ERROR} Could not fetch bidding channel for Session 2`);
+      return;
+    }
+
+    // Announce Session 2 starting
+    const session2Embed = new EmbedBuilder()
+      .setColor(COLORS.AUCTION)
+      .setTitle(`${EMOJI.AUCTION} Session 2 Starting!`)
+      .setDescription(
+        '**The second auction session is now starting!**\n\n' +
+        '📦 Auctioning leftover items from Session 1\n' +
+        '💰 Points have been refreshed\n\n' +
+        '**Get ready to bid!**'
+      )
+      .setTimestamp();
+
+    await biddingChannel.send({
+      content: '@everyone',
+      embeds: [session2Embed]
+    });
+
+    // CRITICAL: Refresh points cache before Session 2
+    // This ensures members have updated points after Session 1 spending
+    console.log(`${EMOJI.INFO} Refreshing points cache for Session 2...`);
+
+    try {
+      const pointsData = await sheetAPI.call('getBiddingPoints');
+      const members = pointsData.members || pointsData.data?.members || [];
+      const points = pointsData.points || pointsData.data?.points || {};
+
+      if (members.length > 0 || Object.keys(points).length > 0) {
+        const pointsMap = Object.keys(points).length > 0 ? points : members.reduce((acc, member) => {
+          const name = member?.username?.trim();
+          if (!name) return acc;
+          acc[name] = Number(member?.pointsLeft) || 0;
+          return acc;
+        }, {});
+
+        // Update bidding module's cache
+        const biddingState = biddingModule.getBiddingState();
+        biddingState.cp = new PointsCache(pointsMap);
+        biddingState.ct = Date.now();
+        biddingModule.saveBiddingState();
+
+        console.log(`${EMOJI.SUCCESS} Refreshed ${biddingState.cp.size()} members' points for Session 2`);
+      }
+    } catch (pointsErr) {
+      console.error(`${EMOJI.ERROR} Failed to refresh points for Session 2:`, pointsErr);
+      await biddingChannel.send(`${EMOJI.WARNING} Could not refresh points cache. Session 2 will use cached points.`);
+    }
+
+    // Start Session 2
+    // startAuctioneering will fetch fresh items (only unsold ones without winners)
+    await startAuctioneering(client, config, biddingChannel);
+    console.log(`${EMOJI.SUCCESS} Session 2 started successfully`);
+
+  } catch (err) {
+    console.error(`${EMOJI.ERROR} Failed to start Session 2:`, err);
+
+    // Notify admin logs
+    try {
+      const adminLogs = await discordCache.getChannel('admin_logs_channel_id').catch(() => null);
+      if (adminLogs) {
+        await adminLogs.send(
+          `${EMOJI.ERROR} **Session 2 Failed**\n` +
+          `Failed to start Session 2 of the scheduled auction.\n` +
+          `**Error:** ${err.message}\n\n` +
+          `You can manually start a new auction with \`!startauction\` if needed.`
+        );
+      }
+    } catch (notifyErr) {
+      console.error(`${EMOJI.ERROR} Could not notify admin logs:`, notifyErr);
+    }
+  }
+}
+
+/**
+ * Monitors Session 1 completion and schedules Session 2.
+ * Polls auctionState.active every 30 seconds until session ends.
+ *
+ * @param {Discord.Client} client - Discord bot client
+ * @param {Object} config - Bot configuration
+ */
+function scheduleSession2AfterCompletion(client, config) {
+  if (!DUAL_SESSION_CONFIG.enabled) {
+    console.log(`${EMOJI.INFO} Dual-session auctions disabled, skipping Session 2 scheduling`);
+    return;
+  }
+
+  // Clear any existing poll interval
+  if (sessionPollInterval) {
+    clearInterval(sessionPollInterval);
+    sessionPollInterval = null;
+  }
+
+  let pollAttempts = 0;
+  console.log(`${EMOJI.CLOCK} Monitoring Session 1 completion for Session 2 scheduling...`);
+
+  sessionPollInterval = setInterval(async () => {
+    pollAttempts++;
+
+    // Safety limit - stop polling after max attempts
+    if (pollAttempts >= DUAL_SESSION_CONFIG.maxPollAttempts) {
+      console.log(`${EMOJI.WARNING} Max poll attempts reached, stopping Session 2 monitoring`);
+      clearInterval(sessionPollInterval);
+      sessionPollInterval = null;
+      return;
+    }
+
+    // Check if Session 1 has ended AND finalization is complete
+    // We check both flags to ensure tallies are submitted and items moved before announcing rest period
+    if (!auctionState.active && auctionState.sessionFinalized) {
+      console.log(`${EMOJI.SUCCESS} Session 1 completed and finalized! Scheduling Session 2 after ${DUAL_SESSION_CONFIG.restPeriodMinutes} minute rest...`);
+
+      // Stop polling
+      clearInterval(sessionPollInterval);
+      sessionPollInterval = null;
+
+      // Announce the rest period
+      try {
+        const biddingChannel = await discordCache.getChannel('bidding_channel_id');
+        const announcementChannel = await discordCache.getChannel('guild_announcement_channel_id').catch(() => null);
+
+        const session2StartTime = Date.now() + (DUAL_SESSION_CONFIG.restPeriodMinutes * 60 * 1000);
+        const session2Timestamp = Math.floor(session2StartTime / 1000);
+
+        const restEmbed = new EmbedBuilder()
+          .setColor(COLORS.INFO)
+          .setTitle(`${EMOJI.CLOCK} Session 1 Complete - Rest Period`)
+          .setDescription(
+            '**Session 1 has ended!**\n\n' +
+            `⏰ **Session 2 starts:** <t:${session2Timestamp}:R> (<t:${session2Timestamp}:t>)\n\n` +
+            '📦 Leftover items from Session 1 will be auctioned\n' +
+            '💰 Points will be refreshed before Session 2\n\n' +
+            '**Take a break and come back for more bidding!**'
+          )
+          .setTimestamp();
+
+        if (biddingChannel) {
+          await biddingChannel.send({ embeds: [restEmbed] });
+        }
+
+        // Also announce in the announcement channel
+        if (announcementChannel) {
+          await announcementChannel.send({
+            content: '@everyone',
+            embeds: [restEmbed]
+          });
+        }
+      } catch (announceErr) {
+        console.error(`${EMOJI.ERROR} Failed to announce rest period:`, announceErr);
+      }
+
+      // Schedule Session 2 after rest period
+      const restDelayMs = DUAL_SESSION_CONFIG.restPeriodMinutes * 60 * 1000;
+
+      // Clear any existing session 2 timer
+      if (session2Timer) {
+        clearTimeout(session2Timer);
+      }
+
+      // 15-minute warning before Session 2
+      const warningDelayMs = restDelayMs - (15 * 60 * 1000);
+      if (warningDelayMs > 0) {
+        setTimeout(async () => {
+          try {
+            const announcementChannel = await discordCache.getChannel('guild_announcement_channel_id').catch(() => null);
+            if (announcementChannel) {
+              await announcementChannel.send({
+                content: '@everyone',
+                embeds: [
+                  new EmbedBuilder()
+                    .setColor(COLORS.WARNING)
+                    .setTitle(`${EMOJI.BELL} Session 2 Starting Soon!`)
+                    .setDescription('**The second auction session starts in 15 minutes!**\n\nPrepare your points and get ready to bid on leftover items!')
+                    .setTimestamp()
+                ]
+              });
+            }
+          } catch (warnErr) {
+            console.error(`${EMOJI.ERROR} Failed to send Session 2 warning:`, warnErr);
+          }
+        }, warningDelayMs);
+      }
+
+      // Start Session 2
+      session2Timer = setTimeout(async () => {
+        await startSession2(client, config);
+        session2Timer = null;
+      }, restDelayMs);
+
+      console.log(`${EMOJI.SUCCESS} Session 2 scheduled to start in ${DUAL_SESSION_CONFIG.restPeriodMinutes} minutes`);
+    }
+  }, DUAL_SESSION_CONFIG.pollIntervalMs);
+}
+
+/**
  * Schedules automatic weekly auctions every Saturday at 12:00 PM GMT+8 (Manila Time).
  *
  * FEATURES:
@@ -3760,9 +4019,13 @@ function scheduleWeeklySaturdayAuction(client, config) {
           return;
         }
 
-        // Start the auction
+        // Start Session 1 of the auction
         await startAuctioneering(client, config, biddingChannel);
-        console.log(`${EMOJI.SUCCESS} Scheduled Saturday auction started successfully`);
+        console.log(`${EMOJI.SUCCESS} Scheduled Saturday auction Session 1 started successfully`);
+
+        // Schedule Session 2 to start after Session 1 completes
+        // This monitors when Session 1 ends and schedules Session 2 after rest period
+        scheduleSession2AfterCompletion(client, config);
       } catch (err) {
         console.error(`${EMOJI.ERROR} Failed to start scheduled auction:`, err);
 
@@ -3792,6 +4055,42 @@ function scheduleWeeklySaturdayAuction(client, config) {
   console.log(`${EMOJI.SUCCESS} Weekly Saturday auction scheduler initialized (12:00 PM GMT+8)`);
 }
 
+/**
+ * Resets session finalization state and clears Session 2 polling/timers.
+ * Use this when finalization crashed and left sessionFinalized stuck at false.
+ *
+ * @returns {Object} Status object with what was reset
+ */
+function resetSessionState() {
+  const status = {
+    previousFinalized: auctionState.sessionFinalized,
+    previousActive: auctionState.active,
+    clearedPollInterval: false,
+    clearedSession2Timer: false,
+  };
+
+  // Reset the finalization flag
+  auctionState.sessionFinalized = true;
+  auctionState.active = false;
+
+  // Clear Session 2 polling interval if running
+  if (sessionPollInterval) {
+    clearInterval(sessionPollInterval);
+    sessionPollInterval = null;
+    status.clearedPollInterval = true;
+  }
+
+  // Clear Session 2 timer if scheduled
+  if (session2Timer) {
+    clearTimeout(session2Timer);
+    session2Timer = null;
+    status.clearedSession2Timer = true;
+  }
+
+  console.log(`${EMOJI.SUCCESS} Session state reset:`, status);
+  return status;
+}
+
 module.exports = {
   initialize,
   itemEnd,
@@ -3817,5 +4116,6 @@ module.exports = {
   handleForceSubmitResults,
   handleMoveToDistribution,
   scheduleWeeklySaturdayAuction, // Weekly Saturday 12:00 PM GMT+8 auction scheduler
+  resetSessionState, // Reset sessionFinalized flag and clear Session 2 timers
   // getCurrentSessionBoss: () => currentSessionBoss - REMOVED: Not used anywhere
 };

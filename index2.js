@@ -6940,6 +6940,8 @@ client.on(Events.MessageCreate, async (message) => {
           "!unlockallpoints",
           "!clearallbids",
           "!diagnostics",
+          "!submittallyfromsheet", // Submit tallies from BiddingItems sheet (crash recovery)
+          "!resetsession", // Reset stuck sessionFinalized flag
           "!forcesync",
           "!testmilestones",
         ].includes(adminCmd)
@@ -6989,6 +6991,8 @@ client.on(Events.MessageCreate, async (message) => {
           await commandHandlers.forcesync(message, member);
         else if (adminCmd === "!testmilestones")
           await commandHandlers.testmilestones(message, member);
+        else if (adminCmd === "!submittallyfromsheet" || adminCmd === "!resetsession")
+          await bidding.handleCommand(adminCmd, message, args, client, config);
         return;
       }
 

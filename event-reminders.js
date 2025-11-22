@@ -55,22 +55,15 @@ const GAME_EVENTS = {
     description: 'Coop Round Arena is starting soon!',
     reminderOffsetMinutes: REMINDER_OFFSET_MINUTES, // Remind 10 min before
   },
-  guildWar: {
-    name: '⚔️ Guild War',
-    days: [5, 6, 0], // Friday, Saturday, Sunday
-    startTime: { hour: 19, minute: 25 }, // Actual event time
-    durationMinutes: 3,
-    color: 0xff4757, // Dark red
-    description: '**GUILD WAR** is starting soon! Get ready!',
-    reminderOffsetMinutes: 20, // Remind 20 min before (gives players time to prepare)
-  },
+  // NOTE: Guild War and GvG are the SAME event - consolidated into single "gvg" entry
+  // to prevent double posting. GvG creates the attendance thread for tracking.
   gvg: {
-    name: '⚔️ GvG (Guild vs Guild)',
-    days: [5, 6, 0], // Friday, Saturday, Sunday (same as Guild War)
+    name: '⚔️ GvG / Guild War',
+    days: [5, 6, 0], // Friday, Saturday, Sunday
     startTime: { hour: 19, minute: 25 }, // Actual event time (7:25 PM)
     durationMinutes: 3, // GvG duration (19:25 - 19:28)
     color: 0xf39c12, // Orange
-    description: '**GvG (Guild vs Guild)** is starting soon! Get ready to attend!',
+    description: '**GvG / Guild War** is starting soon! Get ready to attend!',
     reminderOffsetMinutes: 20, // Remind 20 min before (19:05)
     createAttendanceThread: true, // Special flag to create attendance thread
     attendanceAutoCloseMinutes: 20, // Auto-close thread 20 min after event starts (19:45)
@@ -344,12 +337,24 @@ async function createGvGAttendanceThread(event, eventTime, reminderMessage) {
     await attendance.saveAttendanceStateToSheet(false);
 
     // Schedule auto-close
-    const autoCloseDelay = event.attendanceAutoCloseMinutes * 60 * 1000;
-    setTimeout(async () => {
-      await autoCloseGvGThread(thread.id);
-    }, autoCloseDelay);
+    // CRITICAL FIX: Auto-close should be calculated from EVENT START TIME, not thread creation time
+    // Thread is created when reminder is sent (reminderOffsetMinutes before event)
+    // So: autoCloseTime = eventTime + attendanceAutoCloseMinutes
+    // Delay from now = eventTime + attendanceAutoCloseMinutes - Date.now()
+    const autoCloseTime = eventTime.getTime() + (event.attendanceAutoCloseMinutes * 60 * 1000);
+    const autoCloseDelay = autoCloseTime - Date.now();
 
-    console.log(`⏱️ [${logTag}] Thread will auto-close in ${event.attendanceAutoCloseMinutes} minutes`);
+    if (autoCloseDelay > 0) {
+      setTimeout(async () => {
+        await autoCloseGvGThread(thread.id);
+      }, autoCloseDelay);
+
+      const delayMinutes = Math.round(autoCloseDelay / 60000);
+      console.log(`⏱️ [${logTag}] Thread will auto-close at ${new Date(autoCloseTime).toISOString()} (in ${delayMinutes} minutes)`);
+    } else {
+      console.warn(`⚠️ [${logTag}] Auto-close time already passed, closing immediately`);
+      await autoCloseGvGThread(thread.id);
+    }
 
   } catch (error) {
     console.error(`❌ [EVENT] Failed to create attendance thread:`, error.message);
@@ -876,12 +881,8 @@ function scheduleAllEvents() {
     scheduleEventReminder(`coopArena_${day}`, GAME_EVENTS.coopArena, day);
   });
 
-  // Schedule Guild War (Fri, Sat, Sun)
-  GAME_EVENTS.guildWar.days.forEach((day, index) => {
-    scheduleEventReminder(`guildWar_${day}`, GAME_EVENTS.guildWar, day);
-  });
-
-  // Schedule GvG (Fri, Sat, Sun) - Creates attendance thread
+  // Schedule GvG / Guild War (Fri, Sat, Sun) - Creates attendance thread
+  // NOTE: Guild War and GvG consolidated into single event to prevent double posting
   GAME_EVENTS.gvg.days.forEach((day, index) => {
     scheduleEventReminder(`gvg_${day}`, GAME_EVENTS.gvg, day);
   });
