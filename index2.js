@@ -4026,6 +4026,12 @@ stats: async (message, member, args) => {
 
       const { total, active, atRisk, topPerformers, averageEngagement, analyses } = analysis;
 
+      // Handle case where no members were found
+      if (total === 0) {
+        await message.reply(`⚠️ No member data found. Please ensure the Google Sheets connection is working.`);
+        return;
+      }
+
       // Top 3 performers (highest attendance rate)
       const top3Text = topPerformers
         .slice(0, 3)
@@ -4050,6 +4056,10 @@ stats: async (message, member, args) => {
         })
         .join('\n') || 'No data';
 
+      // Guard against division by zero
+      const activePercent = total > 0 ? ((active/total)*100).toFixed(0) : 0;
+      const atRiskPercent = total > 0 ? ((atRisk/total)*100).toFixed(0) : 0;
+
       const embed = new EmbedBuilder()
         .setColor(0x00aaff)
         .setTitle(`📊 Guild Attendance Report`)
@@ -4059,18 +4069,18 @@ stats: async (message, member, args) => {
             name: '📈 Overview',
             value:
               `Total Members: **${total}**\n` +
-              `Active (60%+): **${active}** (${((active/total)*100).toFixed(0)}%)\n` +
-              `At Risk (<60%): **${atRisk}** (${((atRisk/total)*100).toFixed(0)}%)`,
+              `Active (60%+): **${active}** (${activePercent}%)\n` +
+              `At Risk (<60%): **${atRisk}** (${atRiskPercent}%)`,
             inline: false,
           },
           {
             name: '🏆 Top 3 Attendance',
-            value: top3Text,
+            value: top3Text || 'No data available',
             inline: false,
           },
           {
             name: '🚨 Bottom 5 Attendance',
-            value: bottom5Text,
+            value: bottom5Text || 'No data available',
             inline: false,
           }
         )
