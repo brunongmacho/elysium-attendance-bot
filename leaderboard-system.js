@@ -627,8 +627,11 @@ async function sendWeeklyReport(targetChannel = null) {
       .setDescription(`**Week:** ${data.weekName || 'N/A'}\n**Report Generated:** ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`)
       .setTimestamp();
 
-    // Add guild branding
-    addGuildThumbnail(embed, adminLogsChannel.guild);
+    // Add guild branding (use targetChannel if provided, otherwise adminLogsChannel)
+    const channelForGuild = targetChannel || adminLogsChannel;
+    if (channelForGuild?.guild) {
+      addGuildThumbnail(embed, channelForGuild.guild);
+    }
 
     // ==========================================
     // NEW: WEEK-SPECIFIC STATISTICS (Sunday-Saturday)
