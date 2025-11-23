@@ -125,7 +125,7 @@ const PROACTIVE_CONFIG = {
   features: {
     autoReminders: false,                      // Manual send only (Option C)
     tagHereInAdminLogs: true,                  // @here for important alerts
-    celebrateMilestones: true,                 // Public milestone announcements
+    celebrateMilestones: false,                // DISABLED: Public milestone announcements (causing API timeouts)
     showPositiveSummaries: true,               // Guild chat weekly summaries
   },
 };
@@ -185,29 +185,34 @@ class ProactiveIntelligence {
 
     console.log('🤖 [PROACTIVE] Initializing proactive intelligence system...');
 
-    // Ensure milestone tabs exist in Google Sheets
-    await this.ensureMilestoneTabsExist();
+    // Skip milestone initialization if milestones are disabled
+    if (PROACTIVE_CONFIG.features.celebrateMilestones) {
+      // Ensure milestone tabs exist in Google Sheets
+      await this.ensureMilestoneTabsExist();
 
-    // Load milestone queue from Google Sheets (survive bot restarts)
-    try {
-      console.log('📥 [PROACTIVE] Loading milestone queue from Google Sheets...');
-      const response = await this.intelligence.sheetAPI.call('loadMilestoneQueue', {});
-      if (response && response.milestoneQueue) {
-        this.milestoneQueue = response.milestoneQueue;
-        const totalLoaded = Object.values(this.milestoneQueue).reduce((sum, arr) => sum + arr.length, 0);
-        console.log(`✅ [PROACTIVE] Loaded ${totalLoaded} queued milestones from Google Sheets`);
-        if (totalLoaded > 0) {
-          console.log('📌 [PROACTIVE] Queue contents:');
-          for (const [type, items] of Object.entries(this.milestoneQueue)) {
-            if (items.length > 0) {
-              console.log(`   - ${type}: ${items.length} milestone(s)`);
+      // Load milestone queue from Google Sheets (survive bot restarts)
+      try {
+        console.log('📥 [PROACTIVE] Loading milestone queue from Google Sheets...');
+        const response = await this.intelligence.sheetAPI.call('loadMilestoneQueue', {});
+        if (response && response.milestoneQueue) {
+          this.milestoneQueue = response.milestoneQueue;
+          const totalLoaded = Object.values(this.milestoneQueue).reduce((sum, arr) => sum + arr.length, 0);
+          console.log(`✅ [PROACTIVE] Loaded ${totalLoaded} queued milestones from Google Sheets`);
+          if (totalLoaded > 0) {
+            console.log('📌 [PROACTIVE] Queue contents:');
+            for (const [type, items] of Object.entries(this.milestoneQueue)) {
+              if (items.length > 0) {
+                console.log(`   - ${type}: ${items.length} milestone(s)`);
+              }
             }
           }
         }
+      } catch (error) {
+        console.error('⚠️ [PROACTIVE] Failed to load milestone queue from Google Sheets:', error.message);
+        console.log('   Starting with empty queue');
       }
-    } catch (error) {
-      console.error('⚠️ [PROACTIVE] Failed to load milestone queue from Google Sheets:', error.message);
-      console.log('   Starting with empty queue');
+    } else {
+      console.log('ℹ️ [PROACTIVE] Milestones disabled - skipping milestone initialization');
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -777,71 +782,73 @@ class ProactiveIntelligence {
       });
 
       // ═══════════════════════════════════════════════════════════════
-      // NEW: Add milestone recap section
+      // NEW: Add milestone recap section (skip if milestones disabled)
       // ═══════════════════════════════════════════════════════════════
-      try {
-        const weeklyMilestonesResponse = await this.intelligence.sheetAPI.call('getWeeklyMilestones', {});
-        const weeklyMilestones = weeklyMilestonesResponse?.data || [];
+      if (PROACTIVE_CONFIG.features.celebrateMilestones) {
+        try {
+          const weeklyMilestonesResponse = await this.intelligence.sheetAPI.call('getWeeklyMilestones', {});
+          const weeklyMilestones = weeklyMilestonesResponse?.data || [];
 
-        if (weeklyMilestones.length > 0) {
-          // Group milestones by type
-          const milestonesByType = {};
-          for (const m of weeklyMilestones) {
-            const type = m.milestoneType;
-            if (!milestonesByType[type]) {
-              milestonesByType[type] = [];
-            }
-            milestonesByType[type].push(m);
-          }
-
-          // Build milestone recap text
-          const recapLines = [];
-          for (const [type, milestones] of Object.entries(milestonesByType)) {
-            const count = milestones.length;
-            let emoji = '🎯';
-            let label = type;
-
-            if (type === 'attendance') {
-              emoji = '🎯';
-              label = 'Attendance';
-            } else if (type === 'bidding') {
-              emoji = '💰';
-              label = 'Bidding';
-            } else if (type === 'engagement') {
-              emoji = '🧠';
-              label = 'Engagement';
-            } else if (type === 'guildWide') {
-              emoji = '🏆';
-              label = 'Guild-Wide';
-            } else if (type === 'spawnStreak') {
-              emoji = '⚡';
-              label = 'Spawn Streak';
-            } else if (type === 'calendarStreak') {
-              emoji = '📅';
-              label = 'Calendar Streak';
-            } else if (type === 'perfectWeek') {
-              emoji = '⭐';
-              label = 'Perfect Week';
-            } else if (type === 'tenure') {
-              emoji = '🗿';
-              label = 'Tenure';
+          if (weeklyMilestones.length > 0) {
+            // Group milestones by type
+            const milestonesByType = {};
+            for (const m of weeklyMilestones) {
+              const type = m.milestoneType;
+              if (!milestonesByType[type]) {
+                milestonesByType[type] = [];
+              }
+              milestonesByType[type].push(m);
             }
 
-            recapLines.push(`${emoji} **${count}** ${label} milestone${count > 1 ? 's' : ''}`);
+            // Build milestone recap text
+            const recapLines = [];
+            for (const [type, milestones] of Object.entries(milestonesByType)) {
+              const count = milestones.length;
+              let emoji = '🎯';
+              let label = type;
+
+              if (type === 'attendance') {
+                emoji = '🎯';
+                label = 'Attendance';
+              } else if (type === 'bidding') {
+                emoji = '💰';
+                label = 'Bidding';
+              } else if (type === 'engagement') {
+                emoji = '🧠';
+                label = 'Engagement';
+              } else if (type === 'guildWide') {
+                emoji = '🏆';
+                label = 'Guild-Wide';
+              } else if (type === 'spawnStreak') {
+                emoji = '⚡';
+                label = 'Spawn Streak';
+              } else if (type === 'calendarStreak') {
+                emoji = '📅';
+                label = 'Calendar Streak';
+              } else if (type === 'perfectWeek') {
+                emoji = '⭐';
+                label = 'Perfect Week';
+              } else if (type === 'tenure') {
+                emoji = '🗿';
+                label = 'Tenure';
+              }
+
+              recapLines.push(`${emoji} **${count}** ${label} milestone${count > 1 ? 's' : ''}`);
+            }
+
+            // Add to embed
+            embed.addFields({
+              name: '🎉 Milestones This Week',
+              value: recapLines.join('\n') || 'No milestones this week',
+              inline: false
+            });
+
+            console.log(`✅ [PROACTIVE] Added milestone recap: ${weeklyMilestones.length} total`);
           }
-
-          // Add to embed
-          embed.addFields({
-            name: '🎉 Milestones This Week',
-            value: recapLines.join('\n') || 'No milestones this week',
-            inline: false
-          });
-
-          console.log(`✅ [PROACTIVE] Added milestone recap: ${weeklyMilestones.length} total`);
+        } catch (error) {
+          console.error('[PROACTIVE] Error adding milestone recap:', error);
+          // Continue without recap if error
         }
-      } catch (error) {
-        console.error('[PROACTIVE] Error adding milestone recap:', error);
-        // Continue without recap if error
       }
 
       // Send summary
@@ -1125,6 +1132,11 @@ class ProactiveIntelligence {
    * Detect all milestone types (hourly check - queue only, no announcements)
    */
   async detectAllMilestones() {
+    // Skip if milestones are disabled
+    if (!PROACTIVE_CONFIG.features.celebrateMilestones) {
+      return;
+    }
+
     try {
       console.log('🔍 [PROACTIVE] Detecting milestones (queueing for batch announcement)...');
 
@@ -1147,6 +1159,11 @@ class ProactiveIntelligence {
    * PREVENTS DUPLICATES: Checks if same milestone already queued
    */
   async queueMilestone(type, data) {
+    // Skip if milestones are disabled
+    if (!PROACTIVE_CONFIG.features.celebrateMilestones) {
+      return;
+    }
+
     // CRITICAL: Check for duplicates to prevent spam at 3:01 AM
     // Each hourly check might find the same milestone if player continuously meets threshold
     const isDuplicate = this.milestoneQueue[type].some(queued => {
@@ -1201,6 +1218,12 @@ class ProactiveIntelligence {
    */
   async announceMilestoneBatch() {
     try {
+      // Skip if milestones are disabled
+      if (!PROACTIVE_CONFIG.features.celebrateMilestones) {
+        console.log('ℹ️ [PROACTIVE] Milestones disabled - skipping batch announcement');
+        return;
+      }
+
       console.log('🎉 [PROACTIVE] ═══════════════════════════════════════');
       console.log('🎉 [PROACTIVE] Starting daily milestone batch announcement...');
 
@@ -1424,6 +1447,12 @@ class ProactiveIntelligence {
         console.log(`📢 [PROACTIVE] Announcing ${this.milestoneQueue.guildWide.length} guild-wide milestones...`);
 
         for (const milestone of this.milestoneQueue.guildWide) {
+          // Validate milestone data before processing
+          if (!milestone || typeof milestone.threshold === 'undefined' || typeof milestone.totalValue === 'undefined') {
+            console.warn(`⚠️ [PROACTIVE] Skipping invalid guild-wide milestone:`, JSON.stringify(milestone));
+            continue;
+          }
+
           const embed = this.createGuildWideMilestoneEmbed(milestone);
 
           await guildChatChannel.send({ embeds: [embed] });
@@ -1537,6 +1566,11 @@ class ProactiveIntelligence {
    * Check engagement score milestones (hourly)
    */
   async checkEngagementMilestones() {
+    // Skip if milestones are disabled
+    if (!PROACTIVE_CONFIG.features.celebrateMilestones) {
+      return;
+    }
+
     try {
       console.log('🧠 [PROACTIVE] Checking engagement score milestones...');
 
@@ -1612,6 +1646,11 @@ class ProactiveIntelligence {
    * Check guild-wide collective milestones (hourly)
    */
   async checkGuildWideMilestones() {
+    // Skip if milestones are disabled
+    if (!PROACTIVE_CONFIG.features.celebrateMilestones) {
+      return;
+    }
+
     try {
       console.log('🏆 [PROACTIVE] Checking guild-wide milestones...');
 
@@ -1710,6 +1749,11 @@ class ProactiveIntelligence {
    * Check tenure/loyalty milestones (daily at 3:01 AM)
    */
   async checkTenureMilestones() {
+    // Skip if milestones are disabled
+    if (!PROACTIVE_CONFIG.features.celebrateMilestones) {
+      return;
+    }
+
     try {
       console.log('🗿 [PROACTIVE] Checking tenure milestones...');
 
@@ -1784,6 +1828,11 @@ class ProactiveIntelligence {
    * Requires 5+ spawns per day to count as 1 streak day
    */
   async checkCalendarDayStreaks() {
+    // Skip if milestones are disabled
+    if (!PROACTIVE_CONFIG.features.celebrateMilestones) {
+      return;
+    }
+
     try {
       // Calculate yesterday's date range (Manila timezone GMT+8)
       const now = new Date();
@@ -2172,6 +2221,10 @@ class ProactiveIntelligence {
   createGuildWideMilestoneEmbed(milestone) {
     const opening = '🎊 ELYSIUM GUILD ACHIEVEMENT! 🎊';
 
+    // Defensive: ensure milestone values exist
+    const threshold = milestone?.threshold ?? 0;
+    const totalValue = milestone?.totalValue ?? 0;
+
     let typeLabel = '';
     let emoji = '';
     let color = 0xFFD700;
@@ -2188,10 +2241,10 @@ class ProactiveIntelligence {
       color = 0x2ECC71;
     }
 
-    const description = `Together we've reached **${milestone.threshold.toLocaleString()} ${typeLabel}!** ${emoji}\n\n` +
+    const description = `Together we've reached **${threshold.toLocaleString()} ${typeLabel}!** ${emoji}\n\n` +
       `This is the result of EVERYONE's hard work!\n` +
       `Every spawn attended, every boss killed - we did this TOGETHER!\n\n` +
-      `Current Value: **${milestone.totalValue.toLocaleString()}**\n\n` +
+      `Current Value: **${totalValue.toLocaleString()}**\n\n` +
       `Let's keep this momentum going! 💪`;
 
     return new EmbedBuilder()
