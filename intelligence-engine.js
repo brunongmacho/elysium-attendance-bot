@@ -743,11 +743,12 @@ class IntelligenceEngine {
    * @param {Array} cachedData.biddingData - Pre-fetched bidding data
    * @param {Object} cachedData.weeklyAttendance - Pre-fetched weekly attendance data
    * @param {Array} cachedData.auctionData - Pre-fetched auction/distribution data
+   * @param {Object} cachedData.leaderboardData - Pre-fetched leaderboard data with totalSpawns
    */
   async getMemberProfile(username, cachedData = {}) {
     try {
       // Use cached data if available, otherwise fetch
-      let attendanceData, biddingData, auctionWins;
+      let attendanceData, biddingData, auctionWins, leaderboardData;
 
       if (cachedData.attendanceData) {
         attendanceData = cachedData.attendanceData;
@@ -761,6 +762,14 @@ class IntelligenceEngine {
       } else {
         const biddingResponse = await this.sheetAPI.call('getBiddingPoints', {});
         biddingData = biddingResponse?.members ?? [];
+      }
+
+      // Fetch attendance leaderboard for total spawns count (use cached if available)
+      if (cachedData.leaderboardData) {
+        leaderboardData = cachedData.leaderboardData;
+      } else {
+        const leaderboardResponse = await this.cachedAPICall('getAttendanceLeaderboard', {});
+        leaderboardData = leaderboardResponse || {};
       }
 
       // Use cached auction data if available to avoid redundant API calls
@@ -782,17 +791,29 @@ class IntelligenceEngine {
         row.username && row.username.toLowerCase() === username.toLowerCase()
       );
 
-      // Fetch recent spawns (with optional cached weekly attendance data)
-      const recentSpawns = await this.getRecentSpawnsForMember(username, cachedData.weeklyAttendance);
+      // Get member's spawn count from leaderboard (more accurate than attendancePoints)
+      const memberLeaderboardEntry = leaderboardData.leaderboard?.find(row =>
+        row.name && row.name.toLowerCase() === username.toLowerCase()
+      );
+
+      // Fetch recent activity data (spawns attended + total spawns in period)
+      const recentActivityData = await this.getRecentActivityForMember(username, cachedData.weeklyAttendance);
 
       // Note: attendancePoints is actually the spawn count (Total Attendance Days)
-      const spawnCount = memberAttendance?.attendancePoints || 0;
+      // Use leaderboard data as primary source (it comes from AttendanceLog which is more accurate)
+      const spawnCount = memberLeaderboardEntry?.points || memberAttendance?.attendancePoints || 0;
+      const totalSystemSpawns = leaderboardData.totalSpawns || 0;
+
+      // Calculate attendance rate
+      const attendanceRate = totalSystemSpawns > 0 ? Math.round((spawnCount / totalSystemSpawns) * 100) : 0;
 
       return {
         username,
         attendance: {
           total: spawnCount * 4, // Each spawn gives 4 points
           spawns: spawnCount,
+          totalSpawns: totalSystemSpawns, // Total spawns that occurred system-wide
+          attendanceRate: attendanceRate, // Percentage of spawns attended
           averagePerSpawn: 4, // Fixed 4 points per spawn
         },
         bidding: {
@@ -801,27 +822,30 @@ class IntelligenceEngine {
           totalAwarded: (memberBidding?.pointsLeft || 0) + (memberBidding?.pointsConsumed || 0),
           auctionsWon: auctionWins,
         },
-        recentActivity: recentSpawns,
+        recentActivity: recentActivityData,
       };
     } catch (error) {
       console.error('[INTELLIGENCE] Error fetching member profile:', error);
       return {
         username,
-        attendance: { total: 0, spawns: 0, averagePerSpawn: 0 },
+        attendance: { total: 0, spawns: 0, totalSpawns: 0, attendanceRate: 0, averagePerSpawn: 0 },
         bidding: { pointsRemaining: 0, pointsConsumed: 0, totalAwarded: 0, auctionsWon: 0 },
-        recentActivity: [],
+        recentActivity: { spawnsAttended: [], totalRecentSpawns: 0, recentAttendanceRate: 0 },
       };
     }
   }
 
   /**
    * Calculate attendance score (0-100)
+   * Now uses actual attendance rate (spawns attended / total spawns)
    */
   calculateAttendanceScore(attendance) {
-    // Score based on attendance points and frequency
-    const baseScore = Math.min((attendance.spawns / 20) * 100, 100); // 20 spawns = 100%
-    const averageBonus = attendance.averagePerSpawn > 15 ? 10 : 0; // Bonus for high-value boss attendance
-    return Math.min(baseScore + averageBonus, 100);
+    // Use attendance rate directly - this is the percentage of spawns attended
+    // attendanceRate is already calculated as (spawns / totalSpawns) * 100
+    const attendanceRate = attendance.attendanceRate || 0;
+
+    // The score IS the attendance rate - if you attended 75% of spawns, score is 75
+    return Math.min(Math.round(attendanceRate), 100);
   }
 
   /**
@@ -841,31 +865,66 @@ class IntelligenceEngine {
 
   /**
    * Calculate consistency score (0-100)
+   * Now based on attendance rate - consistent attendance means regularly attending spawns
    */
   calculateConsistencyScore(attendance) {
-    // Consistent attendance = regular spawns over time
-    if (attendance.spawns < 5) return 0;
+    // If very few spawns have occurred, can't measure consistency
+    if (attendance.totalSpawns < 5) return 50; // Neutral score if not enough data
 
-    // For now, use simple metric: spawns vs expected spawns (e.g., 3 per week)
-    const weeksActive = 4; // Assume 4 weeks
-    const expectedSpawns = weeksActive * 3;
-    const consistencyRatio = Math.min(attendance.spawns / expectedSpawns, 1);
+    // Consistency is based on attendance rate
+    // High attendance rate = consistent attendance
+    const attendanceRate = attendance.attendanceRate || 0;
 
-    return consistencyRatio * 100;
+    // Apply a curve that rewards consistent attendance
+    // 80%+ attendance = excellent consistency (100)
+    // 60-80% = good consistency (75-100)
+    // 40-60% = moderate consistency (50-75)
+    // Below 40% = poor consistency (0-50)
+    if (attendanceRate >= 80) {
+      return 100;
+    } else if (attendanceRate >= 60) {
+      // Scale 60-80 to 75-100
+      return 75 + ((attendanceRate - 60) / 20) * 25;
+    } else if (attendanceRate >= 40) {
+      // Scale 40-60 to 50-75
+      return 50 + ((attendanceRate - 40) / 20) * 25;
+    } else {
+      // Scale 0-40 to 0-50
+      return (attendanceRate / 40) * 50;
+    }
   }
 
   /**
    * Calculate recent activity score (0-100)
+   * Now uses attendance rate for recent period (spawns attended / total spawns in period)
    */
   calculateRecentActivityScore(recentActivity) {
-    // Recent activity = spawns in last 7 days
-    const last7Days = Date.now() - (7 * 24 * 60 * 60 * 1000);
-    const recentSpawns = recentActivity.filter(a =>
-      new Date(a.timestamp).getTime() > last7Days
-    );
+    // recentActivity now contains: { spawnsAttended, totalRecentSpawns, recentAttendanceRate }
+    if (typeof recentActivity === 'object' && recentActivity.recentAttendanceRate !== undefined) {
+      // New format with attendance rate
+      const recentRate = recentActivity.recentAttendanceRate || 0;
 
-    // 3+ spawns in last 7 days = 100%
-    return Math.min((recentSpawns.length / 3) * 100, 100);
+      // If no recent spawns occurred, give neutral score
+      if (recentActivity.totalRecentSpawns === 0) {
+        return 50; // Neutral score if no recent spawns to measure
+      }
+
+      // Score is based on recent attendance rate
+      return Math.min(Math.round(recentRate), 100);
+    }
+
+    // Fallback for old format (array of spawns attended)
+    // This shouldn't happen with new code, but keep for safety
+    if (Array.isArray(recentActivity)) {
+      const last7Days = Date.now() - (7 * 24 * 60 * 60 * 1000);
+      const recentSpawns = recentActivity.filter(a =>
+        new Date(a.timestamp).getTime() > last7Days
+      );
+      // Old behavior as fallback
+      return Math.min((recentSpawns.length / 3) * 100, 100);
+    }
+
+    return 50; // Neutral score if data format unknown
   }
 
   /**
@@ -886,9 +945,13 @@ class IntelligenceEngine {
       return 0.1;
     }
 
-    // Calculate overall attendance rate based on total spawns in system
-    // Get total spawns from recent activity (this represents all spawns that have occurred)
-    const totalSystemSpawns = recentActivity.length;
+    // Handle both new format (object with totalSpawns) and old format (array)
+    const isNewFormat = typeof recentActivity === 'object' && !Array.isArray(recentActivity);
+
+    // Get total spawns - prefer from attendance object (more accurate), fallback to recentActivity
+    const totalSystemSpawns = attendance.totalSpawns || (isNewFormat
+      ? recentActivity.totalRecentSpawns || 0
+      : recentActivity?.length || 0);
 
     // If we have no spawn data to compare against, use a simple heuristic
     if (totalSystemSpawns === 0) {
@@ -919,29 +982,46 @@ class IntelligenceEngine {
     }
 
     // Calculate overall attendance rate: spawns attended / total spawns available
-    const overallRate = Math.min(attendance.spawns / totalSystemSpawns, 1.0);
+    // Use attendance rate from profile if available (more accurate)
+    const overallRate = attendance.attendanceRate
+      ? attendance.attendanceRate / 100
+      : Math.min(attendance.spawns / totalSystemSpawns, 1.0);
 
-    // Calculate recent attendance (last 14 days)
-    const last14Days = Date.now() - (14 * 24 * 60 * 60 * 1000);
-    const recentSpawns = recentActivity.filter(a =>
-      new Date(a.timestamp).getTime() > last14Days
-    );
+    // Get recent spawns data
+    let recentSpawnsCount;
+    if (isNewFormat) {
+      // New format: use spawnsAttended array
+      recentSpawnsCount = recentActivity.spawnsAttended?.length || 0;
+    } else {
+      // Old format: filter array by last 14 days
+      const last14Days = Date.now() - (14 * 24 * 60 * 60 * 1000);
+      const recentSpawnsArray = (recentActivity || []).filter(a =>
+        new Date(a.timestamp).getTime() > last14Days
+      );
+      recentSpawnsCount = recentSpawnsArray.length;
+    }
 
     // For recent rate, we need to know how many of these recent spawns the user attended
-    // Since we don't have individual attendance records here, we'll estimate based on overall rate
-    // But give more weight to consistency if user has been active recently
-    let recentRate = overallRate; // Default to overall rate
-
-    // If there are recent spawns, adjust based on recency
-    if (recentSpawns.length > 0) {
-      // If user has attended more recently, boost the rate slightly
-      // This is a heuristic: if overall rate is high and there are recent spawns, maintain high likelihood
-      const recencyBoost = Math.min(0.1, recentSpawns.length / 50); // Small boost for active period
-      recentRate = Math.min(overallRate + recencyBoost, 1.0);
+    // Use recent attendance rate if available (new format), otherwise estimate
+    let recentRate;
+    if (isNewFormat && recentActivity.recentAttendanceRate !== undefined) {
+      // New format: use actual recent attendance rate
+      recentRate = recentActivity.recentAttendanceRate / 100;
     } else {
-      // No recent spawns in system means we can't assess recent behavior
-      // Slightly reduce likelihood if there's been a gap
-      recentRate = overallRate * 0.9;
+      // Old format or fallback: estimate based on overall rate
+      recentRate = overallRate; // Default to overall rate
+
+      // If there are recent spawns, adjust based on recency
+      if (recentSpawnsCount > 0) {
+        // If user has attended more recently, boost the rate slightly
+        // This is a heuristic: if overall rate is high and there are recent spawns, maintain high likelihood
+        const recencyBoost = Math.min(0.1, recentSpawnsCount / 50); // Small boost for active period
+        recentRate = Math.min(overallRate + recencyBoost, 1.0);
+      } else {
+        // No recent spawns in system means we can't assess recent behavior
+        // Slightly reduce likelihood if there's been a gap
+        recentRate = overallRate * 0.9;
+      }
     }
 
     // Weighted prediction (70% overall rate, 30% recent adjustment)
@@ -949,7 +1029,7 @@ class IntelligenceEngine {
     const likelihood = Math.min((overallRate * 0.7) + (recentRate * 0.3), 1.0);
 
     // Calculate base confidence based on data quality
-    const baseConfidence = this.calculateAttendanceConfidence(attendance.spawns, recentSpawns.length);
+    const baseConfidence = this.calculateAttendanceConfidence(attendance.spawns, recentSpawnsCount);
 
     if (saveForLearning) {
       // Adjust confidence based on historical accuracy (learning system)
@@ -959,7 +1039,7 @@ class IntelligenceEngine {
       const features = {
         totalSpawns: attendance.spawns,
         totalSystemSpawns: totalSystemSpawns,
-        recentSystemSpawns: recentSpawns.length,
+        recentSystemSpawns: recentSpawnsCount,
         overallRate: overallRate,
         recentRate: recentRate,
       };
@@ -1499,7 +1579,12 @@ class IntelligenceEngine {
       recommendations.push('💰 Has points but never bids. Encourage auction participation.');
     }
 
-    if (profile.recentActivity.length === 0) {
+    // Check for no recent activity - handle both new format (object) and old format (array)
+    const hasNoRecentActivity = typeof profile.recentActivity === 'object' && !Array.isArray(profile.recentActivity)
+      ? (profile.recentActivity.spawnsAttended?.length || 0) === 0
+      : (profile.recentActivity?.length || 0) === 0;
+
+    if (hasNoRecentActivity) {
       recommendations.push('⏰ No recent activity. Schedule reminder before next event.');
     }
 
@@ -1566,6 +1651,93 @@ class IntelligenceEngine {
   }
 
   /**
+   * Get recent activity data for a member with proper attendance rate calculation
+   * Returns spawns attended, total recent spawns, and attendance rate for recent period
+   * @param {string} username - Member username
+   * @param {Object} cachedWeeklyAttendance - Optional pre-fetched weekly attendance data
+   * @returns {Object} { spawnsAttended: Array, totalRecentSpawns: number, recentAttendanceRate: number }
+   */
+  async getRecentActivityForMember(username, cachedWeeklyAttendance = null) {
+    try {
+      // Fetch attendance leaderboard which has spawn data from AttendanceLog
+      const leaderboardResponse = await this.cachedAPICall('getAttendanceLeaderboard', {});
+
+      if (!leaderboardResponse || leaderboardResponse.status === 'error') {
+        return { spawnsAttended: [], totalRecentSpawns: 0, recentAttendanceRate: 0 };
+      }
+
+      // Get member's attendance data from getMemberStats which has recent activity
+      const memberStatsResponse = await this.sheetAPI.call('getMemberStats', { memberName: username });
+
+      if (!memberStatsResponse || memberStatsResponse.status === 'error') {
+        // Fallback: use leaderboard data for basic calculation
+        const memberEntry = leaderboardResponse.leaderboard?.find(row =>
+          row.name && row.name.toLowerCase() === username.toLowerCase()
+        );
+
+        const totalSpawns = leaderboardResponse.totalSpawns || 0;
+        const memberSpawns = memberEntry?.points || 0;
+        const attendanceRate = totalSpawns > 0 ? Math.round((memberSpawns / totalSpawns) * 100) : 0;
+
+        return {
+          spawnsAttended: [],
+          totalRecentSpawns: totalSpawns,
+          recentAttendanceRate: attendanceRate,
+        };
+      }
+
+      // Extract recent activity data from member stats
+      const attendanceData = memberStatsResponse.data?.attendance || {};
+      const recentBosses = attendanceData.recentBosses || [];
+
+      // Filter to last 7 days
+      const last7Days = Date.now() - (7 * 24 * 60 * 60 * 1000);
+      const recentSpawnsAttended = recentBosses.filter(spawn => {
+        const spawnTime = new Date(spawn.timestamp).getTime();
+        return spawnTime > last7Days;
+      });
+
+      // Get total recent spawns from all spawns in last 7 days
+      // We need to calculate this from weekly attendance data
+      let allSheets;
+      if (cachedWeeklyAttendance) {
+        allSheets = cachedWeeklyAttendance.sheets || [];
+      } else {
+        const weeklyResponse = await this.sheetAPI.call('getAllWeeklyAttendance', {});
+        allSheets = weeklyResponse?.sheets || [];
+      }
+
+      // Count all spawns in last 7 days
+      let totalRecentSpawns = 0;
+      for (const weekSheet of allSheets) {
+        const columns = weekSheet.columns || [];
+        for (const column of columns) {
+          if (column.timestamp) {
+            const spawnTime = new Date(column.timestamp).getTime();
+            if (spawnTime > last7Days) {
+              totalRecentSpawns++;
+            }
+          }
+        }
+      }
+
+      // Calculate recent attendance rate
+      const recentAttendanceRate = totalRecentSpawns > 0
+        ? Math.round((recentSpawnsAttended.length / totalRecentSpawns) * 100)
+        : 0;
+
+      return {
+        spawnsAttended: recentSpawnsAttended,
+        totalRecentSpawns: totalRecentSpawns,
+        recentAttendanceRate: recentAttendanceRate,
+      };
+    } catch (error) {
+      console.error('[INTELLIGENCE] Error fetching recent activity:', error);
+      return { spawnsAttended: [], totalRecentSpawns: 0, recentAttendanceRate: 0 };
+    }
+  }
+
+  /**
    * Get auction wins for a member
    */
   async getAuctionWinsForMember(username) {
@@ -1585,23 +1757,25 @@ class IntelligenceEngine {
 
   /**
    * Analyze engagement for all members and identify at-risk members
-   * OPTIMIZED: Fetches all data once instead of per-member to reduce API calls from N*4 to 4
+   * OPTIMIZED: Fetches all data once instead of per-member to reduce API calls from N*4 to 5
    */
   async analyzeAllMembersEngagement() {
     try {
       // Fetch all data ONCE instead of per-member (massive performance improvement)
       // Use cached API calls to prevent timeouts from duplicate concurrent requests
-      const [biddingResponse, attendanceResponse, weeklyAttendanceResponse, auctionResponse] = await Promise.all([
+      const [biddingResponse, attendanceResponse, weeklyAttendanceResponse, auctionResponse, leaderboardResponse] = await Promise.all([
         this.cachedAPICall('getBiddingPoints', {}),
         this.cachedAPICall('getTotalAttendance', {}),
         this.cachedAPICall('getAllWeeklyAttendance', {}),
         this.cachedAPICall('getForDistribution', {}, { timeout: 60000 }),
+        this.cachedAPICall('getAttendanceLeaderboard', {}),
       ]);
 
       const biddingData = biddingResponse?.members ?? [];
       const attendanceData = attendanceResponse?.members ?? [];
       const weeklyAttendance = weeklyAttendanceResponse || {};
       const auctionData = auctionResponse?.items ?? [];
+      const leaderboardData = leaderboardResponse || {};
 
       // Create cached data object to pass to each analysis
       const cachedData = {
@@ -1609,6 +1783,7 @@ class IntelligenceEngine {
         biddingData,
         weeklyAttendance,
         auctionData,
+        leaderboardData,
       };
 
       const analyses = [];
