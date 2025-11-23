@@ -673,19 +673,17 @@ class IntelligenceEngine {
     try {
       const profile = await this.getMemberProfile(username, cachedData);
 
-      // Calculate engagement components
+      // Calculate attendance score - this IS the engagement score
+      // Simple: attendance rate = (spawns attended / total spawns) * 100
       const attendanceScore = this.calculateAttendanceScore(profile.attendance);
+
+      // Keep other scores for display purposes only
       const biddingScore = this.calculateBiddingScore(profile.bidding);
       const consistencyScore = this.calculateConsistencyScore(profile.attendance);
       const recentActivityScore = this.calculateRecentActivityScore(profile.recentActivity);
 
-      // Weighted engagement score
-      const engagementScore = Math.round(
-        attendanceScore * 0.4 +
-        biddingScore * 0.2 +
-        consistencyScore * 0.2 +
-        recentActivityScore * 0.2
-      );
+      // Engagement score IS the attendance rate - simple and direct
+      const engagementScore = attendanceScore;
 
       // Engagement level
       let level, emoji, status;
