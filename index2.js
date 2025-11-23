@@ -3980,8 +3980,8 @@ stats: async (message, member, args) => {
             name: '📈 Member Profile',
             value:
               `Total Attendance: ${profile.attendance.total}pts\n` +
-              `Spawns Attended: ${profile.attendance.spawns}\n` +
-              `Avg per Spawn: ${profile.attendance.averagePerSpawn.toFixed(1)}pts`,
+              `Spawns Attended: ${profile.attendance.spawns}/${profile.attendance.totalSpawns || '?'}\n` +
+              `Attendance Rate: **${profile.attendance.attendanceRate || 0}%**`,
             inline: false,
           },
           {
@@ -4635,9 +4635,9 @@ stats: async (message, member, args) => {
           {
             name: '📈 Attendance Stats',
             value:
-              `Total Points: **${profile.attendance.total}pts**\n` +
-              `Spawns Attended: **${profile.attendance.spawns}**\n` +
-              `Avg Points/Spawn: **${profile.attendance.averagePerSpawn.toFixed(1)}pts**`,
+              `Spawns Attended: **${profile.attendance.spawns}/${profile.attendance.totalSpawns || '?'}**\n` +
+              `Attendance Rate: **${profile.attendance.attendanceRate || 0}%**\n` +
+              `Total Points: **${profile.attendance.total}pts**`,
             inline: true,
           },
           {
