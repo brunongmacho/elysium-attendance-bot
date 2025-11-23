@@ -4024,46 +4024,57 @@ stats: async (message, member, args) => {
         return;
       }
 
-      const { total, active, atRisk, topPerformers, needsAttention, averageEngagement } = analysis;
+      const { total, active, atRisk, topPerformers, averageEngagement, analyses } = analysis;
 
-      // Top performers embed
-      const topPerformersText = topPerformers
-        .map((m, i) => `${i + 1}. **${m.username}** - ${m.engagementScore}/100 ${m.emoji}`)
-        .join('\n');
+      // Top 3 performers (highest attendance rate)
+      const top3Text = topPerformers
+        .slice(0, 3)
+        .map((m, i) => {
+          const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
+          const rate = m.profile?.attendance?.attendanceRate || m.engagementScore;
+          return `${medal} **${m.username}** - ${rate}% attendance`;
+        })
+        .join('\n') || 'No data';
 
-      // At-risk members
-      const atRiskText = needsAttention.length > 0
-        ? needsAttention
-            .map((m) => `• ${m.username} (${m.engagementScore}/100) - ${m.recommendations[0]}`)
-            .slice(0, 5)
-            .join('\n')
-        : 'None';
+      // Bottom 5 performers (lowest attendance rate)
+      const bottom5 = [...analyses]
+        .sort((a, b) => a.engagementScore - b.engagementScore)
+        .slice(0, 5);
+
+      const bottom5Text = bottom5
+        .map((m, i) => {
+          const rate = m.profile?.attendance?.attendanceRate || m.engagementScore;
+          const spawns = m.profile?.attendance?.spawns || 0;
+          const totalSpawns = m.profile?.attendance?.totalSpawns || '?';
+          return `${i + 1}. **${m.username}** - ${rate}% (${spawns}/${totalSpawns} spawns)`;
+        })
+        .join('\n') || 'No data';
 
       const embed = new EmbedBuilder()
         .setColor(0x00aaff)
-        .setTitle(`📊 Guild Engagement Analysis`)
-        .setDescription(`Average Engagement: **${averageEngagement}/100**`)
+        .setTitle(`📊 Guild Attendance Report`)
+        .setDescription(`Average Attendance Rate: **${averageEngagement}%**`)
         .addFields(
           {
             name: '📈 Overview',
             value:
               `Total Members: **${total}**\n` +
-              `Active: **${active}** (${((active/total)*100).toFixed(0)}%)\n` +
-              `At Risk: **${atRisk}** (${((atRisk/total)*100).toFixed(0)}%)`,
+              `Active (60%+): **${active}** (${((active/total)*100).toFixed(0)}%)\n` +
+              `At Risk (<60%): **${atRisk}** (${((atRisk/total)*100).toFixed(0)}%)`,
             inline: false,
           },
           {
-            name: '🏆 Top Performers',
-            value: topPerformersText,
+            name: '🏆 Top 3 Attendance',
+            value: top3Text,
             inline: false,
           },
           {
-            name: '⚠️ Needs Attention',
-            value: atRiskText,
+            name: '🚨 Bottom 5 Attendance',
+            value: bottom5Text,
             inline: false,
           }
         )
-        .setFooter({ text: `Requested by ${member.user.username} • Powered by ML` })
+        .setFooter({ text: `Requested by ${member.user.username}` })
         .setTimestamp();
 
       await message.reply({ embeds: [embed] });
