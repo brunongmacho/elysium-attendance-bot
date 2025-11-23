@@ -1799,15 +1799,18 @@ class IntelligenceEngine {
       const atRisk = analyses.filter(a => a.status === 'at-risk');
       const active = analyses.filter(a => a.status === 'active');
 
+      // Guard against division by zero when no members found
+      const averageEngagement = analyses.length > 0
+        ? Math.round(analyses.reduce((sum, a) => sum + a.engagementScore, 0) / analyses.length)
+        : 0;
+
       return {
         total: analyses.length,
         active: active.length,
         atRisk: atRisk.length,
         topPerformers: analyses.slice(0, 5),
         needsAttention: atRisk.slice(0, 10),
-        averageEngagement: Math.round(
-          analyses.reduce((sum, a) => sum + a.engagementScore, 0) / analyses.length
-        ),
+        averageEngagement,
         analyses,
       };
     } catch (error) {
