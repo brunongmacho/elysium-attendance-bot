@@ -3766,22 +3766,15 @@ stats: async (message, member, args) => {
       // Permission check is done in routing logic
       console.log(`📅 ${member.user.username} manually triggered monthly report`);
 
-      const statusMsg = await message.reply({ content: "📊 Generating monthly report...", failIfNotExists: false });
+      // Validate channel exists before proceeding
+      if (!message.channel) {
+        console.error('❌ message.channel is null/undefined');
+        await message.reply({ content: "❌ Error: Unable to determine channel for report", failIfNotExists: false });
+        return;
+      }
 
-      await leaderboardSystem.sendMonthlyReport();
-
-      // Get both channel names for the confirmation message
-      const [adminLogsChannel, guildChatChannel] = await Promise.all([
-        client.channels.fetch(config.admin_logs_channel_id).catch(() => null),
-        client.channels.fetch(config.elysium_commands_channel_id).catch(() => null)
-      ]);
-
-      const channels = [];
-      if (adminLogsChannel) channels.push(`<#${adminLogsChannel.id}>`);
-      if (guildChatChannel) channels.push(`<#${guildChatChannel.id}>`);
-
-      const channelList = channels.length > 0 ? channels.join(' and ') : 'target channels';
-      await errorHandler.safeEdit(statusMsg, { content: `✅ Monthly report sent to ${channelList}!` }, 'monthly report status update');
+      // Pass the channel where the command was invoked so report is sent only there
+      await leaderboardSystem.sendMonthlyReport(message.channel);
       console.log(`✅ Monthly report command completed successfully`);
     } catch (error) {
       console.error(`❌ Error in monthlyreport command:`, error);

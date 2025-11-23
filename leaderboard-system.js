@@ -1061,9 +1061,11 @@ function scheduleWeeklyReport() {
  *    - Top 3 bidders
  *    - Month-over-month trends
  *
+ * @param {Object|null} targetChannel - If provided, send report only to this channel (manual trigger).
+ *                                       If null, sends to both admin logs and guild chat (scheduled trigger).
  * @returns {Promise<void>}
  */
-async function sendMonthlyReport() {
+async function sendMonthlyReport(targetChannel = null) {
   try {
     if (!client || !config) {
       console.error('❌ Leaderboard system not initialized');
@@ -1072,28 +1074,49 @@ async function sendMonthlyReport() {
 
     console.log('📅 Generating monthly report...');
 
-    // Get both admin-logs and guild chat (elysium commands) channels
-    const [adminLogsChannel, guildChatChannel] = await Promise.all([
-      client.channels.fetch(config.admin_logs_channel_id).catch((err) => {
-        console.error('❌ Error fetching admin logs channel:', err);
-        return null;
-      }),
-      client.channels.fetch(config.elysium_commands_channel_id).catch((err) => {
-        console.error('❌ Error fetching guild chat channel:', err);
-        return null;
-      })
-    ]);
+    // If targetChannel is provided, use it exclusively; otherwise use default channels
+    let adminLogsChannel = null;
+    let guildChatChannel = null;
 
-    if (!adminLogsChannel && !guildChatChannel) {
-      console.error(`❌ Neither admin logs nor guild chat channels found`);
-      return;
-    }
+    if (targetChannel) {
+      // Manual trigger: only send to the channel where command was invoked
+      // Validate that targetChannel is a valid channel object
+      if (!targetChannel || typeof targetChannel.send !== 'function') {
+        console.error('❌ Invalid targetChannel provided:', targetChannel);
+        return;
+      }
 
-    if (adminLogsChannel) {
-      console.log(`📍 Will send monthly report to admin logs: ${adminLogsChannel.name} (${adminLogsChannel.id})`);
-    }
-    if (guildChatChannel) {
-      console.log(`📍 Will send monthly report to guild chat: ${guildChatChannel.name} (${guildChatChannel.id})`);
+      // Additional validation for Discord channel properties
+      if (!targetChannel.id) {
+        console.error('❌ targetChannel missing id property');
+        return;
+      }
+
+      console.log(`📍 Sending monthly report to specific channel: ${targetChannel.name || targetChannel.id} (type: ${targetChannel.type})`);
+    } else {
+      // Scheduled trigger: send to both admin logs and guild chat
+      [adminLogsChannel, guildChatChannel] = await Promise.all([
+        client.channels.fetch(config.admin_logs_channel_id).catch((err) => {
+          console.error('❌ Error fetching admin logs channel:', err);
+          return null;
+        }),
+        client.channels.fetch(config.elysium_commands_channel_id).catch((err) => {
+          console.error('❌ Error fetching guild chat channel:', err);
+          return null;
+        })
+      ]);
+
+      if (!adminLogsChannel && !guildChatChannel) {
+        console.error(`❌ Neither admin logs nor guild chat channels found`);
+        return;
+      }
+
+      if (adminLogsChannel) {
+        console.log(`📍 Will send monthly report to admin logs: ${adminLogsChannel.name} (${adminLogsChannel.id})`);
+      }
+      if (guildChatChannel) {
+        console.log(`📍 Will send monthly report to guild chat: ${guildChatChannel.name} (${guildChatChannel.id})`);
+      }
     }
 
     // Fetch leaderboard data
@@ -1200,58 +1223,72 @@ async function sendMonthlyReport() {
     embed.setFooter({ text: 'Next monthly report: Last day of next month at 11:59pm GMT+8' });
     embed.setTimestamp();
 
-    // Add guild branding
-    addGuildThumbnail(embed, adminLogsChannel.guild);
+    // Add guild branding (use targetChannel if provided, otherwise adminLogsChannel or guildChatChannel)
+    const channelForGuild = targetChannel || adminLogsChannel || guildChatChannel;
+    if (channelForGuild?.guild) {
+      addGuildThumbnail(embed, channelForGuild.guild);
+    }
 
-    // Send the report to both channels
+    // Send the report
     console.log(`📤 Attempting to send monthly report embed...`);
 
-    const sendPromises = [];
-    if (adminLogsChannel) {
-      sendPromises.push(
-        adminLogsChannel.send({ embeds: [embed] })
-          .then((msg) => {
-            console.log(`✅ Monthly report sent to admin logs - Message ID: ${msg.id}`);
-            return { channel: 'admin-logs', success: true, messageId: msg.id };
-          })
-          .catch((err) => {
-            console.error('❌ Error sending to admin logs:', err);
-            return { channel: 'admin-logs', success: false, error: err.message };
-          })
-      );
-    }
-
-    if (guildChatChannel) {
-      console.log(`🔍 Guild chat channel type: ${guildChatChannel.type}, isTextBased: ${guildChatChannel.isTextBased()}`);
-      sendPromises.push(
-        guildChatChannel.send({ embeds: [embed] })
-          .then((msg) => {
-            console.log(`✅ Monthly report sent to guild chat - Message ID: ${msg.id}`);
-            return { channel: 'guild-chat', success: true, messageId: msg.id };
-          })
-          .catch((err) => {
-            console.error('❌ Error sending to guild chat:', err);
-            console.error('❌ Error details:', {
-              message: err.message,
-              code: err.code,
-              httpStatus: err.httpStatus,
-              channelId: guildChatChannel.id,
-              channelName: guildChatChannel.name
-            });
-            return { channel: 'guild-chat', success: false, error: err.message };
-          })
-      );
+    if (targetChannel) {
+      // Manual trigger: send only to the target channel
+      try {
+        const msg = await targetChannel.send({ embeds: [embed] });
+        console.log(`✅ Monthly report sent to ${targetChannel.name || targetChannel.id} - Message ID: ${msg.id}`);
+      } catch (err) {
+        console.error('❌ Error sending monthly report to target channel:', err);
+      }
     } else {
-      console.warn('⚠️ Guild chat channel is null/undefined');
-    }
+      // Scheduled trigger: send to both admin logs and guild chat
+      const sendPromises = [];
+      if (adminLogsChannel) {
+        sendPromises.push(
+          adminLogsChannel.send({ embeds: [embed] })
+            .then((msg) => {
+              console.log(`✅ Monthly report sent to admin logs - Message ID: ${msg.id}`);
+              return { channel: 'admin-logs', success: true, messageId: msg.id };
+            })
+            .catch((err) => {
+              console.error('❌ Error sending to admin logs:', err);
+              return { channel: 'admin-logs', success: false, error: err.message };
+            })
+        );
+      }
 
-    const results = await Promise.all(sendPromises);
-    const successCount = results.filter(r => r.success).length;
+      if (guildChatChannel) {
+        console.log(`🔍 Guild chat channel type: ${guildChatChannel.type}, isTextBased: ${guildChatChannel.isTextBased()}`);
+        sendPromises.push(
+          guildChatChannel.send({ embeds: [embed] })
+            .then((msg) => {
+              console.log(`✅ Monthly report sent to guild chat - Message ID: ${msg.id}`);
+              return { channel: 'guild-chat', success: true, messageId: msg.id };
+            })
+            .catch((err) => {
+              console.error('❌ Error sending to guild chat:', err);
+              console.error('❌ Error details:', {
+                message: err.message,
+                code: err.code,
+                httpStatus: err.httpStatus,
+                channelId: guildChatChannel.id,
+                channelName: guildChatChannel.name
+              });
+              return { channel: 'guild-chat', success: false, error: err.message };
+            })
+        );
+      } else {
+        console.warn('⚠️ Guild chat channel is null/undefined');
+      }
 
-    if (successCount > 0) {
-      console.log(`✅ Monthly report sent successfully for ${monthName} to ${successCount} channel(s)`);
-    } else {
-      console.error('❌ Failed to send monthly report to any channels');
+      const results = await Promise.all(sendPromises);
+      const successCount = results.filter(r => r.success).length;
+
+      if (successCount > 0) {
+        console.log(`✅ Monthly report sent successfully for ${monthName} to ${successCount} channel(s)`);
+      } else {
+        console.error('❌ Failed to send monthly report to any channels');
+      }
     }
 
   } catch (error) {
