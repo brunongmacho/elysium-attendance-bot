@@ -76,7 +76,7 @@ const GAME_EVENTS = {
     color: 0xe74c3c, // Red
     description: '**Guild Boss** is starting soon! Attend for 15 bidding points!',
     reminderOffsetMinutes: 20, // Remind 20 min before (20:40)
-    createAttendanceThread: true, // Create attendance thread
+    createAttendanceThread: false, // DISABLED: boss-timer.js handles Guild Boss thread creation with proper Google Sheets integration
     attendanceAutoCloseMinutes: 30, // Auto-close thread 30 min after event starts (21:30)
   },
 };
