@@ -3122,9 +3122,14 @@ stats: async (message, member, args) => {
             (columnExists ? ` (Overwriting existing column)` : ` (Creating new column)`)
         );
 
-        // Prepare payload - use different action based on whether column exists
+        // Prepare payload - always use overwriteAttendance action for !overrideclose
+        // This ensures proper column handling since handleOverwriteAttendance:
+        // 1. Finds and overwrites existing column if it exists
+        // 2. Creates new column if no existing column found
+        // Using submitAttendance when columnExists is false can cause issues if the
+        // check result is stale (e.g., activeColumns cache not updated after openthread)
         const payload = {
-          action: columnExists ? "overwriteAttendance" : "submitAttendance",
+          action: "overwriteAttendance",
           boss: spawnInfo.boss,
           date: spawnInfo.date,
           time: spawnInfo.time,
