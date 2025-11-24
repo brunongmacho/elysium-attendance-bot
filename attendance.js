@@ -92,6 +92,7 @@ let pendingVerifications = {};  // Message IDs awaiting admin verification
 let pendingClosures = {};       // Message IDs awaiting closure confirmation
 let confirmationMessages = {};  // Thread IDs to confirmation message IDs
 let lastSheetCall = 0;          // Timestamp of last Google Sheets API call
+let pendingCreations = new Map(); // Mutex: boss names currently being created (prevents race conditions)
 
 /**
  * Timing constants for rate limiting and retry logic
@@ -399,6 +400,29 @@ async function createSpawnThreads(
     return { success: false, error: `Unknown boss: ${bossName}` };
   }
 
+  // MUTEX: Prevent concurrent thread creation for the same boss
+  // This fixes race conditions where timer and external bot fire simultaneously
+  const creationKey = `${bossName.toUpperCase()}|${normalizeTimestamp(fullTimestamp)}`;
+  const MUTEX_TIMEOUT_MS = 60000; // 60 second safety timeout
+  if (pendingCreations.has(creationKey)) {
+    const existingCreation = pendingCreations.get(creationKey);
+    const waitTime = Date.now() - existingCreation.startedAt;
+
+    // Safety: Clear stale mutex if it's been held too long (indicates a bug/crash)
+    if (waitTime > MUTEX_TIMEOUT_MS) {
+      console.log(`⚠️ STALE MUTEX: ${bossName} mutex held for ${waitTime}ms - clearing and proceeding`);
+      pendingCreations.delete(creationKey);
+    } else {
+      console.log(`⏳ BLOCKED CONCURRENT CREATION: ${bossName} at ${fullTimestamp} - creation already in progress (${waitTime}ms ago) by ${existingCreation.source}`);
+      return { success: false, error: `Thread creation already in progress for ${bossName}` };
+    }
+  }
+
+  // Set the mutex lock immediately before any async operations
+  pendingCreations.set(creationKey, { startedAt: Date.now(), source: triggerSource });
+  console.log(`🔒 MUTEX SET: Starting thread creation for ${bossName} at ${fullTimestamp} (source: ${triggerSource})`);
+
+  try {
   // Fetch required guild and channels
   const mainGuild = await client.guilds
     .fetch(config.main_guild_id)
@@ -605,6 +629,11 @@ async function createSpawnThreads(
 
   // Return success object for maintenance command
   return { success: true, threadId: attThread.id };
+  } finally {
+    // MUTEX: Always clear the lock when done (success or failure)
+    pendingCreations.delete(creationKey);
+    console.log(`🔓 MUTEX CLEARED: Finished thread creation for ${bossName} at ${fullTimestamp}`);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
