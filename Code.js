@@ -1291,13 +1291,14 @@ function getSessionTimestamp() {
   const hours = String(manilaTime.getHours()).padStart(2, "0");
   const mins = String(manilaTime.getMinutes()).padStart(2, "0");
   
+  const dateOnly = `${month}/${day}/${year}`;
   const dateTime = `${month}/${day}/${year} ${hours}:${mins}`;
   const sessionNum = getSessionNumber(dateTime);
-  
+
   return {
     dateTime,
     sessionNum,
-    columnHeader: `${dateTime} #${sessionNum}`,
+    columnHeader: dateOnly,
     auctionStartTime: dateTime,
     logDate: new Date().toISOString()
   };
