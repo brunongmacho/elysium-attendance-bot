@@ -23,6 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const crashRecovery = require('./utils/crash-recovery');
+const { normalizeTimestamp } = require('./utils/common');
 
 // ============================================================================
 // CONFIGURATION
@@ -801,6 +802,64 @@ async function handleNoSpawn(bossName, userId) {
       const thread = await attChannel.threads.fetch(recentlyHandled.threadId);
 
       if (thread) {
+        // CRITICAL: Clean up spawn state from attendance module BEFORE locking thread
+        // This prevents auto-close from submitting to Google Sheets after 30 minutes
+        const activeSpawns = attendance.getActiveSpawns();
+        const spawnInfo = activeSpawns[thread.id];
+
+        if (spawnInfo) {
+          // Mark as closed to prevent auto-close from processing it
+          spawnInfo.closed = true;
+
+          // Remove from activeColumns to prevent duplicate detection
+          const activeColumns = attendance.getActiveColumns();
+          const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
+          delete activeColumns[cacheKey];
+
+          // Clean up pending verifications for this thread
+          const pendingVerifications = attendance.getPendingVerifications();
+          const pendingInThread = Object.keys(pendingVerifications).filter(
+            (msgId) => pendingVerifications[msgId].threadId === thread.id
+          );
+          pendingInThread.forEach((msgId) => delete pendingVerifications[msgId]);
+
+          // Clean up pending closures for this thread
+          const pendingClosures = attendance.getPendingClosures();
+          const closuresInThread = Object.keys(pendingClosures).filter(
+            (msgId) => pendingClosures[msgId].threadId === thread.id
+          );
+          closuresInThread.forEach((msgId) => delete pendingClosures[msgId]);
+
+          // Clean up confirmation messages
+          const confirmationMessages = attendance.getConfirmationMessages();
+          delete confirmationMessages[thread.id];
+
+          // Close confirmation thread if it exists
+          if (spawnInfo.confirmThreadId) {
+            try {
+              const confirmThread = await guild.channels.fetch(spawnInfo.confirmThreadId).catch(() => null);
+              if (confirmThread) {
+                await confirmThread.send(`⚠️ Spawn cancelled: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - Thread marked as false alarm`);
+                await confirmThread.delete().catch(console.error);
+              }
+            } catch (error) {
+              console.error(`⚠️ Failed to clean up confirmation thread:`, error.message);
+            }
+          }
+
+          // Remove from activeSpawns
+          delete activeSpawns[thread.id];
+
+          // Sync state back to attendance module
+          attendance.setActiveSpawns(activeSpawns);
+          attendance.setActiveColumns(activeColumns);
+          attendance.setPendingVerifications(pendingVerifications);
+          attendance.setPendingClosures(pendingClosures);
+          attendance.setConfirmationMessages(confirmationMessages);
+
+          console.log(`🧹 Cleaned up spawn state for ${bossName} (thread ${thread.id})`);
+        }
+
         // Post correction in thread
         await thread.send(`⚠️ **FALSE ALARM - Wrong timer data**\n\nBoss did not spawn as predicted.\nThread cancelled by <@${userId}>\n\n❌ Please ignore this thread.`);
 
@@ -932,12 +991,14 @@ async function serverDown() {
 /**
  * Reset all timer-based bosses for maintenance
  * Automatically exits server down mode and resumes normal operations
- * @returns {Promise<number>} Number of bosses reset
+ * Also reschedules all schedule-based bosses
+ * @returns {Promise<{timerBased: number, scheduleBased: number}>} Number of bosses reset and scheduled
  */
 async function maintenance() {
   const now = new Date();
   const entries = [];
-  let count = 0;
+  let timerCount = 0;
+  let scheduleCount = 0;
 
   // Exit server down mode (if active)
   if (isServerDown) {
@@ -981,7 +1042,7 @@ async function maintenance() {
       killedBy: 'MAINTENANCE'
     });
 
-    count++;
+    timerCount++;
   }
 
   // Bulk save to Sheets with critical retry
@@ -992,12 +1053,29 @@ async function maintenance() {
       rateLimitBaseDelay: 20000,
       rateLimitMaxDelay: 300000,
     });
-    console.log(`💾 Saved ${count} maintenance timers to recovery sheet`);
+    console.log(`💾 Saved ${timerCount} maintenance timers to recovery sheet`);
   } catch (error) {
     console.error(`❌ CRITICAL: Failed to save maintenance data:`, error.message);
   }
 
-  return count;
+  // Schedule all schedule-based bosses (no API calls, just setTimeout)
+  console.log('🔄 Scheduling all schedule-based bosses...');
+  for (const [bossName, bossConfig] of Object.entries(bossSpawnConfig.scheduleBasedBosses)) {
+    // Skip metadata keys like _note
+    if (bossName.startsWith('_')) continue;
+
+    const nextSpawn = findNextScheduledTime(bossConfig.schedules);
+    if (nextSpawn && !isNaN(nextSpawn.getTime())) {
+      scheduleReminder(bossName, nextSpawn);
+      scheduleCount++;
+    } else {
+      console.error(`❌ Invalid scheduled spawn time for ${bossName}`);
+    }
+  }
+
+  console.log(`✅ Maintenance complete: ${timerCount} timer-based, ${scheduleCount} schedule-based bosses`);
+
+  return { timerBased: timerCount, scheduleBased: scheduleCount };
 }
 
 /**

@@ -84,7 +84,7 @@ const leaderboardSystem = require("./leaderboard-system.js"); // Leaderboards
 const errorHandler = require('./utils/error-handler');      // Centralized error handling
 const { SheetAPI, clientCache } = require('./utils/sheet-api');          // Unified Google Sheets API + cache
 const { DiscordCache } = require('./utils/discord-cache');  // Channel caching system
-const { normalizeUsername, findBossMatch } = require('./utils/common');    // Username normalization and boss matching
+const { normalizeUsername, findBossMatch, normalizeTimestamp } = require('./utils/common');    // Username normalization and boss matching
 const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images'); // Boss images utility
 const { addGuildFooter, addGuildThumbnail } = require('./utils/embed-branding'); // Guild branding utility
 const scheduler = require('./utils/maintenance-scheduler'); // Unified maintenance scheduler
@@ -2440,8 +2440,9 @@ stats: async (message, member, args) => {
                 .catch(err => errorHandler.silentError(err, 'mass close archive empty thread'));
 
               // Clean up state
+              const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
               delete activeSpawns[threadId];
-              delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+              delete activeColumns[cacheKey];
               delete confirmationMessages[threadId];
 
               successCount++;
@@ -2457,7 +2458,12 @@ stats: async (message, member, args) => {
                 `📍 Mass close: ${spawnInfo.boss} at ${spawnInfo.timestamp} (0 members - no submission)`
               );
             } else {
-              // Members exist - check for duplicates before submitting
+              // Members exist - remove from activeColumns cache BEFORE checking Google Sheets
+              // This prevents false positives where the thread exists but was never submitted
+              const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
+              delete activeColumns[cacheKey];
+
+              // Check for duplicates before submitting
               const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
 
               if (columnExists) {
@@ -2487,8 +2493,9 @@ stats: async (message, member, args) => {
                   .setArchived(true, `Mass close by ${member.user.username} (duplicate prevented)`)
                   .catch(err => errorHandler.silentError(err, 'mass close archive duplicate thread'));
 
+                // Note: activeColumns already removed before check, but keeping for safety
                 delete activeSpawns[threadId];
-                delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+                delete activeColumns[cacheKey];
                 delete confirmationMessages[threadId];
 
                 successCount++;
@@ -7122,6 +7129,11 @@ client.on(Events.MessageCreate, async (message) => {
 
         spawnInfo.closed = true;
 
+        // Remove from activeColumns cache BEFORE checking Google Sheets
+        // This prevents false positives where the thread exists but was never submitted
+        const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
+        delete activeColumns[cacheKey];
+
         // Check for duplicate column before submitting
         const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
 
@@ -7777,6 +7789,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
           components: [disabledRow]
         });
 
+        // Remove from activeColumns cache BEFORE checking Google Sheets
+        // This prevents false positives where the thread exists but was never submitted
+        const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
+        delete activeColumns[cacheKey];
+
         // Check for duplicate column before submitting
         const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
 
@@ -8105,6 +8122,11 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 
         spawnInfo.closed = true;
         attendance.setActiveSpawns(activeSpawns); // Sync
+
+        // Remove from activeColumns cache BEFORE checking Google Sheets
+        // This prevents false positives where the thread exists but was never submitted
+        const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
+        delete activeColumns[cacheKey];
 
         // Check for duplicate column before submitting
         const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
