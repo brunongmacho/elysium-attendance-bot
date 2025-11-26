@@ -1,0 +1,105 @@
+name: Security Scanning
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+  pull_request:
+    branches:
+      - main
+  schedule:
+    # Run security scans weekly on Mondays at 9:00 UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  npm-audit:
+    name: NPM Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run npm audit
+        run: |
+          npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: Run npm audit (production only)
+        run: |
+          npm audit --production --audit-level=high
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  check-suspicious-packages:
+    name: Check for Suspicious Packages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for known malicious packages
+        run: |
+          echo "Checking for recently compromised packages..."
+
+          # Check for packages mentioned in recent supply chain attacks
+          SUSPICIOUS_PATTERNS="zapier|postman|posthog|ensdomains|asyncapi"
+
+          if grep -E "$SUSPICIOUS_PATTERNS" package.json; then
+            echo "⚠️ WARNING: Found potentially affected packages"
+            echo "Please verify these packages are safe before installing"
+            exit 1
+          else
+            echo "✅ No known suspicious packages detected"
+          fi
+
+      - name: Verify package-lock integrity
+        run: |
+          if [ -f package-lock.json ]; then
+            echo "✅ package-lock.json exists"
+            # Check if package-lock is in sync with package.json
+            npm install --package-lock-only --dry-run
+          else
+            echo "⚠️ No package-lock.json found - consider adding one for security"
+          fi
