@@ -192,8 +192,8 @@ const client = new Client({
   // Optimized for fast message cleanup while maintaining reaction functionality
   sweepers: {
     messages: {
-      interval: 180, // Run every 3 minutes (optimized from 5)
-      lifetime: 300, // Remove messages older than 5 minutes (optimized from 10)
+      interval: 300, // Run every 5 minutes
+      lifetime: 600, // Remove messages older than 10 minutes (reduced aggressiveness)
     },
     users: {
       interval: 600, // Run every 10 minutes
@@ -323,6 +323,29 @@ let lastOverrideTime = 0;
  */
 const statsCache = new Map();
 const STATS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Cleanup expired entries from statsCache
+ * Prevents memory leaks by removing old cached data
+ */
+function cleanupStatsCache() {
+  const now = Date.now();
+  let removed = 0;
+
+  for (const [key, value] of statsCache.entries()) {
+    if (now - value.timestamp > STATS_CACHE_DURATION) {
+      statsCache.delete(key);
+      removed++;
+    }
+  }
+
+  if (removed > 0) {
+    console.log(`🧹 Cleaned up ${removed} expired stats cache entries (${statsCache.size} remaining)`);
+  }
+}
+
+// Run cleanup every 10 minutes
+setInterval(cleanupStatsCache, 10 * 60 * 1000);
 
 /**
  * Timestamp when last auction ended (for cooldown enforcement)
