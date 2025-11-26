@@ -718,6 +718,13 @@ async function cleanupBiddingChannel() {
 
           for (const [threadId, thread] of activeThreads.threads) {
             try {
+              // Skip specific threads that should never be locked
+              if (threadId === '1430356542871437494') {
+                threadsSkipped++;
+                console.log(`⏭️ Skipping protected thread: ${thread.name}`);
+                continue;
+              }
+
               // Check if thread is an auction thread (type 11 or 12)
               if (thread.type !== 11 && thread.type !== 12) {
                 threadsSkipped++;
@@ -788,6 +795,12 @@ async function cleanupBiddingChannel() {
 
           for (const [threadId, thread] of archivedThreads.threads) {
             try {
+              // Skip specific threads that should never be locked
+              if (threadId === '1430356542871437494') {
+                console.log(`⏭️ Skipping protected archived thread: ${thread.name}`);
+                continue;
+              }
+
               // Lock archived threads that aren't locked yet
               if (!thread.locked && typeof thread.setLocked === "function") {
                 // Must unarchive first, then lock, then re-archive
