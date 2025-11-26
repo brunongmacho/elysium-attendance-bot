@@ -996,7 +996,6 @@ async function serverDown() {
  */
 async function maintenance() {
   const now = new Date();
-  const entries = [];
   let timerCount = 0;
   let scheduleCount = 0;
 
@@ -1026,7 +1025,7 @@ async function maintenance() {
     // Schedule reminder
     const timerId = scheduleReminder(bossName, nextSpawn);
 
-    // Save to cache
+    // Save to cache (will be persisted to Sheets when bosses spawn/get killed)
     bossKillTimes.set(bossName.toLowerCase(), {
       killTime: now,
       nextSpawn,
@@ -1034,29 +1033,15 @@ async function maintenance() {
       killedBy: 'MAINTENANCE'
     });
 
-    // Prepare bulk save
-    entries.push({
-      bossName,
-      lastKillTime: now.toISOString(),
-      nextSpawnTime: nextSpawn.toISOString(),
-      killedBy: 'MAINTENANCE'
-    });
-
     timerCount++;
   }
 
-  // Bulk save to Sheets with critical retry
-  try {
-    await sheetAPI.call('bulkSaveBossTimerRecovery', { entries }, {
-      maxRetries: 7,
-      rateLimitMaxRetries: 10,
-      rateLimitBaseDelay: 20000,
-      rateLimitMaxDelay: 300000,
-    });
-    console.log(`💾 Saved ${timerCount} maintenance timers to recovery sheet`);
-  } catch (error) {
-    console.error(`❌ CRITICAL: Failed to save maintenance data:`, error.message);
-  }
+  // NOTE: We don't save to Google Sheets here to avoid rate limits.
+  // Boss timer data will be saved automatically when:
+  // - Bosses spawn and create threads
+  // - Bosses are killed and respawn timers are set
+  // This prevents rate limit issues during maintenance while ensuring data persistence.
+  console.log(`✅ Scheduled ${timerCount} timer-based bosses (data will be saved on spawn/kill)`);
 
   // Schedule all schedule-based bosses (no API calls, just setTimeout)
   console.log('🔄 Scheduling all schedule-based bosses...');
@@ -1236,7 +1221,7 @@ function formatCountdown(timestamp) {
  */
 async function saveServerDownState() {
   try {
-    await crashRecovery.saveState('bossTimer', {
+    await crashRecovery.saveBossTimerState({
       isServerDown,
     });
   } catch (error) {
