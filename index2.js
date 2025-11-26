@@ -5957,6 +5957,15 @@ client.on(Events.MessageCreate, async (message) => {
       }
       return await bossTimerCommands.handleMaintenance(message);
     }
+    if (content === '!serverdown') {
+      const guild = message.guild;
+      if (!guild) return;
+      const member = await guild.members.fetch(message.author.id).catch(() => null);
+      if (!member || !isAdmin(member)) {
+        return message.reply('❌ Admin only command');
+      }
+      return await bossTimerCommands.handleServerDown(message);
+    }
     if (content === '!clearkills') {
       const guild = message.guild;
       if (!guild) return;

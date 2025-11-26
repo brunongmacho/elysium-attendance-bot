@@ -253,6 +253,7 @@ async function handleUnkill(message, args, config) {
  */
 async function handleMaintenance(message) {
   try {
+    const wasServerDown = bossTimer.getServerDownStatus();
     const count = await bossTimer.maintenance();
 
     // Find first spawn
@@ -262,7 +263,10 @@ async function handleMaintenance(message) {
     const embed = new EmbedBuilder()
       .setColor(0x9b59b6)
       .setTitle('🔧 Maintenance Mode Activated')
-      .setDescription(`✅ Reset **${count}** timer-based bosses`)
+      .setDescription(
+        `✅ Reset **${count}** timer-based bosses\n` +
+        (wasServerDown ? `✅ Exited server down mode - attendance threads will be created again` : '')
+      )
       .setTimestamp();
 
     if (firstSpawn) {
@@ -277,6 +281,46 @@ async function handleMaintenance(message) {
     await message.reply({ embeds: [embed] });
   } catch (error) {
     console.error('Error in !maintenance command:', error);
+    return message.reply(`❌ Error: ${error.message}`);
+  }
+}
+
+/**
+ * Handle !serverdown command (admin)
+ * Pauses boss attendance operations without affecting other bot features
+ */
+async function handleServerDown(message) {
+  try {
+    const count = await bossTimer.serverDown();
+
+    const embed = new EmbedBuilder()
+      .setColor(0xe74c3c)
+      .setTitle('🛑 Server Down Mode Activated')
+      .setDescription(
+        `**Boss attendance operations paused**\n\n` +
+        `✅ Cleared **${count}** boss timers (all bosses now available)\n` +
+        `⏸️ New attendance threads will NOT be created\n` +
+        `✅ All other bot features remain active (bidding, auctions, stats)\n\n` +
+        `💡 Use \`!maintenance\` to resume normal operations`
+      )
+      .addFields({
+        name: 'ℹ️ What\'s Affected',
+        value: '• Boss spawn reminders: **Disabled**\n' +
+               '• Attendance threads: **Not created**\n' +
+               '• Boss timers: **Cleared**',
+        inline: true
+      }, {
+        name: 'ℹ️ What Still Works',
+        value: '• Bidding system: **Active**\n' +
+               '• Auction system: **Active**\n' +
+               '• Stats & leaderboards: **Active**',
+        inline: true
+      })
+      .setTimestamp();
+
+    await message.reply({ embeds: [embed] });
+  } catch (error) {
+    console.error('Error in !serverdown command:', error);
     return message.reply(`❌ Error: ${error.message}`);
   }
 }
@@ -589,6 +633,7 @@ module.exports = {
   handleNextSpawn,
   handleUnkill,
   handleMaintenance,
+  handleServerDown,
   handleClearKills,
   handleNoSpawn,
   handleSpawned,
