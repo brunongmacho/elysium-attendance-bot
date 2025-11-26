@@ -82,7 +82,7 @@ const bossTimerCommands = require("./boss-timer-commands.js"); // Boss timer com
 const emergencyCommands = require("./emergency-commands.js"); // Emergency overrides
 const leaderboardSystem = require("./leaderboard-system.js"); // Leaderboards
 const errorHandler = require('./utils/error-handler');      // Centralized error handling
-const { SheetAPI } = require('./utils/sheet-api');          // Unified Google Sheets API
+const { SheetAPI, clientCache } = require('./utils/sheet-api');          // Unified Google Sheets API + cache
 const { DiscordCache } = require('./utils/discord-cache');  // Channel caching system
 const { normalizeUsername, findBossMatch } = require('./utils/common');    // Username normalization and boss matching
 const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images'); // Boss images utility
@@ -3163,6 +3163,10 @@ stats: async (message, member, args) => {
         const resp = await attendance.postToSheet(payload);
 
         if (resp.ok) {
+          // Invalidate client-side cache (attendance data changed)
+          clientCache.invalidate('getAllWeeklyAttendance:{}');
+          console.log(`🧹 Invalidated client cache (overwrite attendance)`);
+
           // Auto-increment boss rotation if it's a rotating boss
           await bossRotation.handleBossKill(spawnInfo.boss);
 

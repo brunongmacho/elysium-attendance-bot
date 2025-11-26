@@ -55,7 +55,7 @@
  */
 
 const { EmbedBuilder } = require("discord.js");
-const { SheetAPI } = require('./utils/sheet-api');
+const { SheetAPI, clientCache } = require('./utils/sheet-api');
 const bossRotation = require('./boss-rotation.js');
 const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images');
 const { addGuildFooter } = require('./utils/embed-branding');
@@ -1597,6 +1597,10 @@ async function checkAndAutoCloseThreads(client) {
 
             if (resp.ok) {
             console.log(`   ✅ Submitted ${spawnInfo.members.length} members to Google Sheets`);
+
+            // Invalidate client-side cache (attendance data changed)
+            clientCache.invalidate('getAllWeeklyAttendance:{}');
+            console.log(`🧹 Invalidated client cache (new attendance submitted)`);
 
             // Auto-increment boss rotation if it's a rotating boss
             await bossRotation.handleBossKill(spawnInfo.boss);
