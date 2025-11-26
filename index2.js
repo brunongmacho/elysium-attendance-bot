@@ -82,7 +82,7 @@ const bossTimerCommands = require("./boss-timer-commands.js"); // Boss timer com
 const emergencyCommands = require("./emergency-commands.js"); // Emergency overrides
 const leaderboardSystem = require("./leaderboard-system.js"); // Leaderboards
 const errorHandler = require('./utils/error-handler');      // Centralized error handling
-const { SheetAPI } = require('./utils/sheet-api');          // Unified Google Sheets API
+const { SheetAPI, clientCache } = require('./utils/sheet-api');          // Unified Google Sheets API + cache
 const { DiscordCache } = require('./utils/discord-cache');  // Channel caching system
 const { normalizeUsername, findBossMatch } = require('./utils/common');    // Username normalization and boss matching
 const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images'); // Boss images utility
@@ -192,8 +192,8 @@ const client = new Client({
   // Optimized for fast message cleanup while maintaining reaction functionality
   sweepers: {
     messages: {
-      interval: 180, // Run every 3 minutes (optimized from 5)
-      lifetime: 300, // Remove messages older than 5 minutes (optimized from 10)
+      interval: 300, // Run every 5 minutes
+      lifetime: 600, // Remove messages older than 10 minutes (reduced aggressiveness)
     },
     users: {
       interval: 600, // Run every 10 minutes
@@ -323,6 +323,29 @@ let lastOverrideTime = 0;
  */
 const statsCache = new Map();
 const STATS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Cleanup expired entries from statsCache
+ * Prevents memory leaks by removing old cached data
+ */
+function cleanupStatsCache() {
+  const now = Date.now();
+  let removed = 0;
+
+  for (const [key, value] of statsCache.entries()) {
+    if (now - value.timestamp > STATS_CACHE_DURATION) {
+      statsCache.delete(key);
+      removed++;
+    }
+  }
+
+  if (removed > 0) {
+    console.log(`🧹 Cleaned up ${removed} expired stats cache entries (${statsCache.size} remaining)`);
+  }
+}
+
+// Run cleanup every 10 minutes
+setInterval(cleanupStatsCache, 10 * 60 * 1000);
 
 /**
  * Timestamp when last auction ended (for cooldown enforcement)
@@ -3140,6 +3163,10 @@ stats: async (message, member, args) => {
         const resp = await attendance.postToSheet(payload);
 
         if (resp.ok) {
+          // Invalidate client-side cache (attendance data changed)
+          clientCache.invalidate('getAllWeeklyAttendance:{}');
+          console.log(`🧹 Invalidated client cache (overwrite attendance)`);
+
           // Auto-increment boss rotation if it's a rotating boss
           await bossRotation.handleBossKill(spawnInfo.boss);
 
@@ -5519,6 +5546,19 @@ client.once(Events.ClientReady, async () => {
   leaderboardSystem.scheduleMonthlyReport();
   auctioneering.scheduleWeeklySaturdayAuction(client, config);
 
+  // WARM UP GOOGLE SHEETS CACHE (preload frequently accessed data)
+  console.log('🔥 Warming up cache...');
+  try {
+    await Promise.all([
+      sheetAPI.call('getAllWeeklyAttendance', { forceFresh: true }),
+      sheetAPI.call('getBiddingPointsSummary', { forceFresh: true }),
+      sheetAPI.call('getLearningMetrics', { forceFresh: true })
+    ]);
+    console.log('✅ Cache warmed up - all frequently accessed data preloaded');
+  } catch (cacheWarmErr) {
+    console.error('⚠️ Cache warm-up failed (non-critical):', cacheWarmErr.message);
+  }
+
   // Register GC task (every 5 minutes)
   if (global.gc) {
     let lastMemoryWarning = 0; // Track last memory warning to prevent log spam
@@ -5916,6 +5956,15 @@ client.on(Events.MessageCreate, async (message) => {
         return message.reply('❌ Admin only command');
       }
       return await bossTimerCommands.handleMaintenance(message);
+    }
+    if (content === '!serverdown') {
+      const guild = message.guild;
+      if (!guild) return;
+      const member = await guild.members.fetch(message.author.id).catch(() => null);
+      if (!member || !isAdmin(member)) {
+        return message.reply('❌ Admin only command');
+      }
+      return await bossTimerCommands.handleServerDown(message);
     }
     if (content === '!clearkills') {
       const guild = message.guild;

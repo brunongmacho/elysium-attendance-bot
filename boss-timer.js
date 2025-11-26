@@ -22,6 +22,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crashRecovery = require('./utils/crash-recovery');
 
 // ============================================================================
 // CONFIGURATION
@@ -46,6 +47,13 @@ const TIMEZONE_OFFSET = 8; // GMT+8
  * }>
  */
 const bossKillTimes = new Map();
+
+/**
+ * Server down state - when true, bot will not create attendance threads
+ * Set by !serverdown command, cleared by !maintenance command
+ * @type {boolean}
+ */
+let isServerDown = false;
 
 /**
  * Recently handled bosses - prevents duplicate threads from external bot
@@ -92,6 +100,9 @@ async function initialize(discordClient, botConfig, sheetAPIInstance, attendance
 
   // Load boss spawn configuration
   loadBossSpawnConfig();
+
+  // Restore server down state from crash recovery (must be before reschedule)
+  await restoreServerDownState();
 
   // Load recovery data and reschedule timers
   await loadRecoveryAndReschedule();
@@ -466,6 +477,29 @@ function scheduleReminder(bossName, spawnTime) {
 async function triggerSpawnReminder(bossName, spawnTime) {
   try {
     console.log(`🔔 Triggering spawn reminder for ${bossName}`);
+
+    // Check if server is down - skip thread creation but reschedule
+    if (isServerDown) {
+      console.log(`⚠️ Server down mode active - skipping thread creation for ${bossName}`);
+
+      // Clear from kill times cache
+      bossKillTimes.delete(bossName.toLowerCase());
+
+      // For scheduled bosses, reschedule for next occurrence
+      const bossType = getBossType(bossName);
+      if (bossType === 'schedule') {
+        const bossConfig = bossSpawnConfig.scheduleBasedBosses[bossName];
+        if (bossConfig && bossConfig.schedules) {
+          const nextSpawn = findNextScheduledTime(bossConfig.schedules);
+          if (nextSpawn) {
+            scheduleReminder(bossName, nextSpawn);
+            console.log(`🔄 Rescheduled ${bossName} for next occurrence (server down mode)`);
+          }
+        }
+      }
+
+      return;
+    }
 
     // Get announcement channel
     const announcementChannel = await client.channels.fetch(config.boss_spawn_announcement_channel_id);
@@ -868,13 +902,50 @@ async function handleSpawned(bossName, userId) {
 }
 
 /**
+ * Enable server down mode - prevents attendance thread creation
+ * Clears all boss timers making them available again
+ * @returns {Promise<number>} Number of timers cleared
+ */
+async function serverDown() {
+  console.log('🛑 Entering server down mode');
+
+  // Set server down flag
+  isServerDown = true;
+
+  // Cancel and clear all boss timers
+  let count = 0;
+  for (const [bossName, data] of bossKillTimes) {
+    if (data.timerId) {
+      clearTimeout(data.timerId);
+      count++;
+    }
+  }
+  bossKillTimes.clear();
+
+  // Save state for crash recovery
+  await saveServerDownState();
+
+  console.log(`✅ Server down mode activated - cleared ${count} timers`);
+  return count;
+}
+
+/**
  * Reset all timer-based bosses for maintenance
+ * Automatically exits server down mode and resumes normal operations
  * @returns {Promise<number>} Number of bosses reset
  */
 async function maintenance() {
   const now = new Date();
   const entries = [];
   let count = 0;
+
+  // Exit server down mode (if active)
+  if (isServerDown) {
+    console.log('✅ Exiting server down mode - resuming normal operations');
+    isServerDown = false;
+    // Save state for crash recovery
+    await saveServerDownState();
+  }
 
   // Cancel all existing timer-based timers
   for (const [bossName, data] of bossKillTimes) {
@@ -1079,8 +1150,54 @@ function formatCountdown(timestamp) {
 }
 
 // ============================================================================
+// CRASH RECOVERY - SERVER DOWN STATE
+// ============================================================================
+
+/**
+ * Save server down state for crash recovery
+ */
+async function saveServerDownState() {
+  try {
+    await crashRecovery.saveState('bossTimer', {
+      isServerDown,
+    });
+  } catch (error) {
+    console.error('⚠️ Failed to save server down state:', error.message);
+  }
+}
+
+/**
+ * Restore server down state from crash recovery
+ */
+async function restoreServerDownState() {
+  try {
+    const state = crashRecovery.getRecoveryState();
+    if (state?.bossTimer?.isServerDown !== undefined) {
+      isServerDown = state.bossTimer.isServerDown;
+      const status = isServerDown ? 'DOWN' : 'UP';
+      console.log(`🔄 [CRASH RECOVERY] Restored server state: ${status}`);
+
+      if (isServerDown) {
+        console.log('⚠️ Bot restarted in SERVER DOWN mode - attendance threads will NOT be created');
+        console.log('💡 Use !maintenance to resume normal operations');
+      }
+    }
+  } catch (error) {
+    console.error('⚠️ Failed to restore server down state:', error.message);
+  }
+}
+
+// ============================================================================
 // MODULE EXPORTS
 // ============================================================================
+
+/**
+ * Get server down status
+ * @returns {boolean} True if server is down
+ */
+function getServerDownStatus() {
+  return isServerDown;
+}
 
 module.exports = {
   initialize,
@@ -1092,6 +1209,8 @@ module.exports = {
   handleNoSpawn,
   handleSpawned,
   maintenance,
+  serverDown,
+  getServerDownStatus,
   clearKills,
   getAllTimers,
   findBossName,

@@ -57,6 +57,10 @@ let recoveryState = {
     tasks: {},
     lastSaved: null,
   },
+  bossTimer: {
+    isServerDown: false,
+    lastSaved: null,
+  },
 };
 
 // ============================================================================
@@ -491,6 +495,13 @@ async function loadRecoveryState() {
         console.log(`✅ [CRASH RECOVERY] Loaded scheduler state (${taskCount} tasks)`);
       }
 
+      // Load boss timer state (server down mode)
+      if (response.state.bossTimer) {
+        recoveryState.bossTimer = response.state.bossTimer;
+        const serverDownStatus = recoveryState.bossTimer.isServerDown ? 'DOWN' : 'UP';
+        console.log(`✅ [CRASH RECOVERY] Loaded boss timer state (server: ${serverDownStatus})`);
+      }
+
       console.log('✅ [CRASH RECOVERY] All recovery state loaded');
     } else {
       console.log('✅ [CRASH RECOVERY] No recovery state found (starting fresh)');
@@ -512,6 +523,7 @@ function getRecoveryState() {
       ...recoveryState.scheduler,
       tasks: { ...recoveryState.scheduler.tasks },
     },
+    bossTimer: { ...recoveryState.bossTimer },
   };
 }
 

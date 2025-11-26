@@ -213,14 +213,28 @@ const COMMANDS = {
     },
     maintenance: {
       usage: "!maintenance",
-      description: "Create spawn threads for all maintenance bosses",
+      description: "Create spawn threads for all maintenance bosses and resume normal operations",
       aliases: ["!maint"],
       adminOnly: true,
       details: [
         "• Creates threads for 22 maintenance bosses",
         "• Sets spawn time to 5 minutes from now",
+        "• **Exits server down mode** if active",
         "• Batch processing with progress tracking",
         "• Requires confirmation"
+      ]
+    },
+    serverdown: {
+      usage: "!serverdown",
+      description: "Pause boss attendance operations (game server maintenance)",
+      adminOnly: true,
+      details: [
+        "• **Pauses only boss attendance** - other features remain active",
+        "• Clears all boss timers (makes all bosses available)",
+        "• No attendance threads will be created",
+        "• Bidding, auctions, stats still work normally",
+        "• **Persists across bot restarts**",
+        "• Use `!maintenance` to resume normal operations"
       ]
     },
     clearstate: {

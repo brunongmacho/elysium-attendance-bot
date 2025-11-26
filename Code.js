@@ -45,7 +45,8 @@ const CONFIG = {
   BOSS_POINTS_SHEET: 'BossPoints',
   BIDDING_SHEET: 'BiddingPoints',
   TIMEZONE: 'Asia/Manila',
-  CACHE_TTL_SECONDS: 300, // Cache duration: 5 minutes
+  CACHE_TTL_SECONDS: 300, // Cache duration for bidding points: 5 minutes
+  CACHE_TTL_LONG: 1800, // Cache duration for historical data: 30 minutes
 };
 
 const COLUMNS = {
@@ -325,6 +326,29 @@ function getAllSpawnColumns(data) {
  */
 function getAllWeeklyAttendance(data) {
   try {
+    const cache = CacheService.getDocumentCache();
+    const cacheKey = 'weeklyAttendance_v1';
+
+    // Check if force refresh requested
+    const forceFresh = data && data.forceFresh === true;
+
+    // Try to get from cache first (unless force refresh)
+    if (!forceFresh) {
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        try {
+          const cachedData = JSON.parse(cached);
+          Logger.log('✅ Cache hit for weekly attendance');
+          return createResponse('ok', 'All weekly attendance fetched (cached)', { sheets: cachedData });
+        } catch (e) {
+          Logger.log('⚠️ Cache parse error, fetching fresh: ' + e.message);
+          // Continue to fresh fetch if cache is corrupted
+        }
+      }
+    }
+
+    // Cache miss or force refresh - read from sheets
+    Logger.log('📊 Cache miss, reading from sheets');
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const allSheets = ss.getSheets();
     const weeklySheets = [];
@@ -339,6 +363,8 @@ function getAllWeeklyAttendance(data) {
 
     if (weeklySheets.length === 0) {
       Logger.log('⚠️ No weekly attendance sheets found');
+      // Cache empty result too (30 min for historical data)
+      cache.put(cacheKey, JSON.stringify([]), CONFIG.CACHE_TTL_LONG);
       return createResponse('ok', 'No weekly sheets found', { sheets: [] });
     }
 
@@ -385,6 +411,15 @@ function getAllWeeklyAttendance(data) {
 
     const totalSpawns = allWeeklyData.reduce((sum, week) => sum + week.columns.length, 0);
     Logger.log(`✅ Found ${totalSpawns} total spawns across ${weeklySheets.length} weekly sheets`);
+
+    // Store in cache for future requests (30 min for historical data)
+    try {
+      cache.put(cacheKey, JSON.stringify(allWeeklyData), CONFIG.CACHE_TTL_LONG);
+      Logger.log(`✅ Cached ${totalSpawns} spawns across ${weeklySheets.length} sheets for ${CONFIG.CACHE_TTL_LONG}s`);
+    } catch (e) {
+      Logger.log('⚠️ Failed to cache weekly attendance: ' + e.message);
+      // Continue anyway, just won't be cached
+    }
 
     return createResponse('ok', 'All weekly attendance fetched', { sheets: allWeeklyData });
 
@@ -842,6 +877,15 @@ function handleSubmitAttendance(data) {
       Logger.log(`[LEARNING] Error updating engagement predictions: ${learningErr.toString()}`);
     }
 
+    // Invalidate weekly attendance cache (new spawn added)
+    try {
+      const cache = CacheService.getDocumentCache();
+      cache.remove('weeklyAttendance_v1');
+      Logger.log('🧹 Invalidated weekly attendance cache (new spawn)');
+    } catch (e) {
+      Logger.log('⚠️ Failed to invalidate cache: ' + e.message);
+    }
+
     return createResponse('ok', `Submitted: ${members.length}`, {column: newCol, boss, timestamp, membersCount: members.length});
   } finally { lock.releaseLock(); }
 }
@@ -960,6 +1004,15 @@ function handleOverwriteAttendance(data) {
 
     const action = isOverwrite ? 'Overwritten' : 'Submitted';
     Logger.log(`📊 ${action} attendance: ${boss} at ${timestamp} - ${members.length} members`);
+
+    // Invalidate weekly attendance cache (attendance updated)
+    try {
+      const cache = CacheService.getDocumentCache();
+      cache.remove('weeklyAttendance_v1');
+      Logger.log('🧹 Invalidated weekly attendance cache (attendance update)');
+    } catch (e) {
+      Logger.log('⚠️ Failed to invalidate cache: ' + e.message);
+    }
 
     return createResponse('ok', `${action}: ${members.length}`, {column: workingCol, boss, timestamp, membersCount: members.length, overwritten: isOverwrite});
   } finally { lock.releaseLock(); }
@@ -2284,6 +2337,15 @@ function savePredictionForLearning(data) {
 
     Logger.log(`✅ Prediction saved: ID=${predictionId}, Type=${type}, Target=${target}`);
 
+    // Invalidate learning metrics cache (new prediction added)
+    try {
+      const cache = CacheService.getDocumentCache();
+      cache.remove('learningMetrics_v1');
+      Logger.log('🧹 Invalidated learning metrics cache');
+    } catch (e) {
+      Logger.log('⚠️ Failed to invalidate cache: ' + e.message);
+    }
+
     return createResponse('ok', 'Prediction saved for learning', {
       predictionId: predictionId,
       timestamp: timestamp.toISOString()
@@ -2462,12 +2524,36 @@ function getLearningData(data) {
  */
 function getLearningMetrics(data) {
   try {
-    Logger.log('📊 Calculating learning metrics...');
+    const cache = CacheService.getDocumentCache();
+    const cacheKey = 'learningMetrics_v1';
+
+    // Check if force refresh requested
+    const forceFresh = data && data.forceFresh === true;
+
+    // Try to get from cache first (unless force refresh)
+    if (!forceFresh) {
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        try {
+          const cachedData = JSON.parse(cached);
+          Logger.log('✅ Cache hit for learning metrics');
+          return createResponse('ok', 'Learning metrics calculated (cached)', { metrics: cachedData });
+        } catch (e) {
+          Logger.log('⚠️ Cache parse error, calculating fresh: ' + e.message);
+          // Continue to fresh calculation if cache is corrupted
+        }
+      }
+    }
+
+    // Cache miss or force refresh - calculate metrics
+    Logger.log('📊 Cache miss, calculating learning metrics...');
 
     const sheet = getBotLearningSheet();
     const lastRow = sheet.getLastRow();
 
     if (lastRow < 2) {
+      // Cache empty result too (30 min for historical data)
+      cache.put(cacheKey, JSON.stringify({}), CONFIG.CACHE_TTL_LONG);
       return createResponse('ok', 'No learning data available', { metrics: {} });
     }
 
@@ -2526,6 +2612,15 @@ function getLearningMetrics(data) {
     }
 
     Logger.log(`✅ Metrics calculated: ${Object.keys(metrics.byType).length} types`);
+
+    // Store in cache for future requests (30 min for historical data)
+    try {
+      cache.put(cacheKey, JSON.stringify(metrics), CONFIG.CACHE_TTL_LONG);
+      Logger.log(`✅ Cached learning metrics for ${CONFIG.CACHE_TTL_LONG}s`);
+    } catch (e) {
+      Logger.log('⚠️ Failed to cache learning metrics: ' + e.message);
+      // Continue anyway, just won't be cached
+    }
 
     return createResponse('ok', 'Learning metrics calculated', { metrics });
 

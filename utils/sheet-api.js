@@ -133,6 +133,110 @@ function queueRequest(requestKey, executeRequest) {
 }
 
 // ============================================================================
+// CLIENT-SIDE CACHE (KOYEB MEMORY)
+// ============================================================================
+
+/**
+ * Client-side cache for Google Apps Script responses.
+ * First layer of dual-layer caching (Koyeb memory → Google cache → Sheets).
+ *
+ * Benefits:
+ * - Zero latency for cached data (no network call)
+ * - Reduces load on Google Apps Script
+ * - Automatic cleanup of expired entries
+ */
+const clientCache = {
+  data: new Map(), // { cacheKey: { value, timestamp, ttl } }
+
+  /**
+   * Cache TTL for different data types (in milliseconds)
+   */
+  TTL: {
+    WEEKLY_ATTENDANCE: 30 * 60 * 1000,  // 30 min - historical data
+    LEARNING_METRICS: 30 * 60 * 1000,   // 30 min - historical data
+    BIDDING_POINTS: 5 * 60 * 1000,      // 5 min - frequently updated
+    DEFAULT: 5 * 60 * 1000              // 5 min - default
+  },
+
+  /**
+   * Get cached value if exists and not expired
+   */
+  get(cacheKey) {
+    const cached = this.data.get(cacheKey);
+    if (!cached) return null;
+
+    const now = Date.now();
+    const age = now - cached.timestamp;
+
+    if (age > cached.ttl) {
+      // Expired - remove it
+      this.data.delete(cacheKey);
+      return null;
+    }
+
+    return cached.value;
+  },
+
+  /**
+   * Store value in cache with TTL
+   */
+  set(cacheKey, value, ttl = this.TTL.DEFAULT) {
+    this.data.set(cacheKey, {
+      value,
+      timestamp: Date.now(),
+      ttl
+    });
+  },
+
+  /**
+   * Remove specific cache entry
+   */
+  invalidate(cacheKey) {
+    this.data.delete(cacheKey);
+  },
+
+  /**
+   * Remove all cache entries (for testing/debugging)
+   */
+  clear() {
+    this.data.clear();
+  },
+
+  /**
+   * Cleanup expired entries (run periodically)
+   */
+  cleanup() {
+    const now = Date.now();
+    let removed = 0;
+
+    for (const [key, cached] of this.data.entries()) {
+      const age = now - cached.timestamp;
+      if (age > cached.ttl) {
+        this.data.delete(key);
+        removed++;
+      }
+    }
+
+    if (removed > 0) {
+      console.log(`🧹 [CLIENT CACHE] Cleaned up ${removed} expired entries (${this.data.size} remaining)`);
+    }
+  },
+
+  /**
+   * Get cache statistics
+   */
+  stats() {
+    return {
+      size: this.data.size,
+      entries: Array.from(this.data.keys())
+    };
+  }
+};
+
+// Run cache cleanup every 10 minutes
+setInterval(() => clientCache.cleanup(), 10 * 60 * 1000);
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
@@ -273,6 +377,29 @@ class SheetAPI {
   async call(action, data = {}, callOptions = {}) {
     const options = { ...this.options, ...callOptions };
 
+    // Determine cache key and TTL based on action type
+    const cacheKey = `${action}:${JSON.stringify(data)}`;
+    let cacheTTL = clientCache.TTL.DEFAULT;
+
+    // Set appropriate TTL for different actions
+    if (action === 'getAllWeeklyAttendance') {
+      cacheTTL = clientCache.TTL.WEEKLY_ATTENDANCE;
+    } else if (action === 'getLearningMetrics') {
+      cacheTTL = clientCache.TTL.LEARNING_METRICS;
+    } else if (action === 'getBiddingPointsSummary') {
+      cacheTTL = clientCache.TTL.BIDDING_POINTS;
+    }
+
+    // Check client-side cache first (unless forceFresh requested)
+    const forceFresh = data && data.forceFresh;
+    if (!forceFresh) {
+      const cached = clientCache.get(cacheKey);
+      if (cached) {
+        console.log(`📦 [CLIENT CACHE HIT] ${action} (0ms)`);
+        return cached;
+      }
+    }
+
     if (options.enableCircuitBreaker && !checkCircuitBreaker()) {
       const error = new Error(
         `Circuit breaker is OPEN. Wait ${Math.round(circuitBreaker.resetTimeout / 1000)}s before retry.`
@@ -285,7 +412,15 @@ class SheetAPI {
     const requestKey = `${action}:${JSON.stringify(data)}`;
 
     // Queue the request to limit concurrent calls
-    return queueRequest(requestKey, () => this._executeCall(action, data, options));
+    const result = await queueRequest(requestKey, () => this._executeCall(action, data, options));
+
+    // Store successful result in client cache
+    if (result && result.status === 'ok') {
+      clientCache.set(cacheKey, result, cacheTTL);
+      console.log(`💾 [CLIENT CACHE STORED] ${action} (TTL: ${cacheTTL / 1000}s)`);
+    }
+
+    return result;
   }
 
   /**
@@ -567,4 +702,5 @@ module.exports = {
   calculateBackoff, // Export for testing
   metrics, // Export for monitoring
   circuitBreaker, // Export for monitoring
+  clientCache, // Export for cache invalidation from other modules
 };
