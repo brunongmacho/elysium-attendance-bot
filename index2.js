@@ -5542,6 +5542,19 @@ client.once(Events.ClientReady, async () => {
   leaderboardSystem.scheduleMonthlyReport();
   auctioneering.scheduleWeeklySaturdayAuction(client, config);
 
+  // WARM UP GOOGLE SHEETS CACHE (preload frequently accessed data)
+  console.log('🔥 Warming up cache...');
+  try {
+    await Promise.all([
+      sheetAPI.call('getAllWeeklyAttendance', { forceFresh: true }),
+      sheetAPI.call('getBiddingPointsSummary', { forceFresh: true }),
+      sheetAPI.call('getLearningMetrics', { forceFresh: true })
+    ]);
+    console.log('✅ Cache warmed up - all frequently accessed data preloaded');
+  } catch (cacheWarmErr) {
+    console.error('⚠️ Cache warm-up failed (non-critical):', cacheWarmErr.message);
+  }
+
   // Register GC task (every 5 minutes)
   if (global.gc) {
     let lastMemoryWarning = 0; // Track last memory warning to prevent log spam

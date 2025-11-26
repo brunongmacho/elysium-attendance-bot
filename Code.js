@@ -877,6 +877,15 @@ function handleSubmitAttendance(data) {
       Logger.log(`[LEARNING] Error updating engagement predictions: ${learningErr.toString()}`);
     }
 
+    // Invalidate weekly attendance cache (new spawn added)
+    try {
+      const cache = CacheService.getDocumentCache();
+      cache.remove('weeklyAttendance_v1');
+      Logger.log('🧹 Invalidated weekly attendance cache (new spawn)');
+    } catch (e) {
+      Logger.log('⚠️ Failed to invalidate cache: ' + e.message);
+    }
+
     return createResponse('ok', `Submitted: ${members.length}`, {column: newCol, boss, timestamp, membersCount: members.length});
   } finally { lock.releaseLock(); }
 }
@@ -995,6 +1004,15 @@ function handleOverwriteAttendance(data) {
 
     const action = isOverwrite ? 'Overwritten' : 'Submitted';
     Logger.log(`📊 ${action} attendance: ${boss} at ${timestamp} - ${members.length} members`);
+
+    // Invalidate weekly attendance cache (attendance updated)
+    try {
+      const cache = CacheService.getDocumentCache();
+      cache.remove('weeklyAttendance_v1');
+      Logger.log('🧹 Invalidated weekly attendance cache (attendance update)');
+    } catch (e) {
+      Logger.log('⚠️ Failed to invalidate cache: ' + e.message);
+    }
 
     return createResponse('ok', `${action}: ${members.length}`, {column: workingCol, boss, timestamp, membersCount: members.length, overwritten: isOverwrite});
   } finally { lock.releaseLock(); }
@@ -2318,6 +2336,15 @@ function savePredictionForLearning(data) {
     const predictionId = sheet.getLastRow();
 
     Logger.log(`✅ Prediction saved: ID=${predictionId}, Type=${type}, Target=${target}`);
+
+    // Invalidate learning metrics cache (new prediction added)
+    try {
+      const cache = CacheService.getDocumentCache();
+      cache.remove('learningMetrics_v1');
+      Logger.log('🧹 Invalidated learning metrics cache');
+    } catch (e) {
+      Logger.log('⚠️ Failed to invalidate cache: ' + e.message);
+    }
 
     return createResponse('ok', 'Prediction saved for learning', {
       predictionId: predictionId,
