@@ -4824,16 +4824,22 @@ stats: async (message, member, args) => {
         const nextSpawn = timerData.nextSpawn;
         const killTime = timerData.killTime;
 
-        // Calculate interval if we have kill time
-        const intervalMs = nextSpawn.getTime() - killTime.getTime();
-        const intervalHours = intervalMs / (1000 * 60 * 60);
+        // Calculate interval if we have kill time (null for scheduled bosses)
+        let intervalHours = null;
+        if (killTime) {
+          const intervalMs = nextSpawn.getTime() - killTime.getTime();
+          intervalHours = intervalMs / (1000 * 60 * 60);
+        }
+
+        // Determine spawn type (scheduled bosses have null killTime)
+        const spawnType = killTime ? 'timer' : 'schedule';
 
         prediction = {
           bossName: bossName,
           predictedTime: nextSpawn,
-          confidence: 95, // High confidence for recorded timer
+          confidence: killTime ? 95 : 99, // Higher confidence for scheduled bosses
           basedOnSpawns: 1,
-          spawnType: 'timer',
+          spawnType: spawnType,
           usingConfiguredTimer: true,
           avgIntervalHours: intervalHours,
           lastSpawnTime: killTime,

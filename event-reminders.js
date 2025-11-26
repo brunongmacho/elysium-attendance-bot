@@ -14,9 +14,9 @@
  * - Timezone-aware scheduling (GMT+8)
  *
  * EVENTS:
- * - Individual Arena: Mon, Wed, Fri at 19:30 - 20:30
- * - Coop Round Arena: Tue, Thu, Sat at 19:30 - 20:30
- * - Guild War: Fri, Sat, Sun at 19:25 - 19:28
+ * - Individual Arena: Mon, Wed, Fri at 20:30 - 21:30
+ * - Coop Round Arena: Tue, Thu, Sat at 20:30 - 21:30
+ * - Guild War: Fri, Sat, Sun at 20:25 - 20:28
  * - World Boss Event: Daily at 11:00 AM and 20:00 PM (8:00 PM)
  * - Guild War Queue Reminder: Thu, Fri, Sat at 23:00 (auto-delete at 01:00)
  *
@@ -40,7 +40,7 @@ const GAME_EVENTS = {
   individualArena: {
     name: '⚔️ Individual Arena',
     days: [1, 3, 5], // Monday, Wednesday, Friday (0=Sunday)
-    startTime: { hour: 19, minute: 30 }, // Actual event time
+    startTime: { hour: 20, minute: 30 }, // Actual event time
     durationMinutes: 60,
     color: 0xff6b6b, // Red
     description: 'Individual Arena is starting soon!',
@@ -49,7 +49,7 @@ const GAME_EVENTS = {
   coopArena: {
     name: '🤝 Coop Round Arena',
     days: [2, 4, 6], // Tuesday, Thursday, Saturday
-    startTime: { hour: 19, minute: 30 }, // Actual event time
+    startTime: { hour: 20, minute: 30 }, // Actual event time
     durationMinutes: 60,
     color: 0x4ecdc4, // Teal
     description: 'Coop Round Arena is starting soon!',
@@ -60,13 +60,13 @@ const GAME_EVENTS = {
   gvg: {
     name: '⚔️ GvG / Guild War',
     days: [5, 6, 0], // Friday, Saturday, Sunday
-    startTime: { hour: 19, minute: 25 }, // Actual event time (7:25 PM)
-    durationMinutes: 3, // GvG duration (19:25 - 19:28)
+    startTime: { hour: 20, minute: 25 }, // Actual event time (8:25 PM)
+    durationMinutes: 3, // GvG duration (20:25 - 20:28)
     color: 0xf39c12, // Orange
     description: '**GvG / Guild War** is starting soon! Get ready to attend!',
-    reminderOffsetMinutes: 20, // Remind 20 min before (19:05)
+    reminderOffsetMinutes: 20, // Remind 20 min before (20:05)
     createAttendanceThread: true, // Special flag to create attendance thread
-    attendanceAutoCloseMinutes: 20, // Auto-close thread 20 min after event starts (19:45)
+    attendanceAutoCloseMinutes: 20, // Auto-close thread 20 min after event starts (20:45)
   },
   guildBoss: {
     name: '⚔️ Guild Boss',
