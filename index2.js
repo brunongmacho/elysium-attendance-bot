@@ -5225,10 +5225,13 @@ stats: async (message, member, args) => {
             }
 
             const guildCount = rotation.guilds ? rotation.guilds.length : 5;
+            const nextGuild = rotation.guilds
+              ? rotation.guilds[rotation.currentIndex % guildCount]
+              : (rotation.nextGuild || rotation.currentGuild || 'Unknown');
 
             embed.addFields({
               name: `${emoji} ${boss}`,
-              value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**\nNext: ${rotation.guilds[rotation.currentIndex % guildCount]}${spawnInfo}`,
+              value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**\nNext: ${nextGuild}${spawnInfo}`,
               inline: false
             });
           }
