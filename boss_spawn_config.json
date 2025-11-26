@@ -226,6 +226,46 @@
         }
       ],
       "description": "Guild boss raid every Monday 21:00"
+    },
+    "Icaruthia": {
+      "schedules": [
+        {
+          "day": "Tuesday",
+          "time": "21:00",
+          "dayOfWeek": 2
+        },
+        {
+          "day": "Friday",
+          "time": "21:00",
+          "dayOfWeek": 5
+        }
+      ],
+      "description": "Spawns Tuesday 21:00, Friday 21:00"
+    },
+    "Motti": {
+      "schedules": [
+        {
+          "day": "Wednesday",
+          "time": "19:00",
+          "dayOfWeek": 3
+        },
+        {
+          "day": "Saturday",
+          "time": "19:00",
+          "dayOfWeek": 6
+        }
+      ],
+      "description": "Spawns Wednesday 19:00, Saturday 19:00"
+    },
+    "Nevaeh": {
+      "schedules": [
+        {
+          "day": "Sunday",
+          "time": "22:00",
+          "dayOfWeek": 0
+        }
+      ],
+      "description": "Spawns Sunday 22:00"
     }
   }
 }

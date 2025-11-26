@@ -996,7 +996,6 @@ async function serverDown() {
  */
 async function maintenance() {
   const now = new Date();
-  const entries = [];
   let timerCount = 0;
   let scheduleCount = 0;
 
@@ -1006,6 +1005,15 @@ async function maintenance() {
     isServerDown = false;
     // Save state for crash recovery
     await saveServerDownState();
+  }
+
+  // Clear all timer-based boss entries from Google Sheets (single API call)
+  try {
+    await sheetAPI.call('clearBossTimerRecovery', { type: 'timer-based' });
+    console.log('💾 Cleared timer-based boss recovery data from Google Sheets');
+  } catch (error) {
+    console.error('⚠️ Failed to clear timer-based recovery data:', error.message);
+    // Continue anyway - local state will be correct
   }
 
   // Cancel all existing timer-based timers
@@ -1026,7 +1034,7 @@ async function maintenance() {
     // Schedule reminder
     const timerId = scheduleReminder(bossName, nextSpawn);
 
-    // Save to cache
+    // Save to cache (will be persisted to Sheets when bosses spawn)
     bossKillTimes.set(bossName.toLowerCase(), {
       killTime: now,
       nextSpawn,
@@ -1034,29 +1042,10 @@ async function maintenance() {
       killedBy: 'MAINTENANCE'
     });
 
-    // Prepare bulk save
-    entries.push({
-      bossName,
-      lastKillTime: now.toISOString(),
-      nextSpawnTime: nextSpawn.toISOString(),
-      killedBy: 'MAINTENANCE'
-    });
-
     timerCount++;
   }
 
-  // Bulk save to Sheets with critical retry
-  try {
-    await sheetAPI.call('bulkSaveBossTimerRecovery', { entries }, {
-      maxRetries: 7,
-      rateLimitMaxRetries: 10,
-      rateLimitBaseDelay: 20000,
-      rateLimitMaxDelay: 300000,
-    });
-    console.log(`💾 Saved ${timerCount} maintenance timers to recovery sheet`);
-  } catch (error) {
-    console.error(`❌ CRITICAL: Failed to save maintenance data:`, error.message);
-  }
+  console.log(`✅ Scheduled ${timerCount} timer-based bosses`);
 
   // Schedule all schedule-based bosses (no API calls, just setTimeout)
   console.log('🔄 Scheduling all schedule-based bosses...');
@@ -1236,7 +1225,7 @@ function formatCountdown(timestamp) {
  */
 async function saveServerDownState() {
   try {
-    await crashRecovery.saveState('bossTimer', {
+    await crashRecovery.saveBossTimerState({
       isServerDown,
     });
   } catch (error) {

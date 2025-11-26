@@ -462,6 +462,29 @@ function shouldSchedulerTaskRunNow(taskName, interval) {
 }
 
 // ============================================================================
+// BOSS TIMER RECOVERY
+// ============================================================================
+
+/**
+ * Save boss timer state (server down mode)
+ * @param {Object} state - Boss timer state to save
+ * @returns {Promise<void>}
+ */
+async function saveBossTimerState(state) {
+  try {
+    recoveryState.bossTimer = {
+      ...state,
+      lastSaved: Date.now(),
+    };
+
+    // Use debounced save to prevent rate limiting
+    debouncedSave('bossTimer', recoveryState.bossTimer);
+  } catch (error) {
+    console.error('⚠️ [CRASH RECOVERY] Failed to save boss timer state:', error.message);
+  }
+}
+
+// ============================================================================
 // GENERAL RECOVERY STATE MANAGEMENT
 // ============================================================================
 
@@ -565,6 +588,9 @@ module.exports = {
   saveSchedulerTaskExecution,
   getSchedulerTaskLastRun,
   shouldSchedulerTaskRunNow,
+
+  // Boss timer recovery
+  saveBossTimerState,
 
   // State management
   loadRecoveryState,
