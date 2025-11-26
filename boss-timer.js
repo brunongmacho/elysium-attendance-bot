@@ -932,12 +932,14 @@ async function serverDown() {
 /**
  * Reset all timer-based bosses for maintenance
  * Automatically exits server down mode and resumes normal operations
- * @returns {Promise<number>} Number of bosses reset
+ * Also reschedules all schedule-based bosses
+ * @returns {Promise<{timerBased: number, scheduleBased: number}>} Number of bosses reset and scheduled
  */
 async function maintenance() {
   const now = new Date();
   const entries = [];
-  let count = 0;
+  let timerCount = 0;
+  let scheduleCount = 0;
 
   // Exit server down mode (if active)
   if (isServerDown) {
@@ -981,7 +983,7 @@ async function maintenance() {
       killedBy: 'MAINTENANCE'
     });
 
-    count++;
+    timerCount++;
   }
 
   // Bulk save to Sheets with critical retry
@@ -992,12 +994,29 @@ async function maintenance() {
       rateLimitBaseDelay: 20000,
       rateLimitMaxDelay: 300000,
     });
-    console.log(`💾 Saved ${count} maintenance timers to recovery sheet`);
+    console.log(`💾 Saved ${timerCount} maintenance timers to recovery sheet`);
   } catch (error) {
     console.error(`❌ CRITICAL: Failed to save maintenance data:`, error.message);
   }
 
-  return count;
+  // Schedule all schedule-based bosses (no API calls, just setTimeout)
+  console.log('🔄 Scheduling all schedule-based bosses...');
+  for (const [bossName, bossConfig] of Object.entries(bossSpawnConfig.scheduleBasedBosses)) {
+    // Skip metadata keys like _note
+    if (bossName.startsWith('_')) continue;
+
+    const nextSpawn = findNextScheduledTime(bossConfig.schedules);
+    if (nextSpawn && !isNaN(nextSpawn.getTime())) {
+      scheduleReminder(bossName, nextSpawn);
+      scheduleCount++;
+    } else {
+      console.error(`❌ Invalid scheduled spawn time for ${bossName}`);
+    }
+  }
+
+  console.log(`✅ Maintenance complete: ${timerCount} timer-based, ${scheduleCount} schedule-based bosses`);
+
+  return { timerBased: timerCount, scheduleBased: scheduleCount };
 }
 
 /**

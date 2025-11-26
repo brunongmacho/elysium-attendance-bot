@@ -254,7 +254,7 @@ async function handleUnkill(message, args, config) {
 async function handleMaintenance(message) {
   try {
     const wasServerDown = bossTimer.getServerDownStatus();
-    const count = await bossTimer.maintenance();
+    const result = await bossTimer.maintenance();
 
     // Find first spawn
     const upcoming = bossTimer.getUpcomingSpawns(48);
@@ -264,7 +264,8 @@ async function handleMaintenance(message) {
       .setColor(0x9b59b6)
       .setTitle('🔧 Maintenance Mode Activated')
       .setDescription(
-        `✅ Reset **${count}** timer-based bosses\n` +
+        `✅ Reset **${result.timerBased}** timer-based bosses\n` +
+        `✅ Scheduled **${result.scheduleBased}** schedule-based bosses\n` +
         (wasServerDown ? `✅ Exited server down mode - attendance threads will be created again` : '')
       )
       .setTimestamp();
