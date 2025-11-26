@@ -1007,6 +1007,15 @@ async function maintenance() {
     await saveServerDownState();
   }
 
+  // Clear all timer-based boss entries from Google Sheets (single API call)
+  try {
+    await sheetAPI.call('clearBossTimerRecovery', { type: 'timer-based' });
+    console.log('💾 Cleared timer-based boss recovery data from Google Sheets');
+  } catch (error) {
+    console.error('⚠️ Failed to clear timer-based recovery data:', error.message);
+    // Continue anyway - local state will be correct
+  }
+
   // Cancel all existing timer-based timers
   for (const [bossName, data] of bossKillTimes) {
     if (data.timerId) {
@@ -1025,7 +1034,7 @@ async function maintenance() {
     // Schedule reminder
     const timerId = scheduleReminder(bossName, nextSpawn);
 
-    // Save to cache (will be persisted to Sheets when bosses spawn/get killed)
+    // Save to cache (will be persisted to Sheets when bosses spawn)
     bossKillTimes.set(bossName.toLowerCase(), {
       killTime: now,
       nextSpawn,
@@ -1036,12 +1045,7 @@ async function maintenance() {
     timerCount++;
   }
 
-  // NOTE: We don't save to Google Sheets here to avoid rate limits.
-  // Boss timer data will be saved automatically when:
-  // - Bosses spawn and create threads
-  // - Bosses are killed and respawn timers are set
-  // This prevents rate limit issues during maintenance while ensuring data persistence.
-  console.log(`✅ Scheduled ${timerCount} timer-based bosses (data will be saved on spawn/kill)`);
+  console.log(`✅ Scheduled ${timerCount} timer-based bosses`);
 
   // Schedule all schedule-based bosses (no API calls, just setTimeout)
   console.log('🔄 Scheduling all schedule-based bosses...');
