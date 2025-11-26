@@ -50,6 +50,17 @@ const TIMEZONE_OFFSET = 8; // GMT+8
 const bossKillTimes = new Map();
 
 /**
+ * Scheduled boss timers - tracks active timers for schedule-based bosses
+ * Used to prevent duplicate timers when rescheduling (e.g., during !maintenance)
+ *
+ * Map<bossName, {
+ *   nextSpawn: Date,
+ *   timerId: setTimeout ID
+ * }>
+ */
+const scheduledBossTimers = new Map();
+
+/**
  * Server down state - when true, bot will not create attendance threads
  * Set by !serverdown command, cleared by !maintenance command
  * @type {boolean}
@@ -190,9 +201,23 @@ async function loadRecoveryAndReschedule() {
     for (const [bossName, bossConfig] of Object.entries(bossSpawnConfig.scheduleBasedBosses)) {
       // Skip metadata keys like _note
       if (bossName.startsWith('_')) continue;
+
+      // Clear existing timer if present (prevents duplicates)
+      const existing = scheduledBossTimers.get(bossName.toLowerCase());
+      if (existing && existing.timerId) {
+        clearTimeout(existing.timerId);
+        console.log(`🔄 Cleared existing timer for scheduled boss: ${bossName}`);
+      }
+
       const nextSpawn = findNextScheduledTime(bossConfig.schedules);
       if (nextSpawn && !isNaN(nextSpawn.getTime())) {
-        scheduleReminder(bossName, nextSpawn);
+        const timerId = scheduleReminder(bossName, nextSpawn);
+
+        // Track the timer to prevent duplicates
+        scheduledBossTimers.set(bossName.toLowerCase(), {
+          nextSpawn,
+          timerId
+        });
       } else {
         console.error(`❌ Invalid scheduled spawn time for ${bossName}`);
       }
@@ -533,7 +558,14 @@ async function triggerSpawnReminder(bossName, spawnTime) {
       if (bossConfig && bossConfig.schedules) {
         const nextSpawn = findNextScheduledTime(bossConfig.schedules);
         if (nextSpawn) {
-          scheduleReminder(bossName, nextSpawn);
+          const timerId = scheduleReminder(bossName, nextSpawn);
+
+          // Track the timer to prevent duplicates
+          scheduledBossTimers.set(bossName.toLowerCase(), {
+            nextSpawn,
+            timerId
+          });
+
           console.log(`🔄 Rescheduled ${bossName} for next occurrence`);
         }
       }
@@ -747,19 +779,40 @@ function getUpcomingSpawns(hours = 24) {
  */
 async function cancelTimer(bossName) {
   const normalizedName = bossName.toLowerCase();
-  const data = bossKillTimes.get(normalizedName);
+  let cancelled = false;
 
-  if (!data) {
-    return false;
+  // Check timer-based bosses
+  const timerData = bossKillTimes.get(normalizedName);
+  if (timerData) {
+    // Clear timeout
+    if (timerData.timerId) {
+      clearTimeout(timerData.timerId);
+    }
+
+    // Remove from cache
+    bossKillTimes.delete(normalizedName);
+    cancelled = true;
+
+    // Remove from Sheets
+    try {
+      await sheetAPI.call('deleteBossTimerRecovery', { bossName });
+    } catch (error) {
+      console.error(`⚠️ Failed to delete recovery data for ${bossName}:`, error.message);
+    }
   }
 
-  // Clear timeout
-  if (data.timerId) {
-    clearTimeout(data.timerId);
-  }
+  // Check scheduled bosses
+  const scheduledData = scheduledBossTimers.get(normalizedName);
+  if (scheduledData) {
+    // Clear timeout
+    if (scheduledData.timerId) {
+      clearTimeout(scheduledData.timerId);
+    }
 
-  // Remove from cache
-  bossKillTimes.delete(normalizedName);
+    // Remove from cache
+    scheduledBossTimers.delete(normalizedName);
+    cancelled = true;
+  }
 
   // Clear from recently handled cache if exists
   const recentlyHandled = recentlyHandledBosses.get(normalizedName);
@@ -769,14 +822,7 @@ async function cancelTimer(bossName) {
     console.log(`🗑️ Cleared ${bossName} from recently-handled cache`);
   }
 
-  // Remove from Sheets
-  try {
-    await sheetAPI.call('deleteBossTimerRecovery', { bossName });
-  } catch (error) {
-    console.error(`⚠️ Failed to delete recovery data for ${bossName}:`, error.message);
-  }
-
-  return true;
+  return cancelled;
 }
 
 /**
@@ -1047,6 +1093,16 @@ async function maintenance() {
 
   console.log(`✅ Scheduled ${timerCount} timer-based bosses`);
 
+  // Clear all existing scheduled boss timers to prevent duplicates
+  console.log('🔄 Clearing existing scheduled boss timers...');
+  for (const [bossName, data] of scheduledBossTimers) {
+    if (data.timerId) {
+      clearTimeout(data.timerId);
+    }
+  }
+  scheduledBossTimers.clear();
+  console.log('✅ Cleared all scheduled boss timers');
+
   // Schedule all schedule-based bosses (no API calls, just setTimeout)
   console.log('🔄 Scheduling all schedule-based bosses...');
   for (const [bossName, bossConfig] of Object.entries(bossSpawnConfig.scheduleBasedBosses)) {
@@ -1055,7 +1111,14 @@ async function maintenance() {
 
     const nextSpawn = findNextScheduledTime(bossConfig.schedules);
     if (nextSpawn && !isNaN(nextSpawn.getTime())) {
-      scheduleReminder(bossName, nextSpawn);
+      const timerId = scheduleReminder(bossName, nextSpawn);
+
+      // Track the timer to prevent duplicates
+      scheduledBossTimers.set(bossName.toLowerCase(), {
+        nextSpawn,
+        timerId
+      });
+
       scheduleCount++;
     } else {
       console.error(`❌ Invalid scheduled spawn time for ${bossName}`);
