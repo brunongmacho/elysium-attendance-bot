@@ -155,6 +155,12 @@ const clientCache = {
     WEEKLY_ATTENDANCE: 30 * 60 * 1000,  // 30 min - historical data
     LEARNING_METRICS: 30 * 60 * 1000,   // 30 min - historical data
     BIDDING_POINTS: 5 * 60 * 1000,      // 5 min - frequently updated
+    FOR_DISTRIBUTION: 30 * 60 * 1000,   // 30 min - historical data
+    MEMBER_STATS: 5 * 60 * 1000,        // 5 min - member lookups
+    ROTATING_BOSSES: 30 * 60 * 1000,    // 30 min - boss rotation data
+    WEEKLY_MILESTONES: 30 * 60 * 1000,  // 30 min - milestone history
+    STREAK_DATA: 24 * 60 * 60 * 1000,   // 24 hours - user streaks
+    BIDDING_ITEMS: 30 * 1000,           // 30 sec - auction setup
     DEFAULT: 5 * 60 * 1000              // 5 min - default
   },
 
@@ -388,6 +394,18 @@ class SheetAPI {
       cacheTTL = clientCache.TTL.LEARNING_METRICS;
     } else if (action === 'getBiddingPointsSummary') {
       cacheTTL = clientCache.TTL.BIDDING_POINTS;
+    } else if (action === 'getForDistribution') {
+      cacheTTL = clientCache.TTL.FOR_DISTRIBUTION;
+    } else if (action === 'getMemberStats') {
+      cacheTTL = clientCache.TTL.MEMBER_STATS;
+    } else if (action === 'getAllRotatingBosses') {
+      cacheTTL = clientCache.TTL.ROTATING_BOSSES;
+    } else if (action === 'getWeeklyMilestones') {
+      cacheTTL = clientCache.TTL.WEEKLY_MILESTONES;
+    } else if (action === 'getStreakData') {
+      cacheTTL = clientCache.TTL.STREAK_DATA;
+    } else if (action === 'getBiddingItems' || action === 'getBiddingItemsWithWinners') {
+      cacheTTL = clientCache.TTL.BIDDING_ITEMS;
     }
 
     // Check client-side cache first (unless forceFresh requested)
