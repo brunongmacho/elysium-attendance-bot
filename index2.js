@@ -121,6 +121,65 @@ const { COMMAND_ALIASES, resolveCommandAlias } = require('./config/command-alias
  */
 const config = JSON.parse(fs.readFileSync("./config.json"));
 
+// =====================================================================
+// CONFIGURATION VALIDATION
+// =====================================================================
+
+/**
+ * Validates required configuration fields at startup
+ * Prevents late failures and provides clear error messages
+ * @throws {Error} If any required field is missing
+ */
+function validateConfig() {
+  const requiredFields = {
+    // Discord Bot Token
+    'token': 'Discord bot token',
+    // Guild & Channel IDs
+    'main_guild_id': 'Main guild ID',
+    'attendance_channel_id': 'Attendance channel ID',
+    'admin_logs_channel_id': 'Admin logs channel ID',
+    'bidding_channel_id': 'Bidding channel ID',
+    'elysium_commands_channel_id': 'Elysium commands channel ID',
+    // Role IDs
+    'elysium_role': 'Elysium role name',
+    'admin_roles': 'Admin roles array',
+    // Google Sheets Integration
+    'sheet_webhook_url': 'Google Sheets webhook URL'
+  };
+
+  const missing = [];
+  const invalid = [];
+
+  for (const [field, description] of Object.entries(requiredFields)) {
+    if (!config[field]) {
+      missing.push(`  ❌ ${field} (${description})`);
+    } else if (field === 'admin_roles' && !Array.isArray(config[field])) {
+      invalid.push(`  ⚠️ ${field} must be an array`);
+    } else if (field === 'sheet_webhook_url' && !config[field].startsWith('http')) {
+      invalid.push(`  ⚠️ ${field} must be a valid URL`);
+    }
+  }
+
+  if (missing.length > 0 || invalid.length > 0) {
+    console.error('\n🚨 CONFIGURATION ERROR 🚨\n');
+    if (missing.length > 0) {
+      console.error('Missing required fields:');
+      missing.forEach(msg => console.error(msg));
+    }
+    if (invalid.length > 0) {
+      console.error('\nInvalid field values:');
+      invalid.forEach(msg => console.error(msg));
+    }
+    console.error('\n📝 Please check your config.json file\n');
+    process.exit(1);
+  }
+
+  console.log('✅ Configuration validated successfully');
+}
+
+// Run validation immediately
+validateConfig();
+
 /**
  * Unified Google Sheets API client instance
  * Provides centralized access to Google Sheets with retry logic
@@ -8428,29 +8487,87 @@ process.on("uncaughtException", (error) => {
   // Otherwise, try to continue
 });
 
-process.on("SIGTERM", () => {
-  console.log("🛑 SIGTERM received, shutting down gracefully...");
-  stopBiddingChannelCleanupSchedule();
-  scheduler.stopScheduler(); // Stop maintenance scheduler
-  timerRegistry.clearAllTimers(); // Clear all tracked timers
-  server.close(() => {
-    console.log("🌐 HTTP server closed");
-    client.destroy();
-    process.exit(0);
-  });
-});
+// =====================================================================
+// GRACEFUL SHUTDOWN HANDLER
+// =====================================================================
 
-process.on("SIGINT", () => {
-  console.log("🛑 SIGINT received, shutting down gracefully...");
-  stopBiddingChannelCleanupSchedule();
-  scheduler.stopScheduler(); // Stop maintenance scheduler
-  timerRegistry.clearAllTimers(); // Clear all tracked timers
-  server.close(() => {
-    console.log("🌐 HTTP server closed");
-    client.destroy();
+let isShuttingDown = false; // Prevent multiple shutdown attempts
+
+/**
+ * Comprehensive graceful shutdown handler
+ * Cleans up all resources to prevent memory leaks
+ * @param {string} signal - Signal name (SIGTERM, SIGINT, etc.)
+ */
+async function gracefulShutdown(signal) {
+  if (isShuttingDown) {
+    console.log(`⏭️ Shutdown already in progress, ignoring ${signal}`);
+    return;
+  }
+
+  isShuttingDown = true;
+  console.log(`\n🛑 ${signal} received - starting graceful shutdown...`);
+
+  // Set a forced shutdown timeout (30 seconds)
+  const forceShutdownTimeout = setTimeout(() => {
+    console.error('⚠️ Graceful shutdown timeout - forcing exit');
+    process.exit(1);
+  }, 30000);
+
+  try {
+    // Step 1: Stop accepting new requests
+    console.log('1️⃣ Stopping bidding channel cleanup...');
+    stopBiddingChannelCleanupSchedule();
+
+    // Step 2: Stop scheduled tasks
+    console.log('2️⃣ Stopping maintenance scheduler...');
+    scheduler.stopScheduler();
+
+    // Step 3: Clear all timers
+    console.log('3️⃣ Clearing all timers...');
+    timerRegistry.clearAllTimers();
+
+    // Step 4: Save state before shutdown
+    console.log('4️⃣ Saving bot state...');
+    if (typeof crashRecovery.saveState === 'function') {
+      await crashRecovery.saveState();
+    }
+
+    // Step 5: Close HTTP server
+    console.log('5️⃣ Closing HTTP server...');
+    await new Promise((resolve) => {
+      server.close(() => {
+        console.log('✅ HTTP server closed');
+        resolve();
+      });
+      // Force close after 5 seconds
+      setTimeout(resolve, 5000);
+    });
+
+    // Step 6: Remove all Discord event listeners
+    console.log('6️⃣ Removing Discord event listeners...');
+    client.removeAllListeners();
+
+    // Step 7: Destroy Discord client
+    console.log('7️⃣ Destroying Discord client...');
+    await client.destroy();
+    console.log('✅ Discord client destroyed');
+
+    // Step 8: Clear the forced shutdown timeout
+    clearTimeout(forceShutdownTimeout);
+
+    console.log('✅ Graceful shutdown complete!');
     process.exit(0);
-  });
-});
+
+  } catch (error) {
+    console.error('❌ Error during graceful shutdown:', error);
+    clearTimeout(forceShutdownTimeout);
+    process.exit(1);
+  }
+}
+
+// Register shutdown handlers
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 // =====================================================================
 // SECTION 10: MODULE EXPORTS & BOT INITIALIZATION
