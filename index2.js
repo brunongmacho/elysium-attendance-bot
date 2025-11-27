@@ -115,11 +115,26 @@ const { COMMAND_ALIASES, resolveCommandAlias } = require('./config/command-alias
 // =====================================================================
 
 /**
- * Bot configuration loaded from config.json
+ * Bot configuration loaded from config.json and environment variables
+ * Environment variables take precedence over config.json values
  * Contains Discord IDs, API endpoints, and bot settings
  * @type {Object}
  */
-const config = JSON.parse(fs.readFileSync("./config.json"));
+const config = (() => {
+  const fileConfig = JSON.parse(fs.readFileSync("./config.json"));
+
+  // Merge environment variables with file config
+  // Environment variables take precedence
+  return {
+    ...fileConfig,
+    // Discord bot token from environment (required for Koyeb deployment)
+    token: process.env.DISCORD_TOKEN || fileConfig.token,
+    // HTTP server port from environment (used for health checks)
+    port: process.env.PORT || fileConfig.port || 3000,
+    // Node environment
+    node_env: process.env.NODE_ENV || fileConfig.node_env || 'production'
+  };
+})();
 
 // =====================================================================
 // CONFIGURATION VALIDATION
@@ -288,10 +303,11 @@ const BOT_START_TIME = Date.now();
 
 /**
  * HTTP health check server port
+ * Reads from environment variable PORT, then config.port, then defaults to 3000
  * @type {number}
  * @constant
  */
-const PORT = process.env.PORT || 8000;
+const PORT = config.port;
 
 /**
  * Timing constants for rate limiting and delays (all values in milliseconds)
@@ -8586,15 +8602,16 @@ global.postToSheet = attendance.postToSheet;
  *
  * Final step: Authenticates bot with Discord using token.
  *
- * The DISCORD_TOKEN must be set as an environment variable.
+ * The token is loaded from DISCORD_TOKEN environment variable,
+ * or falls back to token field in config.json.
  * Without it, the bot cannot connect to Discord and will exit.
  *
  * After successful login, the ClientReady event fires and
  * triggers the full initialization sequence.
  */
-if (!process.env.DISCORD_TOKEN) {
-  console.error("❌ DISCORD_TOKEN environment variable not set!");
+if (!config.token) {
+  console.error("❌ Discord token not found! Set DISCORD_TOKEN environment variable or add token to config.json");
   process.exit(1);
 }
 
-client.login(process.env.DISCORD_TOKEN);
+client.login(config.token);
