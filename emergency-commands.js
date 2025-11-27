@@ -219,85 +219,108 @@ async function forceCloseAllAttendance(message) {
   let confirmed = false;
 
   collector.on('collect', async (interaction) => {
-    const isConfirm = interaction.customId.startsWith('closeall_confirm_');
+    try {
+      const isConfirm = interaction.customId.startsWith('closeall_confirm_');
 
-    const disabledRow = createDisabledRow(confirmButton, cancelButton);
+      const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
-    if (!isConfirm) {
-      await interaction.update({
-        embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })],
-        components: [disabledRow]
-      });
-      collector.stop('cancelled');
-      return;
-    }
-
-    confirmed = true;
-    await interaction.update({ components: [disabledRow] });
-    collector.stop('confirmed');
-
-    // OPTIMIZATION v6.4: Use cached channels for instant access
-    const [attChannel, adminLogs] = await Promise.all([
-      discordCache.getChannel('attendance_channel_id'),
-      discordCache.getChannel('admin_logs_channel_id')
-    ]);
-
-    const threads = await attChannel.threads.fetchActive();
-    let closedCount = 0;
-    let errorCount = 0;
-
-    for (const [threadId, thread] of threads.threads) {
-      try {
-        await thread.send(`${EMOJI.EMERGENCY} **EMERGENCY CLOSURE** by admin ${message.author.username}`);
-        await attendance.cleanupAllThreadReactions(thread);
-        await thread.setArchived(true, "Emergency closure by admin");
-
-        // Delete rotation warning if this was a rotating boss thread
-        const spawnInfo = activeSpawns[threadId];
-        if (spawnInfo && spawnInfo.boss) {
-          const bossRotation = require('./boss-rotation');
-          await bossRotation.deleteRotationWarning(spawnInfo.boss);
-        }
-
-        closedCount++;
-      } catch (err) {
-        console.error(`Failed to close thread ${threadId}:`, err.message);
-        errorCount++;
+      if (!isConfirm) {
+        await interaction.update({
+          embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })],
+          components: [disabledRow]
+        });
+        collector.stop('cancelled');
+        return;
       }
+
+      confirmed = true;
+      await interaction.update({ components: [disabledRow] });
+      collector.stop('confirmed');
+
+      // OPTIMIZATION v6.4: Use cached channels for instant access
+      const [attChannel, adminLogs] = await Promise.all([
+        discordCache.getChannel('attendance_channel_id'),
+        discordCache.getChannel('admin_logs_channel_id')
+      ]);
+
+      const threads = await attChannel.threads.fetchActive();
+      let closedCount = 0;
+      let errorCount = 0;
+
+      for (const [threadId, thread] of threads.threads) {
+        try {
+          await thread.send(`${EMOJI.EMERGENCY} **EMERGENCY CLOSURE** by admin ${message.author.username}`);
+          await attendance.cleanupAllThreadReactions(thread);
+          await thread.setArchived(true, "Emergency closure by admin");
+
+          // Delete rotation warning if this was a rotating boss thread
+          const spawnInfo = activeSpawns[threadId];
+          if (spawnInfo && spawnInfo.boss) {
+            const bossRotation = require('./boss-rotation');
+            await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          }
+
+          closedCount++;
+        } catch (err) {
+          console.error(`Failed to close thread ${threadId}:`, err.message);
+          errorCount++;
+        }
+      }
+
+      // Clear all state
+      const activeSpawns = attendance.getActiveSpawns();
+      const activeColumns = attendance.getActiveColumns();
+      const pendingVerifications = attendance.getPendingVerifications();
+      const pendingClosures = attendance.getPendingClosures();
+
+      const spawnCount = Object.keys(activeSpawns).length;
+      const verificationCount = Object.keys(pendingVerifications).length;
+
+      attendance.setActiveSpawns({});
+      attendance.setActiveColumns({});
+      attendance.setPendingVerifications({});
+      attendance.setPendingClosures({});
+      attendance.setConfirmationMessages({});
+
+      // Force save state
+      await attendance.saveAttendanceStateToSheet(true);
+
+      const resultEmbed = new EmbedBuilder()
+        .setColor(COLORS.SUCCESS)
+        .setTitle(`${EMOJI.SUCCESS} Emergency Closure Complete`)
+        .addFields(
+          { name: "Threads Closed", value: `${closedCount}`, inline: true },
+          { name: "Errors", value: `${errorCount}`, inline: true },
+          { name: "Spawns Cleared", value: `${spawnCount}`, inline: true },
+          { name: "Verifications Cleared", value: `${verificationCount}`, inline: true }
+        )
+        .setFooter({ text: "State saved to Google Sheets" })
+        .setTimestamp();
+
+      await conf.edit({ embeds: [resultEmbed] });
+
+      // Send to admin logs if available
+      if (adminLogs) {
+        await adminLogs.send({ embeds: [resultEmbed] }).catch(err => {
+          console.error(`Failed to send closeall result to admin logs: ${err.message}`);
+        });
+      }
+    } catch (err) {
+      console.error(`❌ [CLOSEALL] Error in button handler: ${err.message}`);
+      console.error(err.stack);
+
+      // Edit the confirmation message with error (don't reply to interaction - it's already been updated)
+      const errorEmbed = new EmbedBuilder()
+        .setColor(COLORS.ERROR)
+        .setTitle(`${EMOJI.ERROR} Emergency Closure Failed`)
+        .setDescription(`An error occurred: ${err.message}`)
+        .setFooter({ text: "Check console logs for details" })
+        .setTimestamp();
+
+      await conf.edit({ embeds: [errorEmbed] }).catch(e => {
+        console.error(`Failed to send error message: ${e.message}`);
+      });
     }
-
-    // Clear all state
-    const activeSpawns = attendance.getActiveSpawns();
-    const activeColumns = attendance.getActiveColumns();
-    const pendingVerifications = attendance.getPendingVerifications();
-    const pendingClosures = attendance.getPendingClosures();
-
-    const spawnCount = Object.keys(activeSpawns).length;
-    const verificationCount = Object.keys(pendingVerifications).length;
-
-    attendance.setActiveSpawns({});
-    attendance.setActiveColumns({});
-    attendance.setPendingVerifications({});
-    attendance.setPendingClosures({});
-    attendance.setConfirmationMessages({});
-
-    // Force save state
-    await attendance.saveAttendanceStateToSheet(true);
-
-    const resultEmbed = new EmbedBuilder()
-      .setColor(COLORS.SUCCESS)
-      .setTitle(`${EMOJI.SUCCESS} Emergency Closure Complete`)
-      .addFields(
-        { name: "Threads Closed", value: `${closedCount}`, inline: true },
-        { name: "Errors", value: `${errorCount}`, inline: true },
-        { name: "Spawns Cleared", value: `${spawnCount}`, inline: true },
-        { name: "Verifications Cleared", value: `${verificationCount}`, inline: true }
-      )
-      .setFooter({ text: "State saved to Google Sheets" })
-      .setTimestamp();
-
-    await conf.edit({ embeds: [resultEmbed] });
-    await adminLogs.send({ embeds: [resultEmbed] });
   });
 
   collector.on('end', async (collected, reason) => {
@@ -458,63 +481,79 @@ async function forceEndAuction(message) {
   let confirmed = false;
 
   collector.on('collect', async (interaction) => {
-    const isConfirm = interaction.customId.startsWith('endauction_confirm_');
+    try {
+      const isConfirm = interaction.customId.startsWith('endauction_confirm_');
 
-    const disabledRow = createDisabledRow(confirmButton, cancelButton);
+      const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
-    if (!isConfirm) {
-      await interaction.update({
-        embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })],
-        components: [disabledRow]
-      });
-      collector.stop('cancelled');
-      return;
-    }
+      if (!isConfirm) {
+        await interaction.update({
+          embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })],
+          components: [disabledRow]
+        });
+        collector.stop('cancelled');
+        return;
+      }
 
-    confirmed = true;
-    await interaction.update({ components: [disabledRow] });
-    collector.stop('confirmed');
+      confirmed = true;
+      await interaction.update({ components: [disabledRow] });
+      collector.stop('confirmed');
 
-    // Check auctioneering first
-    if (auctioneering) {
-      const auctState = auctioneering.getAuctionState();
-      if (auctState && auctState.active) {
-        const biddingChannel = await discordCache.getChannel('bidding_channel_id');
+      // Check auctioneering first
+      if (auctioneering) {
+        const auctState = auctioneering.getAuctionState();
+        if (auctState && auctState.active) {
+          const biddingChannel = await discordCache.getChannel('bidding_channel_id');
 
-        await auctioneering.endAuctionSession(message.client, config, biddingChannel);
+          await auctioneering.endAuctionSession(message.client, config, biddingChannel);
+
+          await conf.edit({
+            embeds: [new EmbedBuilder()
+              .setColor(COLORS.SUCCESS)
+              .setTitle(`${EMOJI.SUCCESS} Auctioneering Session Ended`)
+              .setDescription("Results submitted, state cleared")
+              .setTimestamp()]
+          });
+          return;
+        }
+      }
+
+      // Check bidding.js auction
+      const biddingState = bidding.getBiddingState();
+      if (biddingState.a) {
+        await bidding.forceEndAuction(message.client, config);
 
         await conf.edit({
           embeds: [new EmbedBuilder()
             .setColor(COLORS.SUCCESS)
-            .setTitle(`${EMOJI.SUCCESS} Auctioneering Session Ended`)
+            .setTitle(`${EMOJI.SUCCESS} Bidding Auction Ended`)
             .setDescription("Results submitted, state cleared")
             .setTimestamp()]
         });
         return;
       }
-    }
-
-    // Check bidding.js auction
-    const biddingState = bidding.getBiddingState();
-    if (biddingState.a) {
-      await bidding.forceEndAuction(message.client, config);
 
       await conf.edit({
         embeds: [new EmbedBuilder()
-          .setColor(COLORS.SUCCESS)
-          .setTitle(`${EMOJI.SUCCESS} Bidding Auction Ended`)
-          .setDescription("Results submitted, state cleared")
-          .setTimestamp()]
+          .setColor(COLORS.WARNING)
+          .setTitle(`${EMOJI.WARNING} No Active Auction`)
+          .setDescription("No auction found to end")]
       });
-      return;
-    }
+    } catch (err) {
+      console.error(`❌ [ENDAUCTION] Error in button handler: ${err.message}`);
+      console.error(err.stack);
 
-    await conf.edit({
-      embeds: [new EmbedBuilder()
-        .setColor(COLORS.WARNING)
-        .setTitle(`${EMOJI.WARNING} No Active Auction`)
-        .setDescription("No auction found to end")]
-    });
+      const errorEmbed = new EmbedBuilder()
+        .setColor(COLORS.ERROR)
+        .setTitle(`${EMOJI.ERROR} End Auction Failed`)
+        .setDescription(`An error occurred: ${err.message}`)
+        .setFooter({ text: "Check console logs for details" })
+        .setTimestamp();
+
+      await conf.edit({ embeds: [errorEmbed] }).catch(e => {
+        console.error(`Failed to send error message: ${e.message}`);
+      });
+    }
   });
 
   collector.on('end', async (collected, reason) => {
@@ -610,38 +649,54 @@ async function unlockAllPoints(message) {
   let confirmed = false;
 
   collector.on('collect', async (interaction) => {
-    const isConfirm = interaction.customId.startsWith('unlock_confirm_');
+    try {
+      const isConfirm = interaction.customId.startsWith('unlock_confirm_');
 
-    const disabledRow = createDisabledRow(confirmButton, cancelButton);
+      const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
-    if (!isConfirm) {
-      await interaction.update({
-        embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })],
-        components: [disabledRow]
+      if (!isConfirm) {
+        await interaction.update({
+          embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })],
+          components: [disabledRow]
+        });
+        collector.stop('cancelled');
+        return;
+      }
+
+      confirmed = true;
+      await interaction.update({ components: [disabledRow] });
+      collector.stop('confirmed');
+
+      const totalUnlocked = Object.values(biddingState.lp).reduce((sum, pts) => sum + pts, 0);
+
+      biddingState.lp = {};
+      bidding.saveBiddingState();
+
+      await conf.edit({
+        embeds: [new EmbedBuilder()
+          .setColor(COLORS.SUCCESS)
+          .setTitle(`${EMOJI.UNLOCK} All Points Unlocked`)
+          .addFields(
+            { name: "Users Affected", value: `${lockedCount}`, inline: true },
+            { name: "Total Points", value: `${totalUnlocked}pts`, inline: true }
+          )
+          .setTimestamp()]
       });
-      collector.stop('cancelled');
-      return;
+    } catch (err) {
+      console.error(`❌ [UNLOCK] Error in button handler: ${err.message}`);
+      console.error(err.stack);
+
+      const errorEmbed = new EmbedBuilder()
+        .setColor(COLORS.ERROR)
+        .setTitle(`${EMOJI.ERROR} Unlock Failed`)
+        .setDescription(`An error occurred: ${err.message}`)
+        .setFooter({ text: "Check console logs for details" })
+        .setTimestamp();
+
+      await conf.edit({ embeds: [errorEmbed] }).catch(e => {
+        console.error(`Failed to send error message: ${e.message}`);
+      });
     }
-
-    confirmed = true;
-    await interaction.update({ components: [disabledRow] });
-    collector.stop('confirmed');
-
-    const totalUnlocked = Object.values(biddingState.lp).reduce((sum, pts) => sum + pts, 0);
-
-    biddingState.lp = {};
-    bidding.saveBiddingState();
-
-    await conf.edit({
-      embeds: [new EmbedBuilder()
-        .setColor(COLORS.SUCCESS)
-        .setTitle(`${EMOJI.UNLOCK} All Points Unlocked`)
-        .addFields(
-          { name: "Users Affected", value: `${lockedCount}`, inline: true },
-          { name: "Total Points", value: `${totalUnlocked}pts`, inline: true }
-        )
-        .setTimestamp()]
-    });
   });
 
   collector.on('end', async (collected, reason) => {
@@ -731,58 +786,74 @@ async function clearPendingConfirmations(message) {
   let confirmed = false;
 
   collector.on('collect', async (interaction) => {
-    const isConfirm = interaction.customId.startsWith('clearbids_confirm_');
+    try {
+      const isConfirm = interaction.customId.startsWith('clearbids_confirm_');
 
-    const disabledRow = createDisabledRow(confirmButton, cancelButton);
+      const disabledRow = createDisabledRow(confirmButton, cancelButton);
 
-    if (!isConfirm) {
-      await interaction.update({
-        embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })],
-        components: [disabledRow]
-      });
-      collector.stop('cancelled');
-      return;
-    }
+      if (!isConfirm) {
+        await interaction.update({
+          embeds: [EmbedBuilder.from(confirmEmbed).setColor(COLORS.SUCCESS).setFooter({ text: "Cancelled" })],
+          components: [disabledRow]
+        });
+        collector.stop('cancelled');
+        return;
+      }
 
-    confirmed = true;
-    await interaction.update({ components: [disabledRow] });
-    collector.stop('confirmed');
+      confirmed = true;
+      await interaction.update({ components: [disabledRow] });
+      collector.stop('confirmed');
 
-    // Try to delete all pending confirmation messages
-    const guild = message.guild;
-    let deletedCount = 0;
+      // Try to delete all pending confirmation messages
+      const guild = message.guild;
+      let deletedCount = 0;
 
-    for (const [msgId, pending] of Object.entries(biddingState.pc)) {
-      try {
-        const threadId = pending.threadId || pending.auctStateRef?.currentItem?.threadId;
-        if (threadId) {
-          const thread = await guild.channels.fetch(threadId).catch(() => null);
-          if (thread) {
-            const msg = await thread.messages.fetch(msgId).catch(() => null);
-            if (msg) {
-              await errorHandler.safeDelete(msg, 'message deletion');
-              deletedCount++;
+      for (const [msgId, pending] of Object.entries(biddingState.pc)) {
+        try {
+          const threadId = pending.threadId || pending.auctStateRef?.currentItem?.threadId;
+          if (threadId) {
+            const thread = await guild.channels.fetch(threadId).catch(() => null);
+            if (thread) {
+              const msg = await thread.messages.fetch(msgId).catch(() => null);
+              if (msg) {
+                await errorHandler.safeDelete(msg, 'message deletion');
+                deletedCount++;
+              }
             }
           }
+        } catch (err) {
+          console.error(`Failed to delete confirmation ${msgId}:`, err.message);
         }
-      } catch (err) {
-        console.error(`Failed to delete confirmation ${msgId}:`, err.message);
       }
+
+      biddingState.pc = {};
+      bidding.saveBiddingState();
+
+      await conf.edit({
+        embeds: [new EmbedBuilder()
+          .setColor(COLORS.SUCCESS)
+          .setTitle(`${EMOJI.CLEANUP} Confirmations Cleared`)
+          .addFields(
+            { name: "Cleared", value: `${pendingCount}`, inline: true },
+            { name: "Messages Deleted", value: `${deletedCount}`, inline: true }
+          )
+          .setTimestamp()]
+      });
+    } catch (err) {
+      console.error(`❌ [CLEARBIDS] Error in button handler: ${err.message}`);
+      console.error(err.stack);
+
+      const errorEmbed = new EmbedBuilder()
+        .setColor(COLORS.ERROR)
+        .setTitle(`${EMOJI.ERROR} Clear Bids Failed`)
+        .setDescription(`An error occurred: ${err.message}`)
+        .setFooter({ text: "Check console logs for details" })
+        .setTimestamp();
+
+      await conf.edit({ embeds: [errorEmbed] }).catch(e => {
+        console.error(`Failed to send error message: ${e.message}`);
+      });
     }
-
-    biddingState.pc = {};
-    bidding.saveBiddingState();
-
-    await conf.edit({
-      embeds: [new EmbedBuilder()
-        .setColor(COLORS.SUCCESS)
-        .setTitle(`${EMOJI.CLEANUP} Confirmations Cleared`)
-        .addFields(
-          { name: "Cleared", value: `${pendingCount}`, inline: true },
-          { name: "Messages Deleted", value: `${deletedCount}`, inline: true }
-        )
-        .setTimestamp()]
-    });
   });
 
   collector.on('end', async (collected, reason) => {
