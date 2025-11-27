@@ -1035,10 +1035,14 @@ async function serverDown() {
 }
 
 /**
- * Reset all timer-based bosses for maintenance
+ * Create immediate attendance threads for all timer-based bosses (maintenance mode)
  * Automatically exits server down mode and resumes normal operations
  * Also reschedules all schedule-based bosses
- * @returns {Promise<{timerBased: number, scheduleBased: number}>} Number of bosses reset and scheduled
+ *
+ * Timer-based bosses: Creates threads immediately with no auto-close
+ * Schedule-based bosses: Schedules timers for next fixed spawn time
+ *
+ * @returns {Promise<{timerBased: number, scheduleBased: number}>} Number of threads created and bosses scheduled
  */
 async function maintenance() {
   const now = new Date();
@@ -1070,28 +1074,23 @@ async function maintenance() {
   }
   bossKillTimes.clear();
 
-  // Reset all timer-based bosses
+  // Create immediate attendance threads for all timer-based bosses (maintenance mode)
+  console.log('📝 Creating attendance threads for all timer-based bosses...');
   for (const [bossName, bossConfig] of Object.entries(bossSpawnConfig.timerBasedBosses)) {
     // Skip metadata keys like _note
     if (bossName.startsWith('_')) continue;
-    const intervalHours = bossConfig.spawnIntervalHours;
-    const nextSpawn = new Date(now.getTime() + intervalHours * 60 * 60 * 1000);
 
-    // Schedule reminder
-    const timerId = scheduleReminder(bossName, nextSpawn);
-
-    // Save to cache (will be persisted to Sheets when bosses spawn)
-    bossKillTimes.set(bossName.toLowerCase(), {
-      killTime: now,
-      nextSpawn,
-      timerId,
-      killedBy: 'MAINTENANCE'
-    });
-
-    timerCount++;
+    try {
+      // Create thread immediately with noAutoClose = true, skipColumnCheck = true
+      const thread = await attendance.createThreadForBoss(client, bossName, now, true, true);
+      console.log(`✅ Created maintenance thread for ${bossName}: ${thread.id}`);
+      timerCount++;
+    } catch (error) {
+      console.error(`❌ Failed to create thread for ${bossName}:`, error.message);
+    }
   }
 
-  console.log(`✅ Scheduled ${timerCount} timer-based bosses`);
+  console.log(`✅ Created ${timerCount} attendance threads for timer-based bosses`);
 
   // Clear all existing scheduled boss timers to prevent duplicates
   console.log('🔄 Clearing existing scheduled boss timers...');
