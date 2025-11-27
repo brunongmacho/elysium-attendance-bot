@@ -17,8 +17,8 @@
 
 ### 🎯 Key Highlights
 
-- **📊 31,320+ lines of code** across 52+ carefully organized modules
-- **🤖 48+ commands** covering attendance, auctions, analytics intelligence, rotation, NLP learning, and emergency recovery
+- **📊 57,000+ lines of code** across 50+ carefully organized modules
+- **🤖 50+ commands** covering attendance, auctions, analytics intelligence, rotation, NLP learning, and emergency recovery
 - **⚡ Highly optimized** - uses only ~100MB RAM, runs on 512MB+ instances
 - **🧠 Smart analytics** - rule-based predictive analytics, statistical fraud detection, and engagement scoring
 - **🔄 Self-healing** - automatic crash recovery with full state restoration
@@ -36,6 +36,7 @@
 5. **Natural Language** - Chat with the bot naturally in multiple languages
 6. **High Availability** - Automatic crash recovery with full state restoration
 7. **Performance Optimized** - Multi-level caching, request batching, and parallel operations
+8. **Channel-Aware Help** - Context-sensitive help system shows only relevant commands
 
 ---
 
@@ -75,6 +76,7 @@
 - ✅ **Crash recovery** - full state restoration on restart
 - ✅ **Bulk operations** - verify all, close all, reset pending
 - ✅ **Duplicate prevention** - smart caching with O(1) lookups
+- ✅ **Zero-attendee handling** - gracefully closes empty threads without errors
 - ✅ **Highly optimized** - see [Performance](#-performance) section for benchmarks
 
 ---
@@ -253,12 +255,12 @@ Automatically manages rotation for bosses shared across 5 guilds:
 - 🏆 **Attendance Leaderboard** - Top 10 by points
 - 🏆 **Bidding Leaderboard** - Top 10 by remaining points
 - 🏆 **Weekly Reports** - Auto-sent Saturday 11:59 PM GMT+8
-- 🏆 **Monthly Reports** - Auto-sent last day of month 11:59 PM GMT+8 (NEW)
+- 🏆 **Monthly Reports** - Auto-sent last day of month 11:59 PM GMT+8
 - 🏆 **Visual progress bars** with percentages
 - 🏆 **Real-time statistics** with live updates
 
 **Activity Analytics:**
-- 📊 **Activity Heatmap** - 24-hour guild activity visualization (NEW)
+- 📊 **Activity Heatmap** - 24-hour guild activity visualization
 - 📊 **Peak time identification** - Find when members are most active
 - 📊 **Event scheduling optimizer** - Schedule events at optimal times
 - 📊 **Weekly patterns** - Track activity trends over time
@@ -271,6 +273,36 @@ Automatically manages rotation for bosses shared across 5 guilds:
 !weeklyreport             # Force weekly report
 !monthlyreport            # Force monthly report (admin only)
 !activity [week]          # Guild activity heatmap
+```
+
+---
+
+### 📖 Channel-Aware Help System v10.0
+
+**Context-Sensitive Command Discovery**
+
+The bot features an intelligent help system that shows only commands relevant to your current location:
+
+**Smart Channel Detection:**
+- 🎯 **Attendance Threads** - Shows only attendance commands
+- 💰 **Auction Threads** - Shows only bidding commands
+- 👑 **Admin Logs** - Shows admin and auction management commands
+- 💬 **Guild Chat** - Shows leaderboards and analytics commands
+- ⏰ **Boss Timer Channel** - Shows boss prediction commands
+
+**Features:**
+- ✅ **Permission-aware** - Admins see admin commands, members see member commands
+- ✅ **Category grouping** - Commands organized by function
+- ✅ **Clear examples** - Every command shows usage syntax
+- ✅ **No clutter** - Only see commands you can actually use
+- ✅ **Helpful hints** - Contextual guidance for new users
+
+**Usage:**
+```
+!help                     # Show all commands for current channel
+!help attendance          # Attendance commands
+!help auction             # Auction commands
+!help intelligence        # Intelligence/analytics commands
 ```
 
 ---
@@ -399,15 +431,15 @@ npm install
 
 **Dependencies** (only 5 lightweight packages):
 - `discord.js` ^14.11.0 - Discord API wrapper
-- `axios` ^1.7.9 - HTTP requests for Google Sheets
+- `axios` ^1.13.2 - HTTP requests for Google Sheets
 - `node-fetch` ^2.6.7 - HTTP requests (fallback)
 - `fast-levenshtein` ^2.0.6 - Fuzzy string matching for NLP
 - `node-cron` ^4.2.1 - Scheduled tasks (proactive intelligence)
 
-**Removed for efficiency:**
-- ~~sharp~~ - Image processing (screenshots now manually verified)
-- ~~tesseract.js~~ - OCR (screenshots now manually verified)
-- Result: ~50MB smaller deployment, faster cold starts
+**Dev Dependencies:**
+- `jest` ^29.7.0 - Testing framework
+
+**Note:** Discord.js v14.11.0 is stable and well-tested. Newer versions (up to v14.25.1) are available if you wish to upgrade.
 
 ### **Step 2: Discord Bot Setup**
 
@@ -473,6 +505,8 @@ NODE_ENV=production npm start
 # Development mode (default - verbose logging)
 npm start
 ```
+
+**Default Port:** The bot runs an HTTP health check server on port **8000** (configurable via `PORT` environment variable).
 
 ---
 
@@ -642,20 +676,21 @@ All emergency commands can also be accessed via `!emergency <subcommand>`:
 
 ```
 elysium-attendance-bot/
-├── index2.js                    # Main bot entry point
+├── index2.js                    # Main bot entry point (8,393 lines)
 ├── Core Systems/
 │   ├── attendance.js            # Attendance tracking
-│   ├── bidding.js               # Bidding logic
-│   ├── auctioneering.js         # Auction management
-│   ├── help-system.js           # Help command system
+│   ├── bidding.js               # Bidding logic (4,660 lines)
+│   ├── auctioneering.js         # Auction management (4,121 lines)
+│   ├── help-system.js           # Legacy help command system
+│   ├── help-system-v2.js        # Channel-aware help system v10.0
 │   ├── emergency-commands.js    # Emergency toolkit
 │   ├── leaderboard-system.js    # Leaderboards, weekly & monthly reports
 │   ├── boss-rotation.js         # Boss rotation tracking
 │   ├── activity-heatmap.js      # Activity visualization & heatmaps
 │   └── crash-recovery.js        # Automatic crash recovery
 ├── Intelligence Systems/
-│   ├── intelligence-engine.js   # Statistical prediction engine
-│   ├── proactive-intelligence.js # Automated monitoring & alerts
+│   ├── intelligence-engine.js   # Statistical prediction engine (2,735 lines)
+│   ├── proactive-intelligence.js # Automated monitoring & alerts (2,755 lines)
 │   └── learning-system.js       # Prediction accuracy tracking
 ├── NLP Systems/
 │   ├── nlp-handler.js           # Pattern matching & parsing
@@ -673,11 +708,26 @@ elysium-attendance-bot/
 │   ├── maintenance-scheduler.js # Unified task scheduler
 │   ├── discord-cache.js         # Discord channel caching
 │   ├── error-handler.js         # Centralized error handling
+│   ├── timer-registry.js        # Timer cleanup management
+│   ├── boss-images.js           # Boss thumbnail URLs
 │   └── common.js                # Utility functions
+├── Tests/
+│   └── __tests__/               # Test suite
+│       ├── test-runner.js       # Syntax validation
+│       ├── integration-tests.js # Integration tests
+│       └── modules/             # Unit tests
 └── config.json                  # Bot configuration
 ```
 
-**Note:** For detailed performance metrics, see the [⚡ Performance Optimization Systems](#-performance-optimization-systems) and [📈 Performance](#-performance) sections.
+**Code Statistics:**
+- **Total Files:** 51 JavaScript modules
+- **Total Lines:** ~57,320 lines of code
+- **Largest Files:**
+  - `index2.js` - 8,393 lines
+  - `bidding.js` - 4,660 lines
+  - `auctioneering.js` - 4,121 lines
+  - `proactive-intelligence.js` - 2,755 lines
+  - `intelligence-engine.js` - 2,735 lines
 
 ---
 
@@ -807,7 +857,7 @@ node --expose-gc --max-old-space-size=450 --optimize-for-size index2.js
 | Sheets API calls | Every 10min | Every 15min | **-25% calls** |
 | Auto-close checks | Every 60s | Every 90s | **-33% CPU** |
 
-*Note: Performance gains depend on data size. O(1) lookup benefits increase with larger datasets.
+*Note: Performance gains depend on data size. O(1) lookup benefits increase with larger datasets.*
 
 ### **Resource Usage** (512MB Instance)
 
@@ -817,6 +867,60 @@ RSS: 95-105MB / 512MB
 CPU: <5% average
 I/O: Reduced 10-15% in production mode
 ```
+
+### **Performance Optimizations Summary**
+
+✅ **Multi-level caching (L1/L2/L3)** - 30-50% API call reduction
+✅ **Request batching** - Prevents rate limiting, intelligent queue management
+✅ **Parallel operations** - 2-3x speedup on bulk operations
+✅ **Optimized sync intervals** - 25% reduction in background tasks
+✅ **Production mode logging** - 10-15% I/O reduction
+✅ **Memory optimization** - 13% RAM usage reduction
+
+---
+
+## 🧪 Testing
+
+The project includes comprehensive testing infrastructure to ensure reliability and catch regressions early.
+
+### **Running Tests**
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+
+# Run syntax validation
+node __tests__/test-runner.js
+```
+
+### **Test Structure**
+
+```
+__tests__/
+├── test-runner.js               # Syntax validation for all modules
+├── integration-tests.js         # Full system integration tests
+├── attendance-autoclose.test.js # Attendance auto-close tests
+└── modules/
+    └── bidding-utilities.test.js # Bidding system unit tests
+```
+
+### **Manual Testing**
+
+For comprehensive manual testing procedures, see [MANUAL_TESTING_GUIDE.md](./MANUAL_TESTING_GUIDE.md).
+
+**Testing Checklist:**
+- ✅ Attendance tracking and verification
+- ✅ Auction bidding and point management
+- ✅ Statistical predictions and analytics
+- ✅ Emergency recovery commands
+- ✅ NLP command parsing
+- ✅ State persistence and recovery
 
 ---
 
@@ -877,51 +981,6 @@ pm2 logs elysium-bot
 
 ---
 
-## 🧪 Testing
-
-The project includes comprehensive testing infrastructure to ensure reliability and catch regressions early.
-
-### **Running Tests**
-
-```bash
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Generate coverage report
-npm run test:coverage
-
-# Run syntax validation
-node __tests__/test-runner.js
-```
-
-### **Test Structure**
-
-```
-__tests__/
-├── test-runner.js               # Syntax validation for all modules
-├── integration-tests.js         # Full system integration tests
-├── attendance-autoclose.test.js # Attendance auto-close tests
-└── modules/
-    └── bidding-utilities.test.js # Bidding system unit tests
-```
-
-### **Manual Testing**
-
-For comprehensive manual testing procedures, see [MANUAL_TESTING_GUIDE.md](./MANUAL_TESTING_GUIDE.md).
-
-**Testing Checklist:**
-- ✅ Attendance tracking and verification
-- ✅ Auction bidding and point management
-- ✅ Statistical predictions and analytics
-- ✅ Emergency recovery commands
-- ✅ NLP command parsing
-- ✅ State persistence and recovery
-
----
-
 ## 💻 Development
 
 ### **Development Setup**
@@ -957,7 +1016,7 @@ npm start
 ### **Adding New Commands**
 
 1. Define command handler in appropriate module
-2. Add command to `help-system.js` COMMANDS object
+2. Add command to `help-system-v2.js` COMMANDS object
 3. Register command in `index2.js` message handler
 4. Add aliases to COMMAND_ALIASES if needed
 5. Update README with command documentation
@@ -968,14 +1027,14 @@ npm start
 ```bash
 DISCORD_TOKEN=your_token_here     # Required: Discord bot token
 NODE_ENV=production               # Optional: production/development
-PORT=3000                         # Optional: HTTP server port
+PORT=8000                         # Optional: HTTP server port (default: 8000)
 ```
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions from the community! Here's how you can help:
+We welcome contributions from the community! For detailed guidelines, see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ### **Ways to Contribute**
 
@@ -994,25 +1053,6 @@ We welcome contributions from the community! Here's how you can help:
 4. **Update documentation** including README and help system
 5. **Test thoroughly** before submitting
 6. **Submit a pull request** with clear description
-
-### **Pull Request Process**
-
-```bash
-# 1. Create feature branch
-git checkout -b feature/your-feature-name
-
-# 2. Make your changes
-# ... code, test, document ...
-
-# 3. Commit with clear message
-git add .
-git commit -m "feat: Add amazing new feature"
-
-# 4. Push to your fork
-git push origin feature/your-feature-name
-
-# 5. Open Pull Request on GitHub
-```
 
 ### **Commit Message Format**
 
@@ -1044,8 +1084,8 @@ A: Currently Google Sheets only, but you can adapt the `utils/sheet-api.js` modu
 
 ### **Technical Questions**
 
-**Q: Why Discord.js v14 instead of newer versions?**
-A: v14 is stable, well-tested, and has excellent documentation. Upgrading is straightforward if needed.
+**Q: Why Discord.js v14.11 instead of newer versions?**
+A: v14.11 is stable and well-tested. Newer versions (up to v14.25.1) are available - upgrading is straightforward if needed.
 
 **Q: Can I run this without Google Sheets?**
 A: Not currently - Google Sheets is integral for data persistence. You could replace it with a database (PostgreSQL, MongoDB).
@@ -1064,7 +1104,7 @@ A: Yes! Each system is modular. Comment out unwanted modules in `index2.js` and 
 **Q: What hosting platforms work best?**
 A: Koyeb, Railway, Render, or any VPS with Node.js 18+. Optimized for 512MB RAM instances.
 
-**Q: Do I need a paid Discord bot hosting?**
+**Q: Do I need paid Discord bot hosting?**
 A: No! Free tiers of Koyeb or Railway work perfectly for small-medium guilds.
 
 **Q: How do I update to a new version?**
@@ -1081,20 +1121,11 @@ A: Check `!diagnostics` for issues. Garbage collection runs every 5 minutes. Res
 **Q: Google Sheets sync failing**
 A: Verify webhook URL is correct and Apps Script is deployed. Check triggers are active in Apps Script console.
 
-### **Deprecated Features**
-
-**Q: What happened to the loot system?**
-A: The loot system has been deprecated and disabled. Manual loot entry is now used instead of automated tracking.
-
-**Q: What happened to bid confirmations?**
-A: Bid confirmations (10-second acceptance window) have been removed in favor of instant bidding for faster auction flow.
-
-**Q: What happened to the smart pause system?**
-A: The smart pause system (auto-pause on last-10-second bids) has been deprecated. Auctions now follow standard countdown timers.
-
 ---
 
 ## 📝 Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for detailed version history.
 
 ### **Version 9.0.0 - Fully Optimized Edition** _(Current)_
 
@@ -1114,35 +1145,17 @@ A: The smart pause system (auto-pause on last-10-second bids) has been deprecate
 - 🧠 Pattern-learning NLP system with multi-language support
 - 📊 Advanced leaderboard system with weekly and monthly reports
 - 📊 Activity heatmap - 24-hour visualization for optimal event scheduling
+- 📖 Channel-aware help system v10.0 - context-sensitive command discovery
 - 🚨 Comprehensive emergency recovery toolkit
 - 💬 Natural language command parsing (English, Filipino, Tagalog)
 
 **Bug Fixes:**
-- Fixed auction command aliases and routing
-- Fixed intelligence command conflicts
-- Improved error handling across all modules
-- Enhanced state persistence and crash recovery
-
-**Documentation:**
-- Complete command verification (49 commands)
-- Comprehensive feature documentation (41 features)
-- Multiple testing and setup guides
-- Architecture and performance documentation
-
-### **Version 8.1**
-- Memory optimizations for 256MB environments
-- Unified maintenance scheduler
-- Enhanced caching strategies
-- Bug fixes for bidding system
-
-### **Version 8.0**
-- Complete rewrite of auction system
-- Added leaderboard functionality
-- Improved state persistence
-- Enhanced error handling
-
-### **Earlier Versions**
-See git history for detailed changelog of versions 1.0-7.x
+- ✅ Fixed close command errors with zero attendees
+- ✅ Fixed auction command aliases and routing
+- ✅ Fixed intelligence command conflicts
+- ✅ Improved error handling across all modules
+- ✅ Enhanced state persistence and crash recovery
+- ✅ Case-insensitive boss thumbnail lookup
 
 ---
 
