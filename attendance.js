@@ -1467,7 +1467,52 @@ async function checkAndAutoCloseThreads(client) {
         const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
         delete activeColumns[cacheKey];
 
-        // Check if column already exists to prevent duplicate submissions
+        // Check if there are any members FIRST (before making API calls)
+        if (spawnInfo.members.length === 0) {
+          // No members - just close and archive without any API calls
+          console.log(`   ⚠️ No members to submit (0 verified). Skipping Google Sheets check and submission...`);
+
+          await thread.send(
+            `⏰ **AUTO-CLOSED (${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes elapsed)**\n\n` +
+            `Attendance window closed. No members verified - no data submitted to Google Sheets.`
+          ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
+
+          // Clean up reactions
+          await cleanupAllThreadReactions(thread);
+
+          // Close confirmation thread if it exists
+          if (spawnInfo.confirmThreadId) {
+            const confirmThread = await guild.channels
+              .fetch(spawnInfo.confirmThreadId)
+              .catch(() => null);
+            if (confirmThread) {
+              await errorHandler.safeSend(confirmThread,
+                `⏰ **AUTO-CLOSED**: ${spawnInfo.boss} (${spawnInfo.timestamp})\n` +
+                `0 members (no submission - thread closed without data)`,
+                'auto-close no members confirm notification'
+              );
+              await errorHandler.safeDelete(confirmThread, 'delete confirm thread no members');
+            }
+          }
+
+          // Lock and archive the thread
+          await thread.setLocked(true, `Auto-locked after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - no members`).catch(err => errorHandler.silentError(err, 'lock thread no members'));
+          await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - no members`).catch(err => errorHandler.silentError(err, 'archive thread no members'));
+
+          // Clean up state
+          delete activeSpawns[threadId];
+          const noMembersKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
+          delete activeColumns[noMembersKey];
+          delete confirmationMessages[threadId];
+
+          closed++;
+          closedBosses.push(spawnInfo.boss);
+
+          console.log(`   ✅ Auto-close complete (no members): ${spawnInfo.boss}`);
+          continue; // Skip to next thread
+        }
+
+        // Members exist - check if column already exists to prevent duplicate submissions
         console.log(`   🔍 Checking if column already exists for ${spawnInfo.boss} at ${spawnInfo.timestamp}...`);
         const columnExists = await checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
 
@@ -1515,93 +1560,50 @@ async function checkAndAutoCloseThreads(client) {
 
           console.log(`   ✅ Auto-close complete (duplicate prevented): ${spawnInfo.boss}`);
         } else {
-          // Column doesn't exist - proceed with submission
+          // Column doesn't exist and members exist - proceed with submission
           console.log(`   ✅ No existing column found, proceeding with submission`);
 
-          // Check if there are any members to submit
-          if (spawnInfo.members.length === 0) {
-            // No members - just close and archive without submission
-            console.log(`   ⚠️ No members to submit (0 verified). Skipping Google Sheets submission...`);
+          // Members exist - proceed with submission
+          // Notify in thread
+          await thread.send(
+            `⏰ **AUTO-CLOSED (${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes elapsed)**\n\n` +
+            `Attendance window closed to prevent cheating.\n` +
+            `${spawnInfo.members.length} member(s) verified and submitting to Google Sheets...`
+          ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
 
-            await thread.send(
-              `⏰ **AUTO-CLOSED (${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes elapsed)**\n\n` +
-              `Attendance window closed. No members verified - no data submitted to Google Sheets.`
-            ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
+          // Validate data before submission
+          if (!spawnInfo.boss || !spawnInfo.timestamp || !spawnInfo.members || spawnInfo.members.length === 0) {
+            console.error(`   ❌ Invalid spawn data - skipping submission:`, {
+              boss: spawnInfo.boss || 'MISSING',
+              timestamp: spawnInfo.timestamp || 'MISSING',
+              membersCount: spawnInfo.members ? spawnInfo.members.length : 'MISSING'
+            });
 
-            // Clean up reactions
-            await cleanupAllThreadReactions(thread);
+            await errorHandler.safeSend(thread,
+              `⚠️ **Error**: Cannot submit attendance due to missing data. Please contact an admin.`,
+              'auto-close invalid data notification'
+            );
 
-            // Close confirmation thread if it exists
-            if (spawnInfo.confirmThreadId) {
-              const confirmThread = await guild.channels
-                .fetch(spawnInfo.confirmThreadId)
-                .catch(() => null);
-              if (confirmThread) {
-                await errorHandler.safeSend(confirmThread,
-                  `⏰ **AUTO-CLOSED**: ${spawnInfo.boss} (${spawnInfo.timestamp})\n` +
-                  `0 members (no submission - thread closed without data)`,
-                  'auto-close no members confirm notification'
-                );
-                await errorHandler.safeDelete(confirmThread, 'delete confirm thread no members');
-              }
-            }
-
-            // Lock and archive the thread
-            await thread.setLocked(true, `Auto-locked after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - no members`).catch(err => errorHandler.silentError(err, 'lock thread no members'));
-            await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - no members`).catch(err => errorHandler.silentError(err, 'archive thread no members'));
-
-            // Clean up state
+            // Clean up and skip
             delete activeSpawns[threadId];
-            const noMembersKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
-            delete activeColumns[noMembersKey];
-            delete confirmationMessages[threadId];
+            const errorKey = `${(spawnInfo.boss || '').toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp || '')}`;
+            delete activeColumns[errorKey];
+            continue;
+          }
 
-            closed++;
-            closedBosses.push(spawnInfo.boss);
+          // Submit to Google Sheets
+          const payload = {
+            action: "submitAttendance",
+            boss: spawnInfo.boss,
+            date: spawnInfo.date,
+            time: spawnInfo.time,
+            timestamp: spawnInfo.timestamp,
+            members: spawnInfo.members,
+          };
 
-            console.log(`   ✅ Auto-close complete (no members): ${spawnInfo.boss}`);
-          } else {
-            // Members exist - proceed with submission
-            // Notify in thread
-            await thread.send(
-              `⏰ **AUTO-CLOSED (${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes elapsed)**\n\n` +
-              `Attendance window closed to prevent cheating.\n` +
-              `${spawnInfo.members.length} member(s) verified and submitting to Google Sheets...`
-            ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
+          const resp = await postToSheet(payload);
 
-            // Validate data before submission
-            if (!spawnInfo.boss || !spawnInfo.timestamp || !spawnInfo.members || spawnInfo.members.length === 0) {
-              console.error(`   ❌ Invalid spawn data - skipping submission:`, {
-                boss: spawnInfo.boss || 'MISSING',
-                timestamp: spawnInfo.timestamp || 'MISSING',
-                membersCount: spawnInfo.members ? spawnInfo.members.length : 'MISSING'
-              });
-
-              await errorHandler.safeSend(thread,
-                `⚠️ **Error**: Cannot submit attendance due to missing data. Please contact an admin.`,
-                'auto-close invalid data notification'
-              );
-
-              // Clean up and skip
-              delete activeSpawns[threadId];
-              const errorKey = `${(spawnInfo.boss || '').toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp || '')}`;
-              delete activeColumns[errorKey];
-              continue;
-            }
-
-            // Submit to Google Sheets
-            const payload = {
-              action: "submitAttendance",
-              boss: spawnInfo.boss,
-              date: spawnInfo.date,
-              time: spawnInfo.time,
-              timestamp: spawnInfo.timestamp,
-              members: spawnInfo.members,
-            };
-
-            const resp = await postToSheet(payload);
-
-            if (resp.ok) {
+          if (resp.ok) {
             console.log(`   ✅ Submitted ${spawnInfo.members.length} members to Google Sheets`);
 
             // Invalidate client-side cache (attendance data changed)
@@ -1663,8 +1665,7 @@ async function checkAndAutoCloseThreads(client) {
 
             // Don't delete state if submission failed, so admin can retry
           }
-          } // End of members.length > 0 check
-        }
+        } // End of columnExists check
       }
     }
 
