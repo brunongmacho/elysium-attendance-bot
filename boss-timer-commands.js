@@ -13,6 +13,7 @@
 
 const { EmbedBuilder } = require('discord.js');
 const bossTimer = require('./boss-timer');
+const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images');
 
 /**
  * Parse command args to extract boss name, time, and date
@@ -124,7 +125,19 @@ async function handleKilled(message, args, config) {
         .setFooter({ text: `Logged by ${message.author.username}` })
         .setTimestamp();
 
-      await message.reply({ embeds: [embed] });
+      // Add boss image if available
+      const bossImage = getBossImageAttachment(bossName);
+      const bossImageURL = getBossImageAttachmentURL(bossName);
+      if (bossImageURL) {
+        embed.setThumbnail(bossImageURL);
+      }
+
+      const messagePayload = { embeds: [embed] };
+      if (bossImage) {
+        messagePayload.files = [bossImage];
+      }
+
+      await message.reply(messagePayload);
       return;
     }
 
@@ -157,7 +170,19 @@ async function handleKilled(message, args, config) {
       .setFooter({ text: `Recorded by ${message.author.username}` })
       .setTimestamp();
 
-    await message.reply({ embeds: [embed] });
+    // Add boss image if available
+    const bossImage = getBossImageAttachment(result.bossName);
+    const bossImageURL = getBossImageAttachmentURL(result.bossName);
+    if (bossImageURL) {
+      embed.setThumbnail(bossImageURL);
+    }
+
+    const messagePayload = { embeds: [embed] };
+    if (bossImage) {
+      messagePayload.files = [bossImage];
+    }
+
+    await message.reply(messagePayload);
   } catch (error) {
     console.error('Error in !killed command:', error);
     return message.reply(`❌ Error: ${error.message}`);
@@ -405,7 +430,19 @@ async function handleNoSpawn(message, args, config) {
       })
       .setTimestamp();
 
-    await message.reply({ embeds: [embed] });
+    // Add boss image if available
+    const bossImage = getBossImageAttachment(bossName);
+    const bossImageURL = getBossImageAttachmentURL(bossName);
+    if (bossImageURL) {
+      embed.setThumbnail(bossImageURL);
+    }
+
+    const messagePayload = { embeds: [embed] };
+    if (bossImage) {
+      messagePayload.files = [bossImage];
+    }
+
+    await message.reply(messagePayload);
   } catch (error) {
     console.error('Error in !nospawn command:', error);
     return message.reply(`❌ Error: ${error.message}`);
@@ -462,7 +499,19 @@ async function handleSpawned(message, args, config) {
       })
       .setTimestamp();
 
-    await message.reply({ embeds: [embed] });
+    // Add boss image if available
+    const bossImage = getBossImageAttachment(bossName);
+    const bossImageURL = getBossImageAttachmentURL(bossName);
+    if (bossImageURL) {
+      embed.setThumbnail(bossImageURL);
+    }
+
+    const messagePayload = { embeds: [embed] };
+    if (bossImage) {
+      messagePayload.files = [bossImage];
+    }
+
+    await message.reply(messagePayload);
   } catch (error) {
     console.error('Error in !spawned command:', error);
     return message.reply(`❌ Error: ${error.message}`);
@@ -552,7 +601,19 @@ async function handleSetBoss(message, args, config) {
       .setFooter({ text: `Set by ${message.author.username}` })
       .setTimestamp();
 
-    await message.reply({ embeds: [embed] });
+    // Add boss image if available
+    const bossImage = getBossImageAttachment(bossName);
+    const bossImageURL = getBossImageAttachmentURL(bossName);
+    if (bossImageURL) {
+      embed.setThumbnail(bossImageURL);
+    }
+
+    const messagePayload = { embeds: [embed] };
+    if (bossImage) {
+      messagePayload.files = [bossImage];
+    }
+
+    await message.reply(messagePayload);
   } catch (error) {
     console.error('Error in !setboss command:', error);
     return message.reply(`❌ Error: ${error.message}`);

@@ -602,9 +602,24 @@ async function createSpawnThreads(
   ];
 
   if (confirmThread) {
-    notifications.push(
-      confirmThread.send(`🟨 **${bossName}** spawn detected (${fullTimestamp}).`)
-    );
+    // Create embed for confirmation thread with boss thumbnail
+    const confirmEmbed = new EmbedBuilder()
+      .setColor(0xf1c40f)
+      .setTitle('🟨 Boss Spawn Detected')
+      .setDescription(`**${bossName}**\n${fullTimestamp}`)
+      .setTimestamp();
+
+    // Add boss image if available
+    if (bossImageURL) {
+      confirmEmbed.setThumbnail(bossImageURL);
+    }
+
+    const confirmPayload = { embeds: [confirmEmbed] };
+    if (bossImage) {
+      confirmPayload.files = [bossImage];
+    }
+
+    notifications.push(confirmThread.send(confirmPayload));
   }
 
   await Promise.all(notifications);

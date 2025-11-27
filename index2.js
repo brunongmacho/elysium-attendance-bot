@@ -4956,18 +4956,26 @@ stats: async (message, member, args) => {
             value: `<t:${Math.floor(prediction.latestTime.getTime() / 1000)}:F>`,
             inline: true,
           },
-          {
-            name: '🕐 Last Spawn',
-            value: `<t:${Math.floor(prediction.lastSpawnTime.getTime() / 1000)}:R>`,
-            inline: true,
-          },
+          // Only show Last Spawn if available (null for scheduled bosses)
+          ...(prediction.lastSpawnTime
+            ? [{
+                name: '🕐 Last Spawn',
+                value: `<t:${Math.floor(prediction.lastSpawnTime.getTime() / 1000)}:R>`,
+                inline: true,
+              }]
+            : []
+          ),
           {
             name: '🧠 AI Insight',
-            value: prediction.isFromBossTimer
+            value: prediction.isFromBossTimer && prediction.avgIntervalHours
               ? `⏱️ **Recorded Timer Data**\n` +
                 `Kill recorded via \`!killed\` command.\n` +
                 `**${prediction.bossName}** has a **${prediction.avgIntervalHours.toFixed(1)}-hour** spawn timer.\n` +
                 `✅ High accuracy - based on actual recorded kill time.`
+              : prediction.isFromBossTimer && !prediction.avgIntervalHours
+              ? `📅 **Fixed Schedule**\n` +
+                `**${prediction.bossName}** spawns on a fixed weekly schedule.\n` +
+                `✅ High accuracy - based on known schedule.`
               : mlEnhancement && mlEnhancement.method === 'ml'
               ? `🤖 **ML-Enhanced Prediction**\n` +
                 `Spawn Window: ${new Date(mlEnhancement.confidenceInterval.earliest).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: config.timezone })} - ` +
@@ -5931,9 +5939,27 @@ client.on(Events.MessageCreate, async (message) => {
               const announcementChannel = await client.channels.fetch(config.boss_spawn_announcement_channel_id);
               if (announcementChannel) {
                 const announceTimestamp = Math.floor(spawnTime.getTime() / 1000);
-                await announcementChannel.send(
-                  `🔔 **${bossName}** spawned!\n🕐 Time: <t:${announceTimestamp}:t>\n\n📝 Check in at the attendance thread!\n\n@everyone`
-                );
+
+                const embed = new EmbedBuilder()
+                  .setColor(0x3498db)
+                  .setTitle(`🔔 ${bossName} Spawned!`)
+                  .setDescription('**Check in at the attendance thread!**')
+                  .addFields({ name: '🕐 Time', value: `<t:${announceTimestamp}:t>`, inline: true })
+                  .setTimestamp();
+
+                // Add boss image if available
+                const bossImage = getBossImageAttachment(bossName);
+                const bossImageURL = getBossImageAttachmentURL(bossName);
+                if (bossImageURL) {
+                  embed.setThumbnail(bossImageURL);
+                }
+
+                const messagePayload = { content: '@everyone', embeds: [embed] };
+                if (bossImage) {
+                  messagePayload.files = [bossImage];
+                }
+
+                await announcementChannel.send(messagePayload);
                 console.log(`📢 Announced ${bossName} spawn to announcement channel`);
               }
             } catch (announceError) {
