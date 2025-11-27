@@ -2134,13 +2134,23 @@ function updateBiddingPoints() {
 
     // Auto-add new members to BiddingPoints sheet
     const insertStart = bpSheet.getLastRow() + 1;
-    const newRows = newMembers.map(m => [m, attendancePoints[m], 0]);
-    bpSheet.getRange(insertStart, 1, newRows.length, 3).setValues(newRows);
+
+    // Calculate number of existing tally columns (columns 4+)
+    const numTallyColumns = Math.max(0, lastCol - 3);
+
+    // Create rows with 0s for all existing tally columns for uniformity
+    const tallyZeros = new Array(numTallyColumns).fill(0);
+    const newRows = newMembers.map(m => [m, attendancePoints[m], 0, ...tallyZeros]);
+
+    // Insert new member rows with all columns
+    const numColumns = 3 + numTallyColumns;
+    bpSheet.getRange(insertStart, 1, newRows.length, numColumns).setValues(newRows);
+
     newMembers.forEach((m, i) => {
       memberMap[m] = { row: insertStart + i, consumed: 0 };
     });
 
-    Logger.log(`✅ Successfully added ${newMembers.length} new members to BiddingPoints`);
+    Logger.log(`✅ Successfully added ${newMembers.length} new members to BiddingPoints with ${numTallyColumns} previous tallies set to 0`);
   }
 
     // --- Step 4: Update Column 3 (Points Consumed) and Column 2 (Points Left) for all members ---
