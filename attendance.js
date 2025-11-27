@@ -1754,9 +1754,10 @@ function startAutoCloseScheduler(client) {
  * @param {Client} discordClient - Discord.js client
  * @param {string} bossName - Boss name from boss_spawn_config.json
  * @param {Date} spawnTime - Spawn time
+ * @param {boolean} noAutoClose - If true, thread won't auto-close (for maintenance mode)
  * @returns {Promise<Object>} Thread object
  */
-async function createThreadForBoss(discordClient, bossName, spawnTime) {
+async function createThreadForBoss(discordClient, bossName, spawnTime, noAutoClose = false) {
   // Format date and time for thread (GMT+8 / Asia/Manila)
   const dateStr = spawnTime.toLocaleDateString('en-US', {
     timeZone: 'Asia/Manila',
@@ -1782,7 +1783,7 @@ async function createThreadForBoss(discordClient, bossName, spawnTime) {
     timeStr,
     fullTimestamp,
     'boss_timer',
-    false // noAutoClose = false (normal threads)
+    noAutoClose // Pass through noAutoClose parameter
   );
 
   if (!result.success) {

@@ -264,16 +264,21 @@ async function handleMaintenance(message) {
       .setColor(0x9b59b6)
       .setTitle('🔧 Maintenance Mode Activated')
       .setDescription(
-        `✅ Reset **${result.timerBased}** timer-based bosses\n` +
+        `✅ Created **${result.timerBased}** attendance threads for timer-based bosses\n` +
         `✅ Scheduled **${result.scheduleBased}** schedule-based bosses\n` +
         (wasServerDown ? `✅ Exited server down mode - attendance threads will be created again` : '')
       )
+      .addFields({
+        name: '📝 Timer-Based Bosses',
+        value: 'All timer-based bosses have attendance threads now.\nThreads will NOT auto-close - use `!killed <boss> <time>` after each kill.',
+        inline: false
+      })
       .setTimestamp();
 
     if (firstSpawn) {
       const timestamp = Math.floor(firstSpawn.nextSpawn.getTime() / 1000);
       embed.addFields({
-        name: '⏰ First Spawn',
+        name: '⏰ Next Scheduled Boss',
         value: `**${firstSpawn.bossName}** at <t:${timestamp}:F> - ${bossTimer.formatCountdown(timestamp)}`,
         inline: false
       });
