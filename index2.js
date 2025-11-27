@@ -73,7 +73,8 @@ const levenshtein = require("fast-levenshtein"); // Fuzzy string matching
 
 // Internal modules - Core systems
 const bidding = require("./bidding.js");                    // Auction bidding logic
-const helpSystem = require("./help-system.js");             // Command help system
+const helpSystem = require("./help-system.js");             // Command help system (legacy)
+const helpSystemV2 = require("./help-system-v2.js");        // NEW: Channel-aware help system
 const auctioneering = require("./auctioneering.js");        // Auction management
 const attendance = require("./attendance.js");              // Attendance tracking
 const bossTimer = require("./boss-timer.js");              // Boss timer system
@@ -1635,8 +1636,8 @@ const commandHandlers = {
   // },
 
   help: async (message, member) => {
-    const args = message.content.trim().split(/\s+/).slice(1);
-    await helpSystem.handleHelp(message, args, member);
+    // Use new channel-aware help system
+    await helpSystemV2.handleHelpCommand(message, member);
   },
 
   // =========================================================================
@@ -5520,6 +5521,7 @@ client.once(Events.ClientReady, async () => {
   attendance.initialize(config, bossPoints, isAdmin, discordCache, intelligenceEngine);
   await bossTimer.initialize(client, config, sheetAPI, attendance); // Boss timer system
   helpSystem.initialize(config, isAdmin, BOT_VERSION);
+  helpSystemV2.initialize(config, isAdmin, BOT_VERSION); // NEW: Initialize channel-aware help system
   auctioneering.initialize(config, isAdmin, bidding, discordCache, intelligenceEngine);
   bidding.initializeBidding(config, isAdmin, auctioneering, discordCache);
   auctioneering.setPostToSheet(attendance.postToSheet);
@@ -7211,6 +7213,48 @@ client.on(Events.MessageCreate, async (message) => {
           return;
         }
 
+        // Check if there are any members to submit
+        if (spawnInfo.members.length === 0) {
+          // No members to submit - just close and archive the thread
+          await message.reply(
+            `⚠️ **FORCE CLOSING** spawn **${spawnInfo.boss}**...\n` +
+              `No members to submit (0 verified, ${pendingInThread.length} pending ignored). Skipping Google Sheets submission...`
+          );
+
+          await message.channel.send(
+            `⚠️ Thread closed with no verified members. No data submitted to Google Sheets.`
+          );
+
+          if (spawnInfo.confirmThreadId) {
+            const confirmThread = await guild.channels
+              .fetch(spawnInfo.confirmThreadId)
+              .catch(() => null);
+            if (confirmThread) {
+              await confirmThread.send(
+                `⚠️ **${spawnInfo.boss}** (${spawnInfo.timestamp}) force closed with 0 members`
+              );
+              await confirmThread.delete().catch(console.error);
+            }
+          }
+
+          // Lock and archive the thread to prevent spam
+          await message.channel
+            .setLocked(true, `Force locked by ${message.author.username} (no members)`)
+            .catch(console.error);
+          await message.channel
+            .setArchived(true, `Force closed by ${message.author.username} (no members)`)
+            .catch(console.error);
+
+          delete activeSpawns[message.channel.id];
+          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+
+          console.log(
+            `🔒 FORCE CLOSE: ${spawnInfo.boss} at ${spawnInfo.timestamp} by ${message.author.username} (0 members)`
+          );
+
+          return;
+        }
+
         await message.reply(
           `⚠️ **FORCE CLOSING** spawn **${spawnInfo.boss}**...\n` +
             `Submitting ${spawnInfo.members.length} members (ignoring ${pendingInThread.length} pending verifications)`
@@ -7866,6 +7910,52 @@ client.on(Events.InteractionCreate, async (interaction) => {
           delete pendingClosures[msg.id];
           delete confirmationMessages[closePending.threadId];
 
+          attendance.setActiveSpawns(activeSpawns);
+          attendance.setActiveColumns(activeColumns);
+          attendance.setPendingClosures(pendingClosures);
+          attendance.setConfirmationMessages(confirmationMessages);
+
+          return;
+        }
+
+        // Check if there are any members to submit
+        if (spawnInfo.members.length === 0) {
+          // No members to submit - just close and archive the thread
+          await interaction.followUp({
+            content: `⚠️ **No members to submit** (0 verified). Closing thread without Google Sheets submission...`,
+            ephemeral: false
+          });
+
+          await interaction.channel.send(
+            `⚠️ Thread closed with no verified members. No data submitted to Google Sheets.`
+          );
+
+          if (spawnInfo.confirmThreadId) {
+            const confirmThread = await guild.channels
+              .fetch(spawnInfo.confirmThreadId)
+              .catch(() => null);
+            if (confirmThread) {
+              await confirmThread.send(
+                `⚠️ **${spawnInfo.boss}** (${spawnInfo.timestamp}) closed with 0 members`
+              );
+              await errorHandler.safeDelete(confirmThread, 'message deletion');
+            }
+          }
+
+          // Lock and archive the thread
+          await interaction.channel
+            .setLocked(true, `Locked by ${user.username} (no members)`)
+            .catch(err => errorHandler.silentError(err, 'button close lock no members'));
+          await interaction.channel
+            .setArchived(true, `Closed by ${user.username} (no members)`)
+            .catch(err => errorHandler.silentError(err, 'button close archive no members'));
+
+          delete activeSpawns[closePending.threadId];
+          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
+          delete pendingClosures[msg.id];
+          delete confirmationMessages[closePending.threadId];
+
+          // Sync all changes
           attendance.setActiveSpawns(activeSpawns);
           attendance.setActiveColumns(activeColumns);
           attendance.setPendingClosures(pendingClosures);
