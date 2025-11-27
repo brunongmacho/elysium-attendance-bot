@@ -63,16 +63,30 @@ function normalizeBossName(bossName) {
 
 /**
  * Find boss image file with any supported extension
+ * Does case-insensitive matching to handle different filename capitalizations
  * @param {string} normalizedName - Normalized boss name (without extension)
  * @returns {string|null} Full path to image file, or null if not found
  */
 function findBossImageFile(normalizedName) {
   if (!normalizedName) return null;
 
+  // Check if directory exists
+  if (!fs.existsSync(BOSS_IMAGES_DIR)) {
+    return null;
+  }
+
+  // Read all files in the directory
+  const files = fs.readdirSync(BOSS_IMAGES_DIR);
+
+  // Try each supported extension with case-insensitive matching
   for (const ext of IMAGE_EXTENSIONS) {
-    const filePath = path.join(BOSS_IMAGES_DIR, `${normalizedName}${ext}`);
-    if (fs.existsSync(filePath)) {
-      return filePath;
+    const targetFilename = `${normalizedName}${ext}`.toLowerCase();
+
+    // Find a file that matches case-insensitively
+    const matchingFile = files.find(file => file.toLowerCase() === targetFilename);
+
+    if (matchingFile) {
+      return path.join(BOSS_IMAGES_DIR, matchingFile);
     }
   }
 
