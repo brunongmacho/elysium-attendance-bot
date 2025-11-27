@@ -5939,9 +5939,27 @@ client.on(Events.MessageCreate, async (message) => {
               const announcementChannel = await client.channels.fetch(config.boss_spawn_announcement_channel_id);
               if (announcementChannel) {
                 const announceTimestamp = Math.floor(spawnTime.getTime() / 1000);
-                await announcementChannel.send(
-                  `🔔 **${bossName}** spawned!\n🕐 Time: <t:${announceTimestamp}:t>\n\n📝 Check in at the attendance thread!\n\n@everyone`
-                );
+
+                const embed = new EmbedBuilder()
+                  .setColor(0x3498db)
+                  .setTitle(`🔔 ${bossName} Spawned!`)
+                  .setDescription('**Check in at the attendance thread!**')
+                  .addFields({ name: '🕐 Time', value: `<t:${announceTimestamp}:t>`, inline: true })
+                  .setTimestamp();
+
+                // Add boss image if available
+                const bossImage = getBossImageAttachment(bossName);
+                const bossImageURL = getBossImageAttachmentURL(bossName);
+                if (bossImageURL) {
+                  embed.setThumbnail(bossImageURL);
+                }
+
+                const messagePayload = { content: '@everyone', embeds: [embed] };
+                if (bossImage) {
+                  messagePayload.files = [bossImage];
+                }
+
+                await announcementChannel.send(messagePayload);
                 console.log(`📢 Announced ${bossName} spawn to announcement channel`);
               }
             } catch (announceError) {

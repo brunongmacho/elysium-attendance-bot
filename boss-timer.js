@@ -22,8 +22,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const { EmbedBuilder } = require('discord.js');
 const crashRecovery = require('./utils/crash-recovery');
 const { normalizeTimestamp } = require('./utils/common');
+const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images');
 
 // ============================================================================
 // CONFIGURATION
@@ -537,11 +539,32 @@ async function triggerSpawnReminder(bossName, spawnTime) {
     // Create attendance thread
     const thread = await attendance.createThreadForBoss(client, bossName, spawnTime);
 
-    // Post reminder to announcement channel
+    // Post reminder to announcement channel with embed and thumbnail
     const timestamp = Math.floor(spawnTime.getTime() / 1000);
-    const message = `⏰ **${bossName}** spawning in 5 minutes!\n🕐 Spawn time: <t:${timestamp}:t>\n\n📝 Attendance thread: ${thread.url}\n\n@everyone`;
 
-    await announcementChannel.send(message);
+    const embed = new EmbedBuilder()
+      .setColor(0xffaa00)
+      .setTitle(`⏰ ${bossName} Spawning Soon!`)
+      .setDescription(`**Spawning in 5 minutes!**`)
+      .addFields(
+        { name: '🕐 Spawn Time', value: `<t:${timestamp}:t>`, inline: true },
+        { name: '📝 Thread', value: `[Click here](${thread.url})`, inline: true }
+      )
+      .setTimestamp();
+
+    // Add boss image if available
+    const bossImage = getBossImageAttachment(bossName);
+    const bossImageURL = getBossImageAttachmentURL(bossName);
+    if (bossImageURL) {
+      embed.setThumbnail(bossImageURL);
+    }
+
+    const messagePayload = { content: '@everyone', embeds: [embed] };
+    if (bossImage) {
+      messagePayload.files = [bossImage];
+    }
+
+    await announcementChannel.send(messagePayload);
 
     // Clear from kill times cache (timer completed)
     bossKillTimes.delete(bossName.toLowerCase());
@@ -974,16 +997,39 @@ async function handleSpawned(bossName, userId) {
     // Create attendance thread for current spawn
     const thread = await attendance.createThreadForBoss(client, bossName, now);
 
-    // Post confirmation in announcement channel
+    // Post confirmation in announcement channel with embed and thumbnail
     const announcementChannel = await client.channels.fetch(config.boss_spawn_announcement_channel_id);
     if (announcementChannel) {
       const timestamp = Math.floor(now.getTime() / 1000);
-      await announcementChannel.send(
-        `✅ **${bossName}** spawned confirmed by <@${userId}>\n` +
-        `🕐 Spawn time: <t:${timestamp}:t>\n` +
-        `📝 Attendance thread: ${thread.url}\n\n` +
-        `💡 Use \`!killed ${bossName} <time>\` when boss is killed to track next spawn.`
-      );
+
+      const embed = new EmbedBuilder()
+        .setColor(0x2ecc71)
+        .setTitle(`✅ ${bossName} Spawn Confirmed`)
+        .setDescription(`Confirmed by <@${userId}>`)
+        .addFields(
+          { name: '🕐 Spawn Time', value: `<t:${timestamp}:t>`, inline: true },
+          { name: '📝 Thread', value: `[Click here](${thread.url})`, inline: true }
+        )
+        .addFields({
+          name: '💡 Next Step',
+          value: `Use \`!killed ${bossName} <time>\` when boss is killed to track next spawn.`,
+          inline: false
+        })
+        .setTimestamp();
+
+      // Add boss image if available
+      const bossImage = getBossImageAttachment(bossName);
+      const bossImageURL = getBossImageAttachmentURL(bossName);
+      if (bossImageURL) {
+        embed.setThumbnail(bossImageURL);
+      }
+
+      const messagePayload = { embeds: [embed] };
+      if (bossImage) {
+        messagePayload.files = [bossImage];
+      }
+
+      await announcementChannel.send(messagePayload);
     }
 
     // Add to recently handled cache to prevent duplicate from external bot
