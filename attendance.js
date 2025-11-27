@@ -373,6 +373,8 @@ async function cleanupAllThreadReactions(thread) {
  * @param {string} timeStr - Time string in "HH:MM" format (24-hour)
  * @param {string} fullTimestamp - Full timestamp in "MM/DD/YY HH:MM" format
  * @param {string} triggerSource - Source that triggered spawn (e.g., "manual", "auto", "bid_auction")
+ * @param {boolean} noAutoClose - If true, thread won't auto-close (for maintenance mode)
+ * @param {boolean} skipColumnCheck - If true, skips duplicate column check (for maintenance - always new)
  * @returns {Promise<void>}
  *
  * @example
@@ -392,7 +394,8 @@ async function createSpawnThreads(
   timeStr,
   fullTimestamp,
   triggerSource,
-  noAutoClose = false  // NEW: Optional flag to disable autoclose for maintenance threads
+  noAutoClose = false,  // NEW: Optional flag to disable autoclose for maintenance threads
+  skipColumnCheck = false  // NEW: Skip duplicate check for maintenance (always new)
 ) {
   // Validate boss exists in bossPoints
   if (!bossPoints[bossName]) {
@@ -437,13 +440,15 @@ async function createSpawnThreads(
 
   if (!attChannel || !adminLogs) return { success: false, error: 'Failed to fetch channels' };
 
-  // Prevent duplicate spawns by checking if column already exists
-  const columnExists = await checkColumnExists(bossName, fullTimestamp);
-  if (columnExists) {
-    await adminLogs.send(
-      `⚠️ **BLOCKED SPAWN:** ${bossName} at ${fullTimestamp}\nColumn already exists.`
-    );
-    return { success: false, error: 'Column already exists (duplicate spawn)' };
+  // Prevent duplicate spawns by checking if column already exists (skip for maintenance - always new)
+  if (!skipColumnCheck) {
+    const columnExists = await checkColumnExists(bossName, fullTimestamp);
+    if (columnExists) {
+      await adminLogs.send(
+        `⚠️ **BLOCKED SPAWN:** ${bossName} at ${fullTimestamp}\nColumn already exists.`
+      );
+      return { success: false, error: 'Column already exists (duplicate spawn)' };
+    }
   }
 
   // NEW: Prevent duplicate threads for same boss if spawn times are close
@@ -1756,9 +1761,10 @@ function startAutoCloseScheduler(client) {
  * @param {string} bossName - Boss name from boss_spawn_config.json
  * @param {Date} spawnTime - Spawn time
  * @param {boolean} noAutoClose - If true, thread won't auto-close (for maintenance mode)
+ * @param {boolean} skipColumnCheck - If true, skips duplicate check (for maintenance - always new)
  * @returns {Promise<Object>} Thread object
  */
-async function createThreadForBoss(discordClient, bossName, spawnTime, noAutoClose = false) {
+async function createThreadForBoss(discordClient, bossName, spawnTime, noAutoClose = false, skipColumnCheck = false) {
   // Format date and time for thread (GMT+8 / Asia/Manila)
   const dateStr = spawnTime.toLocaleDateString('en-US', {
     timeZone: 'Asia/Manila',
@@ -1784,7 +1790,8 @@ async function createThreadForBoss(discordClient, bossName, spawnTime, noAutoClo
     timeStr,
     fullTimestamp,
     'boss_timer',
-    noAutoClose // Pass through noAutoClose parameter
+    noAutoClose, // Pass through noAutoClose parameter
+    skipColumnCheck // Pass through skipColumnCheck parameter
   );
 
   if (!result.success) {

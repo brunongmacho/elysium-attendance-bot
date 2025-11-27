@@ -1081,8 +1081,8 @@ async function maintenance() {
     if (bossName.startsWith('_')) continue;
 
     try {
-      // Create thread immediately with noAutoClose = true
-      const thread = await attendance.createThreadForBoss(client, bossName, now, true);
+      // Create thread immediately with noAutoClose = true, skipColumnCheck = true
+      const thread = await attendance.createThreadForBoss(client, bossName, now, true, true);
       console.log(`✅ Created maintenance thread for ${bossName}: ${thread.id}`);
       timerCount++;
     } catch (error) {
