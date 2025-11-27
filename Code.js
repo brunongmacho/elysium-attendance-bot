@@ -2100,19 +2100,31 @@ function updateBiddingPoints() {
   const memberMap = {};
 
   // --- Step 1: Map existing members and calculate consumed from session columns ---
+  let hasBlankTallies = false;
   allData.forEach((r, i) => {
     const m = (r[0] || '').toString().trim();
     if (!m) return;
 
-    // Sum all session columns (columns 4+ = indices 3+)
+    // Sum all session columns (columns 4+ = indices 3+) and check for blank entries
     let totalConsumed = 0;
     for (let col = 3; col < r.length; col++) {
+      // Check if value is blank/empty and replace with 0
+      if (r[col] === '' || r[col] === null || r[col] === undefined) {
+        r[col] = 0;
+        hasBlankTallies = true;
+      }
       const val = Number(r[col]) || 0;
       totalConsumed += val;
     }
 
     memberMap[m] = { row: i + 2, consumed: totalConsumed };
   });
+
+  // Write back normalized data if any blank tallies were found
+  if (hasBlankTallies && allData.length > 0) {
+    bpSheet.getRange(2, 1, allData.length, lastCol).setValues(allData);
+    Logger.log(`✅ Filled blank tally entries with 0 for existing members`);
+  }
 
   // --- Step 2: Collect attendance points from all weekly sheets ---
   const sheets = ss.getSheets().filter(s => s.getName().startsWith(CONFIG.SHEET_NAME_PREFIX));
