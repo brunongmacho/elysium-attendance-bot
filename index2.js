@@ -6105,6 +6105,9 @@ client.on(Events.MessageCreate, async (message) => {
                   embed.setThumbnail(bossImageURL);
                 }
 
+                // Add guild branding
+                addGuildFooter(embed, message.guild);
+
                 const messagePayload = { content: '@everyone', embeds: [embed] };
                 if (bossImage) {
                   messagePayload.files = [bossImage];
