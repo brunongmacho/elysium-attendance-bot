@@ -54,22 +54,10 @@
 // =====================================================================
 
 // ═══════════════════════════════════════════════════════════════════════════
-// INITIALIZE SENTRY FIRST - Error tracking must be set up before anything else
-// ═══════════════════════════════════════════════════════════════════════════
-const { initializeSentry } = require('./utils/sentry');
-initializeSentry();
-
-// ═══════════════════════════════════════════════════════════════════════════
 // STRUCTURED LOGGING - Replace console.log with structured logger
 // ═══════════════════════════════════════════════════════════════════════════
 const { createLogger, withCorrelationId } = require('./utils/logger');
 const mainLogger = createLogger('main');
-
-// ═══════════════════════════════════════════════════════════════════════════
-// METRICS & MONITORING
-// ═══════════════════════════════════════════════════════════════════════════
-const metrics = require('./utils/metrics');
-const { startMetricsServer } = require('./utils/metrics-server');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GRACEFUL DEGRADATION
@@ -5537,14 +5525,6 @@ client.once(Events.ClientReady, async () => {
     guildId: config.main_guild_id,
     version: BOT_VERSION,
   });
-
-  // START METRICS SERVER (Prometheus endpoint)
-  try {
-    startMetricsServer();
-    mainLogger.info('Metrics server started successfully');
-  } catch (error) {
-    mainLogger.error('Failed to start metrics server', error);
-  }
 
   // INITIALIZE OPERATION QUEUE (Graceful degradation)
   try {
