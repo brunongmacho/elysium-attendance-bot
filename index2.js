@@ -3662,7 +3662,8 @@ stats: async (message, member, args) => {
               `${hours}:${minutes}`,
               formattedTimestamp,
               "manual",
-              true  // noAutoClose = true for maintenance threads
+              true,  // noAutoClose = true for maintenance threads
+              true   // skipColumnCheck = true (maintenance = fresh sheets, no duplicates possible)
             );
 
             if (result && result.success) {
