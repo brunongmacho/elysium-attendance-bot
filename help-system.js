@@ -349,8 +349,7 @@ const COMMANDS = {
         "• **Instant bidding** - immediate placement",
         "• Points validation",
         "• Self-overbid support",
-        "• 3-second rate limit",
-        "• **NLP support**: \"bid 500\" or \"offer 300 pts\""
+        "• 3-second rate limit"
       ]
     },
     mypoints: {
@@ -414,146 +413,6 @@ const COMMANDS = {
         "• Starts auction immediately",
         "• Use for emergency starts",
         "• Resets cooldown"
-      ]
-    }
-  },
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // INTELLIGENCE/ANALYTICS COMMANDS (Member-Accessible!)
-  // ─────────────────────────────────────────────────────────────────────────
-  intelligence: {
-    predictspawn: {
-      usage: "!predictspawn [boss name]",
-      description: "Predict next boss spawn time (pattern-based)",
-      aliases: ["!nextspawn", "!whennext", "!spawntimer"],
-      adminOnly: false,
-      details: [
-        "• Spawn time prediction using multiple methods:",
-        "  - Timer-based: Known spawn intervals (e.g., Venatus 10h)",
-        "  - Schedule-based: Fixed times (e.g., Guild Boss Mon 21:00)",
-        "  - Historical: Pattern analysis from past spawns",
-        "• Confidence intervals with spawn type indicator",
-        "• If no boss specified: shows next boss to spawn",
-        "• **NLP**: \"when is next spawn?\" or \"kelan lalabas venatus?\"",
-        "• Use in guild chat by @mentioning the bot"
-      ]
-    },
-    predictprice: {
-      usage: "!predictprice <item>",
-      description: "Get statistical price prediction for auction item",
-      aliases: ["!predict", "!suggestprice"],
-      adminOnly: false,
-      details: [
-        "• Statistical price estimation using historical averages",
-        "• Confidence intervals and trend analysis",
-        "• Historical data with outlier detection",
-        "• **85%+ accuracy** after bootstrapping",
-        "• **NLP**: \"how much is crimson pendant worth?\" or \"magkano flame claw?\"",
-        "• Use in guild chat by @mentioning the bot"
-      ]
-    },
-    predictattendance: {
-      usage: "!predictattendance <username>",
-      description: "Predict member's likelihood to attend next spawn",
-      aliases: ["!predatt"],
-      adminOnly: false,
-      details: [
-        "• Pattern-based attendance prediction",
-        "• Based on historical attendance patterns",
-        "• Confidence scoring",
-        "• Recent activity analysis",
-        "• **NLP**: \"will PlayerName attend?\" or \"dadalo ba si PlayerName?\"",
-        "• Use in guild chat by @mentioning the bot"
-      ]
-    },
-    analyze: {
-      usage: "!analyze [username]",
-      description: "Check engagement stats (no username = check yourself)",
-      aliases: ["!engagement", "!engage"],
-      adminOnly: false,
-      details: [
-        "• Engagement scoring (attendance + bidding + consistency)",
-        "• Next event attendance prediction",
-        "• Personalized recommendations",
-        "• **Self-check**: Just say \"!analyze\" or \"how am i doing?\"",
-        "• **NLP**: \"my stats\" or \"kamusta ako?\"",
-        "• Use in guild chat by @mentioning the bot"
-      ]
-    },
-    analyzeall: {
-      usage: "!analyzeall",
-      description: "Guild-wide engagement analysis with top performers",
-      aliases: ["!analyzeengagement", "!guildanalyze"],
-      adminOnly: false,
-      details: [
-        "• Guild-wide statistics",
-        "• Top performers ranking",
-        "• At-risk members list",
-        "• Engagement trends",
-        "• **NLP**: \"guild engagement\" or \"engagement ng lahat\"",
-        "• Use in guild chat by @mentioning the bot"
-      ]
-    },
-    recommendations: {
-      usage: "!recommendations",
-      description: "Get analytics-based recommendations for guild management",
-      aliases: ["!recommend", "!suggest"],
-      adminOnly: true,
-      details: [
-        "• Optimal auction timing",
-        "• Participation forecasts",
-        "• Member reminder suggestions",
-        "• Smart guild management insights"
-      ]
-    },
-    performance: {
-      usage: "!performance",
-      description: "View system performance metrics and health",
-      aliases: ["!perf"],
-      adminOnly: true,
-      details: [
-        "• Memory usage statistics",
-        "• Bot uptime",
-        "• Intelligence cache status",
-        "• Performance recommendations"
-      ]
-    },
-    suggestauction: {
-      usage: "!suggestauction",
-      description: "Analyze entire auction queue before starting",
-      aliases: ["!analyzequeue", "!aq", "!auctionqueue"],
-      adminOnly: true,
-      details: [
-        "• Statistical price suggestions for all items",
-        "• Optimal item ordering",
-        "• Participation forecasts",
-        "• Analytics-based recommendations"
-      ]
-    },
-    detectanomalies: {
-      usage: "!detectanomalies",
-      description: "Run fraud detection scan on recent activity",
-      aliases: ["!fraud", "!anomaly"],
-      adminOnly: true,
-      details: [
-        "• Collusion detection in bidding",
-        "• Unusual bid patterns",
-        "• Attendance anomalies",
-        "• Statistical analysis",
-        "• **Proactive alerts**: Daily 6 PM automatic scan"
-      ]
-    },
-    bootstraplearning: {
-      usage: "!bootstraplearning",
-      description: "Re-analyze ALL historical data for baseline predictions",
-      aliases: ["!bootstrap", "!learnhistory"],
-      adminOnly: true,
-      details: [
-        "• Analyzes all historical auction data",
-        "• Creates baseline statistical predictions",
-        "• **85%+ accuracy from day 1** (with sufficient data)",
-        "• No warm-up period needed",
-        "• Run once on first deployment or after major data changes"
       ]
     }
   },
@@ -680,99 +539,6 @@ const COMMANDS = {
         "  - !rotation set Amentis 1",
         "  - !rotation increment \"General Aquleus\"",
         "  - !rotation refresh"
-      ]
-    }
-  },
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // NLP LEARNING SYSTEM COMMANDS
-  // ─────────────────────────────────────────────────────────────────────────
-  nlp: {
-    nlpstats: {
-      usage: "!nlpstats",
-      description: "View NLP learning statistics and progress",
-      aliases: ["!nlp", "!nlpinfo"],
-      adminOnly: true,
-      details: [
-        "• Total patterns learned",
-        "• Success rate statistics",
-        "• Unrecognized phrases count",
-        "• Learning system health",
-        "• Multi-language support stats (EN/TL/Taglish)"
-      ]
-    },
-    learned: {
-      usage: "!learned",
-      description: "List all learned NLP patterns with confidence scores",
-      aliases: ["!learnedpatterns", "!patterns"],
-      adminOnly: true,
-      details: [
-        "• Shows all custom-learned patterns",
-        "• Confidence scores for each",
-        "• Command mappings",
-        "• Usage frequency",
-        "• Sorted by confidence"
-      ]
-    },
-    unrecognized: {
-      usage: "!unrecognized",
-      description: "Show phrases the bot doesn't understand yet",
-      aliases: ["!unrec", "!unknown"],
-      adminOnly: true,
-      details: [
-        "• Lists unrecognized user inputs",
-        "• Helps identify missing patterns",
-        "• Shows frequency of attempts",
-        "• Use for improving NLP coverage"
-      ]
-    },
-    teachbot: {
-      usage: "!teachbot \"phrase\" → !command",
-      description: "Manually teach the bot a new NLP pattern",
-      aliases: ["!teach", "!addpattern"],
-      adminOnly: true,
-      details: [
-        "• Add custom pattern mappings",
-        "• Supports multi-language",
-        "• Immediate effect",
-        "• Example: !teachbot \"ilan points ko?\" → !mypoints",
-        "• Validates command exists before saving"
-      ]
-    },
-    clearlearned: {
-      usage: "!clearlearned [pattern]",
-      description: "Remove specific or all learned patterns",
-      aliases: ["!clearnlp", "!resetlearned"],
-      adminOnly: true,
-      details: [
-        "• With pattern: removes specific learned pattern",
-        "• Without pattern: clears all learned patterns",
-        "• Requires confirmation for bulk clear",
-        "• Resets to default patterns"
-      ]
-    },
-    nlpunhide: {
-      usage: "!nlpunhide",
-      description: "Unhide NLP tabs in Google Sheets for viewing",
-      aliases: ["!shownlp"],
-      adminOnly: true,
-      details: [
-        "• Makes NLP sheets visible",
-        "• View learned patterns directly in Sheets",
-        "• See unrecognized phrases log",
-        "• Useful for debugging"
-      ]
-    },
-    myprofile: {
-      usage: "!myprofile",
-      description: "View your personal NLP learning profile",
-      aliases: ["!profile", "!mypatterns"],
-      adminOnly: false,
-      details: [
-        "• See commands you use most",
-        "• View your NLP patterns",
-        "• Engagement statistics",
-        "• Personal usage insights"
       ]
     }
   },
@@ -918,11 +684,6 @@ function buildMainHelp() {
         inline: true
       },
       {
-        name: `${EMOJI.ROBOT} AI/Intelligence`,
-        value: `\`!help intelligence\`\nPredictions, analytics, fraud detection`,
-        inline: true
-      },
-      {
         name: `${EMOJI.TROPHY} Leaderboards`,
         value: `\`!help leaderboard\`\nRankings, weekly reports, statistics`,
         inline: true
@@ -935,11 +696,6 @@ function buildMainHelp() {
       {
         name: `🔄 Boss Rotation`,
         value: `\`!help rotation\`\nMulti-guild boss rotation tracking`,
-        inline: true
-      },
-      {
-        name: `🧠 NLP Learning`,
-        value: `\`!help nlp\`\nNatural language pattern management`,
         inline: true
       },
       {
@@ -984,11 +740,6 @@ function buildCategoryHelp(category, isUserAdmin = true) {
       description: "Point-based bidding and auction management",
       color: COLORS.AUCTION
     },
-    intelligence: {
-      title: `${EMOJI.ROBOT} Intelligence/Analytics Commands`,
-      description: "Statistical analytics and pattern-based predictions",
-      color: COLORS.AI
-    },
     leaderboard: {
       title: `${EMOJI.TROPHY} Leaderboard Commands`,
       description: "Rankings and weekly statistics",
@@ -1003,11 +754,6 @@ function buildCategoryHelp(category, isUserAdmin = true) {
       title: `🔄 Boss Rotation System Commands`,
       description: "Multi-guild boss rotation tracking and management",
       color: COLORS.PRIMARY
-    },
-    nlp: {
-      title: `🧠 NLP Learning System Commands`,
-      description: "Natural language pattern learning and management",
-      color: COLORS.AI
     },
     emergency: {
       title: `${EMOJI.EMERGENCY} Emergency Recovery Commands`,
@@ -1121,11 +867,9 @@ function buildErrorEmbed(query) {
       `**Available categories:**\n` +
       `• \`!help attendance\`\n` +
       `• \`!help auction\`\n` +
-      `• \`!help intelligence\`\n` +
       `• \`!help leaderboard\`\n` +
       `• \`!help management\`\n` +
       `• \`!help rotation\`\n` +
-      `• \`!help nlp\`\n` +
       `• \`!help emergency\`\n\n` +
       `Or try \`!help\` for the main menu.`
     )

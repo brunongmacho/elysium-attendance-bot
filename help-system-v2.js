@@ -377,38 +377,6 @@ const COMMANDS = {
       channels: [CHANNEL_TYPES.ADMIN_LOGS],
       category: "Boss Management"
     },
-    nlpstats: {
-      usage: "!nlpstats",
-      description: "View NLP learning statistics",
-      aliases: [],
-      adminOnly: true,
-      channels: [CHANNEL_TYPES.ADMIN_LOGS],
-      category: "NLP Admin"
-    },
-    learned: {
-      usage: "!learned",
-      description: "List all learned NLP patterns",
-      aliases: [],
-      adminOnly: true,
-      channels: [CHANNEL_TYPES.ADMIN_LOGS],
-      category: "NLP Admin"
-    },
-    unrecognized: {
-      usage: "!unrecognized",
-      description: "Show unrecognized phrases",
-      aliases: [],
-      adminOnly: true,
-      channels: [CHANNEL_TYPES.ADMIN_LOGS],
-      category: "NLP Admin"
-    },
-    teachbot: {
-      usage: "!teachbot \"phrase\" → !command",
-      description: "Manually teach NLP pattern",
-      aliases: [],
-      adminOnly: true,
-      channels: [CHANNEL_TYPES.ADMIN_LOGS],
-      category: "NLP Admin"
-    },
     weeklyreport: {
       usage: "!weeklyreport or !weekly",
       description: "Force generate weekly report",
@@ -508,38 +476,6 @@ const COMMANDS = {
       adminOnly: false,
       channels: [CHANNEL_TYPES.GUILD_CHAT, CHANNEL_TYPES.BOT_COMMANDS, CHANNEL_TYPES.ADMIN_LOGS],
       category: "Analytics"
-    },
-    predictspawn: {
-      usage: "!predictspawn [boss]",
-      description: "Predict next boss spawn time",
-      aliases: ["!nextspawn", "!whennext", "!spawntimer"],
-      adminOnly: false,
-      channels: [CHANNEL_TYPES.GUILD_CHAT, CHANNEL_TYPES.BOT_COMMANDS, CHANNEL_TYPES.ADMIN_LOGS, CHANNEL_TYPES.BOSS_TIMER],
-      category: "Intelligence"
-    },
-    predictprice: {
-      usage: "!predictprice <item>",
-      description: "Get price prediction for auction item",
-      aliases: ["!predict", "!suggestprice"],
-      adminOnly: false,
-      channels: [CHANNEL_TYPES.GUILD_CHAT, CHANNEL_TYPES.BOT_COMMANDS, CHANNEL_TYPES.ADMIN_LOGS],
-      category: "Intelligence"
-    },
-    engagement: {
-      usage: "!engagement [@member]",
-      description: "Analyze member engagement",
-      aliases: ["!analyze", "!engage"],
-      adminOnly: false,
-      channels: [CHANNEL_TYPES.GUILD_CHAT, CHANNEL_TYPES.BOT_COMMANDS, CHANNEL_TYPES.ADMIN_LOGS],
-      category: "Intelligence"
-    },
-    analyzeengagement: {
-      usage: "!analyzeengagement",
-      description: "Guild-wide engagement analysis",
-      aliases: ["!analyzeall", "!guildanalyze"],
-      adminOnly: false,
-      channels: [CHANNEL_TYPES.GUILD_CHAT, CHANNEL_TYPES.BOT_COMMANDS, CHANNEL_TYPES.ADMIN_LOGS],
-      category: "Intelligence"
     }
   },
 
@@ -651,10 +587,8 @@ async function generateChannelHelp(message, isAdmin) {
       'Fun': '🎮',
       'Leaderboards': EMOJI.TROPHY,
       'Analytics': EMOJI.CHART,
-      'Intelligence': EMOJI.ROBOT,
       'Reports': '📋',
       'Boss Management': '🐉',
-      'NLP Admin': '🧠',
       'Help': EMOJI.BOOK
     }[category] || EMOJI.INFO;
 
