@@ -1197,7 +1197,7 @@ function findBestMemberMatch(searchName, guild) {
  * @param {GuildMember} member - Discord guild member
  * @returns {EmbedBuilder} Formatted stats embed
  */
-function buildStatsEmbed(stats, member, countdown = 30) {
+function buildStatsEmbed(stats, member, countdown = 300) {
   const { memberName, attendance, bidding, rank, totalMembers } = stats;
 
   // Calculate percentile (handle null/0 rank)
@@ -1267,9 +1267,10 @@ function buildStatsEmbed(stats, member, countdown = 30) {
   const lore = loreKey ? memberLore[loreKey] : null;
 
   if (lore) {
+    const skillsList = lore.skills ? lore.skills.join(', ') : 'None';
     embed.addFields({
-      name: `⚔️ ${lore.class}`,
-      value: `**Weapon:** ${lore.weapon}\n*${lore.lore}*`,
+      name: `✨ ${lore.title}`,
+      value: `${lore.lore}\n\n**Specialty:** ${lore.specialty}\n**Reputation:** ${lore.reputation}\n**Stats:** ${lore.stats}\n**Skills:** ${skillsList}`,
       inline: false
     });
   } else {
@@ -1421,7 +1422,7 @@ function getActivityLevel(rate) {
  *                                       Should accept (embed, countdown) and return updated embed
  * @param {number} duration - Total duration in seconds (default: 30)
  */
-async function startCountdownDeletion(message, botMessage, stats, member, updateFunction, duration = 30) {
+async function startCountdownDeletion(message, botMessage, stats, member, updateFunction, duration = 300) {
   let remainingTime = duration;
 
   // Delete user's command message immediately
@@ -1431,7 +1432,7 @@ async function startCountdownDeletion(message, botMessage, stats, member, update
     console.warn(`⚠️ Could not delete user message: ${e.message}`);
   }
 
-  // Update every 5 seconds: 30s, 25s, 20s, 15s, 10s, 5s
+  // Update every 5 seconds: 300s, 295s, 290s, etc.
   const updateInterval = 5;
   const countdownTimer = setInterval(async () => {
     remainingTime -= updateInterval;
@@ -2252,11 +2253,11 @@ stats: async (message, member, args) => {
       }
     }
     
-    const embed = buildStatsEmbed(cached.data, targetMember, 30);
+    const embed = buildStatsEmbed(cached.data, targetMember, 300);
     const statsMsg = await message.reply({ embeds: [embed] });
 
     // Start countdown deletion
-    startCountdownDeletion(message, statsMsg, cached.data, targetMember, buildStatsEmbed, 30);
+    startCountdownDeletion(message, statsMsg, cached.data, targetMember, buildStatsEmbed, 300);
 
     return;
   }
@@ -2298,11 +2299,11 @@ stats: async (message, member, args) => {
     });
 
     // Build and send embed (now with proper targetMember for lore lookup)
-    const embed = buildStatsEmbed(result, targetMember, 30);
+    const embed = buildStatsEmbed(result, targetMember, 300);
     await loadingMsg.edit({ content: null, embeds: [embed] });
 
     // Start countdown deletion
-    startCountdownDeletion(message, loadingMsg, result, targetMember, buildStatsEmbed, 30);
+    startCountdownDeletion(message, loadingMsg, result, targetMember, buildStatsEmbed, 300);
 
     console.log(`✅ Stats sent for ${actualMemberName} (searched: ${targetName})`);
 
