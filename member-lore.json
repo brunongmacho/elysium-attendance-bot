@@ -1,267 +1,308 @@
 {
   "AmielJohn": {
-    "weapon": "Bow",
-    "class": "Snack Archer",
-    "lore": "Fires arrows while snacking. Hits sometimes; appetite always. Has been seen using beef jerky as emergency ammo."
+    "title": "The Snack Strategist",
+    "lore": "A warrior who believes the secret to victory lies not just in skill, but in proper nutrition timing. Has developed a complex battle-snacking rotation that somehow works. Credits every victory to the perfect jerky-to-combat ratio.",
+    "specialty": "Mid-battle meal optimization",
+    "reputation": "The only member who brings more snacks than potions to raids"
   },
-  "ans2pid": {
-    "weapon": "Crossbow",
-    "class": "Chaos Ranger",
-    "lore": "Plays tactical chess with crossbow... mostly hits scenery. The trees have a restraining order."
+  "Joco": {
+    "title": "The Strategic Vice",
+    "lore": "Right hand to the Guild Leader, Joco is known for turning chaotic situations into calculated victories. While others panic, Joco sees patterns. A master tactician who somehow makes sense of Goblok's wildest plans and transforms them into actual strategy.",
+    "specialty": "Chaos translation and tactical coordination",
+    "reputation": "The voice of reason that keeps the guild from complete anarchy"
   },
   "Azryth": {
-    "weapon": "Dual Dagger",
-    "class": "Vampire Assassin",
-    "lore": "Throws daggers stylishly; debates bat supremacy with Batghost mid-combo. Currently losing the argument."
-  },
-  "Batghost": {
-    "weapon": "Staff",
-    "class": "Phantom Sorcerer",
-    "lore": "Haunts the battlefield. Mostly scares teammates, enemies occasionally. Voted 'Most Likely to Make Allies Scream' three years running."
+    "title": "Nightblade Philosopher",
+    "lore": "Strikes from the shadows while pondering the deeper meaning of combat. Has been known to pause mid-assassination to debate the ethics of surprise attacks. Enemies never know if they're about to be eliminated or engaged in philosophical discourse.",
+    "specialty": "Existential combat theory",
+    "reputation": "Most likely to defeat you physically and mentally"
   },
   "Draxiimov": {
-    "weapon": "Bow",
-    "class": "Meme Archer",
-    "lore": "Shoots arrows of chaos; monsters die laughing instead of fighting. Weaponized cringe so powerful it violates the Geneva Convention."
+    "title": "The Meme Lord",
+    "lore": "Weaponized internet culture into a legitimate combat style. Every attack comes with perfectly timed references that confuse enemies into submission. The battlefield is their stage, and cringe is their sword. Undefeated in psychological warfare.",
+    "specialty": "Weaponized cringe and cultural references",
+    "reputation": "Banned from three enemy guilds for emotional damage"
   },
   "Goblok": {
-    "weapon": "Greatsword",
-    "class": "Goblin Warrior (Leader)",
-    "lore": "Wields a massive greatsword... and wisdom rarely. Leads raids in unpredictable patterns. GPS has given up on providing directions."
+    "title": "The Unpredictable Leader",
+    "lore": "Guild Leader and master of controlled chaos. Leads with a unique combination of brilliant strategy and complete randomness that keeps both allies and enemies perpetually confused. GPS systems have given up trying to predict raid patterns. Despite the chaos, somehow always gets results.",
+    "specialty": "Strategic unpredictability and inspirational confusion",
+    "reputation": "The only leader who can turn a disaster into a victory parade"
   },
   "Hesucrypto": {
-    "weapon": "Crossbow",
-    "class": "Crypto Ranger (Vice)",
-    "lore": "Shoots arrows of investment advice. Gold golems spawn randomly. Lost more guild funds than battles, somehow still Vice Leader."
+    "title": "The Crypto Vice King",
+    "lore": "Vice Guild Leader and visionary investor who sees every battle as a market opportunity. Analyzes enemy HP bars like stock charts and treats loot drops as portfolio diversification. The bot's creator and patron saint of calculated risks. Lost more gold than the guild treasury but somehow still Vice Leader.",
+    "specialty": "Economic warfare and investment-based combat theory",
+    "reputation": "The reason guild funds are both invested and terrifying"
   },
   "Iguro": {
-    "weapon": "Crossbow",
-    "class": "Portal Sniper",
-    "lore": "Crossbow shots teleport unpredictably; allies dodge or join enemies. Has accidentally recruited three bosses to the guild."
+    "title": "Portal Chaos Agent",
+    "lore": "Mastered the art of spatial manipulation with questionable results. Every attack teleports unpredictably, making them as dangerous to allies as to enemies. Has accidentally recruited three raid bosses to the guild through portal mishaps. The recruitment team loves them anyway.",
+    "specialty": "Unpredictable spatial warfare",
+    "reputation": "Simultaneously the best and worst at targeting"
   },
   "Inihaw": {
-    "weapon": "Battle Shield",
-    "class": "Pyro Guardian (Vice)",
-    "lore": "Defends allies while firing grills of doom. Battlefield doubles as BBQ. Enemies die from heart disease before combat damage."
+    "title": "The BBQ Vice Commander",
+    "lore": "Vice Guild Leader who turned defensive tactics into a culinary art form. Protects allies while simultaneously grilling enemies to perfection. Every battlefield becomes a barbecue, every raid a feast. Enemies die from heart disease before combat damage. The guild's morale and cholesterol are both at all-time highs.",
+    "specialty": "Defensive grilling and protective cooking",
+    "reputation": "The shield that also feeds you"
   },
   "Jalo": {
-    "weapon": "Bow",
-    "class": "Lore Archer",
-    "lore": "Arrows and useless facts fly simultaneously; accuracy optional. Once lectured a dragon about its poor dental hygiene mid-fight. Dragon fled."
+    "title": "The Legendary Namesake",
+    "lore": "The legend himself - the member so iconic that the entire attendance bot bears his name. A walking encyclopedia of useless facts who somehow makes them tactically relevant. Once defeated a dragon by lecturing it about proper dental hygiene. The dragon fled in shame. This bot exists as tribute to his legendary status.",
+    "specialty": "Tactical trivia and educational warfare",
+    "reputation": "The guild's living legend and bot inspiration"
   },
   "LXRDGRIM": {
-    "weapon": "Bow",
-    "class": "Reaper Marksman",
-    "lore": "Shoots arrows that hug and confuse; brooding optional. Enemies request therapy after encounters. Brooding still mandatory."
-  },
-  "ShionXT": {
-    "weapon": "Sword and Shield",
-    "class": "Reluctant Knight",
-    "lore": "Swings sword, barely blocks; heroic poses included for flair. Has mastered the art of looking epic while accomplishing nothing."
-  },
-  "zadaku": {
-    "weapon": "Sword and Shield",
-    "class": "Shadow Paladin",
-    "lore": "Blocks and schemes; usually forgets the plan mid-battle. Has 47 half-completed strategies and zero completed victories."
-  },
-  "Andrina": {
-    "weapon": "Crossbow",
-    "class": "Shadow Ranger",
-    "lore": "Shoots from darkness; sometimes hits the wrong side... but looks cool doing it. Style points awarded, victory points questionable."
-  },
-  "BabyDoge": {
-    "weapon": "Bow",
-    "class": "Bark Archer",
-    "lore": "Arrows bark; morale boosts and chaos ensue. Every shot sounds like a motivational chihuahua. Enemies confused. Allies inspired?"
-  },
-  "BronnyJames": {
-    "weapon": "Crossbow",
-    "class": "Pyro Ranger",
-    "lore": "Tries to set everything on fire with bolts; succeeds occasionally... accidentally. Guild insurance premiums have tripled."
+    "title": "The Brooding Reaper",
+    "lore": "Radiates an aura of darkness and existential dread that somehow comforts allies and terrifies enemies. Every attack carries the weight of a thousand dark thoughts. Enemies request therapy sessions after encounters. Brooding is not optional - it's mandatory and weaponized.",
+    "specialty": "Therapeutic intimidation through brooding",
+    "reputation": "Guild's emotional support reaper"
   },
   "Byakko": {
-    "weapon": "Crossbow",
-    "class": "Roaring Hunter",
-    "lore": "Terrifies enemies with bolts and booming roars. Volume: max. Accuracy: variable. Intimidation: effective. Hearing loss: inevitable."
+    "title": "The Roaring Terror",
+    "lore": "Believes volume equals victory and has the track record to prove it. Every attack comes with a deafening roar that breaks enemy morale and allied eardrums simultaneously. The guild provides earplugs. Enemies provide surrender documents. Intimidation tactics: maximum. Hearing safety: questionable.",
+    "specialty": "Sonic intimidation and morale destruction",
+    "reputation": "The reason the guild insurance covers hearing aids"
   },
   "Carrera": {
-    "weapon": "Crossbow",
-    "class": "Wind Ranger",
-    "lore": "Fast bolts, rarely hits target, style guaranteed. Moves so fast even their own arrows can't keep up. Physics weeps."
+    "title": "Speed Demon",
+    "lore": "Moves so fast that physics has filed a formal complaint. Attacks with incredible speed and style, though accuracy is a secondary concern. Even their own attacks can't keep up with their movement. The battlefield becomes a blur when they arrive. Effectiveness through overwhelming velocity.",
+    "specialty": "Supersonic combat and stylish chaos",
+    "reputation": "Faster than their own decision-making process"
   },
   "CheeseCakee": {
-    "weapon": "Bow",
-    "class": "Dessert Archer",
-    "lore": "Shoots cakes that explode on contact. Sweet, deadly, and surprisingly moist. Bosses die diabetic and satisfied."
+    "title": "The Dessert Destroyer",
+    "lore": "Weaponized baking into a legitimate combat art. Every attack is delicious, deadly, and surprisingly moist. Enemies die satisfied and diabetic. Has defeated more bosses through pastry than most members defeat through actual combat. The sweetest threat in the guild.",
+    "specialty": "Confectionary combat and diabetic warfare",
+    "reputation": "The only member whose attacks smell amazing"
   },
   "Chunchunmaru": {
-    "weapon": "Greatsword",
-    "class": "Beast Warrior",
-    "lore": "Swings massive sword; mounted chaos included. Named sword after... that. Enemies die laughing. Strategy working as intended."
-  },
-  "CobRa": {
-    "weapon": "Bow",
-    "class": "Stealth Archer",
-    "lore": "Shoots arrows while setting traps; stealth optional. Once trapped self for three hours. Enemy felt bad and left."
+    "title": "The Legendary Blade",
+    "lore": "Wields a massive legendary sword with an absolutely ridiculous name. The name was chosen deliberately for psychological warfare - enemies die laughing before they can mount a defense. Strategy working perfectly. The sword is mighty, the name is questionable, the results are undeniable.",
+    "specialty": "Comedic nomenclature warfare",
+    "reputation": "Most powerful weapon with the silliest name"
   },
   "Daleee": {
-    "weapon": "Battle Staff",
-    "class": "Bard Mage",
-    "lore": "Casts spells that buff allies... unintentionally. Meant to curse boss, accidentally made teammates immortal. Happy accidents only."
+    "title": "The Accidental Savior",
+    "lore": "A mage whose spells do the opposite of what's intended, but somehow everything works out. Aims curses at bosses, accidentally grants immortality to teammates. The guild has stopped questioning it and just accepts the happy accidents. Chaos theory incarnate.",
+    "specialty": "Inverse spellcasting and miraculous mistakes",
+    "reputation": "Wrong in every way that matters, perfect in every way that counts"
   },
   "EoriuX": {
-    "weapon": "Dual Dagger",
-    "class": "Silent Assassin",
-    "lore": "Strikes fast; mostly hits self by accident. Owns more bandages than weapons. Tetanus shots on speed dial."
+    "title": "The Self-Wounded Shadow",
+    "lore": "A master assassin with one critical flaw: attacking themselves more than the enemy. Owns more bandages than weapons and has the local healer on speed dial. Despite this, somehow still terrifying in combat. Enemies unsure if they should attack or offer medical assistance.",
+    "specialty": "Accidental self-harm and confused intimidation",
+    "reputation": "The guild's biggest customer for healing supplies"
   },
   "erwarrr": {
-    "weapon": "Staff",
-    "class": "Warcry Mage",
-    "lore": "Spells mixed with screams; morale questionable. Volume compensates for spell accuracy. Enemies surrender to stop the noise."
+    "title": "The Screaming Spellcaster",
+    "lore": "Discovered that spell accuracy increases when volume compensates for precision. Casts magic while screaming at maximum volume. Enemies surrender not from damage but from the sheer desire for silence. Morale impact questionable, effectiveness undeniable.",
+    "specialty": "Volume-based magic amplification",
+    "reputation": "The reason guild meetings are held outdoors"
   },
   "Evand3r": {
-    "weapon": "Staff",
-    "class": "Trinket Mage",
-    "lore": "Uses shiny objects as magical weapons; results vary. Once defeated a boss with a spoon. Refuses to explain how or why."
+    "title": "The Trinket Tactician",
+    "lore": "Believes any object can be a weapon with enough magical conviction. Once defeated a raid boss using only a spoon. Refuses to explain the technique or the logistics. The spoon is now guild legend, mounted in the hall of fame. Still uses random objects in combat daily.",
+    "specialty": "Improvised magical weaponry",
+    "reputation": "The reason the guild storage has a 'weapons?' section"
   },
   "Fever": {
-    "weapon": "Bow",
-    "class": "Chaos Archer",
-    "lore": "Arrows spread confusion; monsters unsure what's happening. Chaos field so strong reality.exe has stopped responding."
-  },
-  "Gehrmann": {
-    "weapon": "Barehands",
-    "class": "Obscure Brawler",
-    "lore": "Punches ideas and enemies equally; chaos guaranteed. Philosophy major turned fighter. Enemies defeated by existential crisis."
+    "title": "Reality Glitch",
+    "lore": "Radiates an aura of pure chaos that makes reality itself question its existence. Enemies enter the chaos field and forget why they're fighting. Allies forget what they're doing too, but somehow everyone on the guild side is fine with it. Reality.exe has permanently stopped responding.",
+    "specialty": "Existential confusion fields",
+    "reputation": "Living proof that chaos can be weaponized"
   },
   "Hercules": {
-    "weapon": "Dual Dagger",
-    "class": "Dancing Assassin",
-    "lore": "Fights and dances; enemies confused, allies too. Guild unsure if he's fighting or auditioning. Bosses die entertained."
+    "title": "The Dancing Death",
+    "lore": "Combines lethal combat with interpretive dance in ways that shouldn't work but absolutely do. Enemies die confused about whether they were attacked or entertained. The guild is equally confused but thoroughly impressed. Every battle is a performance, every kill a choreographed masterpiece.",
+    "specialty": "Combat choreography and deadly performances",
+    "reputation": "The guild's most entertaining combatant"
   },
   "IZANAGI": {
-    "weapon": "Greatsword",
-    "class": "Shadow Warrior",
-    "lore": "Massive sword swings; brooding heroics optional. Has three facial expressions: brood, brood harder, occasional brood with hint of smile."
-  },
-  "JEBER89": {
-    "weapon": "Battle Shield",
-    "class": "Button Guardian",
-    "lore": "Blocks attacks; presses imaginary buttons that occasionally work. Shield has QTE minigame only he can see. Critics rate gameplay 7/10."
+    "title": "The Shadow Colossus",
+    "lore": "Wields massive power with three primary facial expressions: brood, brood harder, and the rare brood-with-slight-smile. Heroic in action, dramatic in presentation, consistent in brooding. Every swing carries the weight of untold darkness and excellent dramatic timing.",
+    "specialty": "Dramatic heroics and professional brooding",
+    "reputation": "Most reliable source of dark atmosphere"
   },
   "M1ssy": {
-    "weapon": "Bow",
-    "class": "Rogue Archer",
-    "lore": "Shoots arrows; chaos guaranteed, snacks mandatory. Will pause mid-battle for snack break. Priorities: snacks, chaos, victory (in that order)."
+    "title": "The Chaotic Snacker",
+    "lore": "Prioritizes snacks over victory, chaos over strategy, and somehow makes it work. Will pause any battle for proper snack breaks. Enemies have learned to wait politely. Priorities firmly established: snacks first, chaos second, victory third. All three usually achieved.",
+    "specialty": "Snack-break tactical advantage",
+    "reputation": "The member with the best battle provisions"
   },
   "Maria": {
-    "weapon": "Barehands",
-    "class": "Twin Brawler",
-    "lore": "Punches everything; debates with Marsha11 over loot mid-fight. Has landed more arguments than punches. Winning both battles."
+    "title": "The Twin Debater",
+    "lore": "Fights with fists and arguments simultaneously. In constant debate with twin Marsha11 over literally everything, especially loot distribution. Has won more arguments than landed punches, but winning both battles. The sibling rivalry fuels combat effectiveness somehow.",
+    "specialty": "Simultaneous physical and verbal combat",
+    "reputation": "Half of the guild's most entertaining duo"
   },
   "Marsha11": {
-    "weapon": "Sword and Shield",
-    "class": "Twin Knight",
-    "lore": "Blocks and argues with Maria constantly; guild morale rises anyway. Fights synchronized: 50% combat, 50% sibling rivalry. Entertainment value: priceless."
-  },
-  "MOTHRA": {
-    "weapon": "Battle Shield",
-    "class": "Colossus Guardian",
-    "lore": "Shield ready; giant-scale destruction inevitable. Defensive stance causes more collateral damage than enemy attacks. Guild rebuilds monthly."
+    "title": "The Twin Defender",
+    "lore": "The other half of the legendary twin duo. Blocks attacks while arguing with Maria constantly. Their synchronized fighting is 50% combat effectiveness, 50% sibling rivalry, 100% entertainment value. Guild morale rises whenever they deploy together, mostly from the show.",
+    "specialty": "Defensive argumentation",
+    "reputation": "The other half of the guild's best entertainment"
   },
   "Munchyy": {
-    "weapon": "Bow",
-    "class": "Stealth Archer",
-    "lore": "Shoots arrows after meals; deadly and polite. Sends apology notes with every kill. Enemies die confused but respected."
+    "title": "The Polite Assassin",
+    "lore": "Kills with deadly efficiency but maintains impeccable manners throughout. Sends handwritten apology notes with every elimination. Enemies die confused but feeling oddly respected. Has never missed a thank-you card. Deadliest member with the best etiquette.",
+    "specialty": "Courteous assassination",
+    "reputation": "Most polite killer in guild history"
   },
   "Nyegerls": {
-    "weapon": "Barehands",
-    "class": "Wild Brawler",
-    "lore": "Punches and casts spells unpredictably; chaos ensues. Multiclassed accidentally. Still doesn't know which class. Neither do enemies."
-  },
-  "OneCrit": {
-    "weapon": "Sword and Shield",
-    "class": "Critical Knight",
-    "lore": "Blocks and swings; critical hits land randomly on friend or foe. RNG incarnate. Teammates wear helmets near him. Just in case."
-  },
-  "Pinchy": {
-    "weapon": "Staff",
-    "class": "Tiny Mage",
-    "lore": "Staff attacks; pinches enemies magically. Small but terrifying. Bosses fear the pinch. Guild medics fear carpal tunnel epidemic."
+    "title": "The Accidental Hybrid",
+    "lore": "Multiclassed by accident and still doesn't know which class they actually are. Punches and casts spells with equal unpredictability. Enemies don't know what to expect. Nyegerls doesn't know what to expect. Somehow this creates perfect chaos and consistent victories.",
+    "specialty": "Identity confusion warfare",
+    "reputation": "The class system's biggest mystery"
   },
   "PotatoCheese": {
-    "weapon": "Bow",
-    "class": "Spud Archer",
-    "lore": "Shoots potatoes that buff allies; delicious chaos. Arrows provide +10 carbs, +5 morale. Side effects: comfort, mild confusion, sudden hunger."
-  },
-  "Seoo": {
-    "weapon": "Bow",
-    "class": "Spy Archer",
-    "lore": "Stealthy shots; trips over shadows. Master of stealth. Except walking. And breathing quietly. And existing subtly. Perfect spy material."
+    "title": "The Carb Crusader",
+    "lore": "Discovered that potatoes make excellent projectiles and moral support. Every attack provides allies with +10 carbs and +5 morale. Side effects include comfort, mild confusion, and sudden hunger. The guild's most nourishing combatant. Enemies defeated, teammates fed.",
+    "specialty": "Nutritional combat support",
+    "reputation": "The reason the guild never goes hungry"
   },
   "Varys": {
-    "weapon": "Wand",
-    "class": "Whisper Mage",
-    "lore": "Knows all secrets; shares some at random. Guild gossip network administrator. Information accuracy: 60%. Entertainment value: 100%."
-  },
-  "Snowy": {
-    "weapon": "Greatsword",
-    "class": "Frost Warrior",
-    "lore": "Swings greatsword; freezes enemies... sometimes allies too. Friendly fire incidents: classified. Apologies: seasonal. Frostbite: constant."
-  },
-  "Wandote": {
-    "weapon": "Wand",
-    "class": "Wand Mage",
-    "lore": "Spells cast themselves... unpredictably. Wand has sentience and attitude. Wizard argues with weapon daily. Wand winning most debates."
+    "title": "The Whisper Network",
+    "lore": "Knows every secret, shares them strategically at random moments. Guild gossip network administrator and information broker. Accuracy of information: 60%. Entertainment value: 100%. Strategic value: surprisingly high. Enemies fear what Varys knows. Allies fear what Varys might reveal.",
+    "specialty": "Strategic information distribution",
+    "reputation": "The guild's living rumor mill"
   },
   "xLunox": {
-    "weapon": "Greatsword",
-    "class": "Lunar Warrior",
-    "lore": "Moonlit swings; dramatic entrances required. Cannot attack without entrance music. Battles delayed 3-5 minutes for proper ambiance. Worth it."
-  },
-  "ZenP4kTo": {
-    "weapon": "Bow",
-    "class": "Monster Archer",
-    "lore": "Arrows inspire enemies accidentally; chaos guaranteed. Motivational speaker energy with terrible aim. Bosses receive confidence boost. Guild confused."
+    "title": "The Moonlit Performer",
+    "lore": "Cannot and will not attack without proper entrance music and ambiance. Every battle begins with a 3-5 minute dramatic entrance sequence. Enemies wait politely because the presentation is that good. Worth every second of delay. Style over speed, ambiance over efficiency.",
+    "specialty": "Theatrical combat staging",
+    "reputation": "The guild's most dramatic entrance specialist"
   },
   "Ztig": {
-    "weapon": "Crossbow",
-    "class": "Berserk Ranger",
-    "lore": "Shoots wildly; friend or foe unclear. Friendly fire rate: impressive. Accuracy: concerning. Banned from three raids. Showed up anyway."
-  },
-  "dmzPapa": {
-    "weapon": "Staff",
-    "class": "Guild Patriarch Mage",
-    "lore": "Magic mixed with parental guidance; naps mandatory. Casts fireball, then lectures about responsibility. Bosses defeated by dad jokes. Effective but painful."
-  },
-  "Exitium": {
-    "weapon": "Crossbow",
-    "class": "Theatrical Ranger",
-    "lore": "Shoots arrows with flair; dramatic exits optional. Every shot has soliloquy. Enemies die waiting for monologue to end. Encore demanded."
-  },
-  "azlamey": {
-    "weapon": "Dagger",
-    "class": "Saboteur Assassin",
-    "lore": "Master of accidental disasters. Sabotages missions unintentionally. Guild suspects double agent. Reality: just really unlucky. Or talented?"
+    "title": "The Friendly Fire Legend",
+    "lore": "Shoots with enthusiasm but questionable targeting. Friend or foe status unclear to their projectiles. Banned from three official raids, showed up anyway and somehow helped. Friendly fire rate: impressive. Accuracy: terrifying. Guild acceptance: unconditional. Team damage insurance: expensive.",
+    "specialty": "Indiscriminate combat enthusiasm",
+    "reputation": "The reason allies wear helmets"
   },
   "Skadushy": {
-    "weapon": "Greatsword",
-    "class": "Shadow Warrior",
-    "lore": "Swings massive greatsword at shadows; snacks on darkness between strikes. Enemies confused by shadow-eating warrior with oversized blade. Nutritionists baffled."
+    "title": "The Darkness Devourer",
+    "lore": "Fights shadows and consumes darkness between strikes. Enemies fundamentally confused by a warrior who eats their element. Nutritionists baffled by shadow-based diet. Combat effectiveness unquestionable. Dietary choices unexplainable. Still swinging that oversized blade with shadow-fueled strength.",
+    "specialty": "Shadow consumption tactics",
+    "reputation": "The guild's most confusing dietary specialist"
   },
   "Mervzs": {
-    "weapon": "Orb",
-    "class": "Collector Mage",
-    "lore": "Purpose unknown; potentially dangerous. Collects shiny orbs. Maybe spells? Maybe decorative? Guild doesn't ask. Too afraid of answer."
-  },
-  "Crestia": {
-    "weapon": "Staff",
-    "class": "Calm Mage",
-    "lore": "Ignored often; decisive when least expected. Silent 99% of time. That 1%? Saves entire raid. Then returns to silence. Legend."
+    "title": "The Mysterious Collector",
+    "lore": "Purpose unclear, methods questionable, results terrifying. Collects orbs of unknown origin and function. Maybe they're spells. Maybe they're decorative. The guild stopped asking after the third mysterious explosion. Definitely powerful, definitely dangerous, definitely not explaining anything.",
+    "specialty": "Mysterious orb manipulation",
+    "reputation": "The member nobody questions out of fear"
   },
   "Sweeney": {
-    "weapon": "Wand + Dagger",
-    "class": "Chaotic Neutral",
-    "lore": "Friend or foe? Identity questionable. Alignment changes hourly. Guild has conspiracy board dedicated to tracking loyalty. Board inconclusive. Probably fine."
+    "title": "The Alignment Enigma",
+    "lore": "Friend or foe? The answer changes hourly. Loyalty alignment shifts like the wind. The guild maintains a full conspiracy board dedicated to tracking Sweeney's current allegiance. Board remains inconclusive. Probably fine. Maybe. Results suggest ally. Probably. Effectiveness undeniable. Trust level: variable.",
+    "specialty": "Allegiance fluidity",
+    "reputation": "The guild's favorite mystery"
+  },
+  "Riku": {
+    "title": "The Wandering Blade",
+    "lore": "Fights with the wisdom of someone who's seen too many battles and learned too few lessons. Every strike carries experience, every dodge carries muscle memory, every strategy carries the weight of 'that one time it worked.' The journey continues, the blade stays sharp, the confusion remains eternal.",
+    "specialty": "Experiential combat improvisation",
+    "reputation": "The warrior who learns everything except planning"
+  },
+  "Maia": {
+    "title": "The Serene Storm",
+    "lore": "Calm on the surface, absolute chaos underneath. Approaches every battle with zen-like tranquility before unleashing calculated devastation. Enemies mistake serenity for weakness until it's far too late. The guild's most deceptively peaceful member and most surprisingly destructive force.",
+    "specialty": "Tranquil devastation",
+    "reputation": "Proof that calm waters run deep and deadly"
+  },
+  "Miang": {
+    "title": "The Silent Reckoning",
+    "lore": "Speaks rarely, strikes decisively, plans constantly. Every word is calculated, every action purposeful. When Miang speaks, the guild listens. When Miang moves, enemies fall. The embodiment of 'actions speak louder than words' and 'silence is golden but violence is platinum.'",
+    "specialty": "Strategic silence and decisive action",
+    "reputation": "The quietest member with the loudest impact"
+  },
+  "Pinayflix": {
+    "title": "The Streaming Sensation",
+    "lore": "Treats every battle like a live performance for an invisible audience. Provides running commentary during raids, complete with sponsorship mentions and viewer shoutouts. Enemies confused by constant narration. Guild entertained by production value. Like, subscribe, and defeat the boss.",
+    "specialty": "Combat entertainment and live battle streaming",
+    "reputation": "The guild's most entertaining narrator"
+  },
+  "Helvenica": {
+    "title": "The Font of Power",
+    "lore": "Fights with typography precision and design sensibility. Every attack formatted perfectly, every combo properly spaced. Believes combat effectiveness is directly related to aesthetic presentation. Has defeated enemies through sheer visual superiority. Comic Sans is banned from their presence.",
+    "specialty": "Aesthetic warfare and design-based combat",
+    "reputation": "The guild's most stylistically consistent fighter"
+  },
+  "Shawty": {
+    "title": "The Compact Devastator",
+    "lore": "Small in stature, overwhelming in power. Has perfected the art of being underestimated and then absolutely destroying that assumption. Enemies make the same mistake once. Only once. The guild's proof that the best things come in small, terrifying packages.",
+    "specialty": "Underestimation exploitation",
+    "reputation": "The smallest member with the biggest impact"
+  },
+  "Jayzzzzzzz": {
+    "title": "The Sleepy Destroyer",
+    "lore": "Fights in a perpetual state of drowsiness but somehow remains devastatingly effective. Every attack delivered with maximum yawns and minimum effort. Enemies confused by lethargic efficiency. The guild's most energy-efficient combatant. Power naps between boss phases.",
+    "specialty": "Low-effort high-impact combat",
+    "reputation": "Most likely to defeat you while half-asleep"
+  },
+  "Onirgerep": {
+    "title": "The Reverse Enigma",
+    "lore": "Everything about this member is backwards - name, strategy, combat style. Attacks in reverse, plans in retrograde, somehow achieves forward progress. The universe hasn't figured out how it works. Neither has the guild. Results speak for themselves, even if they speak backwards.",
+    "specialty": "Reverse logic warfare",
+    "reputation": "The guild's most confusingly effective member"
+  },
+  "Enaira": {
+    "title": "The Storm Caller",
+    "lore": "Brings the fury of tempests to every battle. Enemies face not just a warrior but an entire weather system. Forecasts call for pain with a 100% chance of defeat. The guild's personal meteorological phenomenon. Side effects may include lightning, thunder, and sudden enemy evacuation.",
+    "specialty": "Meteorological combat manipulation",
+    "reputation": "The reason enemies check the weather forecast"
+  },
+  "DEMIURGE": {
+    "title": "The Architect of Chaos",
+    "lore": "Designs elaborate plans with godlike complexity and demonic execution. Every strategy a masterpiece, every tactic a work of dark art. Creates scenarios where enemies defeat themselves through the sheer brilliance of the setup. The guild's resident genius of controlled destruction.",
+    "specialty": "Architectural devastation planning",
+    "reputation": "The mind behind the guild's most complex victories"
+  },
+  "JeffEpstein": {
+    "title": "The Controversial Tactician",
+    "lore": "Named controversially, fights effectively. Every battle raises questions, every victory raises eyebrows. The guild has learned not to ask about the name and just appreciate the combat results. Tactical effectiveness unquestionable, naming choices forever debatable.",
+    "specialty": "Questionable branding with solid results",
+    "reputation": "The name everyone questions, the fighter nobody doubts"
+  },
+  "ladyhoho": {
+    "title": "The Laughing Warrior",
+    "lore": "Approaches every battle with infectious joy and devastating technique. Enemies hear laughter and assume weakness until they're already defeated. The guild's morale booster and enemy confusion generator. Proof that happiness is the best weapon and joy is terrifying in the right hands.",
+    "specialty": "Joyful devastation",
+    "reputation": "The happiest member with the saddest enemies"
+  },
+  "Andromach3": {
+    "title": "The Cyber Sentinel",
+    "lore": "Fights like a program executing flawless code. Every attack optimized, every defense compiled for maximum efficiency. Has turned combat into computational science. Enemies debug their strategy too late. The guild's most algorithmically perfect fighter.",
+    "specialty": "Computational combat execution",
+    "reputation": "The warrior who turned fighting into programming"
+  },
+  "卂几几": {
+    "title": "The Symbolic Force",
+    "lore": "Named in symbols, fights in legend. Communication transcends language, combat transcends understanding. Enemies confused by everything from name to tactics. Guild inspired by mysterious excellence. A warrior who proves you don't need to be understood to be unstoppable.",
+    "specialty": "Symbolic warfare and linguistic chaos",
+    "reputation": "The member whose name is harder to type than their hits are to avoid"
+  },
+  "PanCoco": {
+    "title": "The Coconut Commander",
+    "lore": "Discovered that coconuts are both nutritious and surprisingly aerodynamic. Weaponized tropical fruit into a combat art form. Enemies defeated by nature's perfect projectile. The guild stays hydrated and enemies stay defeated. Tropical warfare at its finest.",
+    "specialty": "Tropical fruit-based combat",
+    "reputation": "The reason the guild smells like vacation"
+  },
+  "Ace": {
+    "title": "The Perfect Hand",
+    "lore": "Plays every battle like a high-stakes card game where they always hold the winning hand. Bluffs enemies into submission, calls their attacks, and goes all-in when it matters. Never shows their full strategy. Always walks away victorious. The guild's luckiest unlucky gambler.",
+    "specialty": "Probability manipulation and tactical gambling",
+    "reputation": "The member who turned combat into a card game and keeps winning"
+  },
+  "Rapadapa": {
+    "title": "The Rhythm Warrior",
+    "lore": "Fights to an internal beat that only they can hear. Every attack perfectly timed to mysterious rhythm, every dodge a dance move. Enemies can't predict the tempo. Guild can't hear the music. Everyone witnesses the devastating choreography. Combat as performance art.",
+    "specialty": "Rhythmic combat synchronization",
+    "reputation": "The warrior with the best internal soundtrack"
+  },
+  "lanZ6": {
+    "title": "The Calculated Chaos",
+    "lore": "Balances perfect mathematical precision with absolute randomness in ways that shouldn't work but devastatingly do. Every attack calculated to six decimal places then executed with pure chaos energy. The guild's proof that order and disorder can coexist beautifully in combat.",
+    "specialty": "Mathematical chaos theory application",
+    "reputation": "The member who weaponized probability itself"
   }
 }
