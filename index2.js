@@ -103,15 +103,11 @@ const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/b
 const { addGuildFooter, addGuildThumbnail } = require('./utils/embed-branding'); // Guild branding utility
 const scheduler = require('./utils/maintenance-scheduler'); // Unified maintenance scheduler
 const timerRegistry = require('./utils/timer-registry'); // Centralized timer tracking
-const { IntelligenceEngine } = require('./intelligence-engine.js'); // AI/ML Intelligence Engine
-const { ProactiveIntelligence } = require('./proactive-intelligence.js'); // Proactive Monitoring
-const { NLPHandler } = require('./nlp-handler.js'); // Natural Language Processing
-const { NLPLearningSystem } = require('./nlp-learning.js'); // NLP Learning System (self-improving)
+// ❌ REMOVED: Abolished systems (intelligence-engine, proactive-intelligence, nlp-*, ml-integration, loot-system)
 const eventReminders = require('./event-reminders.js'); // Game Event Reminder System
 const bossRotation = require('./boss-rotation.js'); // Boss Rotation System (5-guild tracking)
 const activityHeatmap = require('./activity-heatmap.js'); // Activity Heatmap System
 const crashRecovery = require('./utils/crash-recovery.js'); // Crash Recovery System (state persistence)
-const { MLIntegration } = require('./ml-integration.js'); // ML Integration (spawn prediction + NLP enhancement)
 const memberLore = JSON.parse(fs.readFileSync("./member-lore.json")); // Member lore data
 const { COMMAND_ALIASES, resolveCommandAlias } = require('./config/command-aliases'); // Command alias mapping
 
@@ -498,7 +494,8 @@ let nlpLearningSystem = null;
  * Enhances NLP with context awareness and sentiment analysis
  * @type {MLIntegration}
  */
-let mlIntegration = null;
+// ❌ REMOVED: Abolished ML systems
+// let mlIntegration = null;
 
 /**
  * Flag indicating bot is currently recovering from a crash
