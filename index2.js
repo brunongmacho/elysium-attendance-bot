@@ -461,14 +461,6 @@ let lastAuctionEndTime = 0;
 
 
 
-/**
- * ML Integration for enhanced spawn predictions and NLP conversation
- * Provides ML-powered spawn time predictions with confidence intervals
- * Enhances NLP with context awareness and sentiment analysis
- * @type {MLIntegration}
- */
-// ❌ REMOVED: Abolished ML systems
-// let mlIntegration = null;
 
 /**
  * Flag indicating bot is currently recovering from a crash
@@ -2049,23 +2041,6 @@ const commandHandlers = {
       ? `🔴 Active: **${biddingState.a.item}** (${biddingState.a.curBid}pts)`
       : `🟢 Queue: ${biddingState.q.length} item(s)`;
 
-    // Get ML statistics if available
-    let mlStats = null;
-    let mlStatusText = '⚠️ Disabled';
-    if (mlIntegration) {
-      try {
-        mlStats = await mlIntegration.getStats();
-        if (mlStats && mlStats.enabled) {
-          const patternsCount = mlStats.spawn?.patternsLearned || 0;
-          mlStatusText = patternsCount > 0
-            ? `✅ Active - ${patternsCount} boss patterns learned`
-            : `🟡 Learning - No patterns yet`;
-        }
-      } catch (mlError) {
-        mlStatusText = `⚠️ Error: ${mlError.message}`;
-      }
-    }
-
     const embed = new EmbedBuilder()
       .setColor(0x00ff00)
       .setTitle("📊 Bot Status")
@@ -2092,8 +2067,7 @@ const commandHandlers = {
           value: spawnListText + moreSpawns,
           inline: false,
         },
-        { name: "💰 Bidding System", value: biddingStatus, inline: false },
-        { name: "🤖 ML Spawn Predictor", value: mlStatusText, inline: false }
+        { name: "💰 Bidding System", value: biddingStatus, inline: false }
       )
       .setFooter({ text: `Requested by ${member.user.username}` })
       .setTimestamp();
@@ -4286,11 +4260,6 @@ client.once(Events.ClientReady, async () => {
   leaderboardSystem.init(client, config, discordCache);
   activityHeatmap.init(client, config);
   bossRotation.initialize(config, client, bossTimer);
-
-  // Initialize ML Integration for enhanced spawn predictions
-  console.log('🤖 Initializing ML Integration...');
-  mlIntegration = new MLIntegration(config, sheetAPI);
-  console.log('✅ ML Integration initialized - Learning from historical data...');
 
   console.log("🔄 Running state recovery...");
   isRecovering = true;
