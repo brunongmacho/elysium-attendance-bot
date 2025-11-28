@@ -80,12 +80,12 @@
     "skills": ["Therapeutic Dread", "Counseling Strike", "Emotional Support Scythe"]
   },
   "Byakko": {
-    "title": "The Roaring Terror",
-    "lore": "Legendary warrior whose thunderous roar breaks enemy morale and shatters eardrums. Laryngitis. Every 'roar' comes out as a tiny squeak. Enemies die from trying not to laugh. The guild pretends they can't hear the squeaking. Most intimidating mouse impression in combat history.",
-    "specialty": "Sonic intimidation via adorable squeaking",
-    "reputation": "The reason the guild bought 'hearing aids' (earplugs they don't use)",
-    "stats": "Intended Volume 100 | Actual Volume 5 | Cuteness 95 | Intimidation 80",
-    "skills": ["Mighty Squeak", "Adorable Terror", "Laryngitis Roar"]
+    "title": "The White Tiger Who Lost His Roar",
+    "lore": "Named after the legendary White Tiger guardian deity of the West, whose roar shakes mountains. Chronic laryngitis. The divine roar comes out as tiny squeaks. Mountains remain unshaken. Enemies die laughing instead of fear. The other guardian deities (Genbu, Suzaku, Seiryu) pretend not to know him. Most adorable celestial beast.",
+    "specialty": "Divine intimidation via celestial squeaking",
+    "reputation": "The guardian deity the legends forgot to mention has a voice problem",
+    "stats": "Divine Power 100 | Roar Volume 5 | Cuteness 999 | Celestial Shame 90",
+    "skills": ["Sacred Squeak", "Heavenly Laryngitis", "Divine Mouse Impression"]
   },
   "Carrera": {
     "title": "Speed Demon",
@@ -152,20 +152,20 @@
     "skills": ["Organized Apocalypse", "Alphabetical Destruction", "Categorized Chaos"]
   },
   "Hercules": {
-    "title": "The Dancing Death",
-    "lore": "Combines lethal martial arts with professional dance in beautiful deadly harmony. Two left feet. Every move is a stumble. Enemies think it's advanced technique and try to dodge. The flailing is completely accidental. Wins through opponents overthinking random clumsiness.",
-    "specialty": "Combat choreography that's entirely unintentional",
-    "reputation": "The guild's most 'talented' dancer (nobody has the heart to tell them)",
-    "stats": "Dance Skill 5 | Combat 85 | Coordination 10 | Accidental Genius 100",
-    "skills": ["Stumble Strike", "Flailing Finisher", "Unintentional Dodge"]
+    "title": "The Legendary Labor-Dodger",
+    "lore": "Named after the Greek demigod who completed 12 impossible labors with godlike strength. Has completed 0 labors. Too tired. Claims every task is the '13th labor' and refuses on principle. Legendary strength is real - exclusively used to carry snacks and avoid responsibility. The heroic bloodline is ashamed.",
+    "specialty": "Legendary labor avoidance and divine procrastination",
+    "reputation": "The demigod who weaponized laziness into an art form",
+    "stats": "Godlike Strength 100 | Completed Labors 0 | Excuses 999 | Heroism 5",
+    "skills": ["13th Labor Denial", "Divine Procrastination", "Mythic Snack Carrying"]
   },
   "IZANAGI": {
-    "title": "The Shadow Colossus",
-    "lore": "Dark warrior with three brooding expressions: brood, brood harder, and slight smile. Incapable of sadness - perpetually joyful inside. The brooding is performance art. Actually loves rainbows and puppies. The facade never breaks. Method acting taken too far.",
-    "specialty": "Professional brooding powered by internal happiness",
-    "reputation": "Most reliable dark atmosphere generator who owns 15 therapy dogs",
-    "stats": "Brooding 100 | Actual Sadness 0 | Joy 95 | Therapy Dogs 15",
-    "skills": ["Joyful Brood", "Rainbow Suppression", "Puppy Love Concealment"]
+    "title": "The Failed Creator Deity",
+    "lore": "Named after the Japanese god who created the world from primordial chaos. Destroys everything touched. Tried to create a sandwich - kitchen exploded. Attempted crafting - guild hall collapsed. Divine creation powers work in reverse. The most destructive 'creator' in existence. Ancestors weep from the heavens.",
+    "specialty": "Divine destruction disguised as creation attempts",
+    "reputation": "The creator deity who unmakes reality with every craft attempt",
+    "stats": "Creation Power 100 | Actual Creation 0 | Destruction 999 | Divine Shame 95",
+    "skills": ["Reverse Genesis", "Catastrophic Crafting", "Primordial Chaos (Accidental)"]
   },
   "M1ssy": {
     "title": "The Chaotic Snacker",
@@ -256,28 +256,28 @@
     "skills": ["Marble Mayhem", "Tantrum Explosion", "Playground Devastation"]
   },
   "Sweeney": {
-    "title": "The Alignment Enigma",
-    "lore": "Legendary double agent whose loyalty shifts unpredictably between friend and foe. Extremely loyal - never changed sides once. The conspiracy board is guild entertainment. Sweeney plays along for fun. Creates elaborate fake evidence. The dedication to the bit is admirable.",
-    "specialty": "Allegiance fluidity (that doesn't actually exist)",
-    "reputation": "The guild's favorite mystery who's the most reliable member",
-    "stats": "Loyalty 100 | Betrayals 0 | Fake Evidence 95 | Commitment to Bit 999",
-    "skills": ["Loyal Deception", "Conspiracy Fuel", "Reliable Mystery"]
+    "title": "The Demon Barber (of Bad Haircuts)",
+    "lore": "Named after Sweeney Todd, the demon barber of Fleet Street who gave fatal shaves. Gives haircuts instead. Terrible at it. Every cut is a disaster. Enemies flee from the scissors, not the blade. Has inadvertently created psychological warfare through bad bangs. The throat-slitting razor sits unused - the safety scissors are deadlier.",
+    "specialty": "Follicle-based psychological warfare",
+    "reputation": "The demon barber whose cuts are more terrifying than murder",
+    "stats": "Barber Skill 5 | Kill Count (Hair) 999 | Actual Kills 0 | Bad Bangs 100",
+    "skills": ["Catastrophic Fade", "Asymmetric Trauma", "Safety Scissor Menace"]
   },
   "Riku": {
-    "title": "The Wandering Blade",
-    "lore": "Seasoned veteran warrior with decades of combat experience and battle wisdom. Started last week. Every 'past battle' is completely made up. Stories change each telling. Nobody knows the truth. Somehow the fabricated experience translates to real skill. Fake it till you make it incarnate.",
-    "specialty": "Experiential combat based on fictional experience",
-    "reputation": "The warrior with 40 years of experience in 7 days",
-    "stats": "Claimed Experience 40 yrs | Actual Experience 7 days | Storytelling 100 | Real Skill 85",
-    "skills": ["Fabricated Mastery", "Story Inconsistency", "Fake-It Combat Style"]
+    "title": "The Keyblade-less Chosen One",
+    "lore": "Named after the legendary keyblade wielder destined to fight darkness and unlock hearts. Lost the keyblade. Literally lost it. Can't find it anywhere. Uses regular keys instead - house keys, car keys, diary keys. Enemies confused by jangling keychain attacks. Darkness remains thoroughly unlocked (wrong keys). Destiny on hold.",
+    "specialty": "Mundane key-based combat while searching for legendary weapon",
+    "reputation": "The chosen one who misplaced their destiny",
+    "stats": "Keyblade Mastery 0 | Regular Keys 999 | Darkness Defeated 5 | Keys Lost 47",
+    "skills": ["Keychain Jangle Attack", "Wrong Key Fumble", "Destiny Postponement"]
   },
   "Maia": {
-    "title": "The Serene Storm",
-    "lore": "Approaches every battle with zen-like tranquility and inner peace. Panic attacks constantly. The 'serenity' is frozen terror. Enemies mistake paralysis for meditation. Can't move from fear, appears strategically patient. Anxiety weaponized into seeming wisdom.",
-    "specialty": "Tranquil devastation powered by internal screaming",
-    "reputation": "Proof that calm waters run deep with suppressed panic",
-    "stats": "Serenity 100 | Actual Calm 0 | Panic 95 | Frozen Terror 90",
-    "skills": ["Paralytic Meditation", "Anxiety Strike", "Terror Patience"]
+    "title": "The Fallen Star of the Pleiades",
+    "lore": "Named after the eldest Pleiades sister, Greek goddess of spring growth and nurturing. Kills plants on contact. Every flower wilts. Spring arrives, nature dies. The divine touch of growth causes death. Garden centers banned her. Mother Gaia sends angry letters. Most anti-nurturing nature deity in existence.",
+    "specialty": "Divine plant genocide disguised as spring blessings",
+    "reputation": "The growth goddess who murdered the concept of green thumbs",
+    "stats": "Nature Affinity 100 | Plant Survival Rate 0 | Wilted Flowers 9999 | Gaia's Disappointment 100",
+    "skills": ["Death Touch Nurture", "Spring Apocalypse", "Botanical Massacre"]
   },
   "Miang": {
     "title": "The Silent Reckoning",
@@ -328,20 +328,20 @@
     "skills": ["Normal Strike", "Forward Attack", "Regular Combat"]
   },
   "Enaira": {
-    "title": "The Storm Caller",
-    "lore": "Commands the fury of tempests and weather itself with meteorological mastery. Afraid of thunder. Every storm summoned causes personal crisis. Enemies face hurricane while Enaira hides under desk. The fear is visible. Power unmatched. Courage questionable.",
-    "specialty": "Meteorological combat while cowering from own storms",
-    "reputation": "The reason enemies check the weather and therapy schedules",
-    "stats": "Storm Power 100 | Thunder Tolerance 0 | Desk Hiding 95 | Fear Visibility 90",
-    "skills": ["Terrified Hurricane", "Cowering Tempest", "Desk Defense Protocol"]
+    "title": "The Digital Currency Disaster",
+    "lore": "Named after Nigeria's eNaira digital currency meant to revolutionize the economy. Revolutionized nothing. Adoption rate: 0%. Every transaction fails. Blockchain permanently broken. Created to digitize wealth, actually digitizes poverty. The Central Bank pretends this never happened. Most unsuccessful cryptocurrency named after a successful person.",
+    "specialty": "Economic disruption through catastrophic blockchain failure",
+    "reputation": "The digital currency even crypto bros won't defend",
+    "stats": "Adoption Rate 0% | Transaction Success 0 | Hype 100 | Actual Value -99",
+    "skills": ["Failed Transaction", "Blockchain Crash", "Economic Disappointment"]
   },
   "DEMIURGE": {
-    "title": "The Architect of Chaos",
-    "lore": "Godlike intellect that designs elaborate strategies of demonic complexity. One brain cell. The 'complex plans' are random scribbles. Enemies assume genius code. It's tic-tac-toe. They defeat themselves trying to decode nothing. Accidental 5D chess via checkers understanding.",
-    "specialty": "Architectural devastation through crayola blueprints",
-    "reputation": "The mind behind victories nobody understands (including them)",
-    "stats": "Brain Cells 1 | Complexity 0 | Enemy Overthinking 100 | Crayon Usage 95",
-    "skills": ["Tic-Tac-Toe Strategy", "Random Scribble Plan", "Accidental 5D Chess"]
+    "title": "The 10,000 IQ Strategist (Self-Proclaimed)",
+    "lore": "Named after Overlord's supreme strategist demon with godlike intellect and master plans. IQ of 47. Actual plans are crayon drawings. Calls tic-tac-toe '10-dimensional warfare'. Enemies assume sarcasm, discover it's genuine. The confidence in stupidity creates accidental brilliance. Nazarick disowns this imposter daily.",
+    "specialty": "Supreme idiocy mistaken for supreme strategy",
+    "reputation": "The demon whose plans work despite negative brain cells",
+    "stats": "Self-Assessed IQ 10000 | Actual IQ 47 | Crayon Mastery 100 | Accidental Wins 95",
+    "skills": ["Tic-Tac-Toe Supremacy", "Crayon Tactics", "Confident Stupidity"]
   },
   "JeffEpstein": {
     "title": "The Controversial Tactician",
@@ -360,12 +360,12 @@
     "skills": ["Tragic Comedy Strike", "Laughing Through Pain", "Smile Masking"]
   },
   "Andromach3": {
-    "title": "The Cyber Sentinel",
-    "lore": "Fights with computational precision - every move perfectly calculated and optimized. All calculations wrong. Math is broken. 2+2=5 in their world. Perfect execution of incorrect formulas. Enemies can't predict broken logic. Debugging reality itself.",
-    "specialty": "Computational combat with alternative mathematics",
-    "reputation": "The warrior who turned fighting into programming with syntax errors",
-    "stats": "Calculation Speed 100 | Math Accuracy 0 | Alternative Logic 95 | Syntax Errors 999",
-    "skills": ["Broken Math Strike", "Syntax Error Assault", "Reality Debug"]
+    "title": "The Glitched Trojan Warrior",
+    "lore": "Named after Andromache, legendary Trojan warrior princess of ancient Greece. Also a cyborg. The fusion went wrong. Ancient combat tactics run on Windows 95. Spear attacks cause blue screen of death. Enemies defeated by system crashes mid-combat. Troy.exe has stopped working. Homer wept, IT support gave up.",
+    "specialty": "Ancient warfare corrupted by obsolete software",
+    "reputation": "The warrior-princess running on deprecated operating systems",
+    "stats": "Trojan Skill 95 | System Stability 0 | Blue Screens 999 | RAM 256MB",
+    "skills": ["Blue Screen Spear", "Windows 95 Shield Bash", "Ancient Greece.exe Error"]
   },
   "卂几几": {
     "title": "The Symbolic Force",
