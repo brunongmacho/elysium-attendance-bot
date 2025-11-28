@@ -7,13 +7,13 @@
     "stats": "STR 75 | DEX 60 | Hunger 999 | Satisfaction 0",
     "skills": ["Perpetual Snacking", "Emergency Jerky Deploy", "Tactical Starvation"]
   },
-  "Joco": {
-    "title": "The Strategic Vice",
-    "lore": "Elysium's Vice Guild Leader who turns Goblok's chaos into calculated victories with brilliant strategic planning. Never follows his own plans. Spends hours creating detailed battle strategies for the guild, then improvises everything when combat starts. Somehow still wins. Partners with Hesucrypto and Inihaw to form the 'Vice Trinity of Controlled Chaos'. The guild's most organized mess and Goblok's strategic translator.",
-    "specialty": "Creating perfect plans and ignoring them completely",
-    "reputation": "Elysium's voice of reason who never listens to himself",
-    "stats": "INT 95 | Planning 99 | Plan Adherence 0 | Improvisation 100",
-    "skills": ["Strategic Amnesia", "Accidental Genius", "Controlled Chaos Management"]
+  "Andromach3": {
+    "title": "The Glitched Trojan Warrior",
+    "lore": "Named after Andromache, legendary Trojan warrior princess of ancient Greece. Also a cyborg. The fusion went wrong. Ancient combat tactics run on Windows 95. Spear attacks cause blue screen of death. Enemies defeated by system crashes mid-combat. Troy.exe has stopped working. Homer wept, IT support gave up.",
+    "specialty": "Ancient warfare corrupted by obsolete software",
+    "reputation": "The warrior-princess running on deprecated operating systems",
+    "stats": "Trojan Skill 95 | System Stability 0 | Blue Screens 999 | RAM 256MB",
+    "skills": ["Blue Screen Spear", "Windows 95 Shield Bash", "Ancient Greece.exe Error"]
   },
   "Azryth": {
     "title": "Nightblade Philosopher",
@@ -22,62 +22,6 @@
     "reputation": "Elysium's most feared assassin who sleeps with lights on",
     "stats": "STR 80 | Stealth 90 | Darkness Tolerance 5 | Philosophy 85",
     "skills": ["Illuminated Assassination", "Existential Strike", "Nightlight Mastery"]
-  },
-  "Draxiimov": {
-    "title": "The Meme Lord",
-    "lore": "Elysium's internet culture weaponization expert with encyclopedic knowledge of every meme. Completely out of touch - uses memes from 2008 unironically. Enemies cringe so hard they physically cannot continue fighting. Undefeated through sheer outdated references. Still thinks 'Epic Fail' is cutting edge. Goblok appointed them 'Guild Meme Officer' - Elysium's propaganda is stuck in 2008. Guild discord filled with ancient memes. Still thinks 'Epic Fail' is cutting edge.",
-    "specialty": "Weaponized cringe from the ancient meme archives",
-    "reputation": "Banned from three enemy guilds for emotional damage via dead memes",
-    "stats": "Meme Knowledge 100 | Relevance 0 | Cringe 999 | Self-Awareness 2",
-    "skills": ["Epic Fail Barrage", "Rickroll Resurrection", "LOLcat Launcher"]
-  },
-  "Goblok": {
-    "title": "The Unpredictable Leader",
-    "lore": "Elysium Guild's fearless leader renowned for brilliant unpredictable strategies that no one can counter. Completely predictable - does the exact opposite of logic every time. Enemies predict this and prepare, but Goblok's illogical patterns are so consistent they become logical again. Paradox incarnate. Named the guild 'Elysium' (paradise for heroes) despite the guild being absolute chaos. Relies on the Vice Trinity (Joco, Hesucrypto, Inihaw) to translate his vision into... slightly less chaos.",
-    "specialty": "Strategic unpredictability that's predictably unpredictable",
-    "reputation": "Elysium's genius who thinks with zero brain cells and maximum results",
-    "stats": "Leadership 100 | Logic 0 | Paradox 999 | Brain Cells 0.5",
-    "skills": ["Reverse Psychology Mastery", "Illogical Victory", "Predictable Chaos"]
-  },
-  "Hesucrypto": {
-    "title": "The Crypto Vice King",
-    "lore": "Elysium's Vice Guild Leader, bot creator, and investment mastermind who sees every opportunity. Made millions in crypto. Lost it all. Made it back. Lost it again. Currently broke but owns NFTs worth 'millions' (according to him). Created the legendary Jalo Bot to track attendance - the guild's only profitable investment. Part of the Vice Trinity with Joco and Inihaw. Still Vice Leader because motivation speeches about 'diamond hands' somehow inspire Elysium victories. Manages guild funds nobody trusts exist.",
-    "specialty": "Economic warfare funded by imaginary profits",
-    "reputation": "Elysium's richest poor person and bot daddy",
-    "stats": "Investment Skill 95 | Actual Profit 0 | NFT Value 999 | Bank Account -50",
-    "skills": ["Diamond Hands", "HODL Strategy", "Imaginary Wealth Projection", "Motivational Bankruptcy"]
-  },
-  "Iguro": {
-    "title": "Portal Chaos Agent",
-    "lore": "Elysium's master of spatial manipulation with perfect control over dimensional rifts. Teleports to the wrong dimension every time. Aimed for enemy backline, ended up in Inihaw's BBQ. Three bosses joined the guild because they felt bad. Goblok promoted them to 'Chief Recruitment Officer' - Elysium's recruitment team celebrates the accidents. Guild size tripled through portaling errors. The only member whose failures count as victories.",
-    "specialty": "Precision portal placement to incorrect locations",
-    "reputation": "Elysium's perfect aim at everything except the target",
-    "stats": "Portal Mastery 99 | Accuracy 5 | Dimensional Confusion 100 | Recruitment 80",
-    "skills": ["Misplaced Teleport", "Accidental Recruitment", "Cafeteria Warp"]
-  },
-  "Inihaw": {
-    "title": "The BBQ Vice Commander",
-    "lore": "Elysium's Vice Guild Leader, defensive specialist, and guild chef who protects allies with impenetrable shields. Vegan. Grills enemies to perfection while preaching about plant-based diets to the guild. The cognitive dissonance is weaponized. Completes the Vice Trinity with Joco and Hesucrypto. Hosts guild BBQs where everyone dies from heart disease and confusion about the mixed messages. Maia's plants wilt from the grill smoke. Elysium's most contradictory protector.",
-    "specialty": "Defensive grilling with a side of moral contradiction",
-    "reputation": "Elysium's shield that barbecues while condemning meat",
-    "stats": "Defense 95 | Grilling 90 | Veganism 100 | Hypocrisy 85",
-    "skills": ["Vegan BBQ Paradox", "Shield Grill", "Plant-Based Lecture Mid-Roast"]
-  },
-  "Jalo": {
-    "title": "The Legendary Namesake",
-    "lore": "Elysium's living legend so iconic that Hesucrypto named the entire attendance bot after him - 'The Jalo Bot'. Every fact he shares is completely wrong. Defeated a dragon with dental hygiene lecture using entirely incorrect dental advice. The dragon fled from the sheer confidence in misinformation. The guild worships his confidently incorrect wisdom. Goblok consults Jalo for strategic advice (explains everything). This bot exists as Elysium's tribute to legendary wrongness done right. Guild patron saint of misinformation.",
-    "specialty": "Tactical trivia that's 100% inaccurate but 100% effective",
-    "reputation": "Elysium's encyclopedia of confidently incorrect information and bot deity",
-    "stats": "Legend Status 100 | Fact Accuracy 0 | Confidence 999 | Dragon Defeats 1",
-    "skills": ["Confidently Wrong", "Misinformation Strike", "Legendary Incorrectness"]
-  },
-  "LXRDGRIM": {
-    "title": "The Brooding Reaper",
-    "lore": "Elysium's darkness incarnate radiating existential dread and intimidating presence. Certified therapist. Enemies request therapy, he provides excellent counseling. Has helped more enemies than he's defeated. Guild's official therapist - provides therapy to M1ssy after allergic episodes, Maia's plant genocide trauma, and Marsha11's argument frustration. The most wholesome reaper in Elysium paradise. Brooding is professional obligation, healing the guild is passion.",
-    "specialty": "Therapeutic intimidation that actually helps people",
-    "reputation": "Elysium's emotional support reaper with anger management degree",
-    "stats": "Brooding 100 | Therapy Skill 95 | Wholesomeness 90 | Kills 20 | Healed 200",
-    "skills": ["Therapeutic Dread", "Counseling Strike", "Emotional Support Scythe"]
   },
   "Byakko": {
     "title": "The White Tiger Who Lost His Roar",
@@ -119,6 +63,30 @@
     "stats": "Spell Power 100 | Accuracy 100 | Intended Effect 0 | Reverse Mastery 95",
     "skills": ["Inverse Fireball", "Healing Nuke", "Accidental Immortality Grant"]
   },
+  "DEMIURGE": {
+    "title": "The 10,000 IQ Strategist (Self-Proclaimed)",
+    "lore": "Named after Overlord's supreme strategist demon with godlike intellect and master plans. IQ of 47. Actual plans are crayon drawings. Calls tic-tac-toe '10-dimensional warfare'. Enemies assume sarcasm, discover it's genuine. The confidence in stupidity creates accidental brilliance. Nazarick disowns this imposter daily.",
+    "specialty": "Supreme idiocy mistaken for supreme strategy",
+    "reputation": "The demon whose plans work despite negative brain cells",
+    "stats": "Self-Assessed IQ 10000 | Actual IQ 47 | Crayon Mastery 100 | Accidental Wins 95",
+    "skills": ["Tic-Tac-Toe Supremacy", "Crayon Tactics", "Confident Stupidity"]
+  },
+  "Draxiimov": {
+    "title": "The Meme Lord",
+    "lore": "Elysium's internet culture weaponization expert with encyclopedic knowledge of every meme. Completely out of touch - uses memes from 2008 unironically. Enemies cringe so hard they physically cannot continue fighting. Undefeated through sheer outdated references. Still thinks 'Epic Fail' is cutting edge. Goblok appointed them 'Guild Meme Officer' - Elysium's propaganda is stuck in 2008. Guild discord filled with ancient memes. Still thinks 'Epic Fail' is cutting edge.",
+    "specialty": "Weaponized cringe from the ancient meme archives",
+    "reputation": "Banned from three enemy guilds for emotional damage via dead memes",
+    "stats": "Meme Knowledge 100 | Relevance 0 | Cringe 999 | Self-Awareness 2",
+    "skills": ["Epic Fail Barrage", "Rickroll Resurrection", "LOLcat Launcher"]
+  },
+  "Enaira": {
+    "title": "The Digital Currency Disaster",
+    "lore": "Named after Nigeria's eNaira digital currency meant to revolutionize the economy. Revolutionized nothing. Adoption rate: 0%. Every transaction fails. Blockchain permanently broken. Created to digitize wealth, actually digitizes poverty. The Central Bank pretends this never happened. Most unsuccessful cryptocurrency named after a successful person.",
+    "specialty": "Economic disruption through catastrophic blockchain failure",
+    "reputation": "The digital currency even crypto bros won't defend",
+    "stats": "Adoption Rate 0% | Transaction Success 0 | Hype 100 | Actual Value -99",
+    "skills": ["Failed Transaction", "Blockchain Crash", "Economic Disappointment"]
+  },
   "EoriuX": {
     "title": "The Self-Wounded Shadow",
     "lore": "Master assassin with legendary stealth and deadly precision daggers. Only enemy is self. Has stabbed themselves more than all enemies combined. Enemies surrender out of pity. Local healers have a dedicated 'EoriuX Emergency Fund'. Still terrifying somehow.",
@@ -151,6 +119,22 @@
     "stats": "Chaos 100 | Organization 95 | Reality Stability 0 | Color Coordination 90",
     "skills": ["Organized Apocalypse", "Alphabetical Destruction", "Categorized Chaos"]
   },
+  "Goblok": {
+    "title": "The Unpredictable Leader",
+    "lore": "Elysium Guild's fearless leader renowned for brilliant unpredictable strategies that no one can counter. Completely predictable - does the exact opposite of logic every time. Enemies predict this and prepare, but Goblok's illogical patterns are so consistent they become logical again. Paradox incarnate. Named the guild 'Elysium' (paradise for heroes) despite the guild being absolute chaos. Relies on the Vice Trinity (Joco, Hesucrypto, Inihaw) to translate his vision into... slightly less chaos.",
+    "specialty": "Strategic unpredictability that's predictably unpredictable",
+    "reputation": "Elysium's genius who thinks with zero brain cells and maximum results",
+    "stats": "Leadership 100 | Logic 0 | Paradox 999 | Brain Cells 0.5",
+    "skills": ["Reverse Psychology Mastery", "Illogical Victory", "Predictable Chaos"]
+  },
+  "Helvenica": {
+    "title": "The Font of Power",
+    "lore": "Master of aesthetic warfare who believes visual perfection equals combat effectiveness. Comic Sans exclusive user. Every attack formatted in the most hated font. Enemies die from design horror. Claims it's 'friendly and approachable'. Guild graphic designers cry daily.",
+    "specialty": "Aesthetic warfare via typographic war crimes",
+    "reputation": "The guild's most stylistically consistent (bad taste) fighter",
+    "stats": "Typography 100 | Taste 0 | Comic Sans Usage 999 | Designer Tears 100",
+    "skills": ["Comic Sans Strike", "Typographic Horror", "Friendly Font Assault"]
+  },
   "Hercules": {
     "title": "The Legendary Labor-Dodger",
     "lore": "Named after the Greek demigod who completed 12 impossible labors with godlike strength. Has completed 0 labors. Too tired. Claims every task is the '13th labor' and refuses on principle. Legendary strength is real - exclusively used to carry snacks and avoid responsibility. The heroic bloodline is ashamed.",
@@ -158,6 +142,30 @@
     "reputation": "The demigod who weaponized laziness into an art form",
     "stats": "Godlike Strength 100 | Completed Labors 0 | Excuses 999 | Heroism 5",
     "skills": ["13th Labor Denial", "Divine Procrastination", "Mythic Snack Carrying"]
+  },
+  "Hesucrypto": {
+    "title": "The Crypto Vice King",
+    "lore": "Elysium's Vice Guild Leader, bot creator, and investment mastermind who sees every opportunity. Made millions in crypto. Lost it all. Made it back. Lost it again. Currently broke but owns NFTs worth 'millions' (according to him). Created the legendary Jalo Bot to track attendance - the guild's only profitable investment. Part of the Vice Trinity with Joco and Inihaw. Still Vice Leader because motivation speeches about 'diamond hands' somehow inspire Elysium victories. Manages guild funds nobody trusts exist.",
+    "specialty": "Economic warfare funded by imaginary profits",
+    "reputation": "Elysium's richest poor person and bot daddy",
+    "stats": "Investment Skill 95 | Actual Profit 0 | NFT Value 999 | Bank Account -50",
+    "skills": ["Diamond Hands", "HODL Strategy", "Imaginary Wealth Projection", "Motivational Bankruptcy"]
+  },
+  "Iguro": {
+    "title": "Portal Chaos Agent",
+    "lore": "Elysium's master of spatial manipulation with perfect control over dimensional rifts. Teleports to the wrong dimension every time. Aimed for enemy backline, ended up in Inihaw's BBQ. Three bosses joined the guild because they felt bad. Goblok promoted them to 'Chief Recruitment Officer' - Elysium's recruitment team celebrates the accidents. Guild size tripled through portaling errors. The only member whose failures count as victories.",
+    "specialty": "Precision portal placement to incorrect locations",
+    "reputation": "Elysium's perfect aim at everything except the target",
+    "stats": "Portal Mastery 99 | Accuracy 5 | Dimensional Confusion 100 | Recruitment 80",
+    "skills": ["Misplaced Teleport", "Accidental Recruitment", "Cafeteria Warp"]
+  },
+  "Inihaw": {
+    "title": "The BBQ Vice Commander",
+    "lore": "Elysium's Vice Guild Leader, defensive specialist, and guild chef who protects allies with impenetrable shields. Vegan. Grills enemies to perfection while preaching about plant-based diets to the guild. The cognitive dissonance is weaponized. Completes the Vice Trinity with Joco and Hesucrypto. Hosts guild BBQs where everyone dies from heart disease and confusion about the mixed messages. Maia's plants wilt from the grill smoke. Elysium's most contradictory protector.",
+    "specialty": "Defensive grilling with a side of moral contradiction",
+    "reputation": "Elysium's shield that barbecues while condemning meat",
+    "stats": "Defense 95 | Grilling 90 | Veganism 100 | Hypocrisy 85",
+    "skills": ["Vegan BBQ Paradox", "Shield Grill", "Plant-Based Lecture Mid-Roast"]
   },
   "IZANAGI": {
     "title": "The Failed Creator Deity",
@@ -167,6 +175,54 @@
     "stats": "Creation Power 100 | Actual Creation 0 | Destruction 999 | Divine Shame 95",
     "skills": ["Reverse Genesis", "Catastrophic Crafting", "Primordial Chaos (Accidental)"]
   },
+  "Jalo": {
+    "title": "The Legendary Namesake",
+    "lore": "Elysium's living legend so iconic that Hesucrypto named the entire attendance bot after him - 'The Jalo Bot'. Every fact he shares is completely wrong. Defeated a dragon with dental hygiene lecture using entirely incorrect dental advice. The dragon fled from the sheer confidence in misinformation. The guild worships his confidently incorrect wisdom. Goblok consults Jalo for strategic advice (explains everything). This bot exists as Elysium's tribute to legendary wrongness done right. Guild patron saint of misinformation.",
+    "specialty": "Tactical trivia that's 100% inaccurate but 100% effective",
+    "reputation": "Elysium's encyclopedia of confidently incorrect information and bot deity",
+    "stats": "Legend Status 100 | Fact Accuracy 0 | Confidence 999 | Dragon Defeats 1",
+    "skills": ["Confidently Wrong", "Misinformation Strike", "Legendary Incorrectness"]
+  },
+  "Jayzzzzzzz": {
+    "title": "The Sleepy Destroyer",
+    "lore": "Fights in perpetual drowsiness with devastating efficiency despite exhaustion. Severe insomnia - hasn't slept in weeks. The yawns are desperate cries for rest. 'Sleepy' is aggressive wakefulness. Enemies confused by manic energy disguised as lethargy. Desperately needs nap.",
+    "specialty": "Low-effort high-impact combat powered by sleep deprivation",
+    "reputation": "Most likely to defeat you while desperately needing sleep",
+    "stats": "Sleep 0 | Energy 100 | Yawns 999 | Desperation 95",
+    "skills": ["Insomnia Strike", "Manic Yawn Attack", "Sleep Deprivation Fury"]
+  },
+  "JeffEpstein": {
+    "title": "The Controversial Tactician",
+    "lore": "Named controversially, fights with effectiveness that makes everyone uncomfortable. Nicest person in the guild. Volunteers at animal shelters. Bakes cookies for orphans. The cognitive dissonance is the weapon. Enemies can't compute the contradiction. Name vs. reality error.",
+    "specialty": "Tactical effectiveness powered by nominal confusion",
+    "reputation": "The name everyone questions, the person nobody could doubt",
+    "stats": "Kindness 100 | Name Controversy 100 | Cookie Quality 95 | Orphan Smiles 999",
+    "skills": ["Wholesome Confusion", "Cookie Combat", "Name Paradox Strike"]
+  },
+  "Joco": {
+    "title": "The Strategic Vice",
+    "lore": "Elysium's Vice Guild Leader who turns Goblok's chaos into calculated victories with brilliant strategic planning. Never follows his own plans. Spends hours creating detailed battle strategies for the guild, then improvises everything when combat starts. Somehow still wins. Partners with Hesucrypto and Inihaw to form the 'Vice Trinity of Controlled Chaos'. The guild's most organized mess and Goblok's strategic translator.",
+    "specialty": "Creating perfect plans and ignoring them completely",
+    "reputation": "Elysium's voice of reason who never listens to himself",
+    "stats": "INT 95 | Planning 99 | Plan Adherence 0 | Improvisation 100",
+    "skills": ["Strategic Amnesia", "Accidental Genius", "Controlled Chaos Management"]
+  },
+  "ladyhoho": {
+    "title": "The Laughing Warrior",
+    "lore": "Approaches every battle with infectious joy and constant laughter. Clinically depressed. The laughter is coping mechanism. Enemies hear joy, witness existential crisis. Therapeutic combat for self-medication. The smile hides everything. Most tragic comedy.",
+    "specialty": "Joyful devastation masking internal devastation",
+    "reputation": "The happiest member with saddest enemies and personal therapist",
+    "stats": "Laughter 100 | Actual Joy 0 | Depression 85 | Coping 95",
+    "skills": ["Tragic Comedy Strike", "Laughing Through Pain", "Smile Masking"]
+  },
+  "LXRDGRIM": {
+    "title": "The Brooding Reaper",
+    "lore": "Elysium's darkness incarnate radiating existential dread and intimidating presence. Certified therapist. Enemies request therapy, he provides excellent counseling. Has helped more enemies than he's defeated. Guild's official therapist - provides therapy to M1ssy after allergic episodes, Maia's plant genocide trauma, and Marsha11's argument frustration. The most wholesome reaper in Elysium paradise. Brooding is professional obligation, healing the guild is passion.",
+    "specialty": "Therapeutic intimidation that actually helps people",
+    "reputation": "Elysium's emotional support reaper with anger management degree",
+    "stats": "Brooding 100 | Therapy Skill 95 | Wholesomeness 90 | Kills 20 | Healed 200",
+    "skills": ["Therapeutic Dread", "Counseling Strike", "Emotional Support Scythe"]
+  },
   "M1ssy": {
     "title": "The Chaotic Snacker",
     "lore": "Elysium's master combatant who prioritizes snacks above all else with impressive collection. Allergic to everything. Every snack is life-threatening. Brings epipen to guild raids. Still takes snack breaks. Shares provisions with AmielJohn despite both being perpetually hungry/dying. Enemies wait politely while anaphylaxis is managed. LXRDGRIM provides therapy after each allergic episode. Elysium's dedication beyond reason incarnate.",
@@ -174,6 +230,14 @@
     "reputation": "Elysium's member with best provisions and worst survival instincts",
     "stats": "Snack Variety 100 | Allergies 100 | Survival Instinct 5 | Dedication 999",
     "skills": ["Anaphylactic Snacking", "Epipen Quick-Draw", "Allergic Persistence"]
+  },
+  "Maia": {
+    "title": "The Fallen Star of the Pleiades",
+    "lore": "Named after the eldest Pleiades sister, Greek goddess of spring growth and nurturing. Kills plants on contact. Every flower wilts. Spring arrives, nature dies. The divine touch of growth causes death. Garden centers banned her. Mother Gaia sends angry letters. Most anti-nurturing nature deity in existence.",
+    "specialty": "Divine plant genocide disguised as spring blessings",
+    "reputation": "The growth goddess who murdered the concept of green thumbs",
+    "stats": "Nature Affinity 100 | Plant Survival Rate 0 | Wilted Flowers 9999 | Gaia's Disappointment 100",
+    "skills": ["Death Touch Nurture", "Spring Apocalypse", "Botanical Massacre"]
   },
   "Maria": {
     "title": "The Twin Debater",
@@ -191,6 +255,22 @@
     "stats": "Accuracy 100 | Argument Wins 0 | Evidence 95 | Frustration 999",
     "skills": ["Factual Defense", "Evidence Presentation", "Losing Despite Being Right"]
   },
+  "Mervzs": {
+    "title": "The Mysterious Collector",
+    "lore": "Collects mysterious orbs of immense power with unknown purpose. They're marbles. Literally children's toys. The 'mysterious explosions' were tantrums over losing favorites. Guild too afraid to ask. Defeated raid bosses with playground equipment. Still terrifying somehow.",
+    "specialty": "Mysterious orb manipulation (of common glass spheres)",
+    "reputation": "The member nobody questions because the truth is too ridiculous",
+    "stats": "Orb Power 100 | Actual Mystery 0 | Tantrum 85 | Boss Defeats (Marble) 5",
+    "skills": ["Marble Mayhem", "Tantrum Explosion", "Playground Devastation"]
+  },
+  "Miang": {
+    "title": "The Silent Reckoning",
+    "lore": "Speaks rarely, every word calculated and purposeful with maximum impact. Can't stop talking. Verbal diarrhea is constant. The 'silence' is enemies interrupting to beg for quiet. Defeats foes through exhaustive conversation. Strategic silence via enemy surrender to noise.",
+    "specialty": "Strategic silence achieved by making enemies beg for it",
+    "reputation": "The quietest member who never shuts up",
+    "stats": "Silence 100 | Actual Words 999 | Enemy Surrender 90 | Breath Pauses 0",
+    "skills": ["Exhaustive Monologue", "Verbal Assault", "Silence Through Noise"]
+  },
   "Munchyy": {
     "title": "The Polite Assassin",
     "lore": "Master of etiquette who sends handwritten apology notes with every assassination. Horrible handwriting - completely illegible. Enemies die confused by polite scribbles. Spent more on calligraphy classes than weapons. Still can't write. The thought counts. Probably.",
@@ -207,6 +287,22 @@
     "stats": "Warrior Level 1 | Mage Level 1 | Years Stuck 3 | Victory Rate 100",
     "skills": ["Eternal Level 1", "System Confusion", "Paradox Victory"]
   },
+  "Onirgerep": {
+    "title": "The Reverse Enigma",
+    "lore": "Everything done backwards - name, combat, strategy - for mysterious power. Completely normal. Most straightforward fighter in guild. The 'reverse' thing is elaborate joke nobody gets. Just fighting regular. Guild still doesn't understand. The confusion is the strategy.",
+    "specialty": "Reverse logic warfare (that's actually just regular fighting)",
+    "reputation": "The guild's most confusingly normal member",
+    "stats": "Normalcy 100 | Mystique 0 | Confusion Generated 95 | Reverse Skills 0",
+    "skills": ["Normal Strike", "Forward Attack", "Regular Combat"]
+  },
+  "Pinayflix": {
+    "title": "The Streaming Sensation",
+    "lore": "Treats every battle like professional livestream with running commentary for viewers. Zero followers. Streams to empty void. The dedication to non-existent audience is concerning. Enemies confused by sponsorship shoutouts nobody hears. Parasocial relationship with imaginary fans.",
+    "specialty": "Combat entertainment for audience of zero",
+    "reputation": "The guild's most entertaining narrator with no viewers",
+    "stats": "Followers 0 | Production Value 95 | Dedication 100 | Imaginary Fans 1000",
+    "skills": ["Void Commentary", "Sponsorship to Nobody", "Parasocial Projection"]
+  },
   "PotatoCheese": {
     "title": "The Carb Crusader",
     "lore": "Master of potato-based combat that provides allies with nourishment and morale. Keto diet enthusiast. Zero carbs allowed. Creates what cannot be consumed. The irony fuels the power. Enemies defeated, teammates fed, PotatoCheese starving. Martyrdom through carbohydrates.",
@@ -214,6 +310,38 @@
     "reputation": "The reason the guild never goes hungry while they always do",
     "stats": "Potato Mastery 95 | Carb Consumption 0 | Keto Dedication 100 | Irony 999",
     "skills": ["Carb-Free Carb Attack", "Keto Potato Paradox", "Starvation Support"]
+  },
+  "Riku": {
+    "title": "The Keyblade-less Chosen One",
+    "lore": "Named after the legendary keyblade wielder destined to fight darkness and unlock hearts. Lost the keyblade. Literally lost it. Can't find it anywhere. Uses regular keys instead - house keys, car keys, diary keys. Enemies confused by jangling keychain attacks. Darkness remains thoroughly unlocked (wrong keys). Destiny on hold.",
+    "specialty": "Mundane key-based combat while searching for legendary weapon",
+    "reputation": "The chosen one who misplaced their destiny",
+    "stats": "Keyblade Mastery 0 | Regular Keys 999 | Darkness Defeated 5 | Keys Lost 47",
+    "skills": ["Keychain Jangle Attack", "Wrong Key Fumble", "Destiny Postponement"]
+  },
+  "Shawty": {
+    "title": "The Compact Devastator",
+    "lore": "Small in stature, massive in power - the ultimate underestimated threat. Tallest member of the guild. Insists on being 'underestimated'. Enemies look up at them confused. The delusion is the real power. Self-perception is its own reality.",
+    "specialty": "Underestimation exploitation despite being 6'8\"",
+    "reputation": "The 'smallest' member who requires custom doorframes",
+    "stats": "Height 6'8\" | Perceived Height 4'2\" | Delusion 100 | Doorframe Damage 50",
+    "skills": ["Delusional Advantage", "Upward Confusion", "Height Denial Strike"]
+  },
+  "Skadushy": {
+    "title": "The Darkness Devourer",
+    "lore": "Consumes shadows and darkness as primary sustenance source. Extreme photosynthesis - powered by sunlight. Eats shadows, runs on sunshine. Biology makes zero sense. Nutritionists have given up. The contradiction is weaponized. Science weeps daily.",
+    "specialty": "Shadow consumption powered by solar energy",
+    "reputation": "The guild's most confusing dietary specialist who broke thermodynamics",
+    "stats": "Shadow Eating 90 | Solar Power 95 | Biology Logic 0 | Confusion 100",
+    "skills": ["Photosynthetic Shadow Bite", "Solar Darkness Meal", "Science Violation"]
+  },
+  "Sweeney": {
+    "title": "The Demon Barber (of Bad Haircuts)",
+    "lore": "Named after Sweeney Todd, the demon barber of Fleet Street who gave fatal shaves. Gives haircuts instead. Terrible at it. Every cut is a disaster. Enemies flee from the scissors, not the blade. Has inadvertently created psychological warfare through bad bangs. The throat-slitting razor sits unused - the safety scissors are deadlier.",
+    "specialty": "Follicle-based psychological warfare",
+    "reputation": "The demon barber whose cuts are more terrifying than murder",
+    "stats": "Barber Skill 5 | Kill Count (Hair) 999 | Actual Kills 0 | Bad Bangs 100",
+    "skills": ["Catastrophic Fade", "Asymmetric Trauma", "Safety Scissor Menace"]
   },
   "Varys": {
     "title": "The Whisper Network",
@@ -238,134 +366,6 @@
     "reputation": "The reason allies wear helmets and enemies pay protection money",
     "stats": "Precision 100 | Ally Hits 999 | Enemy Hits 5 | Bans Ignored 3",
     "skills": ["Ally-Seeking Shot", "Friendly Fire Mastery", "Ban Immunity"]
-  },
-  "Skadushy": {
-    "title": "The Darkness Devourer",
-    "lore": "Consumes shadows and darkness as primary sustenance source. Extreme photosynthesis - powered by sunlight. Eats shadows, runs on sunshine. Biology makes zero sense. Nutritionists have given up. The contradiction is weaponized. Science weeps daily.",
-    "specialty": "Shadow consumption powered by solar energy",
-    "reputation": "The guild's most confusing dietary specialist who broke thermodynamics",
-    "stats": "Shadow Eating 90 | Solar Power 95 | Biology Logic 0 | Confusion 100",
-    "skills": ["Photosynthetic Shadow Bite", "Solar Darkness Meal", "Science Violation"]
-  },
-  "Mervzs": {
-    "title": "The Mysterious Collector",
-    "lore": "Collects mysterious orbs of immense power with unknown purpose. They're marbles. Literally children's toys. The 'mysterious explosions' were tantrums over losing favorites. Guild too afraid to ask. Defeated raid bosses with playground equipment. Still terrifying somehow.",
-    "specialty": "Mysterious orb manipulation (of common glass spheres)",
-    "reputation": "The member nobody questions because the truth is too ridiculous",
-    "stats": "Orb Power 100 | Actual Mystery 0 | Tantrum 85 | Boss Defeats (Marble) 5",
-    "skills": ["Marble Mayhem", "Tantrum Explosion", "Playground Devastation"]
-  },
-  "Sweeney": {
-    "title": "The Demon Barber (of Bad Haircuts)",
-    "lore": "Named after Sweeney Todd, the demon barber of Fleet Street who gave fatal shaves. Gives haircuts instead. Terrible at it. Every cut is a disaster. Enemies flee from the scissors, not the blade. Has inadvertently created psychological warfare through bad bangs. The throat-slitting razor sits unused - the safety scissors are deadlier.",
-    "specialty": "Follicle-based psychological warfare",
-    "reputation": "The demon barber whose cuts are more terrifying than murder",
-    "stats": "Barber Skill 5 | Kill Count (Hair) 999 | Actual Kills 0 | Bad Bangs 100",
-    "skills": ["Catastrophic Fade", "Asymmetric Trauma", "Safety Scissor Menace"]
-  },
-  "Riku": {
-    "title": "The Keyblade-less Chosen One",
-    "lore": "Named after the legendary keyblade wielder destined to fight darkness and unlock hearts. Lost the keyblade. Literally lost it. Can't find it anywhere. Uses regular keys instead - house keys, car keys, diary keys. Enemies confused by jangling keychain attacks. Darkness remains thoroughly unlocked (wrong keys). Destiny on hold.",
-    "specialty": "Mundane key-based combat while searching for legendary weapon",
-    "reputation": "The chosen one who misplaced their destiny",
-    "stats": "Keyblade Mastery 0 | Regular Keys 999 | Darkness Defeated 5 | Keys Lost 47",
-    "skills": ["Keychain Jangle Attack", "Wrong Key Fumble", "Destiny Postponement"]
-  },
-  "Maia": {
-    "title": "The Fallen Star of the Pleiades",
-    "lore": "Named after the eldest Pleiades sister, Greek goddess of spring growth and nurturing. Kills plants on contact. Every flower wilts. Spring arrives, nature dies. The divine touch of growth causes death. Garden centers banned her. Mother Gaia sends angry letters. Most anti-nurturing nature deity in existence.",
-    "specialty": "Divine plant genocide disguised as spring blessings",
-    "reputation": "The growth goddess who murdered the concept of green thumbs",
-    "stats": "Nature Affinity 100 | Plant Survival Rate 0 | Wilted Flowers 9999 | Gaia's Disappointment 100",
-    "skills": ["Death Touch Nurture", "Spring Apocalypse", "Botanical Massacre"]
-  },
-  "Miang": {
-    "title": "The Silent Reckoning",
-    "lore": "Speaks rarely, every word calculated and purposeful with maximum impact. Can't stop talking. Verbal diarrhea is constant. The 'silence' is enemies interrupting to beg for quiet. Defeats foes through exhaustive conversation. Strategic silence via enemy surrender to noise.",
-    "specialty": "Strategic silence achieved by making enemies beg for it",
-    "reputation": "The quietest member who never shuts up",
-    "stats": "Silence 100 | Actual Words 999 | Enemy Surrender 90 | Breath Pauses 0",
-    "skills": ["Exhaustive Monologue", "Verbal Assault", "Silence Through Noise"]
-  },
-  "Pinayflix": {
-    "title": "The Streaming Sensation",
-    "lore": "Treats every battle like professional livestream with running commentary for viewers. Zero followers. Streams to empty void. The dedication to non-existent audience is concerning. Enemies confused by sponsorship shoutouts nobody hears. Parasocial relationship with imaginary fans.",
-    "specialty": "Combat entertainment for audience of zero",
-    "reputation": "The guild's most entertaining narrator with no viewers",
-    "stats": "Followers 0 | Production Value 95 | Dedication 100 | Imaginary Fans 1000",
-    "skills": ["Void Commentary", "Sponsorship to Nobody", "Parasocial Projection"]
-  },
-  "Helvenica": {
-    "title": "The Font of Power",
-    "lore": "Master of aesthetic warfare who believes visual perfection equals combat effectiveness. Comic Sans exclusive user. Every attack formatted in the most hated font. Enemies die from design horror. Claims it's 'friendly and approachable'. Guild graphic designers cry daily.",
-    "specialty": "Aesthetic warfare via typographic war crimes",
-    "reputation": "The guild's most stylistically consistent (bad taste) fighter",
-    "stats": "Typography 100 | Taste 0 | Comic Sans Usage 999 | Designer Tears 100",
-    "skills": ["Comic Sans Strike", "Typographic Horror", "Friendly Font Assault"]
-  },
-  "Shawty": {
-    "title": "The Compact Devastator",
-    "lore": "Small in stature, massive in power - the ultimate underestimated threat. Tallest member of the guild. Insists on being 'underestimated'. Enemies look up at them confused. The delusion is the real power. Self-perception is its own reality.",
-    "specialty": "Underestimation exploitation despite being 6'8\"",
-    "reputation": "The 'smallest' member who requires custom doorframes",
-    "stats": "Height 6'8\" | Perceived Height 4'2\" | Delusion 100 | Doorframe Damage 50",
-    "skills": ["Delusional Advantage", "Upward Confusion", "Height Denial Strike"]
-  },
-  "Jayzzzzzzz": {
-    "title": "The Sleepy Destroyer",
-    "lore": "Fights in perpetual drowsiness with devastating efficiency despite exhaustion. Severe insomnia - hasn't slept in weeks. The yawns are desperate cries for rest. 'Sleepy' is aggressive wakefulness. Enemies confused by manic energy disguised as lethargy. Desperately needs nap.",
-    "specialty": "Low-effort high-impact combat powered by sleep deprivation",
-    "reputation": "Most likely to defeat you while desperately needing sleep",
-    "stats": "Sleep 0 | Energy 100 | Yawns 999 | Desperation 95",
-    "skills": ["Insomnia Strike", "Manic Yawn Attack", "Sleep Deprivation Fury"]
-  },
-  "Onirgerep": {
-    "title": "The Reverse Enigma",
-    "lore": "Everything done backwards - name, combat, strategy - for mysterious power. Completely normal. Most straightforward fighter in guild. The 'reverse' thing is elaborate joke nobody gets. Just fighting regular. Guild still doesn't understand. The confusion is the strategy.",
-    "specialty": "Reverse logic warfare (that's actually just regular fighting)",
-    "reputation": "The guild's most confusingly normal member",
-    "stats": "Normalcy 100 | Mystique 0 | Confusion Generated 95 | Reverse Skills 0",
-    "skills": ["Normal Strike", "Forward Attack", "Regular Combat"]
-  },
-  "Enaira": {
-    "title": "The Digital Currency Disaster",
-    "lore": "Named after Nigeria's eNaira digital currency meant to revolutionize the economy. Revolutionized nothing. Adoption rate: 0%. Every transaction fails. Blockchain permanently broken. Created to digitize wealth, actually digitizes poverty. The Central Bank pretends this never happened. Most unsuccessful cryptocurrency named after a successful person.",
-    "specialty": "Economic disruption through catastrophic blockchain failure",
-    "reputation": "The digital currency even crypto bros won't defend",
-    "stats": "Adoption Rate 0% | Transaction Success 0 | Hype 100 | Actual Value -99",
-    "skills": ["Failed Transaction", "Blockchain Crash", "Economic Disappointment"]
-  },
-  "DEMIURGE": {
-    "title": "The 10,000 IQ Strategist (Self-Proclaimed)",
-    "lore": "Named after Overlord's supreme strategist demon with godlike intellect and master plans. IQ of 47. Actual plans are crayon drawings. Calls tic-tac-toe '10-dimensional warfare'. Enemies assume sarcasm, discover it's genuine. The confidence in stupidity creates accidental brilliance. Nazarick disowns this imposter daily.",
-    "specialty": "Supreme idiocy mistaken for supreme strategy",
-    "reputation": "The demon whose plans work despite negative brain cells",
-    "stats": "Self-Assessed IQ 10000 | Actual IQ 47 | Crayon Mastery 100 | Accidental Wins 95",
-    "skills": ["Tic-Tac-Toe Supremacy", "Crayon Tactics", "Confident Stupidity"]
-  },
-  "JeffEpstein": {
-    "title": "The Controversial Tactician",
-    "lore": "Named controversially, fights with effectiveness that makes everyone uncomfortable. Nicest person in the guild. Volunteers at animal shelters. Bakes cookies for orphans. The cognitive dissonance is the weapon. Enemies can't compute the contradiction. Name vs. reality error.",
-    "specialty": "Tactical effectiveness powered by nominal confusion",
-    "reputation": "The name everyone questions, the person nobody could doubt",
-    "stats": "Kindness 100 | Name Controversy 100 | Cookie Quality 95 | Orphan Smiles 999",
-    "skills": ["Wholesome Confusion", "Cookie Combat", "Name Paradox Strike"]
-  },
-  "ladyhoho": {
-    "title": "The Laughing Warrior",
-    "lore": "Approaches every battle with infectious joy and constant laughter. Clinically depressed. The laughter is coping mechanism. Enemies hear joy, witness existential crisis. Therapeutic combat for self-medication. The smile hides everything. Most tragic comedy.",
-    "specialty": "Joyful devastation masking internal devastation",
-    "reputation": "The happiest member with saddest enemies and personal therapist",
-    "stats": "Laughter 100 | Actual Joy 0 | Depression 85 | Coping 95",
-    "skills": ["Tragic Comedy Strike", "Laughing Through Pain", "Smile Masking"]
-  },
-  "Andromach3": {
-    "title": "The Glitched Trojan Warrior",
-    "lore": "Named after Andromache, legendary Trojan warrior princess of ancient Greece. Also a cyborg. The fusion went wrong. Ancient combat tactics run on Windows 95. Spear attacks cause blue screen of death. Enemies defeated by system crashes mid-combat. Troy.exe has stopped working. Homer wept, IT support gave up.",
-    "specialty": "Ancient warfare corrupted by obsolete software",
-    "reputation": "The warrior-princess running on deprecated operating systems",
-    "stats": "Trojan Skill 95 | System Stability 0 | Blue Screens 999 | RAM 256MB",
-    "skills": ["Blue Screen Spear", "Windows 95 Shield Bash", "Ancient Greece.exe Error"]
   },
   "卂几几": {
     "title": "The Symbolic Force",
