@@ -1178,6 +1178,17 @@ function findBestMemberMatch(searchName, guild) {
       // Confidence inversely proportional to distance
       // Distance of 0 = 100%, distance of 10+ = ~0%
       confidence = Math.max(0, Math.min(100, 100 - (bestScore * 10)));
+
+      // Reject fuzzy matches with too low confidence or too high relative distance
+      // For short names, we need stricter matching to avoid false positives like "Jalo" → "Joco"
+      const minConfidence = 85; // Require at least 85% confidence for fuzzy matches
+      const maxRelativeDistance = 0.3; // Max 30% character difference
+      const relativeDistance = bestScore / normalizedSearch.length;
+
+      if (confidence < minConfidence || relativeDistance > maxRelativeDistance) {
+        console.log(`❌ Rejecting fuzzy match: "${normalizedSearch}" → "${bestMatch.displayName}" (${confidence}% confidence, ${(relativeDistance * 100).toFixed(0)}% character difference)`);
+        return null;
+      }
     }
 
     return {
