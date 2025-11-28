@@ -42,7 +42,6 @@ const { addGuildFooter } = require('./utils/embed-branding');
 let config = null;
 let sheetAPI = null;
 let client = null;
-let intelligenceEngine = null; // Reference to intelligence engine for spawn predictions
 let bossTimerModule = null; // Reference to boss timer for recorded spawn times
 
 /**
@@ -86,12 +85,11 @@ const WARNING_WINDOW_MINUTES = 15; // Warn when spawn is 15-20 mins away
  * Initializes the boss rotation system
  * @param {Object} cfg - Bot configuration from config.json
  * @param {Client} discordClient - Discord.js client instance
- * @param {Object} intelligence - Intelligence engine for spawn predictions
+ * @param {Object} bossTimer - Boss timer module for spawn time tracking
  */
-function initialize(cfg, discordClient, intelligence = null, bossTimer = null) {
+function initialize(cfg, discordClient, bossTimer = null) {
   config = cfg;
   client = discordClient;
-  intelligenceEngine = intelligence;
   bossTimerModule = bossTimer;
   sheetAPI = new SheetAPI(cfg.sheet_webhook_url);
 
@@ -103,12 +101,12 @@ function initialize(cfg, discordClient, intelligence = null, bossTimer = null) {
   // Load initial rotation status
   refreshRotationCache();
 
-  // Start spawn warning monitor if intelligence engine available
-  if (intelligenceEngine) {
+  // Start spawn warning monitor if boss timer available
+  if (bossTimerModule) {
     startSpawnMonitor();
     console.log('🔔 Rotation spawn monitor started (checks every 5 minutes for 15-min warnings)');
   } else {
-    console.warn('⚠️ Intelligence engine not provided - rotation warnings disabled');
+    console.warn('⚠️ Boss timer not provided - rotation warnings disabled');
   }
 }
 
@@ -515,39 +513,19 @@ function startSpawnMonitor() {
  */
 async function checkUpcomingSpawns() {
   try {
-    if (!intelligenceEngine && !bossTimerModule) return;
+    if (!bossTimerModule) return;
 
     // Check each rotating boss
     for (const bossName of ROTATING_BOSSES) {
       try {
         let spawnTime = null;
-        let usingBossTimer = false;
 
-        // Check boss timer first for recorded spawn times
+        // Check boss timer for recorded spawn times
         if (bossTimerModule) {
           const timerData = bossTimerModule.getNextSpawn(bossName);
           if (timerData && timerData.nextSpawn) {
             spawnTime = timerData.nextSpawn;
-            usingBossTimer = true;
           }
-        }
-
-        // Fall back to prediction if no boss timer data
-        if (!spawnTime && intelligenceEngine) {
-          // Quick check: Skip if spawn is definitely far away (>2 hours)
-          // This uses cached data and avoids expensive API calls for distant spawns
-          if (!intelligenceEngine.isSpawnLikelySoon(bossName, 2)) {
-            continue; // Boss is 24+ hours away, skip expensive prediction
-          }
-
-          // Get spawn prediction (uses cache if available)
-          const prediction = await intelligenceEngine.predictNextSpawnTime(bossName);
-
-          if (prediction.error) {
-            continue; // Skip if prediction failed
-          }
-
-          spawnTime = prediction.predictedTime;
         }
 
         if (!spawnTime) continue; // No spawn time available
