@@ -6086,12 +6086,16 @@ client.on(Events.MessageCreate, async (message) => {
               const announcementChannel = await client.channels.fetch(config.boss_spawn_announcement_channel_id);
               if (announcementChannel) {
                 const announceTimestamp = Math.floor(spawnTime.getTime() / 1000);
+                const threadUrl = `https://discord.com/channels/${config.main_guild_id}/${config.attendance_channel_id}/${result.threadId}`;
 
                 const embed = new EmbedBuilder()
                   .setColor(0x3498db)
                   .setTitle(`🔔 ${bossName} Spawned!`)
                   .setDescription('**Check in at the attendance thread!**')
-                  .addFields({ name: '🕐 Time', value: `<t:${announceTimestamp}:t>`, inline: true })
+                  .addFields(
+                    { name: '🕐 Time', value: `<t:${announceTimestamp}:t>`, inline: true },
+                    { name: '📝 Thread', value: `[Click here](${threadUrl})`, inline: true }
+                  )
                   .setTimestamp();
 
                 // Add boss image if available
