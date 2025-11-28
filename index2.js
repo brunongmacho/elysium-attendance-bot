@@ -460,30 +460,7 @@ let lastAuctionEndTime = 0;
 
 
 
-/**
- * NLP Handler for natural language command interpretation
- * Allows flexible command syntax without strict ! prefix
- * @type {NLPHandler}
- */
-let nlpHandler = null;
 
-/**
- * NLP Learning System for self-improving natural language understanding
- * Learns patterns from user confirmations and adapts to multilingual usage
- * Mention-based activation (responds only when @mentioned)
- * Passive learning mode (learns from all messages)
- * @type {NLPLearningSystem}
- */
-let nlpLearningSystem = null;
-
-/**
- * ML Integration for enhanced spawn predictions and NLP conversation
- * Provides ML-powered spawn time predictions with confidence intervals
- * Enhances NLP with context awareness and sentiment analysis
- * @type {MLIntegration}
- */
-// ❌ REMOVED: Abolished ML systems
-// let mlIntegration = null;
 
 /**
  * Flag indicating bot is currently recovering from a crash
@@ -2064,23 +2041,6 @@ const commandHandlers = {
       ? `🔴 Active: **${biddingState.a.item}** (${biddingState.a.curBid}pts)`
       : `🟢 Queue: ${biddingState.q.length} item(s)`;
 
-    // Get ML statistics if available
-    let mlStats = null;
-    let mlStatusText = '⚠️ Disabled';
-    if (mlIntegration) {
-      try {
-        mlStats = await mlIntegration.getStats();
-        if (mlStats && mlStats.enabled) {
-          const patternsCount = mlStats.spawn?.patternsLearned || 0;
-          mlStatusText = patternsCount > 0
-            ? `✅ Active - ${patternsCount} boss patterns learned`
-            : `🟡 Learning - No patterns yet`;
-        }
-      } catch (mlError) {
-        mlStatusText = `⚠️ Error: ${mlError.message}`;
-      }
-    }
-
     const embed = new EmbedBuilder()
       .setColor(0x00ff00)
       .setTitle("📊 Bot Status")
@@ -2107,8 +2067,7 @@ const commandHandlers = {
           value: spawnListText + moreSpawns,
           inline: false,
         },
-        { name: "💰 Bidding System", value: biddingStatus, inline: false },
-        { name: "🤖 ML Spawn Predictor", value: mlStatusText, inline: false }
+        { name: "💰 Bidding System", value: biddingStatus, inline: false }
       )
       .setFooter({ text: `Requested by ${member.user.username}` })
       .setTimestamp();
@@ -4301,14 +4260,6 @@ client.once(Events.ClientReady, async () => {
   leaderboardSystem.init(client, config, discordCache);
   activityHeatmap.init(client, config);
   bossRotation.initialize(config, client, bossTimer);
-  nlpHandler = new NLPHandler(config);
-  nlpLearningSystem = new NLPLearningSystem();
-  await nlpLearningSystem.initialize(client);
-
-  // Initialize ML Integration for enhanced spawn predictions and NLP
-  console.log('🤖 Initializing ML Integration...');
-  mlIntegration = new MLIntegration(config, sheetAPI);
-  console.log('✅ ML Integration initialized - Learning from historical data...');
 
   console.log("🔄 Running state recovery...");
   isRecovering = true;
@@ -5295,92 +5246,13 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
-    // =========================================================================
-    // INTELLIGENCE ENGINE COMMANDS - Member-Accessible (BOT-COMMANDS + Admin Logs)
-    // =========================================================================
-    // Member-friendly prediction & analytics commands
-    if (
-      resolvedCmd === "!predictprice" ||
-      resolvedCmd === "!predictspawn" ||
-      resolvedCmd === "!predictattendance" ||
-      resolvedCmd === "!engagement" ||
-      resolvedCmd === "!analyzeengagement"
-    ) {
-      // Define bot commands channel (reuse from above if already defined)
-      const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
-        (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
-
-      // Check permissions: either admin OR ELYSIUM role in allowed channels
-      const inAllowedChannel = inBotCommandsChannel || inElysiumCommandsChannel || inAdminLogs;
-      const hasPermission = userIsAdmin || (hasElysiumRole(member) && inAllowedChannel);
-
-      if (!hasPermission) {
-        await message.reply(
-          "❌ Intelligence commands are available to ELYSIUM members in BOT-COMMANDS or admin logs.\n" +
-          "💡 **Tip:** Mention me in BOT-COMMANDS (e.g., `@bot when is next spawn?`)"
-        );
-        return;
-      }
-
-      // If invoked in guild chat, redirect to BOT-COMMANDS (for both admins and members)
-      if (inElysiumCommandsChannel && !inBotCommandsChannel) {
-        // Send redirect message in guild chat that auto-deletes after 30 seconds
-        const redirectMsg = await message.reply(
-          `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
-          `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
-        ).catch(() => null);
-
-        // Delete both messages after 30 seconds
-        setTimeout(async () => {
-          if (redirectMsg) {
-            await errorHandler.safeDelete(redirectMsg, 'intelligence command redirect cleanup');
-          }
-          await errorHandler.safeDelete(message, 'intelligence command original message cleanup');
-        }, 30000);
-
-        return;
-      }
-
-      // Don't clutter spawn threads
-      if (
-        message.channel.isThread() &&
-        message.channel.parentId === config.attendance_channel_id
-      ) {
-        await message.reply(
-          "⚠️ Please use intelligence commands in BOT-COMMANDS or admin logs to avoid cluttering spawn threads."
-        );
-        return;
-      }
-
-      // Route to appropriate command handler
-      if (resolvedCmd === "!predictprice") {
-        await commandHandlers.predictprice(message, member);
-      } else if (resolvedCmd === "!predictspawn") {
-        await commandHandlers.predictspawn(message, member);
-      } else if (resolvedCmd === "!predictattendance") {
-        await commandHandlers.predictattendance(message, member);
-      } else if (resolvedCmd === "!engagement") {
-        await commandHandlers.engagement(message, member);
-      } else if (resolvedCmd === "!analyzeengagement") {
-        await commandHandlers.analyzeengagement(message, member);
-      }
-      return;
-    }
 
     // =========================================================================
-    // INTELLIGENCE ENGINE COMMANDS - Admin Only
+    // BOSS ROTATION COMMAND - Admin Only
     // =========================================================================
-    // Advanced admin tools (fraud detection, performance, bootstrapping)
-    if (
-      resolvedCmd === "!detectanomalies" ||
-      resolvedCmd === "!recommendations" ||
-      resolvedCmd === "!performance" ||
-      resolvedCmd === "!analyzequeue" ||
-      resolvedCmd === "!bootstraplearning" ||
-      resolvedCmd === "!rotation"
-    ) {
+    if (resolvedCmd === "!rotation") {
       if (!userIsAdmin) {
-        await message.reply("❌ This intelligence command is admin-only.");
+        await message.reply("❌ This command is admin-only.");
         return;
       }
 
@@ -5389,107 +5261,15 @@ client.on(Events.MessageCreate, async (message) => {
         message.channel.parentId === config.attendance_channel_id
       ) {
         await message.reply(
-          "⚠️ Please use intelligence commands in admin logs channel to avoid cluttering spawn threads."
+          "⚠️ Please use this command in admin logs channel to avoid cluttering spawn threads."
         );
         return;
       }
 
-      // Route to appropriate command handler
-      if (resolvedCmd === "!detectanomalies") {
-        await commandHandlers.detectanomalies(message, member);
-      } else if (resolvedCmd === "!recommendations") {
-        await commandHandlers.recommendations(message, member);
-      } else if (resolvedCmd === "!performance") {
-        await commandHandlers.performance(message, member);
-      } else if (resolvedCmd === "!analyzequeue") {
-        await commandHandlers.analyzequeue(message, member);
-      } else if (resolvedCmd === "!bootstraplearning") {
-        await commandHandlers.bootstraplearning(message, member);
-      } else if (resolvedCmd === "!rotation") {
-        await commandHandlers.rotation(message, member);
-      }
+      await commandHandlers.rotation(message, member);
       return;
     }
 
-    // =========================================================================
-    // NLP LEARNING SYSTEM COMMANDS (Admin only, except !myprofile)
-    // =========================================================================
-    if (
-      resolvedCmd === "!nlpstats" ||
-      resolvedCmd === "!unrecognized" ||
-      resolvedCmd === "!learned" ||
-      resolvedCmd === "!teachbot" ||
-      resolvedCmd === "!clearlearned" ||
-      resolvedCmd === "!nlpunhide" ||
-      resolvedCmd === "!myprofile"
-    ) {
-      if (!userIsAdmin && resolvedCmd !== "!myprofile") {
-        await message.reply("❌ NLP admin commands are admin-only. Use `!myprofile` to see your learning profile.");
-        return;
-      }
-
-      if (
-        message.channel.isThread() &&
-        message.channel.parentId === config.attendance_channel_id
-      ) {
-        await message.reply(
-          "⚠️ Please use NLP commands in BOT-COMMANDS channel to avoid cluttering spawn threads."
-        );
-        return;
-      }
-
-      // !myprofile is member-accessible, redirect from guild chat to BOT-COMMANDS
-      if (resolvedCmd === "!myprofile") {
-        // Define bot commands channel
-        const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
-          (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
-
-        // If invoked in guild chat, redirect to BOT-COMMANDS
-        if (inElysiumCommandsChannel && !inBotCommandsChannel && !inAdminLogs) {
-          // Send redirect message in guild chat that auto-deletes after 30 seconds
-          const redirectMsg = await message.reply(
-            `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
-            `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
-          ).catch(() => null);
-
-          // Delete both messages after 30 seconds
-          setTimeout(async () => {
-            if (redirectMsg) {
-              await errorHandler.safeDelete(redirectMsg, 'NLP admin command redirect cleanup');
-            }
-            await errorHandler.safeDelete(message, 'NLP admin command original message cleanup');
-          }, 30000);
-
-          return;
-        }
-      }
-
-      if (!nlpLearningSystem) {
-        await message.reply("❌ NLP Learning System is not initialized.");
-        return;
-      }
-
-      // Import and route to NLP admin command handlers
-      const nlpAdminCommands = require('./nlp-admin-commands.js');
-      const args = message.content.trim().split(/\s+/).slice(1);
-
-      if (resolvedCmd === "!nlpstats") {
-        await nlpAdminCommands.showNLPStats(message, nlpLearningSystem);
-      } else if (resolvedCmd === "!unrecognized") {
-        await nlpAdminCommands.showUnrecognized(message, nlpLearningSystem);
-      } else if (resolvedCmd === "!learned") {
-        await nlpAdminCommands.showLearned(message, nlpLearningSystem);
-      } else if (resolvedCmd === "!teachbot") {
-        await nlpAdminCommands.teachBot(message, args, nlpLearningSystem);
-      } else if (resolvedCmd === "!clearlearned") {
-        await nlpAdminCommands.clearLearned(message, args, nlpLearningSystem);
-      } else if (resolvedCmd === "!nlpunhide") {
-        await nlpAdminCommands.unhideNLPTabs(message, sheetAPI);
-      } else if (resolvedCmd === "!myprofile") {
-        await nlpAdminCommands.showMyProfile(message, nlpLearningSystem);
-      }
-      return;
-    }
 
     // =========================================================================
     // SPAWN THREAD CHECK-IN SYSTEM
