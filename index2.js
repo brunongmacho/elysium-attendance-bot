@@ -108,6 +108,7 @@ const eventReminders = require('./event-reminders.js'); // Game Event Reminder S
 const bossRotation = require('./boss-rotation.js'); // Boss Rotation System (5-guild tracking)
 const activityHeatmap = require('./activity-heatmap.js'); // Activity Heatmap System
 const crashRecovery = require('./utils/crash-recovery.js'); // Crash Recovery System (state persistence)
+const dbAPI = require('./utils/database-api'); // MongoDB Database API
 const memberLore = JSON.parse(fs.readFileSync("./member-lore.json")); // Member lore data
 const { COMMAND_ALIASES, resolveCommandAlias } = require('./config/command-aliases'); // Command alias mapping
 
@@ -4233,6 +4234,24 @@ client.once(Events.ClientReady, async () => {
     mainLogger.error('Failed to initialize operation queue', error);
   }
 
+  // INITIALIZE MONGODB CONNECTION (Non-blocking for Phase 2 testing)
+  try {
+    console.log('🔌 Connecting to MongoDB...');
+    await dbAPI.connect();
+    console.log('✅ MongoDB connected successfully');
+
+    // Get connection health info
+    const health = await dbAPI.healthCheck();
+    console.log(`📊 MongoDB Health: ${health.status} (Latency: ${health.latency}ms)`);
+
+    // Get database stats
+    const stats = await dbAPI.getStats();
+    console.log(`📦 Database: ${stats.database} | Collections: ${stats.collections} | Size: ${stats.storageSize}`);
+  } catch (error) {
+    console.error('⚠️ MongoDB connection failed (non-critical for now):', error.message);
+    console.log('📝 Bot will continue with Google Sheets only until Phase 4');
+  }
+
   // Attach config to client for module access
   client.config = config;
 
@@ -7056,8 +7075,17 @@ async function gracefulShutdown(signal) {
       await crashRecovery.saveState();
     }
 
-    // Step 5: Close HTTP server
-    console.log('5️⃣ Closing HTTP server...');
+    // Step 5: Close MongoDB connection
+    console.log('5️⃣ Closing MongoDB connection...');
+    try {
+      await dbAPI.close();
+      console.log('✅ MongoDB connection closed');
+    } catch (error) {
+      console.log('⚠️ MongoDB close skipped (not connected)');
+    }
+
+    // Step 6: Close HTTP server
+    console.log('6️⃣ Closing HTTP server...');
     await new Promise((resolve) => {
       server.close(() => {
         console.log('✅ HTTP server closed');
@@ -7067,16 +7095,16 @@ async function gracefulShutdown(signal) {
       setTimeout(resolve, 5000);
     });
 
-    // Step 6: Remove all Discord event listeners
-    console.log('6️⃣ Removing Discord event listeners...');
+    // Step 7: Remove all Discord event listeners
+    console.log('7️⃣ Removing Discord event listeners...');
     client.removeAllListeners();
 
-    // Step 7: Destroy Discord client
-    console.log('7️⃣ Destroying Discord client...');
+    // Step 8: Destroy Discord client
+    console.log('8️⃣ Destroying Discord client...');
     await client.destroy();
     console.log('✅ Discord client destroyed');
 
-    // Step 8: Clear the forced shutdown timeout
+    // Step 9: Clear the forced shutdown timeout
     clearTimeout(forceShutdownTimeout);
 
     console.log('✅ Graceful shutdown complete!');
