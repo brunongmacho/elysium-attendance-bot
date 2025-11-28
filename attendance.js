@@ -699,15 +699,41 @@ async function createSpawnThreads(
  * console.log(`Found ${result.members.length} verified, ${result.pending.length} pending`);
  */
 async function scanThreadForPendingReactions(thread, client, bossName, parsed) {
-  // Fetch recent messages (reduced from 100 to 50 for memory optimization)
-  const messages = await thread.messages.fetch({ limit: 50 }).catch(() => null);
-  if (!messages) return { members: [], pending: [], confirmations: [] };
+  // Fetch ALL messages in thread to capture all verifications (not just recent 50)
+  // For threads with many attendees, we need to paginate through messages
+  let allMessages = new Map();
+  let lastMessageId = null;
+  let fetchCount = 0;
+  const MAX_FETCHES = 5; // Max 500 messages (5 * 100) to prevent infinite loops
+
+  // Paginate through messages until we've fetched all or hit the limit
+  while (fetchCount < MAX_FETCHES) {
+    const options = { limit: 100 };
+    if (lastMessageId) {
+      options.before = lastMessageId;
+    }
+
+    const batch = await thread.messages.fetch(options).catch(() => null);
+    if (!batch || batch.size === 0) break;
+
+    // Merge batch into allMessages
+    batch.forEach((msg, id) => allMessages.set(id, msg));
+
+    // If we got less than 100, we've reached the end
+    if (batch.size < 100) break;
+
+    // Get the oldest message ID from this batch for next iteration
+    lastMessageId = Array.from(batch.keys()).pop();
+    fetchCount++;
+  }
+
+  console.log(`📨 Fetched ${allMessages.size} messages from thread (${fetchCount + 1} API calls)`);
 
   const members = [];
   const pending = [];
   const confirmations = [];
 
-  for (const [msgId, msg] of messages) {
+  for (const [msgId, msg] of allMessages) {
     // Process bot messages for verification history and closure prompts
     if (msg.author.id === client.user.id) {
       // Extract already-verified members from bot confirmation messages
@@ -747,7 +773,7 @@ async function scanThreadForPendingReactions(thread, client, bossName, parsed) {
       const username = author ? (author.nickname || msg.author.username) : msg.author.username;
 
       // Look for bot reply with buttons (new system) or verification confirmation
-      const hasBotReply = messages.some(
+      const hasBotReply = Array.from(allMessages.values()).some(
         (m) =>
           m.reference?.messageId === msgId &&
           m.author.id === client.user.id &&
@@ -755,7 +781,7 @@ async function scanThreadForPendingReactions(thread, client, bossName, parsed) {
       );
 
       // Look for verification confirmation message
-      const hasVerificationReply = messages.some(
+      const hasVerificationReply = Array.from(allMessages.values()).some(
         (m) =>
           m.reference?.messageId === msgId &&
           m.author.id === client.user.id &&

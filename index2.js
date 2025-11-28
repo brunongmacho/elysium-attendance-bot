@@ -7215,34 +7215,54 @@ client.on(Events.MessageCreate, async (message) => {
           ([msgId, p]) => p.threadId === message.channel.id
         );
 
+        // AUTO-VERIFY pending members (like !closeall does) instead of blocking close
+        // This ensures all valid check-ins are included in the attendance tally
         if (pendingInThread.length > 0) {
-          // Limit to first 10 to avoid exceeding 2000 char Discord message limit
-          const maxShow = 10;
-          const toShow = pendingInThread.slice(0, maxShow);
-          const remaining = pendingInThread.length - maxShow;
+          await message.reply(
+            `🔍 Found **${pendingInThread.length} pending verification(s)**.\n\n` +
+            `Auto-verifying all before closing...`
+          );
 
-          const pendingList = toShow
-            .map(([msgId, p]) => {
-              const messageLink = `https://discord.com/channels/${guild.id}/${message.channel.id}/${msgId}`;
-              return `• **${p.author}** - [View](${messageLink})`;
-            })
-            .join("\n");
+          // Filter out duplicates and add new members
+          const newMembers = pendingInThread
+            .filter(
+              ([msgId, p]) =>
+                !spawnInfo.members.some(
+                  (m) => normalizeUsername(m) === normalizeUsername(p.author)
+                )
+            )
+            .map(([msgId, p]) => p.author);
 
-          let warningMessage =
-            `⚠️ **Cannot close spawn!**\n\n` +
-            `There are **${pendingInThread.length} pending verification(s)**:\n\n` +
-            `${pendingList}`;
+          spawnInfo.members.push(...newMembers);
 
-          if (remaining > 0) {
-            warningMessage += `\n\n...and **${remaining} more**.`;
-          }
+          // Clean up verification button messages
+          const messageIds = pendingInThread.map(([msgId, p]) => msgId);
+          const messagePromises = messageIds.map((msgId) =>
+            message.channel.messages.fetch(msgId).catch(() => null)
+          );
+          const fetchedMessages = await Promise.allSettled(messagePromises);
 
-          warningMessage +=
-            `\n\nPlease verify (✅) or deny (❌) all check-ins first, then type \`close\` again.\n\n` +
-            `💡 Or use \`!resetpending\` to clear them.`;
+          const reactionPromises = fetchedMessages.map((result) => {
+            if (result.status === "fulfilled" && result.value) {
+              return result.value.reactions.removeAll().catch(err => errorHandler.silentError(err, 'auto-verify reaction cleanup'));
+            }
+            return Promise.resolve();
+          });
+          await Promise.allSettled(reactionPromises);
 
-          await message.reply(warningMessage);
-          return;
+          // Remove from pending verifications
+          pendingInThread.forEach(
+            ([msgId]) => delete pendingVerifications[msgId]
+          );
+
+          attendance.setPendingVerifications(pendingVerifications);
+          attendance.setActiveSpawns(activeSpawns);
+
+          await message.channel.send(
+            `✅ Auto-verified **${newMembers.length}** member(s). ` +
+            `(${pendingInThread.length - newMembers.length} were duplicates)\n\n` +
+            `Total members: **${spawnInfo.members.length}**`
+          );
         }
 
         const closeEmbed = new EmbedBuilder()
