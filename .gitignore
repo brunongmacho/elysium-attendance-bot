@@ -1,9 +1,9 @@
 # Existing gitignore content preserved
 node_modules/
-package-lock.json
 .env
 config.json
 *.log
+.queue.json
 
 # ML Service
 ml-service/__pycache__/

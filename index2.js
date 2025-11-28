@@ -53,6 +53,30 @@
 // SECTION 1: IMPORTS & DEPENDENCIES
 // =====================================================================
 
+// ═══════════════════════════════════════════════════════════════════════════
+// INITIALIZE SENTRY FIRST - Error tracking must be set up before anything else
+// ═══════════════════════════════════════════════════════════════════════════
+const { initializeSentry } = require('./utils/sentry');
+initializeSentry();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STRUCTURED LOGGING - Replace console.log with structured logger
+// ═══════════════════════════════════════════════════════════════════════════
+const { createLogger, withCorrelationId } = require('./utils/logger');
+const mainLogger = createLogger('main');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// METRICS & MONITORING
+// ═══════════════════════════════════════════════════════════════════════════
+const metrics = require('./utils/metrics');
+const { startMetricsServer } = require('./utils/metrics-server');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GRACEFUL DEGRADATION
+// ═══════════════════════════════════════════════════════════════════════════
+const { OperationQueue, getStalenessTracker } = require('./utils/operation-queue');
+const operationQueue = new OperationQueue();
+
 // Discord.js - Official Discord API wrapper
 const {
   Client,           // Main Discord client class
@@ -176,20 +200,18 @@ function validateConfig() {
   }
 
   if (missing.length > 0 || invalid.length > 0) {
-    console.error('\n🚨 CONFIGURATION ERROR 🚨\n');
+    mainLogger.error('CONFIGURATION ERROR - Missing or invalid configuration fields');
     if (missing.length > 0) {
-      console.error('Missing required fields:');
-      missing.forEach(msg => console.error(msg));
+      mainLogger.error('Missing required fields:', { missing });
     }
     if (invalid.length > 0) {
-      console.error('\nInvalid field values:');
-      invalid.forEach(msg => console.error(msg));
+      mainLogger.error('Invalid field values:', { invalid });
     }
-    console.error('\n📝 Please check your config.json file\n');
+    mainLogger.error('Please check your config.json file');
     process.exit(1);
   }
 
-  console.log('✅ Configuration validated successfully');
+  mainLogger.info('Configuration validated successfully');
 }
 
 // Run validation immediately
@@ -5509,8 +5531,28 @@ stats: async (message, member, args) => {
  * @event ClientReady
  */
 client.once(Events.ClientReady, async () => {
-  console.log(`✅ Bot logged in as ${client.user.tag}`);
-  console.log(`📊 Tracking ${Object.keys(bossPoints).length} bosses | Guild: ${config.main_guild_id} | Version: ${BOT_VERSION}`);
+  mainLogger.info('Bot logged in successfully', {
+    tag: client.user.tag,
+    bossCount: Object.keys(bossPoints).length,
+    guildId: config.main_guild_id,
+    version: BOT_VERSION,
+  });
+
+  // START METRICS SERVER (Prometheus endpoint)
+  try {
+    startMetricsServer();
+    mainLogger.info('Metrics server started successfully');
+  } catch (error) {
+    mainLogger.error('Failed to start metrics server', error);
+  }
+
+  // INITIALIZE OPERATION QUEUE (Graceful degradation)
+  try {
+    await operationQueue.initialize();
+    mainLogger.info('Operation queue initialized');
+  } catch (error) {
+    mainLogger.error('Failed to initialize operation queue', error);
+  }
 
   // Attach config to client for module access
   client.config = config;
@@ -5533,13 +5575,13 @@ client.once(Events.ClientReady, async () => {
   try {
     const needsCheck = await sheetAPI.call('needsBootstrap', {});
     if (needsCheck.status === 'ok' && needsCheck.needsBootstrap) {
-      console.log('🚀 [FIRST DEPLOYMENT] Bootstrapping learning system from historical data...');
+      mainLogger.info('[FIRST DEPLOYMENT] Bootstrapping learning system from historical data');
 
       const bootstrapResult = await sheetAPI.call('bootstrapLearning', {});
 
       if (bootstrapResult.status === 'ok') {
         const { predictionsCreated, uniqueItems, averageAccuracy } = bootstrapResult;
-        console.log(`✅ Bootstrap complete: ${predictionsCreated} predictions, ${uniqueItems} items, ${averageAccuracy}% accuracy`);
+        mainLogger.info('Bootstrap complete', { predictionsCreated, uniqueItems, averageAccuracy });
 
         // Send notification to admin logs
         const adminLogsChannel = await discordCache.getChannel('admin_logs_channel_id');
