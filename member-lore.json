@@ -1,31 +1,31 @@
 {
   "AmielJohn": {
     "title": "The Snack Strategist",
-    "lore": "Master tactician who's developed a complex battle-snacking rotation that guarantees victory. Has never actually finished a snack before getting hungry again. Credits every victory to the perfect jerky-to-combat ratio while simultaneously starving. The most well-fed warrior who's perpetually hungry.",
+    "lore": "Elysium's perpetually hungry tactician who's developed a complex battle-snacking rotation that guarantees victory. Has never actually finished a snack before getting hungry again. Shares snacks with M1ssy despite their mutual allergies/starvation. Credits every victory to the perfect jerky-to-combat ratio while simultaneously starving. Goblok appointed them 'Guild Quartermaster' - they ate the supplies.",
     "specialty": "Mid-battle meal optimization that never satisfies",
-    "reputation": "Brings more snacks than anyone but somehow always begging for food",
+    "reputation": "Elysium's most well-fed warrior who's perpetually hungry",
     "stats": "STR 75 | DEX 60 | Hunger 999 | Satisfaction 0",
     "skills": ["Perpetual Snacking", "Emergency Jerky Deploy", "Tactical Starvation"]
   },
   "Joco": {
     "title": "The Strategic Vice",
-    "lore": "Master tactician who turns chaos into calculated victories with brilliant strategic planning. Never follows his own plans. Spends hours creating detailed battle strategies, then improvises everything when combat starts. Somehow still wins. The guild's most organized mess.",
+    "lore": "Elysium's Vice Guild Leader who turns Goblok's chaos into calculated victories with brilliant strategic planning. Never follows his own plans. Spends hours creating detailed battle strategies for the guild, then improvises everything when combat starts. Somehow still wins. Partners with Hesucrypto and Inihaw to form the 'Vice Trinity of Controlled Chaos'. The guild's most organized mess and Goblok's strategic translator.",
     "specialty": "Creating perfect plans and ignoring them completely",
-    "reputation": "The voice of reason who never listens to himself",
+    "reputation": "Elysium's voice of reason who never listens to himself",
     "stats": "INT 95 | Planning 99 | Plan Adherence 0 | Improvisation 100",
     "skills": ["Strategic Amnesia", "Accidental Genius", "Controlled Chaos Management"]
   },
   "Azryth": {
     "title": "Nightblade Philosopher",
-    "lore": "Deadly shadow assassin who strikes with lethal precision from the darkness. Afraid of the dark. Carries a nightlight to every assassination. Philosophical debates help distract from crippling fear of shadows. Enemies die laughing at the irony before the blade even reaches them.",
+    "lore": "Elysium's deadly shadow assassin who strikes with lethal precision from the darkness. Afraid of the dark. Carries a nightlight to every guild assassination. Philosophical debates help distract from crippling fear of shadows. Enemies die laughing at the irony before the blade even reaches them. Requests LXRDGRIM's therapy for darkness phobia. Goblok assigned them 'Night Raids' anyway. Elysium's most ironic shadow warrior.",
     "specialty": "Existential combat theory performed in well-lit areas",
-    "reputation": "Most feared assassin who sleeps with lights on",
+    "reputation": "Elysium's most feared assassin who sleeps with lights on",
     "stats": "STR 80 | Stealth 90 | Darkness Tolerance 5 | Philosophy 85",
     "skills": ["Illuminated Assassination", "Existential Strike", "Nightlight Mastery"]
   },
   "Draxiimov": {
     "title": "The Meme Lord",
-    "lore": "Internet culture weaponization expert with encyclopedic knowledge of every meme. Completely out of touch - uses memes from 2008 unironically. Enemies cringe so hard they physically cannot continue fighting. Undefeated through sheer outdated references. Still thinks 'Epic Fail' is cutting edge.",
+    "lore": "Elysium's internet culture weaponization expert with encyclopedic knowledge of every meme. Completely out of touch - uses memes from 2008 unironically. Enemies cringe so hard they physically cannot continue fighting. Undefeated through sheer outdated references. Still thinks 'Epic Fail' is cutting edge. Goblok appointed them 'Guild Meme Officer' - Elysium's propaganda is stuck in 2008. Guild discord filled with ancient memes. Still thinks 'Epic Fail' is cutting edge.",
     "specialty": "Weaponized cringe from the ancient meme archives",
     "reputation": "Banned from three enemy guilds for emotional damage via dead memes",
     "stats": "Meme Knowledge 100 | Relevance 0 | Cringe 999 | Self-Awareness 2",
@@ -33,49 +33,49 @@
   },
   "Goblok": {
     "title": "The Unpredictable Leader",
-    "lore": "Guild Leader renowned for brilliant unpredictable strategies that no one can counter. Completely predictable - does the exact opposite of logic every time. Enemies predict this and prepare, but Goblok's illogical patterns are so consistent they become logical again. Paradox incarnate.",
+    "lore": "Elysium Guild's fearless leader renowned for brilliant unpredictable strategies that no one can counter. Completely predictable - does the exact opposite of logic every time. Enemies predict this and prepare, but Goblok's illogical patterns are so consistent they become logical again. Paradox incarnate. Named the guild 'Elysium' (paradise for heroes) despite the guild being absolute chaos. Relies on the Vice Trinity (Joco, Hesucrypto, Inihaw) to translate his vision into... slightly less chaos.",
     "specialty": "Strategic unpredictability that's predictably unpredictable",
-    "reputation": "The genius who thinks with zero brain cells and maximum results",
+    "reputation": "Elysium's genius who thinks with zero brain cells and maximum results",
     "stats": "Leadership 100 | Logic 0 | Paradox 999 | Brain Cells 0.5",
     "skills": ["Reverse Psychology Mastery", "Illogical Victory", "Predictable Chaos"]
   },
   "Hesucrypto": {
     "title": "The Crypto Vice King",
-    "lore": "Vice Guild Leader and investment mastermind who sees every opportunity. Made millions in crypto. Lost it all. Made it back. Lost it again. Currently broke but owns NFTs worth 'millions' (according to him). Still Vice Leader because motivation speeches about 'diamond hands' somehow inspire victories.",
+    "lore": "Elysium's Vice Guild Leader, bot creator, and investment mastermind who sees every opportunity. Made millions in crypto. Lost it all. Made it back. Lost it again. Currently broke but owns NFTs worth 'millions' (according to him). Created the legendary Jalo Bot to track attendance - the guild's only profitable investment. Part of the Vice Trinity with Joco and Inihaw. Still Vice Leader because motivation speeches about 'diamond hands' somehow inspire Elysium victories. Manages guild funds nobody trusts exist.",
     "specialty": "Economic warfare funded by imaginary profits",
-    "reputation": "Richest poor person in the guild",
+    "reputation": "Elysium's richest poor person and bot daddy",
     "stats": "Investment Skill 95 | Actual Profit 0 | NFT Value 999 | Bank Account -50",
     "skills": ["Diamond Hands", "HODL Strategy", "Imaginary Wealth Projection", "Motivational Bankruptcy"]
   },
   "Iguro": {
     "title": "Portal Chaos Agent",
-    "lore": "Master of spatial manipulation with perfect control over dimensional rifts. Teleports to the wrong dimension every time. Aimed for enemy backline, ended up in the cafeteria. Three bosses joined the guild because they felt bad. The recruitment team's MVP for all the wrong reasons.",
+    "lore": "Elysium's master of spatial manipulation with perfect control over dimensional rifts. Teleports to the wrong dimension every time. Aimed for enemy backline, ended up in Inihaw's BBQ. Three bosses joined the guild because they felt bad. Goblok promoted them to 'Chief Recruitment Officer' - Elysium's recruitment team celebrates the accidents. Guild size tripled through portaling errors. The only member whose failures count as victories.",
     "specialty": "Precision portal placement to incorrect locations",
-    "reputation": "Perfect aim at everything except the target",
+    "reputation": "Elysium's perfect aim at everything except the target",
     "stats": "Portal Mastery 99 | Accuracy 5 | Dimensional Confusion 100 | Recruitment 80",
     "skills": ["Misplaced Teleport", "Accidental Recruitment", "Cafeteria Warp"]
   },
   "Inihaw": {
     "title": "The BBQ Vice Commander",
-    "lore": "Vice Guild Leader and defensive specialist who protects allies with impenetrable shields. Vegan. Grills enemies to perfection while preaching about plant-based diets. The cognitive dissonance is weaponized. Enemies die from heart disease and confusion about the mixed messages.",
+    "lore": "Elysium's Vice Guild Leader, defensive specialist, and guild chef who protects allies with impenetrable shields. Vegan. Grills enemies to perfection while preaching about plant-based diets to the guild. The cognitive dissonance is weaponized. Completes the Vice Trinity with Joco and Hesucrypto. Hosts guild BBQs where everyone dies from heart disease and confusion about the mixed messages. Maia's plants wilt from the grill smoke. Elysium's most contradictory protector.",
     "specialty": "Defensive grilling with a side of moral contradiction",
-    "reputation": "The shield that barbecues while condemning meat consumption",
+    "reputation": "Elysium's shield that barbecues while condemning meat",
     "stats": "Defense 95 | Grilling 90 | Veganism 100 | Hypocrisy 85",
     "skills": ["Vegan BBQ Paradox", "Shield Grill", "Plant-Based Lecture Mid-Roast"]
   },
   "Jalo": {
     "title": "The Legendary Namesake",
-    "lore": "The living legend so iconic the entire bot bears his name. Every fact he shares is completely wrong. Defeated a dragon with dental hygiene lecture using entirely incorrect dental advice. The dragon fled from the sheer confidence in misinformation. This bot exists as tribute to legendary wrongness done right.",
+    "lore": "Elysium's living legend so iconic that Hesucrypto named the entire attendance bot after him - 'The Jalo Bot'. Every fact he shares is completely wrong. Defeated a dragon with dental hygiene lecture using entirely incorrect dental advice. The dragon fled from the sheer confidence in misinformation. The guild worships his confidently incorrect wisdom. Goblok consults Jalo for strategic advice (explains everything). This bot exists as Elysium's tribute to legendary wrongness done right. Guild patron saint of misinformation.",
     "specialty": "Tactical trivia that's 100% inaccurate but 100% effective",
-    "reputation": "The guild's encyclopedia of confidently incorrect information",
+    "reputation": "Elysium's encyclopedia of confidently incorrect information and bot deity",
     "stats": "Legend Status 100 | Fact Accuracy 0 | Confidence 999 | Dragon Defeats 1",
     "skills": ["Confidently Wrong", "Misinformation Strike", "Legendary Incorrectness"]
   },
   "LXRDGRIM": {
     "title": "The Brooding Reaper",
-    "lore": "Darkness incarnate radiating existential dread and intimidating presence. Certified therapist. Enemies request therapy, he provides excellent counseling. Has helped more enemies than he's defeated. The most wholesome reaper. Brooding is professional obligation, healing is passion.",
+    "lore": "Elysium's darkness incarnate radiating existential dread and intimidating presence. Certified therapist. Enemies request therapy, he provides excellent counseling. Has helped more enemies than he's defeated. Guild's official therapist - provides therapy to M1ssy after allergic episodes, Maia's plant genocide trauma, and Marsha11's argument frustration. The most wholesome reaper in Elysium paradise. Brooding is professional obligation, healing the guild is passion.",
     "specialty": "Therapeutic intimidation that actually helps people",
-    "reputation": "Guild's emotional support reaper with anger management degree",
+    "reputation": "Elysium's emotional support reaper with anger management degree",
     "stats": "Brooding 100 | Therapy Skill 95 | Wholesomeness 90 | Kills 20 | Healed 200",
     "skills": ["Therapeutic Dread", "Counseling Strike", "Emotional Support Scythe"]
   },
@@ -169,25 +169,25 @@
   },
   "M1ssy": {
     "title": "The Chaotic Snacker",
-    "lore": "Master combatant who prioritizes snacks above all else with impressive collection. Allergic to everything. Every snack is life-threatening. Brings epipen to raids. Still takes snack breaks. Enemies wait politely while anaphylaxis is managed. Dedication beyond reason.",
+    "lore": "Elysium's master combatant who prioritizes snacks above all else with impressive collection. Allergic to everything. Every snack is life-threatening. Brings epipen to guild raids. Still takes snack breaks. Shares provisions with AmielJohn despite both being perpetually hungry/dying. Enemies wait politely while anaphylaxis is managed. LXRDGRIM provides therapy after each allergic episode. Elysium's dedication beyond reason incarnate.",
     "specialty": "Snack-break tactical advantage despite medical emergencies",
-    "reputation": "The member with best provisions and worst survival instincts",
+    "reputation": "Elysium's member with best provisions and worst survival instincts",
     "stats": "Snack Variety 100 | Allergies 100 | Survival Instinct 5 | Dedication 999",
     "skills": ["Anaphylactic Snacking", "Epipen Quick-Draw", "Allergic Persistence"]
   },
   "Maria": {
     "title": "The Twin Debater",
-    "lore": "Legendary debater who's won every argument with twin Marsha11 through superior logic. Completely wrong about everything. Wins arguments through confidence, not facts. Marsha11 is objectively correct but loses anyway. Peak sibling rivalry - truth loses to volume.",
+    "lore": "Elysium's legendary debater who's won every argument with twin Marsha11 through superior logic. Completely wrong about everything. Wins arguments through confidence, not facts. Marsha11 is objectively correct but loses anyway. Peak sibling rivalry that fuels Elysium guild morale. The twin debates are guild entertainment during raids. Goblok settles arguments by declaring both wrong. Truth loses to volume in Elysium paradise.",
     "specialty": "Simultaneous physical combat and confidently incorrect arguing",
-    "reputation": "Half of the guild's most entertaining duo who's never been right",
+    "reputation": "Half of Elysium's most entertaining duo who's never been right",
     "stats": "Confidence 100 | Accuracy 0 | Volume 95 | Arguments Won 999",
     "skills": ["Confidently Wrong Strike", "Volume Override", "Fact Immunity"]
   },
   "Marsha11": {
     "title": "The Twin Defender",
-    "lore": "Twin defender with perfect facts and logical arguments against Maria. Loses every argument. Being correct is weakness in sibling warfare. Has documented proof, witnesses, and evidence. Maria just says 'no' louder. The struggle continues. Truth is overrated anyway.",
+    "lore": "Elysium's twin defender with perfect facts and logical arguments against Maria. Loses every argument. Being correct is weakness in sibling warfare at Elysium. Has documented proof, witnesses, and evidence. Maria just says 'no' louder. The struggle continues during every guild meeting. Jalo's incorrect facts somehow support Maria. Truth is overrated in Elysium anyway. The guild's most frustrated accurate member.",
     "specialty": "Defensive argumentation backed by facts that never matter",
-    "reputation": "The other half who's always right but never wins",
+    "reputation": "Elysium's other half who's always right but never wins",
     "stats": "Accuracy 100 | Argument Wins 0 | Evidence 95 | Frustration 999",
     "skills": ["Factual Defense", "Evidence Presentation", "Losing Despite Being Right"]
   },
