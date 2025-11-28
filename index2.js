@@ -1267,9 +1267,10 @@ function buildStatsEmbed(stats, member, countdown = 300) {
   const lore = loreKey ? memberLore[loreKey] : null;
 
   if (lore) {
+    const skillsList = lore.skills ? lore.skills.join(', ') : 'None';
     embed.addFields({
       name: `✨ ${lore.title}`,
-      value: `${lore.lore}\n\n**Specialty:** ${lore.specialty}\n**Reputation:** ${lore.reputation}`,
+      value: `${lore.lore}\n\n**Specialty:** ${lore.specialty}\n**Reputation:** ${lore.reputation}\n**Stats:** ${lore.stats}\n**Skills:** ${skillsList}`,
       inline: false
     });
   } else {

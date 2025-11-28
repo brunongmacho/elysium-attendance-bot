@@ -1,308 +1,410 @@
 {
   "AmielJohn": {
     "title": "The Snack Strategist",
-    "lore": "A warrior who believes the secret to victory lies not just in skill, but in proper nutrition timing. Has developed a complex battle-snacking rotation that somehow works. Credits every victory to the perfect jerky-to-combat ratio.",
-    "specialty": "Mid-battle meal optimization",
-    "reputation": "The only member who brings more snacks than potions to raids"
+    "lore": "Master tactician who's developed a complex battle-snacking rotation that guarantees victory. Has never actually finished a snack before getting hungry again. Credits every victory to the perfect jerky-to-combat ratio while simultaneously starving. The most well-fed warrior who's perpetually hungry.",
+    "specialty": "Mid-battle meal optimization that never satisfies",
+    "reputation": "Brings more snacks than anyone but somehow always begging for food",
+    "stats": "STR 75 | DEX 60 | Hunger 999 | Satisfaction 0",
+    "skills": ["Perpetual Snacking", "Emergency Jerky Deploy", "Tactical Starvation"]
   },
   "Joco": {
     "title": "The Strategic Vice",
-    "lore": "Right hand to the Guild Leader, Joco is known for turning chaotic situations into calculated victories. While others panic, Joco sees patterns. A master tactician who somehow makes sense of Goblok's wildest plans and transforms them into actual strategy.",
-    "specialty": "Chaos translation and tactical coordination",
-    "reputation": "The voice of reason that keeps the guild from complete anarchy"
+    "lore": "Master tactician who turns chaos into calculated victories with brilliant strategic planning. Never follows his own plans. Spends hours creating detailed battle strategies, then improvises everything when combat starts. Somehow still wins. The guild's most organized mess.",
+    "specialty": "Creating perfect plans and ignoring them completely",
+    "reputation": "The voice of reason who never listens to himself",
+    "stats": "INT 95 | Planning 99 | Plan Adherence 0 | Improvisation 100",
+    "skills": ["Strategic Amnesia", "Accidental Genius", "Controlled Chaos Management"]
   },
   "Azryth": {
     "title": "Nightblade Philosopher",
-    "lore": "Strikes from the shadows while pondering the deeper meaning of combat. Has been known to pause mid-assassination to debate the ethics of surprise attacks. Enemies never know if they're about to be eliminated or engaged in philosophical discourse.",
-    "specialty": "Existential combat theory",
-    "reputation": "Most likely to defeat you physically and mentally"
+    "lore": "Deadly shadow assassin who strikes with lethal precision from the darkness. Afraid of the dark. Carries a nightlight to every assassination. Philosophical debates help distract from crippling fear of shadows. Enemies die laughing at the irony before the blade even reaches them.",
+    "specialty": "Existential combat theory performed in well-lit areas",
+    "reputation": "Most feared assassin who sleeps with lights on",
+    "stats": "STR 80 | Stealth 90 | Darkness Tolerance 5 | Philosophy 85",
+    "skills": ["Illuminated Assassination", "Existential Strike", "Nightlight Mastery"]
   },
   "Draxiimov": {
     "title": "The Meme Lord",
-    "lore": "Weaponized internet culture into a legitimate combat style. Every attack comes with perfectly timed references that confuse enemies into submission. The battlefield is their stage, and cringe is their sword. Undefeated in psychological warfare.",
-    "specialty": "Weaponized cringe and cultural references",
-    "reputation": "Banned from three enemy guilds for emotional damage"
+    "lore": "Internet culture weaponization expert with encyclopedic knowledge of every meme. Completely out of touch - uses memes from 2008 unironically. Enemies cringe so hard they physically cannot continue fighting. Undefeated through sheer outdated references. Still thinks 'Epic Fail' is cutting edge.",
+    "specialty": "Weaponized cringe from the ancient meme archives",
+    "reputation": "Banned from three enemy guilds for emotional damage via dead memes",
+    "stats": "Meme Knowledge 100 | Relevance 0 | Cringe 999 | Self-Awareness 2",
+    "skills": ["Epic Fail Barrage", "Rickroll Resurrection", "LOLcat Launcher"]
   },
   "Goblok": {
     "title": "The Unpredictable Leader",
-    "lore": "Guild Leader and master of controlled chaos. Leads with a unique combination of brilliant strategy and complete randomness that keeps both allies and enemies perpetually confused. GPS systems have given up trying to predict raid patterns. Despite the chaos, somehow always gets results.",
-    "specialty": "Strategic unpredictability and inspirational confusion",
-    "reputation": "The only leader who can turn a disaster into a victory parade"
+    "lore": "Guild Leader renowned for brilliant unpredictable strategies that no one can counter. Completely predictable - does the exact opposite of logic every time. Enemies predict this and prepare, but Goblok's illogical patterns are so consistent they become logical again. Paradox incarnate.",
+    "specialty": "Strategic unpredictability that's predictably unpredictable",
+    "reputation": "The genius who thinks with zero brain cells and maximum results",
+    "stats": "Leadership 100 | Logic 0 | Paradox 999 | Brain Cells 0.5",
+    "skills": ["Reverse Psychology Mastery", "Illogical Victory", "Predictable Chaos"]
   },
   "Hesucrypto": {
     "title": "The Crypto Vice King",
-    "lore": "Vice Guild Leader and visionary investor who sees every battle as a market opportunity. Analyzes enemy HP bars like stock charts and treats loot drops as portfolio diversification. The bot's creator and patron saint of calculated risks. Lost more gold than the guild treasury but somehow still Vice Leader.",
-    "specialty": "Economic warfare and investment-based combat theory",
-    "reputation": "The reason guild funds are both invested and terrifying"
+    "lore": "Vice Guild Leader and investment mastermind who sees every opportunity. Made millions in crypto. Lost it all. Made it back. Lost it again. Currently broke but owns NFTs worth 'millions' (according to him). Still Vice Leader because motivation speeches about 'diamond hands' somehow inspire victories.",
+    "specialty": "Economic warfare funded by imaginary profits",
+    "reputation": "Richest poor person in the guild",
+    "stats": "Investment Skill 95 | Actual Profit 0 | NFT Value 999 | Bank Account -50",
+    "skills": ["Diamond Hands", "HODL Strategy", "Imaginary Wealth Projection", "Motivational Bankruptcy"]
   },
   "Iguro": {
     "title": "Portal Chaos Agent",
-    "lore": "Mastered the art of spatial manipulation with questionable results. Every attack teleports unpredictably, making them as dangerous to allies as to enemies. Has accidentally recruited three raid bosses to the guild through portal mishaps. The recruitment team loves them anyway.",
-    "specialty": "Unpredictable spatial warfare",
-    "reputation": "Simultaneously the best and worst at targeting"
+    "lore": "Master of spatial manipulation with perfect control over dimensional rifts. Teleports to the wrong dimension every time. Aimed for enemy backline, ended up in the cafeteria. Three bosses joined the guild because they felt bad. The recruitment team's MVP for all the wrong reasons.",
+    "specialty": "Precision portal placement to incorrect locations",
+    "reputation": "Perfect aim at everything except the target",
+    "stats": "Portal Mastery 99 | Accuracy 5 | Dimensional Confusion 100 | Recruitment 80",
+    "skills": ["Misplaced Teleport", "Accidental Recruitment", "Cafeteria Warp"]
   },
   "Inihaw": {
     "title": "The BBQ Vice Commander",
-    "lore": "Vice Guild Leader who turned defensive tactics into a culinary art form. Protects allies while simultaneously grilling enemies to perfection. Every battlefield becomes a barbecue, every raid a feast. Enemies die from heart disease before combat damage. The guild's morale and cholesterol are both at all-time highs.",
-    "specialty": "Defensive grilling and protective cooking",
-    "reputation": "The shield that also feeds you"
+    "lore": "Vice Guild Leader and defensive specialist who protects allies with impenetrable shields. Vegan. Grills enemies to perfection while preaching about plant-based diets. The cognitive dissonance is weaponized. Enemies die from heart disease and confusion about the mixed messages.",
+    "specialty": "Defensive grilling with a side of moral contradiction",
+    "reputation": "The shield that barbecues while condemning meat consumption",
+    "stats": "Defense 95 | Grilling 90 | Veganism 100 | Hypocrisy 85",
+    "skills": ["Vegan BBQ Paradox", "Shield Grill", "Plant-Based Lecture Mid-Roast"]
   },
   "Jalo": {
     "title": "The Legendary Namesake",
-    "lore": "The legend himself - the member so iconic that the entire attendance bot bears his name. A walking encyclopedia of useless facts who somehow makes them tactically relevant. Once defeated a dragon by lecturing it about proper dental hygiene. The dragon fled in shame. This bot exists as tribute to his legendary status.",
-    "specialty": "Tactical trivia and educational warfare",
-    "reputation": "The guild's living legend and bot inspiration"
+    "lore": "The living legend so iconic the entire bot bears his name. Every fact he shares is completely wrong. Defeated a dragon with dental hygiene lecture using entirely incorrect dental advice. The dragon fled from the sheer confidence in misinformation. This bot exists as tribute to legendary wrongness done right.",
+    "specialty": "Tactical trivia that's 100% inaccurate but 100% effective",
+    "reputation": "The guild's encyclopedia of confidently incorrect information",
+    "stats": "Legend Status 100 | Fact Accuracy 0 | Confidence 999 | Dragon Defeats 1",
+    "skills": ["Confidently Wrong", "Misinformation Strike", "Legendary Incorrectness"]
   },
   "LXRDGRIM": {
     "title": "The Brooding Reaper",
-    "lore": "Radiates an aura of darkness and existential dread that somehow comforts allies and terrifies enemies. Every attack carries the weight of a thousand dark thoughts. Enemies request therapy sessions after encounters. Brooding is not optional - it's mandatory and weaponized.",
-    "specialty": "Therapeutic intimidation through brooding",
-    "reputation": "Guild's emotional support reaper"
+    "lore": "Darkness incarnate radiating existential dread and intimidating presence. Certified therapist. Enemies request therapy, he provides excellent counseling. Has helped more enemies than he's defeated. The most wholesome reaper. Brooding is professional obligation, healing is passion.",
+    "specialty": "Therapeutic intimidation that actually helps people",
+    "reputation": "Guild's emotional support reaper with anger management degree",
+    "stats": "Brooding 100 | Therapy Skill 95 | Wholesomeness 90 | Kills 20 | Healed 200",
+    "skills": ["Therapeutic Dread", "Counseling Strike", "Emotional Support Scythe"]
   },
   "Byakko": {
     "title": "The Roaring Terror",
-    "lore": "Believes volume equals victory and has the track record to prove it. Every attack comes with a deafening roar that breaks enemy morale and allied eardrums simultaneously. The guild provides earplugs. Enemies provide surrender documents. Intimidation tactics: maximum. Hearing safety: questionable.",
-    "specialty": "Sonic intimidation and morale destruction",
-    "reputation": "The reason the guild insurance covers hearing aids"
+    "lore": "Legendary warrior whose thunderous roar breaks enemy morale and shatters eardrums. Laryngitis. Every 'roar' comes out as a tiny squeak. Enemies die from trying not to laugh. The guild pretends they can't hear the squeaking. Most intimidating mouse impression in combat history.",
+    "specialty": "Sonic intimidation via adorable squeaking",
+    "reputation": "The reason the guild bought 'hearing aids' (earplugs they don't use)",
+    "stats": "Intended Volume 100 | Actual Volume 5 | Cuteness 95 | Intimidation 80",
+    "skills": ["Mighty Squeak", "Adorable Terror", "Laryngitis Roar"]
   },
   "Carrera": {
     "title": "Speed Demon",
-    "lore": "Moves so fast that physics has filed a formal complaint. Attacks with incredible speed and style, though accuracy is a secondary concern. Even their own attacks can't keep up with their movement. The battlefield becomes a blur when they arrive. Effectiveness through overwhelming velocity.",
-    "specialty": "Supersonic combat and stylish chaos",
-    "reputation": "Faster than their own decision-making process"
+    "lore": "Moves faster than light itself - physics has filed a restraining order. Always late. Arrives at battles three hours after they end. Speed so incredible it loops back to being slow. Time dilation makes every arrival perfectly mistimed. Fastest person to miss every event.",
+    "specialty": "Supersonic combat arrival at wrong temporal coordinates",
+    "reputation": "Faster than everyone but last to arrive to everything",
+    "stats": "Speed 999 | Punctuality 0 | Time Dilation 100 | Event Attendance -50",
+    "skills": ["Lightspeed Lateness", "Temporal Mistiming", "Supersonic Absence"]
   },
   "CheeseCakee": {
     "title": "The Dessert Destroyer",
-    "lore": "Weaponized baking into a legitimate combat art. Every attack is delicious, deadly, and surprisingly moist. Enemies die satisfied and diabetic. Has defeated more bosses through pastry than most members defeat through actual combat. The sweetest threat in the guild.",
-    "specialty": "Confectionary combat and diabetic warfare",
-    "reputation": "The only member whose attacks smell amazing"
+    "lore": "Master baker who weaponized confections into lethal combat art. Lactose intolerant. Every creation causes personal gastrointestinal warfare. Enemies die deliciously while CheeseCakee suffers magnificently. True dedication - willing to endure for the craft. The sweetest suffering.",
+    "specialty": "Confectionary combat with immediate regret",
+    "reputation": "The only member whose attacks hurt them more than enemies",
+    "stats": "Baking 95 | Lactose Tolerance 0 | Pain 100 | Dedication 999",
+    "skills": ["Explosive Cheesecake", "Lactose Kamikaze", "Sweet Suffering Strike"]
   },
   "Chunchunmaru": {
     "title": "The Legendary Blade",
-    "lore": "Wields a massive legendary sword with an absolutely ridiculous name. The name was chosen deliberately for psychological warfare - enemies die laughing before they can mount a defense. Strategy working perfectly. The sword is mighty, the name is questionable, the results are undeniable.",
-    "specialty": "Comedic nomenclature warfare",
-    "reputation": "Most powerful weapon with the silliest name"
+    "lore": "Wields the most powerful legendary sword in existence with a name that strikes fear. Named it 'Chunchunmaru' to intimidate foes. Backfired - enemies die laughing. This was the plan all along. Claims it was strategic. Nobody believes him. Strategy works anyway. Accidental genius.",
+    "specialty": "Psychological warfare via involuntary comedy",
+    "reputation": "Most powerful weapon wielded by biggest comedian",
+    "stats": "Sword Power 100 | Naming Skill 5 | Comedy 95 | Intentionality 10",
+    "skills": ["Legendary Ridicule", "Comic Relief Slash", "Strategic Embarrassment"]
   },
   "Daleee": {
     "title": "The Accidental Savior",
-    "lore": "A mage whose spells do the opposite of what's intended, but somehow everything works out. Aims curses at bosses, accidentally grants immortality to teammates. The guild has stopped questioning it and just accepts the happy accidents. Chaos theory incarnate.",
-    "specialty": "Inverse spellcasting and miraculous mistakes",
-    "reputation": "Wrong in every way that matters, perfect in every way that counts"
+    "lore": "Genius mage with perfect spell accuracy. Every spell does the opposite. Aims fireball at enemy, heals them. Aims heal at ally, nukes them. Aims nuke at everyone, grants immortality. Pattern discovered - aim at allies to destroy enemies. Reverse psychology magic.",
+    "specialty": "Inverse spellcasting that requires backward thinking",
+    "reputation": "Right in every way that's wrong, perfect through complete failure",
+    "stats": "Spell Power 100 | Accuracy 100 | Intended Effect 0 | Reverse Mastery 95",
+    "skills": ["Inverse Fireball", "Healing Nuke", "Accidental Immortality Grant"]
   },
   "EoriuX": {
     "title": "The Self-Wounded Shadow",
-    "lore": "A master assassin with one critical flaw: attacking themselves more than the enemy. Owns more bandages than weapons and has the local healer on speed dial. Despite this, somehow still terrifying in combat. Enemies unsure if they should attack or offer medical assistance.",
-    "specialty": "Accidental self-harm and confused intimidation",
-    "reputation": "The guild's biggest customer for healing supplies"
+    "lore": "Master assassin with legendary stealth and deadly precision daggers. Only enemy is self. Has stabbed themselves more than all enemies combined. Enemies surrender out of pity. Local healers have a dedicated 'EoriuX Emergency Fund'. Still terrifying somehow.",
+    "specialty": "Accidental self-harm mastery and sympathy intimidation",
+    "reputation": "The guild's biggest healing supplies customer and bulk discount holder",
+    "stats": "Stealth 90 | Self-Harm 999 | Enemy Kills 10 | Self-Stabs 500",
+    "skills": ["Reflexive Self-Stab", "Pity Surrender Induction", "Emergency Fund Generation"]
   },
   "erwarrr": {
     "title": "The Screaming Spellcaster",
-    "lore": "Discovered that spell accuracy increases when volume compensates for precision. Casts magic while screaming at maximum volume. Enemies surrender not from damage but from the sheer desire for silence. Morale impact questionable, effectiveness undeniable.",
-    "specialty": "Volume-based magic amplification",
-    "reputation": "The reason guild meetings are held outdoors"
+    "lore": "Powerful mage who discovered volume amplifies spell power. Mute. Every 'scream' is complete silence. The silent intensity is more terrifying than actual screaming. Enemies surrender to avoid the uncomfortable quiet. Weaponized awkward silence to perfection.",
+    "specialty": "Volume-based magic amplification through absolute silence",
+    "reputation": "The reason guild meetings are held outdoors (for the echo they don't hear)",
+    "stats": "Spell Power 90 | Volume 0 | Awkwardness 100 | Silent Intensity 95",
+    "skills": ["Silent Scream", "Awkward Silence Blast", "Mute Amplification"]
   },
   "Evand3r": {
     "title": "The Trinket Tactician",
-    "lore": "Believes any object can be a weapon with enough magical conviction. Once defeated a raid boss using only a spoon. Refuses to explain the technique or the logistics. The spoon is now guild legend, mounted in the hall of fame. Still uses random objects in combat daily.",
-    "specialty": "Improvised magical weaponry",
-    "reputation": "The reason the guild storage has a 'weapons?' section"
+    "lore": "Legendary warrior who once defeated a raid boss using only a spoon. Lost the spoon. Spends every battle searching for that specific spoon. Uses random objects while searching. Accidentally defeats enemies with coffee mugs and staplers. Still hasn't found the spoon.",
+    "specialty": "Improvised weaponry while perpetually searching for one specific spoon",
+    "reputation": "The reason guild storage has a 'Lost Spoon' bulletin board",
+    "stats": "Improvisation 100 | Memory 30 | Spoon Location 0 | Random Object Mastery 85",
+    "skills": ["Coffee Mug Crush", "Stapler Strike", "Eternal Spoon Search"]
   },
   "Fever": {
     "title": "Reality Glitch",
-    "lore": "Radiates an aura of pure chaos that makes reality itself question its existence. Enemies enter the chaos field and forget why they're fighting. Allies forget what they're doing too, but somehow everyone on the guild side is fine with it. Reality.exe has permanently stopped responding.",
-    "specialty": "Existential confusion fields",
-    "reputation": "Living proof that chaos can be weaponized"
+    "lore": "Living embodiment of chaos that breaks reality itself with presence alone. Obsessive-compulsive organizer. While reality crumbles, arranges debris by color and size. Enemies lose sanity watching chaos being meticulously categorized. The most organized apocalypse.",
+    "specialty": "Existential confusion fields with alphabetized destruction",
+    "reputation": "Living proof chaos can be weaponized and color-coordinated",
+    "stats": "Chaos 100 | Organization 95 | Reality Stability 0 | Color Coordination 90",
+    "skills": ["Organized Apocalypse", "Alphabetical Destruction", "Categorized Chaos"]
   },
   "Hercules": {
     "title": "The Dancing Death",
-    "lore": "Combines lethal combat with interpretive dance in ways that shouldn't work but absolutely do. Enemies die confused about whether they were attacked or entertained. The guild is equally confused but thoroughly impressed. Every battle is a performance, every kill a choreographed masterpiece.",
-    "specialty": "Combat choreography and deadly performances",
-    "reputation": "The guild's most entertaining combatant"
+    "lore": "Combines lethal martial arts with professional dance in beautiful deadly harmony. Two left feet. Every move is a stumble. Enemies think it's advanced technique and try to dodge. The flailing is completely accidental. Wins through opponents overthinking random clumsiness.",
+    "specialty": "Combat choreography that's entirely unintentional",
+    "reputation": "The guild's most 'talented' dancer (nobody has the heart to tell them)",
+    "stats": "Dance Skill 5 | Combat 85 | Coordination 10 | Accidental Genius 100",
+    "skills": ["Stumble Strike", "Flailing Finisher", "Unintentional Dodge"]
   },
   "IZANAGI": {
     "title": "The Shadow Colossus",
-    "lore": "Wields massive power with three primary facial expressions: brood, brood harder, and the rare brood-with-slight-smile. Heroic in action, dramatic in presentation, consistent in brooding. Every swing carries the weight of untold darkness and excellent dramatic timing.",
-    "specialty": "Dramatic heroics and professional brooding",
-    "reputation": "Most reliable source of dark atmosphere"
+    "lore": "Dark warrior with three brooding expressions: brood, brood harder, and slight smile. Incapable of sadness - perpetually joyful inside. The brooding is performance art. Actually loves rainbows and puppies. The facade never breaks. Method acting taken too far.",
+    "specialty": "Professional brooding powered by internal happiness",
+    "reputation": "Most reliable dark atmosphere generator who owns 15 therapy dogs",
+    "stats": "Brooding 100 | Actual Sadness 0 | Joy 95 | Therapy Dogs 15",
+    "skills": ["Joyful Brood", "Rainbow Suppression", "Puppy Love Concealment"]
   },
   "M1ssy": {
     "title": "The Chaotic Snacker",
-    "lore": "Prioritizes snacks over victory, chaos over strategy, and somehow makes it work. Will pause any battle for proper snack breaks. Enemies have learned to wait politely. Priorities firmly established: snacks first, chaos second, victory third. All three usually achieved.",
-    "specialty": "Snack-break tactical advantage",
-    "reputation": "The member with the best battle provisions"
+    "lore": "Master combatant who prioritizes snacks above all else with impressive collection. Allergic to everything. Every snack is life-threatening. Brings epipen to raids. Still takes snack breaks. Enemies wait politely while anaphylaxis is managed. Dedication beyond reason.",
+    "specialty": "Snack-break tactical advantage despite medical emergencies",
+    "reputation": "The member with best provisions and worst survival instincts",
+    "stats": "Snack Variety 100 | Allergies 100 | Survival Instinct 5 | Dedication 999",
+    "skills": ["Anaphylactic Snacking", "Epipen Quick-Draw", "Allergic Persistence"]
   },
   "Maria": {
     "title": "The Twin Debater",
-    "lore": "Fights with fists and arguments simultaneously. In constant debate with twin Marsha11 over literally everything, especially loot distribution. Has won more arguments than landed punches, but winning both battles. The sibling rivalry fuels combat effectiveness somehow.",
-    "specialty": "Simultaneous physical and verbal combat",
-    "reputation": "Half of the guild's most entertaining duo"
+    "lore": "Legendary debater who's won every argument with twin Marsha11 through superior logic. Completely wrong about everything. Wins arguments through confidence, not facts. Marsha11 is objectively correct but loses anyway. Peak sibling rivalry - truth loses to volume.",
+    "specialty": "Simultaneous physical combat and confidently incorrect arguing",
+    "reputation": "Half of the guild's most entertaining duo who's never been right",
+    "stats": "Confidence 100 | Accuracy 0 | Volume 95 | Arguments Won 999",
+    "skills": ["Confidently Wrong Strike", "Volume Override", "Fact Immunity"]
   },
   "Marsha11": {
     "title": "The Twin Defender",
-    "lore": "The other half of the legendary twin duo. Blocks attacks while arguing with Maria constantly. Their synchronized fighting is 50% combat effectiveness, 50% sibling rivalry, 100% entertainment value. Guild morale rises whenever they deploy together, mostly from the show.",
-    "specialty": "Defensive argumentation",
-    "reputation": "The other half of the guild's best entertainment"
+    "lore": "Twin defender with perfect facts and logical arguments against Maria. Loses every argument. Being correct is weakness in sibling warfare. Has documented proof, witnesses, and evidence. Maria just says 'no' louder. The struggle continues. Truth is overrated anyway.",
+    "specialty": "Defensive argumentation backed by facts that never matter",
+    "reputation": "The other half who's always right but never wins",
+    "stats": "Accuracy 100 | Argument Wins 0 | Evidence 95 | Frustration 999",
+    "skills": ["Factual Defense", "Evidence Presentation", "Losing Despite Being Right"]
   },
   "Munchyy": {
     "title": "The Polite Assassin",
-    "lore": "Kills with deadly efficiency but maintains impeccable manners throughout. Sends handwritten apology notes with every elimination. Enemies die confused but feeling oddly respected. Has never missed a thank-you card. Deadliest member with the best etiquette.",
-    "specialty": "Courteous assassination",
-    "reputation": "Most polite killer in guild history"
+    "lore": "Master of etiquette who sends handwritten apology notes with every assassination. Horrible handwriting - completely illegible. Enemies die confused by polite scribbles. Spent more on calligraphy classes than weapons. Still can't write. The thought counts. Probably.",
+    "specialty": "Courteous assassination with incomprehensible apologies",
+    "reputation": "Most polite killer whose apologies require translation",
+    "stats": "Etiquette 100 | Handwriting 5 | Politeness 95 | Calligraphy Classes 50",
+    "skills": ["Illegible Apology", "Courteous Kill", "Scribbly Sorry Strike"]
   },
   "Nyegerls": {
     "title": "The Accidental Hybrid",
-    "lore": "Multiclassed by accident and still doesn't know which class they actually are. Punches and casts spells with equal unpredictability. Enemies don't know what to expect. Nyegerls doesn't know what to expect. Somehow this creates perfect chaos and consistent victories.",
-    "specialty": "Identity confusion warfare",
-    "reputation": "The class system's biggest mystery"
+    "lore": "Multiclassed into the perfect combination of warrior and mage. Both skill trees are level 1. Has been level 1 for three years. Defeats max-level enemies through sheer confusion. The system doesn't know how to handle it. Neither does anyone else.",
+    "specialty": "Identity confusion warfare at permanent beginner level",
+    "reputation": "The class system's biggest paradox who never levels up but always wins",
+    "stats": "Warrior Level 1 | Mage Level 1 | Years Stuck 3 | Victory Rate 100",
+    "skills": ["Eternal Level 1", "System Confusion", "Paradox Victory"]
   },
   "PotatoCheese": {
     "title": "The Carb Crusader",
-    "lore": "Discovered that potatoes make excellent projectiles and moral support. Every attack provides allies with +10 carbs and +5 morale. Side effects include comfort, mild confusion, and sudden hunger. The guild's most nourishing combatant. Enemies defeated, teammates fed.",
-    "specialty": "Nutritional combat support",
-    "reputation": "The reason the guild never goes hungry"
+    "lore": "Master of potato-based combat that provides allies with nourishment and morale. Keto diet enthusiast. Zero carbs allowed. Creates what cannot be consumed. The irony fuels the power. Enemies defeated, teammates fed, PotatoCheese starving. Martyrdom through carbohydrates.",
+    "specialty": "Nutritional combat support while fasting from own creation",
+    "reputation": "The reason the guild never goes hungry while they always do",
+    "stats": "Potato Mastery 95 | Carb Consumption 0 | Keto Dedication 100 | Irony 999",
+    "skills": ["Carb-Free Carb Attack", "Keto Potato Paradox", "Starvation Support"]
   },
   "Varys": {
     "title": "The Whisper Network",
-    "lore": "Knows every secret, shares them strategically at random moments. Guild gossip network administrator and information broker. Accuracy of information: 60%. Entertainment value: 100%. Strategic value: surprisingly high. Enemies fear what Varys knows. Allies fear what Varys might reveal.",
-    "specialty": "Strategic information distribution",
-    "reputation": "The guild's living rumor mill"
+    "lore": "Knows every secret in the realm with perfect information network. Terrible memory. Forgets secrets immediately. Makes up new ones. 60% accuracy because half is fabricated. Strategic value somehow high. Misinformation is still information. Guild intelligence at its finest.",
+    "specialty": "Strategic information distribution of questionable authenticity",
+    "reputation": "The guild's living rumor mill that invents half the rumors",
+    "stats": "Info Network 100 | Memory 10 | Fabrication 90 | Accuracy 60",
+    "skills": ["Fabricated Intelligence", "Strategic Forgetfulness", "Rumor Generation"]
   },
   "xLunox": {
     "title": "The Moonlit Performer",
-    "lore": "Cannot and will not attack without proper entrance music and ambiance. Every battle begins with a 3-5 minute dramatic entrance sequence. Enemies wait politely because the presentation is that good. Worth every second of delay. Style over speed, ambiance over efficiency.",
-    "specialty": "Theatrical combat staging",
-    "reputation": "The guild's most dramatic entrance specialist"
+    "lore": "Legendary warrior who requires perfect entrance music and dramatic staging. Tone deaf. The music is always off-key. Enemies wait politely because the confidence is incredible. The show must go on, regardless of musical accuracy. Style over substance over talent.",
+    "specialty": "Theatrical combat staging with questionable audio quality",
+    "reputation": "The guild's most dramatic entrance specialist who can't carry a tune",
+    "stats": "Drama 100 | Musical Talent 5 | Confidence 95 | Entrance Quality 50",
+    "skills": ["Off-Key Entrance", "Dramatic Mistiming", "Tone-Deaf Performance"]
   },
   "Ztig": {
     "title": "The Friendly Fire Legend",
-    "lore": "Shoots with enthusiasm but questionable targeting. Friend or foe status unclear to their projectiles. Banned from three official raids, showed up anyway and somehow helped. Friendly fire rate: impressive. Accuracy: terrifying. Guild acceptance: unconditional. Team damage insurance: expensive.",
-    "specialty": "Indiscriminate combat enthusiasm",
-    "reputation": "The reason allies wear helmets"
+    "lore": "Master marksman with legendary precision and perfect aim. Hits allies exclusively. Enemy targeting is impossible - allies are magnetic. Banned from raids, shows up anyway. Enemies hire Ztig. Guild pays more. Everyone's confused. Results mysteriously work.",
+    "specialty": "Indiscriminate combat enthusiasm with ally-seeking ammunition",
+    "reputation": "The reason allies wear helmets and enemies pay protection money",
+    "stats": "Precision 100 | Ally Hits 999 | Enemy Hits 5 | Bans Ignored 3",
+    "skills": ["Ally-Seeking Shot", "Friendly Fire Mastery", "Ban Immunity"]
   },
   "Skadushy": {
     "title": "The Darkness Devourer",
-    "lore": "Fights shadows and consumes darkness between strikes. Enemies fundamentally confused by a warrior who eats their element. Nutritionists baffled by shadow-based diet. Combat effectiveness unquestionable. Dietary choices unexplainable. Still swinging that oversized blade with shadow-fueled strength.",
-    "specialty": "Shadow consumption tactics",
-    "reputation": "The guild's most confusing dietary specialist"
+    "lore": "Consumes shadows and darkness as primary sustenance source. Extreme photosynthesis - powered by sunlight. Eats shadows, runs on sunshine. Biology makes zero sense. Nutritionists have given up. The contradiction is weaponized. Science weeps daily.",
+    "specialty": "Shadow consumption powered by solar energy",
+    "reputation": "The guild's most confusing dietary specialist who broke thermodynamics",
+    "stats": "Shadow Eating 90 | Solar Power 95 | Biology Logic 0 | Confusion 100",
+    "skills": ["Photosynthetic Shadow Bite", "Solar Darkness Meal", "Science Violation"]
   },
   "Mervzs": {
     "title": "The Mysterious Collector",
-    "lore": "Purpose unclear, methods questionable, results terrifying. Collects orbs of unknown origin and function. Maybe they're spells. Maybe they're decorative. The guild stopped asking after the third mysterious explosion. Definitely powerful, definitely dangerous, definitely not explaining anything.",
-    "specialty": "Mysterious orb manipulation",
-    "reputation": "The member nobody questions out of fear"
+    "lore": "Collects mysterious orbs of immense power with unknown purpose. They're marbles. Literally children's toys. The 'mysterious explosions' were tantrums over losing favorites. Guild too afraid to ask. Defeated raid bosses with playground equipment. Still terrifying somehow.",
+    "specialty": "Mysterious orb manipulation (of common glass spheres)",
+    "reputation": "The member nobody questions because the truth is too ridiculous",
+    "stats": "Orb Power 100 | Actual Mystery 0 | Tantrum 85 | Boss Defeats (Marble) 5",
+    "skills": ["Marble Mayhem", "Tantrum Explosion", "Playground Devastation"]
   },
   "Sweeney": {
     "title": "The Alignment Enigma",
-    "lore": "Friend or foe? The answer changes hourly. Loyalty alignment shifts like the wind. The guild maintains a full conspiracy board dedicated to tracking Sweeney's current allegiance. Board remains inconclusive. Probably fine. Maybe. Results suggest ally. Probably. Effectiveness undeniable. Trust level: variable.",
-    "specialty": "Allegiance fluidity",
-    "reputation": "The guild's favorite mystery"
+    "lore": "Legendary double agent whose loyalty shifts unpredictably between friend and foe. Extremely loyal - never changed sides once. The conspiracy board is guild entertainment. Sweeney plays along for fun. Creates elaborate fake evidence. The dedication to the bit is admirable.",
+    "specialty": "Allegiance fluidity (that doesn't actually exist)",
+    "reputation": "The guild's favorite mystery who's the most reliable member",
+    "stats": "Loyalty 100 | Betrayals 0 | Fake Evidence 95 | Commitment to Bit 999",
+    "skills": ["Loyal Deception", "Conspiracy Fuel", "Reliable Mystery"]
   },
   "Riku": {
     "title": "The Wandering Blade",
-    "lore": "Fights with the wisdom of someone who's seen too many battles and learned too few lessons. Every strike carries experience, every dodge carries muscle memory, every strategy carries the weight of 'that one time it worked.' The journey continues, the blade stays sharp, the confusion remains eternal.",
-    "specialty": "Experiential combat improvisation",
-    "reputation": "The warrior who learns everything except planning"
+    "lore": "Seasoned veteran warrior with decades of combat experience and battle wisdom. Started last week. Every 'past battle' is completely made up. Stories change each telling. Nobody knows the truth. Somehow the fabricated experience translates to real skill. Fake it till you make it incarnate.",
+    "specialty": "Experiential combat based on fictional experience",
+    "reputation": "The warrior with 40 years of experience in 7 days",
+    "stats": "Claimed Experience 40 yrs | Actual Experience 7 days | Storytelling 100 | Real Skill 85",
+    "skills": ["Fabricated Mastery", "Story Inconsistency", "Fake-It Combat Style"]
   },
   "Maia": {
     "title": "The Serene Storm",
-    "lore": "Calm on the surface, absolute chaos underneath. Approaches every battle with zen-like tranquility before unleashing calculated devastation. Enemies mistake serenity for weakness until it's far too late. The guild's most deceptively peaceful member and most surprisingly destructive force.",
-    "specialty": "Tranquil devastation",
-    "reputation": "Proof that calm waters run deep and deadly"
+    "lore": "Approaches every battle with zen-like tranquility and inner peace. Panic attacks constantly. The 'serenity' is frozen terror. Enemies mistake paralysis for meditation. Can't move from fear, appears strategically patient. Anxiety weaponized into seeming wisdom.",
+    "specialty": "Tranquil devastation powered by internal screaming",
+    "reputation": "Proof that calm waters run deep with suppressed panic",
+    "stats": "Serenity 100 | Actual Calm 0 | Panic 95 | Frozen Terror 90",
+    "skills": ["Paralytic Meditation", "Anxiety Strike", "Terror Patience"]
   },
   "Miang": {
     "title": "The Silent Reckoning",
-    "lore": "Speaks rarely, strikes decisively, plans constantly. Every word is calculated, every action purposeful. When Miang speaks, the guild listens. When Miang moves, enemies fall. The embodiment of 'actions speak louder than words' and 'silence is golden but violence is platinum.'",
-    "specialty": "Strategic silence and decisive action",
-    "reputation": "The quietest member with the loudest impact"
+    "lore": "Speaks rarely, every word calculated and purposeful with maximum impact. Can't stop talking. Verbal diarrhea is constant. The 'silence' is enemies interrupting to beg for quiet. Defeats foes through exhaustive conversation. Strategic silence via enemy surrender to noise.",
+    "specialty": "Strategic silence achieved by making enemies beg for it",
+    "reputation": "The quietest member who never shuts up",
+    "stats": "Silence 100 | Actual Words 999 | Enemy Surrender 90 | Breath Pauses 0",
+    "skills": ["Exhaustive Monologue", "Verbal Assault", "Silence Through Noise"]
   },
   "Pinayflix": {
     "title": "The Streaming Sensation",
-    "lore": "Treats every battle like a live performance for an invisible audience. Provides running commentary during raids, complete with sponsorship mentions and viewer shoutouts. Enemies confused by constant narration. Guild entertained by production value. Like, subscribe, and defeat the boss.",
-    "specialty": "Combat entertainment and live battle streaming",
-    "reputation": "The guild's most entertaining narrator"
+    "lore": "Treats every battle like professional livestream with running commentary for viewers. Zero followers. Streams to empty void. The dedication to non-existent audience is concerning. Enemies confused by sponsorship shoutouts nobody hears. Parasocial relationship with imaginary fans.",
+    "specialty": "Combat entertainment for audience of zero",
+    "reputation": "The guild's most entertaining narrator with no viewers",
+    "stats": "Followers 0 | Production Value 95 | Dedication 100 | Imaginary Fans 1000",
+    "skills": ["Void Commentary", "Sponsorship to Nobody", "Parasocial Projection"]
   },
   "Helvenica": {
     "title": "The Font of Power",
-    "lore": "Fights with typography precision and design sensibility. Every attack formatted perfectly, every combo properly spaced. Believes combat effectiveness is directly related to aesthetic presentation. Has defeated enemies through sheer visual superiority. Comic Sans is banned from their presence.",
-    "specialty": "Aesthetic warfare and design-based combat",
-    "reputation": "The guild's most stylistically consistent fighter"
+    "lore": "Master of aesthetic warfare who believes visual perfection equals combat effectiveness. Comic Sans exclusive user. Every attack formatted in the most hated font. Enemies die from design horror. Claims it's 'friendly and approachable'. Guild graphic designers cry daily.",
+    "specialty": "Aesthetic warfare via typographic war crimes",
+    "reputation": "The guild's most stylistically consistent (bad taste) fighter",
+    "stats": "Typography 100 | Taste 0 | Comic Sans Usage 999 | Designer Tears 100",
+    "skills": ["Comic Sans Strike", "Typographic Horror", "Friendly Font Assault"]
   },
   "Shawty": {
     "title": "The Compact Devastator",
-    "lore": "Small in stature, overwhelming in power. Has perfected the art of being underestimated and then absolutely destroying that assumption. Enemies make the same mistake once. Only once. The guild's proof that the best things come in small, terrifying packages.",
-    "specialty": "Underestimation exploitation",
-    "reputation": "The smallest member with the biggest impact"
+    "lore": "Small in stature, massive in power - the ultimate underestimated threat. Tallest member of the guild. Insists on being 'underestimated'. Enemies look up at them confused. The delusion is the real power. Self-perception is its own reality.",
+    "specialty": "Underestimation exploitation despite being 6'8\"",
+    "reputation": "The 'smallest' member who requires custom doorframes",
+    "stats": "Height 6'8\" | Perceived Height 4'2\" | Delusion 100 | Doorframe Damage 50",
+    "skills": ["Delusional Advantage", "Upward Confusion", "Height Denial Strike"]
   },
   "Jayzzzzzzz": {
     "title": "The Sleepy Destroyer",
-    "lore": "Fights in a perpetual state of drowsiness but somehow remains devastatingly effective. Every attack delivered with maximum yawns and minimum effort. Enemies confused by lethargic efficiency. The guild's most energy-efficient combatant. Power naps between boss phases.",
-    "specialty": "Low-effort high-impact combat",
-    "reputation": "Most likely to defeat you while half-asleep"
+    "lore": "Fights in perpetual drowsiness with devastating efficiency despite exhaustion. Severe insomnia - hasn't slept in weeks. The yawns are desperate cries for rest. 'Sleepy' is aggressive wakefulness. Enemies confused by manic energy disguised as lethargy. Desperately needs nap.",
+    "specialty": "Low-effort high-impact combat powered by sleep deprivation",
+    "reputation": "Most likely to defeat you while desperately needing sleep",
+    "stats": "Sleep 0 | Energy 100 | Yawns 999 | Desperation 95",
+    "skills": ["Insomnia Strike", "Manic Yawn Attack", "Sleep Deprivation Fury"]
   },
   "Onirgerep": {
     "title": "The Reverse Enigma",
-    "lore": "Everything about this member is backwards - name, strategy, combat style. Attacks in reverse, plans in retrograde, somehow achieves forward progress. The universe hasn't figured out how it works. Neither has the guild. Results speak for themselves, even if they speak backwards.",
-    "specialty": "Reverse logic warfare",
-    "reputation": "The guild's most confusingly effective member"
+    "lore": "Everything done backwards - name, combat, strategy - for mysterious power. Completely normal. Most straightforward fighter in guild. The 'reverse' thing is elaborate joke nobody gets. Just fighting regular. Guild still doesn't understand. The confusion is the strategy.",
+    "specialty": "Reverse logic warfare (that's actually just regular fighting)",
+    "reputation": "The guild's most confusingly normal member",
+    "stats": "Normalcy 100 | Mystique 0 | Confusion Generated 95 | Reverse Skills 0",
+    "skills": ["Normal Strike", "Forward Attack", "Regular Combat"]
   },
   "Enaira": {
     "title": "The Storm Caller",
-    "lore": "Brings the fury of tempests to every battle. Enemies face not just a warrior but an entire weather system. Forecasts call for pain with a 100% chance of defeat. The guild's personal meteorological phenomenon. Side effects may include lightning, thunder, and sudden enemy evacuation.",
-    "specialty": "Meteorological combat manipulation",
-    "reputation": "The reason enemies check the weather forecast"
+    "lore": "Commands the fury of tempests and weather itself with meteorological mastery. Afraid of thunder. Every storm summoned causes personal crisis. Enemies face hurricane while Enaira hides under desk. The fear is visible. Power unmatched. Courage questionable.",
+    "specialty": "Meteorological combat while cowering from own storms",
+    "reputation": "The reason enemies check the weather and therapy schedules",
+    "stats": "Storm Power 100 | Thunder Tolerance 0 | Desk Hiding 95 | Fear Visibility 90",
+    "skills": ["Terrified Hurricane", "Cowering Tempest", "Desk Defense Protocol"]
   },
   "DEMIURGE": {
     "title": "The Architect of Chaos",
-    "lore": "Designs elaborate plans with godlike complexity and demonic execution. Every strategy a masterpiece, every tactic a work of dark art. Creates scenarios where enemies defeat themselves through the sheer brilliance of the setup. The guild's resident genius of controlled destruction.",
-    "specialty": "Architectural devastation planning",
-    "reputation": "The mind behind the guild's most complex victories"
+    "lore": "Godlike intellect that designs elaborate strategies of demonic complexity. One brain cell. The 'complex plans' are random scribbles. Enemies assume genius code. It's tic-tac-toe. They defeat themselves trying to decode nothing. Accidental 5D chess via checkers understanding.",
+    "specialty": "Architectural devastation through crayola blueprints",
+    "reputation": "The mind behind victories nobody understands (including them)",
+    "stats": "Brain Cells 1 | Complexity 0 | Enemy Overthinking 100 | Crayon Usage 95",
+    "skills": ["Tic-Tac-Toe Strategy", "Random Scribble Plan", "Accidental 5D Chess"]
   },
   "JeffEpstein": {
     "title": "The Controversial Tactician",
-    "lore": "Named controversially, fights effectively. Every battle raises questions, every victory raises eyebrows. The guild has learned not to ask about the name and just appreciate the combat results. Tactical effectiveness unquestionable, naming choices forever debatable.",
-    "specialty": "Questionable branding with solid results",
-    "reputation": "The name everyone questions, the fighter nobody doubts"
+    "lore": "Named controversially, fights with effectiveness that makes everyone uncomfortable. Nicest person in the guild. Volunteers at animal shelters. Bakes cookies for orphans. The cognitive dissonance is the weapon. Enemies can't compute the contradiction. Name vs. reality error.",
+    "specialty": "Tactical effectiveness powered by nominal confusion",
+    "reputation": "The name everyone questions, the person nobody could doubt",
+    "stats": "Kindness 100 | Name Controversy 100 | Cookie Quality 95 | Orphan Smiles 999",
+    "skills": ["Wholesome Confusion", "Cookie Combat", "Name Paradox Strike"]
   },
   "ladyhoho": {
     "title": "The Laughing Warrior",
-    "lore": "Approaches every battle with infectious joy and devastating technique. Enemies hear laughter and assume weakness until they're already defeated. The guild's morale booster and enemy confusion generator. Proof that happiness is the best weapon and joy is terrifying in the right hands.",
-    "specialty": "Joyful devastation",
-    "reputation": "The happiest member with the saddest enemies"
+    "lore": "Approaches every battle with infectious joy and constant laughter. Clinically depressed. The laughter is coping mechanism. Enemies hear joy, witness existential crisis. Therapeutic combat for self-medication. The smile hides everything. Most tragic comedy.",
+    "specialty": "Joyful devastation masking internal devastation",
+    "reputation": "The happiest member with saddest enemies and personal therapist",
+    "stats": "Laughter 100 | Actual Joy 0 | Depression 85 | Coping 95",
+    "skills": ["Tragic Comedy Strike", "Laughing Through Pain", "Smile Masking"]
   },
   "Andromach3": {
     "title": "The Cyber Sentinel",
-    "lore": "Fights like a program executing flawless code. Every attack optimized, every defense compiled for maximum efficiency. Has turned combat into computational science. Enemies debug their strategy too late. The guild's most algorithmically perfect fighter.",
-    "specialty": "Computational combat execution",
-    "reputation": "The warrior who turned fighting into programming"
+    "lore": "Fights with computational precision - every move perfectly calculated and optimized. All calculations wrong. Math is broken. 2+2=5 in their world. Perfect execution of incorrect formulas. Enemies can't predict broken logic. Debugging reality itself.",
+    "specialty": "Computational combat with alternative mathematics",
+    "reputation": "The warrior who turned fighting into programming with syntax errors",
+    "stats": "Calculation Speed 100 | Math Accuracy 0 | Alternative Logic 95 | Syntax Errors 999",
+    "skills": ["Broken Math Strike", "Syntax Error Assault", "Reality Debug"]
   },
   "卂几几": {
     "title": "The Symbolic Force",
-    "lore": "Named in symbols, fights in legend. Communication transcends language, combat transcends understanding. Enemies confused by everything from name to tactics. Guild inspired by mysterious excellence. A warrior who proves you don't need to be understood to be unstoppable.",
-    "specialty": "Symbolic warfare and linguistic chaos",
-    "reputation": "The member whose name is harder to type than their hits are to avoid"
+    "lore": "Named in mysterious symbols, communicates beyond language itself. Name is 'Ann'. Autocorrect betrayed them once. Too committed to admit it. Fully leaning into the 'mystery'. Guild plays along. The legend is typo. Nobody tells enemies the truth.",
+    "specialty": "Symbolic warfare powered by autocorrect failure",
+    "reputation": "The member whose name is typo but legend is real",
+    "stats": "Mystery 100 | Actual Name Complexity 0 | Commitment to Bit 95 | Autocorrect Rage 85",
+    "skills": ["Typo Transcendence", "Autocorrect Mastery", "Accidental Symbolism"]
   },
   "PanCoco": {
     "title": "The Coconut Commander",
-    "lore": "Discovered that coconuts are both nutritious and surprisingly aerodynamic. Weaponized tropical fruit into a combat art form. Enemies defeated by nature's perfect projectile. The guild stays hydrated and enemies stay defeated. Tropical warfare at its finest.",
-    "specialty": "Tropical fruit-based combat",
-    "reputation": "The reason the guild smells like vacation"
+    "lore": "Weaponized tropical warfare using coconuts as perfect natural projectiles. Coconut allergy. Anaphylaxis is constant threat. Fights in hazmat suit. Enemies confused by tropical themed medical emergency. Still uses coconuts exclusively. Dedication over survival.",
+    "specialty": "Tropical fruit combat while actively dying from it",
+    "reputation": "The reason the guild smells like vacation and hospital",
+    "stats": "Coconut Mastery 95 | Allergy Severity 100 | Hazmat Reliance 90 | Survival Instinct 5",
+    "skills": ["Allergic Coconut Toss", "Anaphylactic Barrage", "Epipen Reload"]
   },
   "Ace": {
     "title": "The Perfect Hand",
-    "lore": "Plays every battle like a high-stakes card game where they always hold the winning hand. Bluffs enemies into submission, calls their attacks, and goes all-in when it matters. Never shows their full strategy. Always walks away victorious. The guild's luckiest unlucky gambler.",
-    "specialty": "Probability manipulation and tactical gambling",
-    "reputation": "The member who turned combat into a card game and keeps winning"
+    "lore": "Master gambler who always holds the winning hand with probability manipulation. Worst luck in the guild. Has never won single bet. Loses every gamble. Still goes all-in. The confidence alone wins battles. Enemies intimidated by delusional certainty.",
+    "specialty": "Tactical gambling with 100% loss rate but 100% confidence",
+    "reputation": "The luckiest unluckiest member who's never won but always wins",
+    "stats": "Luck 0 | Confidence 999 | Gambling Losses 100% | Battle Wins 85",
+    "skills": ["All-In Bluff", "Confident Loss", "Delusional Victory"]
   },
   "Rapadapa": {
     "title": "The Rhythm Warrior",
-    "lore": "Fights to an internal beat that only they can hear. Every attack perfectly timed to mysterious rhythm, every dodge a dance move. Enemies can't predict the tempo. Guild can't hear the music. Everyone witnesses the devastating choreography. Combat as performance art.",
-    "specialty": "Rhythmic combat synchronization",
-    "reputation": "The warrior with the best internal soundtrack"
+    "lore": "Fights to internal musical rhythm with perfect tempo and timing. Tone deaf. No rhythm. The 'beat' is seizure. Enemies can't predict random flailing set to incorrect timing. Weaponized lack of coordination. Off-beat is the beat.",
+    "specialty": "Rhythmic combat synchronization to music only they can't hear",
+    "reputation": "The warrior with the best (worst) internal soundtrack",
+    "stats": "Rhythm 0 | Musical Talent 5 | Flailing 100 | Unpredictability 95",
+    "skills": ["Seizure Step", "Off-Beat Assault", "Arhythmic Strike"]
   },
   "lanZ6": {
     "title": "The Calculated Chaos",
-    "lore": "Balances perfect mathematical precision with absolute randomness in ways that shouldn't work but devastatingly do. Every attack calculated to six decimal places then executed with pure chaos energy. The guild's proof that order and disorder can coexist beautifully in combat.",
-    "specialty": "Mathematical chaos theory application",
-    "reputation": "The member who weaponized probability itself"
+    "lore": "Balances mathematical precision with chaos theory for perfect unpredictable accuracy. Failed math class. Twice. The 'calculations' are guesses. Six decimal places of random numbers. Enemies assume genius. It's butterflies and vibes. Accidental probability mastery.",
+    "specialty": "Mathematical chaos theory without understanding math",
+    "reputation": "The member who weaponized probability without knowing what it means",
+    "stats": "Math Skill 0 | Fake Precision 100 | Vibes 95 | Accidental Genius 85",
+    "skills": ["Random Number Generation", "Vibes-Based Calculation", "Butterfly Effect (Literal)"]
   }
 }
