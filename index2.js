@@ -1260,7 +1260,7 @@ function buildStatsEmbed(stats, member, countdown = 300) {
   if (attendance.recentBosses && attendance.recentBosses.length > 0) {
     const recent = attendance.recentBosses
       .slice(0, 5)
-      .map(b => `${b.boss} (${b.points}pts)`)
+      .map(b => `${b.boss} (${b.points}pt${b.points !== 1 ? 's' : ''})`)
       .join(' • ');
 
     embed.addFields({
