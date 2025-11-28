@@ -53,6 +53,18 @@
 // SECTION 1: IMPORTS & DEPENDENCIES
 // =====================================================================
 
+// ═══════════════════════════════════════════════════════════════════════════
+// STRUCTURED LOGGING - Replace console.log with structured logger
+// ═══════════════════════════════════════════════════════════════════════════
+const { createLogger, withCorrelationId } = require('./utils/logger');
+const mainLogger = createLogger('main');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GRACEFUL DEGRADATION
+// ═══════════════════════════════════════════════════════════════════════════
+const { OperationQueue, getStalenessTracker } = require('./utils/operation-queue');
+const operationQueue = new OperationQueue();
+
 // Discord.js - Official Discord API wrapper
 const {
   Client,           // Main Discord client class
@@ -64,6 +76,7 @@ const {
   ButtonBuilder,    // Button constructor
   ButtonStyle,      // Button style constants
   ComponentType,    // Component type constants
+  Options,          // Cache configuration options
 } = require("discord.js");
 
 // External dependencies
@@ -176,20 +189,18 @@ function validateConfig() {
   }
 
   if (missing.length > 0 || invalid.length > 0) {
-    console.error('\n🚨 CONFIGURATION ERROR 🚨\n');
+    mainLogger.error('CONFIGURATION ERROR - Missing or invalid configuration fields');
     if (missing.length > 0) {
-      console.error('Missing required fields:');
-      missing.forEach(msg => console.error(msg));
+      mainLogger.error('Missing required fields:', { missing });
     }
     if (invalid.length > 0) {
-      console.error('\nInvalid field values:');
-      invalid.forEach(msg => console.error(msg));
+      mainLogger.error('Invalid field values:', { invalid });
     }
-    console.error('\n📝 Please check your config.json file\n');
+    mainLogger.error('Please check your config.json file');
     process.exit(1);
   }
 
-  console.log('✅ Configuration validated successfully');
+  mainLogger.info('Configuration validated successfully');
 }
 
 // Run validation immediately
@@ -263,22 +274,44 @@ const client = new Client({
     retries: 5,     // Retry failed requests up to 5 times
   },
 
+  // Cache size limits to prevent unbounded memory growth (512MB environment)
+  makeCache: Options.cacheWithLimits({
+    ...Options.DefaultMakeCacheSettings,
+    MessageManager: 200,        // Limit messages per channel (down from default 200)
+    GuildMemberManager: 100,    // Limit cached members per guild (down from unlimited)
+    UserManager: 100,           // Limit cached users (down from unlimited)
+    ReactionManager: 50,        // Limit reactions per message
+    ReactionUserManager: 50,    // Limit users per reaction
+  }),
+
   // Memory optimization: Sweep caches regularly to manage 512MB RAM limit
   // Optimized for fast message cleanup while maintaining reaction functionality
   sweepers: {
     messages: {
-      interval: 300, // Run every 5 minutes
-      lifetime: 600, // Remove messages older than 10 minutes (reduced aggressiveness)
+      interval: 180, // Run every 3 minutes (more aggressive)
+      lifetime: 300, // Remove messages older than 5 minutes (more aggressive)
     },
     users: {
-      interval: 600, // Run every 10 minutes
-      // Keep only non-bot users and self to reduce memory footprint
+      interval: 300, // Run every 5 minutes (more aggressive)
+      // Remove bot users except self to reduce memory
       filter: () => (user) => user.bot && user.id !== client.user?.id,
     },
     guildMembers: {
-      interval: 900, // Run every 15 minutes
-      // Keep only self to minimize cached member data
-      filter: () => (member) => member.id !== client.user?.id,
+      interval: 300, // Run every 5 minutes (more aggressive)
+      // Remove members not seen recently, keep self
+      filter: () => {
+        const now = Date.now();
+        return (member) => {
+          if (member.id === client.user?.id) return false; // Keep self
+          // Remove members not accessed in last 10 minutes
+          return now - (member._cacheTime || 0) > 600000;
+        };
+      },
+    },
+    // Add thread sweeper to clean up old threads
+    threads: {
+      interval: 600, // Every 10 minutes
+      lifetime: 1800, // Remove threads older than 30 minutes
     },
   },
 });
@@ -3652,7 +3685,8 @@ stats: async (message, member, args) => {
               `${hours}:${minutes}`,
               formattedTimestamp,
               "manual",
-              true  // noAutoClose = true for maintenance threads
+              true,  // noAutoClose = true for maintenance threads
+              true   // skipColumnCheck = true (maintenance = fresh sheets, no duplicates possible)
             );
 
             if (result && result.success) {
@@ -5509,8 +5543,20 @@ stats: async (message, member, args) => {
  * @event ClientReady
  */
 client.once(Events.ClientReady, async () => {
-  console.log(`✅ Bot logged in as ${client.user.tag}`);
-  console.log(`📊 Tracking ${Object.keys(bossPoints).length} bosses | Guild: ${config.main_guild_id} | Version: ${BOT_VERSION}`);
+  mainLogger.info('Bot logged in successfully', {
+    tag: client.user.tag,
+    bossCount: Object.keys(bossPoints).length,
+    guildId: config.main_guild_id,
+    version: BOT_VERSION,
+  });
+
+  // INITIALIZE OPERATION QUEUE (Graceful degradation)
+  try {
+    await operationQueue.initialize();
+    mainLogger.info('Operation queue initialized');
+  } catch (error) {
+    mainLogger.error('Failed to initialize operation queue', error);
+  }
 
   // Attach config to client for module access
   client.config = config;
@@ -5533,13 +5579,13 @@ client.once(Events.ClientReady, async () => {
   try {
     const needsCheck = await sheetAPI.call('needsBootstrap', {});
     if (needsCheck.status === 'ok' && needsCheck.needsBootstrap) {
-      console.log('🚀 [FIRST DEPLOYMENT] Bootstrapping learning system from historical data...');
+      mainLogger.info('[FIRST DEPLOYMENT] Bootstrapping learning system from historical data');
 
       const bootstrapResult = await sheetAPI.call('bootstrapLearning', {});
 
       if (bootstrapResult.status === 'ok') {
         const { predictionsCreated, uniqueItems, averageAccuracy } = bootstrapResult;
-        console.log(`✅ Bootstrap complete: ${predictionsCreated} predictions, ${uniqueItems} items, ${averageAccuracy}% accuracy`);
+        mainLogger.info('Bootstrap complete', { predictionsCreated, uniqueItems, averageAccuracy });
 
         // Send notification to admin logs
         const adminLogsChannel = await discordCache.getChannel('admin_logs_channel_id');
@@ -5673,7 +5719,7 @@ client.once(Events.ClientReady, async () => {
     console.error('⚠️ Cache warm-up failed (non-critical):', cacheWarmErr.message);
   }
 
-  // Register GC task (every 5 minutes)
+  // Register GC task (every 3 minutes - more aggressive for 512MB)
   if (global.gc) {
     let lastMemoryWarning = 0; // Track last memory warning to prevent log spam
 
@@ -5694,12 +5740,24 @@ client.once(Events.ClientReady, async () => {
         );
       }
 
-      // Proactive cleanup for 512MB Koyeb - trigger at 70% to prevent buildup
-      if (memoryPressure > 70) {
+      // Proactive cleanup for 512MB Koyeb - trigger at 65% to prevent buildup (lowered threshold)
+      if (memoryPressure > 65) {
         // Clear caches before GC to free memory
         if (intelligenceEngine) {
-          // Use aggressive clearing for high pressure (>80%)
-          intelligenceEngine.clearCaches(memoryPressure > 80);
+          // Use aggressive clearing for high pressure (>75%)
+          intelligenceEngine.clearCaches(memoryPressure > 75);
+        }
+
+        // Clear cache-manager caches for high pressure
+        if (memoryPressure > 75) {
+          cacheManager.clearGeneralCache();
+          console.log('🧹 [GC] Cleared cache-manager general caches');
+        }
+
+        // Clear fuzzy match cache if very high pressure (>85%)
+        if (memoryPressure > 85) {
+          cacheManager.clearFuzzyMatchCache();
+          console.log('🧹 [GC] Cleared fuzzy match cache');
         }
 
         global.gc();
@@ -5719,7 +5777,7 @@ client.once(Events.ClientReady, async () => {
       }
 
       // Alert if approaching Koyeb 512MB limit (rate limited to once per hour)
-      if (rssMB > 400) {
+      if (rssMB > 450) {
         const now = Date.now();
         const oneHour = 60 * 60 * 1000;
 
@@ -5728,7 +5786,7 @@ client.once(Events.ClientReady, async () => {
           lastMemoryWarning = now;
         }
       }
-    }, 5 * 60 * 1000); // Every 5 minutes
+    }, 3 * 60 * 1000); // Every 3 minutes (more aggressive)
   } else {
     console.warn("⚠️ Garbage collection not available. Run with --expose-gc flag.");
   }
