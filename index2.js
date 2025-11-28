@@ -1260,7 +1260,7 @@ function buildStatsEmbed(stats, member, countdown = 300) {
   if (attendance.recentBosses && attendance.recentBosses.length > 0) {
     const recent = attendance.recentBosses
       .slice(0, 5)
-      .map(b => `${b.boss} (${b.points}pts)`)
+      .map(b => `${b.boss} (${b.points}pt${b.points !== 1 ? 's' : ''})`)
       .join(' • ');
 
     embed.addFields({
@@ -6086,12 +6086,16 @@ client.on(Events.MessageCreate, async (message) => {
               const announcementChannel = await client.channels.fetch(config.boss_spawn_announcement_channel_id);
               if (announcementChannel) {
                 const announceTimestamp = Math.floor(spawnTime.getTime() / 1000);
+                const threadUrl = `https://discord.com/channels/${config.main_guild_id}/${config.attendance_channel_id}/${result.threadId}`;
 
                 const embed = new EmbedBuilder()
                   .setColor(0x3498db)
                   .setTitle(`🔔 ${bossName} Spawned!`)
                   .setDescription('**Check in at the attendance thread!**')
-                  .addFields({ name: '🕐 Time', value: `<t:${announceTimestamp}:t>`, inline: true })
+                  .addFields(
+                    { name: '🕐 Time', value: `<t:${announceTimestamp}:t>`, inline: true },
+                    { name: '📝 Thread', value: `[Click here](${threadUrl})`, inline: true }
+                  )
                   .setTimestamp();
 
                 // Add boss image if available
@@ -6100,6 +6104,9 @@ client.on(Events.MessageCreate, async (message) => {
                 if (bossImageURL) {
                   embed.setThumbnail(bossImageURL);
                 }
+
+                // Add guild branding
+                addGuildFooter(embed, message.guild);
 
                 const messagePayload = { content: '@everyone', embeds: [embed] };
                 if (bossImage) {

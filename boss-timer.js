@@ -26,6 +26,7 @@ const { EmbedBuilder } = require('discord.js');
 const crashRecovery = require('./utils/crash-recovery');
 const { normalizeTimestamp } = require('./utils/common');
 const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images');
+const { addGuildFooter } = require('./utils/embed-branding');
 
 // ============================================================================
 // CONFIGURATION
@@ -559,6 +560,10 @@ async function triggerSpawnReminder(bossName, spawnTime) {
       embed.setThumbnail(bossImageURL);
     }
 
+    // Add guild branding
+    const guild = await client.guilds.fetch(config.main_guild_id);
+    addGuildFooter(embed, guild);
+
     const messagePayload = { content: '@everyone', embeds: [embed] };
     if (bossImage) {
       messagePayload.files = [bossImage];
@@ -1023,6 +1028,10 @@ async function handleSpawned(bossName, userId) {
       if (bossImageURL) {
         embed.setThumbnail(bossImageURL);
       }
+
+      // Add guild branding
+      const guild = await client.guilds.fetch(config.main_guild_id);
+      addGuildFooter(embed, guild);
 
       const messagePayload = { embeds: [embed] };
       if (bossImage) {
