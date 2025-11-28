@@ -459,12 +459,6 @@ setInterval(cleanupStatsCache, 10 * 60 * 1000);
 let lastAuctionEndTime = 0;
 
 
-/**
- * Proactive Intelligence instance for auto-notifications
- * Monitors guild health and sends proactive alerts
- * @type {ProactiveIntelligence}
- */
-let proactiveIntelligence = null;
 
 /**
  * NLP Handler for natural language command interpretation
@@ -4010,20 +4004,6 @@ stats: async (message, member, args) => {
     await emergencyCommands.handleEmergencyCommand(message, ['sync']);
   },
 
-  /**
-   * Test milestone checking system (manual trigger)
-   * Usage: !testmilestones | !tm
-   */
-  testmilestones: async (message, member) => {
-    try {
-      await message.reply('🎯 Manually triggering milestone check...');
-      await proactiveIntelligence.checkMilestones();
-      await message.reply('✅ Milestone check complete! Check logs for details.');
-    } catch (error) {
-      console.error('[COMMAND] Error testing milestones:', error);
-      await message.reply(`❌ Error: ${error.message}`);
-    }
-  },
 
   /**
    * Boss rotation management commands
@@ -4321,8 +4301,6 @@ client.once(Events.ClientReady, async () => {
   leaderboardSystem.init(client, config, discordCache);
   activityHeatmap.init(client, config);
   bossRotation.initialize(config, client, bossTimer);
-  proactiveIntelligence = new ProactiveIntelligence(client, config);
-  await proactiveIntelligence.initialize();
   nlpHandler = new NLPHandler(config);
   nlpLearningSystem = new NLPLearningSystem();
   await nlpLearningSystem.initialize(client);
