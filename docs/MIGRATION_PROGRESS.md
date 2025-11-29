@@ -289,6 +289,16 @@ commit (pending): fix: correct MongoDB health and stats logging
   - [x] Fallback to Sheets on MongoDB failure
   - [x] Background sync (IMMEDIATE priority for session end)
 
+- [x] `auctioneering.js` ✅
+  - [x] MongoDB-first architecture with feature flag
+  - [x] `USE_MONGODB_AUCTIONEERING=true` support
+  - [x] `fetchSheetItems()` reads from MongoDB auctionItems collection
+  - [x] `logAuctionResult()` marks items as sold in MongoDB
+  - [x] `saveAuctionState()` saves to MongoDB botState collection
+  - [x] Background sync with priorities (IMMEDIATE/HIGH/NORMAL)
+  - [x] Fallback to Sheets on MongoDB failure
+  - [x] Startup logging shows MongoDB vs Sheets mode
+
 ### Discord ID Migration
 
 - [x] `scripts/migrate-discord-ids.js` ✅
