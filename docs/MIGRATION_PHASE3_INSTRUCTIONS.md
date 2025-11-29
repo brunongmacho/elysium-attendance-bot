@@ -364,16 +364,17 @@ Migration is successful if:
 
 ## 🐛 Troubleshooting
 
-### Error: "WEBHOOK_URL not found"
+### Error: "MONGODB_URI not found"
 
-**Cause**: Environment variable not set
-**Solution**: Ensure script runs in production environment (Koyeb) or set locally:
+**Cause**: Environment variable not set (only available in Koyeb)
+**Solution**: Script must run in production environment (Koyeb) where MONGODB_URI is set, or set locally:
 
 ```bash
-export WEBHOOK_URL="https://script.google.com/..."
-export MONGODB_URI="mongodb+srv://..."
+export MONGODB_URI="mongodb+srv://elysium-bot:PASSWORD@cluster.mongodb.net/"
 node scripts/migrate-to-mongodb.js --dry-run
 ```
+
+**Note**: The WEBHOOK_URL is automatically loaded from `config.json`, no environment variable needed.
 
 ### Error: "Failed to fetch from sheets"
 

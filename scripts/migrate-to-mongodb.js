@@ -29,6 +29,8 @@
 
 const dbAPI = require('../utils/database-api');
 const { SheetAPI } = require('../utils/sheet-api');
+const fs = require('fs');
+const path = require('path');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -41,9 +43,19 @@ const CONFIG = {
   VERBOSE: process.argv.includes('--verbose'),
 };
 
-const WEBHOOK_URL = process.env.WEBHOOK_URL;
+// Load bot configuration
+let botConfig;
+try {
+  const configPath = path.join(__dirname, '..', 'config.json');
+  botConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+} catch (error) {
+  console.error('❌ Failed to load config.json:', error.message);
+  process.exit(1);
+}
+
+const WEBHOOK_URL = botConfig.sheet_webhook_url;
 if (!WEBHOOK_URL) {
-  console.error('❌ WEBHOOK_URL not found in environment variables');
+  console.error('❌ sheet_webhook_url not found in config.json');
   process.exit(1);
 }
 
