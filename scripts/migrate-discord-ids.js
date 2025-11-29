@@ -39,7 +39,7 @@ const adminAlerts = require('../utils/admin-alerts');
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════
 
-const GUILD_ID = config.guild_id;
+const GUILD_ID = config.main_guild_id;
 const DRY_RUN = process.env.DRY_RUN === 'true';
 
 // ═══════════════════════════════════════════════════════════════════════════
