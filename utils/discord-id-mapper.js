@@ -34,14 +34,18 @@ const dbAPI = require('./database-api');
  * @param {Object} discordUser - Discord user object from Discord.js
  * @param {string} discordUser.id - Discord user ID
  * @param {string} discordUser.username - Discord username
+ * @param {string} discordUser.nickname - Discord server nickname (optional, used for matching)
  * @returns {Promise<Object>} - Member document with real Discord ID
  */
 async function ensureMemberExists(discordUser) {
-  const { id, username } = discordUser;
+  const { id, username, nickname } = discordUser;
 
-  if (!id || !username) {
-    throw new Error('Discord user must have id and username');
+  if (!id) {
+    throw new Error('Discord user must have id');
   }
+
+  // Use nickname as the in-game name if available, otherwise use username
+  const inGameName = nickname || username;
 
   const db = await dbAPI.connect();
   const membersCollection = db.collection('members');
@@ -50,32 +54,36 @@ async function ensureMemberExists(discordUser) {
   let member = await membersCollection.findOne({ _id: id });
 
   if (member) {
-    // Member found with real Discord ID - just update last active
+    // Member found with real Discord ID - update username/nickname if changed
     await membersCollection.updateOne(
       { _id: id },
       {
         $set: {
           lastActive: new Date(),
-          username: username // Update username in case it changed
+          username: inGameName // Update to current nickname/username
         }
       }
     );
 
-    console.log(`✅ [Discord ID Mapper] Member found: ${username} (${id})`);
-    return { ...member, username };
+    console.log(`✅ [Discord ID Mapper] Member found: ${inGameName} (${id})`);
+    return { ...member, username: inGameName };
   }
 
-  // Step 2: Try to find by username (migration path)
-  member = await membersCollection.findOne({ username });
+  // Step 2: Try to find by in-game name (username field in DB)
+  // This handles the migration path from temp IDs
+  member = await membersCollection.findOne({
+    username: { $regex: new RegExp(`^${inGameName}$`, 'i') } // Case-insensitive match
+  });
 
   if (member && member._id.startsWith('temp_')) {
     // Member exists with temp ID - migrate to real Discord ID
-    console.log(`🔄 [Discord ID Mapper] Migrating ${username}: ${member._id} → ${id}`);
+    console.log(`🔄 [Discord ID Mapper] Migrating ${inGameName}: ${member._id} → ${id}`);
 
     // Create new document with real Discord ID
     const migratedMember = {
       ...member,
       _id: id,
+      username: inGameName,
       migratedFrom: member._id,
       migratedAt: new Date(),
       lastActive: new Date()
@@ -87,29 +95,28 @@ async function ensureMemberExists(discordUser) {
     // Insert with real Discord ID
     await membersCollection.insertOne(migratedMember);
 
-    console.log(`✅ [Discord ID Mapper] Migration complete: ${username} → ${id}`);
+    console.log(`✅ [Discord ID Mapper] Migration complete: ${inGameName} → ${id}`);
     return migratedMember;
 
   } else if (member && !member._id.startsWith('temp_')) {
-    // Member exists with different Discord ID (username changed)
-    console.warn(`⚠️ [Discord ID Mapper] Username conflict: ${username} exists with different Discord ID`);
+    // Member exists with different Discord ID (unusual case)
+    console.warn(`⚠️ [Discord ID Mapper] In-game name conflict: ${inGameName} exists with different Discord ID`);
 
-    // This is a new user with same username - create with real ID
-    // The old user will keep the old username in their record
-    const newMember = createNewMember(id, username);
+    // This is a new user with same in-game name - create with real ID
+    const newMember = createNewMember(id, inGameName);
     await membersCollection.insertOne(newMember);
 
-    console.log(`✅ [Discord ID Mapper] Created new member: ${username} (${id})`);
+    console.log(`✅ [Discord ID Mapper] Created new member: ${inGameName} (${id})`);
     return newMember;
   }
 
   // Step 3: Member doesn't exist at all - create new
-  console.log(`➕ [Discord ID Mapper] Creating new member: ${username} (${id})`);
+  console.log(`➕ [Discord ID Mapper] Creating new member: ${inGameName} (${id})`);
 
-  const newMember = createNewMember(id, username);
+  const newMember = createNewMember(id, inGameName);
   await membersCollection.insertOne(newMember);
 
-  console.log(`✅ [Discord ID Mapper] New member created: ${username} (${id})`);
+  console.log(`✅ [Discord ID Mapper] New member created: ${inGameName} (${id})`);
   return newMember;
 }
 
@@ -207,16 +214,26 @@ async function batchMigrateAllMembers(discordClient, guildId) {
   // Migrate each member
   for (const member of tempMembers) {
     try {
-      // Find Discord member by username
-      const discordMember = guild.members.cache.find(
-        m => m.user.username.toLowerCase() === member.username.toLowerCase()
+      // Find Discord member by nickname (in-game name) first, then username
+      let discordMember = guild.members.cache.find(
+        m => m.nickname && m.nickname.toLowerCase() === member.username.toLowerCase()
       );
 
+      // If not found by nickname, try by Discord username as fallback
       if (!discordMember) {
-        console.warn(`⚠️ [Discord ID Mapper] Discord member not found: ${member.username}`);
+        discordMember = guild.members.cache.find(
+          m => m.user.username.toLowerCase() === member.username.toLowerCase()
+        );
+      }
+
+      if (!discordMember) {
+        console.warn(`⚠️ [Discord ID Mapper] Discord member not found for: ${member.username}`);
+        console.warn(`   Tried: nickname="${member.username}" and username="${member.username}"`);
         stats.notFound++;
         continue;
       }
+
+      console.log(`🔍 Found ${member.username} → Discord ID: ${discordMember.id} (matched by ${discordMember.nickname ? 'nickname' : 'username'})`);
 
       // Migrate this member
       await mapDiscordIdToMember(member.username, discordMember.id);
