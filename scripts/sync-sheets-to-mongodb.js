@@ -17,6 +17,9 @@
  *   node scripts/sync-sheets-to-mongodb.js --items      # Sync auction items only
  *   node scripts/sync-sheets-to-mongodb.js --dry-run    # Test without writing
  *
+ * Note: Output is Discord-safe (stays under 2000 char limit) by limiting
+ *       preview to first 5 items and using compact summary formatting.
+ *
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -47,6 +50,8 @@ try {
 // HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
+const MAX_PREVIEW_ITEMS = 5; // Limit preview to avoid Discord 2000 char limit
+
 function hasModuleFlag() {
   return process.argv.includes('--members') ||
          process.argv.includes('--items');
@@ -54,6 +59,54 @@ function hasModuleFlag() {
 
 function log(emoji, message) {
   console.log(`${emoji} ${message}`);
+}
+
+/**
+ * Format a list preview with Discord message length limits in mind
+ */
+function formatPreview(items, formatFn, label = 'items') {
+  if (items.length === 0) {
+    return `   (No ${label})`;
+  }
+
+  const preview = items.slice(0, MAX_PREVIEW_ITEMS).map(formatFn).join('\n');
+  const remaining = items.length - MAX_PREVIEW_ITEMS;
+
+  if (remaining > 0) {
+    return preview + `\n   ... and ${remaining} more ${label}`;
+  }
+
+  return preview;
+}
+
+/**
+ * Format summary output (Discord-safe)
+ * Keeps output under 1500 chars to stay well below Discord's 2000 limit
+ */
+function formatSummary(results) {
+  const lines = [
+    '═══════════════════════════════════════════════════════════════',
+    '📊 SYNC SUMMARY',
+    '═══════════════════════════════════════════════════════════════'
+  ];
+
+  if (results.members) {
+    lines.push(`👥 Members: ${results.members.synced} synced, ${results.members.skipped} skipped`);
+  }
+
+  if (results.items) {
+    lines.push(`🎁 Auction Items: ${results.items.synced} synced`);
+  }
+
+  lines.push('');
+
+  if (DRY_RUN) {
+    lines.push('🔍 DRY RUN COMPLETE - No changes were made');
+  } else {
+    lines.push('✅ SYNC COMPLETE - MongoDB is now up to date with Google Sheets');
+  }
+
+  return lines.join('\n');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -81,12 +134,12 @@ async function syncMembers(db, sheetAPI) {
 
     if (DRY_RUN) {
       log('🔍', '[DRY RUN] Would sync members:');
-      membersData.slice(0, 5).forEach(m => {
-        console.log(`   - ${m.username}: ${m.pointsAvailable} pts`);
-      });
-      if (membersData.length > 5) {
-        console.log(`   ... and ${membersData.length - 5} more`);
-      }
+      const preview = formatPreview(
+        membersData,
+        m => `   - ${m.username}: ${m.pointsAvailable} pts`,
+        'members'
+      );
+      console.log(preview);
       return { synced: membersData.length, skipped: 0 };
     }
 
@@ -173,12 +226,12 @@ async function syncAuctionItems(db, sheetAPI) {
 
     if (DRY_RUN) {
       log('🔍', '[DRY RUN] Would sync items:');
-      itemsData.slice(0, 5).forEach((item, idx) => {
-        console.log(`   - ${item.item} (${item.startPrice} pts)`);
-      });
-      if (itemsData.length > 5) {
-        console.log(`   ... and ${itemsData.length - 5} more`);
-      }
+      const preview = formatPreview(
+        itemsData,
+        item => `   - ${item.item} (${item.startPrice} pts)`,
+        'items'
+      );
+      console.log(preview);
       return { synced: itemsData.length, skipped: 0 };
     }
 
@@ -253,26 +306,8 @@ async function main() {
       console.log('');
     }
 
-    // Summary
-    console.log('═══════════════════════════════════════════════════════════════');
-    console.log('📊 SYNC SUMMARY');
-    console.log('═══════════════════════════════════════════════════════════════');
-
-    if (results.members) {
-      log('👥', `Members: ${results.members.synced} synced, ${results.members.skipped} skipped`);
-    }
-
-    if (results.items) {
-      log('🎁', `Auction Items: ${results.items.synced} synced`);
-    }
-
-    console.log('');
-
-    if (DRY_RUN) {
-      log('🔍', 'DRY RUN COMPLETE - No changes were made');
-    } else {
-      log('✅', 'SYNC COMPLETE - MongoDB is now up to date with Google Sheets');
-    }
+    // Summary (Discord-safe formatting)
+    console.log(formatSummary(results));
 
     process.exit(0);
 
