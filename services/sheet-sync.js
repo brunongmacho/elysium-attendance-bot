@@ -219,6 +219,14 @@ async function syncToSheet(action) {
       await syncMemberRemoval(action.data);
       break;
 
+    case 'submitBiddingResults':
+      await syncBiddingResults(action.data);
+      break;
+
+    case 'saveBotState':
+      await syncBotState(action.data);
+      break;
+
     default:
       console.warn(`⚠️ Unknown sync action type: ${action.type}`);
   }
@@ -306,6 +314,36 @@ async function syncMemberRemoval(data) {
   });
 
   console.log(`✅ Synced member removal: ${username}`);
+}
+
+/**
+ * Sync bidding results to Sheets
+ */
+async function syncBiddingResults(data) {
+  const { results, timestamp } = data;
+
+  // Call Sheet API to submit bidding results
+  await sheetAPI.call('submitBiddingResults', {
+    results,
+    timestamp
+  });
+
+  console.log(`✅ Synced bidding results: ${results.length} members`);
+}
+
+/**
+ * Sync bot state to Sheets
+ */
+async function syncBotState(data) {
+  const { module, state } = data;
+
+  // Call Sheet API to save bot state
+  await sheetAPI.call('saveBotState', {
+    module,
+    state
+  });
+
+  console.log(`✅ Synced bot state: ${module}`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
