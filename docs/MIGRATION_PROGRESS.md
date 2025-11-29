@@ -1,19 +1,19 @@
 # MongoDB Migration Progress Tracker
 
-**Last Updated**: Nov 28, 2025
-**Current Phase**: Phase 2 Almost Complete (Final Testing)
-**Overall Progress**: 30% (1.9 of 6 phases)
+**Last Updated**: Nov 29, 2025
+**Current Phase**: Phase 3 In Progress 🔄 - Migration Script Ready
+**Overall Progress**: 42% (2.5 of 6 phases)
 
 ---
 
 ## 📊 Overall Progress
 
 ```
-[██████░░░░░░░░░░░░░░] 30% Complete
+[████████░░░░░░░░░░░░] 42% Complete
 
 Phase 1: Cleanup           ████████████████████ 100% ✅
-Phase 2: MongoDB Setup     ██████████████████░░  90% 🔄
-Phase 3: Data Migration    ░░░░░░░░░░░░░░░░░░░░   0% ⏳
+Phase 2: MongoDB Setup     ████████████████████ 100% ✅
+Phase 3: Data Migration    ██████████░░░░░░░░░░  50% 🔄
 Phase 4: Core Refactor     ░░░░░░░░░░░░░░░░░░░░   0% ⏳
 Phase 5: Sheet Sync        ░░░░░░░░░░░░░░░░░░░░   0% ⏳
 Phase 6: Deployment        ░░░░░░░░░░░░░░░░░░░░   0% ⏳
@@ -76,12 +76,13 @@ commit: chore: remove abolished systems (intelligence, learning, ML, NLP, loot)
 
 ---
 
-## 🔄 Phase 2: MongoDB Setup (90% Complete)
+## ✅ Phase 2: MongoDB Setup (100% Complete)
 
-**Status**: 🔄 IN PROGRESS (Final Testing)
-**Estimated Time**: 1 day
+**Status**: ✅ COMPLETED
+**Time Spent**: 1 day
 **Dependencies**: Phase 1 ✅
 **Date Started**: Nov 28, 2025
+**Date Completed**: Nov 29, 2025
 
 ### Prerequisites Completed
 
@@ -120,9 +121,10 @@ commit: chore: remove abolished systems (intelligence, learning, ML, NLP, loot)
   - ✅ Graceful shutdown on SIGTERM/SIGINT
 - [x] Commit and push changes (3 commits total)
 
-### Tasks Remaining
+### Final Tasks Completed
 
-- [ ] Verify MongoDB connection in production (waiting for Koyeb deployment)
+- [x] Verify MongoDB connection in production ✅
+- [x] Fix health/stats logging bugs in index2.js ✅
 
 ### Deliverables
 
@@ -151,67 +153,89 @@ commit ba2d20c: feat: integrate MongoDB connection into bot startup
 - Logs connection health, latency, and database stats
 - Add graceful shutdown for MongoDB connections
 - Import database-api in index2.js
+
+commit (pending): fix: correct MongoDB health and stats logging
+- Fix health.status to health.healthy in index2.js:4245
+- Fix stats.storageSize to stats.dataSize in index2.js:4249
+- Improve health status display (✅ Healthy / ❌ Unhealthy)
+- Verified in production logs (2ms latency, 6 collections)
 ```
 
 ### Success Criteria
 
-- ⏳ Bot connects to MongoDB Atlas (testing in progress - deploy triggered)
-- ⏳ Latency under 15ms (pending verification in logs)
-- ✅ Indexes created successfully (implemented in createIndexes())
-- ✅ Test queries work (test script ready)
+- ✅ Bot connects to MongoDB Atlas successfully
+- ✅ Latency under 15ms (verified: 2ms in production!)
+- ✅ Indexes created successfully (6 collections with indexes)
+- ✅ Health checks working properly
 - ✅ Graceful shutdown implemented
+- ✅ Production deployment verified
 
 ---
 
-## ⏳ Phase 3: Data Migration (0% Complete)
+## 🔄 Phase 3: Data Migration (50% Complete)
 
-**Status**: ⏸️ PENDING
+**Status**: 🔄 SCRIPT READY - Awaiting Execution
 **Estimated Time**: 1 day
-**Dependencies**: Phase 2
+**Dependencies**: Phase 2 ✅
+**Date Started**: Nov 29, 2025
 
-### Tasks
+### Tasks Completed
 
-- [ ] Create migration script `scripts/migrate-to-mongodb.js`
-- [ ] Migrate attendance data
-  - [ ] Get all weekly sheets from Google Sheets
-  - [ ] Parse attendance records
-  - [ ] Insert to MongoDB `attendance` collection
-  - [ ] Verify record count
-- [ ] Migrate member data
-  - [ ] Get BiddingPointsSummary from Sheets
-  - [ ] Calculate aggregated stats
-  - [ ] Insert to MongoDB `members` collection
-  - [ ] Verify member count
-- [ ] Migrate auction items
-  - [ ] Get BiddingItems from Sheets
-  - [ ] Insert to MongoDB `auctionItems` collection
-- [ ] Migrate boss rotation
-  - [ ] Get BossRotation from Sheets
-  - [ ] Insert to MongoDB `bossRotation` collection
-- [ ] Migrate event reminders
-  - [ ] Get EventReminders from Sheets
-  - [ ] Insert to MongoDB `eventReminders` collection
-- [ ] Verify data integrity
-  - [ ] Compare counts
-  - [ ] Spot-check random records
-  - [ ] Validate in MongoDB Atlas dashboard
+- [x] Create migration script `scripts/migrate-to-mongodb.js` ✅
+  - ✅ Implemented Phase 1: Member migration
+  - ✅ Implemented Phase 2: Auction items migration
+  - ⚠️ Implemented Phase 3: Attendance migration (partial - needs Sheet API enhancement)
+  - ⚠️ Deferred Phase 4: Boss rotation (to Phase 4 refactor)
+  - ✅ Implemented Phase 5: Event reminders migration
+- [x] Add safety features ✅
+  - ✅ Dry-run mode
+  - ✅ Progress tracking
+  - ✅ Error handling
+  - ✅ Batch processing for large datasets
+- [x] Create documentation ✅
+  - ✅ Created MIGRATION_PHASE3_INSTRUCTIONS.md
+  - ✅ Usage examples
+  - ✅ Troubleshooting guide
+
+### Tasks Remaining
+
+- [ ] Run migration script in production environment
+  - [ ] Test with --dry-run first
+  - [ ] Run Phase 1: Members migration
+  - [ ] Run Phase 2: Auction items migration
+  - [ ] Verify data in MongoDB Atlas
+- [ ] Optional: Enhance Phase 3 for full attendance migration
+  - [ ] Add getSpawnAttendance() endpoint to Code.js
+  - [ ] Extract member-level attendance data
+  - [ ] Or: Skip and start fresh from Phase 4 onwards
+
+### Deliverables
+
+- ✅ `scripts/migrate-to-mongodb.js` - Complete migration script (600+ lines)
+- ✅ `docs/MIGRATION_PHASE3_INSTRUCTIONS.md` - Comprehensive execution guide
+- ✅ Dry-run mode for safe testing
+- ✅ Progress tracking and statistics
+- ✅ Error handling and rollback plan
 
 ### Expected Data Volume
 
-- **Attendance**: ~405,600 records (~80MB)
 - **Members**: 50 records (~100KB)
 - **Auction Items**: ~500 records (~250KB)
-- **Boss Rotation**: ~30 records (~30KB)
+- **Attendance**: ~405,600 records (~80MB) - partial implementation
+- **Boss Rotation**: ~30 records (~30KB) - deferred
 - **Event Reminders**: ~50 records (~50KB)
-- **Total**: ~81MB
+- **Total (Phase 3)**: ~350KB (members + auction items only)
+- **Total (Full)**: ~81MB (with attendance enhancement)
 
 ### Success Criteria
 
-- ✅ All historical data migrated
-- ✅ Record counts match expectations
-- ✅ Spot-checks pass (10+ samples)
-- ✅ MongoDB Atlas shows correct data size
-- ✅ No data loss
+- ⏳ Migration script created and tested
+- ⏳ Members data migrated (~50 records)
+- ⏳ Auction items migrated (~500 records)
+- ⏳ Record counts match expectations
+- ⏳ Spot-checks pass (10+ samples)
+- ⏳ MongoDB Atlas shows correct data size
+- ⏳ No data loss or errors
 
 ---
 
@@ -507,13 +531,19 @@ After migration is complete, we expect:
 ---
 
 **Next Steps**:
-1. ⏳ Wait for Koyeb auto-deployment to complete (in progress)
-2. ✅ Check deployment logs for MongoDB connection
-3. ✅ Verify connection health, latency, and database stats
-4. ✅ Mark Phase 2 complete once verified
-5. 🎯 Begin Phase 3 (Data Migration)
+1. ✅ Phase 2 Complete! MongoDB connected successfully (2ms latency)
+2. ✅ Phase 3 Script Ready! Migration script created and documented
+3. 🎯 Execute Phase 3 Migration:
+   - Run `node scripts/migrate-to-mongodb.js --dry-run` to test
+   - Run `node scripts/migrate-to-mongodb.js --phase=1` for members
+   - Run `node scripts/migrate-to-mongodb.js --phase=2` for auction items
+   - Verify data in MongoDB Atlas dashboard
+4. 🎯 Begin Phase 4: Core Refactor
+   - Update attendance.js to use MongoDB
+   - Update bidding.js to use MongoDB
+   - Map Discord IDs to member documents
 
-**Current Branch**: `claude/recover-previous-tasks-011EAz2ViYuonGvTBDJAyvZY`
+**Current Branch**: `claude/mongodb-migration-attendance-016LAPTocnZAC8xxAwuLWWwD`
 
-**Last Updated**: Nov 28, 2025
-**Last Commit**: ba2d20c - MongoDB integration into bot startup
+**Last Updated**: Nov 29, 2025
+**Last Commit**: (pending) - Phase 3 migration script and documentation

@@ -4242,11 +4242,11 @@ client.once(Events.ClientReady, async () => {
 
     // Get connection health info
     const health = await dbAPI.healthCheck();
-    console.log(`📊 MongoDB Health: ${health.status} (Latency: ${health.latency}ms)`);
+    console.log(`📊 MongoDB Health: ${health.healthy ? '✅ Healthy' : '❌ Unhealthy'} (Latency: ${health.latency}ms)`);
 
     // Get database stats
     const stats = await dbAPI.getStats();
-    console.log(`📦 Database: ${stats.database} | Collections: ${stats.collections} | Size: ${stats.storageSize}`);
+    console.log(`📦 Database: ${stats.database} | Collections: ${stats.collections} | Size: ${stats.dataSize}`);
   } catch (error) {
     console.error('⚠️ MongoDB connection failed (non-critical for now):', error.message);
     console.log('📝 Bot will continue with Google Sheets only until Phase 4');
