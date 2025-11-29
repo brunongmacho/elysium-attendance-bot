@@ -122,6 +122,13 @@ const {
 const auctionCache = require('./utils/auction-cache');
 const attendance = require("./attendance");
 
+// MongoDB integration (Phase 4)
+const mongoHelpers = require('./utils/mongodb-helpers');
+const sheetSync = require('./services/sheet-sync');
+
+// Feature flag: Enable MongoDB for auctioneering operations
+const USE_MONGODB_AUCTIONEERING = process.env.USE_MONGODB_AUCTIONEERING === 'true';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // SECTION 1: MODULE STATE & INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════════════
@@ -353,6 +360,16 @@ function initialize(config, isAdminFunc, biddingModuleRef, cache = null, intelli
   discordCache = cache;
   intelligenceEngine = intelligenceEngineRef;
   console.log(`${EMOJI.SUCCESS} Auctioneering system initialized`);
+
+  // MongoDB integration status (Phase 4)
+  if (USE_MONGODB_AUCTIONEERING) {
+    console.log(`${EMOJI.SUCCESS} [MongoDB] Auctioneering using MongoDB-first architecture`);
+    console.log(`${EMOJI.INFO} [MongoDB] Background Sheet sync enabled (priorities: IMMEDIATE/HIGH/NORMAL/LOW)`);
+  } else {
+    console.log(`${EMOJI.INFO} Auctioneering using Google Sheets (legacy mode)`);
+    console.log(`${EMOJI.INFO} Set USE_MONGODB_AUCTIONEERING=true to enable MongoDB`);
+  }
+
   if (intelligenceEngine) {
     console.log(`${EMOJI.SUCCESS} Intelligence Engine linked to auctioneering (auto-learning enabled)`);
   }
@@ -413,6 +430,54 @@ const { formatUptime: fmtTime } = require('./utils/common');
  * @returns {Promise<Array<Object>>} Items array (never null, but may be empty)
  */
 async function fetchSheetItems(url, retries = 3, allowCache = true) {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MONGODB-FIRST PATH (Phase 4)
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (USE_MONGODB_AUCTIONEERING) {
+    try {
+      const startTime = Date.now();
+
+      // Fetch from MongoDB
+      const mongoItems = await mongoHelpers.getAuctionQueue();
+
+      const duration = Date.now() - startTime;
+      console.log(
+        `${EMOJI.SUCCESS} [MongoDB] Fetched ${mongoItems.length} auction items in ${duration}ms`
+      );
+
+      // Convert MongoDB format to legacy format for compatibility
+      const items = mongoItems.map(item => ({
+        item: item.itemName,
+        startPrice: item.startPrice,
+        duration: item.duration,
+        quantity: item.quantity || 1,
+        boss: item.boss || 'Unknown',
+        source: item.source || 'MongoDB',
+        _id: item._id,
+        sheetRow: item.sheetRow
+      }));
+
+      // Queue background sync to Sheets (NORMAL priority - 5s delay)
+      sheetSync.queueSync({
+        action: 'syncAuctionQueue',
+        data: { items: mongoItems },
+        priority: sheetSync.PRIORITY.NORMAL
+      });
+
+      return items;
+
+    } catch (error) {
+      console.error(`${EMOJI.ERROR} [MongoDB] Failed to fetch auction items:`, error.message);
+      console.log(`${EMOJI.WARNING} [MongoDB] Falling back to Google Sheets...`);
+
+      // Fall through to Sheets logic below
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GOOGLE SHEETS PATH (Legacy + Fallback)
+  // ═══════════════════════════════════════════════════════════════════════════
+
   // Check circuit breaker - skip if open and use cache
   if (!auctionCache.canAttemptFetch()) {
     console.log(`${EMOJI.WARNING} Circuit breaker OPEN - using cached items`);
@@ -514,8 +579,57 @@ async function logAuctionResult(
   totalBids,
   bidCount,
   itemSource,
-  timestamp
+  timestamp,
+  winnerId = null,
+  itemId = null  // MongoDB item ID (optional, for MongoDB operations)
 ) {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MONGODB-FIRST PATH (Phase 4)
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (USE_MONGODB_AUCTIONEERING && itemId) {
+    try {
+      const startTime = Date.now();
+
+      // Mark item as sold in MongoDB
+      await mongoHelpers.markItemAsSold(
+        itemId,
+        { username: winner || 'No winner', userId: winnerId },
+        winningBid || 0
+      );
+
+      const duration = Date.now() - startTime;
+      console.log(
+        `${EMOJI.SUCCESS} [MongoDB] Result logged: ${winner || "No winner"} - ${winningBid}pts (${duration}ms)`
+      );
+
+      // Queue background sync to Sheets (IMMEDIATE priority - auction result)
+      sheetSync.queueSync({
+        action: 'logAuctionResult',
+        data: {
+          itemIndex,
+          winner,
+          winningBid,
+          totalBids,
+          bidCount,
+          itemSource,
+          timestamp
+        },
+        priority: sheetSync.PRIORITY.IMMEDIATE
+      });
+
+      return true;
+
+    } catch (error) {
+      console.error(`${EMOJI.ERROR} [MongoDB] Failed to log auction result:`, error.message);
+      console.log(`${EMOJI.WARNING} [MongoDB] Falling back to Google Sheets...`);
+
+      // Fall through to Sheets logic below
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GOOGLE SHEETS PATH (Legacy + Fallback)
+  // ═══════════════════════════════════════════════════════════════════════════
   try {
     await sheetAPI.call('logAuctionResult', {
       itemIndex,
@@ -551,49 +665,69 @@ async function logAuctionResult(
  * @returns {Promise<boolean>} True if successfully saved, false otherwise
  */
 async function saveAuctionState(url) {
-  try {
-    // 🔒 Prevent circular reference errors
-    const safeStringify = (obj) => {
-      const seen = new WeakSet();
-      return JSON.stringify(obj, (key, value) => {
-        // Skip timers and circular references
-        if (key === "timers" || key === "currentSession") return undefined;
-        if (typeof value === "object" && value !== null) {
-          if (seen.has(value)) return undefined;
-          seen.add(value);
+  // 🧩 Clean item (avoid timers and circular data)
+  const cleanItem =
+    auctionState.currentItem && typeof auctionState.currentItem === "object"
+      ? {
+          item: auctionState.currentItem.item,
+          startPrice: auctionState.currentItem.startPrice,
+          duration: auctionState.currentItem.duration,
+          curBid: auctionState.currentItem.curBid,
+          curWin: auctionState.currentItem.curWin,
+          curWinId: auctionState.currentItem.curWinId,
+          status: auctionState.currentItem.status,
+          source: auctionState.currentItem.source,
+          sheetIndex: auctionState.currentItem.sheetIndex,
+          bossName: auctionState.currentItem.bossName,
+          _id: auctionState.currentItem._id  // Include MongoDB ID
         }
-        return value;
+      : null;
+
+  const stateToSave = {
+    auctionState: {
+      active: auctionState.active,
+      currentItem: cleanItem,
+      sessionItems: auctionState.sessionItems,
+      currentItemIndex: auctionState.currentItemIndex,
+      paused: auctionState.paused,
+    },
+    timestamp: getTimestamp(),
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MONGODB-FIRST PATH (Phase 4)
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (USE_MONGODB_AUCTIONEERING) {
+    try {
+      const startTime = Date.now();
+
+      // Save to MongoDB bot state
+      await mongoHelpers.saveBotState('auction', stateToSave);
+
+      const duration = Date.now() - startTime;
+      console.log(`${EMOJI.SUCCESS} [MongoDB] Auction state saved (${duration}ms)`);
+
+      // Queue background sync to Sheets (HIGH priority - state save)
+      sheetSync.queueSync({
+        action: 'saveBotState',
+        data: { state: stateToSave },
+        priority: sheetSync.PRIORITY.HIGH
       });
-    };
 
-    // 🧩 Clean item (avoid timers and circular data)
-    const cleanItem =
-      auctionState.currentItem && typeof auctionState.currentItem === "object"
-        ? {
-            item: auctionState.currentItem.item,
-            startPrice: auctionState.currentItem.startPrice,
-            duration: auctionState.currentItem.duration,
-            curBid: auctionState.currentItem.curBid,
-            curWin: auctionState.currentItem.curWin,
-            curWinId: auctionState.currentItem.curWinId,
-            status: auctionState.currentItem.status,
-            source: auctionState.currentItem.source,
-            sheetIndex: auctionState.currentItem.sheetIndex,
-            bossName: auctionState.currentItem.bossName,
-          }
-        : null;
+      return true;
 
-    const stateToSave = {
-      auctionState: {
-        active: auctionState.active,
-        currentItem: cleanItem,
-        sessionItems: auctionState.sessionItems,
-        currentItemIndex: auctionState.currentItemIndex,
-        paused: auctionState.paused,
-      },
-      timestamp: getTimestamp(),
-    };
+    } catch (error) {
+      console.error(`${EMOJI.ERROR} [MongoDB] Failed to save auction state:`, error.message);
+      console.log(`${EMOJI.WARNING} [MongoDB] Falling back to Google Sheets...`);
 
+      // Fall through to Sheets logic below
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GOOGLE SHEETS PATH (Legacy + Fallback)
+  // ═══════════════════════════════════════════════════════════════════════════
+  try {
     await sheetAPI.call('saveBotState', { state: stateToSave });
     console.log(`${EMOJI.SUCCESS} Auction state saved`);
     return true;
@@ -1590,25 +1724,20 @@ async function itemEnd(client, config, channel) {
       ],
     });
 
-    // 🧾 Log result to sheet
+    // 🧾 Log result to sheet/database
     try {
-      if (!postToSheetFunc) {
-        console.error(`${EMOJI.ERROR} postToSheet not initialized.`);
-      } else {
-        await getPostToSheet()({
-          action: "logAuctionResult",
-          itemIndex: item.source === "GoogleSheet" ? item.sheetIndex : -1,
-          winner: item.curWin,
-          winningBid: item.curBid,
-          totalBids,
-          bidCount,
-          itemSource: item.source,
-          itemName: item.item,
-          timestamp,
-          auctionStartTime: item.auctionStartTime,
-          auctionEndTime: endTimeStr,
-        });
-      }
+      await logAuctionResult(
+        config.webhook_url,
+        item.source === "GoogleSheet" ? item.sheetIndex : -1,
+        item.curWin,
+        item.curBid,
+        totalBids,
+        bidCount,
+        item.source,
+        timestamp,
+        item.curWinId,  // Winner Discord ID
+        item._id        // MongoDB item ID (if available)
+      );
     } catch (err) {
       console.error(`${EMOJI.ERROR} Failed to log auction result:`, err);
     }

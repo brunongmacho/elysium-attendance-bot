@@ -15,7 +15,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-const SheetAPI = require('../utils/sheet-api');
+const { SheetAPI } = require('../utils/sheet-api');  // Destructure from exports
 const config = require('../config.json');
 const adminAlerts = require('../utils/admin-alerts');
 
