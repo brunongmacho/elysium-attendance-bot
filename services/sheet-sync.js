@@ -17,21 +17,26 @@
 
 const SheetAPI = require('../utils/sheet-api');
 const config = require('../config.json');
+const adminAlerts = require('../utils/admin-alerts');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════
 
 const SYNC_PRIORITIES = {
-  IMMEDIATE: 0,      // No delay (auction results, point changes)
-  HIGH: 2000,        // 2 seconds (attendance)
-  NORMAL: 5000,      // 5 seconds (stats updates)
-  LOW: 30000         // 30 seconds (non-critical)
+  IMMEDIATE: 0,      // No delay - Critical operations:
+                     // - Auction session end (bidding points tally)
+                     // - Attendance thread close
+                     // - Boss spawn timer
+                     // - Point changes
+  HIGH: 2000,        // 2 seconds (attendance records, bot state)
+  NORMAL: 5000,      // 5 seconds (member updates, stats)
+  LOW: 30000         // 30 seconds (non-critical background tasks)
 };
 
 const RETRY_CONFIG = {
-  MAX_ATTEMPTS: 3,
-  BACKOFF_MS: 2000  // 2 seconds base backoff
+  MAX_ATTEMPTS: 10,  // 10 attempts with exponential backoff
+  BACKOFF_MS: 1000   // 1 second base backoff (grows to 30s max)
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -171,18 +176,23 @@ async function processSyncQueue(priority) {
       if (queuedAction.attempts < RETRY_CONFIG.MAX_ATTEMPTS) {
         console.log(`🔄 Retrying sync (attempt ${queuedAction.attempts + 1}/${RETRY_CONFIG.MAX_ATTEMPTS})`);
 
-        // Re-queue with exponential backoff
+        // Re-queue with exponential backoff (capped at 30s)
+        const backoffMs = Math.min(
+          RETRY_CONFIG.BACKOFF_MS * Math.pow(2, queuedAction.attempts),
+          30000
+        );
+
         setTimeout(() => {
           queue.push(queuedAction);
           scheduleSync(priority);
-        }, RETRY_CONFIG.BACKOFF_MS * queuedAction.attempts);
+        }, backoffMs);
 
       } else {
         console.error(`❌ Sync failed after ${RETRY_CONFIG.MAX_ATTEMPTS} attempts, giving up`);
         stats.totalFailed++;
         stats.byPriority[priority].failed++;
 
-        // Log failed sync for manual review
+        // Log failed sync for manual review and alert admins
         logFailedSync(queuedAction.action, error);
       }
     }
@@ -372,7 +382,7 @@ function getWeekNumber(date) {
 }
 
 /**
- * Log failed sync for manual review
+ * Log failed sync for manual review and alert admins
  */
 function logFailedSync(action, error) {
   const failedSync = {
@@ -382,8 +392,16 @@ function logFailedSync(action, error) {
     attempts: RETRY_CONFIG.MAX_ATTEMPTS
   };
 
-  // TODO: Store failed syncs in database for admin review
+  // Log to console
   console.error('💾 Failed sync logged:', JSON.stringify(failedSync, null, 2));
+
+  // Alert admins via Discord
+  adminAlerts.alertSheetSyncFailure({
+    action: action,
+    attempts: RETRY_CONFIG.MAX_ATTEMPTS,
+    error: error,
+    data: action.data
+  }).catch(err => console.error('Failed to send sync failure alert:', err));
 }
 
 /**

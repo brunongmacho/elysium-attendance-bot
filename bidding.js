@@ -343,6 +343,7 @@ const FEATURE_FLAGS = {
 const mongoBiddingCircuit = new CircuitBreaker({
   threshold: 5,
   timeout: 60000,
+  maxRetries: 10, // 10 attempts with exponential backoff before fallback
   name: 'BiddingMongoDB'
 });
 

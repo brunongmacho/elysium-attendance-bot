@@ -15,9 +15,12 @@
  * - Auto-recovery detection
  * - Failure threshold configuration
  * - Success/failure tracking
+ * - Admin alerts via Discord
  *
  * ═══════════════════════════════════════════════════════════════════════════
  */
+
+const adminAlerts = require('./admin-alerts');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CIRCUIT BREAKER CLASS
@@ -29,11 +32,13 @@ class CircuitBreaker {
    * @param {Object} options - Configuration options
    * @param {number} options.threshold - Number of failures before opening circuit (default: 5)
    * @param {number} options.timeout - Milliseconds before attempting recovery (default: 60000)
+   * @param {number} options.maxRetries - Maximum retry attempts before fallback (default: 10)
    * @param {string} options.name - Name for logging (default: 'CircuitBreaker')
    */
   constructor(options = {}) {
     this.threshold = options.threshold || 5;
     this.timeout = options.timeout || 60000; // 1 minute
+    this.maxRetries = options.maxRetries || 10;
     this.name = options.name || 'CircuitBreaker';
 
     this.state = 'CLOSED'; // CLOSED, OPEN, HALF_OPEN
@@ -47,6 +52,7 @@ class CircuitBreaker {
       totalSuccesses: 0,
       totalFailures: 0,
       totalFallbacks: 0,
+      totalRetries: 0,
       stateChanges: {
         CLOSED: 0,
         OPEN: 0,
@@ -56,7 +62,7 @@ class CircuitBreaker {
   }
 
   /**
-   * Execute operation with circuit breaker protection
+   * Execute operation with circuit breaker protection and retry logic
    * @param {Function} operation - Primary operation (MongoDB)
    * @param {Function} fallback - Fallback operation (Sheets)
    * @returns {Promise<any>} - Result from operation or fallback
@@ -78,20 +84,38 @@ class CircuitBreaker {
       }
     }
 
-    // Try primary operation
-    try {
-      const result = await operation();
-      this.onSuccess();
-      return result;
+    // Try primary operation with retries
+    let lastError = null;
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      try {
+        const result = await operation();
+        this.onSuccess();
 
-    } catch (error) {
-      this.onFailure(error);
+        if (attempt > 1) {
+          console.log(`✅ [${this.name}] Succeeded on attempt ${attempt}/${this.maxRetries}`);
+        }
 
-      // Use fallback
-      console.warn(`⚠️ [${this.name}] Primary failed, using fallback:`, error.message);
-      this.stats.totalFallbacks++;
-      return await this.executeFallback(fallback);
+        return result;
+
+      } catch (error) {
+        lastError = error;
+        this.stats.totalRetries++;
+
+        if (attempt < this.maxRetries) {
+          const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 30000); // Cap at 30s
+          console.warn(`⚠️ [${this.name}] Attempt ${attempt}/${this.maxRetries} failed, retrying in ${backoffMs}ms:`, error.message);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+        } else {
+          console.error(`❌ [${this.name}] All ${this.maxRetries} attempts failed`);
+        }
+      }
     }
+
+    // All retries exhausted, record failure and use fallback
+    this.onFailure(lastError);
+    console.warn(`⚠️ [${this.name}] Using fallback after ${this.maxRetries} failed attempts`);
+    this.stats.totalFallbacks++;
+    return await this.executeFallback(fallback);
   }
 
   /**
@@ -123,6 +147,11 @@ class CircuitBreaker {
     if (this.state !== 'CLOSED') {
       console.log(`✅ [${this.name}] Operation successful, closing circuit`);
       this.setState('CLOSED');
+
+      // Alert admins of recovery
+      adminAlerts.alertCircuitBreakerRecovered({
+        name: this.name
+      }).catch(err => console.error('Failed to send recovery alert:', err));
     }
   }
 
@@ -143,6 +172,13 @@ class CircuitBreaker {
       if (this.state !== 'OPEN') {
         console.error(`🚨 [${this.name}] Failure threshold reached, opening circuit`);
         this.setState('OPEN');
+
+        // Alert admins that circuit opened
+        adminAlerts.alertCircuitBreakerOpen({
+          name: this.name,
+          failures: this.failures,
+          threshold: this.threshold
+        }).catch(err => console.error('Failed to send circuit open alert:', err));
       }
     }
   }
