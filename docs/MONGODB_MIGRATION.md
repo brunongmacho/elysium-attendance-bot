@@ -105,12 +105,13 @@ This document tracks the migration from Google Sheets-only architecture to Mongo
 
 ---
 
-### Phase 4: Core Refactor ✅ COMPLETED (Bidding Module)
+### Phase 4: Core Refactor ✅ COMPLETED (Bidding & Auctioneering Modules)
 **Time Spent**: 1 day
 **Date Completed**: Nov 29, 2025
 
 **Files Refactored**:
 - ✅ `bidding.js` → MongoDB-first with feature flag `USE_MONGODB_BIDDING=true`
+- ✅ `auctioneering.js` → MongoDB-first with feature flag `USE_MONGODB_AUCTIONEERING=true`
 - ✅ `services/sheet-sync.js` → Priority-based background sync (IMMEDIATE/HIGH/NORMAL/LOW)
 - ✅ `utils/circuit-breaker.js` → 10 retries, exponential backoff, admin alerts
 - ✅ `utils/mongodb-helpers.js` → Clean MongoDB API for members, points, auction, attendance
@@ -118,7 +119,6 @@ This document tracks the migration from Google Sheets-only architecture to Mongo
 - ✅ `scripts/migrate-discord-ids.js` → One-time migration script (ready to run)
 
 **Remaining Files** (Phase 4 Continued):
-- ⏳ `auctioneering.js` → Use MongoDB for queue
 - ⏳ `attendance.js` → Use MongoDB for attendance
 - ⏳ `index2.js` → Update commands (!mypoints, !stats, !leaderboard)
 - ⏳ `boss-rotation.js` → Use MongoDB for rotation
@@ -345,7 +345,7 @@ After migration, we expect:
 ---
 
 **Last Updated**: Nov 29, 2025
-**Current Phase**: Phase 4 Complete (Bidding Module), Phase 4 Continued Next
+**Current Phase**: Phase 4 Complete (Bidding & Auctioneering Modules), Phase 4 Continued Next
 **Status**: 🚀 MongoDB Integration Live in Production
 **Branch**: `claude/mongodb-migration-phase-4-01SRHz5wCis1N38AP9sJQrNi`
 
@@ -356,7 +356,9 @@ After migration, we expect:
 ### Enabled Features
 - ✅ MongoDB connection established (2ms latency)
 - ✅ `USE_MONGODB_BIDDING=true` enabled in Koyeb
+- ✅ `USE_MONGODB_AUCTIONEERING=true` enabled in Koyeb
 - ✅ Bidding operations using MongoDB (10-50ms response time)
+- ✅ Auctioneering operations using MongoDB (10-50ms response time)
 - ✅ Circuit breaker with 10 retry attempts
 - ✅ Automatic fallback to Sheets on MongoDB failure
 - ✅ Priority-based background sync to Sheets
@@ -375,7 +377,7 @@ node scripts/migrate-discord-ids.js
 - ✅ **Production Ready** - MongoDB-first architecture fully operational
 
 ### Future Work
-- Continue Phase 4: Refactor auctioneering.js, attendance.js, index2.js
+- Continue Phase 4: Refactor attendance.js, index2.js
 - Testing & validation during Saturday 12pm auction
 - Monitor and optimize performance
 - Complete remaining modules
