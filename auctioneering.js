@@ -461,7 +461,7 @@ async function fetchSheetItems(url, retries = 3, allowCache = true) {
       sheetSync.queueSync({
         action: 'syncAuctionQueue',
         data: { items: mongoItems },
-        priority: sheetSync.PRIORITY.NORMAL
+        priority: sheetSync.SYNC_PRIORITIES.NORMAL
       });
 
       return items;
@@ -614,7 +614,7 @@ async function logAuctionResult(
           itemSource,
           timestamp
         },
-        priority: sheetSync.PRIORITY.IMMEDIATE
+        priority: sheetSync.SYNC_PRIORITIES.IMMEDIATE
       });
 
       return true;
@@ -711,7 +711,7 @@ async function saveAuctionState(url) {
       sheetSync.queueSync({
         action: 'saveBotState',
         data: { state: stateToSave },
-        priority: sheetSync.PRIORITY.HIGH
+        priority: sheetSync.SYNC_PRIORITIES.HIGH
       });
 
       return true;

@@ -36,12 +36,13 @@ node scripts/migrate-discord-ids.js
 
 Members not found in Discord will keep temp IDs until they join the server.
 
-### 2. Enable MongoDB for Bidding
+### 2. Enable MongoDB for Bidding and Auctioneering
 
 Set environment variables in Koyeb:
 
 ```bash
 USE_MONGODB_BIDDING=true
+USE_MONGODB_AUCTIONEERING=true
 MONGODB_FALLBACK_ENABLED=true  # Recommended for safety
 ```
 
@@ -80,6 +81,25 @@ USE_MONGODB_BIDDING=true
 
 **When disabled:**
 - All operations use Google Sheets (legacy behavior)
+- Safe fallback if MongoDB has issues
+
+### USE_MONGODB_AUCTIONEERING
+
+**Default:** `false` (Sheets only)
+
+```bash
+# Enable MongoDB for auctioneering operations
+USE_MONGODB_AUCTIONEERING=true
+```
+
+**When enabled:**
+- fetchSheetItems() reads from MongoDB auctionItems collection
+- logAuctionResult() marks items as sold in MongoDB + queues Sheet sync
+- saveAuctionState() saves to MongoDB botState collection
+- Startup logging shows MongoDB vs Sheets mode
+
+**When disabled:**
+- All auction operations use Google Sheets (legacy behavior)
 - Safe fallback if MongoDB has issues
 
 ### MONGODB_FALLBACK_ENABLED
@@ -219,6 +239,7 @@ console.log(`Progress: ${stats.percentComplete}%`);
 **In Koyeb environment variables:**
 ```bash
 USE_MONGODB_BIDDING=false
+USE_MONGODB_AUCTIONEERING=false
 ```
 
 **Restart bot** → All operations use Sheets immediately.
@@ -364,8 +385,10 @@ console.log(stats);
 
 **Before auction (11:45am):**
 - [ ] Verify `USE_MONGODB_BIDDING=true` in Koyeb
+- [ ] Verify `USE_MONGODB_AUCTIONEERING=true` in Koyeb
 - [ ] Check MongoDB health in logs (2ms latency expected)
-- [ ] Verify Discord ID migration completed (90%+ expected)
+- [ ] Verify Discord ID migration completed (100% expected)
+- [ ] Check startup logs for "✅ [MongoDB] Auctioneering using MongoDB-first architecture"
 - [ ] Test !mypoints command (should use MongoDB)
 - [ ] Monitor admin-logs channel (should be quiet)
 
@@ -385,6 +408,7 @@ console.log(stats);
 ```bash
 # In Koyeb
 USE_MONGODB_BIDDING=false
+USE_MONGODB_AUCTIONEERING=false
 # Restart bot
 ```
 
