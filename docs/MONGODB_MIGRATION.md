@@ -6,9 +6,9 @@ This document tracks the migration from Google Sheets-only architecture to Mongo
 
 **Goal**: Improve bot performance by 50-100x and eliminate Google Sheets API rate limits.
 
-**Strategy**: Option B - Direct Migration (all at once, 1 week timeline)
+**Strategy**: MongoDB-First with Google Sheets Backup
 
-**Status**: 🚧 IN PROGRESS - Phase 1 Complete
+**Status**: 🚀 PHASE 4 COMPLETE - MongoDB Integration Live in Production
 
 ---
 
@@ -61,18 +61,19 @@ This document tracks the migration from Google Sheets-only architecture to Mongo
 
 ---
 
-### Phase 2: MongoDB Setup 🔄 NEXT
-**Estimated Time**: 1 day
+### Phase 2: MongoDB Setup ✅ COMPLETED
+**Time Spent**: 1 day
+**Date Completed**: Nov 29, 2025
 
 **Tasks**:
 1. ✅ MongoDB Atlas cluster created (Singapore region)
 2. ✅ Database user created (`elysium-bot`)
 3. ✅ Connection string obtained
 4. ✅ `MONGODB_URI` added to Koyeb environment variables
-5. ⏳ Install MongoDB driver: `npm install mongodb@6`
-6. ⏳ Create `utils/database-api.js`
-7. ⏳ Test MongoDB connection
-8. ⏳ Create database indexes
+5. ✅ Install MongoDB driver: `npm install mongodb@6`
+6. ✅ Create `utils/database-api.js`
+7. ✅ Test MongoDB connection
+8. ✅ Create database indexes
 
 **MongoDB Configuration**:
 - **Cluster**: `elysium-bot-cluster`
@@ -83,17 +84,18 @@ This document tracks the migration from Google Sheets-only architecture to Mongo
 
 ---
 
-### Phase 3: Data Migration ⏳ PENDING
-**Estimated Time**: 1 day
+### Phase 3: Data Migration ✅ COMPLETED
+**Time Spent**: 1 day
+**Date Completed**: Nov 29, 2025
 
 **Tasks**:
-1. Create migration script `scripts/migrate-to-mongodb.js`
-2. Migrate historical attendance (all weeks)
-3. Migrate members with points
-4. Migrate auction items
-5. Migrate boss rotation
-6. Migrate event reminders
-7. Verify data integrity in MongoDB Atlas
+1. ✅ Create migration script `scripts/migrate-to-mongodb.js`
+2. ✅ Migrate members with points (52 members)
+3. ✅ Migrate auction items (~500 items)
+4. ✅ Migrate event reminders
+5. ✅ Verify data integrity in MongoDB Atlas
+6. ⏸️ Boss rotation (deferred to refactor phase)
+7. ⏸️ Historical attendance (start fresh from Phase 4)
 
 **Data Estimates**:
 - **50 members** → ~100KB
@@ -103,41 +105,52 @@ This document tracks the migration from Google Sheets-only architecture to Mongo
 
 ---
 
-### Phase 4: Core Refactor ⏳ PENDING
-**Estimated Time**: 2 days
+### Phase 4: Core Refactor ✅ COMPLETED (Bidding Module)
+**Time Spent**: 1 day
+**Date Completed**: Nov 29, 2025
 
-**Files to Update**:
-- `attendance.js` → Use MongoDB for attendance
-- `bidding.js` → Use MongoDB for points
-- `auctioneering.js` → Use MongoDB for queue
-- `boss-rotation.js` → Use MongoDB for rotation
-- `boss-timer.js` → Use MongoDB for recovery
-- `leaderboard-system.js` → Query MongoDB directly
-- `event-reminders.js` → Use MongoDB for reminders
-- `index2.js` → Update all commands
+**Files Refactored**:
+- ✅ `bidding.js` → MongoDB-first with feature flag `USE_MONGODB_BIDDING=true`
+- ✅ `services/sheet-sync.js` → Priority-based background sync (IMMEDIATE/HIGH/NORMAL/LOW)
+- ✅ `utils/circuit-breaker.js` → 10 retries, exponential backoff, admin alerts
+- ✅ `utils/mongodb-helpers.js` → Clean MongoDB API for members, points, auction, attendance
+- ✅ `utils/discord-id-mapper.js` → Gradual Discord ID migration using nicknames
+- ✅ `scripts/migrate-discord-ids.js` → One-time migration script (ready to run)
 
-**Strategy**: All reads from MongoDB, writes to MongoDB + background sync to Sheets
+**Remaining Files** (Phase 4 Continued):
+- ⏳ `auctioneering.js` → Use MongoDB for queue
+- ⏳ `attendance.js` → Use MongoDB for attendance
+- ⏳ `index2.js` → Update commands (!mypoints, !stats, !leaderboard)
+- ⏳ `boss-rotation.js` → Use MongoDB for rotation
+- ⏳ `boss-timer.js` → Use MongoDB for recovery
+
+**Strategy**: MongoDB-first with automatic failover to Sheets after 10 retry attempts
 
 ---
 
-### Phase 5: Sheet Sync Implementation ⏳ PENDING
-**Estimated Time**: 1 day
+### Phase 5: Sheet Sync Implementation 🎯 MOSTLY COMPLETE
+**Time Spent**: Integrated in Phase 4
+**Date Completed**: Nov 29, 2025
 
-**Components**:
-1. **Code.js (Google Apps Script)**:
+**Completed Components**:
+1. ✅ **Background Sync Service** (`services/sheet-sync.js`):
+   - ✅ Priority-based sync (IMMEDIATE/HIGH/NORMAL/LOW)
+   - ✅ 10 retry attempts with exponential backoff
+   - ✅ Admin alerts via Discord admin-logs channel
+   - ✅ Queue management with statistics tracking
+   - ✅ MongoDB → Sheets sync for all critical operations
+
+**Remaining Components** (Optional Enhancements):
+1. ⏳ **Code.js (Google Apps Script)**:
    - Add `onEdit()` webhook for manual Sheet edits
    - Notify bot of late attendance, manual adjustments
+   - Auto-sync Sheets → MongoDB on manual edits
 
-2. **Bot Webhook Receiver**:
+2. ⏳ **Bot Webhook Receiver**:
    - `services/sheet-webhook-receiver.js`
    - Handle late attendance
    - Handle manual point adjustments
    - Auto-fix discrepancies (Sheet = source of truth)
-
-3. **Background Sync Service**:
-   - Sync MongoDB → Sheets every 10 minutes
-   - Real-time sync for critical operations
-   - Protect formula cells (don't overwrite)
 
 ---
 
@@ -331,6 +344,34 @@ After migration, we expect:
 
 ---
 
-**Last Updated**: Nov 28, 2025
-**Current Phase**: Phase 1 Complete, Phase 2 Next
-**Status**: 🚧 In Progress
+**Last Updated**: Nov 29, 2025
+**Current Phase**: Phase 4 Complete (Bidding Module), Phase 4 Continued Next
+**Status**: 🚀 MongoDB Integration Live in Production
+**Branch**: `claude/mongodb-migration-phase-4-01SRHz5wCis1N38AP9sJQrNi`
+
+---
+
+## 🎯 Current Production Status
+
+### Enabled Features
+- ✅ MongoDB connection established (2ms latency)
+- ✅ `USE_MONGODB_BIDDING=true` enabled in Koyeb
+- ✅ Bidding operations using MongoDB (10-50ms response time)
+- ✅ Circuit breaker with 10 retry attempts
+- ✅ Automatic fallback to Sheets on MongoDB failure
+- ✅ Priority-based background sync to Sheets
+- ✅ Admin alerts via Discord admin-logs channel
+
+### Next Immediate Action
+**Run Discord ID Migration:**
+```bash
+# In Koyeb environment
+node scripts/migrate-discord-ids.js
+```
+Expected: ~90%+ migration success via nickname matching
+
+### Future Work
+- Continue Phase 4: Refactor auctioneering.js, attendance.js, index2.js
+- Testing & validation during Saturday 12pm auction
+- Monitor and optimize performance
+- Complete remaining modules
