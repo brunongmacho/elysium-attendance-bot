@@ -1307,6 +1307,10 @@ async function sendMonthlyReport(targetChannel = null) {
  * - Converted to UTC for setTimeout
  * - Logs show GMT+8 times for clarity
  *
+ * TIMEOUT LIMIT HANDLING:
+ * - JavaScript setTimeout has a 32-bit signed integer limit (~24.8 days)
+ * - For delays >24 days, uses intermediate timeouts to avoid overflow
+ *
  * @returns {void}
  */
 function scheduleMonthlyReport() {
@@ -1315,6 +1319,12 @@ function scheduleMonthlyReport() {
     console.log('⚠️ Monthly report scheduler already running, skipping initialization');
     return;
   }
+
+  /**
+   * JavaScript setTimeout maximum safe delay (24.8 days in milliseconds)
+   * Using 24 days to be safe (2,073,600,000 ms)
+   */
+  const MAX_TIMEOUT_DELAY = 24 * 24 * 60 * 60 * 1000;
 
   /**
    * Calculates the last day of current month at 11:59pm GMT+8 in UTC time
@@ -1373,24 +1383,62 @@ function scheduleMonthlyReport() {
 
   /**
    * Schedules the next monthly report execution
+   * Handles setTimeout overflow by using intermediate timeouts for delays >24 days
    */
   const scheduleNext = () => {
     const nextLastDayUTC = calculateNextLastDayOfMonth1159PM();
     const now = new Date();
-    const delay = nextLastDayUTC.getTime() - now.getTime();
+    const totalDelay = nextLastDayUTC.getTime() - now.getTime();
 
     // Format for logging (convert to GMT+8 for display)
     const displayTime = new Date(nextLastDayUTC.getTime() + 8 * 60 * 60 * 1000);
-    const hours = Math.floor(delay / 1000 / 60 / 60);
+    const hours = Math.floor(totalDelay / 1000 / 60 / 60);
     const days = Math.floor(hours / 24);
 
-    console.log(`📅 Next monthly report scheduled for: ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${days} days)`);
+    console.log(`📅 Next monthly report scheduled for: ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${days} days, ${hours} hours)`);
 
-    // Schedule the report
-    monthlyReportTimer = setTimeout(async () => {
-      await sendMonthlyReport();
-      scheduleNext(); // Automatically schedule next month's report
-    }, delay);
+    /**
+     * Recursive function to schedule with overflow protection
+     * If delay >24 days, schedules intermediate timeout and reschedules
+     */
+    const scheduleWithOverflowProtection = (remainingDelay) => {
+      if (remainingDelay <= 0) {
+        // Time to send report
+        console.log('📅 Monthly report time reached, generating report...');
+        sendMonthlyReport().then(() => {
+          scheduleNext(); // Schedule next month
+        }).catch(err => {
+          console.error('❌ Error sending monthly report:', err);
+          // Still schedule next month even if this one failed
+          scheduleNext();
+        });
+        return;
+      }
+
+      // If delay exceeds max safe timeout, use intermediate timeout
+      if (remainingDelay > MAX_TIMEOUT_DELAY) {
+        const intermediateDays = Math.floor(MAX_TIMEOUT_DELAY / (24 * 60 * 60 * 1000));
+        console.log(`⏳ Delay exceeds safe limit (${days} days). Scheduling intermediate checkpoint in ${intermediateDays} days...`);
+        
+        monthlyReportTimer = setTimeout(() => {
+          console.log(`✅ Intermediate checkpoint reached. Recalculating remaining delay...`);
+          // Recalculate delay (in case system clock changed)
+          const newNow = new Date();
+          const newRemainingDelay = nextLastDayUTC.getTime() - newNow.getTime();
+          scheduleWithOverflowProtection(newRemainingDelay);
+        }, MAX_TIMEOUT_DELAY);
+      } else {
+        // Delay is safe, schedule final timeout
+        monthlyReportTimer = setTimeout(async () => {
+          console.log('📅 Monthly report time reached, generating report...');
+          await sendMonthlyReport();
+          scheduleNext(); // Automatically schedule next month's report
+        }, remainingDelay);
+      }
+    };
+
+    // Start scheduling with overflow protection
+    scheduleWithOverflowProtection(totalDelay);
   };
 
   // Start the scheduling cycle
