@@ -411,10 +411,17 @@ function getAllWeeklyAttendance(data) {
         // Extract members who attended this spawn
         for (let row = 0; row < memberRows.length; row++) {
           const memberName = (memberRows[row][COLUMNS.USERNAME - 1] || '').toString().trim();
-          const checkmark = (memberRows[row][col] || '').toString().trim();
+          const checkmarkValue = memberRows[row][col];
 
-          // If member has a checkmark (✓, ✔, ☑, or any non-empty value)
-          if (memberName && checkmark) {
+          // Handle different checkmark formats:
+          // - Boolean TRUE (Google Sheets checkbox)
+          // - Text checkmarks (✓, ✔, ☑, TRUE, etc.)
+          // - Any non-empty value
+          const hasCheckmark = checkmarkValue === true ||
+                              (checkmarkValue && checkmarkValue.toString().trim() !== '' && checkmarkValue.toString().trim().toLowerCase() !== 'false');
+
+          // If member has a checkmark
+          if (memberName && hasCheckmark) {
             allAttendanceRecords.push({
               memberName: memberName,
               bossName: bossName,
