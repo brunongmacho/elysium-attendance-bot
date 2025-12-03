@@ -23,8 +23,8 @@ As Phase 4 progresses, the script is updated to support new modules:
 |--------|-------------|--------|
 | Members (Bidding Points) | `USE_MONGODB_BIDDING` | ✅ Supported |
 | Auction Items | `USE_MONGODB_AUCTIONEERING` | ✅ Supported |
-| Attendance Records | `USE_MONGODB_ATTENDANCE` | ⏳ Coming soon |
-| Boss Rotation | `USE_MONGODB_BOSS_ROTATION` | ⏳ Coming soon |
+| Boss Rotation | N/A (always synced) | ✅ Supported |
+| Attendance Records | `USE_MONGODB_ATTENDANCE` | ✅ Supported (historical import) |
 
 ---
 
@@ -96,11 +96,15 @@ node scripts/sync-sheets-to-mongodb.js --members
 
 # Sync only auction items
 node scripts/sync-sheets-to-mongodb.js --items
+
+# Sync only boss rotation
+node scripts/sync-sheets-to-mongodb.js --rotation
 ```
 
 **Use cases:**
 - Only member points changed in Sheets → sync members only
 - Only auction queue changed → sync items only
+- Only boss rotation changed → sync rotation only
 
 ---
 
@@ -199,6 +203,28 @@ This gradual migration ensures:
 - Auction items change frequently (items sold, new items added)
 - Sheet is always authoritative for auction queue
 - Simpler than trying to diff and update
+
+### Boss Rotation Sync
+
+1. Fetches list of rotating bosses from Google Sheets via `getAllRotatingBosses()`
+2. For each rotating boss, fetches rotation status via `getBossRotation(bossName)`
+3. **Clears** all existing boss rotation data in MongoDB
+4. **Inserts** fresh rotation data from Sheets
+
+**Data Synced:**
+- `bossName` - Name of the rotating boss (e.g., "Amentis")
+- `currentIndex` - Current rotation index (1-5)
+- `currentGuild` - Guild whose turn it is (e.g., "ELYSIUM")
+- `isOurTurn` - Boolean flag for quick checks
+- `guilds` - List of all guilds in rotation
+- `nextGuild` - Next guild in rotation sequence
+- `lastUpdated` - Timestamp of sync
+
+**Why delete-then-insert?**
+- Rotation changes after each boss kill
+- Sheet is always authoritative for rotation state
+- Simpler than trying to diff and update
+- Fast lookup for rotation warnings
 
 ---
 
