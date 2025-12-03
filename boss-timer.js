@@ -550,6 +550,27 @@ async function triggerSpawnReminder(bossName, spawnTime) {
       return;
     }
 
+    // Check if spawn already exists (prevent duplicates)
+    const activeSpawns = attendance.getActiveSpawns();
+    if (activeSpawns[bossName]) {
+      console.log(`⚠️ Spawn already exists for ${bossName}, skipping reminder to prevent duplicate`);
+
+      // Reschedule for next occurrence
+      const bossType = getBossType(bossName);
+      if (bossType === 'schedule') {
+        const bossConfig = bossSpawnConfig.scheduleBasedBosses[bossName];
+        if (bossConfig && bossConfig.schedules) {
+          const nextSpawn = findNextScheduledTime(bossConfig.schedules);
+          if (nextSpawn) {
+            scheduleReminder(bossName, nextSpawn);
+            console.log(`🔄 Rescheduled ${bossName} for next occurrence`);
+          }
+        }
+      }
+
+      return;
+    }
+
     // Create attendance thread
     const thread = await attendance.createThreadForBoss(client, bossName, spawnTime);
 
