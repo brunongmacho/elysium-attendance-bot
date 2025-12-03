@@ -59,7 +59,7 @@ async function forceSyncRecentAttendance() {
     console.log(`📊 Found ${spawns.size} distinct spawns to sync`);
     console.log('');
 
-    // Sync each spawn to Sheets
+    // Sync each spawn to Sheets (with duplicate check & overwrite)
     let synced = 0;
     let failed = 0;
 
@@ -67,18 +67,35 @@ async function forceSyncRecentAttendance() {
       try {
         console.log(`🔄 Syncing: ${spawn.boss} (${spawn.members.length} members)...`);
 
+        // Convert to GMT+8 (Philippine Time)
         const spawnDate = new Date(spawn.timestamp);
+        const gmt8Date = new Date(spawnDate.getTime() + (8 * 60 * 60 * 1000));
 
-        const result = await sheetAPI.call('submitAttendance', {
+        // Format as MM/DD/YY HH:mm:ss in GMT+8
+        const month = String(gmt8Date.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(gmt8Date.getUTCDate()).padStart(2, '0');
+        const year = String(gmt8Date.getUTCFullYear()).slice(-2);
+        const hours = String(gmt8Date.getUTCHours()).padStart(2, '0');
+        const minutes = String(gmt8Date.getUTCMinutes()).padStart(2, '0');
+        const seconds = String(gmt8Date.getUTCSeconds()).padStart(2, '0');
+
+        const formattedDate = `${month}/${day}/${year}`;
+        const formattedTime = `${hours}:${minutes}:${seconds}`;
+        const formattedTimestamp = `${formattedDate} ${formattedTime}`;
+
+        console.log(`   📅 Timestamp: ${formattedTimestamp} (GMT+8)`);
+
+        // Use overwriteAttendance to handle duplicates (overwrites if exists)
+        const result = await sheetAPI.call('overwriteAttendance', {
           boss: spawn.boss,
-          timestamp: spawn.timestamp,
-          date: spawnDate.toLocaleDateString('en-US'),
-          time: spawnDate.toLocaleTimeString('en-US', { hour12: false }),
+          timestamp: formattedTimestamp,
+          date: formattedDate,
+          time: formattedTime,
           members: spawn.members
         });
 
         if (result && result.status === 'ok') {
-          console.log(`   ✅ Synced: ${spawn.boss} (${spawn.members.length} members)`);
+          console.log(`   ✅ Synced: ${spawn.boss} (${spawn.members.length} members) - ${result.isOverwrite ? 'Overwritten' : 'Created'}`);
           synced++;
         } else {
           console.log(`   ❌ Failed: ${result?.message || 'Unknown error'}`);
