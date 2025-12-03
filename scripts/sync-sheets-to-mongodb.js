@@ -125,8 +125,20 @@ async function syncMembers(db, sheetAPI) {
     log('📥', 'Fetching members from Google Sheets...');
     const membersData = await sheetAPI.call('getBiddingPointsSummary');
 
-    if (!membersData || membersData.length === 0) {
-      log('⚠️', 'No members found in Google Sheets');
+    // Validate response is an array
+    if (!membersData) {
+      log('⚠️', 'No response from Google Sheets (null/undefined)');
+      return { synced: 0, skipped: 0 };
+    }
+
+    if (!Array.isArray(membersData)) {
+      log('⚠️', `Invalid response from Google Sheets (expected array, got ${typeof membersData})`);
+      log('⚠️', `Response: ${JSON.stringify(membersData).substring(0, 200)}`);
+      return { synced: 0, skipped: 0 };
+    }
+
+    if (membersData.length === 0) {
+      log('⚠️', 'No members found in Google Sheets (empty array)');
       return { synced: 0, skipped: 0 };
     }
 
@@ -231,8 +243,20 @@ async function syncAuctionItems(db, sheetAPI) {
     log('📥', 'Fetching auction items from Google Sheets...');
     const itemsData = await sheetAPI.call('getBiddingItems');
 
-    if (!itemsData || itemsData.length === 0) {
-      log('⚠️', 'No auction items found in Google Sheets');
+    // Validate response is an array
+    if (!itemsData) {
+      log('⚠️', 'No response from Google Sheets (null/undefined)');
+      return { synced: 0, skipped: 0 };
+    }
+
+    if (!Array.isArray(itemsData)) {
+      log('⚠️', `Invalid response from Google Sheets (expected array, got ${typeof itemsData})`);
+      log('⚠️', `Response: ${JSON.stringify(itemsData).substring(0, 200)}`);
+      return { synced: 0, skipped: 0 };
+    }
+
+    if (itemsData.length === 0) {
+      log('⚠️', 'No auction items found in Google Sheets (empty array)');
       return { synced: 0, skipped: 0 };
     }
 
