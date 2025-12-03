@@ -67,21 +67,26 @@ async function forceSyncRecentAttendance() {
       try {
         console.log(`🔄 Syncing: ${spawn.boss} (${spawn.members.length} members)...`);
 
-        // Convert to GMT+8 (Philippine Time)
+        // Convert to GMT+8 (Philippine Time) using proper timezone conversion
         const spawnDate = new Date(spawn.timestamp);
-        const gmt8Date = new Date(spawnDate.getTime() + (8 * 60 * 60 * 1000));
 
-        // Format as MM/DD/YY HH:mm:ss in GMT+8
-        const month = String(gmt8Date.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(gmt8Date.getUTCDate()).padStart(2, '0');
-        const year = String(gmt8Date.getUTCFullYear()).slice(-2);
-        const hours = String(gmt8Date.getUTCHours()).padStart(2, '0');
-        const minutes = String(gmt8Date.getUTCMinutes()).padStart(2, '0');
-        const seconds = String(gmt8Date.getUTCSeconds()).padStart(2, '0');
+        // Format date as MM/DD/YY in GMT+8
+        const dateStr = spawnDate.toLocaleDateString('en-US', {
+          timeZone: 'Asia/Manila',
+          month: '2-digit',
+          day: '2-digit',
+          year: '2-digit'
+        });
 
-        const formattedDate = `${month}/${day}/${year}`;
-        const formattedTime = `${hours}:${minutes}:${seconds}`;
-        const formattedTimestamp = `${formattedDate} ${formattedTime}`;
+        // Format time as H:MM in GMT+8 (matches Google Sheets: no seconds, no zero-padding for hours)
+        const timeStr = spawnDate.toLocaleTimeString('en-US', {
+          timeZone: 'Asia/Manila',
+          hour: 'numeric',      // No zero-padding (0-23, matches Google Sheets)
+          minute: '2-digit',    // Zero-padded minutes
+          hour12: false
+        });
+
+        const formattedTimestamp = `${dateStr} ${timeStr}`;
 
         console.log(`   📅 Timestamp: ${formattedTimestamp} (GMT+8)`);
 
@@ -89,8 +94,8 @@ async function forceSyncRecentAttendance() {
         const result = await sheetAPI.call('overwriteAttendance', {
           boss: spawn.boss,
           timestamp: formattedTimestamp,
-          date: formattedDate,
-          time: formattedTime,
+          date: dateStr,
+          time: timeStr,
           members: spawn.members
         });
 

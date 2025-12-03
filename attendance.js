@@ -1898,11 +1898,10 @@ async function createThreadForBoss(discordClient, bossName, spawnTime, noAutoClo
 
   const timeStr = spawnTime.toLocaleTimeString('en-US', {
     timeZone: 'Asia/Manila',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+    hour: 'numeric',      // No zero-padding (matches Google Sheets: 0-23)
+    minute: '2-digit',    // Zero-padded minutes
     hour12: false
-  }); // HH:MM:SS
+  }); // H:MM (matches Google Sheets format: no seconds)
 
   const fullTimestamp = `${dateStr} ${timeStr}`;
 
