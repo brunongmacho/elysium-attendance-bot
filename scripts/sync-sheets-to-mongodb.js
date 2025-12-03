@@ -92,6 +92,9 @@ function formatSummary(results) {
 
   if (results.members) {
     lines.push(`👥 Members: ${results.members.synced} synced, ${results.members.skipped} skipped`);
+    if (results.members.deactivated > 0) {
+      lines.push(`⚠️ Inactive: ${results.members.deactivated} members (removed from Sheets)`);
+    }
   }
 
   if (results.items) {
@@ -165,7 +168,16 @@ async function syncMembers(db, sheetAPI) {
     const membersCollection = db.collection('members');
     let synced = 0;
     let skipped = 0;
+    let deactivated = 0;
 
+    // Step 1: Mark all existing members as inactive
+    log('🔄', 'Marking existing members as inactive...');
+    await membersCollection.updateMany(
+      {},
+      { $set: { isActive: false } }
+    );
+
+    // Step 2: Update/create members from Sheets (marking as active)
     for (const memberData of membersData) {
       try {
         // Skip if username is missing or invalid
@@ -181,7 +193,7 @@ async function syncMembers(db, sheetAPI) {
         });
 
         if (existingMember) {
-          // Update existing member's points
+          // Update existing member's points and mark as active
           await membersCollection.updateOne(
             { _id: existingMember._id },
             {
@@ -190,6 +202,7 @@ async function syncMembers(db, sheetAPI) {
                 pointsEarned: memberData.pointsEarned || 0,
                 pointsSpent: memberData.pointsSpent || 0,
                 username: memberData.username,
+                isActive: true,  // Re-activate member
                 lastUpdated: new Date()
               }
             }
@@ -203,6 +216,7 @@ async function syncMembers(db, sheetAPI) {
             pointsAvailable: memberData.pointsAvailable || 0,
             pointsEarned: memberData.pointsEarned || 0,
             pointsSpent: memberData.pointsSpent || 0,
+            isActive: true,  // New members are active
             attendance: {
               total: 0,
               thisWeek: 0,
@@ -222,8 +236,15 @@ async function syncMembers(db, sheetAPI) {
       }
     }
 
+    // Step 3: Count deactivated members (not in current Sheets)
+    const inactiveCount = await membersCollection.countDocuments({ isActive: false });
+
     log('✅', `Members synced: ${synced}, skipped: ${skipped}`);
-    return { synced, skipped };
+    if (inactiveCount > 0) {
+      log('ℹ️', `Inactive members (removed from Sheets): ${inactiveCount}`);
+    }
+
+    return { synced, skipped, deactivated: inactiveCount };
 
   } catch (error) {
     log('❌', `Member sync failed: ${error.message}`);
