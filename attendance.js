@@ -1665,53 +1665,91 @@ async function checkAndAutoCloseThreads(client) {
           let submitted = false;
           let submissionSource = 'Unknown';
 
+          // ═════════════════════════════════════════════════════════════════
+          // PARALLEL SAVE: MongoDB + Google Sheets (SIMULTANEOUS)
+          // ═════════════════════════════════════════════════════════════════
           if (USE_MONGODB_ATTENDANCE) {
-            try {
-              const startTime = Date.now();
+            const startTime = Date.now();
 
-              // Add attendance records for each member
-              for (const memberName of spawnInfo.members) {
-                await mongoHelpers.addAttendance({
-                  username: memberName,
-                  boss: spawnInfo.boss,
-                  timestamp: spawnInfo.timestamp,
-                  date: spawnInfo.date,
-                  time: spawnInfo.time,
-                  points: bossPoints[spawnInfo.boss]?.points || 1
-                });
+            // Prepare MongoDB save promise
+            const mongoSavePromise = (async () => {
+              try {
+                // Add attendance records for each member
+                for (const memberName of spawnInfo.members) {
+                  await mongoHelpers.addAttendance({
+                    username: memberName,
+                    boss: spawnInfo.boss,
+                    timestamp: spawnInfo.timestamp,
+                    date: spawnInfo.date,
+                    time: spawnInfo.time,
+                    points: bossPoints[spawnInfo.boss]?.points || 1
+                  });
+                }
+                return { success: true, source: 'MongoDB' };
+              } catch (error) {
+                console.error(`   ❌ [MongoDB] Failed to submit attendance:`, error.message);
+                return { success: false, source: 'MongoDB', error };
               }
+            })();
 
-              const duration = Date.now() - startTime;
-              console.log(`   ✅ [MongoDB] Submitted ${spawnInfo.members.length} attendance records in ${duration}ms`);
-
-              // Queue background sync to Sheets (IMMEDIATE priority - attendance close)
-              // Use overwriteAttendance to handle duplicates (safe to run multiple times)
-              sheetSync.queueSync({
-                action: 'overwriteAttendance',
-                data: {
+            // Prepare Google Sheets save promise
+            const sheetSavePromise = (async () => {
+              try {
+                const payload = {
+                  action: "submitAttendance",
                   boss: spawnInfo.boss,
                   date: spawnInfo.date,
                   time: spawnInfo.time,
                   timestamp: spawnInfo.timestamp,
-                  members: spawnInfo.members
-                },
-                priority: sheetSync.SYNC_PRIORITIES.IMMEDIATE
-              });
+                  members: spawnInfo.members,
+                };
 
-              submitted = true;
-              submissionSource = 'MongoDB';
+                const resp = await postToSheet(payload);
 
-            } catch (error) {
-              console.error(`   ❌ [MongoDB] Failed to submit attendance:`, error.message);
-              console.log(`   ⚠️ [MongoDB] Falling back to Google Sheets...`);
-              // Fall through to Sheets submission below
+                if (resp.ok) {
+                  return { success: true, source: 'Google Sheets' };
+                } else {
+                  return { success: false, source: 'Google Sheets', error: resp.text || resp.err };
+                }
+              } catch (error) {
+                console.error(`   ❌ [Sheets] Failed to submit attendance:`, error.message);
+                return { success: false, source: 'Google Sheets', error };
+              }
+            })();
+
+            // Execute both saves in parallel
+            const [mongoResult, sheetResult] = await Promise.all([
+              mongoSavePromise,
+              sheetSavePromise
+            ]);
+
+            const duration = Date.now() - startTime;
+
+            // Log results
+            if (mongoResult.success) {
+              console.log(`   ✅ [MongoDB] Submitted ${spawnInfo.members.length} attendance records`);
             }
-          }
+            if (sheetResult.success) {
+              console.log(`   ✅ [Sheets] Submitted ${spawnInfo.members.length} attendance records`);
+            }
 
-          // ═════════════════════════════════════════════════════════════════
-          // GOOGLE SHEETS PATH (Fallback or when MongoDB disabled)
-          // ═════════════════════════════════════════════════════════════════
-          if (!submitted || !USE_MONGODB_ATTENDANCE) {
+            console.log(`   ⚡ Total parallel save time: ${duration}ms`);
+
+            // Consider successful if at least one succeeded
+            if (mongoResult.success || sheetResult.success) {
+              submitted = true;
+              submissionSource = [
+                mongoResult.success ? 'MongoDB' : null,
+                sheetResult.success ? 'Sheets' : null
+              ].filter(Boolean).join(' + ');
+            } else {
+              console.error(`   ❌ Both MongoDB and Sheets failed!`);
+            }
+
+          } else {
+            // ═════════════════════════════════════════════════════════════════
+            // SHEETS ONLY PATH (when MongoDB disabled)
+            // ═════════════════════════════════════════════════════════════════
             const payload = {
               action: "submitAttendance",
               boss: spawnInfo.boss,
