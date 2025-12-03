@@ -361,11 +361,14 @@ function getAllWeeklyAttendance(data) {
       }
     }
 
+    Logger.log(`📊 Found ${weeklySheets.length} weekly sheets: ${weeklySheets.map(s => s.getName()).join(', ')}`);
+
     if (weeklySheets.length === 0) {
       Logger.log('⚠️ No weekly attendance sheets found');
       // Cache empty result too (30 min for historical data)
       cache.put(cacheKey, JSON.stringify([]), CONFIG.CACHE_TTL_LONG);
-      return createResponse('ok', 'No weekly sheets found', { sheets: [] });
+      return ContentService.createTextOutput(JSON.stringify([]))
+        .setMimeType(ContentService.MimeType.JSON);
     }
 
     const allAttendanceRecords = [];
@@ -376,9 +379,11 @@ function getAllWeeklyAttendance(data) {
       const lastRow = sheet.getLastRow();
       const lastCol = sheet.getLastColumn();
 
+      Logger.log(`📄 Processing ${sheetName}: ${lastRow} rows, ${lastCol} columns`);
+
       if (lastCol < COLUMNS.FIRST_SPAWN || lastRow < 3) {
         // No spawn columns or no member rows in this sheet
-        Logger.log(`ℹ️ Skipping ${sheetName} - no data`);
+        Logger.log(`ℹ️ Skipping ${sheetName} - no data (lastCol: ${lastCol}, lastRow: ${lastRow}, need: col >= ${COLUMNS.FIRST_SPAWN}, row >= 3)`);
         continue;
       }
 
@@ -389,6 +394,9 @@ function getAllWeeklyAttendance(data) {
       const bossNames = allData[1];  // Row 2: Boss names
       const memberRows = allData.slice(2); // Row 3+: Members
 
+      let sheetRecordCount = 0;
+      let spawnColumnCount = 0;
+
       // For each spawn column
       for (let col = COLUMNS.FIRST_SPAWN - 1; col < lastCol; col++) {
         const timestamp = (timestamps[col] || '').toString().trim();
@@ -397,6 +405,8 @@ function getAllWeeklyAttendance(data) {
         if (!timestamp || !bossName) {
           continue; // Skip empty columns
         }
+
+        spawnColumnCount++;
 
         // Extract members who attended this spawn
         for (let row = 0; row < memberRows.length; row++) {
@@ -414,9 +424,12 @@ function getAllWeeklyAttendance(data) {
               weekSheet: sheetName,
               points: 1 // Default points (can be enhanced later)
             });
+            sheetRecordCount++;
           }
         }
       }
+
+      Logger.log(`   ✓ ${sheetName}: ${spawnColumnCount} spawns, ${sheetRecordCount} attendance records`);
     }
 
     Logger.log(`✅ Found ${allAttendanceRecords.length} attendance records across ${weeklySheets.length} weekly sheets`);
