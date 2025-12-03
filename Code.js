@@ -421,6 +421,17 @@ function getAllWeeklyAttendance(data) {
 
         spawnColumnCount++;
 
+        // DEBUG: Log first spawn column details to see actual data format
+        if (spawnColumnCount === 1) {
+          Logger.log(`🔍 DEBUG First spawn column (col ${col + 1}): timestamp="${timestamp}", boss="${bossName}"`);
+          Logger.log(`🔍 DEBUG Sample member rows (first 3):`);
+          for (let debugRow = 0; debugRow < Math.min(3, memberRows.length); debugRow++) {
+            const debugMember = (memberRows[debugRow][COLUMNS.USERNAME - 1] || '').toString().trim();
+            const debugCheckmark = memberRows[debugRow][col];
+            Logger.log(`   Row ${debugRow + 3}: memberName="${debugMember}", checkmarkValue=${JSON.stringify(debugCheckmark)} (type: ${typeof debugCheckmark})`);
+          }
+        }
+
         // Extract members who attended this spawn
         for (let row = 0; row < memberRows.length; row++) {
           const memberName = (memberRows[row][COLUMNS.USERNAME - 1] || '').toString().trim();
