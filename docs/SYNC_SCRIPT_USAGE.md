@@ -4,11 +4,14 @@
 
 The `sync-sheets-to-mongodb.js` script syncs the latest data from Google Sheets → MongoDB for all MongoDB-enabled modules. This ensures MongoDB has the most current data.
 
-**When to use:**
-- After enabling a new MongoDB feature flag (e.g., `USE_MONGODB_AUCTIONEERING=true`)
-- When Google Sheets has been updated manually and you want to refresh MongoDB
-- Before major events (Saturday auctions) to ensure data consistency
-- After bot has been using Sheets-only mode and you're re-enabling MongoDB
+**🔄 Auto-Sync on Startup:**
+Starting with Phase 4, the bot **automatically runs this sync script on every startup**. This ensures MongoDB is always fresh with your Google Sheets backup data when the bot deploys.
+
+**When to manually run:**
+- Testing sync before deployment
+- Forcing a sync without restarting the bot
+- Debugging sync issues with `--dry-run`
+- Syncing specific modules only (`--members`, `--items`)
 
 ---
 
@@ -233,6 +236,103 @@ node scripts/sync-sheets-to-mongodb.js
 
 ---
 
+## Auto-Sync on Startup (Phase 4+)
+
+### How It Works
+
+The bot now uses a startup script (`scripts/startup.js`) that automatically runs the sync before starting Discord bot:
+
+```
+═══════════════════════════════════════════════════════════════
+🚀 ELYSIUM GUILD BOT - STARTUP
+═══════════════════════════════════════════════════════════════
+
+📋 Step 1/2: Syncing Google Sheets → MongoDB...
+
+[Sync script output...]
+
+✅ Step 1/2: MongoDB sync complete!
+
+🤖 Step 2/2: Starting Discord bot...
+
+[Bot startup logs...]
+```
+
+### Why Auto-Sync?
+
+**Google Sheets is your backup.** Every time the bot starts, it ensures MongoDB has the latest data from your Sheets backup. This means:
+
+✅ **Fresh data on every deployment** - No manual sync needed
+✅ **Sheets edits respected** - If you manually edited Sheets, MongoDB gets updated
+✅ **Zero-downtime migrations** - New members added to Sheets are auto-synced
+✅ **Recovery from MongoDB issues** - If MongoDB was down, it catches up on startup
+
+### NPM Scripts
+
+```bash
+# Start bot with auto-sync (production)
+npm start
+
+# Start bot directly, skip sync (emergency/testing)
+npm run start:direct
+
+# Run sync manually without starting bot
+npm run sync
+```
+
+### Graceful Degradation
+
+If sync fails during startup:
+- ⚠️ Warning logged to Koyeb console
+- ✅ Bot starts anyway (MongoDB may be behind, but bot won't crash)
+- 📊 Next manual sync will catch up
+
+**This ensures the bot never fails to start due to sync issues.**
+
+### Deployment Flow
+
+When you push code to Koyeb:
+
+1. 🚀 Koyeb detects new commit
+2. 🔄 Builds and deploys new version
+3. 📋 **Runs auto-sync** (Step 1/2)
+   - Syncs members from Sheets → MongoDB
+   - Syncs auction items from Sheets → MongoDB
+4. 🤖 **Starts Discord bot** (Step 2/2)
+5. ✅ Bot is live with fresh MongoDB data
+
+### Monitoring Auto-Sync
+
+**Koyeb Logs:**
+```
+📋 Step 1/2: Syncing Google Sheets → MongoDB...
+🔌 Connecting to MongoDB...
+✅ MongoDB connected
+🔄 Syncing members (bidding points)...
+✅ Found 52 members in Google Sheets
+✅ Members synced: 52 (0 new), skipped: 0
+🔄 Syncing auction items...
+✅ Auction items synced: 58
+✅ Step 1/2: MongoDB sync complete!
+🤖 Step 2/2: Starting Discord bot...
+```
+
+**What to watch for:**
+- ✅ "MongoDB sync complete!" - All good
+- ⚠️ "MongoDB sync failed" - Bot still starts, check logs
+- ❌ Sync errors - May need manual intervention
+
+### When to Skip Auto-Sync
+
+Use `npm run start:direct` to skip auto-sync if:
+- MongoDB is already up to date (rare)
+- Emergency bot restart needed (no time to wait for sync)
+- Testing bot changes unrelated to data
+
+**Normal deployments should always use `npm start` with auto-sync.**
+
+---
+
 ## Adding New Modules
 
 As Phase 4 continues, we add more modules. Here's how to update the script:
@@ -283,5 +383,5 @@ if (SYNC_ATTENDANCE) {
 
 ---
 
-**Last Updated**: Nov 29, 2025
-**Script Version**: 1.0 (Members + Auction Items)
+**Last Updated**: Dec 3, 2025
+**Script Version**: 2.0 (Members + Auction Items + Auto-Sync on Startup)

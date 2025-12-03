@@ -11,30 +11,36 @@ Phase 4 implements MongoDB-first architecture with Google Sheets as backup. This
 
 ## Quick Start
 
-### 1. Run One-Time Discord ID Migration
+### 1. Auto-Sync on Startup (NEW in Phase 4)
 
-Before enabling MongoDB, migrate all members from temp IDs to real Discord IDs:
+**Good news:** The bot now **automatically syncs Google Sheets → MongoDB on every startup**!
 
+When you deploy to Koyeb, the bot will:
+1. 📋 Sync latest member points from Sheets → MongoDB
+2. 📋 Sync latest auction items from Sheets → MongoDB
+3. 🤖 Start the Discord bot
+
+**You don't need to manually run the sync script anymore.** Just deploy and the bot handles it!
+
+**See startup logs in Koyeb:**
+```
+═══════════════════════════════════════════════════════════════
+🚀 ELYSIUM GUILD BOT - STARTUP
+═══════════════════════════════════════════════════════════════
+
+📋 Step 1/2: Syncing Google Sheets → MongoDB...
+✅ Found 52 members in Google Sheets
+✅ Members synced: 52 (0 new), skipped: 0
+✅ Auction items synced: 58
+✅ Step 1/2: MongoDB sync complete!
+
+🤖 Step 2/2: Starting Discord bot...
+```
+
+**Manual sync (optional):** If you need to force a sync without restarting:
 ```bash
-# On Koyeb or local environment with MONGODB_URI and DISCORD_TOKEN set
-node scripts/migrate-discord-ids.js
+npm run sync
 ```
-
-**What it does:**
-- Finds all members with temp IDs (`temp_username`)
-- Looks up real Discord IDs from the guild
-- Migrates MongoDB documents to use Discord IDs as primary keys
-- Queues background sync to update Sheets
-
-**Expected output:**
-```
-✅ Successfully migrated: 45
-❌ Failed: 0
-⚠️ Not found in Discord: 5
-📊 Migration progress: 90%
-```
-
-Members not found in Discord will keep temp IDs until they join the server.
 
 ### 2. Enable MongoDB for All Operations
 
@@ -409,8 +415,10 @@ console.log(stats);
 - [ ] Verify `USE_MONGODB_BIDDING=true` in Koyeb
 - [ ] Verify `USE_MONGODB_AUCTIONEERING=true` in Koyeb
 - [ ] Verify `USE_MONGODB_ATTENDANCE=true` in Koyeb
+- [ ] ✨ **Check startup auto-sync completed successfully** (MongoDB has latest Sheets data)
 - [ ] Check MongoDB health in logs (2ms latency expected)
 - [ ] Verify Discord ID migration completed (100% expected)
+- [ ] Check startup logs for "✅ Step 1/2: MongoDB sync complete!"
 - [ ] Check startup logs for "✅ [MongoDB] Auctioneering using MongoDB-first architecture"
 - [ ] Check startup logs for "✅ [MongoDB] Attendance using MongoDB-first architecture"
 - [ ] Test !mypoints command (should use MongoDB)
