@@ -38,7 +38,10 @@ const DRY_RUN = process.argv.includes('--dry-run');
 const SYNC_MEMBERS = process.argv.includes('--members') || !hasModuleFlag();
 const SYNC_ITEMS = process.argv.includes('--items') || !hasModuleFlag();
 const SYNC_ROTATION = process.argv.includes('--rotation') || !hasModuleFlag();
-const SYNC_ATTENDANCE = process.argv.includes('--attendance') || !hasModuleFlag();
+
+// Allow skipping attendance sync via environment variable (useful during deployment/emergency)
+const SKIP_ATTENDANCE = process.env.SKIP_ATTENDANCE_SYNC === 'true';
+const SYNC_ATTENDANCE = (process.argv.includes('--attendance') || !hasModuleFlag()) && !SKIP_ATTENDANCE;
 
 // Load bot configuration
 let config;
@@ -677,6 +680,9 @@ async function main() {
     // Sync attendance records
     if (SYNC_ATTENDANCE) {
       results.attendance = await syncAttendance(db, sheetAPI);
+      console.log('');
+    } else if (SKIP_ATTENDANCE) {
+      log('⏭️', 'Skipping attendance sync (SKIP_ATTENDANCE_SYNC=true)');
       console.log('');
     }
 
