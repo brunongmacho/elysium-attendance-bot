@@ -1685,8 +1685,9 @@ async function checkAndAutoCloseThreads(client) {
               console.log(`   ✅ [MongoDB] Submitted ${spawnInfo.members.length} attendance records in ${duration}ms`);
 
               // Queue background sync to Sheets (IMMEDIATE priority - attendance close)
+              // Use overwriteAttendance to handle duplicates (safe to run multiple times)
               sheetSync.queueSync({
-                action: 'submitAttendance',
+                action: 'overwriteAttendance',
                 data: {
                   boss: spawnInfo.boss,
                   date: spawnInfo.date,
@@ -1899,8 +1900,9 @@ async function createThreadForBoss(discordClient, bossName, spawnTime, noAutoClo
     timeZone: 'Asia/Manila',
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
     hour12: false
-  }); // HH:MM
+  }); // HH:MM:SS
 
   const fullTimestamp = `${dateStr} ${timeStr}`;
 
