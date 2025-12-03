@@ -109,6 +109,7 @@ const bossRotation = require('./boss-rotation.js'); // Boss Rotation System (5-g
 const activityHeatmap = require('./activity-heatmap.js'); // Activity Heatmap System
 const crashRecovery = require('./utils/crash-recovery.js'); // Crash Recovery System (state persistence)
 const dbAPI = require('./utils/database-api'); // MongoDB Database API
+const mongoHelpers = require('./utils/mongodb-helpers'); // MongoDB helper functions (Phase 4)
 const memberLore = JSON.parse(fs.readFileSync("./member-lore.json")); // Member lore data
 const { COMMAND_ALIASES, resolveCommandAlias } = require('./config/command-aliases'); // Command alias mapping
 
@@ -209,6 +210,13 @@ validateConfig();
  * @type {SheetAPI}
  */
 const sheetAPI = new SheetAPI(config.sheet_webhook_url);
+
+/**
+ * Feature flag: Enable MongoDB for bidding operations (Phase 4)
+ * When true, commands like !mypoints, !stats, !leaderboard use MongoDB instead of Sheets
+ * @type {boolean}
+ */
+const USE_MONGODB_BIDDING = process.env.USE_MONGODB_BIDDING === 'true';
 
 /**
  * Global Discord channel cache instance

@@ -148,8 +148,20 @@ node scripts/sync-sheets-to-mongodb.js --dry-run
 1. Fetches current member points from Google Sheets via `getBiddingPointsSummary()`
 2. For each member:
    - If member exists in MongoDB → **Update** points (preserves Discord ID, attendance, etc.)
-   - If member doesn't exist → **Insert** new member (shouldn't happen after initial migration)
+   - If member doesn't exist → **Insert** new member with temp ID
 3. Updates `lastUpdated` timestamp
+
+**New Member Handling:**
+When a new guild member appears in Google Sheets for the first time:
+1. **First sync:** Created with `_id: "temp_username"` (temporary ID)
+2. **First interaction:** When they use bot commands (e.g., `!mypoints`), automatically migrated to real Discord ID
+3. **Subsequent syncs:** Points updated using real Discord ID (preserved forever)
+
+This gradual migration ensures:
+- ✅ No manual work needed
+- ✅ Members migrate as they interact
+- ✅ No data loss
+- ✅ Discord IDs preserved once migrated
 
 **Data Updated:**
 - `pointsAvailable`

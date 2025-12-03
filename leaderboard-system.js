@@ -45,6 +45,25 @@
 const { EmbedBuilder } = require('discord.js');
 const { SheetAPI } = require('./utils/sheet-api');
 const { addGuildThumbnail } = require('./utils/embed-branding');
+const mongoHelpers = require('./utils/mongodb-helpers'); // Phase 4: MongoDB integration
+
+// ============================================================================
+// FEATURE FLAGS
+// ============================================================================
+
+/**
+ * Feature flag: Enable MongoDB for bidding leaderboard
+ * When true, fetchBiddingLeaderboard uses MongoDB instead of Sheets
+ * @type {boolean}
+ */
+const USE_MONGODB_BIDDING = process.env.USE_MONGODB_BIDDING === 'true';
+
+/**
+ * Feature flag: Enable MongoDB for attendance leaderboard
+ * When true, fetchAttendanceLeaderboard uses MongoDB instead of Sheets
+ * @type {boolean}
+ */
+const USE_MONGODB_ATTENDANCE = process.env.USE_MONGODB_ATTENDANCE === 'true';
 
 // ============================================================================
 // MODULE STATE
@@ -117,6 +136,49 @@ function init(discordClient, botConfig, cache = null, crashRecoveryModule = null
  */
 async function fetchAttendanceLeaderboard() {
   const startTime = Date.now(); // Performance tracking
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // MONGODB-FIRST PATH (Phase 4)
+  // ═════════════════════════════════════════════════════════════════════════
+  if (USE_MONGODB_ATTENDANCE) {
+    try {
+      const members = await mongoHelpers.getAllMembers();
+      const duration = Date.now() - startTime;
+      console.log(`✅ [MongoDB] Fetched attendance leaderboard from ${members.length} members in ${duration}ms`);
+
+      // Calculate total attendance points per member
+      const memberAttendance = members.map(m => ({
+        name: m.username,
+        points: (m.attendance?.total || 0)
+      })).filter(m => m.points > 0); // Only include members with attendance
+
+      // Sort by points (descending)
+      memberAttendance.sort((a, b) => b.points - a.points);
+
+      // Calculate statistics
+      const totalPoints = memberAttendance.reduce((sum, m) => sum + m.points, 0);
+      const averageAttendance = memberAttendance.length > 0
+        ? Math.round(totalPoints / memberAttendance.length)
+        : 0;
+
+      return {
+        status: 'ok',
+        weekName: 'Current Week', // MongoDB doesn't store week names
+        leaderboard: memberAttendance,
+        totalSpawns: 0, // Not calculated from MongoDB yet
+        averageAttendance
+      };
+
+    } catch (error) {
+      console.error(`❌ [MongoDB] Failed to fetch attendance leaderboard:`, error.message);
+      console.log(`⚠️ [MongoDB] Falling back to Google Sheets...`);
+      // Fall through to Sheets logic below
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // GOOGLE SHEETS PATH (Fallback or when MongoDB disabled)
+  // ═════════════════════════════════════════════════════════════════════════
   try {
     const result = await sheetAPI.call('getAttendanceLeaderboard');
     const duration = Date.now() - startTime;
@@ -156,6 +218,53 @@ async function fetchAttendanceLeaderboard() {
  */
 async function fetchBiddingLeaderboard() {
   const startTime = Date.now(); // Performance tracking
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // MONGODB-FIRST PATH (Phase 4)
+  // ═════════════════════════════════════════════════════════════════════════
+  if (USE_MONGODB_BIDDING) {
+    try {
+      const members = await mongoHelpers.getAllMembers();
+      const duration = Date.now() - startTime;
+      console.log(`✅ [MongoDB] Fetched bidding leaderboard from ${members.length} members in ${duration}ms`);
+
+      // Sort by pointsAvailable (descending)
+      const sortedMembers = members
+        .filter(m => m.username) // Only include members with usernames
+        .sort((a, b) => (b.pointsAvailable || 0) - (a.pointsAvailable || 0));
+
+      // Calculate totals
+      const totalPointsDistributed = members.reduce((sum, m) =>
+        sum + (m.pointsAvailable || 0) + (m.pointsSpent || 0), 0
+      );
+      const totalPointsConsumed = members.reduce((sum, m) =>
+        sum + (m.pointsSpent || 0), 0
+      );
+
+      // Format leaderboard array
+      const leaderboard = sortedMembers.map(m => ({
+        name: m.username,
+        pointsLeft: m.pointsAvailable || 0,
+        pointsConsumed: m.pointsSpent || 0
+      }));
+
+      return {
+        status: 'ok',
+        leaderboard,
+        totalPointsDistributed,
+        totalPointsConsumed
+      };
+
+    } catch (error) {
+      console.error(`❌ [MongoDB] Failed to fetch bidding leaderboard:`, error.message);
+      console.log(`⚠️ [MongoDB] Falling back to Google Sheets...`);
+      // Fall through to Sheets logic below
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // GOOGLE SHEETS PATH (Fallback or when MongoDB disabled)
+  // ═════════════════════════════════════════════════════════════════════════
   try {
     const result = await sheetAPI.call('getBiddingLeaderboard');
     const duration = Date.now() - startTime;
