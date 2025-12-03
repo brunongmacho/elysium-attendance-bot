@@ -275,17 +275,18 @@ async function syncAuctionItems(db, sheetAPI) {
   try {
     // Fetch latest data from Google Sheets
     log('📥', 'Fetching auction items from Google Sheets...');
-    const itemsData = await sheetAPI.call('getBiddingItems');
+    const response = await sheetAPI.call('getBiddingItems');
 
-    // Validate response is an array
-    if (!itemsData) {
-      log('⚠️', 'No response from Google Sheets (null/undefined)');
+    // Validate response structure
+    if (!response || response.status !== 'ok') {
+      log('⚠️', `Invalid response from Google Sheets: ${JSON.stringify(response).substring(0, 200)}`);
       return { synced: 0, skipped: 0 };
     }
 
+    const itemsData = response.items || [];
+
     if (!Array.isArray(itemsData)) {
-      log('⚠️', `Invalid response from Google Sheets (expected array, got ${typeof itemsData})`);
-      log('⚠️', `Response: ${JSON.stringify(itemsData).substring(0, 200)}`);
+      log('⚠️', `Invalid items data (expected array, got ${typeof itemsData})`);
       return { synced: 0, skipped: 0 };
     }
 
