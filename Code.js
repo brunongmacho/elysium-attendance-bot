@@ -321,13 +321,26 @@ function getAllSpawnColumns(data) {
 }
 
 /**
+ * Clear attendance cache (for debugging/testing)
+ * Run this manually to force fresh data fetch
+ */
+function clearAttendanceCache() {
+  const cache = CacheService.getDocumentCache();
+  cache.remove('weeklyAttendance_v1');
+  cache.remove('weeklyAttendance_v2');
+  Logger.log('✅ Attendance cache cleared!');
+  return ContentService.createTextOutput(JSON.stringify({ status: 'ok', message: 'Cache cleared' }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
  * Get all spawn columns from ALL weekly attendance sheets
  * Used for spawn prediction - analyzes historical patterns across all weeks
  */
 function getAllWeeklyAttendance(data) {
   try {
     const cache = CacheService.getDocumentCache();
-    const cacheKey = 'weeklyAttendance_v1';
+    const cacheKey = 'weeklyAttendance_v2'; // Changed to v2 to invalidate old cache
 
     // Check if force refresh requested
     const forceFresh = data && data.forceFresh === true;
@@ -408,13 +421,37 @@ function getAllWeeklyAttendance(data) {
 
         spawnColumnCount++;
 
+        // DEBUG: Log first spawn column details to see actual data format
+        if (spawnColumnCount === 1) {
+          Logger.log(`🔍 DEBUG First spawn column (col ${col + 1}): timestamp="${timestamp}", boss="${bossName}"`);
+          Logger.log(`🔍 DEBUG First data row (row 3) - ALL columns (first 10):`);
+          const firstRow = memberRows[0] || [];
+          for (let debugCol = 0; debugCol < Math.min(10, firstRow.length); debugCol++) {
+            const val = firstRow[debugCol];
+            Logger.log(`   Column ${debugCol + 1} (${String.fromCharCode(65 + debugCol)}): "${val}" (type: ${typeof val})`);
+          }
+          Logger.log(`🔍 DEBUG Sample member rows (using COLUMNS.USERNAME = ${COLUMNS.USERNAME}):`);
+          for (let debugRow = 0; debugRow < Math.min(3, memberRows.length); debugRow++) {
+            const debugMember = (memberRows[debugRow][COLUMNS.USERNAME - 1] || '').toString().trim();
+            const debugCheckmark = memberRows[debugRow][col];
+            Logger.log(`   Row ${debugRow + 3}: memberName="${debugMember}", checkmarkValue=${JSON.stringify(debugCheckmark)} (type: ${typeof debugCheckmark})`);
+          }
+        }
+
         // Extract members who attended this spawn
         for (let row = 0; row < memberRows.length; row++) {
           const memberName = (memberRows[row][COLUMNS.USERNAME - 1] || '').toString().trim();
-          const checkmark = (memberRows[row][col] || '').toString().trim();
+          const checkmarkValue = memberRows[row][col];
 
-          // If member has a checkmark (✓, ✔, ☑, or any non-empty value)
-          if (memberName && checkmark) {
+          // Handle different checkmark formats:
+          // - Boolean TRUE (Google Sheets checkbox)
+          // - Text checkmarks (✓, ✔, ☑, TRUE, etc.)
+          // - Any non-empty value
+          const hasCheckmark = checkmarkValue === true ||
+                              (checkmarkValue && checkmarkValue.toString().trim() !== '' && checkmarkValue.toString().trim().toLowerCase() !== 'false');
+
+          // If member has a checkmark
+          if (memberName && hasCheckmark) {
             allAttendanceRecords.push({
               memberName: memberName,
               bossName: bossName,
