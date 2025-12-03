@@ -92,6 +92,9 @@ function formatSummary(results) {
 
   if (results.members) {
     lines.push(`👥 Members: ${results.members.synced} synced, ${results.members.skipped} skipped`);
+    if (results.members.deactivated > 0) {
+      lines.push(`⚠️ Inactive: ${results.members.deactivated} members (removed from Sheets)`);
+    }
   }
 
   if (results.items) {
@@ -125,8 +128,20 @@ async function syncMembers(db, sheetAPI) {
     log('📥', 'Fetching members from Google Sheets...');
     const membersData = await sheetAPI.call('getBiddingPointsSummary');
 
-    if (!membersData || membersData.length === 0) {
-      log('⚠️', 'No members found in Google Sheets');
+    // Validate response is an array
+    if (!membersData) {
+      log('⚠️', 'No response from Google Sheets (null/undefined)');
+      return { synced: 0, skipped: 0 };
+    }
+
+    if (!Array.isArray(membersData)) {
+      log('⚠️', `Invalid response from Google Sheets (expected array, got ${typeof membersData})`);
+      log('⚠️', `Response: ${JSON.stringify(membersData).substring(0, 200)}`);
+      return { synced: 0, skipped: 0 };
+    }
+
+    if (membersData.length === 0) {
+      log('⚠️', 'No members found in Google Sheets (empty array)');
       return { synced: 0, skipped: 0 };
     }
 
@@ -134,29 +149,51 @@ async function syncMembers(db, sheetAPI) {
 
     if (DRY_RUN) {
       log('🔍', '[DRY RUN] Would sync members:');
+      // Filter out invalid members for preview
+      const validMembers = membersData.filter(m => m && m.username && m.username.trim() !== '');
       const preview = formatPreview(
-        membersData,
-        m => `   - ${m.username}: ${m.pointsAvailable} pts`,
+        validMembers,
+        m => `   - ${m.username}: ${m.pointsAvailable || 0} pts`,
         'members'
       );
       console.log(preview);
-      return { synced: membersData.length, skipped: 0 };
+      const skipped = membersData.length - validMembers.length;
+      if (skipped > 0) {
+        log('⚠️', `Would skip ${skipped} members with invalid/missing usernames`);
+      }
+      return { synced: validMembers.length, skipped };
     }
 
     // Update MongoDB
     const membersCollection = db.collection('members');
     let synced = 0;
     let skipped = 0;
+    let deactivated = 0;
 
+    // Step 1: Mark all existing members as inactive
+    log('🔄', 'Marking existing members as inactive...');
+    await membersCollection.updateMany(
+      {},
+      { $set: { isActive: false } }
+    );
+
+    // Step 2: Update/create members from Sheets (marking as active)
     for (const memberData of membersData) {
       try {
+        // Skip if username is missing or invalid
+        if (!memberData || !memberData.username || memberData.username.trim() === '') {
+          log('⚠️', `Skipping member with invalid/missing username: ${JSON.stringify(memberData)}`);
+          skipped++;
+          continue;
+        }
+
         // Find member by username (will be Discord ID after migration)
         const existingMember = await membersCollection.findOne({
           username: memberData.username
         });
 
         if (existingMember) {
-          // Update existing member's points
+          // Update existing member's points and mark as active
           await membersCollection.updateOne(
             { _id: existingMember._id },
             {
@@ -165,6 +202,7 @@ async function syncMembers(db, sheetAPI) {
                 pointsEarned: memberData.pointsEarned || 0,
                 pointsSpent: memberData.pointsSpent || 0,
                 username: memberData.username,
+                isActive: true,  // Re-activate member
                 lastUpdated: new Date()
               }
             }
@@ -178,6 +216,7 @@ async function syncMembers(db, sheetAPI) {
             pointsAvailable: memberData.pointsAvailable || 0,
             pointsEarned: memberData.pointsEarned || 0,
             pointsSpent: memberData.pointsSpent || 0,
+            isActive: true,  // New members are active
             attendance: {
               total: 0,
               thisWeek: 0,
@@ -191,13 +230,21 @@ async function syncMembers(db, sheetAPI) {
           synced++;
         }
       } catch (error) {
-        log('⚠️', `Failed to sync ${memberData.username}: ${error.message}`);
+        const username = memberData?.username || 'unknown';
+        log('⚠️', `Failed to sync ${username}: ${error.message}`);
         skipped++;
       }
     }
 
+    // Step 3: Count deactivated members (not in current Sheets)
+    const inactiveCount = await membersCollection.countDocuments({ isActive: false });
+
     log('✅', `Members synced: ${synced}, skipped: ${skipped}`);
-    return { synced, skipped };
+    if (inactiveCount > 0) {
+      log('ℹ️', `Inactive members (removed from Sheets): ${inactiveCount}`);
+    }
+
+    return { synced, skipped, deactivated: inactiveCount };
 
   } catch (error) {
     log('❌', `Member sync failed: ${error.message}`);
@@ -217,8 +264,20 @@ async function syncAuctionItems(db, sheetAPI) {
     log('📥', 'Fetching auction items from Google Sheets...');
     const itemsData = await sheetAPI.call('getBiddingItems');
 
-    if (!itemsData || itemsData.length === 0) {
-      log('⚠️', 'No auction items found in Google Sheets');
+    // Validate response is an array
+    if (!itemsData) {
+      log('⚠️', 'No response from Google Sheets (null/undefined)');
+      return { synced: 0, skipped: 0 };
+    }
+
+    if (!Array.isArray(itemsData)) {
+      log('⚠️', `Invalid response from Google Sheets (expected array, got ${typeof itemsData})`);
+      log('⚠️', `Response: ${JSON.stringify(itemsData).substring(0, 200)}`);
+      return { synced: 0, skipped: 0 };
+    }
+
+    if (itemsData.length === 0) {
+      log('⚠️', 'No auction items found in Google Sheets (empty array)');
       return { synced: 0, skipped: 0 };
     }
 

@@ -146,8 +146,11 @@ async function fetchAttendanceLeaderboard() {
       const duration = Date.now() - startTime;
       console.log(`✅ [MongoDB] Fetched attendance leaderboard from ${members.length} members in ${duration}ms`);
 
+      // Filter active members only (exclude removed/inactive members)
+      const activeMembers = members.filter(m => m.isActive !== false);
+
       // Calculate total attendance points per member
-      const memberAttendance = members.map(m => ({
+      const memberAttendance = activeMembers.map(m => ({
         name: m.username,
         points: (m.attendance?.total || 0)
       })).filter(m => m.points > 0); // Only include members with attendance
@@ -228,16 +231,19 @@ async function fetchBiddingLeaderboard() {
       const duration = Date.now() - startTime;
       console.log(`✅ [MongoDB] Fetched bidding leaderboard from ${members.length} members in ${duration}ms`);
 
+      // Filter active members only (exclude removed/inactive members)
+      const activeMembers = members.filter(m => m.isActive !== false);
+
       // Sort by pointsAvailable (descending)
-      const sortedMembers = members
+      const sortedMembers = activeMembers
         .filter(m => m.username) // Only include members with usernames
         .sort((a, b) => (b.pointsAvailable || 0) - (a.pointsAvailable || 0));
 
-      // Calculate totals
-      const totalPointsDistributed = members.reduce((sum, m) =>
+      // Calculate totals (from active members only)
+      const totalPointsDistributed = activeMembers.reduce((sum, m) =>
         sum + (m.pointsAvailable || 0) + (m.pointsSpent || 0), 0
       );
-      const totalPointsConsumed = members.reduce((sum, m) =>
+      const totalPointsConsumed = activeMembers.reduce((sum, m) =>
         sum + (m.pointsSpent || 0), 0
       );
 
