@@ -448,6 +448,8 @@ async function syncBossRotation(db, sheetAPI) {
  * Sync attendance records from Sheets → MongoDB (non-duplicating)
  * Uses unique key (memberName + bossName + timestamp) to prevent duplicates
  * Safe to run multiple times - only inserts new records
+ *
+ * OPTIMIZED VERSION: Uses batching and bulk operations to handle large datasets (14k+ records)
  */
 async function syncAttendance(db, sheetAPI) {
   log('🔄', 'Syncing attendance records...');
@@ -483,91 +485,143 @@ async function syncAttendance(db, sheetAPI) {
       return { synced: attendanceRecords.length, skipped: 0 };
     }
 
-    // Update MongoDB (upsert to avoid duplicates)
     const attendanceCollection = db.collection('attendance');
     const membersCollection = db.collection('members');
-    let synced = 0;
-    let skipped = 0;
 
-    log('💾', 'Upserting attendance records (skip if already exists)...');
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STEP 1: Pre-fetch all members and build username → member map (1 query)
+    // ═══════════════════════════════════════════════════════════════════════════
+    log('📥', 'Pre-fetching all members...');
+    const allMembers = await membersCollection.find({}).toArray();
+    const memberMap = new Map();
+    for (const member of allMembers) {
+      memberMap.set(member.username.toLowerCase(), member);
+    }
+    log('✅', `Loaded ${allMembers.length} members into memory`);
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STEP 2: Identify missing members and batch create them
+    // ═══════════════════════════════════════════════════════════════════════════
+    const missingMembers = new Set();
     for (const record of attendanceRecords) {
-      try {
-        // Find member by username (case-insensitive)
-        const member = await membersCollection.findOne({
-          username: { $regex: new RegExp(`^${record.memberName}$`, 'i') }
-        });
+      if (!memberMap.has(record.memberName.toLowerCase())) {
+        missingMembers.add(record.memberName);
+      }
+    }
 
+    if (missingMembers.size > 0) {
+      log('➕', `Creating ${missingMembers.size} missing members...`);
+      const newMemberDocs = Array.from(missingMembers).map(username => ({
+        _id: `temp_${username.toLowerCase().replace(/\s+/g, '_')}`,
+        username: username,
+        pointsAvailable: 0,
+        pointsEarned: 0,
+        pointsSpent: 0,
+        isActive: true,
+        attendance: {
+          total: 0,
+          thisWeek: 0,
+          thisMonth: 0,
+          byBoss: {},
+          streak: { current: 0, longest: 0 }
+        },
+        joinedAt: new Date(),
+        lastUpdated: new Date()
+      }));
+
+      try {
+        await membersCollection.insertMany(newMemberDocs, { ordered: false });
+        log('✅', `Created ${missingMembers.size} new members`);
+
+        // Update member map with new members
+        for (const newMember of newMemberDocs) {
+          memberMap.set(newMember.username.toLowerCase(), newMember);
+        }
+      } catch (error) {
+        // Some members may have been created by concurrent processes, ignore duplicates
+        if (error.code !== 11000) { // Not a duplicate key error
+          log('⚠️', `Warning: Some members may not have been created: ${error.message}`);
+        }
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STEP 3: Batch upsert attendance records (500 at a time)
+    // ═══════════════════════════════════════════════════════════════════════════
+    const BATCH_SIZE = 500;
+    const totalBatches = Math.ceil(attendanceRecords.length / BATCH_SIZE);
+    let totalSynced = 0;
+    let totalSkipped = 0;
+
+    log('💾', `Upserting attendance in ${totalBatches} batches of ${BATCH_SIZE}...`);
+
+    for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+      const start = batchNum * BATCH_SIZE;
+      const end = Math.min(start + BATCH_SIZE, attendanceRecords.length);
+      const batch = attendanceRecords.slice(start, end);
+
+      // Build bulk operations for this batch
+      const bulkOps = batch.map(record => {
+        const member = memberMap.get(record.memberName.toLowerCase());
         if (!member) {
-          // Create member with temp ID if not found
-          const tempId = `temp_${record.memberName.toLowerCase().replace(/\s+/g, '_')}`;
-          await membersCollection.insertOne({
-            _id: tempId,
-            username: record.memberName,
-            pointsAvailable: 0,
-            pointsEarned: 0,
-            pointsSpent: 0,
-            isActive: true,
-            attendance: {
-              total: 0,
-              thisWeek: 0,
-              thisMonth: 0,
-              byBoss: {},
-              streak: { current: 0, longest: 0 }
-            },
-            joinedAt: new Date(),
-            lastUpdated: new Date()
-          });
-          log('➕', `Created member ${record.memberName} with temp ID`);
+          log('⚠️', `Member not found in map: ${record.memberName}`);
+          return null;
         }
 
-        // Re-fetch member after potential creation
-        const finalMember = await membersCollection.findOne({
-          username: { $regex: new RegExp(`^${record.memberName}$`, 'i') }
-        });
-
-        // Create unique key to prevent duplicates
         const timestamp = new Date(record.timestamp || record.date);
         const uniqueKey = {
-          memberId: finalMember._id,
+          memberId: member._id,
           memberName: record.memberName,
           bossName: record.bossName,
           timestamp: timestamp
         };
 
-        // Upsert (insert only if doesn't exist)
-        const result = await attendanceCollection.updateOne(
-          uniqueKey, // Match by unique key
-          {
-            $setOnInsert: {
-              memberId: finalMember._id,
-              memberName: record.memberName,
-              bossName: record.bossName,
-              bossPoints: record.points || 1,
-              timestamp: timestamp,
-              weekStartDate: record.weekStartDate ? new Date(record.weekStartDate) : null,
-              weekLabel: record.weekLabel || 'Unknown',
-              verified: true,
-              syncedFromSheet: true,
-              syncedAt: new Date()
-            }
-          },
-          { upsert: true } // Insert only if not exists
-        );
+        return {
+          updateOne: {
+            filter: uniqueKey,
+            update: {
+              $setOnInsert: {
+                memberId: member._id,
+                memberName: record.memberName,
+                bossName: record.bossName,
+                bossPoints: record.points || 1,
+                timestamp: timestamp,
+                weekStartDate: record.weekStartDate ? new Date(record.weekStartDate) : null,
+                weekLabel: record.weekLabel || 'Unknown',
+                verified: true,
+                syncedFromSheet: true,
+                syncedAt: new Date()
+              }
+            },
+            upsert: true
+          }
+        };
+      }).filter(op => op !== null);
 
-        if (result.upsertedCount > 0) {
-          synced++; // New record inserted
-        } else {
-          skipped++; // Already exists, skipped
+      if (bulkOps.length === 0) {
+        continue;
+      }
+
+      try {
+        const result = await attendanceCollection.bulkWrite(bulkOps, { ordered: false });
+        const synced = result.upsertedCount || 0;
+        const skipped = bulkOps.length - synced;
+
+        totalSynced += synced;
+        totalSkipped += skipped;
+
+        // Progress logging every 5 batches
+        if ((batchNum + 1) % 5 === 0 || batchNum === totalBatches - 1) {
+          const progress = Math.round(((batchNum + 1) / totalBatches) * 100);
+          log('⏳', `Progress: ${progress}% (${batchNum + 1}/${totalBatches} batches) - ${totalSynced} new, ${totalSkipped} existing`);
         }
       } catch (error) {
-        log('⚠️', `Failed to sync attendance for ${record.memberName}: ${error.message}`);
-        skipped++;
+        log('⚠️', `Batch ${batchNum + 1} failed: ${error.message}`);
       }
     }
 
-    log('✅', `Attendance synced: ${synced} new records, ${skipped} already existed`);
-    return { synced, skipped };
+    log('✅', `Attendance synced: ${totalSynced} new records, ${totalSkipped} already existed`);
+    return { synced: totalSynced, skipped: totalSkipped };
 
   } catch (error) {
     log('❌', `Attendance sync failed: ${error.message}`);
