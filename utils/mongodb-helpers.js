@@ -441,6 +441,76 @@ async function updateAttendanceStats(identifier, attendanceData) {
   return await getMemberByDiscordId(member._id);
 }
 
+/**
+ * Add attendance (high-level wrapper for attendance.js)
+ * This is the main function called when attendance is submitted.
+ * It creates the attendance record AND updates the member's stats/points.
+ *
+ * @param {Object} data - Attendance data
+ * @param {string} data.username - Member username
+ * @param {string} data.boss - Boss name
+ * @param {string} data.timestamp - Timestamp string
+ * @param {string} data.date - Date string (MM/DD/YY)
+ * @param {string} data.time - Time string (HH:MM)
+ * @param {number} data.points - Points to award
+ * @param {string} data.threadId - Discord thread ID (optional)
+ * @returns {Promise<Object>} - Updated member
+ */
+async function addAttendance(data) {
+  const db = await dbAPI.connect();
+
+  // Step 1: Find or create member by username
+  let member = await getMemberByUsername(data.username);
+
+  if (!member) {
+    // Member doesn't exist - create with temp ID
+    console.log(`➕ [MongoDB] Creating new member: ${data.username}`);
+    const tempId = `temp_${data.username.toLowerCase().replace(/\s+/g, '_')}`;
+
+    await db.collection('members').insertOne({
+      _id: tempId,
+      username: data.username,
+      pointsAvailable: 0,
+      pointsEarned: 0,
+      pointsSpent: 0,
+      isActive: true,
+      attendance: {
+        total: 0,
+        thisWeek: 0,
+        thisMonth: 0,
+        byBoss: {},
+        streak: { current: 0, longest: 0 }
+      },
+      joinedAt: new Date(),
+      lastUpdated: new Date()
+    });
+
+    member = await getMemberByUsername(data.username);
+  }
+
+  // Step 2: Add attendance record
+  await addAttendanceRecord({
+    memberId: member._id,
+    memberName: data.username,
+    bossName: data.boss,
+    bossPoints: data.points || 0,
+    timestamp: new Date(data.timestamp),
+    weekStartDate: getWeekStart(),
+    weekLabel: getWeekLabel(),
+    verified: true,
+    threadId: data.threadId || null
+  });
+
+  // Step 3: Update member stats and increment points
+  const updatedMember = await updateAttendanceStats(member._id, {
+    bossName: data.boss,
+    bossPoints: data.points || 0
+  });
+
+  console.log(`✅ [MongoDB] Added attendance for ${data.username}: ${data.boss} (+${data.points} pts)`);
+  return updatedMember;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // BOT STATE OPERATIONS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -567,7 +637,8 @@ module.exports = {
   getSoldItems,
 
   // Attendance operations
-  addAttendanceRecord,
+  addAttendance,           // High-level wrapper (creates record + updates stats)
+  addAttendanceRecord,     // Low-level: just creates record
   getMemberAttendance,
   updateAttendanceStats,
 
