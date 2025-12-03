@@ -126,8 +126,9 @@ const attendance = require("./attendance");
 const mongoHelpers = require('./utils/mongodb-helpers');
 const sheetSync = require('./services/sheet-sync');
 
-// Feature flag: Enable MongoDB for auctioneering operations
+// Feature flags: Enable MongoDB for operations
 const USE_MONGODB_AUCTIONEERING = process.env.USE_MONGODB_AUCTIONEERING === 'true';
+const USE_MONGODB_BIDDING = process.env.USE_MONGODB_BIDDING === 'true';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SECTION 1: MODULE STATE & INITIALIZATION
@@ -2827,19 +2828,56 @@ async function handleMyPoints(message, biddingModule, config) {
   const u = (message.member?.nickname || message.author?.username || 'Unknown User');
 
   let freshPts = {};
-  try {
-    const data = await sheetAPI.call('getBiddingPoints');
-    freshPts = data.points || {};
-  } catch (err) {
-    console.error(`❌ Failed to fetch points for !mypoints:`, err.message);
+  let userPts = null;
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // MONGODB-FIRST PATH (Phase 4)
+  // ═════════════════════════════════════════════════════════════════════════
+  if (USE_MONGODB_BIDDING) {
+    try {
+      const startTime = Date.now();
+      const members = await mongoHelpers.getAllMembers();
+      const duration = Date.now() - startTime;
+      console.log(`${EMOJI.SUCCESS} [MongoDB] Fetched ${members.length} members for !mypoints in ${duration}ms`);
+
+      // Find user by username (case-insensitive)
+      const member = members.find(m =>
+        m.username.toLowerCase() === u.toLowerCase()
+      );
+
+      if (member) {
+        userPts = member.pointsAvailable || 0;
+      } else {
+        // User not found
+        userPts = null;
+      }
+
+    } catch (error) {
+      console.error(`${EMOJI.ERROR} [MongoDB] Failed to fetch points for !mypoints:`, error.message);
+      console.log(`${EMOJI.WARNING} [MongoDB] Falling back to Google Sheets...`);
+      // Fall through to Sheets logic below
+    }
   }
 
-  // Use PointsCache for efficient O(1) lookup
-  const ptsCache = new PointsCache(freshPts);
-  let userPts = ptsCache.getPoints(u);
-  if (userPts === 0 && !ptsCache.hasUser(u)) {
-    // User not found in system
-    userPts = null;
+  // ═════════════════════════════════════════════════════════════════════════
+  // GOOGLE SHEETS PATH (Fallback or when MongoDB disabled)
+  // ═════════════════════════════════════════════════════════════════════════
+  if (!USE_MONGODB_BIDDING || userPts === undefined) {
+    try {
+      const data = await sheetAPI.call('getBiddingPoints');
+      freshPts = data.points || {};
+
+      // Use PointsCache for efficient O(1) lookup
+      const ptsCache = new PointsCache(freshPts);
+      userPts = ptsCache.getPoints(u);
+      if (userPts === 0 && !ptsCache.hasUser(u)) {
+        // User not found in system
+        userPts = null;
+      }
+    } catch (err) {
+      console.error(`❌ Failed to fetch points for !mypoints:`, err.message);
+      userPts = null;
+    }
   }
 
   let ptsMsg;
