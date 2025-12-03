@@ -12,11 +12,12 @@
  * - ✅ Phase 4.4: Attendance records - USE_MONGODB_ATTENDANCE (historical import)
  *
  * Usage:
- *   node scripts/sync-sheets-to-mongodb.js              # Sync all modules
- *   node scripts/sync-sheets-to-mongodb.js --members    # Sync members only
- *   node scripts/sync-sheets-to-mongodb.js --items      # Sync auction items only
- *   node scripts/sync-sheets-to-mongodb.js --rotation   # Sync boss rotation only
- *   node scripts/sync-sheets-to-mongodb.js --dry-run    # Test without writing
+ *   node scripts/sync-sheets-to-mongodb.js                # Sync all modules
+ *   node scripts/sync-sheets-to-mongodb.js --members      # Sync members only
+ *   node scripts/sync-sheets-to-mongodb.js --items        # Sync auction items only
+ *   node scripts/sync-sheets-to-mongodb.js --rotation     # Sync boss rotation only
+ *   node scripts/sync-sheets-to-mongodb.js --attendance   # Sync attendance only
+ *   node scripts/sync-sheets-to-mongodb.js --dry-run      # Test without writing
  *
  * Note: Output is Discord-safe (stays under 2000 char limit) by limiting
  *       preview to first 5 items and using compact summary formatting.
@@ -37,6 +38,7 @@ const DRY_RUN = process.argv.includes('--dry-run');
 const SYNC_MEMBERS = process.argv.includes('--members') || !hasModuleFlag();
 const SYNC_ITEMS = process.argv.includes('--items') || !hasModuleFlag();
 const SYNC_ROTATION = process.argv.includes('--rotation') || !hasModuleFlag();
+const SYNC_ATTENDANCE = process.argv.includes('--attendance') || !hasModuleFlag();
 
 // Load bot configuration
 let config;
@@ -57,7 +59,8 @@ const MAX_PREVIEW_ITEMS = 5; // Limit preview to avoid Discord 2000 char limit
 function hasModuleFlag() {
   return process.argv.includes('--members') ||
          process.argv.includes('--items') ||
-         process.argv.includes('--rotation');
+         process.argv.includes('--rotation') ||
+         process.argv.includes('--attendance');
 }
 
 function log(emoji, message) {
@@ -110,6 +113,10 @@ function formatSummary(results) {
 
   if (results.rotation) {
     lines.push(`🔄 Boss Rotation: ${results.rotation.synced} bosses synced`);
+  }
+
+  if (results.attendance) {
+    lines.push(`📅 Attendance: ${results.attendance.synced} new records, ${results.attendance.skipped} already existed`);
   }
 
   lines.push('');
@@ -437,6 +444,137 @@ async function syncBossRotation(db, sheetAPI) {
   }
 }
 
+/**
+ * Sync attendance records from Sheets → MongoDB (non-duplicating)
+ * Uses unique key (memberName + bossName + timestamp) to prevent duplicates
+ * Safe to run multiple times - only inserts new records
+ */
+async function syncAttendance(db, sheetAPI) {
+  log('🔄', 'Syncing attendance records...');
+
+  try {
+    // Fetch all attendance from Google Sheets
+    log('📥', 'Fetching attendance from Google Sheets...');
+    const response = await sheetAPI.call('getAllWeeklyAttendance');
+
+    // Validate response structure
+    if (!response || !Array.isArray(response)) {
+      log('⚠️', `Invalid response from Google Sheets: ${JSON.stringify(response).substring(0, 200)}`);
+      return { synced: 0, skipped: 0 };
+    }
+
+    const attendanceRecords = response;
+
+    if (attendanceRecords.length === 0) {
+      log('⚠️', 'No attendance records found in Google Sheets (empty array)');
+      return { synced: 0, skipped: 0 };
+    }
+
+    log('✅', `Found ${attendanceRecords.length} attendance records in Google Sheets`);
+
+    if (DRY_RUN) {
+      log('🔍', '[DRY RUN] Would sync attendance records:');
+      const preview = formatPreview(
+        attendanceRecords,
+        record => `   - ${record.memberName}: ${record.bossName} on ${new Date(record.timestamp || record.date).toLocaleDateString()}`,
+        'records'
+      );
+      console.log(preview);
+      return { synced: attendanceRecords.length, skipped: 0 };
+    }
+
+    // Update MongoDB (upsert to avoid duplicates)
+    const attendanceCollection = db.collection('attendance');
+    const membersCollection = db.collection('members');
+    let synced = 0;
+    let skipped = 0;
+
+    log('💾', 'Upserting attendance records (skip if already exists)...');
+
+    for (const record of attendanceRecords) {
+      try {
+        // Find member by username (case-insensitive)
+        const member = await membersCollection.findOne({
+          username: { $regex: new RegExp(`^${record.memberName}$`, 'i') }
+        });
+
+        if (!member) {
+          // Create member with temp ID if not found
+          const tempId = `temp_${record.memberName.toLowerCase().replace(/\s+/g, '_')}`;
+          await membersCollection.insertOne({
+            _id: tempId,
+            username: record.memberName,
+            pointsAvailable: 0,
+            pointsEarned: 0,
+            pointsSpent: 0,
+            isActive: true,
+            attendance: {
+              total: 0,
+              thisWeek: 0,
+              thisMonth: 0,
+              byBoss: {},
+              streak: { current: 0, longest: 0 }
+            },
+            joinedAt: new Date(),
+            lastUpdated: new Date()
+          });
+          log('➕', `Created member ${record.memberName} with temp ID`);
+        }
+
+        // Re-fetch member after potential creation
+        const finalMember = await membersCollection.findOne({
+          username: { $regex: new RegExp(`^${record.memberName}$`, 'i') }
+        });
+
+        // Create unique key to prevent duplicates
+        const timestamp = new Date(record.timestamp || record.date);
+        const uniqueKey = {
+          memberId: finalMember._id,
+          memberName: record.memberName,
+          bossName: record.bossName,
+          timestamp: timestamp
+        };
+
+        // Upsert (insert only if doesn't exist)
+        const result = await attendanceCollection.updateOne(
+          uniqueKey, // Match by unique key
+          {
+            $setOnInsert: {
+              memberId: finalMember._id,
+              memberName: record.memberName,
+              bossName: record.bossName,
+              bossPoints: record.points || 1,
+              timestamp: timestamp,
+              weekStartDate: record.weekStartDate ? new Date(record.weekStartDate) : null,
+              weekLabel: record.weekLabel || 'Unknown',
+              verified: true,
+              syncedFromSheet: true,
+              syncedAt: new Date()
+            }
+          },
+          { upsert: true } // Insert only if not exists
+        );
+
+        if (result.upsertedCount > 0) {
+          synced++; // New record inserted
+        } else {
+          skipped++; // Already exists, skipped
+        }
+      } catch (error) {
+        log('⚠️', `Failed to sync attendance for ${record.memberName}: ${error.message}`);
+        skipped++;
+      }
+    }
+
+    log('✅', `Attendance synced: ${synced} new records, ${skipped} already existed`);
+    return { synced, skipped };
+
+  } catch (error) {
+    log('❌', `Attendance sync failed: ${error.message}`);
+    throw error;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN EXECUTION
 // ═══════════════════════════════════════════════════════════════════════════
@@ -479,6 +617,12 @@ async function main() {
     // Sync boss rotation
     if (SYNC_ROTATION) {
       results.rotation = await syncBossRotation(db, sheetAPI);
+      console.log('');
+    }
+
+    // Sync attendance records
+    if (SYNC_ATTENDANCE) {
+      results.attendance = await syncAttendance(db, sheetAPI);
       console.log('');
     }
 

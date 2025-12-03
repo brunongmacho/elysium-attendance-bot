@@ -34,6 +34,7 @@ const { EmbedBuilder } = require('discord.js');
 const { SheetAPI } = require('./utils/sheet-api');
 const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images');
 const { addGuildFooter } = require('./utils/embed-branding');
+const dbAPI = require('./utils/database-api');
 
 // ============================================================================
 // MODULE STATE
@@ -233,6 +234,40 @@ async function refreshRotationCache() {
 }
 
 /**
+ * Sync rotation data to MongoDB (called after Sheet updates)
+ * @param {string} bossName - Name of the boss
+ * @param {Object} rotationData - Rotation data from Sheet API response
+ */
+async function syncRotationToMongoDB(bossName, rotationData) {
+  try {
+    const db = await dbAPI.connect();
+    const rotationCollection = db.collection('bossRotation');
+
+    const doc = {
+      _id: bossName.toLowerCase().replace(/\s+/g, '_'),
+      bossName: bossName,
+      currentIndex: rotationData.newIndex || rotationData.currentIndex || 1,
+      currentGuild: rotationData.newGuild || rotationData.currentGuild || 'Unknown',
+      isOurTurn: rotationData.isNowOurTurn !== undefined ? rotationData.isNowOurTurn : (rotationData.isOurTurn || false),
+      guilds: rotationData.guilds || [],
+      nextGuild: rotationData.nextGuild || 'Unknown',
+      lastUpdated: new Date()
+    };
+
+    await rotationCollection.updateOne(
+      { _id: doc._id },
+      { $set: doc },
+      { upsert: true }
+    );
+
+    console.log(`✅ [MongoDB] Synced ${bossName} rotation to MongoDB: Index ${doc.currentIndex} (${doc.currentGuild})`);
+  } catch (error) {
+    console.error(`⚠️ [MongoDB] Failed to sync ${bossName} rotation to MongoDB:`, error.message);
+    // Non-critical - don't throw, just log
+  }
+}
+
+/**
  * Increment rotation counter for a boss (called after boss is killed)
  * @param {string} bossName - Name of the boss that was killed
  * @returns {Promise<Object>} Updated rotation data
@@ -262,6 +297,11 @@ async function incrementRotation(bossName) {
         currentGuild: result.newGuild,
         isOurTurn: result.isNowOurTurn
       };
+
+      // Sync to MongoDB (non-blocking)
+      syncRotationToMongoDB(normalizedName, result).catch(err =>
+        console.error(`⚠️ Background MongoDB sync failed:`, err.message)
+      );
 
       // Send admin notification
       await sendRotationUpdateNotification(result);
@@ -311,6 +351,11 @@ async function setRotation(bossName, newIndex) {
         currentGuild: result.currentGuild,
         isOurTurn: result.isOurTurn
       };
+
+      // Sync to MongoDB (non-blocking)
+      syncRotationToMongoDB(normalizedName, result).catch(err =>
+        console.error(`⚠️ Background MongoDB sync failed:`, err.message)
+      );
 
       return { success: true, data: result };
     } else {

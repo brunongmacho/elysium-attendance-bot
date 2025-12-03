@@ -4346,6 +4346,64 @@ client.once(Events.ClientReady, async () => {
     console.error('⚠️ Cache warm-up failed (non-critical):', cacheWarmErr.message);
   }
 
+  // START PERIODIC AUTO-SYNC (15 minutes - sync Google Sheets → MongoDB)
+  console.log('🔄 Starting periodic auto-sync (every 15 minutes)...');
+  const { spawn } = require('child_process');
+  const path = require('path');
+
+  async function runPeriodicSync() {
+    console.log('🔄 [Auto-Sync] Running periodic sync from Google Sheets → MongoDB...');
+
+    return new Promise((resolve) => {
+      const syncScriptPath = path.join(__dirname, 'scripts', 'sync-sheets-to-mongodb.js');
+      const syncProcess = spawn('node', [syncScriptPath], {
+        cwd: __dirname,
+        stdio: 'pipe' // Capture output
+      });
+
+      let output = '';
+      syncProcess.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+
+      syncProcess.stderr.on('data', (data) => {
+        console.error(`⚠️ [Auto-Sync] ${data.toString()}`);
+      });
+
+      syncProcess.on('close', (code) => {
+        if (code === 0) {
+          console.log('✅ [Auto-Sync] Periodic sync complete');
+          // Log summary only (last few lines)
+          const lines = output.trim().split('\n');
+          const summaryStart = lines.findIndex(l => l.includes('SYNC SUMMARY'));
+          if (summaryStart >= 0) {
+            console.log(lines.slice(summaryStart).join('\n'));
+          }
+        } else {
+          console.error(`❌ [Auto-Sync] Sync failed with exit code ${code}`);
+        }
+        resolve();
+      });
+
+      syncProcess.on('error', (error) => {
+        console.error(`❌ [Auto-Sync] Failed to run sync script: ${error.message}`);
+        resolve();
+      });
+    });
+  }
+
+  // Run first sync after 1 minute (allow bot to fully start up)
+  setTimeout(() => {
+    runPeriodicSync().catch(err => console.error('❌ [Auto-Sync] Error:', err));
+  }, 60 * 1000);
+
+  // Then run every 15 minutes
+  setInterval(() => {
+    runPeriodicSync().catch(err => console.error('❌ [Auto-Sync] Error:', err));
+  }, 15 * 60 * 1000);
+
+  console.log('✅ Periodic auto-sync scheduled (15 min intervals)');
+
   // Register GC task (every 3 minutes - more aggressive for 512MB)
   if (global.gc) {
     let lastMemoryWarning = 0; // Track last memory warning to prevent log spam
