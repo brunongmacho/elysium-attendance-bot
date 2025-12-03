@@ -134,13 +134,19 @@ async function syncMembers(db, sheetAPI) {
 
     if (DRY_RUN) {
       log('🔍', '[DRY RUN] Would sync members:');
+      // Filter out invalid members for preview
+      const validMembers = membersData.filter(m => m && m.username && m.username.trim() !== '');
       const preview = formatPreview(
-        membersData,
-        m => `   - ${m.username}: ${m.pointsAvailable} pts`,
+        validMembers,
+        m => `   - ${m.username}: ${m.pointsAvailable || 0} pts`,
         'members'
       );
       console.log(preview);
-      return { synced: membersData.length, skipped: 0 };
+      const skipped = membersData.length - validMembers.length;
+      if (skipped > 0) {
+        log('⚠️', `Would skip ${skipped} members with invalid/missing usernames`);
+      }
+      return { synced: validMembers.length, skipped };
     }
 
     // Update MongoDB
@@ -150,6 +156,13 @@ async function syncMembers(db, sheetAPI) {
 
     for (const memberData of membersData) {
       try {
+        // Skip if username is missing or invalid
+        if (!memberData || !memberData.username || memberData.username.trim() === '') {
+          log('⚠️', `Skipping member with invalid/missing username: ${JSON.stringify(memberData)}`);
+          skipped++;
+          continue;
+        }
+
         // Find member by username (will be Discord ID after migration)
         const existingMember = await membersCollection.findOne({
           username: memberData.username
@@ -191,7 +204,8 @@ async function syncMembers(db, sheetAPI) {
           synced++;
         }
       } catch (error) {
-        log('⚠️', `Failed to sync ${memberData.username}: ${error.message}`);
+        const username = memberData?.username || 'unknown';
+        log('⚠️', `Failed to sync ${username}: ${error.message}`);
         skipped++;
       }
     }
