@@ -51,6 +51,7 @@ const CONFIG = {
 
 const COLUMNS = {
   MEMBERS: 1,
+  USERNAME: 1,  // Alias for MEMBERS (used in attendance tracking)
   POINTS_CONSUMED: 2,
   POINTS_LEFT: 3,
   ATTENDANCE_POINTS: 4,
