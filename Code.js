@@ -327,7 +327,7 @@ function getAllSpawnColumns(data) {
 function getAllWeeklyAttendance(data) {
   try {
     const cache = CacheService.getDocumentCache();
-    const cacheKey = 'weeklyAttendance_v1';
+    const cacheKey = 'weeklyAttendance_v2'; // Changed to v2 to invalidate old cache
 
     // Check if force refresh requested
     const forceFresh = data && data.forceFresh === true;
