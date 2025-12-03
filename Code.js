@@ -430,7 +430,9 @@ function getAllWeeklyAttendance(data) {
       // Continue anyway, just won't be cached
     }
 
-    return allAttendanceRecords; // Return flat array directly (no wrapper object)
+    // Return properly serialized JSON for Google Apps Script web app
+    return ContentService.createTextOutput(JSON.stringify(allAttendanceRecords))
+      .setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {
     Logger.log('❌ Error in getAllWeeklyAttendance: ' + err.toString());
