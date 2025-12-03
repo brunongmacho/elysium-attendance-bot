@@ -60,6 +60,8 @@ const bossRotation = require('./boss-rotation.js');
 const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images');
 const { addGuildFooter } = require('./utils/embed-branding');
 const errorHandler = require('./utils/error-handler');
+const mongoHelpers = require('./utils/mongodb-helpers'); // Phase 4: MongoDB integration
+const sheetSync = require('./services/sheet-sync'); // Phase 4: Background Sheet sync
 const {
   getCurrentTimestamp,
   getSundayOfWeek,
@@ -72,6 +74,17 @@ const {
   normalizeUsername,
   sleep,
 } = require("./utils/common");
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FEATURE FLAGS (Phase 4)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Feature flag: Enable MongoDB for attendance operations
+ * When true, attendance records are saved to MongoDB with background sync to Sheets
+ * @type {boolean}
+ */
+const USE_MONGODB_ATTENDANCE = process.env.USE_MONGODB_ATTENDANCE === 'true';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // STATE VARIABLES
@@ -134,6 +147,15 @@ function initialize(cfg, bossPointsData, isAdmin, cache = null, intelligence = n
   discordCache = cache;
   intelligenceEngine = intelligence;
   console.log("✅ Attendance module initialized");
+
+  // MongoDB integration status (Phase 4)
+  if (USE_MONGODB_ATTENDANCE) {
+    console.log('✅ [MongoDB] Attendance using MongoDB-first architecture');
+    console.log('ℹ️  [MongoDB] Attendance records saved to MongoDB with IMMEDIATE priority Sheet sync');
+  } else {
+    console.log('ℹ️  Attendance using Google Sheets (legacy mode)');
+    console.log('ℹ️  Set USE_MONGODB_ATTENDANCE=true to enable MongoDB');
+  }
 }
 
 /**
@@ -1637,20 +1659,80 @@ async function checkAndAutoCloseThreads(client) {
             continue;
           }
 
-          // Submit to Google Sheets
-          const payload = {
-            action: "submitAttendance",
-            boss: spawnInfo.boss,
-            date: spawnInfo.date,
-            time: spawnInfo.time,
-            timestamp: spawnInfo.timestamp,
-            members: spawnInfo.members,
-          };
+          // ═════════════════════════════════════════════════════════════════
+          // MONGODB-FIRST PATH (Phase 4)
+          // ═════════════════════════════════════════════════════════════════
+          let submitted = false;
+          let submissionSource = 'Unknown';
 
-          const resp = await postToSheet(payload);
+          if (USE_MONGODB_ATTENDANCE) {
+            try {
+              const startTime = Date.now();
 
-          if (resp.ok) {
-            console.log(`   ✅ Submitted ${spawnInfo.members.length} members to Google Sheets`);
+              // Add attendance records for each member
+              for (const memberName of spawnInfo.members) {
+                await mongoHelpers.addAttendance({
+                  username: memberName,
+                  boss: spawnInfo.boss,
+                  timestamp: spawnInfo.timestamp,
+                  date: spawnInfo.date,
+                  time: spawnInfo.time,
+                  points: bossPoints[spawnInfo.boss]?.points || 1
+                });
+              }
+
+              const duration = Date.now() - startTime;
+              console.log(`   ✅ [MongoDB] Submitted ${spawnInfo.members.length} attendance records in ${duration}ms`);
+
+              // Queue background sync to Sheets (IMMEDIATE priority - attendance close)
+              sheetSync.queueSync({
+                action: 'submitAttendance',
+                data: {
+                  boss: spawnInfo.boss,
+                  date: spawnInfo.date,
+                  time: spawnInfo.time,
+                  timestamp: spawnInfo.timestamp,
+                  members: spawnInfo.members
+                },
+                priority: sheetSync.SYNC_PRIORITIES.IMMEDIATE
+              });
+
+              submitted = true;
+              submissionSource = 'MongoDB';
+
+            } catch (error) {
+              console.error(`   ❌ [MongoDB] Failed to submit attendance:`, error.message);
+              console.log(`   ⚠️ [MongoDB] Falling back to Google Sheets...`);
+              // Fall through to Sheets submission below
+            }
+          }
+
+          // ═════════════════════════════════════════════════════════════════
+          // GOOGLE SHEETS PATH (Fallback or when MongoDB disabled)
+          // ═════════════════════════════════════════════════════════════════
+          if (!submitted || !USE_MONGODB_ATTENDANCE) {
+            const payload = {
+              action: "submitAttendance",
+              boss: spawnInfo.boss,
+              date: spawnInfo.date,
+              time: spawnInfo.time,
+              timestamp: spawnInfo.timestamp,
+              members: spawnInfo.members,
+            };
+
+            const resp = await postToSheet(payload);
+
+            if (resp.ok) {
+              console.log(`   ✅ Submitted ${spawnInfo.members.length} members to Google Sheets`);
+              submitted = true;
+              submissionSource = 'Google Sheets';
+            } else {
+              console.log(`   ❌ Failed to submit attendance: ${resp.text || resp.err}`);
+            }
+          }
+
+          if (submitted) {
+            console.log(`   📊 Submission source: ${submissionSource}`);
 
             // Invalidate client-side cache (attendance data changed)
             clientCache.invalidate('getAllWeeklyAttendance:{}');
@@ -1698,14 +1780,13 @@ async function checkAndAutoCloseThreads(client) {
 
             console.log(`   ✅ Auto-close complete: ${spawnInfo.boss}`);
           } else {
-            console.log(`   ❌ Failed to submit attendance: ${resp.text || resp.err}`);
+            console.log(`   ❌ Failed to submit attendance to both MongoDB and Google Sheets`);
 
             await errorHandler.safeSend(thread,
               `⚠️ **AUTO-CLOSE FAILED**\n\n` +
-              `Could not submit to Google Sheets.\n` +
-              `Error: ${resp.text || resp.err}\n\n` +
+              `Could not submit attendance records.\n\n` +
               `**Members (${spawnInfo.members.length}):** ${spawnInfo.members.join(", ")}\n\n` +
-              `Please manually update the sheet.`,
+              `Please manually update the records.`,
               'auto-close failure notification'
             );
 
