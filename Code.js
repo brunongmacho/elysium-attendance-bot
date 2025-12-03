@@ -321,6 +321,19 @@ function getAllSpawnColumns(data) {
 }
 
 /**
+ * Clear attendance cache (for debugging/testing)
+ * Run this manually to force fresh data fetch
+ */
+function clearAttendanceCache() {
+  const cache = CacheService.getDocumentCache();
+  cache.remove('weeklyAttendance_v1');
+  cache.remove('weeklyAttendance_v2');
+  Logger.log('✅ Attendance cache cleared!');
+  return ContentService.createTextOutput(JSON.stringify({ status: 'ok', message: 'Cache cleared' }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
  * Get all spawn columns from ALL weekly attendance sheets
  * Used for spawn prediction - analyzes historical patterns across all weeks
  */
