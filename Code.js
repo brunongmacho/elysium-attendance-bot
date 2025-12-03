@@ -368,60 +368,69 @@ function getAllWeeklyAttendance(data) {
       return createResponse('ok', 'No weekly sheets found', { sheets: [] });
     }
 
-    const allWeeklyData = [];
+    const allAttendanceRecords = [];
 
-    // Extract spawn columns from each weekly sheet
+    // Extract attendance records from each weekly sheet
     for (const sheet of weeklySheets) {
       const sheetName = sheet.getName();
+      const lastRow = sheet.getLastRow();
       const lastCol = sheet.getLastColumn();
 
-      if (lastCol < COLUMNS.FIRST_SPAWN) {
-        // No spawn columns in this sheet
-        allWeeklyData.push({
-          weekSheet: sheetName,
-          columns: []
-        });
+      if (lastCol < COLUMNS.FIRST_SPAWN || lastRow < 3) {
+        // No spawn columns or no member rows in this sheet
+        Logger.log(`ℹ️ Skipping ${sheetName} - no data`);
         continue;
       }
 
-      const spawnData = sheet.getRange(1, COLUMNS.FIRST_SPAWN, 2, lastCol - COLUMNS.FIRST_SPAWN + 1).getValues();
-      const row1 = spawnData[0]; // Timestamps
-      const row2 = spawnData[1]; // Boss names
+      // Read all data (headers + members)
+      const allData = sheet.getRange(1, 1, lastRow, lastCol).getValues();
 
-      const columns = [];
+      const timestamps = allData[0]; // Row 1: Timestamps
+      const bossNames = allData[1];  // Row 2: Boss names
+      const memberRows = allData.slice(2); // Row 3+: Members
 
-      for (let i = 0; i < row1.length; i++) {
-        const timestamp = (row1[i] || '').toString().trim();
-        const boss = (row2[i] || '').toString().trim().toUpperCase();
+      // For each spawn column
+      for (let col = COLUMNS.FIRST_SPAWN - 1; col < lastCol; col++) {
+        const timestamp = (timestamps[col] || '').toString().trim();
+        const bossName = (bossNames[col] || '').toString().trim().toUpperCase();
 
-        if (timestamp && boss) {
-          columns.push({
-            timestamp: timestamp,
-            boss: boss,
-            column: i + COLUMNS.FIRST_SPAWN
-          });
+        if (!timestamp || !bossName) {
+          continue; // Skip empty columns
+        }
+
+        // Extract members who attended this spawn
+        for (let row = 0; row < memberRows.length; row++) {
+          const memberName = (memberRows[row][COLUMNS.USERNAME - 1] || '').toString().trim();
+          const checkmark = (memberRows[row][col] || '').toString().trim();
+
+          // If member has a checkmark (✓, ✔, ☑, or any non-empty value)
+          if (memberName && checkmark) {
+            allAttendanceRecords.push({
+              memberName: memberName,
+              bossName: bossName,
+              timestamp: timestamp,
+              date: timestamp, // For backward compatibility
+              weekLabel: sheetName.replace('ELYSIUM_WEEK_', ''),
+              weekSheet: sheetName,
+              points: 1 // Default points (can be enhanced later)
+            });
+          }
         }
       }
-
-      allWeeklyData.push({
-        weekSheet: sheetName,
-        columns: columns
-      });
     }
 
-    const totalSpawns = allWeeklyData.reduce((sum, week) => sum + week.columns.length, 0);
-    Logger.log(`✅ Found ${totalSpawns} total spawns across ${weeklySheets.length} weekly sheets`);
+    Logger.log(`✅ Found ${allAttendanceRecords.length} attendance records across ${weeklySheets.length} weekly sheets`);
 
     // Store in cache for future requests (30 min for historical data)
     try {
-      cache.put(cacheKey, JSON.stringify(allWeeklyData), CONFIG.CACHE_TTL_LONG);
-      Logger.log(`✅ Cached ${totalSpawns} spawns across ${weeklySheets.length} sheets for ${CONFIG.CACHE_TTL_LONG}s`);
+      cache.put(cacheKey, JSON.stringify(allAttendanceRecords), CONFIG.CACHE_TTL_LONG);
+      Logger.log(`✅ Cached ${allAttendanceRecords.length} records for ${CONFIG.CACHE_TTL_LONG}s`);
     } catch (e) {
       Logger.log('⚠️ Failed to cache weekly attendance: ' + e.message);
       // Continue anyway, just won't be cached
     }
 
-    return createResponse('ok', 'All weekly attendance fetched', { sheets: allWeeklyData });
+    return allAttendanceRecords; // Return flat array directly (no wrapper object)
 
   } catch (err) {
     Logger.log('❌ Error in getAllWeeklyAttendance: ' + err.toString());
