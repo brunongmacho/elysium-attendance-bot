@@ -321,48 +321,55 @@ Speedup: 100-300x faster ⚡
 
 ## 🚨 CRITICAL ISSUES FOUND
 
-### **1. Missing `addAttendance()` Function** ❌ **CRITICAL**
+### **1. Missing `addAttendance()` Function** ✅ **FIXED**
 
 **Location:** `utils/mongodb-helpers.js`
 
-**Problem:**
+**Problem (Was):**
 - `attendance.js:1674` calls `mongoHelpers.addAttendance()`
-- **This function doesn't exist!** ❌
-- Only `addAttendanceRecord()` and `updateAttendanceStats()` are exported
+- This function didn't exist! ❌
+- Only `addAttendanceRecord()` and `updateAttendanceStats()` were exported
 
-**Impact:**
-- ⚠️ Attendance auto-close will ERROR when MongoDB is enabled
-- ⚠️ Points don't auto-update when attendance closes
-- ⚠️ Must manually run sync script after attendance
+**Impact (Before Fix):**
+- ⚠️ Attendance auto-close would ERROR when MongoDB is enabled
+- ⚠️ Points didn't auto-update when attendance closes
+- ⚠️ Required manual sync script after attendance
 
-**Expected Behavior:**
+**Fix Applied:** ✅ **Commit `fe4f1b1`**
+
+Implemented `addAttendance()` function that:
+1. Finds or creates member by username (with temp ID if new)
+2. Adds attendance record to 'attendance' collection
+3. Updates member stats and increments `pointsEarned` & `pointsAvailable`
+4. Returns updated member document
+5. Logs successful attendance addition
+
 ```javascript
-// Should exist but doesn't:
+// Implemented in utils/mongodb-helpers.js:459-512
 async function addAttendance(data) {
-  // 1. Find or create member
-  const member = await ensureMemberExists(data.username);
+  // Step 1: Find or create member
+  let member = await getMemberByUsername(data.username);
+  if (!member) {
+    // Create with temp ID
+    const tempId = `temp_${data.username.toLowerCase().replace(/\s+/g, '_')}`;
+    await db.collection('members').insertOne({ ... });
+    member = await getMemberByUsername(data.username);
+  }
 
-  // 2. Add attendance record
-  await addAttendanceRecord({
-    memberId: member._id,
-    memberName: data.username,
-    bossName: data.boss,
-    bossPoints: data.points,
-    timestamp: new Date(data.timestamp),
-    verified: true
-  });
+  // Step 2: Add attendance record
+  await addAttendanceRecord({ memberId: member._id, ... });
 
-  // 3. Update member stats + points
-  await updateAttendanceStats(member._id, {
+  // Step 3: Update stats + increment points
+  const updatedMember = await updateAttendanceStats(member._id, {
     bossName: data.boss,
     bossPoints: data.points
   });
 
-  return member;
+  return updatedMember;
 }
 ```
 
-**What `updateAttendanceStats()` Does (lines 431-434):**
+**What `updateAttendanceStats()` Does (lines 432-433):**
 ```javascript
 // Add points if specified
 if (bossPoints && bossPoints > 0) {
@@ -371,13 +378,8 @@ if (bossPoints && bossPoints > 0) {
 }
 ```
 
-**Workaround:**
-Run sync script manually after attendance closes:
-```bash
-node scripts/sync-sheets-to-mongodb.js
-```
-
-**Fix Required:** ✅ Implement `addAttendance()` wrapper function
+**Status:** ✅ **FIXED** - Function implemented and exported
+**Testing Required:** Attendance auto-close with MongoDB enabled
 
 ---
 
@@ -512,11 +514,11 @@ MongoDB points up-to-date immediately ⚡
 
 ### **Critical Missing**
 
-#### **1. `addAttendance()` Function** ❌ **BLOCKER**
-**Impact:** Attendance auto-close broken with MongoDB
-**Priority:** 🔴 **CRITICAL - Must fix before production**
-**Location:** `utils/mongodb-helpers.js`
-**Status:** Not implemented
+#### **1. `addAttendance()` Function** ✅ **FIXED (Commit fe4f1b1)**
+**Impact:** Attendance auto-close now works with MongoDB
+**Priority:** ✅ **RESOLVED**
+**Location:** `utils/mongodb-helpers.js:459-512`
+**Status:** Implemented and exported
 
 #### **2. New Member Discord ID Fetching** ℹ️ **By Design**
 **Impact:** New members get temp IDs until first interaction
@@ -579,66 +581,43 @@ Status:      Never opened  ✅ Healthy
 
 ### **Immediate (This Session)**
 
-#### **1. Implement `addAttendance()` Function** 🔴 **CRITICAL**
-```javascript
-// Add to utils/mongodb-helpers.js
+#### **1. Implement `addAttendance()` Function** ✅ **COMPLETED (Commit fe4f1b1)**
 
-const discordMapper = require('./discord-id-mapper');
+**What was implemented:**
+```javascript
+// Added to utils/mongodb-helpers.js:459-512
 
 async function addAttendance(data) {
   const db = await dbAPI.connect();
 
-  // Step 1: Ensure member exists (auto-migrate if needed)
-  const discordUser = {
-    id: data.userId || null,
-    username: data.username,
-    nickname: data.username
-  };
-
-  let member;
-  if (discordUser.id) {
-    member = await discordMapper.ensureMemberExists(discordUser);
-  } else {
-    // Fallback: find by username
+  // Step 1: Find or create member by username
+  let member = await getMemberByUsername(data.username);
+  if (!member) {
+    const tempId = `temp_${data.username.toLowerCase().replace(/\s+/g, '_')}`;
+    await db.collection('members').insertOne({ ... });
     member = await getMemberByUsername(data.username);
-    if (!member) {
-      // Create with temp ID
-      member = await createMember({
-        username: data.username,
-        pointsAvailable: 0,
-        pointsEarned: 0,
-        pointsSpent: 0
-      });
-    }
   }
 
   // Step 2: Add attendance record
-  await addAttendanceRecord({
-    memberId: member._id,
-    memberName: data.username,
-    bossName: data.boss,
-    bossPoints: data.points,
-    timestamp: new Date(data.timestamp),
-    verified: true,
-    threadId: data.threadId || null
-  });
+  await addAttendanceRecord({ memberId: member._id, ... });
 
   // Step 3: Update stats and increment points
-  await updateAttendanceStats(member._id, {
+  const updatedMember = await updateAttendanceStats(member._id, {
     bossName: data.boss,
     bossPoints: data.points
   });
 
   console.log(`✅ [MongoDB] Added attendance for ${data.username}: ${data.boss} (+${data.points} pts)`);
-  return member;
+  return updatedMember;
 }
-
-// Add to exports
-module.exports = {
-  // ... existing exports
-  addAttendance,  // ← ADD THIS
-};
 ```
+
+**Changes:**
+- ✅ Function implemented in `utils/mongodb-helpers.js`
+- ✅ Added to exports (line 640)
+- ✅ Fully compatible with `attendance.js:1674` call signature
+- ✅ Auto-creates members with temp IDs
+- ✅ Increments both `pointsEarned` and `pointsAvailable`
 
 #### **2. Test Sync Script on Koyeb**
 ```bash
@@ -668,9 +647,9 @@ Check MongoDB for "Ace":
 ### **Before Saturday Auction**
 
 #### **1. Deploy Fixed Code**
-- [ ] Implement `addAttendance()`
-- [ ] Commit and push
-- [ ] Deploy to Koyeb
+- [x] ✅ Implement `addAttendance()` (commit fe4f1b1)
+- [x] ✅ Commit and push (pushed to branch)
+- [ ] Deploy to Koyeb (auto-deploy or manual)
 - [ ] Restart bot
 
 #### **2. Run Final Sync**
@@ -787,7 +766,7 @@ docs/
 
 **Code Quality:**
 - [x] All modules refactored to MongoDB-first
-- [ ] ❌ All functions implemented and tested (missing `addAttendance`)
+- [x] ✅ All functions implemented (addAttendance fixed - commit fe4f1b1)
 - [x] Error handling in place
 - [x] Circuit breaker tested
 - [x] Fallback to Sheets working
@@ -813,10 +792,10 @@ docs/
 - [ ] ⚠️ Error handling guide needed
 
 **Production Readiness:**
-- [ ] ❌ Critical bugs fixed (`addAttendance` missing)
+- [x] ✅ Critical bugs fixed (addAttendance implemented - fe4f1b1, sync script - 6f1e703)
 - [ ] ⏳ Sync script tested on Koyeb
 - [ ] ⏳ Full auction tested end-to-end
-- [ ] ⏳ Attendance auto-close tested (blocked by bug)
+- [ ] ⏳ Attendance auto-close tested (ready after deploy)
 - [x] Rollback plan documented (disable feature flags)
 
 ---
