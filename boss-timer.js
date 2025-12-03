@@ -483,10 +483,23 @@ function scheduleReminder(bossName, spawnTime) {
   const reminderTime = new Date(spawnTime.getTime() - REMINDER_MINUTES_BEFORE * 60 * 1000);
   const delay = reminderTime - now;
 
-  // Skip if reminder time already passed
+  // Handle late starts: if we're past reminder time but spawn hasn't happened yet
   if (delay < 0) {
-    console.log(`⏭️ Skipping past reminder for ${bossName} (spawn: ${formatGMT8(spawnTime)})`);
-    return null;
+    const timeUntilSpawn = spawnTime - now;
+
+    // If spawn time has already passed (more than 1 min ago), skip it
+    if (timeUntilSpawn < -60000) {
+      console.log(`⏭️ Skipping past spawn for ${bossName} (spawn was: ${formatGMT8(spawnTime)})`);
+      return null;
+    }
+
+    // If we're past reminder time but spawn is still upcoming/recent, trigger immediately
+    console.log(`⚡ Late start detected for ${bossName} - triggering immediately (spawn: ${formatGMT8(spawnTime)})`);
+    const timerId = setTimeout(async () => {
+      await triggerSpawnReminder(bossName, spawnTime);
+    }, Math.max(0, timeUntilSpawn));
+
+    return timerId;
   }
 
   const timerId = setTimeout(async () => {
