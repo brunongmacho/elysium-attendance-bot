@@ -15,7 +15,8 @@ async function diagnose() {
 
   try {
     console.log('📥 Fetching attendance from Google Sheets API...');
-    const response = await sheetAPI.call('getAllWeeklyAttendance');
+    console.log('🔄 Force fetching (bypassing cache)...');
+    const response = await sheetAPI.call('getAllWeeklyAttendance', { forceFresh: true });
 
     console.log('');
     console.log('📊 RESULTS:');
@@ -26,19 +27,42 @@ async function diagnose() {
       return;
     }
 
-    if (!Array.isArray(response)) {
-      console.log('⚠️ Response is not an array');
+    // Handle both array response (new) and wrapper object response (old/cached)
+    let attendanceRecords = [];
+
+    if (Array.isArray(response)) {
+      // New format: direct array
+      attendanceRecords = response;
+      console.log('✅ Received direct array response (new format)');
+    } else if (response.status === 'ok' && Array.isArray(response.sheets)) {
+      // Old format: wrapper object (cached or old function)
+      console.log('⚠️  Received wrapper object response (old format or cached)');
+      if (response.sheets.length === 0) {
+        console.log('❌ Empty sheets array - no data found!');
+        console.log('');
+        console.log('💡 Possible causes:');
+        console.log('   1. Google Apps Script not updated with new function');
+        console.log('   2. No sheets named "ELYSIUM_WEEK_*" found');
+        console.log('   3. Sheets are empty (no attendance data)');
+        console.log('   4. COLUMNS.FIRST_SPAWN constant issue');
+        return;
+      }
+      // Old format returned column metadata, not attendance records
+      console.log('⚠️  Old function format detected - need to update Google Apps Script!');
+      return;
+    } else {
+      console.log('⚠️ Unexpected response format');
       console.log('Response type:', typeof response);
       console.log('Response:', JSON.stringify(response, null, 2).substring(0, 500));
       return;
     }
 
-    console.log(`✅ Total records returned: ${response.length}`);
+    console.log(`✅ Total records returned: ${attendanceRecords.length}`);
     console.log('');
 
     // Group by boss
     const byBoss = {};
-    response.forEach(record => {
+    attendanceRecords.forEach(record => {
       const boss = record.bossName || 'Unknown';
       byBoss[boss] = (byBoss[boss] || 0) + 1;
     });
@@ -54,7 +78,7 @@ async function diagnose() {
 
     // Group by member
     const byMember = {};
-    response.forEach(record => {
+    attendanceRecords.forEach(record => {
       const member = record.memberName || 'Unknown';
       byMember[member] = (byMember[member] || 0) + 1;
     });
@@ -64,7 +88,7 @@ async function diagnose() {
 
     // Show first 5 records as sample
     console.log('📋 Sample records (first 5):');
-    response.slice(0, 5).forEach((record, i) => {
+    attendanceRecords.slice(0, 5).forEach((record, i) => {
       console.log(`   ${i + 1}. ${record.memberName} - ${record.bossName} - ${record.date || record.timestamp}`);
     });
 
@@ -74,10 +98,10 @@ async function diagnose() {
     console.log('═══════════════════════════════════════════════════════════════');
     console.log('');
     console.log('📌 EXPECTED: 1,000-3,000 records (for 7 weeks of data)');
-    console.log(`📌 ACTUAL: ${response.length} records`);
+    console.log(`📌 ACTUAL: ${attendanceRecords.length} records`);
     console.log('');
 
-    if (response.length < 500) {
+    if (attendanceRecords.length < 500) {
       console.log('⚠️  WARNING: Record count is very low!');
       console.log('   Possible issues:');
       console.log('   1. Google Sheets API is limiting the response');
