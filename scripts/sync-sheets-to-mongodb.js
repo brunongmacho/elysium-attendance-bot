@@ -8,13 +8,14 @@
  * As Phase 4 progresses, this script is updated to include new modules:
  * - ✅ Phase 4.1: Members (bidding points) - USE_MONGODB_BIDDING
  * - ✅ Phase 4.2: Auction Items - USE_MONGODB_AUCTIONEERING
- * - ⏳ Phase 4.3: Attendance records (coming soon)
- * - ⏳ Phase 4.4: Boss rotation (coming soon)
+ * - ✅ Phase 4.3: Boss Rotation - Boss rotation tracking
+ * - ✅ Phase 4.4: Attendance records - USE_MONGODB_ATTENDANCE (historical import)
  *
  * Usage:
  *   node scripts/sync-sheets-to-mongodb.js              # Sync all modules
  *   node scripts/sync-sheets-to-mongodb.js --members    # Sync members only
  *   node scripts/sync-sheets-to-mongodb.js --items      # Sync auction items only
+ *   node scripts/sync-sheets-to-mongodb.js --rotation   # Sync boss rotation only
  *   node scripts/sync-sheets-to-mongodb.js --dry-run    # Test without writing
  *
  * Note: Output is Discord-safe (stays under 2000 char limit) by limiting
@@ -35,6 +36,7 @@ const path = require('path');
 const DRY_RUN = process.argv.includes('--dry-run');
 const SYNC_MEMBERS = process.argv.includes('--members') || !hasModuleFlag();
 const SYNC_ITEMS = process.argv.includes('--items') || !hasModuleFlag();
+const SYNC_ROTATION = process.argv.includes('--rotation') || !hasModuleFlag();
 
 // Load bot configuration
 let config;
@@ -54,7 +56,8 @@ const MAX_PREVIEW_ITEMS = 5; // Limit preview to avoid Discord 2000 char limit
 
 function hasModuleFlag() {
   return process.argv.includes('--members') ||
-         process.argv.includes('--items');
+         process.argv.includes('--items') ||
+         process.argv.includes('--rotation');
 }
 
 function log(emoji, message) {
@@ -103,6 +106,10 @@ function formatSummary(results) {
 
   if (results.items) {
     lines.push(`🎁 Auction Items: ${results.items.synced} synced`);
+  }
+
+  if (results.rotation) {
+    lines.push(`🔄 Boss Rotation: ${results.rotation.synced} bosses synced`);
   }
 
   lines.push('');
@@ -340,6 +347,96 @@ async function syncAuctionItems(db, sheetAPI) {
   }
 }
 
+/**
+ * Sync boss rotation from Sheets → MongoDB
+ * Maps to: Boss rotation tracking feature
+ */
+async function syncBossRotation(db, sheetAPI) {
+  log('🔄', 'Syncing boss rotation...');
+
+  try {
+    // Fetch list of rotating bosses from Google Sheets
+    log('📥', 'Fetching rotating bosses from Google Sheets...');
+    const bossesResponse = await sheetAPI.call('getAllRotatingBosses');
+
+    // Validate response structure
+    if (!bossesResponse || bossesResponse.status !== 'ok') {
+      log('⚠️', `Invalid response from Google Sheets: ${JSON.stringify(bossesResponse).substring(0, 200)}`);
+      return { synced: 0, skipped: 0 };
+    }
+
+    const rotatingBosses = bossesResponse.bosses || [];
+
+    if (!Array.isArray(rotatingBosses)) {
+      log('⚠️', `Invalid bosses data (expected array, got ${typeof rotatingBosses})`);
+      return { synced: 0, skipped: 0 };
+    }
+
+    if (rotatingBosses.length === 0) {
+      log('⚠️', 'No rotating bosses found in Google Sheets (empty array)');
+      return { synced: 0, skipped: 0 };
+    }
+
+    log('✅', `Found ${rotatingBosses.length} rotating bosses in Google Sheets`);
+
+    // Fetch rotation status for each boss
+    const rotationData = [];
+    for (const bossName of rotatingBosses) {
+      try {
+        const rotationResponse = await sheetAPI.call('getBossRotation', { bossName });
+
+        if (rotationResponse && rotationResponse.status === 'ok' && rotationResponse.isRotating) {
+          rotationData.push({
+            _id: bossName.toLowerCase().replace(/\s+/g, '_'),
+            bossName: rotationResponse.bossName,
+            currentIndex: rotationResponse.currentIndex || 1,
+            currentGuild: rotationResponse.currentGuild || 'Unknown',
+            isOurTurn: rotationResponse.isOurTurn || false,
+            guilds: rotationResponse.guilds || [],
+            nextGuild: rotationResponse.nextGuild || 'Unknown',
+            lastUpdated: new Date()
+          });
+        }
+      } catch (bossError) {
+        log('⚠️', `Failed to fetch rotation for ${bossName}: ${bossError.message}`);
+      }
+    }
+
+    if (rotationData.length === 0) {
+      log('⚠️', 'No rotation data fetched from Google Sheets');
+      return { synced: 0, skipped: 0 };
+    }
+
+    if (DRY_RUN) {
+      log('🔍', '[DRY RUN] Would sync rotation data:');
+      const preview = formatPreview(
+        rotationData,
+        rotation => `   - ${rotation.bossName}: Index ${rotation.currentIndex} (${rotation.currentGuild}) ${rotation.isOurTurn ? '🟢 OUR TURN' : '🔴'}`,
+        'bosses'
+      );
+      console.log(preview);
+      return { synced: rotationData.length, skipped: 0 };
+    }
+
+    // Clear existing rotation and insert fresh data
+    const rotationCollection = db.collection('bossRotation');
+
+    log('🗑️', 'Clearing old boss rotation data...');
+    await rotationCollection.deleteMany({});
+
+    log('💾', 'Inserting fresh boss rotation data...');
+    const result = await rotationCollection.insertMany(rotationData, { ordered: false });
+    const synced = result.insertedCount;
+
+    log('✅', `Boss rotation synced: ${synced} bosses`);
+    return { synced, skipped: 0 };
+
+  } catch (error) {
+    log('❌', `Boss rotation sync failed: ${error.message}`);
+    throw error;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN EXECUTION
 // ═══════════════════════════════════════════════════════════════════════════
@@ -376,6 +473,12 @@ async function main() {
     // Sync auction items
     if (SYNC_ITEMS) {
       results.items = await syncAuctionItems(db, sheetAPI);
+      console.log('');
+    }
+
+    // Sync boss rotation
+    if (SYNC_ROTATION) {
+      results.rotation = await syncBossRotation(db, sheetAPI);
       console.log('');
     }
 
