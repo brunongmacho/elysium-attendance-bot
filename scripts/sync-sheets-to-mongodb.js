@@ -91,9 +91,13 @@ function formatSummary(results) {
   ];
 
   if (results.members) {
-    lines.push(`👥 Members: ${results.members.synced} synced, ${results.members.skipped} skipped`);
+    const createdStr = results.members.created > 0 ? ` (${results.members.created} new)` : '';
+    lines.push(`👥 Members: ${results.members.synced} synced${createdStr}, ${results.members.skipped} skipped`);
     if (results.members.deactivated > 0) {
       lines.push(`⚠️ Inactive: ${results.members.deactivated} members (removed from Sheets)`);
+    }
+    if (results.members.created > 0) {
+      lines.push(`ℹ️  New members will auto-migrate to Discord ID on first bot interaction`);
     }
   }
 
@@ -126,23 +130,24 @@ async function syncMembers(db, sheetAPI) {
   try {
     // Fetch latest data from Google Sheets
     log('📥', 'Fetching members from Google Sheets...');
-    const membersData = await sheetAPI.call('getBiddingPointsSummary');
+    const response = await sheetAPI.call('getBiddingPoints');
 
-    // Validate response is an array
-    if (!membersData) {
-      log('⚠️', 'No response from Google Sheets (null/undefined)');
-      return { synced: 0, skipped: 0 };
+    // Validate response structure
+    if (!response || response.status !== 'ok') {
+      log('⚠️', `Invalid response from Google Sheets: ${JSON.stringify(response).substring(0, 200)}`);
+      return { synced: 0, skipped: 0, deactivated: 0 };
     }
 
+    const membersData = response.members || [];
+
     if (!Array.isArray(membersData)) {
-      log('⚠️', `Invalid response from Google Sheets (expected array, got ${typeof membersData})`);
-      log('⚠️', `Response: ${JSON.stringify(membersData).substring(0, 200)}`);
-      return { synced: 0, skipped: 0 };
+      log('⚠️', `Invalid members data (expected array, got ${typeof membersData})`);
+      return { synced: 0, skipped: 0, deactivated: 0 };
     }
 
     if (membersData.length === 0) {
       log('⚠️', 'No members found in Google Sheets (empty array)');
-      return { synced: 0, skipped: 0 };
+      return { synced: 0, skipped: 0, deactivated: 0 };
     }
 
     log('✅', `Found ${membersData.length} members in Google Sheets`);
@@ -153,7 +158,7 @@ async function syncMembers(db, sheetAPI) {
       const validMembers = membersData.filter(m => m && m.username && m.username.trim() !== '');
       const preview = formatPreview(
         validMembers,
-        m => `   - ${m.username}: ${m.pointsAvailable || 0} pts`,
+        m => `   - ${m.username}: ${m.pointsLeft || 0} left, ${m.pointsConsumed || 0} spent`,
         'members'
       );
       console.log(preview);
@@ -161,14 +166,14 @@ async function syncMembers(db, sheetAPI) {
       if (skipped > 0) {
         log('⚠️', `Would skip ${skipped} members with invalid/missing usernames`);
       }
-      return { synced: validMembers.length, skipped };
+      return { synced: validMembers.length, skipped, deactivated: 0 };
     }
 
     // Update MongoDB
     const membersCollection = db.collection('members');
     let synced = 0;
     let skipped = 0;
-    let deactivated = 0;
+    let created = 0;
 
     // Step 1: Mark all existing members as inactive
     log('🔄', 'Marking existing members as inactive...');
@@ -187,9 +192,14 @@ async function syncMembers(db, sheetAPI) {
           continue;
         }
 
-        // Find member by username (will be Discord ID after migration)
+        const username = memberData.username.trim();
+        const pointsAvailable = memberData.pointsLeft || 0;
+        const pointsSpent = memberData.pointsConsumed || 0;
+        const pointsEarned = pointsAvailable + pointsSpent; // Total earned = left + spent
+
+        // Find member by username (case-insensitive)
         const existingMember = await membersCollection.findOne({
-          username: memberData.username
+          username: { $regex: new RegExp(`^${username}$`, 'i') }
         });
 
         if (existingMember) {
@@ -198,10 +208,10 @@ async function syncMembers(db, sheetAPI) {
             { _id: existingMember._id },
             {
               $set: {
-                pointsAvailable: memberData.pointsAvailable || 0,
-                pointsEarned: memberData.pointsEarned || 0,
-                pointsSpent: memberData.pointsSpent || 0,
-                username: memberData.username,
+                pointsAvailable: pointsAvailable,
+                pointsEarned: pointsEarned,
+                pointsSpent: pointsSpent,
+                username: username, // Update to current casing
                 isActive: true,  // Re-activate member
                 lastUpdated: new Date()
               }
@@ -209,13 +219,14 @@ async function syncMembers(db, sheetAPI) {
           );
           synced++;
         } else {
-          // Create new member (shouldn't happen after initial migration)
+          // Create new member with temp ID (will be migrated to Discord ID when they first interact)
+          const tempId = `temp_${username.toLowerCase().replace(/\s+/g, '_')}`;
           await membersCollection.insertOne({
-            _id: `temp_${memberData.username}`,
-            username: memberData.username,
-            pointsAvailable: memberData.pointsAvailable || 0,
-            pointsEarned: memberData.pointsEarned || 0,
-            pointsSpent: memberData.pointsSpent || 0,
+            _id: tempId,
+            username: username,
+            pointsAvailable: pointsAvailable,
+            pointsEarned: pointsEarned,
+            pointsSpent: pointsSpent,
             isActive: true,  // New members are active
             attendance: {
               total: 0,
@@ -227,7 +238,9 @@ async function syncMembers(db, sheetAPI) {
             joinedAt: new Date(),
             lastUpdated: new Date()
           });
+          created++;
           synced++;
+          log('➕', `Created new member: ${username} with temp ID (will migrate to Discord ID on first interaction)`);
         }
       } catch (error) {
         const username = memberData?.username || 'unknown';
@@ -239,12 +252,12 @@ async function syncMembers(db, sheetAPI) {
     // Step 3: Count deactivated members (not in current Sheets)
     const inactiveCount = await membersCollection.countDocuments({ isActive: false });
 
-    log('✅', `Members synced: ${synced}, skipped: ${skipped}`);
+    log('✅', `Members synced: ${synced} (${created} new), skipped: ${skipped}`);
     if (inactiveCount > 0) {
       log('ℹ️', `Inactive members (removed from Sheets): ${inactiveCount}`);
     }
 
-    return { synced, skipped, deactivated: inactiveCount };
+    return { synced, skipped, deactivated: inactiveCount, created };
 
   } catch (error) {
     log('❌', `Member sync failed: ${error.message}`);

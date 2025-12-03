@@ -145,11 +145,16 @@ node scripts/sync-sheets-to-mongodb.js --dry-run
 
 ### Members Sync
 
-1. Fetches current member points from Google Sheets via `getBiddingPointsSummary()`
-2. For each member:
+1. Fetches current member points from Google Sheets via `getBiddingPoints()` API
+2. For each member in the response:
+   - Extracts `pointsLeft` (column B), `pointsConsumed` (column C)
+   - Calculates `pointsEarned = pointsLeft + pointsConsumed` (total earned)
+   - Maps fields: `pointsLeft` → `pointsAvailable`, `pointsConsumed` → `pointsSpent`
+3. For each member:
    - If member exists in MongoDB → **Update** points (preserves Discord ID, attendance, etc.)
    - If member doesn't exist → **Insert** new member with temp ID
-3. Updates `lastUpdated` timestamp
+4. Marks members not in Google Sheets as `isActive: false` (inactive)
+5. Updates `lastUpdated` timestamp
 
 **New Member Handling:**
 When a new guild member appears in Google Sheets for the first time:
@@ -157,23 +162,28 @@ When a new guild member appears in Google Sheets for the first time:
 2. **First interaction:** When they use bot commands (e.g., `!mypoints`), automatically migrated to real Discord ID
 3. **Subsequent syncs:** Points updated using real Discord ID (preserved forever)
 
+**Important:** Discord IDs are NOT fetched automatically during sync. They are mapped when members first interact with the bot (via `discord-id-mapper.js`).
+
 This gradual migration ensures:
 - ✅ No manual work needed
-- ✅ Members migrate as they interact
+- ✅ No Discord API calls during sync (faster, no rate limits)
+- ✅ Members migrate automatically as they interact
 - ✅ No data loss
 - ✅ Discord IDs preserved once migrated
 
 **Data Updated:**
-- `pointsAvailable`
-- `pointsEarned`
-- `pointsSpent`
-- `username`
-- `lastUpdated`
+- `pointsAvailable` (from Sheet column B: Points Left)
+- `pointsEarned` (calculated: Points Left + Points Consumed)
+- `pointsSpent` (from Sheet column C: Points Consumed)
+- `username` (from Sheet column A)
+- `isActive` (true if in Sheets, false if removed)
+- `lastUpdated` (current timestamp)
 
 **Data Preserved:**
-- Discord ID (`_id`)
+- Discord ID (`_id`) - Never changed once migrated
 - Attendance records
 - Join date
+- Streak data
 - All other fields
 
 ### Auction Items Sync
