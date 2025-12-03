@@ -36,13 +36,14 @@ node scripts/migrate-discord-ids.js
 
 Members not found in Discord will keep temp IDs until they join the server.
 
-### 2. Enable MongoDB for Bidding and Auctioneering
+### 2. Enable MongoDB for All Operations
 
 Set environment variables in Koyeb:
 
 ```bash
 USE_MONGODB_BIDDING=true
 USE_MONGODB_AUCTIONEERING=true
+USE_MONGODB_ATTENDANCE=true
 MONGODB_FALLBACK_ENABLED=true  # Recommended for safety
 ```
 
@@ -100,6 +101,26 @@ USE_MONGODB_AUCTIONEERING=true
 
 **When disabled:**
 - All auction operations use Google Sheets (legacy behavior)
+- Safe fallback if MongoDB has issues
+
+### USE_MONGODB_ATTENDANCE
+
+**Default:** `false` (Sheets only)
+
+```bash
+# Enable MongoDB for attendance operations
+USE_MONGODB_ATTENDANCE=true
+```
+
+**When enabled:**
+- Daily attendance records saved to MongoDB attendance collection
+- Each member's attendance added individually with boss, timestamp, points
+- !leaderboard (attendance) reads from MongoDB members collection
+- IMMEDIATE priority Sheet sync (0ms delay - critical operation)
+- Startup logging shows MongoDB vs Sheets mode
+
+**When disabled:**
+- All attendance operations use Google Sheets (legacy behavior)
 - Safe fallback if MongoDB has issues
 
 ### MONGODB_FALLBACK_ENABLED
@@ -240,6 +261,7 @@ console.log(`Progress: ${stats.percentComplete}%`);
 ```bash
 USE_MONGODB_BIDDING=false
 USE_MONGODB_AUCTIONEERING=false
+USE_MONGODB_ATTENDANCE=false
 ```
 
 **Restart bot** → All operations use Sheets immediately.
@@ -386,10 +408,13 @@ console.log(stats);
 **Before auction (11:45am):**
 - [ ] Verify `USE_MONGODB_BIDDING=true` in Koyeb
 - [ ] Verify `USE_MONGODB_AUCTIONEERING=true` in Koyeb
+- [ ] Verify `USE_MONGODB_ATTENDANCE=true` in Koyeb
 - [ ] Check MongoDB health in logs (2ms latency expected)
 - [ ] Verify Discord ID migration completed (100% expected)
 - [ ] Check startup logs for "✅ [MongoDB] Auctioneering using MongoDB-first architecture"
+- [ ] Check startup logs for "✅ [MongoDB] Attendance using MongoDB-first architecture"
 - [ ] Test !mypoints command (should use MongoDB)
+- [ ] Test !leaderboard command (should use MongoDB)
 - [ ] Monitor admin-logs channel (should be quiet)
 
 **During auction (12:00pm):**
