@@ -78,12 +78,11 @@ async function forceSyncRecentAttendance() {
           year: '2-digit'
         });
 
-        // Format time as HH:MM:SS in GMT+8
+        // Format time as H:MM in GMT+8 (matches Google Sheets: no seconds, no zero-padding for hours)
         const timeStr = spawnDate.toLocaleTimeString('en-US', {
           timeZone: 'Asia/Manila',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
+          hour: 'numeric',      // No zero-padding (0-23, matches Google Sheets)
+          minute: '2-digit',    // Zero-padded minutes
           hour12: false
         });
 
