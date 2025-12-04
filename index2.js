@@ -3084,26 +3084,61 @@ stats: async (message, member, args) => {
           return;
         }
 
-        // Try to load existing members from Google Sheets
+        // Try to load existing members from MongoDB (fast) or Google Sheets (fallback)
         let existingMembers = [];
         if (!existingSpawn) {
-          await message.channel.send(`🔍 Loading existing attendance from Google Sheets...`);
-          try {
-            const checkResp = await attendance.postToSheet({
-              action: "getColumnData",
-              boss: bossName,
-              timestamp: parsed.timestamp
-            });
+          const loadMsg = await message.channel.send(`🔍 Loading existing attendance...`);
 
-            if (checkResp.ok) {
-              const data = JSON.parse(checkResp.text);
-              if (data.members && Array.isArray(data.members)) {
-                existingMembers = data.members;
-                console.log(`   ✅ Loaded ${existingMembers.length} existing members from Sheets`);
+          try {
+            // FAST PATH: Load from MongoDB first
+            if (USE_MONGODB_ATTENDANCE) {
+              const db = await dbAPI.connect();
+
+              // Parse timestamp to Date object for MongoDB query
+              const timestampDate = new Date(parsed.timestamp);
+
+              // Get all attendance records for this boss + timestamp
+              const attendanceRecords = await db.collection('attendance')
+                .find({
+                  bossName: bossName,
+                  timestamp: timestampDate
+                })
+                .toArray();
+
+              if (attendanceRecords.length > 0) {
+                // Extract unique member names
+                existingMembers = [...new Set(attendanceRecords.map(r => r.memberName))];
+                console.log(`   ✅ Loaded ${existingMembers.length} existing members from MongoDB (${attendanceRecords.length} records)`);
+                await loadMsg.edit(`✅ Loaded ${existingMembers.length} existing member(s) from MongoDB`);
+              } else {
+                console.log(`   ℹ️ No records found in MongoDB, trying Sheets...`);
               }
+            }
+
+            // FALLBACK PATH: Load from Google Sheets if MongoDB returned nothing
+            if (existingMembers.length === 0) {
+              const checkResp = await attendance.postToSheet({
+                action: "getColumnData",
+                boss: bossName,
+                timestamp: parsed.timestamp
+              });
+
+              if (checkResp.ok) {
+                const data = JSON.parse(checkResp.text);
+                if (data.members && Array.isArray(data.members)) {
+                  existingMembers = data.members;
+                  console.log(`   ✅ Loaded ${existingMembers.length} existing members from Sheets`);
+                  await loadMsg.edit(`✅ Loaded ${existingMembers.length} existing member(s) from Google Sheets`);
+                }
+              }
+            }
+
+            if (existingMembers.length === 0) {
+              await loadMsg.edit(`ℹ️ No existing attendance found`);
             }
           } catch (err) {
             console.log(`   ⚠️ Could not load existing members: ${err.message}`);
+            await loadMsg.edit(`⚠️ Could not load existing members`).catch(() => {});
           }
         }
 
@@ -3113,7 +3148,7 @@ stats: async (message, member, args) => {
           date: parsed.date,
           time: parsed.time,
           timestamp: parsed.timestamp,
-          members: existingSpawn ? existingSpawn.members : existingMembers, // Preserve from memory OR load from Sheets
+          members: existingSpawn ? existingSpawn.members : existingMembers, // Preserve from memory OR load from MongoDB/Sheets
           confirmThreadId: existingSpawn ? existingSpawn.confirmThreadId : null,
           closed: false,
           createdAt: existingSpawn ? existingSpawn.createdAt : Date.now(),
