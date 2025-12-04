@@ -4223,6 +4223,147 @@ function scheduleWeeklySaturdayAuction(client, config) {
 }
 
 /**
+ * Schedule pre-auction sync (Sheets → MongoDB) 1 hour before Saturday auction
+ * Ensures all manual Google Sheets edits to bidding points are synced to MongoDB
+ * before the auction starts and loads points from MongoDB.
+ *
+ * TIMING:
+ * - Runs every Saturday at 11:00 AM GMT+8 (1 hour before 12:00 PM auction)
+ * - Syncs: BiddingPoints (Google Sheets → MongoDB)
+ * - Also syncs: Boss Rotation (for good measure)
+ *
+ * PURPOSE:
+ * - Admin may manually adjust points in Google Sheets between auctions
+ * - Bot loads points from Sheets at auction start, but MongoDB might be stale
+ * - This sync ensures MongoDB has latest data before auction
+ *
+ * @param {SheetAPI} sheetAPI - Google Sheets API instance
+ * @param {Object} bossRotation - Boss rotation module reference
+ */
+let preAuctionSyncTimer = null;
+
+function schedulePreAuctionSync(sheetAPI, bossRotation) {
+  // Prevent duplicate schedulers
+  if (preAuctionSyncTimer) {
+    console.log(`${EMOJI.WARNING} Pre-auction sync scheduler already running`);
+    return;
+  }
+
+  console.log(`${EMOJI.CLOCK} Initializing pre-auction sync scheduler (1 hour before auction)...`);
+
+  const calculateNextSaturday11AM = () => {
+    const now = new Date();
+    const GMT8_OFFSET = 8 * 60 * 60 * 1000;
+    const nowGMT8 = new Date(now.getTime() + GMT8_OFFSET);
+
+    // Set to 11:00 AM (1 hour before noon) in GMT+8
+    const targetGMT8 = new Date(nowGMT8);
+    targetGMT8.setUTCHours(11, 0, 0, 0);
+
+    const currentDay = targetGMT8.getUTCDay();
+    let daysUntilSaturday;
+
+    if (currentDay === 6) {
+      // Today is Saturday
+      if (targetGMT8.getTime() > nowGMT8.getTime()) {
+        daysUntilSaturday = 0;
+      } else {
+        daysUntilSaturday = 7;
+      }
+    } else {
+      daysUntilSaturday = (6 - currentDay + 7) % 7;
+      if (daysUntilSaturday === 0) daysUntilSaturday = 7;
+    }
+
+    targetGMT8.setUTCDate(targetGMT8.getUTCDate() + daysUntilSaturday);
+    return new Date(targetGMT8.getTime() - GMT8_OFFSET);
+  };
+
+  const scheduleNext = () => {
+    const nextUTC = calculateNextSaturday11AM();
+    const now = new Date();
+    const delay = nextUTC.getTime() - now.getTime();
+
+    const displayTime = new Date(nextUTC.getTime() + 8 * 60 * 60 * 1000);
+    const days = Math.floor(delay / 1000 / 60 / 60 / 24);
+    const hours = Math.floor((delay / 1000 / 60 / 60) % 24);
+    const minutes = Math.floor((delay / 1000 / 60) % 60);
+
+    console.log(`${EMOJI.CLOCK} Next pre-auction sync scheduled for: ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${days}d ${hours}h ${minutes}m)`);
+
+    preAuctionSyncTimer = setTimeout(async () => {
+      try {
+        console.log(`${EMOJI.RESET} [PRE-AUCTION SYNC] Starting 1-hour pre-auction sync (Sheets → MongoDB)...`);
+        const startTime = Date.now();
+
+        // Sync bidding points: Sheets → MongoDB
+        const mongoHelpers = require('./utils/mongodb-helpers');
+        const dbAPI = require('./utils/database-api');
+
+        try {
+          const pointsData = await sheetAPI.call('getBiddingPoints');
+          const members = pointsData.members || pointsData.data?.members || [];
+
+          if (members.length === 0) {
+            console.warn(`${EMOJI.WARNING} [PRE-AUCTION SYNC] No points data received from Sheets`);
+          } else {
+            const db = await dbAPI.connect();
+            const membersCollection = db.collection('members');
+            let syncedCount = 0;
+
+            for (const member of members) {
+              const username = member?.username?.trim();
+              if (!username) continue;
+
+              const pointsLeft = Number(member?.pointsLeft) || 0;
+              const pointsLocked = Number(member?.pointsLocked) || 0;
+
+              await membersCollection.updateOne(
+                { username: username },
+                {
+                  $set: {
+                    pointsLeft: pointsLeft,
+                    pointsLocked: pointsLocked,
+                    lastSyncFromSheets: new Date()
+                  }
+                },
+                { upsert: true }
+              );
+
+              syncedCount++;
+            }
+
+            console.log(`${EMOJI.SUCCESS} [PRE-AUCTION SYNC] Synced ${syncedCount} member points from Sheets → MongoDB`);
+          }
+        } catch (pointsError) {
+          console.error(`${EMOJI.ERROR} [PRE-AUCTION SYNC] Failed to sync points:`, pointsError.message);
+        }
+
+        // Also sync boss rotation (good measure)
+        try {
+          await bossRotation.refreshRotationCache();
+          console.log(`${EMOJI.SUCCESS} [PRE-AUCTION SYNC] Boss rotation synced`);
+        } catch (rotationError) {
+          console.error(`${EMOJI.ERROR} [PRE-AUCTION SYNC] Failed to sync rotation:`, rotationError.message);
+        }
+
+        const duration = Date.now() - startTime;
+        console.log(`${EMOJI.SUCCESS} [PRE-AUCTION SYNC] Sync complete (${duration}ms) - Ready for auction in 1 hour!`);
+
+      } catch (error) {
+        console.error(`${EMOJI.ERROR} [PRE-AUCTION SYNC] Failed:`, error.message);
+      }
+
+      // Schedule next week's sync
+      scheduleNext();
+    }, delay);
+  };
+
+  scheduleNext();
+  console.log(`${EMOJI.SUCCESS} Pre-auction sync scheduler initialized (11:00 AM GMT+8 every Saturday)`);
+}
+
+/**
  * Resets session finalization state and clears Session 2 polling/timers.
  * Use this when finalization crashed and left sessionFinalized stuck at false.
  *
@@ -4283,6 +4424,7 @@ module.exports = {
   handleForceSubmitResults,
   handleMoveToDistribution,
   scheduleWeeklySaturdayAuction, // Weekly Saturday 12:00 PM GMT+8 auction scheduler
+  schedulePreAuctionSync, // Pre-auction sync (Sheets → MongoDB) 1 hour before auction
   resetSessionState, // Reset sessionFinalized flag and clear Session 2 timers
   // getCurrentSessionBoss: () => currentSessionBoss - REMOVED: Not used anywhere
 };
