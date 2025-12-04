@@ -815,7 +815,7 @@ async function cleanupBiddingChannel() {
           for (const [threadId, thread] of activeThreads.threads) {
             try {
               // Skip specific threads that should never be locked
-              if (threadId === '1430356542871437494') {
+              if (config.protected_thread_ids && config.protected_thread_ids.includes(threadId)) {
                 threadsSkipped++;
                 console.log(`⏭️ Skipping protected thread: ${thread.name}`);
                 continue;
@@ -892,7 +892,7 @@ async function cleanupBiddingChannel() {
           for (const [threadId, thread] of archivedThreads.threads) {
             try {
               // Skip specific threads that should never be locked
-              if (threadId === '1430356542871437494') {
+              if (config.protected_thread_ids && config.protected_thread_ids.includes(threadId)) {
                 console.log(`⏭️ Skipping protected archived thread: ${thread.name}`);
                 continue;
               }

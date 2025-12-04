@@ -11,6 +11,9 @@
   "bot_manual_channel_id": "1431640753238442014",
   "boss_timer_channel_id": "1440868302237728879",
   "boss_spawn_announcement_channel_id": "1440868364691181648",
+  "protected_thread_ids": [
+    "1430356542871437494"
+  ],
   "admin_roles": [
     "GUILD LEADER",
     "ELITE",
