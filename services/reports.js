@@ -1,0 +1,660 @@
+/**
+ * ============================================================================
+ * WEEKLY & MONTHLY REPORTS SERVICE (MongoDB-Powered)
+ * ============================================================================
+ *
+ * PURPOSE:
+ * Generate comprehensive weekly and monthly guild activity reports
+ * Uses MongoDB for accurate, real-time statistics
+ *
+ * FEATURES:
+ * - Weekly reports with week-over-week comparison
+ * - Monthly comprehensive reports with trends
+ * - Accurate spawn-based attendance (columns, not member counts)
+ * - Top 3 from last week for guild rewards
+ * - Boss kill statistics
+ * - Member activity analytics
+ * - Bidding economy stats
+ *
+ * IMPORTANT: Attendance = Boss Spawns Killed (columns in sheets)
+ * NOT total member attendance counts
+ *
+ * @module reports
+ */
+
+// ============================================================================
+// DEPENDENCIES
+// ============================================================================
+
+const { EmbedBuilder } = require('discord.js');
+const dbAPI = require('../utils/database-api');
+const mongoHelpers = require('../utils/mongodb-helpers');
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Get week start date (Sunday)
+ */
+function getWeekStart(date = new Date()) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day;
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * Get week end date (Saturday)
+ */
+function getWeekEnd(date = new Date()) {
+  const start = getWeekStart(date);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+/**
+ * Get month start date
+ */
+function getMonthStart(date = new Date()) {
+  const d = new Date(date);
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * Get month end date
+ */
+function getMonthEnd(date = new Date()) {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + 1);
+  d.setDate(0);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+// ============================================================================
+// WEEKLY REPORT
+// ============================================================================
+
+/**
+ * Generate weekly report data from MongoDB
+ * Attendance = Total boss spawns killed (not member counts)
+ */
+async function generateWeeklyReport() {
+  const db = await dbAPI.connect();
+
+  // Current week dates
+  const thisWeekStart = getWeekStart();
+  const thisWeekEnd = getWeekEnd();
+
+  // Last week dates
+  const lastWeekStart = new Date(thisWeekStart);
+  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  const lastWeekEnd = new Date(thisWeekEnd);
+  lastWeekEnd.setDate(lastWeekEnd.getDate() - 7);
+
+  // Fetch data IN PARALLEL
+  const [thisWeekData, lastWeekData] = await Promise.all([
+    getWeekData(db, thisWeekStart, thisWeekEnd),
+    getWeekData(db, lastWeekStart, lastWeekEnd)
+  ]);
+
+  return {
+    thisWeek: thisWeekData,
+    lastWeek: lastWeekData,
+    weekStart: thisWeekStart,
+    weekEnd: thisWeekEnd
+  };
+}
+
+/**
+ * Get week statistics
+ * IMPORTANT: Groups by boss spawn (timestamp + boss) to count SPAWNS not member attendance
+ */
+async function getWeekData(db, startDate, endDate) {
+  // Get unique boss spawns (timestamp + boss combination = 1 spawn)
+  const spawns = await db.collection('attendance')
+    .aggregate([
+      {
+        $match: {
+          timestamp: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            boss: '$bossName',
+            timestamp: '$timestamp'
+          },
+          members: { $addToSet: '$memberName' }
+        }
+      },
+      {
+        $project: {
+          boss: '$_id.boss',
+          timestamp: '$_id.timestamp',
+          memberCount: { $size: '$members' }
+        }
+      }
+    ]).toArray();
+
+  // Boss kill counts
+  const bossKills = {};
+  spawns.forEach(spawn => {
+    bossKills[spawn.boss] = (bossKills[spawn.boss] || 0) + 1;
+  });
+
+  // Member attendance (how many spawns each member attended)
+  const memberAttendance = await db.collection('attendance')
+    .aggregate([
+      {
+        $match: {
+          timestamp: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $group: {
+          _id: '$memberName',
+          spawnsAttended: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { spawnsAttended: -1 }
+      }
+    ]).toArray();
+
+  // Calculate stats
+  const totalSpawns = spawns.length;
+  const totalMemberAttendance = memberAttendance.reduce((sum, m) => sum + m.spawnsAttended, 0);
+  const averageAttendancePerSpawn = totalSpawns > 0 ? Math.round((totalMemberAttendance / totalSpawns) * 10) / 10 : 0;
+  const uniqueMembers = memberAttendance.length;
+
+  // Calculate participation rate (avg attendance / total active members)
+  const totalActiveMembers = await db.collection('members')
+    .countDocuments({ isActive: true });
+  const participationRate = totalActiveMembers > 0
+    ? Math.round((averageAttendancePerSpawn / totalActiveMembers) * 100 * 10) / 10
+    : 0;
+
+  // Top 10 members
+  const top10Members = memberAttendance.slice(0, 10).map((m, index) => ({
+    rank: index + 1,
+    name: m._id,
+    spawnsAttended: m.spawnsAttended,
+    percentage: totalSpawns > 0 ? Math.round((m.spawnsAttended / totalSpawns) * 100 * 10) / 10 : 0
+  }));
+
+  // Top 5 bosses
+  const top5Bosses = Object.entries(bossKills)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([boss, kills]) => ({
+      boss,
+      kills,
+      percentage: totalSpawns > 0 ? Math.round((kills / totalSpawns) * 100 * 10) / 10 : 0
+    }));
+
+  // Most active day
+  const dayStats = {};
+  spawns.forEach(spawn => {
+    const day = new Date(spawn.timestamp).toLocaleDateString('en-US', { weekday: 'long' });
+    dayStats[day] = (dayStats[day] || 0) + 1;
+  });
+  const mostActiveDay = Object.entries(dayStats)
+    .sort((a, b) => b[1] - a[1])[0] || ['N/A', 0];
+
+  // Bidding stats
+  const members = await mongoHelpers.getAllMembers({ isActive: true });
+  const totalPointsEarned = members.reduce((sum, m) => sum + (m.pointsEarned || 0), 0);
+  const totalPointsSpent = members.reduce((sum, m) => sum + (m.pointsSpent || 0), 0);
+
+  return {
+    totalSpawns,
+    averageAttendancePerSpawn,
+    participationRate,
+    uniqueMembers,
+    top10Members,
+    top5Bosses,
+    mostActiveDay: {
+      day: mostActiveDay[0],
+      spawns: mostActiveDay[1]
+    },
+    bidding: {
+      pointsEarned: totalPointsEarned,
+      pointsSpent: totalPointsSpent,
+      netChange: totalPointsEarned - totalPointsSpent,
+      activeBidders: members.filter(m => (m.pointsSpent || 0) > 0).length
+    }
+  };
+}
+
+/**
+ * Build weekly report embed
+ */
+function buildWeeklyReportEmbed(reportData) {
+  const { thisWeek, lastWeek, weekStart, weekEnd } = reportData;
+
+  // Format dates
+  const dateRange = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+
+  // Calculate changes
+  const spawnChange = thisWeek.totalSpawns - lastWeek.totalSpawns;
+  const avgChange = thisWeek.averageAttendancePerSpawn - lastWeek.averageAttendancePerSpawn;
+  const partChange = thisWeek.participationRate - lastWeek.participationRate;
+  const memberChange = thisWeek.uniqueMembers - lastWeek.uniqueMembers;
+
+  const embed = new EmbedBuilder()
+    .setColor(0x3498DB)
+    .setTitle('📊 ELYSIUM WEEKLY REPORT')
+    .setDescription(`**Week of ${dateRange}**`)
+    .setTimestamp();
+
+  // Boss spawns this week
+  embed.addFields({
+    name: '📈 BOSS SPAWNS THIS WEEK',
+    value: [
+      `**Total Boss Spawns:** ${thisWeek.totalSpawns} spawns ${spawnChange >= 0 ? '▲' : '▼'} (${spawnChange > 0 ? '+' : ''}${spawnChange} from last week)`,
+      `**Average Attendance/Spawn:** ${thisWeek.averageAttendancePerSpawn} members`,
+      `**Participation Rate:** ${thisWeek.participationRate}%`
+    ].join('\n'),
+    inline: false
+  });
+
+  // Top 5 bosses
+  if (thisWeek.top5Bosses.length > 0) {
+    const bossLines = thisWeek.top5Bosses.map((b, i) => {
+      const emoji = ['🔥', '⚔️', '🗡️', '💀', '🌊'][i] || '⚡';
+      return `${i + 1}. ${emoji} **${b.boss}** - ${b.kills} spawns (${b.percentage}%)`;
+    });
+
+    embed.addFields({
+      name: '🎯 TOP 5 BOSSES KILLED',
+      value: bossLines.join('\n') || 'No data',
+      inline: false
+    });
+  }
+
+  // Top 10 members
+  if (thisWeek.top10Members.length > 0) {
+    const memberLines = thisWeek.top10Members.map((m, i) => {
+      const medal = i === 0 ? '🏆' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+      const stars = m.percentage >= 95 ? '⭐⭐⭐⭐⭐' :
+                    m.percentage >= 85 ? '⭐⭐⭐⭐' :
+                    m.percentage >= 75 ? '⭐⭐⭐' :
+                    m.percentage >= 60 ? '⭐⭐' : '⭐';
+      return `${medal} **${m.name}** - ${m.spawnsAttended}/${thisWeek.totalSpawns} (${m.percentage}%) ${stars}`;
+    });
+
+    embed.addFields({
+      name: '👥 TOP 10 MOST ACTIVE MEMBERS',
+      value: memberLines.join('\n'),
+      inline: false
+    });
+  }
+
+  // Top 3 from LAST week (for guild rewards)
+  if (lastWeek.top10Members.length > 0) {
+    const lastWeekTop3 = lastWeek.top10Members.slice(0, 3).map((m, i) => {
+      const medal = ['🥇', '🥈', '🥉'][i];
+      return `${medal} **${m.name}** - ${m.spawnsAttended}/${lastWeek.totalSpawns} spawns (${m.percentage}%)`;
+    });
+
+    embed.addFields({
+      name: '🏅 LAST WEEK\'S TOP 3 (For Guild Rewards)',
+      value: lastWeekTop3.join('\n'),
+      inline: false
+    });
+  }
+
+  // Week comparison
+  embed.addFields({
+    name: '📊 WEEK COMPARISON',
+    value: [
+      '```',
+      `                    This Week    Last Week    Change`,
+      `Boss Spawns:           ${String(thisWeek.totalSpawns).padStart(3)}          ${String(lastWeek.totalSpawns).padStart(3)}         ${spawnChange > 0 ? '+' : ''}${spawnChange} ${spawnChange >= 0 ? '▲' : '▼'}`,
+      `Avg Attendance:        ${String(thisWeek.averageAttendancePerSpawn).padStart(4)}         ${String(lastWeek.averageAttendancePerSpawn).padStart(4)}        ${avgChange > 0 ? '+' : ''}${avgChange.toFixed(1)} ${avgChange >= 0 ? '▲' : '▼'}`,
+      `Participation:         ${String(thisWeek.participationRate + '%').padStart(5)}        ${String(lastWeek.participationRate + '%').padStart(5)}       ${partChange > 0 ? '+' : ''}${partChange.toFixed(1)}% ${partChange >= 0 ? '▲' : '▼'}`,
+      `Unique Members:        ${String(thisWeek.uniqueMembers).padStart(3)}          ${String(lastWeek.uniqueMembers).padStart(3)}         ${memberChange > 0 ? '+' : ''}${memberChange} ${memberChange >= 0 ? '▲' : '▼'}`,
+      '```'
+    ].join('\n'),
+    inline: false
+  });
+
+  // Most active day
+  embed.addFields({
+    name: '🔥 MOST ACTIVE DAY',
+    value: `**${thisWeek.mostActiveDay.day}:** ${thisWeek.mostActiveDay.spawns} spawns killed`,
+    inline: false
+  });
+
+  // Bidding activity
+  embed.addFields({
+    name: '💰 BIDDING ACTIVITY',
+    value: [
+      `**Total Points Earned:** ${thisWeek.bidding.pointsEarned} points`,
+      `**Total Points Spent:** ${thisWeek.bidding.pointsSpent} points`,
+      `**Net Change:** ${thisWeek.bidding.netChange > 0 ? '+' : ''}${thisWeek.bidding.netChange} points`,
+      `**Active Bidders:** ${thisWeek.bidding.activeBidders} members`
+    ].join('\n'),
+    inline: false
+  });
+
+  // Guild performance
+  const rating = thisWeek.participationRate >= 85 ? '⭐⭐⭐⭐⭐ EXCELLENT' :
+                 thisWeek.participationRate >= 75 ? '⭐⭐⭐⭐ GREAT' :
+                 thisWeek.participationRate >= 65 ? '⭐⭐⭐ GOOD' :
+                 thisWeek.participationRate >= 50 ? '⭐⭐ FAIR' : '⭐ NEEDS IMPROVEMENT';
+
+  const trend = spawnChange > 0 ? '📈 IMPROVING' :
+                spawnChange < 0 ? '📉 DECLINING' : '➡️ STABLE';
+
+  const status = thisWeek.participationRate >= 80 ? '🟢 VERY ACTIVE' :
+                 thisWeek.participationRate >= 60 ? '🟡 ACTIVE' :
+                 thisWeek.participationRate >= 40 ? '🟠 MODERATE' : '🔴 LOW ACTIVITY';
+
+  embed.addFields({
+    name: '🎯 GUILD PERFORMANCE',
+    value: [
+      `**Rating:** ${rating}`,
+      `**Trend:** ${trend}`,
+      `**Status:** ${status}`
+    ].join('\n'),
+    inline: false
+  });
+
+  embed.setFooter({ text: `Generated: ${new Date().toLocaleDateString()} | Next Report: Next Sunday` });
+
+  return embed;
+}
+
+// ============================================================================
+// MONTHLY REPORT
+// ============================================================================
+
+/**
+ * Generate monthly report data from MongoDB
+ */
+async function generateMonthlyReport(date = new Date()) {
+  const db = await dbAPI.connect();
+
+  const monthStart = getMonthStart(date);
+  const monthEnd = getMonthEnd(date);
+
+  // Get all spawns for the month
+  const spawns = await db.collection('attendance')
+    .aggregate([
+      {
+        $match: {
+          timestamp: { $gte: monthStart, $lte: monthEnd }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            boss: '$bossName',
+            timestamp: '$timestamp'
+          },
+          members: { $addToSet: '$memberName' }
+        }
+      }
+    ]).toArray();
+
+  // Boss statistics
+  const bossKills = {};
+  spawns.forEach(spawn => {
+    bossKills[spawn._id.boss] = (bossKills[spawn._id.boss] || 0) + 1;
+  });
+
+  // Member leaderboard
+  const memberStats = await db.collection('attendance')
+    .aggregate([
+      {
+        $match: {
+          timestamp: { $gte: monthStart, $lte: monthEnd }
+        }
+      },
+      {
+        $group: {
+          _id: '$memberName',
+          spawnsAttended: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { spawnsAttended: -1 }
+      }
+    ]).toArray();
+
+  const totalSpawns = spawns.length;
+
+  // Top 20 members
+  const top20Members = memberStats.slice(0, 20).map((m, index) => ({
+    rank: index + 1,
+    name: m._id,
+    spawnsAttended: m.spawnsAttended,
+    percentage: totalSpawns > 0 ? Math.round((m.spawnsAttended / totalSpawns) * 100 * 10) / 10 : 0
+  }));
+
+  // Weekly breakdown
+  const weeks = [];
+  let weekStart = getWeekStart(monthStart);
+  while (weekStart <= monthEnd) {
+    const weekEnd = getWeekEnd(weekStart);
+    const weekSpawns = spawns.filter(s =>
+      s._id.timestamp >= weekStart && s._id.timestamp <= weekEnd
+    );
+    weeks.push({
+      weekNum: weeks.length + 1,
+      spawns: weekSpawns.length,
+      avgPerDay: weekSpawns.length / 7
+    });
+    weekStart = new Date(weekStart);
+    weekStart.setDate(weekStart.getDate() + 7);
+  }
+
+  // Activity patterns
+  const dayStats = {};
+  const hourStats = {};
+  spawns.forEach(spawn => {
+    const date = new Date(spawn._id.timestamp);
+    const day = date.toLocaleDateString('en-US', { weekday: 'long' });
+    const hour = date.getHours();
+
+    dayStats[day] = (dayStats[day] || 0) + 1;
+    hourStats[hour] = (hourStats[hour] || 0) + 1;
+  });
+
+  const topDays = Object.entries(dayStats)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+
+  const topHours = Object.entries(hourStats)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([hour, count]) => ({
+      hour: `${hour}:00-${parseInt(hour) + 1}:00`,
+      count
+    }));
+
+  // Bidding stats
+  const members = await mongoHelpers.getAllMembers({ isActive: true });
+  const totalPointsEarned = members.reduce((sum, m) => sum + (m.pointsEarned || 0), 0);
+  const totalPointsSpent = members.reduce((sum, m) => sum + (m.pointsSpent || 0), 0);
+
+  return {
+    month: date,
+    totalSpawns,
+    totalMemberAttendance: memberStats.reduce((sum, m) => sum + m.spawnsAttended, 0),
+    avgPerSpawn: totalSpawns > 0 ? Math.round((memberStats.reduce((sum, m) => sum + m.spawnsAttended, 0) / totalSpawns) * 10) / 10 : 0,
+    uniqueMembers: memberStats.length,
+    activeDays: new Set(spawns.map(s => new Date(s._id.timestamp).toDateString())).size,
+    bossKills,
+    top20Members,
+    weeks,
+    topDays,
+    topHours,
+    bidding: {
+      earned: totalPointsEarned,
+      spent: totalPointsSpent,
+      net: totalPointsEarned - totalPointsSpent
+    }
+  };
+}
+
+/**
+ * Build monthly report embed (comprehensive)
+ */
+function buildMonthlyReportEmbed(reportData) {
+  const monthName = reportData.month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const daysInMonth = new Date(reportData.month.getFullYear(), reportData.month.getMonth() + 1, 0).getDate();
+
+  const embed = new EmbedBuilder()
+    .setColor(0x9B59B6)
+    .setTitle(`📊 ELYSIUM MONTHLY REPORT - ${monthName.toUpperCase()}`)
+    .setTimestamp();
+
+  // Monthly overview
+  embed.addFields({
+    name: '📈 MONTHLY OVERVIEW',
+    value: [
+      `**Reporting Period:** ${monthName}`,
+      `**Total Boss Spawns:** ${reportData.totalSpawns} spawns`,
+      `**Total Attendance:** ${reportData.totalMemberAttendance} member-kills`,
+      `**Average Per Spawn:** ${reportData.avgPerSpawn} members`,
+      `**Unique Participants:** ${reportData.uniqueMembers} members`,
+      `**Active Days:** ${reportData.activeDays} out of ${daysInMonth} days (${Math.round((reportData.activeDays / daysInMonth) * 100)}%)`
+    ].join('\n'),
+    inline: false
+  });
+
+  // Boss statistics (top 10)
+  const bossEntries = Object.entries(reportData.bossKills)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+
+  if (bossEntries.length > 0) {
+    const bossLines = bossEntries.map(([boss, kills], i) => {
+      const percentage = Math.round((kills / reportData.totalSpawns) * 100 * 10) / 10;
+      const emoji = ['🔥', '⚔️', '🗡️', '💀', '🌊', '⚡', '👹', '🐉', '☠️', '⚔'][i] || '•';
+      return `${i + 1}. ${emoji} **${boss}** - ${kills} spawns (${percentage}%)`;
+    });
+
+    embed.addFields({
+      name: '🎯 TOP 10 BOSSES KILLED',
+      value: bossLines.join('\n'),
+      inline: false
+    });
+  }
+
+  // Top 20 members (split into 2 fields for better formatting)
+  if (reportData.top20Members.length > 0) {
+    const top10 = reportData.top20Members.slice(0, 10).map(m => {
+      const medal = m.rank === 1 ? '👑' : m.rank === 2 ? '🥈' : m.rank === 3 ? '🥉' : `${m.rank}.`;
+      const stars = m.percentage >= 95 ? '⭐⭐⭐⭐⭐' :
+                    m.percentage >= 85 ? '⭐⭐⭐⭐' :
+                    m.percentage >= 75 ? '⭐⭐⭐' : '';
+      return `${medal} **${m.name}** - ${m.spawnsAttended}/${reportData.totalSpawns} (${m.percentage}%) ${stars}`;
+    });
+
+    embed.addFields({
+      name: '🏆 TOP 20 MEMBERS BY ATTENDANCE',
+      value: top10.join('\n'),
+      inline: false
+    });
+
+    if (reportData.top20Members.length > 10) {
+      const next10 = reportData.top20Members.slice(10, 20).map(m => {
+        return `${m.rank}. **${m.name}** - ${m.spawnsAttended}/${reportData.totalSpawns} (${m.percentage}%)`;
+      });
+
+      embed.addFields({
+        name: '​', // Zero-width space for continuation
+        value: next10.join('\n'),
+        inline: false
+      });
+    }
+  }
+
+  // Weekly breakdown
+  if (reportData.weeks.length > 0) {
+    const weekLines = reportData.weeks.map(w =>
+      `Week ${w.weekNum}: **${w.spawns} spawns** (avg ${w.avgPerDay.toFixed(1)}/day)${w.spawns === Math.max(...reportData.weeks.map(wk => wk.spawns)) ? ' 📈 Best!' : ''}`
+    );
+
+    embed.addFields({
+      name: '📅 WEEKLY BREAKDOWN',
+      value: weekLines.join('\n'),
+      inline: false
+    });
+  }
+
+  // Activity patterns
+  const dayLines = reportData.topDays.map(([day, count], i) =>
+    `${i + 1}. **${day}:** ${count} spawns (${Math.round((count / reportData.totalSpawns) * 100)}%)`
+  );
+
+  const hourLines = reportData.topHours.map((h, i) =>
+    `${i + 1}. **${h.hour}:** ${h.count} spawns (${Math.round((h.count / reportData.totalSpawns) * 100)}%)`
+  );
+
+  embed.addFields({
+    name: '🕐 ACTIVITY PATTERNS',
+    value: [
+      '**Peak Days:**',
+      ...dayLines,
+      '',
+      '**Peak Hours (Server Time):**',
+      ...hourLines
+    ].join('\n'),
+    inline: false
+  });
+
+  // Bidding & economy
+  embed.addFields({
+    name: '💰 BIDDING & ECONOMY',
+    value: [
+      `**Total Points Earned:** ${reportData.bidding.earned} points`,
+      `**Total Points Spent:** ${reportData.bidding.spent} points`,
+      `**Net Change:** ${reportData.bidding.net > 0 ? '+' : ''}${reportData.bidding.net} points`
+    ].join('\n'),
+    inline: false
+  });
+
+  // Guild performance
+  const participation = Math.round((reportData.avgPerSpawn / reportData.uniqueMembers) * 100);
+  const rating = participation >= 85 ? '⭐⭐⭐⭐⭐ EXCELLENT' :
+                 participation >= 75 ? '⭐⭐⭐⭐ VERY HIGH' :
+                 participation >= 65 ? '⭐⭐⭐ HIGH' : '⭐⭐ MODERATE';
+
+  embed.addFields({
+    name: '📊 GUILD PERFORMANCE METRICS',
+    value: [
+      `**Activity Level:** ${rating}`,
+      `**Member Engagement:** ${participation}%`,
+      `**Roster Health:** 🟢 STRONG`,
+      `**Month Trend:** 📈 GROWING`
+    ].join('\n'),
+    inline: false
+  });
+
+  embed.setFooter({ text: `Generated: ${new Date().toLocaleDateString()} | Next Report: End of next month` });
+
+  return embed;
+}
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
+module.exports = {
+  generateWeeklyReport,
+  buildWeeklyReportEmbed,
+  generateMonthlyReport,
+  buildMonthlyReportEmbed
+};

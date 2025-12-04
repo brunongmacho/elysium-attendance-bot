@@ -112,6 +112,8 @@ const dbAPI = require('./utils/database-api'); // MongoDB Database API
 const mongoHelpers = require('./utils/mongodb-helpers'); // MongoDB helper functions (Phase 4)
 const memberLore = JSON.parse(fs.readFileSync("./member-lore.json")); // Member lore data
 const { COMMAND_ALIASES, resolveCommandAlias } = require('./config/command-aliases'); // Command alias mapping
+const BackgroundSync = require('./services/background-sync'); // Background MongoDB → Sheets sync (Phase 5.1)
+const reports = require('./services/reports'); // Weekly & monthly reports (Phase 6)
 
 // =====================================================================
 // SECTION 1B: COMMAND ALIASES (moved to config/command-aliases.js)
@@ -3892,6 +3894,40 @@ stats: async (message, member, args) => {
     await leaderboardSystem.displayCombinedLeaderboards(message);
   },
 
+  // ==========================================
+  // WEEKLY & MONTHLY REPORT COMMANDS (Phase 6)
+  // ==========================================
+
+  weekly: async (message, member) => {
+    try {
+      console.log(`📊 ${member.user.username} requested weekly report`);
+      await message.channel.send('📊 Generating weekly report...');
+
+      const data = await reports.generateWeeklyReport();
+      const embed = reports.buildWeeklyReportEmbed(data);
+
+      await message.channel.send({ embeds: [embed] });
+    } catch (error) {
+      console.error('❌ Failed to generate weekly report:', error);
+      await message.reply('⚠️ Failed to generate weekly report. Please try again later.');
+    }
+  },
+
+  monthly: async (message, member) => {
+    try {
+      console.log(`📊 ${member.user.username} requested monthly report`);
+      await message.channel.send('📊 Generating monthly report...');
+
+      const data = await reports.generateMonthlyReport();
+      const embed = reports.buildMonthlyReportEmbed(data);
+
+      await message.channel.send({ embeds: [embed] });
+    } catch (error) {
+      console.error('❌ Failed to generate monthly report:', error);
+      await message.reply('⚠️ Failed to generate monthly report. Please try again later.');
+    }
+  },
+
   weeklyreport: async (message, member) => {
     // Permission check is done in routing logic
     console.log(`📅 ${member.user.username} manually triggered weekly report in channel: ${message.channel?.name || message.channel?.id}`);
@@ -4370,6 +4406,11 @@ client.once(Events.ClientReady, async () => {
   leaderboardSystem.scheduleWeeklyReport();
   leaderboardSystem.scheduleMonthlyReport();
   auctioneering.scheduleWeeklySaturdayAuction(client, config);
+
+  // START BACKGROUND SYNC SERVICE (Phase 5.1) - MongoDB → Sheets every 5 minutes
+  const backgroundSync = new BackgroundSync(config, sheetAPI);
+  backgroundSync.start();
+  console.log('✅ Background sync service started (syncs MongoDB → Sheets every 5 minutes)');
 
   // WARM UP GOOGLE SHEETS CACHE (preload frequently accessed data)
   console.log('🔥 Warming up cache...');
@@ -5310,6 +5351,8 @@ client.on(Events.MessageCreate, async (message) => {
       resolvedCmd === "!leaderboards" ||
       resolvedCmd === "!weeklyreport" ||
       resolvedCmd === "!monthlyreport" ||
+      resolvedCmd === "!weekly" ||
+      resolvedCmd === "!monthly" ||
       resolvedCmd === "!activity"
     ) {
       // Define bot commands channel (reuse from above if already defined)
@@ -5363,6 +5406,10 @@ client.on(Events.MessageCreate, async (message) => {
         await commandHandlers.weeklyreport(message, member);
       } else if (resolvedCmd === "!monthlyreport") {
         await commandHandlers.monthlyreport(message, member);
+      } else if (resolvedCmd === "!weekly") {
+        await commandHandlers.weekly(message, member);
+      } else if (resolvedCmd === "!monthly") {
+        await commandHandlers.monthly(message, member);
       } else if (resolvedCmd === "!activity") {
         await commandHandlers.activity(message, member);
       }
