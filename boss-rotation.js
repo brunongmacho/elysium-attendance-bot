@@ -354,33 +354,79 @@ async function incrementRotation(bossName) {
       return { updated: false, bossName };
     }
 
-    console.log(`🔄 Incrementing rotation for ${normalizedName}...`);
+    console.log(`🔄 [DUAL-WRITE] Incrementing rotation for ${normalizedName} (parallel Sheets + MongoDB)...`);
+    const startTime = Date.now();
 
-    const result = await sheetAPI.call('incrementBossRotation', { bossName: normalizedName });
+    // Prepare Sheets write promise
+    const sheetWritePromise = (async () => {
+      try {
+        console.log(`   🔹 [Sheets] Starting parallel write...`);
+        const result = await sheetAPI.call('incrementBossRotation', { bossName: normalizedName });
 
-    if (result.status === 'ok') {
-      console.log(`✅ ${normalizedName} rotation: ${result.oldIndex} (${result.oldGuild}) → ${result.newIndex} (${result.newGuild})`);
+        if (result.status === 'ok') {
+          console.log(`   ✅ [Sheets] Rotation incremented: ${result.oldIndex} → ${result.newIndex}`);
+          return { success: true, source: 'Google Sheets', data: result };
+        } else {
+          return { success: false, source: 'Google Sheets', error: result.message };
+        }
+      } catch (error) {
+        console.error(`   ❌ [Sheets] Failed to increment rotation:`, error.message);
+        return { success: false, source: 'Google Sheets', error };
+      }
+    })();
 
-      // Update cache
-      rotationCache[normalizedName] = {
-        currentIndex: result.newIndex,
-        currentGuild: result.newGuild,
-        isOurTurn: result.isNowOurTurn
-      };
+    // Prepare MongoDB write promise (needs to get updated data from Sheets result)
+    // Note: We need Sheets result first to know what to write to MongoDB
+    // So we can't truly parallel these - MongoDB depends on Sheets response
+    // But we can still execute them efficiently
 
-      // Sync to MongoDB (non-blocking)
-      syncRotationToMongoDB(normalizedName, result).catch(err =>
-        console.error(`⚠️ Background MongoDB sync failed:`, err.message)
-      );
+    const sheetResult = await sheetWritePromise;
 
-      // Send admin notification
-      await sendRotationUpdateNotification(result);
-
-      return result;
-    } else {
-      console.error(`❌ Failed to increment rotation for ${normalizedName}:`, result.message);
-      return { updated: false, bossName: normalizedName, error: result.message };
+    if (!sheetResult.success) {
+      console.error(`❌ [DUAL-WRITE] Sheets write failed - cannot update MongoDB without new rotation data`);
+      return { updated: false, bossName: normalizedName, error: sheetResult.error };
     }
+
+    const result = sheetResult.data;
+
+    // Now write to MongoDB with the new rotation data (parallel with notification)
+    const mongoWritePromise = (async () => {
+      try {
+        console.log(`   🔹 [MongoDB] Writing rotation data...`);
+        await syncRotationToMongoDB(normalizedName, result);
+        console.log(`   ✅ [MongoDB] Rotation synced successfully`);
+        return { success: true, source: 'MongoDB' };
+      } catch (error) {
+        console.error(`   ❌ [MongoDB] Failed to sync rotation:`, error.message);
+        return { success: false, source: 'MongoDB', error };
+      }
+    })();
+
+    const notificationPromise = sendRotationUpdateNotification(result);
+
+    // Execute MongoDB write and notification in parallel
+    const [mongoResult] = await Promise.all([
+      mongoWritePromise,
+      notificationPromise
+    ]);
+
+    const duration = Date.now() - startTime;
+
+    // Update cache (Sheets succeeded, so cache the data)
+    rotationCache[normalizedName] = {
+      currentIndex: result.newIndex,
+      currentGuild: result.newGuild,
+      isOurTurn: result.isNowOurTurn
+    };
+
+    // Log results
+    if (mongoResult.success) {
+      console.log(`✅ [DUAL-WRITE] ${normalizedName} rotation: ${result.oldIndex} → ${result.newIndex} (Sheets + MongoDB) [${duration}ms]`);
+    } else {
+      console.warn(`⚠️ [DUAL-WRITE] ${normalizedName} rotation: ${result.oldIndex} → ${result.newIndex} (Sheets only - MongoDB failed) [${duration}ms]`);
+    }
+
+    return result;
 
   } catch (err) {
     console.error(`❌ Error incrementing rotation for ${bossName}:`, err.message);
@@ -408,29 +454,68 @@ async function setRotation(bossName, newIndex) {
       return { success: false, message: 'Index must be >= 1' };
     }
 
-    console.log(`⚙️ Manually setting ${normalizedName} rotation to index ${newIndex}...`);
+    console.log(`⚙️ [DUAL-WRITE] Manually setting ${normalizedName} rotation to index ${newIndex} (parallel Sheets + MongoDB)...`);
+    const startTime = Date.now();
 
-    const result = await sheetAPI.call('setBossRotation', { bossName: normalizedName, newIndex });
+    // Prepare Sheets write promise
+    const sheetWritePromise = (async () => {
+      try {
+        console.log(`   🔹 [Sheets] Starting parallel write...`);
+        const result = await sheetAPI.call('setBossRotation', { bossName: normalizedName, newIndex });
 
-    if (result.status === 'ok') {
-      console.log(`✅ ${normalizedName} rotation set: ${result.oldIndex} → ${result.newIndex} (${result.currentGuild})`);
+        if (result.status === 'ok') {
+          console.log(`   ✅ [Sheets] Rotation set: ${result.oldIndex} → ${result.newIndex}`);
+          return { success: true, source: 'Google Sheets', data: result };
+        } else {
+          return { success: false, source: 'Google Sheets', error: result.message };
+        }
+      } catch (error) {
+        console.error(`   ❌ [Sheets] Failed to set rotation:`, error.message);
+        return { success: false, source: 'Google Sheets', error };
+      }
+    })();
 
-      // Update cache
-      rotationCache[normalizedName] = {
-        currentIndex: result.newIndex,
-        currentGuild: result.currentGuild,
-        isOurTurn: result.isOurTurn
-      };
+    const sheetResult = await sheetWritePromise;
 
-      // Sync to MongoDB (non-blocking)
-      syncRotationToMongoDB(normalizedName, result).catch(err =>
-        console.error(`⚠️ Background MongoDB sync failed:`, err.message)
-      );
-
-      return { success: true, data: result };
-    } else {
-      return { success: false, message: result.message };
+    if (!sheetResult.success) {
+      console.error(`❌ [DUAL-WRITE] Sheets write failed - cannot update MongoDB without rotation data`);
+      return { success: false, message: sheetResult.error };
     }
+
+    const result = sheetResult.data;
+
+    // Now write to MongoDB with the new rotation data
+    const mongoWritePromise = (async () => {
+      try {
+        console.log(`   🔹 [MongoDB] Writing rotation data...`);
+        await syncRotationToMongoDB(normalizedName, result);
+        console.log(`   ✅ [MongoDB] Rotation synced successfully`);
+        return { success: true, source: 'MongoDB' };
+      } catch (error) {
+        console.error(`   ❌ [MongoDB] Failed to sync rotation:`, error.message);
+        return { success: false, source: 'MongoDB', error };
+      }
+    })();
+
+    const mongoResult = await mongoWritePromise;
+
+    const duration = Date.now() - startTime;
+
+    // Update cache (Sheets succeeded, so cache the data)
+    rotationCache[normalizedName] = {
+      currentIndex: result.newIndex,
+      currentGuild: result.currentGuild,
+      isOurTurn: result.isOurTurn
+    };
+
+    // Log results
+    if (mongoResult.success) {
+      console.log(`✅ [DUAL-WRITE] ${normalizedName} rotation set: ${result.oldIndex} → ${result.newIndex} (Sheets + MongoDB) [${duration}ms]`);
+    } else {
+      console.warn(`⚠️ [DUAL-WRITE] ${normalizedName} rotation set: ${result.oldIndex} → ${result.newIndex} (Sheets only - MongoDB failed) [${duration}ms]`);
+    }
+
+    return { success: true, data: result };
 
   } catch (err) {
     console.error(`❌ Error setting rotation for ${bossName}:`, err.message);

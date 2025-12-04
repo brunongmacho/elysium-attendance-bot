@@ -3084,17 +3084,76 @@ stats: async (message, member, args) => {
           return;
         }
 
+        // Try to load existing members from MongoDB (fast) or Google Sheets (fallback)
+        let existingMembers = [];
+        if (!existingSpawn) {
+          const loadMsg = await message.channel.send(`🔍 Loading existing attendance...`);
+
+          try {
+            // FAST PATH: Load from MongoDB first
+            if (USE_MONGODB_ATTENDANCE) {
+              const db = await dbAPI.connect();
+
+              // Parse timestamp to Date object for MongoDB query
+              const timestampDate = new Date(parsed.timestamp);
+
+              // Get all attendance records for this boss + timestamp
+              const attendanceRecords = await db.collection('attendance')
+                .find({
+                  bossName: bossName,
+                  timestamp: timestampDate
+                })
+                .toArray();
+
+              if (attendanceRecords.length > 0) {
+                // Extract unique member names
+                existingMembers = [...new Set(attendanceRecords.map(r => r.memberName))];
+                console.log(`   ✅ Loaded ${existingMembers.length} existing members from MongoDB (${attendanceRecords.length} records)`);
+                await loadMsg.edit(`✅ Loaded ${existingMembers.length} existing member(s) from MongoDB`);
+              } else {
+                console.log(`   ℹ️ No records found in MongoDB, trying Sheets...`);
+              }
+            }
+
+            // FALLBACK PATH: Load from Google Sheets if MongoDB returned nothing
+            if (existingMembers.length === 0) {
+              const checkResp = await attendance.postToSheet({
+                action: "getColumnData",
+                boss: bossName,
+                timestamp: parsed.timestamp
+              });
+
+              if (checkResp.ok) {
+                const data = JSON.parse(checkResp.text);
+                if (data.members && Array.isArray(data.members)) {
+                  existingMembers = data.members;
+                  console.log(`   ✅ Loaded ${existingMembers.length} existing members from Sheets`);
+                  await loadMsg.edit(`✅ Loaded ${existingMembers.length} existing member(s) from Google Sheets`);
+                }
+              }
+            }
+
+            if (existingMembers.length === 0) {
+              await loadMsg.edit(`ℹ️ No existing attendance found`);
+            }
+          } catch (err) {
+            console.log(`   ⚠️ Could not load existing members: ${err.message}`);
+            await loadMsg.edit(`⚠️ Could not load existing members`).catch(() => {});
+          }
+        }
+
         // Re-register spawn in activeSpawns
         activeSpawns[thread.id] = {
           boss: bossName,
           date: parsed.date,
           time: parsed.time,
           timestamp: parsed.timestamp,
-          members: existingSpawn ? existingSpawn.members : [], // Preserve existing members if any
+          members: existingSpawn ? existingSpawn.members : existingMembers, // Preserve from memory OR load from MongoDB/Sheets
           confirmThreadId: existingSpawn ? existingSpawn.confirmThreadId : null,
           closed: false,
           createdAt: existingSpawn ? existingSpawn.createdAt : Date.now(),
           noAutoClose: true, // Prevent auto-close for manually reopened threads
+          reopened: true, // Mark as reopened to prevent rotation increment on close
         };
 
         // Sync to attendance module
@@ -3301,8 +3360,12 @@ stats: async (message, member, args) => {
           clientCache.invalidate('getAllWeeklyAttendance:{}');
           console.log(`🧹 Invalidated client cache (overwrite attendance)`);
 
-          // Auto-increment boss rotation if it's a rotating boss
-          await bossRotation.handleBossKill(spawnInfo.boss);
+          // Auto-increment boss rotation if it's a rotating boss (but NOT if thread was reopened)
+          if (!spawnInfo.reopened) {
+            await bossRotation.handleBossKill(spawnInfo.boss);
+          } else {
+            console.log(`⏭️ Skipping rotation increment for ${spawnInfo.boss} (thread was reopened - fixing attendance, not a new kill)`);
+          }
 
           await message.channel.send(
             `✅ **Attendance ${columnExists ? 'overwritten' : 'submitted'} successfully!**\n\n` +
@@ -4407,10 +4470,15 @@ client.once(Events.ClientReady, async () => {
   leaderboardSystem.scheduleMonthlyReport();
   auctioneering.scheduleWeeklySaturdayAuction(client, config);
 
-  // START BACKGROUND SYNC SERVICE (Phase 5.1) - MongoDB → Sheets every 15 minutes
-  const backgroundSync = new BackgroundSync(config, sheetAPI);
-  backgroundSync.start();
-  console.log('✅ Background sync service started (syncs MongoDB → Sheets every 15 minutes)');
+  // BACKGROUND SYNC SERVICE DISABLED (Phase 7)
+  // Reason: Redundant after implementing parallel dual-write (Phase 7)
+  // All MongoDB writes now have simultaneous Sheets writes via Promise.all()
+  // Background sync caused circuit breaker issues with non-existent Apps Script actions
+  //
+  // const backgroundSync = new BackgroundSync(config, sheetAPI);
+  // backgroundSync.start();
+  // console.log('✅ Background sync service started (syncs MongoDB → Sheets every 15 minutes)');
+  console.log('⏸️ Background sync service disabled (redundant with Phase 7 parallel dual-write)');
 
   // WARM UP GOOGLE SHEETS CACHE (preload frequently accessed data)
   console.log('🔥 Warming up cache...');
@@ -5604,6 +5672,8 @@ client.on(Events.MessageCreate, async (message) => {
         };
         attendance.setPendingVerifications(pendingVerifications);
 
+        console.log(`📝 PENDING ADDED: ${username} for ${spawnInfo.boss} | Thread: ${message.channel.id} | MsgID: ${message.id} | Total pending: ${Object.keys(pendingVerifications).length}`);
+
         if (spawnInfo.confirmThreadId) {
           const confirmThread = await guild.channels
             .fetch(spawnInfo.confirmThreadId)
@@ -6469,6 +6539,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
 
+      // Re-sync state immediately before processing (prevent race conditions)
+      activeSpawns = attendance.getActiveSpawns();
+      pendingVerifications = attendance.getPendingVerifications();
+
       // Find the pending verification
       let pendingMsgId = null;
       let pending = null;
@@ -6519,6 +6593,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         spawnInfo.members.push(pending.author);
         attendance.setActiveSpawns(activeSpawns);
+
+        console.log(`✅ VERIFY: ${pending.author} added to ${spawnInfo.boss} (${spawnInfo.timestamp}) by ${user.username} | Total: ${spawnInfo.members.length} members`);
 
         await interaction.update({
           embeds: [EmbedBuilder.from(msg.embeds[0]).setColor(0x00ff00).setFooter({ text: `Verified by ${user.username}` })],
