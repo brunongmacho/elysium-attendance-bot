@@ -219,6 +219,13 @@ const sheetAPI = new SheetAPI(config.sheet_webhook_url);
 const USE_MONGODB_BIDDING = process.env.USE_MONGODB_BIDDING === 'true';
 
 /**
+ * Feature flag: Enable MongoDB for attendance operations (Phase 4.5)
+ * When true, commands like !stats use MongoDB for attendance data instead of Sheets
+ * @type {boolean}
+ */
+const USE_MONGODB_ATTENDANCE = process.env.USE_MONGODB_ATTENDANCE === 'true';
+
+/**
  * Global Discord channel cache instance
  * Reduces redundant channel fetch calls by 60-80%
  * @type {DiscordCache|null}
