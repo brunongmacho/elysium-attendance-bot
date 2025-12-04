@@ -39,7 +39,7 @@ class BackgroundSync {
   constructor(config, sheetAPI) {
     this.config = config;
     this.sheetAPI = sheetAPI;
-    this.syncInterval = 5 * 60 * 1000; // 5 minutes in milliseconds
+    this.syncInterval = 15 * 60 * 1000; // 15 minutes in milliseconds (optimized for memory)
     this.timer = null;
     this.isRunning = false;
     this.lastSyncTime = null;
@@ -55,13 +55,10 @@ class BackgroundSync {
       return;
     }
 
-    console.log('✅ Background sync service started (interval: 5 minutes)');
+    console.log('✅ Background sync service started (interval: 15 minutes)');
     this.isRunning = true;
 
-    // Run immediately on startup
-    this.runSync();
-
-    // Then run every 5 minutes
+    // Wait for first interval before running (don't run immediately to reduce startup memory pressure)
     this.timer = setInterval(() => {
       this.runSync();
     }, this.syncInterval);
@@ -92,9 +89,14 @@ class BackgroundSync {
       console.log(`   💰 Points: ${pointsResult.synced} members ${pointsResult.error ? `(⚠️ ${pointsResult.error})` : ''}`);
       console.log(`   🔄 Rotation: ${rotationResult.synced} bosses ${rotationResult.error ? `(⚠️ ${rotationResult.error})` : ''}`);
 
+      // Force garbage collection to reduce memory pressure
+      if (global.gc) {
+        global.gc();
+      }
+
     } catch (error) {
       console.error('❌ [Background Sync] Critical error:', error.message);
-      // Non-critical - will retry in 5 minutes
+      // Non-critical - will retry in 15 minutes
     }
   }
 
