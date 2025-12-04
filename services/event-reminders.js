@@ -25,6 +25,7 @@
 
 const mongoHelpers = require('../utils/mongodb-helpers');
 const { EmbedBuilder } = require('discord.js');
+const { DISCORD_ERRORS } = require('../utils/constants');
 
 // ============================================================================
 // CONFIGURATION
@@ -131,10 +132,10 @@ async function sendReminderNotification(reminder) {
       console.error(`❌ Failed to fetch channel ${reminder.channelId} for reminder "${reminder.eventName}":`, fetchError.message);
 
       // Deactivate reminder if channel is permanently inaccessible
-      if (fetchError.code === 10003) { // Unknown Channel
+      if (fetchError.code === DISCORD_ERRORS.UNKNOWN_CHANNEL) {
         console.log(`⚠️ Channel ${reminder.channelId} no longer exists, deactivating reminder "${reminder.eventName}"`);
         await mongoHelpers.deactivateReminder(reminder._id.toString());
-      } else if (fetchError.code === 50001) { // Missing Access
+      } else if (fetchError.code === DISCORD_ERRORS.MISSING_ACCESS) {
         console.log(`⚠️ No access to channel ${reminder.channelId}, deactivating reminder "${reminder.eventName}"`);
         await mongoHelpers.deactivateReminder(reminder._id.toString());
       } else {
@@ -181,7 +182,7 @@ async function sendReminderNotification(reminder) {
       console.error(`❌ Failed to send message for reminder "${reminder.eventName}":`, sendError.message);
 
       // Deactivate if permissions issue or channel deleted
-      if (sendError.code === 50013 || sendError.code === 10003) {
+      if (sendError.code === DISCORD_ERRORS.MISSING_PERMISSIONS || sendError.code === DISCORD_ERRORS.UNKNOWN_CHANNEL) {
         console.log(`⚠️ Deactivating reminder "${reminder.eventName}" due to send failure`);
         await mongoHelpers.deactivateReminder(reminder._id.toString());
         return;

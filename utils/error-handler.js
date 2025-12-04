@@ -25,6 +25,8 @@
  * ============================================================================
  */
 
+const { DISCORD_ERRORS } = require('./constants');
+
 // ============================================================================
 // LOG LEVELS
 // ============================================================================
@@ -343,9 +345,9 @@ async function safeDelete(message, context = 'message deletion') {
   } catch (error) {
     // Silently ignore expected errors that occur during normal cleanup
     const isExpectedError =
-      error?.code === 10003 || // Unknown Channel (channel deleted)
-      error?.code === 10008 || // Unknown Message (already deleted)
-      error?.code === 50083 || // Thread is archived
+      error?.code === DISCORD_ERRORS.UNKNOWN_CHANNEL ||
+      error?.code === DISCORD_ERRORS.UNKNOWN_MESSAGE ||
+      error?.code === DISCORD_ERRORS.THREAD_ARCHIVED ||
       error?.message?.includes('archived') ||
       error?.message?.includes('Unknown Message') ||
       error?.message?.includes('Unknown Channel');
@@ -469,8 +471,8 @@ async function safeEdit(message, content, context = 'message edit') {
   } catch (error) {
     // Silently ignore expected errors that occur during normal operations
     const isExpectedError =
-      error?.code === 10008 || // Unknown Message (deleted)
-      error?.code === 50083 || // Thread is archived
+      error?.code === DISCORD_ERRORS.UNKNOWN_MESSAGE ||
+      error?.code === DISCORD_ERRORS.THREAD_ARCHIVED ||
       error?.message?.includes('archived') ||
       error?.message?.includes('Unknown Message');
 
