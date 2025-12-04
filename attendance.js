@@ -1502,10 +1502,14 @@ async function checkAndAutoCloseThreads(client) {
         }
 
         // AUTO-VERIFY all pending check-ins for this thread
+        console.log(`   🔍 Checking pending verifications for thread ${threadId}`);
+        console.log(`   📋 Total pending verifications in system: ${Object.keys(pendingVerifications).length}`);
+
         const pendingInThread = Object.entries(pendingVerifications).filter(
           ([msgId, p]) => p.threadId === threadId
         );
 
+        console.log(`   📋 Pending for this thread: ${pendingInThread.length}`);
         if (pendingInThread.length > 0) {
           console.log(`   ✅ Auto-verifying ${pendingInThread.length} pending member(s)`);
 

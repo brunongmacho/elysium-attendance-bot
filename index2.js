@@ -5609,6 +5609,8 @@ client.on(Events.MessageCreate, async (message) => {
         };
         attendance.setPendingVerifications(pendingVerifications);
 
+        console.log(`📝 PENDING ADDED: ${username} for ${spawnInfo.boss} | Thread: ${message.channel.id} | MsgID: ${message.id} | Total pending: ${Object.keys(pendingVerifications).length}`);
+
         if (spawnInfo.confirmThreadId) {
           const confirmThread = await guild.channels
             .fetch(spawnInfo.confirmThreadId)
