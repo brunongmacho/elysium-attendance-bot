@@ -35,7 +35,7 @@ class DatabaseAPI {
    */
   async connect() {
     if (this.connected && this.db) {
-      console.log('✅ MongoDB already connected');
+      // Already connected - return existing connection (no logging to reduce noise)
       return this.db;
     }
 
