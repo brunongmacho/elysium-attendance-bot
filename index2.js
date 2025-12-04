@@ -4633,18 +4633,10 @@ client.once(Events.ClientReady, async () => {
   // console.log('✅ Background sync service started (syncs MongoDB → Sheets every 15 minutes)');
   console.log('⏸️ Background sync service disabled (redundant with Phase 7 parallel dual-write)');
 
-  // WARM UP GOOGLE SHEETS CACHE (preload frequently accessed data)
-  console.log('🔥 Warming up cache...');
-  try {
-    await Promise.all([
-      sheetAPI.call('getAllWeeklyAttendance', { forceFresh: true }),
-      sheetAPI.call('getBiddingPointsSummary', { forceFresh: true }),
-      sheetAPI.call('getLearningMetrics', { forceFresh: true })
-    ]);
-    console.log('✅ Cache warmed up - all frequently accessed data preloaded');
-  } catch (cacheWarmErr) {
-    console.error('⚠️ Cache warm-up failed (non-critical):', cacheWarmErr.message);
-  }
+  // LAZY CACHE LOADING - Cache will be populated on-demand to reduce startup memory
+  // Previous aggressive warmup caused 91% heap usage immediately (30MB/33MB)
+  // Now using lazy loading: data cached on first access instead of preloading
+  console.log('✅ Cache configured for lazy loading (on-demand) - reduced startup memory pressure');
 
   // START PERIODIC AUTO-SYNC (15 minutes - sync Google Sheets → MongoDB)
   console.log('🔄 Starting periodic auto-sync (every 15 minutes)...');
