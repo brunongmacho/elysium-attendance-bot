@@ -4470,6 +4470,10 @@ client.once(Events.ClientReady, async () => {
   leaderboardSystem.scheduleMonthlyReport();
   auctioneering.scheduleWeeklySaturdayAuction(client, config);
 
+  // PRE-AUCTION SYNC (Sheets → MongoDB) - Runs 1 hour before Saturday auction
+  auctioneering.schedulePreAuctionSync(sheetAPI, bossRotation);
+  console.log('✅ Pre-auction sync scheduled (Saturdays 11:00 AM GMT+8) - syncs manual Sheets edits to MongoDB');
+
   // BACKGROUND SYNC SERVICE DISABLED (Phase 7)
   // Reason: Redundant after implementing parallel dual-write (Phase 7)
   // All MongoDB writes now have simultaneous Sheets writes via Promise.all()
