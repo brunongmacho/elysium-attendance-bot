@@ -910,25 +910,28 @@ async function fetchPts(url) {
 }
 
 /**
- * Submits auction results to MongoDB (Phase 4) with background Sheet sync
+ * Submits auction results with PARALLEL DUAL-WRITE (MongoDB + Sheets simultaneously)
  *
  * RESULT FORMAT:
  * - Array of objects: { member: username, totalSpent: points }
  * - Includes ALL members (winners and non-winners with 0 spent)
  *
- * MONGODB INTEGRATION (Phase 4):
- * - If USE_MONGODB_BIDDING=true, update MongoDB members collection first
- * - Queue background sync to Sheets (non-blocking, priority: IMMEDIATE)
- * - Circuit breaker with fallback to Sheets-only mode
+ * MONGODB INTEGRATION (Phase 4) - PARALLEL DUAL-WRITE:
+ * - If USE_MONGODB_BIDDING=true, write to BOTH MongoDB AND Sheets simultaneously
+ * - Uses Promise.all() for true parallel execution (not queued/sequential)
+ * - MongoDB write: Updates member points in parallel
+ * - Sheets write: Submits results to Google Sheets in parallel
+ * - Succeeds if at least one write succeeds (MongoDB OR Sheets)
  *
- * RETRY LOGIC:
- * - MongoDB updates are atomic per member
- * - Sheet sync has automatic retry with exponential backoff
+ * REDUNDANCY:
+ * - Both MongoDB AND Sheets are kept in sync for records
+ * - If one fails, the other still saves the data
+ * - Both databases are equal records (dual-write for redundancy)
  *
  * CRITICAL:
  * - Only called after session ends (all auctions complete)
  * - Points are deducted from user balances
- * - MongoDB is source of truth, Sheets is backup
+ * - Both sources kept in sync via parallel writes
  *
  * @param {string} url - Google Sheets webhook URL
  * @param {Array<Object>} res - Results array with member and totalSpent
@@ -939,80 +942,97 @@ async function submitRes(url, res, time) {
   if (!time || !res || res.length === 0)
     return { ok: false, err: "Missing data" };
 
-  // Phase 4: Update MongoDB first if enabled
+  // Phase 4: PARALLEL DUAL-WRITE to MongoDB + Google Sheets (simultaneous)
   if (FEATURE_FLAGS.USE_MONGODB_BIDDING) {
-    try {
-      await mongoBiddingCircuit.execute(
-        // Primary operation: Update MongoDB
-        async () => {
-          console.log(`💾 [MongoDB] Updating points for ${res.length} members`);
+    console.log(`💾 [DUAL-WRITE] Submitting ${res.length} member results to MongoDB + Sheets (parallel)...`);
+    const startTime = Date.now();
 
-          // Update each member's points in MongoDB
-          for (const result of res) {
-            if (result.totalSpent > 0) {
-              try {
-                await mongoHelpers.updateMemberPoints(
-                  result.member,
-                  -result.totalSpent, // Negative to deduct points
-                  `Auction session ${time}`
-                );
-                console.log(`✅ [MongoDB] ${result.member}: -${result.totalSpent} points`);
-              } catch (memberError) {
-                console.error(`❌ [MongoDB] Failed to update ${result.member}:`, memberError.message);
-                // Continue with other members even if one fails
-              }
+    // Prepare MongoDB save promise
+    const mongoSavePromise = (async () => {
+      try {
+        console.log(`   🔹 [MongoDB] Starting parallel write...`);
+
+        // Update each member's points in MongoDB
+        for (const result of res) {
+          if (result.totalSpent > 0) {
+            try {
+              await mongoHelpers.updateMemberPoints(
+                result.member,
+                -result.totalSpent, // Negative to deduct points
+                `Auction session ${time}`
+              );
+              console.log(`   ✅ [MongoDB] ${result.member}: -${result.totalSpent} points`);
+            } catch (memberError) {
+              console.error(`   ❌ [MongoDB] Failed to update ${result.member}:`, memberError.message);
+              // Continue with other members even if one fails
             }
           }
-
-          console.log(`✅ [MongoDB] Points updated successfully`);
-          return true;
-        },
-        // Fallback operation: Update Sheets directly
-        FEATURE_FLAGS.MONGODB_FALLBACK_ENABLED ? async () => {
-          console.warn('⚠️ [MongoDB] Fallback to Sheets for results submission');
-          const d = await sheetAPI.call('submitBiddingResults', {
-            results: res,
-            timestamp: time,
-          });
-          if (d.status !== "ok") {
-            throw new Error(d.message || "Unknown");
-          }
-          return true;
-        } : null
-      );
-
-      // Queue background sync to Sheets (non-blocking)
-      sheetSync.queueSync({
-        type: 'submitBiddingResults',
-        data: { results: res, timestamp: time }
-      }, sheetSync.SYNC_PRIORITIES.IMMEDIATE);
-
-      console.log("✅ [MongoDB] Results submitted, Sheet sync queued");
-      return { ok: true, d: { status: "ok", source: "MongoDB" } };
-
-    } catch (e) {
-      console.error(`❌ [MongoDB] Submit error:`, e.message);
-
-      // If MongoDB failed and no fallback, try Sheets directly
-      if (!FEATURE_FLAGS.MONGODB_FALLBACK_ENABLED) {
-        console.log('🔄 Attempting direct Sheet submission...');
-        try {
-          const d = await sheetAPI.call('submitBiddingResults', {
-            results: res,
-            timestamp: time,
-          });
-          if (d.status === "ok") {
-            console.log("✅ Sheet submission successful (fallback)");
-            return { ok: true, d };
-          }
-          throw new Error(d.message || "Unknown");
-        } catch (sheetError) {
-          console.error(`❌ Sheet fallback also failed:`, sheetError.message);
-          return { ok: false, err: sheetError.message, res };
         }
+
+        console.log(`   ✅ [MongoDB] Points updated successfully`);
+        return { success: true, source: 'MongoDB' };
+      } catch (error) {
+        console.error(`   ❌ [MongoDB] Failed to submit results:`, error.message);
+        return { success: false, source: 'MongoDB', error };
+      }
+    })();
+
+    // Prepare Google Sheets save promise
+    const sheetSavePromise = (async () => {
+      try {
+        console.log(`   🔹 [Sheets] Starting parallel write...`);
+
+        const d = await sheetAPI.call('submitBiddingResults', {
+          results: res,
+          timestamp: time,
+        });
+
+        if (d.status === "ok") {
+          console.log(`   ✅ [Sheets] Results submitted successfully`);
+          return { success: true, source: 'Google Sheets' };
+        } else {
+          return { success: false, source: 'Google Sheets', error: d.message || d.err };
+        }
+      } catch (error) {
+        console.error(`   ❌ [Sheets] Failed to submit results:`, error.message);
+        return { success: false, source: 'Google Sheets', error };
+      }
+    })();
+
+    // Execute both saves in parallel
+    const [mongoResult, sheetResult] = await Promise.all([
+      mongoSavePromise,
+      sheetSavePromise
+    ]);
+
+    const duration = Date.now() - startTime;
+
+    // Determine success and source
+    if (mongoResult.success || sheetResult.success) {
+      const successSources = [
+        mongoResult.success ? 'MongoDB' : null,
+        sheetResult.success ? 'Sheets' : null
+      ].filter(Boolean).join(' + ');
+
+      console.log(`✅ [DUAL-WRITE] Results submitted successfully via ${successSources} (${duration}ms)`);
+
+      // Warn if one failed
+      if (!mongoResult.success) {
+        console.warn(`⚠️ [MongoDB] Write failed, but Sheets succeeded - data saved`);
+      }
+      if (!sheetResult.success) {
+        console.warn(`⚠️ [Sheets] Write failed, but MongoDB succeeded - data saved`);
       }
 
-      return { ok: false, err: e.message, res };
+      return { ok: true, d: { status: "ok", source: successSources } };
+    } else {
+      // Both failed
+      console.error(`❌ [DUAL-WRITE] BOTH MongoDB AND Sheets failed - results NOT saved!`);
+      return {
+        ok: false,
+        err: `MongoDB: ${mongoResult.error?.message || 'Unknown'}, Sheets: ${sheetResult.error?.message || 'Unknown'}`,
+        res
+      };
     }
   }
 

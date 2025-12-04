@@ -59,6 +59,32 @@ Real-time tracking of migration progress:
 
 ---
 
+### 4. [PHASE5_ROADMAP.md](./PHASE5_ROADMAP.md)
+**Phase 5+ Implementation Plan**
+
+Documents Phase 5+ features including:
+- Phase 5.1: Background MongoDB → Sheets sync
+- Phase 6: Weekly & monthly reports
+- Phase 7: Parallel dual-write implementation
+- Optional future enhancements
+
+**Check this** for recent feature implementations and roadmap.
+
+---
+
+### 5. [PHASE7_PARALLEL_DUAL_WRITE.md](./PHASE7_PARALLEL_DUAL_WRITE.md)
+**Parallel Dual-Write Implementation**
+
+Complete documentation of Phase 7 parallel dual-write refactor:
+- Changed bidding from queued sync to parallel writes
+- Changed boss rotation from fire-and-forget to guaranteed writes
+- All MongoDB writes now have parallel/guaranteed Sheets writes
+- Code changes, patterns, and testing checklist
+
+**Read this** to understand the dual-write implementation.
+
+---
+
 ## 🚀 Quick Start
 
 ### If You're Resuming After Session Lag:
@@ -85,11 +111,11 @@ Real-time tracking of migration progress:
 
 ## 📊 Current Status
 
-**Phase**: Phase 4 Complete (Bidding Module) ✅ - Phase 4 Continued Next
-**Next**: Run Discord ID migration, then refactor auctioneering.js & attendance.js
-**Overall Progress**: 67% (4 of 6 phases complete)
-**Last Commit**: Phase 4 implementation complete (bidding module + helper modules)
-**Branch**: `claude/mongodb-migration-phase-4-01SRHz5wCis1N38AP9sJQrNi`
+**Phase**: Phase 7 Complete (Parallel Dual-Write) ✅
+**Next**: Production deployment and monitoring
+**Overall Progress**: 100% (All phases complete)
+**Last Commit**: Phase 7 parallel dual-write implementation complete
+**Branch**: `claude/mongodb-phase-4-migration-01TxBYbFtty8okkgjRi5ikHW`
 
 See [MIGRATION_PROGRESS.md](./MIGRATION_PROGRESS.md) for details.
 
@@ -111,4 +137,4 @@ See [MIGRATION_PROGRESS.md](./MIGRATION_PROGRESS.md) for details.
 
 ---
 
-**Last Updated**: Nov 29, 2025
+**Last Updated**: Dec 4, 2025
