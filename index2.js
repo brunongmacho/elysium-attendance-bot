@@ -534,21 +534,86 @@ const BIDDING_CHANNEL_CLEANUP_INTERVAL = 12 * 60 * 60 * 1000;
  * @type {http.Server}
  * @constant
  */
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   // Health check endpoint - returns bot status and metrics
   if (req.url === "/health" || req.url === "/") {
+    // PHASE 2.5: Enhanced health check with MongoDB metrics
+    const healthData = {
+      status: "healthy",
+      version: BOT_VERSION,
+      uptime: process.uptime(),
+      bot: client.user ? client.user.tag : "not ready",
+      activeSpawns: Object.keys(activeSpawns).length,
+      pendingVerifications: Object.keys(pendingVerifications).length,
+      timestamp: new Date().toISOString(),
+    };
+
+    // Add MongoDB health metrics
+    try {
+      if (dbAPI.connected && dbAPI.db) {
+        const mongoStartTime = Date.now();
+
+        // Test MongoDB connection with a ping
+        await dbAPI.db.admin().ping();
+        const mongoLatency = Date.now() - mongoStartTime;
+
+        // Get collection stats
+        const collections = await dbAPI.db.listCollections().toArray();
+        const collectionNames = collections.map(c => c.name);
+
+        // Get document counts for key collections
+        const collectionStats = {};
+        for (const collName of ['attendance', 'bosses', 'members', 'event_reminders', 'boss_timers']) {
+          if (collectionNames.includes(collName)) {
+            try {
+              const count = await dbAPI.db.collection(collName).estimatedDocumentCount();
+              const stats = await dbAPI.db.collection(collName).stats();
+              collectionStats[collName] = {
+                documents: count,
+                sizeBytes: stats.size,
+                avgDocSize: stats.avgObjSize || 0,
+              };
+            } catch (err) {
+              // Collection might not exist or stats unavailable
+              collectionStats[collName] = { error: 'unavailable' };
+            }
+          }
+        }
+
+        // Get database stats
+        const dbStats = await dbAPI.db.stats();
+
+        healthData.mongodb = {
+          connected: true,
+          latencyMs: mongoLatency,
+          database: dbAPI.db.databaseName,
+          collections: {
+            total: collections.length,
+            names: collectionNames,
+            stats: collectionStats,
+          },
+          database_stats: {
+            sizeBytes: dbStats.dataSize,
+            storageSizeBytes: dbStats.storageSize,
+            indexes: dbStats.indexes,
+            indexSizeBytes: dbStats.indexSize,
+          },
+        };
+      } else {
+        healthData.mongodb = {
+          connected: false,
+          reason: 'not_initialized',
+        };
+      }
+    } catch (mongoError) {
+      healthData.mongodb = {
+        connected: false,
+        error: mongoError.message,
+      };
+    }
+
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(
-      JSON.stringify({
-        status: "healthy",
-        version: BOT_VERSION,
-        uptime: process.uptime(),
-        bot: client.user ? client.user.tag : "not ready",
-        activeSpawns: Object.keys(activeSpawns).length,
-        pendingVerifications: Object.keys(pendingVerifications).length,
-        timestamp: new Date().toISOString(),
-      })
-    );
+    res.end(JSON.stringify(healthData, null, 2));
   } else {
     // Return 404 for all other routes
     res.writeHead(404);
