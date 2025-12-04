@@ -6432,6 +6432,69 @@ client.on(Events.MessageCreate, async (message) => {
           addGuildFooter(embed);
           await message.reply({ embeds: [embed] });
         }
+        else if (adminCmd === "!mongoindexes") {
+          try {
+            await message.reply('🔄 Recreating MongoDB indexes...');
+
+            const results = await dbAPI.createIndexes();
+            const totalIndexes = results.created.length + results.skipped.length + results.failed.length;
+            const successRate = Math.round(((results.created.length + results.skipped.length) / totalIndexes) * 100);
+
+            const embed = new EmbedBuilder()
+              .setColor(results.failed.length === 0 ? 0x00FF00 : (results.failed.filter(f => f.critical).length > 0 ? 0xFF0000 : 0xFFA500))
+              .setTitle('📇 MongoDB Index Creation Results')
+              .setDescription(`Successfully processed ${totalIndexes} indexes (${successRate}% success rate)`)
+              .addFields(
+                { name: '✅ Created', value: `${results.created.length}`, inline: true },
+                { name: '⏭️ Already Existed', value: `${results.skipped.length}`, inline: true },
+                { name: '❌ Failed', value: `${results.failed.length}`, inline: true },
+                { name: '✓ Critical Verified', value: `${results.verified.length}`, inline: true }
+              );
+
+            // Add failures if any
+            if (results.failed.length > 0) {
+              const criticalFailures = results.failed.filter(f => f.critical);
+              const regularFailures = results.failed.filter(f => !f.critical);
+
+              if (criticalFailures.length > 0) {
+                embed.addFields({
+                  name: '🔴 Critical Failures',
+                  value: criticalFailures
+                    .map(f => `• ${f.collection}.${f.name}`)
+                    .join('\n')
+                    .substring(0, 200),
+                  inline: false
+                });
+              }
+
+              if (regularFailures.length > 0) {
+                embed.addFields({
+                  name: '⚠️ Non-Critical Failures',
+                  value: regularFailures
+                    .map(f => `• ${f.collection}.${f.name}`)
+                    .join('\n')
+                    .substring(0, 200),
+                  inline: false
+                });
+              }
+
+              embed.addFields({
+                name: '💡 Note',
+                value: results.failed.length > 0
+                  ? 'Check MongoDB Atlas dashboard for detailed error information'
+                  : 'All indexes created or already exist',
+                inline: false
+              });
+            }
+
+            embed.setTimestamp();
+            addGuildFooter(embed);
+
+            await message.reply({ embeds: [embed] });
+          } catch (error) {
+            await message.reply(`❌ Index creation failed: ${error.message}`);
+          }
+        }
         return;
       }
 
