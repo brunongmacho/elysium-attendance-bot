@@ -200,6 +200,18 @@ class DatabaseAPI {
         { name: 'event_type_lookup' }
       );
 
+      // ─────────────────────────────────────────────────────────────
+      // BOSS TIMERS COLLECTION INDEXES (Phase 8)
+      // ─────────────────────────────────────────────────────────────
+      await this.db.collection('bossTimers').createIndex(
+        { bossName: 1 },
+        { unique: true, name: 'boss_timer_unique' }
+      );
+      await this.db.collection('bossTimers').createIndex(
+        { nextSpawnTime: 1 },
+        { name: 'spawn_time_lookup' }
+      );
+
       // Bot state collection doesn't need indexes (only 3 documents, queried by _id)
 
       console.log('✅ Database indexes created successfully');
