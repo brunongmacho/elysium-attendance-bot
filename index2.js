@@ -121,6 +121,10 @@ const reports = require('./services/reports'); // Weekly & monthly reports (Phas
 const shutdownManager = require('./utils/shutdown-manager'); // CRIT-001: Timer cleanup & graceful shutdown
 const DualWriteManager = require('./utils/dual-write-manager'); // CRIT-003: Data loss prevention
 
+// PHASE 3.3 - Internal Discord Monitoring
+// ═══════════════════════════════════════════════════════════════════════════
+const discordMonitoring = require('./utils/discord-monitoring');
+
 // =====================================================================
 // SECTION 1B: COMMAND ALIASES (moved to config/command-aliases.js)
 // =====================================================================
@@ -4526,6 +4530,10 @@ client.once(Events.ClientReady, async () => {
     const adminChannel = await client.channels.fetch(config.admin_logs_channel_id);
     dbAPI.setAdminChannel(adminChannel);
     console.log('✅ MongoDB admin alerts configured');
+
+    // PHASE 3.3: Initialize Discord monitoring system
+    discordMonitoring.initialize(adminChannel);
+    console.log('✅ Discord monitoring initialized');
   } catch (error) {
     console.error('⚠️ Failed to configure MongoDB admin alerts:', error.message);
   }
@@ -4698,6 +4706,56 @@ client.once(Events.ClientReady, async () => {
   shutdownManager.registerInterval('periodic-sync', periodicSyncTimer, { frequency: '15 minutes' });
 
   console.log('✅ Periodic auto-sync scheduled (15 min intervals)');
+
+  // PHASE 3.3: Schedule daily health digest (9 AM)
+  const scheduleDailyDigest = () => {
+    const now = new Date();
+    const next9AM = new Date(now);
+    next9AM.setHours(9, 0, 0, 0);
+
+    // If 9 AM has already passed today, schedule for tomorrow
+    if (next9AM <= now) {
+      next9AM.setDate(next9AM.getDate() + 1);
+    }
+
+    const msUntil9AM = next9AM - now;
+    const hoursUntil = Math.round(msUntil9AM / 1000 / 60 / 60);
+
+    console.log(`📅 Daily health digest scheduled for 9 AM (in ~${hoursUntil}h)`);
+
+    setTimeout(async () => {
+      try {
+        // Fetch health data from /health endpoint
+        const http = require('http');
+        const healthResponse = await new Promise((resolve, reject) => {
+          http.get(`http://localhost:${PORT}/health`, (res) => {
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => resolve(JSON.parse(data)));
+          }).on('error', reject);
+        });
+
+        await discordMonitoring.sendDailyHealthDigest(healthResponse);
+        console.log('✅ Daily health digest sent');
+      } catch (err) {
+        console.error('❌ Failed to send daily health digest:', err.message);
+      }
+
+      // Schedule next day
+      scheduleDailyDigest();
+    }, msUntil9AM);
+  };
+
+  // Start daily digest scheduler
+  scheduleDailyDigest();
+
+  // PHASE 3.3: Periodic memory monitoring (every 10 minutes)
+  const memoryCheckInterval = setInterval(() => {
+    discordMonitoring.checkMemoryUsage();
+  }, 10 * 60 * 1000); // 10 minutes
+
+  shutdownManager.registerInterval('memory-monitoring', memoryCheckInterval, { frequency: '10 minutes' });
+  console.log('✅ Memory monitoring active (checks every 10 minutes)');
 
   // Register GC task (every 3 minutes - more aggressive for 512MB)
   if (global.gc) {
