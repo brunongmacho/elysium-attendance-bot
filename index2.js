@@ -4470,10 +4470,15 @@ client.once(Events.ClientReady, async () => {
   leaderboardSystem.scheduleMonthlyReport();
   auctioneering.scheduleWeeklySaturdayAuction(client, config);
 
-  // START BACKGROUND SYNC SERVICE (Phase 5.1) - MongoDB → Sheets every 15 minutes
-  const backgroundSync = new BackgroundSync(config, sheetAPI);
-  backgroundSync.start();
-  console.log('✅ Background sync service started (syncs MongoDB → Sheets every 15 minutes)');
+  // BACKGROUND SYNC SERVICE DISABLED (Phase 7)
+  // Reason: Redundant after implementing parallel dual-write (Phase 7)
+  // All MongoDB writes now have simultaneous Sheets writes via Promise.all()
+  // Background sync caused circuit breaker issues with non-existent Apps Script actions
+  //
+  // const backgroundSync = new BackgroundSync(config, sheetAPI);
+  // backgroundSync.start();
+  // console.log('✅ Background sync service started (syncs MongoDB → Sheets every 15 minutes)');
+  console.log('⏸️ Background sync service disabled (redundant with Phase 7 parallel dual-write)');
 
   // WARM UP GOOGLE SHEETS CACHE (preload frequently accessed data)
   console.log('🔥 Warming up cache...');
