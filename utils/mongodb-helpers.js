@@ -559,11 +559,12 @@ async function getMemberStats(memberName) {
   const totalKills = attendanceRecords.length;
   const attendancePoints = attendanceRecords.reduce((sum, record) => sum + (record.bossPoints || 1), 0);
 
-  // Get recent bosses (last 5)
+  // Get recent bosses (last 5) - include points for display
   const recentBosses = attendanceRecords
     .slice(0, 5)
     .map(record => ({
       boss: record.bossName,
+      points: record.bossPoints || 1,
       date: record.timestamp instanceof Date ? record.timestamp.toLocaleDateString() : new Date(record.timestamp).toLocaleDateString()
     }));
 
@@ -573,6 +574,17 @@ async function getMemberStats(memberName) {
     const boss = record.bossName;
     bossCounts[boss] = (bossCounts[boss] || 0) + 1;
   });
+
+  // Calculate favorite boss (most attended)
+  let favoriteBoss = null;
+  if (Object.keys(bossCounts).length > 0) {
+    const sortedBosses = Object.entries(bossCounts).sort((a, b) => b[1] - a[1]);
+    const [bossName, count] = sortedBosses[0];
+    favoriteBoss = {
+      name: bossName,
+      count: count
+    };
+  }
 
   // Step 4: Calculate attendance rate (need total possible spawns)
   // For now, use a reasonable estimate or get from separate tracking
@@ -610,7 +622,8 @@ async function getMemberStats(memberName) {
       rate: attendanceRate,
       streak: currentStreak,
       recentBosses: recentBosses,
-      bossCounts: bossCounts
+      bossCounts: bossCounts,
+      favoriteBoss: favoriteBoss
     },
     bidding: {
       left: pointsLeft,
