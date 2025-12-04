@@ -30,6 +30,25 @@ const { EmbedBuilder } = require('discord.js');
 const dbAPI = require('../utils/database-api');
 const mongoHelpers = require('../utils/mongodb-helpers');
 const errorHandler = require('../utils/error-handler');
+const LRUCache = require('../utils/lru-cache');
+
+// ============================================================================
+// QUERY RESULT CACHING (PHASE 3.2)
+// ============================================================================
+
+/**
+ * Cache for weekly report results
+ * TTL: 15 minutes (reports change frequently during active times)
+ * Max size: 10 entries (covers ~2.5 months of unique weeks)
+ */
+const weeklyReportCache = new LRUCache(10, 15 * 60 * 1000);
+
+/**
+ * Cache for monthly report results
+ * TTL: 60 minutes (monthly reports are expensive, change less frequently)
+ * Max size: 12 entries (1 year of monthly reports)
+ */
+const monthlyReportCache = new LRUCache(12, 60 * 60 * 1000);
 
 // ============================================================================
 // RETRY LOGIC FOR TRANSIENT FAILURES
@@ -138,18 +157,31 @@ function getMonthEnd(date = new Date()) {
  * Generate weekly report data from MongoDB
  * Attendance = Total boss spawns killed (not member counts)
  * PHASE 2.3: Enhanced with error boundaries and retry logic
+ * PHASE 3.2: Added query result caching (15-min TTL)
  */
 async function generateWeeklyReport() {
   try {
+    // Current week dates (for cache key)
+    const thisWeekStart = getWeekStart();
+    const thisWeekEnd = getWeekEnd();
+
+    // PHASE 3.2: Check cache first
+    const cacheKey = `weekly_${thisWeekStart.getTime()}`;
+    const cached = weeklyReportCache.get(cacheKey);
+
+    if (cached) {
+      errorHandler.info('Weekly report served from cache', {
+        weekStart: thisWeekStart.toISOString(),
+        cacheAge: Date.now() - (cached.cachedAt || Date.now())
+      });
+      return cached;
+    }
+
     // Connect to MongoDB with retry logic
     const db = await retryOperation(
       () => dbAPI.connect(),
       'MongoDB connection for weekly report'
     );
-
-    // Current week dates
-    const thisWeekStart = getWeekStart();
-    const thisWeekEnd = getWeekEnd();
 
     // Last week dates
     const lastWeekStart = new Date(thisWeekStart);
@@ -174,12 +206,19 @@ async function generateWeeklyReport() {
       lastWeekSpawns: lastWeekData.totalSpawns
     });
 
-    return {
+    const result = {
       thisWeek: thisWeekData,
       lastWeek: lastWeekData,
       weekStart: thisWeekStart,
-      weekEnd: thisWeekEnd
+      weekEnd: thisWeekEnd,
+      cachedAt: Date.now() // Track when this was generated
     };
+
+    // PHASE 3.2: Cache the result
+    weeklyReportCache.set(cacheKey, result);
+    errorHandler.debug('Weekly report cached', { cacheKey, ttl: '15 minutes' });
+
+    return result;
   } catch (error) {
     errorHandler.handleError(error, 'generateWeeklyReport', {
       silent: false,
@@ -469,17 +508,30 @@ function buildWeeklyReportEmbed(reportData) {
 /**
  * Generate monthly report data from MongoDB
  * PHASE 2.3: Enhanced with error boundaries and retry logic
+ * PHASE 3.2: Added query result caching (60-min TTL)
  */
 async function generateMonthlyReport(date = new Date()) {
   try {
+    const monthStart = getMonthStart(date);
+    const monthEnd = getMonthEnd(date);
+
+    // PHASE 3.2: Check cache first
+    const cacheKey = `monthly_${monthStart.getTime()}`;
+    const cached = monthlyReportCache.get(cacheKey);
+
+    if (cached) {
+      errorHandler.info('Monthly report served from cache', {
+        month: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        cacheAge: Date.now() - (cached.cachedAt || Date.now())
+      });
+      return cached;
+    }
+
     // Connect to MongoDB with retry logic
     const db = await retryOperation(
       () => dbAPI.connect(),
       'MongoDB connection for monthly report'
     );
-
-    const monthStart = getMonthStart(date);
-    const monthEnd = getMonthEnd(date);
 
     // Get all spawns for the month with retry logic
     const spawns = await retryOperation(
@@ -608,7 +660,7 @@ async function generateMonthlyReport(date = new Date()) {
       uniqueMembers: memberStats.length
     });
 
-    return {
+    const result = {
       month: date,
       totalSpawns,
       totalMemberAttendance: memberStats.reduce((sum, m) => sum + m.spawnsAttended, 0),
@@ -624,8 +676,15 @@ async function generateMonthlyReport(date = new Date()) {
         earned: totalPointsEarned,
         spent: totalPointsSpent,
         net: totalPointsEarned - totalPointsSpent
-      }
+      },
+      cachedAt: Date.now() // Track when this was generated
     };
+
+    // PHASE 3.2: Cache the result
+    monthlyReportCache.set(cacheKey, result);
+    errorHandler.debug('Monthly report cached', { cacheKey, ttl: '60 minutes' });
+
+    return result;
   } catch (error) {
     errorHandler.handleError(error, 'generateMonthlyReport', {
       silent: false,
@@ -780,6 +839,47 @@ function buildMonthlyReportEmbed(reportData) {
 }
 
 // ============================================================================
+// CACHE MANAGEMENT (PHASE 3.2)
+// ============================================================================
+
+/**
+ * Get cache statistics for monitoring
+ * @returns {Object} Combined cache stats
+ */
+function getCacheStats() {
+  const weeklyStats = weeklyReportCache.getStats();
+  const monthlyStats = monthlyReportCache.getStats();
+
+  return {
+    weekly: {
+      size: weeklyStats.size,
+      maxSize: weeklyStats.maxSize,
+      hits: weeklyStats.hits,
+      misses: weeklyStats.misses,
+      hitRate: weeklyStats.hitRate,
+      ttl: '15 minutes'
+    },
+    monthly: {
+      size: monthlyStats.size,
+      maxSize: monthlyStats.maxSize,
+      hits: monthlyStats.hits,
+      misses: monthlyStats.misses,
+      hitRate: monthlyStats.hitRate,
+      ttl: '60 minutes'
+    }
+  };
+}
+
+/**
+ * Clear all report caches (useful for testing or after bulk data imports)
+ */
+function clearCaches() {
+  weeklyReportCache.clear();
+  monthlyReportCache.clear();
+  errorHandler.info('Report caches cleared');
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -787,5 +887,7 @@ module.exports = {
   generateWeeklyReport,
   buildWeeklyReportEmbed,
   generateMonthlyReport,
-  buildMonthlyReportEmbed
+  buildMonthlyReportEmbed,
+  getCacheStats,
+  clearCaches
 };

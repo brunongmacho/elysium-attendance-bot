@@ -164,10 +164,19 @@ class DatabaseAPI {
       { collection: 'attendance', spec: { bossName: 1 }, name: 'boss_lookup', critical: false },
       { collection: 'attendance', spec: { weekLabel: 1 }, name: 'sheet_sync', critical: false },
 
+      // PHASE 3.2: Compound indexes for report optimization
+      { collection: 'attendance', spec: { timestamp: -1, bossName: 1 }, name: 'report_spawns', critical: false },
+      { collection: 'attendance', spec: { timestamp: -1, memberName: 1, bossName: 1 }, name: 'report_members', critical: false },
+      { collection: 'attendance', spec: { timestamp: -1, memberId: 1 }, name: 'member_timeline', critical: false },
+
       // Members indexes
       { collection: 'members', spec: { username: 1 }, options: { unique: true }, name: 'username_unique', critical: true },
       { collection: 'members', spec: { pointsAvailable: -1 }, name: 'points_leaderboard', critical: false },
       { collection: 'members', spec: { 'attendance.total': -1 }, name: 'attendance_leaderboard', critical: false },
+
+      // PHASE 3.2: Compound indexes for bidding stats in reports
+      { collection: 'members', spec: { isActive: 1, pointsEarned: -1 }, name: 'active_top_earners', critical: false },
+      { collection: 'members', spec: { isActive: 1, pointsSpent: -1 }, name: 'active_top_spenders', critical: false },
 
       // Auction items indexes
       { collection: 'auctionItems', spec: { status: 1 }, name: 'status_lookup', critical: false },
