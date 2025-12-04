@@ -29,6 +29,7 @@ class DatabaseAPI {
     this.maxConnectAttempts = 5;
     this.connectionPromise = null; // CRIT-002 FIX: Mutex to prevent race condition
     this.adminChannel = null; // For alert notifications
+    this.indexesCreated = false; // PERF FIX: Skip redundant index creation on subsequent connects
   }
 
   /**
@@ -145,6 +146,13 @@ class DatabaseAPI {
   async createIndexes() {
     if (!this.db) {
       throw new Error('Database not connected');
+    }
+
+    // PERF FIX: Skip if indexes already created this session
+    // Prevents triple index creation on startup (sync → import → bot)
+    if (this.indexesCreated) {
+      console.log('⏭️  Database indexes already created this session - skipping');
+      return { created: [], failed: [], verified: [], skipped: [] };
     }
 
     console.log('📇 Creating database indexes with enhanced tracking...');
@@ -280,6 +288,9 @@ class DatabaseAPI {
       }
       await this.alertIndexFailure(indexResults);
     }
+
+    // Mark indexes as created for this session
+    this.indexesCreated = true;
 
     return indexResults;
   }

@@ -26,7 +26,7 @@ function startBot() {
   const botPath = path.join(__dirname, '..', 'index2.js');
   const botProcess = spawn('node', [
     '--expose-gc',
-    '--max-old-space-size=480',
+    '--max-old-space-size=512',
     '--optimize-for-size',
     '--max-semi-space-size=8',
     botPath

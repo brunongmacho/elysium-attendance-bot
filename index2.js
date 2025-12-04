@@ -4473,6 +4473,9 @@ stats: async (message, member, args) => {
  * @event ClientReady
  */
 client.once(Events.ClientReady, async () => {
+  // Track startup time for performance metrics
+  const startupStartTime = Date.now();
+
   mainLogger.info('Bot logged in successfully', {
     tag: client.user.tag,
     bossCount: Object.keys(bossPoints).length,
@@ -4633,18 +4636,10 @@ client.once(Events.ClientReady, async () => {
   // console.log('✅ Background sync service started (syncs MongoDB → Sheets every 15 minutes)');
   console.log('⏸️ Background sync service disabled (redundant with Phase 7 parallel dual-write)');
 
-  // WARM UP GOOGLE SHEETS CACHE (preload frequently accessed data)
-  console.log('🔥 Warming up cache...');
-  try {
-    await Promise.all([
-      sheetAPI.call('getAllWeeklyAttendance', { forceFresh: true }),
-      sheetAPI.call('getBiddingPointsSummary', { forceFresh: true }),
-      sheetAPI.call('getLearningMetrics', { forceFresh: true })
-    ]);
-    console.log('✅ Cache warmed up - all frequently accessed data preloaded');
-  } catch (cacheWarmErr) {
-    console.error('⚠️ Cache warm-up failed (non-critical):', cacheWarmErr.message);
-  }
+  // LAZY CACHE LOADING - Cache will be populated on-demand to reduce startup memory
+  // Previous aggressive warmup caused 91% heap usage immediately (30MB/33MB)
+  // Now using lazy loading: data cached on first access instead of preloading
+  console.log('✅ Cache configured for lazy loading (on-demand) - reduced startup memory pressure');
 
   // START PERIODIC AUTO-SYNC (15 minutes - sync Google Sheets → MongoDB)
   console.log('🔄 Starting periodic auto-sync (every 15 minutes)...');
@@ -4835,6 +4830,24 @@ client.once(Events.ClientReady, async () => {
     await leaderboardSystem.sendWeeklyReport();
     await crashRecovery.markWeeklyReportCompleted();
   }
+
+  // Log startup performance metrics
+  const startupDuration = Date.now() - startupStartTime;
+  const memUsage = process.memoryUsage();
+  const heapUsedMB = (memUsage.heapUsed / 1024 / 1024).toFixed(1);
+  const heapTotalMB = (memUsage.heapTotal / 1024 / 1024).toFixed(1);
+  const heapPercent = Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100);
+  const rssMB = (memUsage.rss / 1024 / 1024).toFixed(1);
+
+  console.log('');
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('📊 STARTUP METRICS');
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log(`⏱️  Startup Time: ${(startupDuration / 1000).toFixed(1)}s`);
+  console.log(`💾 Heap: ${heapUsedMB}MB / ${heapTotalMB}MB (${heapPercent}%)`);
+  console.log(`📈 RSS: ${rssMB}MB`);
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('');
 
   console.log("✅ Bot ready for operations!");
 });
