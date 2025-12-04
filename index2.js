@@ -3084,13 +3084,36 @@ stats: async (message, member, args) => {
           return;
         }
 
+        // Try to load existing members from Google Sheets
+        let existingMembers = [];
+        if (!existingSpawn) {
+          await message.channel.send(`🔍 Loading existing attendance from Google Sheets...`);
+          try {
+            const checkResp = await attendance.postToSheet({
+              action: "getColumnData",
+              boss: bossName,
+              timestamp: parsed.timestamp
+            });
+
+            if (checkResp.ok) {
+              const data = JSON.parse(checkResp.text);
+              if (data.members && Array.isArray(data.members)) {
+                existingMembers = data.members;
+                console.log(`   ✅ Loaded ${existingMembers.length} existing members from Sheets`);
+              }
+            }
+          } catch (err) {
+            console.log(`   ⚠️ Could not load existing members: ${err.message}`);
+          }
+        }
+
         // Re-register spawn in activeSpawns
         activeSpawns[thread.id] = {
           boss: bossName,
           date: parsed.date,
           time: parsed.time,
           timestamp: parsed.timestamp,
-          members: existingSpawn ? existingSpawn.members : [], // Preserve existing members if any
+          members: existingSpawn ? existingSpawn.members : existingMembers, // Preserve from memory OR load from Sheets
           confirmThreadId: existingSpawn ? existingSpawn.confirmThreadId : null,
           closed: false,
           createdAt: existingSpawn ? existingSpawn.createdAt : Date.now(),
