@@ -538,6 +538,7 @@ const server = http.createServer(async (req, res) => {
   // Health check endpoint - returns bot status and metrics
   if (req.url === "/health" || req.url === "/") {
     // PHASE 2.5: Enhanced health check with MongoDB metrics
+    // PHASE 3.3: Added memory and cache metrics
     const healthData = {
       status: "healthy",
       version: BOT_VERSION,
@@ -547,6 +548,35 @@ const server = http.createServer(async (req, res) => {
       pendingVerifications: Object.keys(pendingVerifications).length,
       timestamp: new Date().toISOString(),
     };
+
+    // PHASE 3.3: Add memory metrics
+    const memUsage = process.memoryUsage();
+    const formatBytes = (bytes) => {
+      const mb = bytes / 1024 / 1024;
+      return `${Math.round(mb * 10) / 10} MB`;
+    };
+
+    healthData.memory = {
+      heapUsed: formatBytes(memUsage.heapUsed),
+      heapTotal: formatBytes(memUsage.heapTotal),
+      heapUsedPercent: Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100) + '%',
+      rss: formatBytes(memUsage.rss), // Resident Set Size (total memory)
+      external: formatBytes(memUsage.external),
+      arrayBuffers: formatBytes(memUsage.arrayBuffers || 0)
+    };
+
+    // PHASE 3.3: Add cache statistics
+    try {
+      const reportsCacheStats = reports.getCacheStats();
+      const attendanceCacheStats = attendance.getCacheStats();
+
+      healthData.caches = {
+        reports: reportsCacheStats,
+        attendance: attendanceCacheStats
+      };
+    } catch (cacheError) {
+      healthData.caches = { error: 'Cache stats unavailable' };
+    }
 
     // Add MongoDB health metrics
     try {
