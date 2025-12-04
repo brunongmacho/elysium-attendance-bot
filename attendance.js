@@ -62,6 +62,7 @@ const { addGuildFooter } = require('./utils/embed-branding');
 const errorHandler = require('./utils/error-handler');
 const mongoHelpers = require('./utils/mongodb-helpers'); // Phase 4: MongoDB integration
 const sheetSync = require('./services/sheet-sync'); // Phase 4: Background Sheet sync
+const shutdownManager = require('./utils/shutdown-manager'); // Phase 1: CRIT-001 - Graceful shutdown
 const {
   getCurrentTimestamp,
   getSundayOfWeek,
@@ -119,6 +120,7 @@ const TIMING = {
   REACTION_RETRY_DELAY: 1000,         // Delay between reaction retry attempts (ms)
   THREAD_AUTO_CLOSE_MINUTES: 30,      // Auto-close threads after this many minutes (prevents cheating)
   THREAD_AGE_CHECK_INTERVAL: 90000,   // Check thread age every 90 seconds (optimized from 60s)
+  CACHE_CLEANUP_INTERVAL: 10 * 60 * 1000,  // LRU cache cleanup every 10 minutes (PHASE 1: CRIT-004)
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -156,6 +158,24 @@ function initialize(cfg, bossPointsData, isAdmin, cache = null, intelligence = n
     console.log('ℹ️  Attendance using Google Sheets (legacy mode)');
     console.log('ℹ️  Set USE_MONGODB_ATTENDANCE=true to enable MongoDB');
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PHASE 1 (CRIT-004): LRU Cache Cleanup
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Start periodic cleanup of expired LRU cache entries (every 10 minutes)
+  const cacheCleanupTimer = setInterval(() => {
+    const removed = columnCheckCache.cleanup();
+    const stats = columnCheckCache.getStats();
+    console.log(`🧹 [Cache] Cleanup complete: ${stats.size}/${stats.maxSize} entries (${stats.hitRate} hit rate)`);
+  }, TIMING.CACHE_CLEANUP_INTERVAL);
+
+  // Register with shutdown manager for graceful cleanup
+  shutdownManager.registerInterval('attendance-cache-cleanup', cacheCleanupTimer, {
+    frequency: '10 minutes',
+    module: 'attendance'
+  });
+
+  console.log('✅ [Cache] LRU cache cleanup scheduled (10-minute intervals)');
 }
 
 /**
@@ -220,14 +240,17 @@ async function postToSheet(payload, retryCount = 0) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 1 (CRIT-004): LRU Cache for Column Checks
+// ═══════════════════════════════════════════════════════════════════════════
 // Column check cache: Reduces redundant Google Sheets API calls during attendance window
-// Cache format: Map<"boss|timestamp", {exists: boolean, cachedAt: timestamp}>
-const columnCheckCache = new Map();
-const COLUMN_CHECK_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+// LRU Cache with max 1000 entries and 5-minute TTL prevents unbounded memory growth
+const LRUCache = require('./utils/lru-cache');
+const columnCheckCache = new LRUCache(1000, 5 * 60 * 1000); // Max 1000 entries, 5-minute TTL
 
 /**
  * Checks if a column already exists for a specific boss spawn to prevent duplicates.
- * First checks local cache (activeColumns), then short-term API result cache,
+ * First checks local cache (activeColumns), then LRU cache (with auto-eviction),
  * then queries Google Sheets if needed. Uses normalized timestamps to handle format variations.
  *
  * @param {string} boss - Boss name to check
@@ -249,17 +272,13 @@ async function checkColumnExists(boss, timestamp) {
     return true;
   }
 
-  // Check short-term API result cache (reduces duplicate API calls)
-  if (columnCheckCache.has(cacheKey)) {
-    const cached = columnCheckCache.get(cacheKey);
-    if (Date.now() - cached.cachedAt < COLUMN_CHECK_CACHE_TTL) {
-      return cached.exists;
-    }
-    // Expired cache entry
-    columnCheckCache.delete(cacheKey);
+  // Check LRU cache (auto-handles TTL expiration)
+  const cached = columnCheckCache.get(cacheKey);
+  if (cached !== undefined) {
+    return cached; // Cache hit - TTL checked automatically by LRUCache
   }
 
-  // Query Google Sheets if not found in any cache
+  // Cache miss - query Google Sheets
   const resp = await postToSheet({ action: "checkColumn", boss, timestamp });
   let exists = false;
 
@@ -272,8 +291,8 @@ async function checkColumnExists(boss, timestamp) {
     }
   }
 
-  // Cache the result for 5 minutes
-  columnCheckCache.set(cacheKey, { exists, cachedAt: Date.now() });
+  // Cache the result (LRU handles TTL and auto-eviction)
+  columnCheckCache.set(cacheKey, exists);
 
   return exists;
 }
