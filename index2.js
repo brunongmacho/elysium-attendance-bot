@@ -3095,6 +3095,7 @@ stats: async (message, member, args) => {
           closed: false,
           createdAt: existingSpawn ? existingSpawn.createdAt : Date.now(),
           noAutoClose: true, // Prevent auto-close for manually reopened threads
+          reopened: true, // Mark as reopened to prevent rotation increment on close
         };
 
         // Sync to attendance module
@@ -3301,8 +3302,12 @@ stats: async (message, member, args) => {
           clientCache.invalidate('getAllWeeklyAttendance:{}');
           console.log(`🧹 Invalidated client cache (overwrite attendance)`);
 
-          // Auto-increment boss rotation if it's a rotating boss
-          await bossRotation.handleBossKill(spawnInfo.boss);
+          // Auto-increment boss rotation if it's a rotating boss (but NOT if thread was reopened)
+          if (!spawnInfo.reopened) {
+            await bossRotation.handleBossKill(spawnInfo.boss);
+          } else {
+            console.log(`⏭️ Skipping rotation increment for ${spawnInfo.boss} (thread was reopened - fixing attendance, not a new kill)`);
+          }
 
           await message.channel.send(
             `✅ **Attendance ${columnExists ? 'overwritten' : 'submitted'} successfully!**\n\n` +
@@ -6469,6 +6474,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
 
+      // Re-sync state immediately before processing (prevent race conditions)
+      activeSpawns = attendance.getActiveSpawns();
+      pendingVerifications = attendance.getPendingVerifications();
+
       // Find the pending verification
       let pendingMsgId = null;
       let pending = null;
@@ -6519,6 +6528,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         spawnInfo.members.push(pending.author);
         attendance.setActiveSpawns(activeSpawns);
+
+        console.log(`✅ VERIFY: ${pending.author} added to ${spawnInfo.boss} (${spawnInfo.timestamp}) by ${user.username} | Total: ${spawnInfo.members.length} members`);
 
         await interaction.update({
           embeds: [EmbedBuilder.from(msg.embeds[0]).setColor(0x00ff00).setFooter({ text: `Verified by ${user.username}` })],
