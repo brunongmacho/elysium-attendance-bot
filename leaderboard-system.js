@@ -46,6 +46,7 @@ const { EmbedBuilder } = require('discord.js');
 const { SheetAPI } = require('./utils/sheet-api');
 const { addGuildThumbnail } = require('./utils/embed-branding');
 const mongoHelpers = require('./utils/mongodb-helpers'); // Phase 4: MongoDB integration
+const dbAPI = require('./utils/database-api'); // Phase 4.5: Direct MongoDB access
 
 // ============================================================================
 // FEATURE FLAGS
@@ -142,21 +143,30 @@ async function fetchAttendanceLeaderboard() {
   // ═════════════════════════════════════════════════════════════════════════
   if (USE_MONGODB_ATTENDANCE) {
     try {
-      const members = await mongoHelpers.getAllMembers();
+      const db = await dbAPI.connect();
+
+      // Aggregate actual attendance records (not stale member.attendance.total)
+      const attendanceStats = await db.collection('attendance')
+        .aggregate([
+          {
+            $group: {
+              _id: '$memberName',
+              attendanceCount: { $sum: 1 }
+            }
+          },
+          {
+            $sort: { attendanceCount: -1 }
+          }
+        ]).toArray();
+
       const duration = Date.now() - startTime;
-      console.log(`✅ [MongoDB] Fetched attendance leaderboard from ${members.length} members in ${duration}ms`);
+      console.log(`✅ [MongoDB] Fetched attendance leaderboard from ${attendanceStats.length} members in ${duration}ms`);
 
-      // Filter active members only (exclude removed/inactive members)
-      const activeMembers = members.filter(m => m.isActive !== false);
-
-      // Calculate total attendance points per member
-      const memberAttendance = activeMembers.map(m => ({
-        name: m.username,
-        points: (m.attendance?.total || 0)
-      })).filter(m => m.points > 0); // Only include members with attendance
-
-      // Sort by points (descending)
-      memberAttendance.sort((a, b) => b.points - a.points);
+      // Format as leaderboard
+      const memberAttendance = attendanceStats.map(stat => ({
+        name: stat._id,
+        points: stat.attendanceCount
+      })).filter(m => m.points > 0);
 
       // Calculate statistics
       const totalPoints = memberAttendance.reduce((sum, m) => sum + m.points, 0);
@@ -166,7 +176,7 @@ async function fetchAttendanceLeaderboard() {
 
       return {
         status: 'ok',
-        weekName: 'Current Week', // MongoDB doesn't store week names
+        weekName: 'All Time', // MongoDB shows all-time stats
         leaderboard: memberAttendance,
         totalSpawns: 0, // Not calculated from MongoDB yet
         averageAttendance
