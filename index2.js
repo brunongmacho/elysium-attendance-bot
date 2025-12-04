@@ -115,6 +115,12 @@ const { COMMAND_ALIASES, resolveCommandAlias } = require('./config/command-alias
 const BackgroundSync = require('./services/background-sync'); // Background MongoDB → Sheets sync (Phase 5.1)
 const reports = require('./services/reports'); // Weekly & monthly reports (Phase 6)
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 1 CRITICAL FIXES - Graceful Shutdown & Resource Management
+// ═══════════════════════════════════════════════════════════════════════════
+const shutdownManager = require('./utils/shutdown-manager'); // CRIT-001: Timer cleanup & graceful shutdown
+const DualWriteManager = require('./utils/dual-write-manager'); // CRIT-003: Data loss prevention
+
 // =====================================================================
 // SECTION 1B: COMMAND ALIASES (moved to config/command-aliases.js)
 // =====================================================================
@@ -467,8 +473,9 @@ function cleanupStatsCache() {
   }
 }
 
-// Run cleanup every 10 minutes
-setInterval(cleanupStatsCache, 10 * 60 * 1000);
+// Run cleanup every 10 minutes (PHASE 1: Register with shutdown manager)
+const statsCleanupTimer = setInterval(cleanupStatsCache, 10 * 60 * 1000);
+shutdownManager.registerInterval('stats-cache-cleanup', statsCleanupTimer, { frequency: '10 minutes' });
 
 /**
  * Timestamp when last auction ended (for cooldown enforcement)
@@ -1059,6 +1066,9 @@ function startBiddingChannelCleanupSchedule() {
       // Continue interval, don't break it
     }
   }, BIDDING_CHANNEL_CLEANUP_INTERVAL);
+
+  // PHASE 1: Register with shutdown manager
+  shutdownManager.registerInterval('bidding-channel-cleanup', biddingChannelCleanupTimer, { frequency: '12 hours' });
 }
 
 /**
@@ -4397,6 +4407,36 @@ client.once(Events.ClientReady, async () => {
     console.log('📝 Bot will continue with Google Sheets only until Phase 4');
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PHASE 1: INITIALIZE GRACEFUL SHUTDOWN MANAGER (CRIT-001)
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log('🛡️ Initializing graceful shutdown manager...');
+  shutdownManager.initialize();
+
+  // Register MongoDB cleanup handler (Priority 10 - runs early)
+  shutdownManager.registerCleanup('mongodb', async () => {
+    console.log('🔄 Closing MongoDB connection...');
+    await dbAPI.close();
+  }, 10);
+
+  // Register Discord client cleanup handler (Priority 20 - runs after MongoDB)
+  shutdownManager.registerCleanup('discord', async () => {
+    console.log('🔄 Destroying Discord client...');
+    client.removeAllListeners();
+    await client.destroy();
+  }, 20);
+
+  // Configure MongoDB admin channel for alerts (CRIT-005)
+  try {
+    const adminChannel = await client.channels.fetch(config.admin_logs_channel_id);
+    dbAPI.setAdminChannel(adminChannel);
+    console.log('✅ MongoDB admin alerts configured');
+  } catch (error) {
+    console.error('⚠️ Failed to configure MongoDB admin alerts:', error.message);
+  }
+
+  console.log('✅ Graceful shutdown manager initialized');
+
   // Attach config to client for module access
   client.config = config;
 
@@ -4555,9 +4595,12 @@ client.once(Events.ClientReady, async () => {
   }, 60 * 1000);
 
   // Then run every 15 minutes
-  setInterval(() => {
+  const periodicSyncTimer = setInterval(() => {
     runPeriodicSync().catch(err => console.error('❌ [Auto-Sync] Error:', err));
   }, 15 * 60 * 1000);
+
+  // PHASE 1: Register with shutdown manager
+  shutdownManager.registerInterval('periodic-sync', periodicSyncTimer, { frequency: '15 minutes' });
 
   console.log('✅ Periodic auto-sync scheduled (15 min intervals)');
 
@@ -6337,6 +6380,58 @@ client.on(Events.MessageCreate, async (message) => {
           await commandHandlers.testmilestones(message, member);
         else if (adminCmd === "!submittallyfromsheet" || adminCmd === "!resetsession")
           await bidding.handleCommand(adminCmd, message, args, client, config);
+        // ═══════════════════════════════════════════════════════════════════════════
+        // PHASE 1 ADMIN COMMANDS - Monitoring & Control
+        // ═══════════════════════════════════════════════════════════════════════════
+        else if (adminCmd === "!shutdownstatus") {
+          const status = shutdownManager.getStatus();
+          const embed = new EmbedBuilder()
+            .setColor(0x3498DB)
+            .setTitle('🛡️ Shutdown Manager Status')
+            .addFields(
+              { name: 'Timeouts Registered', value: `${status.timeouts}`, inline: true },
+              { name: 'Intervals Registered', value: `${status.intervals}`, inline: true },
+              { name: 'Cleanup Handlers', value: `${status.cleanupHandlers}`, inline: true },
+              {
+                name: 'Active Intervals',
+                value: status.timers.intervals.length > 0
+                  ? status.timers.intervals.map(name => `• ${name}`).join('\n')
+                  : 'None',
+                inline: false
+              },
+              {
+                name: 'Cleanup Handlers',
+                value: status.handlers.map(h => `• ${h.name} (priority: ${h.priority})`).join('\n'),
+                inline: false
+              }
+            )
+            .setTimestamp();
+
+          addGuildFooter(embed);
+          await message.reply({ embeds: [embed] });
+        }
+        else if (adminCmd === "!cachestats") {
+          const stats = attendance.getCacheStats();
+          const embed = new EmbedBuilder()
+            .setColor(0x3498DB)
+            .setTitle('📊 LRU Cache Statistics')
+            .addFields(
+              { name: 'Current Size', value: `${stats.size}/${stats.maxSize}`, inline: true },
+              { name: 'Utilization', value: `${stats.utilizationPercent}%`, inline: true },
+              { name: 'Hit Rate', value: stats.hitRate, inline: true },
+              { name: 'Total Hits', value: `${stats.hits}`, inline: true },
+              { name: 'Total Misses', value: `${stats.misses}`, inline: true },
+              { name: 'Cache Efficiency', value: `${stats.hits}/${stats.hits + stats.misses} requests`, inline: true },
+              { name: 'Evictions', value: `${stats.evictions}`, inline: true },
+              { name: 'Expirations', value: `${stats.expirations}`, inline: true },
+              { name: 'Total Sets', value: `${stats.sets}`, inline: true }
+            )
+            .setDescription('Column check cache prevents redundant Google Sheets API calls during attendance windows.')
+            .setTimestamp();
+
+          addGuildFooter(embed);
+          await message.reply({ embeds: [embed] });
+        }
         return;
       }
 
