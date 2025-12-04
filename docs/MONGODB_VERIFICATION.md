@@ -75,19 +75,19 @@
 
 ### 3. **Reports System** ✅
 
-**Primary Commands** (NEW MongoDB versions):
+**Primary Commands** (MongoDB-powered):
 - `!weekly` → MongoDB aggregation (100-300ms)
 - `!monthly` → MongoDB aggregation (200-500ms)
 
-**Legacy Commands** (Sheets-based, for backward compatibility):
-- `!weeklyreport` → Google Sheets legacy version
-- `!monthlyreport` → Google Sheets legacy version
-
 **Command Aliases**:
-- `!week` → `!weeklyreport` (legacy) ⚠️
-- `!month` → `!monthlyreport` (legacy) ⚠️
+- `!week` → `!weekly` ✅ (MongoDB-powered)
+- `!month` → `!monthly` ✅ (MongoDB-powered)
 
-**Note**: Users should use `!weekly` and `!monthly` for the new MongoDB-powered reports.
+**Legacy Commands** (Deprecated - Sheets-based):
+- `!weeklyreport` → Google Sheets legacy version (deprecated)
+- `!monthlyreport` → Google Sheets legacy version (deprecated)
+
+**Note**: All report aliases now use MongoDB-powered versions for maximum performance.
 
 **MongoDB Integration**:
 - Collection: `attendance`
@@ -326,10 +326,10 @@ const USE_MONGODB_ATTENDANCE = process.env.USE_MONGODB_ATTENDANCE === 'true';
 | `!lb`, `!leaderboard` | `!leaderboards` | ✅ MongoDB | ✅ |
 | `!profile`, `!stat`, `!info`, `!mystats` | `!stats` | ✅ MongoDB | ✅ |
 | `!heatmap`, `!activityheatmap`, `!guildactivity` | `!activity` | ⚪ In-memory | ✅ |
-| `!week` | `!weeklyreport` | ⚠️ Legacy Sheets | ✅ |
-| `!month` | `!monthlyreport` | ⚠️ Legacy Sheets | ✅ |
+| `!week` | `!weekly` | ✅ MongoDB | ✅ |
+| `!month` | `!monthly` | ✅ MongoDB | ✅ |
 
-**Note**: Use `!weekly` and `!monthly` (no aliases) for new MongoDB-powered reports.
+**Note**: All report aliases now point to MongoDB-powered versions (40-100x faster than legacy Sheets versions).
 
 ---
 
@@ -397,18 +397,21 @@ const USE_MONGODB_ATTENDANCE = process.env.USE_MONGODB_ATTENDANCE === 'true';
 
 ### For Users:
 
-1. **Use new report commands** for MongoDB-powered reports:
-   - Use `!weekly` instead of `!weeklyreport` or `!week`
-   - Use `!monthly` instead of `!monthlyreport` or `!month`
+1. **Report commands now fully MongoDB-powered**:
+   - Use `!weekly` or `!week` for weekly reports (MongoDB-powered)
+   - Use `!monthly` or `!month` for monthly reports (MongoDB-powered)
+   - Both aliases and full commands now deliver 40-100x faster performance
+   - Activity percentages now strictly count unique spawns (no more inflated 100% attendance)
 
 2. **All command aliases work correctly**:
    - `!b` is 40-200x faster than before
    - `!mp`, `!pts` show instant results
    - `!lba`, `!lbb` display leaderboards in <50ms
+   - `!week`, `!month` now use MongoDB (100-500ms vs 10000-20000ms)
 
 3. **Activity tracking**:
    - `!activity` shows real-time patterns (intentionally not persisted)
-   - Use `!weekly` for historical activity data from MongoDB
+   - `!weekly` and `!week` show accurate historical attendance with strict unique spawn counting
 
 ### For Developers:
 

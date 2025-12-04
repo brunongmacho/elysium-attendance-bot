@@ -150,7 +150,8 @@ async function getWeekData(db, startDate, endDate) {
     bossKills[spawn.boss] = (bossKills[spawn.boss] || 0) + 1;
   });
 
-  // Member attendance (how many spawns each member attended)
+  // Member attendance (how many UNIQUE spawns each member attended)
+  // First deduplicate by memberName + timestamp + boss to count unique spawns only
   const memberAttendance = await db.collection('attendance')
     .aggregate([
       {
@@ -159,8 +160,19 @@ async function getWeekData(db, startDate, endDate) {
         }
       },
       {
+        // Group by member + timestamp + boss to get unique spawn attendance
         $group: {
-          _id: '$memberName',
+          _id: {
+            memberName: '$memberName',
+            timestamp: '$timestamp',
+            boss: '$boss'
+          }
+        }
+      },
+      {
+        // Now group by member to count unique spawns attended
+        $group: {
+          _id: '$_id.memberName',
           spawnsAttended: { $sum: 1 }
         }
       },
@@ -412,7 +424,8 @@ async function generateMonthlyReport(date = new Date()) {
     bossKills[spawn._id.boss] = (bossKills[spawn._id.boss] || 0) + 1;
   });
 
-  // Member leaderboard
+  // Member leaderboard (count UNIQUE spawns only)
+  // First deduplicate by memberName + timestamp + boss to count unique spawns only
   const memberStats = await db.collection('attendance')
     .aggregate([
       {
@@ -421,8 +434,19 @@ async function generateMonthlyReport(date = new Date()) {
         }
       },
       {
+        // Group by member + timestamp + boss to get unique spawn attendance
         $group: {
-          _id: '$memberName',
+          _id: {
+            memberName: '$memberName',
+            timestamp: '$timestamp',
+            boss: '$bossName'
+          }
+        }
+      },
+      {
+        // Now group by member to count unique spawns attended
+        $group: {
+          _id: '$_id.memberName',
           spawnsAttended: { $sum: 1 }
         }
       },
