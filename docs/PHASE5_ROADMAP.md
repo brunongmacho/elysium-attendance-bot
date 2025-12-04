@@ -1,9 +1,10 @@
 # Phase 5+ Roadmap
-# Future MongoDB Migration Phases
+# MongoDB Migration Enhancement Phases
 
 **Last Updated**: Dec 4, 2025
-**Current Status**: Phase 7 (Parallel Dual-Write) Complete ✅
-**Next Phase**: Production Deployment 🚀
+**Current Status**: Phase 7 (Parallel Dual-Write) Complete ✅ + Pre-Auction Sync ✅
+**MongoDB Adoption**: 85% (9/11 core systems)
+**Next Phase**: Optional Phase 8 (Boss Timer MongoDB) or Production Monitoring 🚀
 
 ---
 
@@ -19,6 +20,7 @@
 ✅ Phase 4.5: Attendance & Rotation MongoDB (100%)
 ✅ Phase 5.1: Background MongoDB → Sheets Sync (100%)
 ✅ Phase 6: Weekly & Monthly Reports (100%)
+✅ Phase 7.5: Pre-Auction Sync (100%)
 ✅ Phase 7: Parallel Dual-Write Refactor (100%)
 ```
 
@@ -130,6 +132,50 @@ if (mongoResult.success || sheetResult.success) {
 - `services/reports.js` - Weekly and monthly report generation
 - `index2.js:3901-3929` - Command handlers for !weekly and !monthly
 - `index2.js:5354-5355, 5409-5412` - Command routing
+
+---
+
+## ✅ PHASE 7.5: PRE-AUCTION SYNC
+
+**Implemented**: Dec 4, 2025
+**Status**: ✅ Complete
+
+### What was implemented
+
+**Problem**: Manual point adjustments in Google Sheets were not synced to MongoDB until next bot operation
+
+**Solution**: Scheduled sync that runs 1 hour before Saturday auction (11:00 AM GMT+8)
+
+**Implementation**:
+- ✅ Scheduled task runs every Saturday at 11:00 AM GMT+8
+- ✅ Syncs Google Sheets → MongoDB for bidding points
+- ✅ Ensures manual point adjustments are reflected before auction starts
+- ✅ Also syncs boss rotation data
+- ✅ Logs sync results for monitoring
+
+**Key Files**:
+- `auctioneering.js:4245-4364` - schedulePreAuctionSync() function
+- `auctioneering.js:4427` - Scheduler initialization
+- `index2.js:4473-4481` - Pre-auction sync service activation
+
+### Benefits
+
+- ✅ Manual point adjustments always synced before auction
+- ✅ No need for manual sync commands before auction
+- ✅ Automated, reliable process
+- ✅ Admin can adjust points in Sheets on Saturday morning
+
+### Data Flow
+
+```
+Saturday 11:00 AM GMT+8
+→ schedulePreAuctionSync() triggers
+→ Fetch BiddingPoints from Google Sheets
+→ Update MongoDB members collection
+→ Fetch BossRotation from Google Sheets
+→ Update MongoDB bossRotation collection
+→ Log sync completion
+```
 
 ---
 
@@ -467,3 +513,259 @@ Ask in #admin-logs or create a GitHub issue.
 ---
 
 **Good luck with your deployment! 🚀**
+
+---
+
+## 🚀 PHASE 8-11: FUTURE ENHANCEMENTS (NEW)
+
+**Added**: Dec 4, 2025
+**Status**: ⏳ RECOMMENDED (Phase 8) / ⏸️ OPTIONAL (Phases 9-11)
+**See**: [MONGODB_FEATURE_STATUS.md](./MONGODB_FEATURE_STATUS.md) for detailed analysis
+
+### Phase 8: Boss Timer MongoDB Integration (RECOMMENDED)
+
+**Priority**: 🔥 HIGH
+**Effort**: 2-3 hours
+**Impact**: High (crash recovery, performance, reliability)
+**Status**: ⏳ Recommended Next Step
+
+**Current State**:
+- ❌ Boss timer system still uses Google Sheets for persistence
+- ❌ Boss kill times saved to Sheets (BossTimerRecovery)
+- ❌ Crash recovery loads from Sheets (5-10 seconds)
+- ❌ Performance: 500-2000ms to load/save timer data
+
+**Proposed Implementation**:
+1. Add `boss_timers` document to MongoDB `botState` collection
+2. Update `loadRecoveryAndReschedule()` to read from MongoDB
+3. Update `saveBossTimerRecovery()` to parallel dual-write (MongoDB + Sheets)
+4. Update `recordBossKill()` to save to MongoDB
+5. Keep Sheets as fallback for manual viewing
+6. Test crash recovery
+
+**Expected Benefits**:
+- ✅ 40-200x faster timer load (10-50ms vs 500-2000ms)
+- ✅ Faster crash recovery (<1s vs 5-10s)
+- ✅ Reduced dependency on Google Sheets API
+- ✅ Better reliability during outages
+
+**Schema Addition**:
+```javascript
+{
+  _id: "boss_timers",
+  timers: [
+    {
+      bossName: "Laphine Queen",
+      killTime: ISODate("2025-12-04T14:00:00Z"),
+      nextSpawn: ISODate("2025-12-04T16:00:00Z"),
+      interval: 7200, // seconds
+      killedBy: "ELYSIUM",
+      scheduledReminder: true
+    }
+  ],
+  serverDown: false,
+  lastUpdated: ISODate("2025-12-04T14:30:00Z")
+}
+```
+
+**Files to Modify**:
+- `boss-timer.js` - Main timer system
+- `utils/mongodb-helpers.js` - Add timer save/load functions
+- `services/background-sync.js` - Add timer sync (optional)
+
+---
+
+### Phase 9: Auction Sessions Audit Trail (OPTIONAL)
+
+**Priority**: 🟡 MEDIUM
+**Effort**: 3-4 hours
+**Impact**: Medium (better analytics, audit trail)
+**Status**: ⏸️ Optional
+
+**Current State**:
+- ⚠️ `auctionSessions` collection exists but partially used
+- ⚠️ Limited session tracking
+- ⚠️ No complete audit trail
+
+**Proposed Implementation**:
+1. Create session record at auction start
+2. Add items to session as they're sold
+3. Track member spending per session
+4. Generate session summary at auction end
+5. Create admin command `!sessionhistory`
+
+**Expected Benefits**:
+- ✅ Complete auction audit trail
+- ✅ Session-based analytics
+- ✅ Member spending history per session
+- ✅ Better ForDistribution column tracking
+
+**Schema Enhancement**:
+```javascript
+{
+  _id: ObjectId("..."),
+  sessionNumber: 5,
+  sessionDate: "12/04/25 12:00",
+  sessionLabel: "12/04/25 12:00 #5",
+  startTime: ISODate("2025-12-04T12:00:00Z"),
+  endTime: ISODate("2025-12-04T14:30:00Z"),
+  items: [
+    {
+      itemId: ObjectId("..."),
+      itemName: "Evil Glove [1]",
+      winner: "PlayerName",
+      winnerId: "discord_user_id",
+      winningBid: 45
+    }
+  ],
+  memberSpending: [
+    { memberId: "discord_user_id", memberName: "PlayerName", totalSpent: 45 }
+  ],
+  totalItemsSold: 2,
+  totalPointsSpent: 80,
+  syncedToSheet: true,
+  sheetColumn: "E"
+}
+```
+
+---
+
+### Phase 10: Event Reminder System (OPTIONAL)
+
+**Priority**: 🟢 LOW
+**Effort**: 1-2 days
+**Impact**: Low (nice-to-have)
+**Status**: ⏸️ Skip (current system sufficient)
+
+**Current State**:
+- ❌ `eventReminders` collection exists but not implemented
+- ✅ Boss spawn reminders work via boss-timer.js
+- ✅ Manual auction announcements work well
+
+**Proposed Implementation** (if needed):
+1. Implement MongoDB `eventReminders` collection
+2. Create `!reminder` commands (add, list, remove)
+3. Build recurring reminder logic
+4. Add reminder notification service
+5. Support custom reminder messages
+6. Support role mentions in reminders
+
+**Expected Benefits**:
+- ✅ Automated custom guild event reminders
+- ✅ Recurring reminder support
+- ✅ Advanced notification features
+
+**Recommendation**: **SKIP** - Current boss spawn warnings work well, manual announcements sufficient
+
+---
+
+### Phase 11: Advanced Analytics Dashboard (OPTIONAL)
+
+**Priority**: ⚪ VERY LOW
+**Effort**: 1-2 weeks
+**Impact**: Low (nice-to-have)
+**Status**: ⏸️ Skip (not critical)
+
+**Proposed Implementation** (if needed):
+1. Create web dashboard showing MongoDB stats
+2. Real-time sync status monitoring
+3. Member activity trends
+4. Boss spawn frequency analysis
+5. Auction economics dashboard
+6. Data consistency checker
+
+**Expected Benefits**:
+- ✅ Visual monitoring of bot health
+- ✅ Advanced guild analytics
+- ✅ Data insights and trends
+
+**Recommendation**: **SKIP** - Console logs + MongoDB Atlas provide sufficient monitoring
+
+---
+
+## 🎯 Updated Recommendation Matrix
+
+| Phase | Feature | Priority | Effort | Impact | Recommendation |
+|-------|---------|----------|--------|--------|----------------|
+| 1-7 | Core Systems | ✅ DONE | High | Critical | ✅ Complete |
+| 7.5 | Pre-Auction Sync | ✅ DONE | Low | Medium | ✅ Complete |
+| 8 | Boss Timer MongoDB | 🔥 HIGH | Low (2-3h) | High | ⏳ **RECOMMENDED** |
+| 9 | Auction Sessions | 🟡 MEDIUM | Medium (3-4h) | Medium | ⏸️ Optional |
+| 10 | Event Reminders | 🟢 LOW | High (1-2d) | Low | ⏸️ Skip |
+| 11 | Analytics Dashboard | ⚪ VERY LOW | Very High (1-2w) | Low | ⏸️ Skip |
+
+---
+
+## 📊 MongoDB Adoption Status
+
+**Current**: 85% (9/11 core systems fully migrated)
+
+```
+✅ Bidding System: 100% MongoDB
+✅ Auctioneering: 100% MongoDB
+✅ Attendance: 100% MongoDB
+✅ Boss Rotation: 100% MongoDB
+✅ Member Stats: 100% MongoDB
+✅ Leaderboards: 100% MongoDB
+✅ Weekly Reports: 100% MongoDB
+✅ Monthly Reports: 100% MongoDB
+✅ Background Sync: 100% MongoDB (disabled)
+⚠️ Bot State: 60% MongoDB (bidding + auction only)
+❌ Boss Timers: 0% MongoDB
+❌ Event Reminders: 0% (not implemented)
+```
+
+**After Phase 8**: 95% (10/11 core systems, boss timers migrated)
+
+---
+
+## 💡 Final Recommendation (Dec 4, 2025)
+
+### Option A: Implement Phase 8 - RECOMMENDED ✅
+
+**Why**: High impact, low effort, completes the MongoDB migration
+**Time**: 2-3 hours
+**Benefits**:
+- ✅ Boss timer performance 40-200x faster
+- ✅ Crash recovery <1 second
+- ✅ 95% MongoDB adoption
+- ✅ Complete bot state migration
+
+**Next Steps**:
+1. Implement boss timer MongoDB integration
+2. Test crash recovery thoroughly
+3. Deploy to production
+4. Monitor for 24-48 hours
+5. Celebrate 95% MongoDB adoption! 🎉
+
+---
+
+### Option B: Production Monitoring - ALSO VALID ✅
+
+**Why**: Bot is production-ready at 85% MongoDB adoption
+**Time**: Ongoing
+**Benefits**:
+- ✅ Current system is stable and fast
+- ✅ All critical operations use MongoDB
+- ✅ 40-200x performance improvements achieved
+- ✅ Parallel dual-write prevents data loss
+
+**Next Steps**:
+1. Monitor production for stability
+2. Gather performance metrics
+3. Collect user feedback
+4. Consider Phase 8 if boss timer issues arise
+
+---
+
+## 📚 Related Documentation
+
+- [MONGODB_FEATURE_STATUS.md](./MONGODB_FEATURE_STATUS.md) - Detailed feature analysis
+- [PHASE7_PARALLEL_DUAL_WRITE.md](./PHASE7_PARALLEL_DUAL_WRITE.md) - Dual-write implementation
+- [MIGRATION_PROGRESS.md](./MIGRATION_PROGRESS.md) - Complete migration history
+- [MONGODB_MIGRATION.md](./MONGODB_MIGRATION.md) - Overall migration plan
+
+---
+
+**Updated**: Dec 4, 2025
+**Next Review**: After Phase 8 implementation or production monitoring period
