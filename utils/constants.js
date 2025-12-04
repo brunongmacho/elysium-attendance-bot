@@ -430,6 +430,28 @@ const MESSAGES = {
 };
 
 // ============================================================================
+// DISCORD API ERROR CODES
+// ============================================================================
+
+/**
+ * Discord API error codes for common errors.
+ *
+ * These codes are returned by Discord's API and can be used to handle
+ * specific error cases gracefully. Centralizing them here ensures consistency
+ * and makes error handling more readable.
+ *
+ * @constant {Object} DISCORD_ERRORS
+ * @see {@link https://discord.com/developers/docs/topics/opcodes-and-status-codes#json}
+ */
+const DISCORD_ERRORS = {
+  UNKNOWN_CHANNEL: 10003,       // The channel does not exist
+  UNKNOWN_MESSAGE: 10008,       // The message does not exist
+  MISSING_ACCESS: 50001,        // Missing access to perform the action
+  MISSING_PERMISSIONS: 50013,   // Missing permissions to perform the action
+  THREAD_ARCHIVED: 50083,       // Cannot send messages in an archived thread
+};
+
+// ============================================================================
 // MODULE EXPORTS
 // ============================================================================
 
@@ -453,6 +475,7 @@ const MESSAGES = {
  * @exports AUCTION_STATES - Auction state machine values
  * @exports COMMON_ALIASES - Command alias mappings
  * @exports MESSAGES - Predefined message templates
+ * @exports DISCORD_ERRORS - Discord API error codes
  */
 module.exports = {
   LOGGING, // Production logging configuration (add this to reduce I/O in production)
@@ -466,4 +489,5 @@ module.exports = {
   AUCTION_STATES,
   COMMON_ALIASES,
   MESSAGES,
+  DISCORD_ERRORS,
 };

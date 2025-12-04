@@ -653,6 +653,50 @@ const COMMANDS = {
         "• Use only if state is corrupted"
       ]
     }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // MONITORING & PERFORMANCE COMMANDS (Phase 2 & 3)
+  // ─────────────────────────────────────────────────────────────────────────
+  monitoring: {
+    shutdownstatus: {
+      usage: "!shutdownstatus",
+      description: "View shutdown manager status and registered handlers",
+      aliases: [],
+      adminOnly: true,
+      details: [
+        "• Shows registered timeouts and intervals",
+        "• Lists cleanup handlers with priorities",
+        "• Helps debug graceful shutdown issues",
+        "• **Phase 1**: Graceful shutdown management"
+      ]
+    },
+    cachestats: {
+      usage: "!cachestats",
+      description: "View LRU cache statistics and performance metrics",
+      aliases: [],
+      adminOnly: true,
+      details: [
+        "• Cache size and utilization",
+        "• Hit rate and efficiency",
+        "• Evictions and expirations",
+        "• Prevents redundant Google Sheets API calls",
+        "• **Phase 1**: Column check cache optimization"
+      ]
+    },
+    mongoindexes: {
+      usage: "!mongoindexes",
+      description: "Recreate MongoDB indexes for optimal query performance",
+      aliases: [],
+      adminOnly: true,
+      details: [
+        "• Creates compound indexes for reports (40-50x faster)",
+        "• Verifies critical indexes exist",
+        "• Shows creation status (created/skipped/failed)",
+        "• Safe to run multiple times (idempotent)",
+        "• **Phase 3.2**: Query optimization with indexes"
+      ]
+    }
   }
 };
 
@@ -705,6 +749,11 @@ function buildMainHelp() {
       {
         name: `${EMOJI.EMERGENCY} Emergency`,
         value: `\`!help emergency\`\nRecovery tools, diagnostics, force commands`,
+        inline: true
+      },
+      {
+        name: `${EMOJI.CHART} Monitoring & Performance`,
+        value: `\`!help monitoring\`\nCache stats, indexes, shutdown status`,
         inline: true
       },
       {
@@ -763,6 +812,11 @@ function buildCategoryHelp(category, isUserAdmin = true) {
       title: `${EMOJI.EMERGENCY} Emergency Recovery Commands`,
       description: "Stuck state recovery and diagnostics",
       color: COLORS.EMERGENCY
+    },
+    monitoring: {
+      title: `${EMOJI.CHART} Monitoring & Performance Commands`,
+      description: "System metrics, cache stats, and performance optimization (Phase 2 & 3)",
+      color: COLORS.PRIMARY
     }
   };
 

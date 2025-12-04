@@ -136,123 +136,239 @@ class DatabaseAPI {
   }
 
   /**
-   * Create database indexes for performance
+   * Create database indexes for performance (PHASE 1: CRIT-005 Enhanced)
    * Indexes dramatically improve query speed (100x faster!)
+   * Tracks individual index creation and alerts admins on failures
+   *
+   * @returns {Promise<Object>} Results object with created, failed, and verified indexes
    */
   async createIndexes() {
     if (!this.db) {
       throw new Error('Database not connected');
     }
 
-    console.log('📇 Creating database indexes...');
+    console.log('📇 Creating database indexes with enhanced tracking...');
 
+    const indexResults = {
+      created: [],
+      failed: [],
+      verified: [],
+      skipped: []
+    };
+
+    // Define all indexes with metadata
+    const indexDefinitions = [
+      // Attendance indexes
+      { collection: 'attendance', spec: { memberId: 1, timestamp: -1 }, name: 'member_history', critical: true },
+      { collection: 'attendance', spec: { weekStartDate: 1 }, name: 'week_lookup', critical: false },
+      { collection: 'attendance', spec: { bossName: 1 }, name: 'boss_lookup', critical: false },
+      { collection: 'attendance', spec: { weekLabel: 1 }, name: 'sheet_sync', critical: false },
+
+      // PHASE 3.2: Compound indexes for report optimization
+      { collection: 'attendance', spec: { timestamp: -1, bossName: 1 }, name: 'report_spawns', critical: false },
+      { collection: 'attendance', spec: { timestamp: -1, memberName: 1, bossName: 1 }, name: 'report_members', critical: false },
+      { collection: 'attendance', spec: { timestamp: -1, memberId: 1 }, name: 'member_timeline', critical: false },
+
+      // Members indexes
+      { collection: 'members', spec: { username: 1 }, options: { unique: true }, name: 'username_unique', critical: true },
+      { collection: 'members', spec: { pointsAvailable: -1 }, name: 'points_leaderboard', critical: false },
+      { collection: 'members', spec: { 'attendance.total': -1 }, name: 'attendance_leaderboard', critical: false },
+
+      // PHASE 3.2: Compound indexes for bidding stats in reports
+      { collection: 'members', spec: { isActive: 1, pointsEarned: -1 }, name: 'active_top_earners', critical: false },
+      { collection: 'members', spec: { isActive: 1, pointsSpent: -1 }, name: 'active_top_spenders', critical: false },
+
+      // Auction items indexes
+      { collection: 'auctionItems', spec: { status: 1 }, name: 'status_lookup', critical: false },
+      { collection: 'auctionItems', spec: { addedAt: -1 }, name: 'recent_items', critical: false },
+      { collection: 'auctionItems', spec: { winnerId: 1, status: 1 }, name: 'winner_items', critical: false },
+
+      // Auction sessions indexes
+      { collection: 'auctionSessions', spec: { sessionDate: -1 }, name: 'recent_sessions', critical: false },
+      { collection: 'auctionSessions', spec: { sessionNumber: 1 }, options: { unique: true }, name: 'session_number_unique', critical: false },
+
+      // Boss rotation indexes
+      { collection: 'bossRotation', spec: { bossName: 1 }, options: { unique: true }, name: 'boss_unique', critical: false },
+      { collection: 'bossRotation', spec: { currentGuild: 1 }, name: 'current_turn', critical: false },
+
+      // Event reminders indexes
+      { collection: 'eventReminders', spec: { nextTrigger: 1, active: 1 }, name: 'due_reminders', critical: true },
+      { collection: 'eventReminders', spec: { eventType: 1 }, name: 'event_type_lookup', critical: false },
+
+      // Boss timers indexes
+      { collection: 'bossTimers', spec: { bossName: 1 }, options: { unique: true }, name: 'boss_timer_unique', critical: false },
+      { collection: 'bossTimers', spec: { nextSpawnTime: 1 }, name: 'spawn_time_lookup', critical: false },
+    ];
+
+    // Create indexes with individual error handling
+    for (const indexDef of indexDefinitions) {
+      try {
+        await this.db.collection(indexDef.collection).createIndex(
+          indexDef.spec,
+          { ...indexDef.options, name: indexDef.name }
+        );
+        indexResults.created.push({
+          collection: indexDef.collection,
+          name: indexDef.name,
+          critical: indexDef.critical
+        });
+        console.log(`   ✅ ${indexDef.collection}.${indexDef.name}`);
+      } catch (error) {
+        // Check if error is "index already exists" (code 85 or 86)
+        if (error.code === 85 || error.code === 86 || error.message.includes('already exists')) {
+          indexResults.skipped.push({
+            collection: indexDef.collection,
+            name: indexDef.name,
+            reason: 'Already exists'
+          });
+          console.log(`   ⏭️  ${indexDef.collection}.${indexDef.name} (already exists)`);
+        } else {
+          indexResults.failed.push({
+            collection: indexDef.collection,
+            name: indexDef.name,
+            error: error.message,
+            critical: indexDef.critical
+          });
+          console.error(`   ❌ ${indexDef.collection}.${indexDef.name}: ${error.message}`);
+        }
+      }
+    }
+
+    // Verify critical indexes exist
+    const criticalIndexes = indexDefinitions.filter(idx => idx.critical);
+    for (const criticalIdx of criticalIndexes) {
+      try {
+        const indexes = await this.db.collection(criticalIdx.collection).indexes();
+        const exists = indexes.some(idx => idx.name === criticalIdx.name);
+
+        if (exists) {
+          indexResults.verified.push({
+            collection: criticalIdx.collection,
+            name: criticalIdx.name
+          });
+          console.log(`   ✓ Verified: ${criticalIdx.collection}.${criticalIdx.name}`);
+        } else {
+          // Critical index missing after creation attempt
+          if (!indexResults.failed.some(f => f.collection === criticalIdx.collection && f.name === criticalIdx.name)) {
+            indexResults.failed.push({
+              collection: criticalIdx.collection,
+              name: criticalIdx.name,
+              error: 'Index not found after creation',
+              critical: true
+            });
+          }
+          console.error(`   ✗ Missing critical index: ${criticalIdx.collection}.${criticalIdx.name}`);
+        }
+      } catch (error) {
+        console.error(`   ⚠️ Could not verify ${criticalIdx.collection}.${criticalIdx.name}: ${error.message}`);
+      }
+    }
+
+    // Report summary
+    const totalIndexes = indexDefinitions.length;
+    const successfulIndexes = indexResults.created.length + indexResults.skipped.length;
+    const successRate = Math.round((successfulIndexes / totalIndexes) * 100);
+
+    console.log(`✅ Index creation complete: ${successfulIndexes}/${totalIndexes} (${successRate}%)`);
+    console.log(`   Created: ${indexResults.created.length}, Skipped: ${indexResults.skipped.length}, Failed: ${indexResults.failed.length}`);
+
+    // Alert if any critical indexes failed
+    if (indexResults.failed.length > 0) {
+      const criticalFailures = indexResults.failed.filter(f => f.critical);
+      if (criticalFailures.length > 0) {
+        console.error(`⚠️ CRITICAL: ${criticalFailures.length} critical indexes failed!`);
+      }
+      await this.alertIndexFailure(indexResults);
+    }
+
+    return indexResults;
+  }
+
+  /**
+   * Alert admins about index creation failures (PHASE 1: CRIT-005)
+   * @param {Object} indexResults - Results from createIndexes()
+   */
+  async alertIndexFailure(indexResults) {
     try {
-      // ─────────────────────────────────────────────────────────────
-      // ATTENDANCE COLLECTION INDEXES
-      // ─────────────────────────────────────────────────────────────
-      await this.db.collection('attendance').createIndex(
-        { memberId: 1, timestamp: -1 },
-        { name: 'member_history' }
-      );
-      await this.db.collection('attendance').createIndex(
-        { weekStartDate: 1 },
-        { name: 'week_lookup' }
-      );
-      await this.db.collection('attendance').createIndex(
-        { bossName: 1 },
-        { name: 'boss_lookup' }
-      );
-      await this.db.collection('attendance').createIndex(
-        { weekLabel: 1 },
-        { name: 'sheet_sync' }
-      );
+      if (!this.adminChannel) {
+        console.warn('⚠️ Cannot send index failure alert: Admin channel not configured');
+        return;
+      }
 
-      // ─────────────────────────────────────────────────────────────
-      // MEMBERS COLLECTION INDEXES
-      // ─────────────────────────────────────────────────────────────
-      await this.db.collection('members').createIndex(
-        { username: 1 },
-        { unique: true, name: 'username_unique' }
-      );
-      await this.db.collection('members').createIndex(
-        { pointsAvailable: -1 },
-        { name: 'points_leaderboard' }
-      );
-      await this.db.collection('members').createIndex(
-        { 'attendance.total': -1 },
-        { name: 'attendance_leaderboard' }
-      );
+      const { EmbedBuilder } = require('discord.js');
+      const criticalFailures = indexResults.failed.filter(f => f.critical);
+      const regularFailures = indexResults.failed.filter(f => !f.critical);
 
-      // ─────────────────────────────────────────────────────────────
-      // AUCTION ITEMS COLLECTION INDEXES
-      // ─────────────────────────────────────────────────────────────
-      await this.db.collection('auctionItems').createIndex(
-        { status: 1 },
-        { name: 'status_lookup' }
-      );
-      await this.db.collection('auctionItems').createIndex(
-        { addedAt: -1 },
-        { name: 'recent_items' }
-      );
-      await this.db.collection('auctionItems').createIndex(
-        { winnerId: 1, status: 1 },
-        { name: 'winner_items' }
-      );
+      const embed = new EmbedBuilder()
+        .setColor(criticalFailures.length > 0 ? 0xFF0000 : 0xFFA500)
+        .setTitle('⚠️ MongoDB Index Creation Warning')
+        .setDescription(
+          criticalFailures.length > 0
+            ? '**CRITICAL**: Some critical indexes failed to create. Queries will be 100x slower!'
+            : 'Some non-critical indexes failed. Performance may be slightly impacted.'
+        )
+        .addFields(
+          {
+            name: '✅ Successfully Created',
+            value: indexResults.created.length > 0
+              ? `${indexResults.created.length} indexes created successfully`
+              : 'None',
+            inline: true
+          },
+          {
+            name: '⏭️ Already Existed',
+            value: indexResults.skipped.length > 0
+              ? `${indexResults.skipped.length} indexes already existed`
+              : 'None',
+            inline: true
+          },
+          {
+            name: '✓ Verified Critical',
+            value: indexResults.verified.length > 0
+              ? `${indexResults.verified.length} critical indexes verified`
+              : 'None',
+            inline: true
+          }
+        );
 
-      // ─────────────────────────────────────────────────────────────
-      // AUCTION SESSIONS COLLECTION INDEXES
-      // ─────────────────────────────────────────────────────────────
-      await this.db.collection('auctionSessions').createIndex(
-        { sessionDate: -1 },
-        { name: 'recent_sessions' }
-      );
-      await this.db.collection('auctionSessions').createIndex(
-        { sessionNumber: 1 },
-        { unique: true, name: 'session_number_unique' }
-      );
+      // Add critical failures if any
+      if (criticalFailures.length > 0) {
+        embed.addFields({
+          name: '🔴 Critical Failures',
+          value: criticalFailures
+            .map(f => `• ${f.collection}.${f.name}\n  Error: ${f.error}`)
+            .join('\n')
+            .substring(0, 1000),
+          inline: false
+        });
+      }
 
-      // ─────────────────────────────────────────────────────────────
-      // BOSS ROTATION COLLECTION INDEXES
-      // ─────────────────────────────────────────────────────────────
-      await this.db.collection('bossRotation').createIndex(
-        { bossName: 1 },
-        { unique: true, name: 'boss_unique' }
-      );
-      await this.db.collection('bossRotation').createIndex(
-        { currentGuild: 1 },
-        { name: 'current_turn' }
-      );
+      // Add regular failures if any
+      if (regularFailures.length > 0) {
+        embed.addFields({
+          name: '⚠️ Non-Critical Failures',
+          value: regularFailures
+            .map(f => `• ${f.collection}.${f.name}: ${f.error}`)
+            .join('\n')
+            .substring(0, 1000),
+          inline: false
+        });
+      }
 
-      // ─────────────────────────────────────────────────────────────
-      // EVENT REMINDERS COLLECTION INDEXES
-      // ─────────────────────────────────────────────────────────────
-      await this.db.collection('eventReminders').createIndex(
-        { nextTrigger: 1, active: 1 },
-        { name: 'due_reminders' }
-      );
-      await this.db.collection('eventReminders').createIndex(
-        { eventType: 1 },
-        { name: 'event_type_lookup' }
-      );
+      embed.addFields({
+        name: '🔧 Action Required',
+        value: criticalFailures.length > 0
+          ? '1. Check MongoDB Atlas dashboard for errors\n2. Verify connection and permissions\n3. Run `!mongoindexes` to retry\n4. **Queries will be very slow until fixed!**'
+          : '1. Check MongoDB Atlas dashboard\n2. Run `!mongoindexes` to retry\n3. Monitor query performance',
+        inline: false
+      });
 
-      // ─────────────────────────────────────────────────────────────
-      // BOSS TIMERS COLLECTION INDEXES (Phase 8)
-      // ─────────────────────────────────────────────────────────────
-      await this.db.collection('bossTimers').createIndex(
-        { bossName: 1 },
-        { unique: true, name: 'boss_timer_unique' }
-      );
-      await this.db.collection('bossTimers').createIndex(
-        { nextSpawnTime: 1 },
-        { name: 'spawn_time_lookup' }
-      );
+      embed.setTimestamp();
 
-      // Bot state collection doesn't need indexes (only 3 documents, queried by _id)
-
-      console.log('✅ Database indexes created successfully');
-    } catch (error) {
-      console.error('⚠️ Error creating indexes:', error.message);
-      // Don't throw - indexes are optimization, not critical for functionality
+      await this.adminChannel.send({ embeds: [embed] });
+      console.log('✅ Index failure alert sent to admin channel');
+    } catch (alertError) {
+      console.error('❌ Failed to send index failure alert:', alertError.message);
     }
   }
 

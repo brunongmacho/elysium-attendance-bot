@@ -121,6 +121,10 @@ const reports = require('./services/reports'); // Weekly & monthly reports (Phas
 const shutdownManager = require('./utils/shutdown-manager'); // CRIT-001: Timer cleanup & graceful shutdown
 const DualWriteManager = require('./utils/dual-write-manager'); // CRIT-003: Data loss prevention
 
+// PHASE 3.3 - Internal Discord Monitoring
+// ═══════════════════════════════════════════════════════════════════════════
+const discordMonitoring = require('./utils/discord-monitoring');
+
 // =====================================================================
 // SECTION 1B: COMMAND ALIASES (moved to config/command-aliases.js)
 // =====================================================================
@@ -534,21 +538,116 @@ const BIDDING_CHANNEL_CLEANUP_INTERVAL = 12 * 60 * 60 * 1000;
  * @type {http.Server}
  * @constant
  */
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   // Health check endpoint - returns bot status and metrics
   if (req.url === "/health" || req.url === "/") {
+    // PHASE 2.5: Enhanced health check with MongoDB metrics
+    // PHASE 3.3: Added memory and cache metrics
+    const healthData = {
+      status: "healthy",
+      version: BOT_VERSION,
+      uptime: process.uptime(),
+      bot: client.user ? client.user.tag : "not ready",
+      activeSpawns: Object.keys(activeSpawns).length,
+      pendingVerifications: Object.keys(pendingVerifications).length,
+      timestamp: new Date().toISOString(),
+    };
+
+    // PHASE 3.3: Add memory metrics
+    const memUsage = process.memoryUsage();
+    const formatBytes = (bytes) => {
+      const mb = bytes / 1024 / 1024;
+      return `${Math.round(mb * 10) / 10} MB`;
+    };
+
+    healthData.memory = {
+      heapUsed: formatBytes(memUsage.heapUsed),
+      heapTotal: formatBytes(memUsage.heapTotal),
+      heapUsedPercent: Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100) + '%',
+      rss: formatBytes(memUsage.rss), // Resident Set Size (total memory)
+      external: formatBytes(memUsage.external),
+      arrayBuffers: formatBytes(memUsage.arrayBuffers || 0)
+    };
+
+    // PHASE 3.3: Add cache statistics
+    try {
+      const reportsCacheStats = reports.getCacheStats();
+      const attendanceCacheStats = attendance.getCacheStats();
+
+      healthData.caches = {
+        reports: reportsCacheStats,
+        attendance: attendanceCacheStats
+      };
+    } catch (cacheError) {
+      healthData.caches = { error: 'Cache stats unavailable' };
+    }
+
+    // Add MongoDB health metrics
+    try {
+      if (dbAPI.connected && dbAPI.db) {
+        const mongoStartTime = Date.now();
+
+        // Test MongoDB connection with a ping
+        await dbAPI.db.admin().ping();
+        const mongoLatency = Date.now() - mongoStartTime;
+
+        // Get collection stats
+        const collections = await dbAPI.db.listCollections().toArray();
+        const collectionNames = collections.map(c => c.name);
+
+        // Get document counts for key collections
+        const collectionStats = {};
+        for (const collName of ['attendance', 'bosses', 'members', 'event_reminders', 'boss_timers']) {
+          if (collectionNames.includes(collName)) {
+            try {
+              const count = await dbAPI.db.collection(collName).estimatedDocumentCount();
+              const stats = await dbAPI.db.collection(collName).stats();
+              collectionStats[collName] = {
+                documents: count,
+                sizeBytes: stats.size,
+                avgDocSize: stats.avgObjSize || 0,
+              };
+            } catch (err) {
+              // Collection might not exist or stats unavailable
+              collectionStats[collName] = { error: 'unavailable' };
+            }
+          }
+        }
+
+        // Get database stats
+        const dbStats = await dbAPI.db.stats();
+
+        healthData.mongodb = {
+          connected: true,
+          latencyMs: mongoLatency,
+          database: dbAPI.db.databaseName,
+          collections: {
+            total: collections.length,
+            names: collectionNames,
+            stats: collectionStats,
+          },
+          database_stats: {
+            sizeBytes: dbStats.dataSize,
+            storageSizeBytes: dbStats.storageSize,
+            indexes: dbStats.indexes,
+            indexSizeBytes: dbStats.indexSize,
+          },
+        };
+      } else {
+        healthData.mongodb = {
+          connected: false,
+          reason: 'not_initialized',
+        };
+      }
+    } catch (mongoError) {
+      healthData.mongodb = {
+        connected: false,
+        error: mongoError.message,
+      };
+    }
+
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(
-      JSON.stringify({
-        status: "healthy",
-        version: BOT_VERSION,
-        uptime: process.uptime(),
-        bot: client.user ? client.user.tag : "not ready",
-        activeSpawns: Object.keys(activeSpawns).length,
-        pendingVerifications: Object.keys(pendingVerifications).length,
-        timestamp: new Date().toISOString(),
-      })
-    );
+    res.end(JSON.stringify(healthData, null, 2));
   } else {
     // Return 404 for all other routes
     res.writeHead(404);
@@ -815,7 +914,7 @@ async function cleanupBiddingChannel() {
           for (const [threadId, thread] of activeThreads.threads) {
             try {
               // Skip specific threads that should never be locked
-              if (threadId === '1430356542871437494') {
+              if (config.protected_thread_ids && config.protected_thread_ids.includes(threadId)) {
                 threadsSkipped++;
                 console.log(`⏭️ Skipping protected thread: ${thread.name}`);
                 continue;
@@ -892,7 +991,7 @@ async function cleanupBiddingChannel() {
           for (const [threadId, thread] of archivedThreads.threads) {
             try {
               // Skip specific threads that should never be locked
-              if (threadId === '1430356542871437494') {
+              if (config.protected_thread_ids && config.protected_thread_ids.includes(threadId)) {
                 console.log(`⏭️ Skipping protected archived thread: ${thread.name}`);
                 continue;
               }
@@ -4431,6 +4530,10 @@ client.once(Events.ClientReady, async () => {
     const adminChannel = await client.channels.fetch(config.admin_logs_channel_id);
     dbAPI.setAdminChannel(adminChannel);
     console.log('✅ MongoDB admin alerts configured');
+
+    // PHASE 3.3: Initialize Discord monitoring system
+    discordMonitoring.initialize(adminChannel);
+    console.log('✅ Discord monitoring initialized');
   } catch (error) {
     console.error('⚠️ Failed to configure MongoDB admin alerts:', error.message);
   }
@@ -4603,6 +4706,56 @@ client.once(Events.ClientReady, async () => {
   shutdownManager.registerInterval('periodic-sync', periodicSyncTimer, { frequency: '15 minutes' });
 
   console.log('✅ Periodic auto-sync scheduled (15 min intervals)');
+
+  // PHASE 3.3: Schedule daily health digest (9 AM)
+  const scheduleDailyDigest = () => {
+    const now = new Date();
+    const next9AM = new Date(now);
+    next9AM.setHours(9, 0, 0, 0);
+
+    // If 9 AM has already passed today, schedule for tomorrow
+    if (next9AM <= now) {
+      next9AM.setDate(next9AM.getDate() + 1);
+    }
+
+    const msUntil9AM = next9AM - now;
+    const hoursUntil = Math.round(msUntil9AM / 1000 / 60 / 60);
+
+    console.log(`📅 Daily health digest scheduled for 9 AM (in ~${hoursUntil}h)`);
+
+    setTimeout(async () => {
+      try {
+        // Fetch health data from /health endpoint
+        const http = require('http');
+        const healthResponse = await new Promise((resolve, reject) => {
+          http.get(`http://localhost:${PORT}/health`, (res) => {
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => resolve(JSON.parse(data)));
+          }).on('error', reject);
+        });
+
+        await discordMonitoring.sendDailyHealthDigest(healthResponse);
+        console.log('✅ Daily health digest sent');
+      } catch (err) {
+        console.error('❌ Failed to send daily health digest:', err.message);
+      }
+
+      // Schedule next day
+      scheduleDailyDigest();
+    }, msUntil9AM);
+  };
+
+  // Start daily digest scheduler
+  scheduleDailyDigest();
+
+  // PHASE 3.3: Periodic memory monitoring (every 10 minutes)
+  const memoryCheckInterval = setInterval(() => {
+    discordMonitoring.checkMemoryUsage();
+  }, 10 * 60 * 1000); // 10 minutes
+
+  shutdownManager.registerInterval('memory-monitoring', memoryCheckInterval, { frequency: '10 minutes' });
+  console.log('✅ Memory monitoring active (checks every 10 minutes)');
 
   // Register GC task (every 3 minutes - more aggressive for 512MB)
   if (global.gc) {
@@ -6431,6 +6584,69 @@ client.on(Events.MessageCreate, async (message) => {
 
           addGuildFooter(embed);
           await message.reply({ embeds: [embed] });
+        }
+        else if (adminCmd === "!mongoindexes") {
+          try {
+            await message.reply('🔄 Recreating MongoDB indexes...');
+
+            const results = await dbAPI.createIndexes();
+            const totalIndexes = results.created.length + results.skipped.length + results.failed.length;
+            const successRate = Math.round(((results.created.length + results.skipped.length) / totalIndexes) * 100);
+
+            const embed = new EmbedBuilder()
+              .setColor(results.failed.length === 0 ? 0x00FF00 : (results.failed.filter(f => f.critical).length > 0 ? 0xFF0000 : 0xFFA500))
+              .setTitle('📇 MongoDB Index Creation Results')
+              .setDescription(`Successfully processed ${totalIndexes} indexes (${successRate}% success rate)`)
+              .addFields(
+                { name: '✅ Created', value: `${results.created.length}`, inline: true },
+                { name: '⏭️ Already Existed', value: `${results.skipped.length}`, inline: true },
+                { name: '❌ Failed', value: `${results.failed.length}`, inline: true },
+                { name: '✓ Critical Verified', value: `${results.verified.length}`, inline: true }
+              );
+
+            // Add failures if any
+            if (results.failed.length > 0) {
+              const criticalFailures = results.failed.filter(f => f.critical);
+              const regularFailures = results.failed.filter(f => !f.critical);
+
+              if (criticalFailures.length > 0) {
+                embed.addFields({
+                  name: '🔴 Critical Failures',
+                  value: criticalFailures
+                    .map(f => `• ${f.collection}.${f.name}`)
+                    .join('\n')
+                    .substring(0, 200),
+                  inline: false
+                });
+              }
+
+              if (regularFailures.length > 0) {
+                embed.addFields({
+                  name: '⚠️ Non-Critical Failures',
+                  value: regularFailures
+                    .map(f => `• ${f.collection}.${f.name}`)
+                    .join('\n')
+                    .substring(0, 200),
+                  inline: false
+                });
+              }
+
+              embed.addFields({
+                name: '💡 Note',
+                value: results.failed.length > 0
+                  ? 'Check MongoDB Atlas dashboard for detailed error information'
+                  : 'All indexes created or already exist',
+                inline: false
+              });
+            }
+
+            embed.setTimestamp();
+            addGuildFooter(embed);
+
+            await message.reply({ embeds: [embed] });
+          } catch (error) {
+            await message.reply(`❌ Index creation failed: ${error.message}`);
+          }
         }
         return;
       }

@@ -1495,7 +1495,7 @@ async function checkAndAutoCloseThreads(client) {
       checked++;
 
       // Skip protected threads that should never be auto-closed
-      if (threadId === '1430356542871437494') {
+      if (config.protected_thread_ids && config.protected_thread_ids.includes(threadId)) {
         console.log(`⏭️ Skipping auto-close for protected thread: ${spawnInfo.boss || 'Unknown'}`);
         continue;
       }
