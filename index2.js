@@ -2230,12 +2230,43 @@ stats: async (message, member, args) => {
   const loadingMsg = await message.reply(`⏳ Fetching stats for **${targetName}**...`);
 
   try {
-    // Fetch stats from Google Sheets (with fuzzy matching support)
-    const result = await sheetAPI.call('getMemberStats', { memberName: targetName });
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MONGODB-FIRST PATH (Phase 4)
+    // ═══════════════════════════════════════════════════════════════════════════
+    let result;
 
-    if (result.status !== 'ok') {
-      await loadingMsg.edit(`❌ Could not find stats for **${targetName}**`);
-      return;
+    if (USE_MONGODB_ATTENDANCE) {
+      try {
+        // Fetch stats from MongoDB
+        result = await mongoHelpers.getMemberStats(targetName);
+
+        if (result.status !== 'ok') {
+          await loadingMsg.edit(`❌ Could not find stats for **${targetName}**`);
+          return;
+        }
+
+        console.log(`✅ [MongoDB] Stats fetched for ${result.memberName}`);
+
+      } catch (mongoError) {
+        console.error(`❌ [MongoDB] Stats fetch failed, falling back to Sheets:`, mongoError.message);
+        // Fall through to Sheets path below
+        result = null;
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // GOOGLE SHEETS PATH (Fallback or when MongoDB disabled)
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (!result) {
+      // Fetch stats from Google Sheets (with fuzzy matching support)
+      result = await sheetAPI.call('getMemberStats', { memberName: targetName });
+
+      if (result.status !== 'ok') {
+        await loadingMsg.edit(`❌ Could not find stats for **${targetName}**`);
+        return;
+      }
+
+      console.log(`✅ [Sheets] Stats fetched for ${result.memberName}`);
     }
 
     // CRITICAL FIX: Get the actual member name returned from sheets (for fuzzy match cases)
