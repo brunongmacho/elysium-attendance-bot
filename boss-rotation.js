@@ -169,12 +169,22 @@ async function getRotationStatus(bossName, useCache = true) {
       return { isRotating: false, bossName };
     }
 
-    // Use cache if available and fresh
+    // STEP 1: Use cache if available and fresh
     if (useCache && rotationCache[normalizedName] && (Date.now() - lastCacheRefresh < CACHE_REFRESH_INTERVAL)) {
       return { isRotating: true, ...rotationCache[normalizedName] };
     }
 
-    // Fetch from Google Sheets
+    // STEP 2: Try MongoDB (faster than Google Sheets)
+    const mongoData = await getRotationFromMongoDB(normalizedName);
+    if (mongoData) {
+      // Update cache
+      rotationCache[normalizedName] = mongoData;
+      console.log(`✅ [MongoDB] Fetched ${normalizedName} rotation: Index ${mongoData.currentIndex} (${mongoData.currentGuild})`);
+      return mongoData;
+    }
+
+    // STEP 3: Fallback to Google Sheets
+    console.log(`⚠️ [MongoDB] ${normalizedName} rotation not in MongoDB, fetching from Google Sheets...`);
     const result = await sheetAPI.call('getBossRotation', { bossName: normalizedName });
 
     if (result.status === 'ok' && result.isRotating) {
@@ -189,8 +199,12 @@ async function getRotationStatus(bossName, useCache = true) {
         nextGuild: result.nextGuild
       };
 
-      // Update cache
+      // Update both cache AND MongoDB
       rotationCache[normalizedName] = rotationData;
+      syncRotationToMongoDB(normalizedName, rotationData).catch(err =>
+        console.error(`⚠️ Failed to sync ${normalizedName} rotation to MongoDB:`, err.message)
+      );
+
       return rotationData;
     }
 
@@ -209,24 +223,45 @@ async function getRotationStatus(bossName, useCache = true) {
 
 /**
  * Refresh rotation cache for all rotating bosses
+ * Syncs Google Sheets → MongoDB → Cache
+ * This is called by !rotation refresh command
  */
 async function refreshRotationCache() {
   try {
-    console.log('🔄 Refreshing rotation cache...');
+    console.log('🔄 Refreshing rotation cache from Google Sheets...');
 
     // Fetch latest list of rotating bosses from sheet
     await fetchRotatingBosses();
 
+    let syncedCount = 0;
     for (const boss of ROTATING_BOSSES) {
-      const rotation = await getRotationStatus(boss, false); // Force fetch from sheets
-      if (rotation.isRotating) {
-        rotationCache[boss] = rotation;
-        console.log(`  ├─ ${boss}: Index ${rotation.currentIndex} (${rotation.currentGuild}) ${rotation.isOurTurn ? '🟢 OUR TURN' : '🔴 NOT OUR TURN'}`);
+      // Fetch directly from Google Sheets (bypassing cache and MongoDB)
+      const result = await sheetAPI.call('getBossRotation', { bossName: boss });
+
+      if (result.status === 'ok' && result.isRotating) {
+        const rotationData = {
+          isRotating: result.isRotating,
+          bossName: result.bossName,
+          currentIndex: result.currentIndex,
+          currentGuild: result.currentGuild,
+          isOurTurn: result.isOurTurn,
+          guilds: result.guilds,
+          nextGuild: result.nextGuild
+        };
+
+        // Update cache
+        rotationCache[boss] = rotationData;
+
+        // Sync to MongoDB
+        await syncRotationToMongoDB(boss, rotationData);
+
+        syncedCount++;
+        console.log(`  ├─ ${boss}: Index ${rotationData.currentIndex} (${rotationData.currentGuild}) ${rotationData.isOurTurn ? '🟢 OUR TURN' : '🔴 NOT OUR TURN'}`);
       }
     }
 
     lastCacheRefresh = Date.now();
-    console.log('✅ Rotation cache refreshed');
+    console.log(`✅ Rotation cache refreshed: ${syncedCount} bosses synced to MongoDB`);
 
   } catch (err) {
     console.error('❌ Error refreshing rotation cache:', err.message);
@@ -264,6 +299,41 @@ async function syncRotationToMongoDB(bossName, rotationData) {
   } catch (error) {
     console.error(`⚠️ [MongoDB] Failed to sync ${bossName} rotation to MongoDB:`, error.message);
     // Non-critical - don't throw, just log
+  }
+}
+
+/**
+ * Get rotation data from MongoDB
+ * @param {string} bossName - Name of the boss
+ * @returns {Promise<Object|null>} Rotation data or null if not found
+ */
+async function getRotationFromMongoDB(bossName) {
+  try {
+    const db = await dbAPI.connect();
+    const rotationCollection = db.collection('bossRotation');
+
+    const doc = await rotationCollection.findOne({
+      _id: bossName.toLowerCase().replace(/\s+/g, '_')
+    });
+
+    if (!doc) {
+      return null;
+    }
+
+    // Return in same format as Google Sheets API
+    return {
+      isRotating: true,
+      bossName: doc.bossName,
+      currentIndex: doc.currentIndex,
+      currentGuild: doc.currentGuild,
+      isOurTurn: doc.isOurTurn,
+      guilds: doc.guilds || [],
+      nextGuild: doc.nextGuild
+    };
+
+  } catch (error) {
+    console.error(`⚠️ [MongoDB] Failed to get ${bossName} rotation from MongoDB:`, error.message);
+    return null;
   }
 }
 
