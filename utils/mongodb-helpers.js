@@ -511,6 +511,117 @@ async function addAttendance(data) {
   return updatedMember;
 }
 
+/**
+ * Get member stats (for !stats command)
+ * Aggregates attendance, points, and ranking data from MongoDB
+ * Returns data in same format as Google Sheets for compatibility
+ *
+ * @param {string} memberName - Member username (supports fuzzy matching)
+ * @returns {Promise<Object>} - Stats object matching Google Sheets format
+ */
+async function getMemberStats(memberName) {
+  const db = await dbAPI.connect();
+
+  // Step 1: Find member (case-insensitive fuzzy match)
+  const members = await db.collection('members').find({ isActive: true }).toArray();
+
+  let member = null;
+  let actualMemberName = memberName;
+
+  // Try exact match first (case-insensitive)
+  member = members.find(m => m.username.toLowerCase() === memberName.toLowerCase());
+
+  // If no exact match, try fuzzy match
+  if (!member) {
+    const searchLower = memberName.toLowerCase();
+    member = members.find(m =>
+      m.username.toLowerCase().includes(searchLower) ||
+      searchLower.includes(m.username.toLowerCase())
+    );
+  }
+
+  if (!member) {
+    return {
+      status: 'error',
+      error: `Member not found: ${memberName}`
+    };
+  }
+
+  actualMemberName = member.username;
+
+  // Step 2: Get attendance records
+  const attendanceRecords = await db.collection('attendance')
+    .find({ memberId: member._id })
+    .sort({ timestamp: -1 })
+    .toArray();
+
+  // Step 3: Calculate attendance stats
+  const totalKills = attendanceRecords.length;
+  const attendancePoints = attendanceRecords.reduce((sum, record) => sum + (record.bossPoints || 1), 0);
+
+  // Get recent bosses (last 5)
+  const recentBosses = attendanceRecords
+    .slice(0, 5)
+    .map(record => ({
+      boss: record.bossName,
+      date: record.timestamp instanceof Date ? record.timestamp.toLocaleDateString() : new Date(record.timestamp).toLocaleDateString()
+    }));
+
+  // Calculate boss distribution
+  const bossCounts = {};
+  attendanceRecords.forEach(record => {
+    const boss = record.bossName;
+    bossCounts[boss] = (bossCounts[boss] || 0) + 1;
+  });
+
+  // Step 4: Calculate attendance rate (need total possible spawns)
+  // For now, use a reasonable estimate or get from separate tracking
+  const totalPossibleSpawns = 100; // TODO: Calculate actual total spawns
+  const attendanceRate = totalPossibleSpawns > 0 ? Math.round((totalKills / totalPossibleSpawns) * 100) : 0;
+
+  // Step 5: Calculate streak
+  // TODO: Implement streak calculation from attendance records
+  const currentStreak = member.attendance?.streak?.current || 0;
+
+  // Step 6: Get ranking
+  const allMembers = members.filter(m => m.isActive);
+  const sortedByAttendance = allMembers
+    .map(m => ({
+      username: m.username,
+      total: m.attendance?.total || 0
+    }))
+    .sort((a, b) => b.total - a.total);
+
+  const rank = sortedByAttendance.findIndex(m => m.username === actualMemberName) + 1;
+
+  // Step 7: Get bidding points
+  const pointsLeft = member.pointsAvailable || 0;
+  const pointsConsumed = member.pointsSpent || 0;
+  const pointsTotal = (member.pointsEarned || 0);
+  const consumptionRate = pointsTotal > 0 ? Math.round((pointsConsumed / pointsTotal) * 100) : 0;
+
+  // Return stats in Google Sheets compatible format
+  return {
+    status: 'ok',
+    memberName: actualMemberName,
+    attendance: {
+      total: totalKills,
+      points: attendancePoints,
+      rate: attendanceRate,
+      streak: currentStreak,
+      recentBosses: recentBosses,
+      bossCounts: bossCounts
+    },
+    bidding: {
+      left: pointsLeft,
+      consumed: pointsConsumed,
+      consumptionRate: consumptionRate
+    },
+    rank: rank,
+    totalMembers: allMembers.length
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // BOT STATE OPERATIONS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -641,6 +752,7 @@ module.exports = {
   addAttendanceRecord,     // Low-level: just creates record
   getMemberAttendance,
   updateAttendanceStats,
+  getMemberStats,          // Get member stats for !stats command
 
   // Bot state operations
   saveBotState,
