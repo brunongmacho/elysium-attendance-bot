@@ -571,8 +571,29 @@ async function triggerSpawnReminder(bossName, spawnTime) {
       return;
     }
 
-    // Create attendance thread
-    const thread = await attendance.createThreadForBoss(client, bossName, spawnTime);
+    // Create attendance thread (with duplicate handling)
+    let thread;
+    try {
+      thread = await attendance.createThreadForBoss(client, bossName, spawnTime);
+    } catch (error) {
+      if (error.message.includes('duplicate spawn') || error.message.includes('Column already exists')) {
+        console.log(`⚠️ Duplicate spawn detected for ${bossName} during thread creation - rescheduling for next spawn`);
+
+        // Reschedule for next occurrence
+        const bossType = getBossType(bossName);
+        if (bossType === 'schedule') {
+          const bossConfig = bossSpawnConfig.scheduleBasedBosses[bossName];
+          if (bossConfig && bossConfig.schedules) {
+            const nextSpawn = findNextScheduledTime(bossConfig.schedules);
+            if (nextSpawn) {
+              scheduleReminder(bossName, nextSpawn);
+            }
+          }
+        }
+        return;
+      }
+      throw error; // Re-throw if not a duplicate error
+    }
 
     // Post reminder to announcement channel with embed and thumbnail
     const timestamp = Math.floor(spawnTime.getTime() / 1000);

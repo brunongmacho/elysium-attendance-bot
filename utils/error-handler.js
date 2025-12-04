@@ -343,10 +343,12 @@ async function safeDelete(message, context = 'message deletion') {
   } catch (error) {
     // Silently ignore expected errors that occur during normal cleanup
     const isExpectedError =
+      error?.code === 10003 || // Unknown Channel (channel deleted)
       error?.code === 10008 || // Unknown Message (already deleted)
       error?.code === 50083 || // Thread is archived
       error?.message?.includes('archived') ||
-      error?.message?.includes('Unknown Message');
+      error?.message?.includes('Unknown Message') ||
+      error?.message?.includes('Unknown Channel');
 
     // Only log unexpected errors
     if (!isExpectedError) {
