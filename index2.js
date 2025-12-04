@@ -6380,6 +6380,58 @@ client.on(Events.MessageCreate, async (message) => {
           await commandHandlers.testmilestones(message, member);
         else if (adminCmd === "!submittallyfromsheet" || adminCmd === "!resetsession")
           await bidding.handleCommand(adminCmd, message, args, client, config);
+        // ═══════════════════════════════════════════════════════════════════════════
+        // PHASE 1 ADMIN COMMANDS - Monitoring & Control
+        // ═══════════════════════════════════════════════════════════════════════════
+        else if (adminCmd === "!shutdownstatus") {
+          const status = shutdownManager.getStatus();
+          const embed = new EmbedBuilder()
+            .setColor(0x3498DB)
+            .setTitle('🛡️ Shutdown Manager Status')
+            .addFields(
+              { name: 'Timeouts Registered', value: `${status.timeouts}`, inline: true },
+              { name: 'Intervals Registered', value: `${status.intervals}`, inline: true },
+              { name: 'Cleanup Handlers', value: `${status.cleanupHandlers}`, inline: true },
+              {
+                name: 'Active Intervals',
+                value: status.timers.intervals.length > 0
+                  ? status.timers.intervals.map(name => `• ${name}`).join('\n')
+                  : 'None',
+                inline: false
+              },
+              {
+                name: 'Cleanup Handlers',
+                value: status.handlers.map(h => `• ${h.name} (priority: ${h.priority})`).join('\n'),
+                inline: false
+              }
+            )
+            .setTimestamp();
+
+          addGuildFooter(embed);
+          await message.reply({ embeds: [embed] });
+        }
+        else if (adminCmd === "!cachestats") {
+          const stats = attendance.getCacheStats();
+          const embed = new EmbedBuilder()
+            .setColor(0x3498DB)
+            .setTitle('📊 LRU Cache Statistics')
+            .addFields(
+              { name: 'Current Size', value: `${stats.size}/${stats.maxSize}`, inline: true },
+              { name: 'Utilization', value: `${stats.utilizationPercent}%`, inline: true },
+              { name: 'Hit Rate', value: stats.hitRate, inline: true },
+              { name: 'Total Hits', value: `${stats.hits}`, inline: true },
+              { name: 'Total Misses', value: `${stats.misses}`, inline: true },
+              { name: 'Cache Efficiency', value: `${stats.hits}/${stats.hits + stats.misses} requests`, inline: true },
+              { name: 'Evictions', value: `${stats.evictions}`, inline: true },
+              { name: 'Expirations', value: `${stats.expirations}`, inline: true },
+              { name: 'Total Sets', value: `${stats.sets}`, inline: true }
+            )
+            .setDescription('Column check cache prevents redundant Google Sheets API calls during attendance windows.')
+            .setTimestamp();
+
+          addGuildFooter(embed);
+          await message.reply({ embeds: [embed] });
+        }
         return;
       }
 

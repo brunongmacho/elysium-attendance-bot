@@ -2042,6 +2042,9 @@ module.exports = {
   getPendingClosures: () => pendingClosures,
   getConfirmationMessages: () => confirmationMessages,
 
+  // Phase 1 (CRIT-004): LRU Cache Statistics
+  getCacheStats: () => columnCheckCache.getStats(),
+
   // State setters (use with caution - primarily for recovery)
   setActiveSpawns: (val) => (activeSpawns = val),
   setActiveColumns: (val) => (activeColumns = val),
