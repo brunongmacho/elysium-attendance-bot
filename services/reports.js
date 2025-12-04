@@ -29,6 +29,58 @@
 const { EmbedBuilder } = require('discord.js');
 const dbAPI = require('../utils/database-api');
 const mongoHelpers = require('../utils/mongodb-helpers');
+const errorHandler = require('../utils/error-handler');
+
+// ============================================================================
+// RETRY LOGIC FOR TRANSIENT FAILURES
+// ============================================================================
+
+/**
+ * Retry a database operation with exponential backoff
+ * PHASE 2.3: Error handling enhancement with retry logic
+ *
+ * @param {Function} operation - Async function to retry
+ * @param {string} operationName - Name for logging
+ * @param {number} maxRetries - Maximum retry attempts (default: 3)
+ * @returns {Promise<any>} Operation result
+ */
+async function retryOperation(operation, operationName, maxRetries = 3) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      // Check if error is transient (network, timeout, temporary MongoDB issues)
+      const isTransient =
+        error.name === 'MongoNetworkError' ||
+        error.name === 'MongoTimeoutError' ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ECONNRESET' ||
+        error.message?.includes('timeout') ||
+        error.message?.includes('network');
+
+      if (!isTransient || attempt === maxRetries) {
+        // Non-transient error or max retries reached - throw
+        throw error;
+      }
+
+      // Exponential backoff: 500ms, 1000ms, 2000ms
+      const backoffMs = 500 * Math.pow(2, attempt - 1);
+      errorHandler.warn(`${operationName} failed (attempt ${attempt}/${maxRetries}), retrying in ${backoffMs}ms`, {
+        error: error.message,
+        attempt,
+        maxRetries
+      });
+
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
+    }
+  }
+
+  throw lastError;
+}
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -85,32 +137,56 @@ function getMonthEnd(date = new Date()) {
 /**
  * Generate weekly report data from MongoDB
  * Attendance = Total boss spawns killed (not member counts)
+ * PHASE 2.3: Enhanced with error boundaries and retry logic
  */
 async function generateWeeklyReport() {
-  const db = await dbAPI.connect();
+  try {
+    // Connect to MongoDB with retry logic
+    const db = await retryOperation(
+      () => dbAPI.connect(),
+      'MongoDB connection for weekly report'
+    );
 
-  // Current week dates
-  const thisWeekStart = getWeekStart();
-  const thisWeekEnd = getWeekEnd();
+    // Current week dates
+    const thisWeekStart = getWeekStart();
+    const thisWeekEnd = getWeekEnd();
 
-  // Last week dates
-  const lastWeekStart = new Date(thisWeekStart);
-  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-  const lastWeekEnd = new Date(thisWeekEnd);
-  lastWeekEnd.setDate(lastWeekEnd.getDate() - 7);
+    // Last week dates
+    const lastWeekStart = new Date(thisWeekStart);
+    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+    const lastWeekEnd = new Date(thisWeekEnd);
+    lastWeekEnd.setDate(lastWeekEnd.getDate() - 7);
 
-  // Fetch data IN PARALLEL
-  const [thisWeekData, lastWeekData] = await Promise.all([
-    getWeekData(db, thisWeekStart, thisWeekEnd),
-    getWeekData(db, lastWeekStart, lastWeekEnd)
-  ]);
+    // Fetch data IN PARALLEL with retry logic
+    const [thisWeekData, lastWeekData] = await Promise.all([
+      retryOperation(
+        () => getWeekData(db, thisWeekStart, thisWeekEnd),
+        'Fetch current week data'
+      ),
+      retryOperation(
+        () => getWeekData(db, lastWeekStart, lastWeekEnd),
+        'Fetch last week data'
+      )
+    ]);
 
-  return {
-    thisWeek: thisWeekData,
-    lastWeek: lastWeekData,
-    weekStart: thisWeekStart,
-    weekEnd: thisWeekEnd
-  };
+    errorHandler.success('Weekly report generated successfully', {
+      thisWeekSpawns: thisWeekData.totalSpawns,
+      lastWeekSpawns: lastWeekData.totalSpawns
+    });
+
+    return {
+      thisWeek: thisWeekData,
+      lastWeek: lastWeekData,
+      weekStart: thisWeekStart,
+      weekEnd: thisWeekEnd
+    };
+  } catch (error) {
+    errorHandler.handleError(error, 'generateWeeklyReport', {
+      silent: false,
+      metadata: { operation: 'weekly_report_generation' }
+    });
+    throw error; // Re-throw for caller to handle
+  }
 }
 
 /**
@@ -392,68 +468,80 @@ function buildWeeklyReportEmbed(reportData) {
 
 /**
  * Generate monthly report data from MongoDB
+ * PHASE 2.3: Enhanced with error boundaries and retry logic
  */
 async function generateMonthlyReport(date = new Date()) {
-  const db = await dbAPI.connect();
+  try {
+    // Connect to MongoDB with retry logic
+    const db = await retryOperation(
+      () => dbAPI.connect(),
+      'MongoDB connection for monthly report'
+    );
 
-  const monthStart = getMonthStart(date);
-  const monthEnd = getMonthEnd(date);
+    const monthStart = getMonthStart(date);
+    const monthEnd = getMonthEnd(date);
 
-  // Get all spawns for the month
-  const spawns = await db.collection('attendance')
-    .aggregate([
-      {
-        $match: {
-          timestamp: { $gte: monthStart, $lte: monthEnd }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            boss: '$bossName',
-            timestamp: '$timestamp'
+    // Get all spawns for the month with retry logic
+    const spawns = await retryOperation(
+      () => db.collection('attendance')
+        .aggregate([
+          {
+            $match: {
+              timestamp: { $gte: monthStart, $lte: monthEnd }
+            }
           },
-          members: { $addToSet: '$memberName' }
-        }
-      }
-    ]).toArray();
-
-  // Boss statistics
-  const bossKills = {};
-  spawns.forEach(spawn => {
-    bossKills[spawn._id.boss] = (bossKills[spawn._id.boss] || 0) + 1;
-  });
-
-  // Member leaderboard (count UNIQUE spawns only)
-  // First deduplicate by memberName + timestamp + boss to count unique spawns only
-  const memberStats = await db.collection('attendance')
-    .aggregate([
-      {
-        $match: {
-          timestamp: { $gte: monthStart, $lte: monthEnd }
-        }
-      },
-      {
-        // Group by member + timestamp + boss to get unique spawn attendance
-        $group: {
-          _id: {
-            memberName: '$memberName',
-            timestamp: '$timestamp',
-            boss: '$bossName'
+          {
+            $group: {
+              _id: {
+                boss: '$bossName',
+                timestamp: '$timestamp'
+              },
+              members: { $addToSet: '$memberName' }
+            }
           }
-        }
-      },
-      {
-        // Now group by member to count unique spawns attended
-        $group: {
-          _id: '$_id.memberName',
-          spawnsAttended: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { spawnsAttended: -1 }
-      }
-    ]).toArray();
+        ]).toArray(),
+      'Fetch monthly spawns data'
+    );
+
+    // Boss statistics
+    const bossKills = {};
+    spawns.forEach(spawn => {
+      bossKills[spawn._id.boss] = (bossKills[spawn._id.boss] || 0) + 1;
+    });
+
+    // Member leaderboard (count UNIQUE spawns only) with retry logic
+    // First deduplicate by memberName + timestamp + boss to count unique spawns only
+    const memberStats = await retryOperation(
+      () => db.collection('attendance')
+        .aggregate([
+          {
+            $match: {
+              timestamp: { $gte: monthStart, $lte: monthEnd }
+            }
+          },
+          {
+            // Group by member + timestamp + boss to get unique spawn attendance
+            $group: {
+              _id: {
+                memberName: '$memberName',
+                timestamp: '$timestamp',
+                boss: '$bossName'
+              }
+            }
+          },
+          {
+            // Now group by member to count unique spawns attended
+            $group: {
+              _id: '$_id.memberName',
+              spawnsAttended: { $sum: 1 }
+            }
+          },
+          {
+            $sort: { spawnsAttended: -1 }
+          }
+        ]).toArray(),
+      'Fetch monthly member stats'
+    );
 
   const totalSpawns = spawns.length;
 
@@ -506,29 +594,48 @@ async function generateMonthlyReport(date = new Date()) {
       count
     }));
 
-  // Bidding stats
-  const members = await mongoHelpers.getAllMembers({ isActive: true });
-  const totalPointsEarned = members.reduce((sum, m) => sum + (m.pointsEarned || 0), 0);
-  const totalPointsSpent = members.reduce((sum, m) => sum + (m.pointsSpent || 0), 0);
+    // Bidding stats with retry logic
+    const members = await retryOperation(
+      () => mongoHelpers.getAllMembers({ isActive: true }),
+      'Fetch active members for bidding stats'
+    );
+    const totalPointsEarned = members.reduce((sum, m) => sum + (m.pointsEarned || 0), 0);
+    const totalPointsSpent = members.reduce((sum, m) => sum + (m.pointsSpent || 0), 0);
 
-  return {
-    month: date,
-    totalSpawns,
-    totalMemberAttendance: memberStats.reduce((sum, m) => sum + m.spawnsAttended, 0),
-    avgPerSpawn: totalSpawns > 0 ? Math.round((memberStats.reduce((sum, m) => sum + m.spawnsAttended, 0) / totalSpawns) * 10) / 10 : 0,
-    uniqueMembers: memberStats.length,
-    activeDays: new Set(spawns.map(s => new Date(s._id.timestamp).toDateString())).size,
-    bossKills,
-    top20Members,
-    weeks,
-    topDays,
-    topHours,
-    bidding: {
-      earned: totalPointsEarned,
-      spent: totalPointsSpent,
-      net: totalPointsEarned - totalPointsSpent
-    }
-  };
+    errorHandler.success('Monthly report generated successfully', {
+      month: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      totalSpawns,
+      uniqueMembers: memberStats.length
+    });
+
+    return {
+      month: date,
+      totalSpawns,
+      totalMemberAttendance: memberStats.reduce((sum, m) => sum + m.spawnsAttended, 0),
+      avgPerSpawn: totalSpawns > 0 ? Math.round((memberStats.reduce((sum, m) => sum + m.spawnsAttended, 0) / totalSpawns) * 10) / 10 : 0,
+      uniqueMembers: memberStats.length,
+      activeDays: new Set(spawns.map(s => new Date(s._id.timestamp).toDateString())).size,
+      bossKills,
+      top20Members,
+      weeks,
+      topDays,
+      topHours,
+      bidding: {
+        earned: totalPointsEarned,
+        spent: totalPointsSpent,
+        net: totalPointsEarned - totalPointsSpent
+      }
+    };
+  } catch (error) {
+    errorHandler.handleError(error, 'generateMonthlyReport', {
+      silent: false,
+      metadata: {
+        operation: 'monthly_report_generation',
+        month: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      }
+    });
+    throw error; // Re-throw for caller to handle
+  }
 }
 
 /**
