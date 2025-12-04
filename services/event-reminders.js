@@ -117,15 +117,42 @@ async function checkDueReminders() {
 }
 
 /**
- * Send reminder notification to Discord channel
+ * Send reminder notification to Discord channel (PHASE 2: Enhanced validation)
  * @param {Object} reminder - Reminder object
  */
 async function sendReminderNotification(reminder) {
   try {
-    const channel = await client.channels.fetch(reminder.channelId);
+    // PHASE 2.1: Enhanced channel validation with explicit error handling
+    let channel;
+    try {
+      channel = await client.channels.fetch(reminder.channelId);
+    } catch (fetchError) {
+      // Handle channel fetch failures explicitly
+      console.error(`❌ Failed to fetch channel ${reminder.channelId} for reminder "${reminder.eventName}":`, fetchError.message);
+
+      // Deactivate reminder if channel is permanently inaccessible
+      if (fetchError.code === 10003) { // Unknown Channel
+        console.log(`⚠️ Channel ${reminder.channelId} no longer exists, deactivating reminder "${reminder.eventName}"`);
+        await mongoHelpers.deactivateReminder(reminder._id.toString());
+      } else if (fetchError.code === 50001) { // Missing Access
+        console.log(`⚠️ No access to channel ${reminder.channelId}, deactivating reminder "${reminder.eventName}"`);
+        await mongoHelpers.deactivateReminder(reminder._id.toString());
+      } else {
+        // Temporary error - don't deactivate, will retry next check
+        console.log(`⚠️ Temporary error fetching channel, will retry next check`);
+      }
+      return;
+    }
+
+    // Additional validation: ensure channel is text-based
     if (!channel) {
       console.error(`❌ Channel not found for reminder: ${reminder.eventName}`);
-      // Mark as inactive since channel is gone
+      await mongoHelpers.deactivateReminder(reminder._id.toString());
+      return;
+    }
+
+    if (!channel.isTextBased()) {
+      console.error(`❌ Channel ${reminder.channelId} is not text-based, deactivating reminder "${reminder.eventName}"`);
       await mongoHelpers.deactivateReminder(reminder._id.toString());
       return;
     }
@@ -146,20 +173,32 @@ async function sendReminderNotification(reminder) {
       .setTimestamp()
       .setFooter({ text: `Event Type: ${reminder.eventType}` });
 
-    // Send notification
-    await channel.send({ embeds: [embed] });
-    console.log(`✅ Sent reminder: ${reminder.eventName}`);
+    // Send notification with error handling
+    try {
+      await channel.send({ embeds: [embed] });
+      console.log(`✅ Sent reminder: ${reminder.eventName}`);
+    } catch (sendError) {
+      console.error(`❌ Failed to send message for reminder "${reminder.eventName}":`, sendError.message);
+
+      // Deactivate if permissions issue or channel deleted
+      if (sendError.code === 50013 || sendError.code === 10003) {
+        console.log(`⚠️ Deactivating reminder "${reminder.eventName}" due to send failure`);
+        await mongoHelpers.deactivateReminder(reminder._id.toString());
+        return;
+      }
+
+      // Other errors - don't deactivate, will retry
+      throw sendError;
+    }
 
     // Update reminder after triggering
     const nextTrigger = calculateNextTrigger(reminder);
     await mongoHelpers.updateReminderAfterTrigger(reminder._id.toString(), nextTrigger);
 
   } catch (error) {
-    console.error(`❌ Error sending reminder "${reminder.eventName}":`, error.message);
-    // Deactivate if error persists (e.g., invalid channel)
-    if (error.code === 10003 || error.code === 50001) {
-      await mongoHelpers.deactivateReminder(reminder._id.toString());
-    }
+    console.error(`❌ Unexpected error in reminder "${reminder.eventName}":`, error.message);
+    // Don't deactivate on unexpected errors - log and continue
+    // This prevents accidental deactivation of working reminders
   }
 }
 
