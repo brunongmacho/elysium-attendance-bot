@@ -1,7 +1,7 @@
 # Startup Performance Analysis & Recommendations
 **Date:** 2025-12-04
 **Environment:** Koyeb (Singapore)
-**Memory Allocation:** 480MB (`--max-old-space-size=480`)
+**Memory Allocation:** 512MB (`--max-old-space-size=512`)
 
 ## Executive Summary
 
@@ -65,15 +65,12 @@ console.log('✅ Cache will warm up on-demand (lazy loading)');
 - 📈 Faster startup time
 - 💾 Memory available for actual operations
 
-#### ✅ Secondary Fix (Priority: HIGH)
-**Increase Koyeb memory allocation** if budget allows:
+#### ✅ Secondary Fix (Priority: MEDIUM)
+**Current memory allocation is adequate:**
 
-Current: 480MB → Recommended: 768MB or 1024MB
+Current: 512MB (sufficient for current workload)
 
-**How to verify Koyeb plan:**
-1. Log into Koyeb dashboard
-2. Check current service instance type
-3. Upgrade to larger instance if on smallest tier
+**Note:** With lazy loading fix, 512MB provides healthy headroom (~50% utilization). Only consider upgrading to 768MB/1024MB if you experience memory pressure after deployment.
 
 ---
 

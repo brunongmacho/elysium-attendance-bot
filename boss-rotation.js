@@ -252,8 +252,8 @@ async function refreshRotationCache() {
         // Update cache
         rotationCache[boss] = rotationData;
 
-        // Sync to MongoDB
-        await syncRotationToMongoDB(boss, rotationData);
+        // Sync to MongoDB (silent mode - batch logging used instead)
+        await syncRotationToMongoDB(boss, rotationData, { silent: true });
 
         syncedCount++;
         console.log(`  ├─ ${boss}: Index ${rotationData.currentIndex} (${rotationData.currentGuild}) ${rotationData.isOurTurn ? '🟢 OUR TURN' : '🔴 NOT OUR TURN'}`);
@@ -272,8 +272,10 @@ async function refreshRotationCache() {
  * Sync rotation data to MongoDB (called after Sheet updates)
  * @param {string} bossName - Name of the boss
  * @param {Object} rotationData - Rotation data from Sheet API response
+ * @param {Object} options - Optional configuration
+ * @param {boolean} options.silent - Skip success logging (for batch operations)
  */
-async function syncRotationToMongoDB(bossName, rotationData) {
+async function syncRotationToMongoDB(bossName, rotationData, options = {}) {
   try {
     const db = await dbAPI.connect();
     const rotationCollection = db.collection('bossRotation');
@@ -295,7 +297,10 @@ async function syncRotationToMongoDB(bossName, rotationData) {
       { upsert: true }
     );
 
-    console.log(`✅ [MongoDB] Synced ${bossName} rotation to MongoDB: Index ${doc.currentIndex} (${doc.currentGuild})`);
+    // Only log if not in silent mode (batch operations use summary logging instead)
+    if (!options.silent) {
+      console.log(`✅ [MongoDB] Synced ${bossName} rotation to MongoDB: Index ${doc.currentIndex} (${doc.currentGuild})`);
+    }
   } catch (error) {
     console.error(`⚠️ [MongoDB] Failed to sync ${bossName} rotation to MongoDB:`, error.message);
     // Non-critical - don't throw, just log

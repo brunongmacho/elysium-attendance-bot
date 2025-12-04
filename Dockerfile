@@ -37,6 +37,6 @@ EXPOSE 3000
 EXPOSE 8000
 
 # ✅ Entry file is index2.js with GC flags and memory limit for Koyeb (512MB RAM)
-# Using 480MB limit to leave ~32MB for system overhead
+# Using 512MB limit to match Koyeb allocation
 # Optimized for size with aggressive garbage collection
-CMD ["--expose-gc", "--max-old-space-size=480", "--optimize-for-size", "--gc-interval=100", "index2.js"]
+CMD ["--expose-gc", "--max-old-space-size=512", "--optimize-for-size", "--gc-interval=100", "index2.js"]

@@ -4473,6 +4473,9 @@ stats: async (message, member, args) => {
  * @event ClientReady
  */
 client.once(Events.ClientReady, async () => {
+  // Track startup time for performance metrics
+  const startupStartTime = Date.now();
+
   mainLogger.info('Bot logged in successfully', {
     tag: client.user.tag,
     bossCount: Object.keys(bossPoints).length,
@@ -4827,6 +4830,24 @@ client.once(Events.ClientReady, async () => {
     await leaderboardSystem.sendWeeklyReport();
     await crashRecovery.markWeeklyReportCompleted();
   }
+
+  // Log startup performance metrics
+  const startupDuration = Date.now() - startupStartTime;
+  const memUsage = process.memoryUsage();
+  const heapUsedMB = (memUsage.heapUsed / 1024 / 1024).toFixed(1);
+  const heapTotalMB = (memUsage.heapTotal / 1024 / 1024).toFixed(1);
+  const heapPercent = Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100);
+  const rssMB = (memUsage.rss / 1024 / 1024).toFixed(1);
+
+  console.log('');
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('📊 STARTUP METRICS');
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log(`⏱️  Startup Time: ${(startupDuration / 1000).toFixed(1)}s`);
+  console.log(`💾 Heap: ${heapUsedMB}MB / ${heapTotalMB}MB (${heapPercent}%)`);
+  console.log(`📈 RSS: ${rssMB}MB`);
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('');
 
   console.log("✅ Bot ready for operations!");
 });
