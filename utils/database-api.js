@@ -27,6 +27,8 @@ class DatabaseAPI {
     this.connected = false;
     this.connectAttempts = 0;
     this.maxConnectAttempts = 5;
+    this.connectionPromise = null; // CRIT-002 FIX: Mutex to prevent race condition
+    this.adminChannel = null; // For alert notifications
   }
 
   /**
@@ -34,11 +36,35 @@ class DatabaseAPI {
    * @returns {Promise<Db>} MongoDB database instance
    */
   async connect() {
+    // Fast path: Already connected
     if (this.connected && this.db) {
       // Already connected - return existing connection (no logging to reduce noise)
       return this.db;
     }
 
+    // CRIT-002 FIX: Wait for existing connection attempt
+    if (this.connectionPromise) {
+      console.log('⏳ [MongoDB] Waiting for existing connection attempt...');
+      return this.connectionPromise;
+    }
+
+    // Create new connection attempt with mutex
+    this.connectionPromise = this._performConnection();
+
+    try {
+      const result = await this.connectionPromise;
+      return result;
+    } finally {
+      // Clear promise after completion (success or failure)
+      this.connectionPromise = null;
+    }
+  }
+
+  /**
+   * Internal method to perform actual connection
+   * @private
+   */
+  async _performConnection() {
     try {
       console.log('🔌 Connecting to MongoDB Atlas (Singapore)...');
 
@@ -93,11 +119,20 @@ class DatabaseAPI {
       if (this.connectAttempts < this.maxConnectAttempts) {
         console.log(`⏳ Retrying connection in 5 seconds...`);
         await new Promise(resolve => setTimeout(resolve, 5000));
-        return this.connect();
+        return this._performConnection(); // CRIT-002 FIX: Recursive retry without mutex
       }
 
       throw error;
     }
+  }
+
+  /**
+   * Set admin channel for MongoDB failure alerts (CRIT-005)
+   * @param {TextChannel} channel - Discord admin channel
+   */
+  setAdminChannel(channel) {
+    this.adminChannel = channel;
+    console.log('✅ [MongoDB] Admin channel configured for alerts');
   }
 
   /**
