@@ -4474,6 +4474,12 @@ client.once(Events.ClientReady, async () => {
   auctioneering.schedulePreAuctionSync(sheetAPI, bossRotation);
   console.log('✅ Pre-auction sync scheduled (Saturdays 11:00 AM GMT+8) - syncs manual Sheets edits to MongoDB');
 
+  // EVENT REMINDER SERVICE (Phase 10) - MongoDB-powered reminder system
+  const eventReminders = require('./services/event-reminders');
+  eventReminders.initialize(client);
+  eventReminders.start();
+  console.log('✅ Event reminder service started - checking for due reminders every 60 seconds');
+
   // BACKGROUND SYNC SERVICE DISABLED (Phase 7)
   // Reason: Redundant after implementing parallel dual-write (Phase 7)
   // All MongoDB writes now have simultaneous Sheets writes via Promise.all()

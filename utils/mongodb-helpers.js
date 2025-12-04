@@ -685,6 +685,233 @@ async function clearBotState(module) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// BOSS TIMER OPERATIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Save boss timer recovery data to MongoDB
+ * @param {string} bossName - Boss name
+ * @param {Date} killTime - Kill time
+ * @param {Date} nextSpawn - Next spawn time
+ * @param {string} killedBy - Username
+ * @param {boolean} serverDown - Server down state
+ * @returns {Promise<Object>} - Save result
+ */
+async function saveBossTimerData(bossName, killTime, nextSpawn, killedBy, serverDown = false) {
+  const db = await dbAPI.connect();
+
+  const timerData = {
+    bossName,
+    lastKillTime: killTime ? killTime.toISOString() : null,
+    nextSpawnTime: nextSpawn ? nextSpawn.toISOString() : null,
+    killedBy,
+    serverDown,
+    updatedAt: new Date()
+  };
+
+  // Update or insert the timer data for this boss
+  await db.collection('bossTimers').updateOne(
+    { bossName },
+    { $set: timerData },
+    { upsert: true }
+  );
+
+  return timerData;
+}
+
+/**
+ * Get all boss timer recovery data from MongoDB
+ * @returns {Promise<Array>} - Array of timer data
+ */
+async function getAllBossTimers() {
+  const db = await dbAPI.connect();
+  return await db.collection('bossTimers').find({}).toArray();
+}
+
+/**
+ * Get specific boss timer data from MongoDB
+ * @param {string} bossName - Boss name
+ * @returns {Promise<Object|null>} - Timer data or null
+ */
+async function getBossTimer(bossName) {
+  const db = await dbAPI.connect();
+  return await db.collection('bossTimers').findOne({ bossName });
+}
+
+/**
+ * Delete boss timer data from MongoDB
+ * @param {string} bossName - Boss name
+ * @returns {Promise<Object>} - Delete result
+ */
+async function deleteBossTimer(bossName) {
+  const db = await dbAPI.connect();
+  return await db.collection('bossTimers').deleteOne({ bossName });
+}
+
+/**
+ * Save server down state to MongoDB
+ * @param {boolean} isDown - Server down state
+ * @returns {Promise<Object>} - Save result
+ */
+async function saveServerDownState(isDown) {
+  const db = await dbAPI.connect();
+
+  await db.collection('botState').updateOne(
+    { _id: 'server_state' },
+    {
+      $set: {
+        serverDown: isDown,
+        updatedAt: new Date()
+      }
+    },
+    { upsert: true }
+  );
+
+  return { serverDown: isDown };
+}
+
+/**
+ * Get server down state from MongoDB
+ * @returns {Promise<boolean>} - Server down state
+ */
+async function getServerDownState() {
+  const db = await dbAPI.connect();
+  const state = await db.collection('botState').findOne({ _id: 'server_state' });
+  return state ? state.serverDown : false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EVENT REMINDER OPERATIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Create a new event reminder
+ * @param {Object} reminderData - Reminder data
+ * @returns {Promise<Object>} - Created reminder
+ */
+async function createReminder(reminderData) {
+  const db = await dbAPI.connect();
+
+  const reminder = {
+    eventType: reminderData.eventType || 'custom',
+    eventName: reminderData.eventName,
+    reminderTime: reminderData.reminderTime,
+    notifyBefore: reminderData.notifyBefore || 0,
+    channelId: reminderData.channelId,
+    message: reminderData.message,
+    mentionRole: reminderData.mentionRole || null,
+    recurring: reminderData.recurring || false,
+    recurrenceRule: reminderData.recurrenceRule || null,
+    triggered: false,
+    lastTriggered: null,
+    nextTrigger: reminderData.reminderTime,
+    createdBy: reminderData.createdBy,
+    createdAt: new Date(),
+    active: true
+  };
+
+  const result = await db.collection('eventReminders').insertOne(reminder);
+  reminder._id = result.insertedId;
+
+  return reminder;
+}
+
+/**
+ * Get all active reminders
+ * @returns {Promise<Array>} - Array of active reminders
+ */
+async function getActiveReminders() {
+  const db = await dbAPI.connect();
+  return await db.collection('eventReminders').find({ active: true }).toArray();
+}
+
+/**
+ * Get due reminders (ready to trigger)
+ * @returns {Promise<Array>} - Array of due reminders
+ */
+async function getDueReminders() {
+  const db = await dbAPI.connect();
+  return await db.collection('eventReminders').find({
+    active: true,
+    nextTrigger: { $lte: new Date() }
+  }).toArray();
+}
+
+/**
+ * Get reminder by ID
+ * @param {string} reminderId - Reminder ID
+ * @returns {Promise<Object|null>} - Reminder or null
+ */
+async function getReminder(reminderId) {
+  const db = await dbAPI.connect();
+  const { ObjectId } = require('mongodb');
+  return await db.collection('eventReminders').findOne({ _id: new ObjectId(reminderId) });
+}
+
+/**
+ * Update reminder after triggering
+ * @param {string} reminderId - Reminder ID
+ * @param {Date} nextTrigger - Next trigger time (null if not recurring)
+ * @returns {Promise<Object>} - Update result
+ */
+async function updateReminderAfterTrigger(reminderId, nextTrigger) {
+  const db = await dbAPI.connect();
+  const { ObjectId } = require('mongodb');
+
+  const update = {
+    triggered: true,
+    lastTriggered: new Date()
+  };
+
+  if (nextTrigger) {
+    update.nextTrigger = nextTrigger;
+    update.triggered = false; // Reset for next occurrence
+  } else {
+    update.active = false; // Deactivate if not recurring
+  }
+
+  return await db.collection('eventReminders').updateOne(
+    { _id: new ObjectId(reminderId) },
+    { $set: update }
+  );
+}
+
+/**
+ * Delete reminder
+ * @param {string} reminderId - Reminder ID
+ * @returns {Promise<Object>} - Delete result
+ */
+async function deleteReminder(reminderId) {
+  const db = await dbAPI.connect();
+  const { ObjectId } = require('mongodb');
+  return await db.collection('eventReminders').deleteOne({ _id: new ObjectId(reminderId) });
+}
+
+/**
+ * Deactivate reminder (soft delete)
+ * @param {string} reminderId - Reminder ID
+ * @returns {Promise<Object>} - Update result
+ */
+async function deactivateReminder(reminderId) {
+  const db = await dbAPI.connect();
+  const { ObjectId } = require('mongodb');
+  return await db.collection('eventReminders').updateOne(
+    { _id: new ObjectId(reminderId) },
+    { $set: { active: false, updatedAt: new Date() } }
+  );
+}
+
+/**
+ * Get reminders by event type
+ * @param {string} eventType - Event type (boss_spawn, auction, guild_event, custom)
+ * @returns {Promise<Array>} - Array of reminders
+ */
+async function getRemindersByType(eventType) {
+  const db = await dbAPI.connect();
+  return await db.collection('eventReminders').find({ eventType, active: true }).toArray();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // UTILITIES
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -771,6 +998,24 @@ module.exports = {
   saveBotState,
   getBotState,
   clearBotState,
+
+  // Boss timer operations
+  saveBossTimerData,
+  getAllBossTimers,
+  getBossTimer,
+  deleteBossTimer,
+  saveServerDownState,
+  getServerDownState,
+
+  // Event reminder operations
+  createReminder,
+  getActiveReminders,
+  getDueReminders,
+  getReminder,
+  updateReminderAfterTrigger,
+  deleteReminder,
+  deactivateReminder,
+  getRemindersByType,
 
   // Utilities
   getCircuitStatus,
