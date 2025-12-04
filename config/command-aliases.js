@@ -52,10 +52,10 @@ const COMMAND_ALIASES = {
   "!lbb": "!leaderboardbidding",
   "!leaderboard": "!leaderboards",  // FIX: Map singular to plural for NLP compatibility
   "!lb": "!leaderboards",
-  "!week": "!weeklyreport",
-  "!weekly": "!weeklyreport",
-  "!month": "!monthlyreport",
-  "!monthly": "!monthlyreport",
+  "!week": "!weeklyreport",        // Legacy: Google Sheets version (keep for backward compatibility)
+  // NOTE: !weekly removed - now uses NEW MongoDB-based reports (services/reports.js)
+  "!month": "!monthlyreport",      // Legacy: Google Sheets version (keep for backward compatibility)
+  // NOTE: !monthly removed - now uses NEW MongoDB-based reports (services/reports.js)
 
   // Activity heatmap commands
   "!heatmap": "!activity",
