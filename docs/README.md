@@ -99,6 +99,49 @@ Comprehensive analysis of MongoDB adoption across all bot features:
 
 ---
 
+### 7. [PHASE2_3_IMPLEMENTATION_SUMMARY.md](./PHASE2_3_IMPLEMENTATION_SUMMARY.md)
+**Phase 2 & 3 Implementation Summary**
+
+Complete documentation of Phase 2 & 3 bug fixes and performance optimizations:
+- Phase 2.1-2.5: Critical bug fixes (event reminders, config, error handling, health checks)
+- Phase 3.2-3.4: Performance suite (MongoDB indexes, monitoring, code deduplication)
+- **Phase 2.6: Startup Performance & Memory Optimization** ⭐ NEW
+  - Critical memory pressure fixes (91% → 69% heap usage)
+  - --optimize-for-size flag removal
+  - Lazy loading implementation
+  - Smart attendance sync skip
+  - 5 commits resolving production deployment issues
+
+**Read this** for bug fixes, performance improvements, and production hotfixes.
+
+---
+
+### 8. [STARTUP_PERFORMANCE_ANALYSIS.md](./STARTUP_PERFORMANCE_ANALYSIS.md)
+**Startup Performance Analysis & Resolution** ⭐ NEW
+
+Detailed technical analysis of critical startup performance issues discovered in Koyeb production:
+- Root cause analysis (--optimize-for-size, cache warmup, triple index creation)
+- Implementation details with code snippets
+- Before/after comparison (91% → 69% heap usage)
+- Verification and deployment checklist
+
+**Read this** for deep technical details on Phase 2.6 performance fixes.
+
+---
+
+### 9. [PERFORMANCE_FIXES_SUMMARY.md](./PERFORMANCE_FIXES_SUMMARY.md)
+**Performance Fixes Quick Reference** ⭐ NEW
+
+Concise summary of startup performance fixes:
+- Quick problem overview
+- Root causes and fixes
+- Results table
+- Deployment instructions
+
+**Read this** for a quick overview of Phase 2.6 fixes.
+
+---
+
 ## 🚀 Quick Start
 
 ### If You're Resuming After Session Lag:
@@ -158,4 +201,4 @@ See [MONGODB_FEATURE_STATUS.md](./MONGODB_FEATURE_STATUS.md) for detailed featur
 
 ---
 
-**Last Updated**: Dec 4, 2025 (Added MONGODB_FEATURE_STATUS.md)
+**Last Updated**: Dec 5, 2025 (Added Phase 2.6 startup performance documentation)
