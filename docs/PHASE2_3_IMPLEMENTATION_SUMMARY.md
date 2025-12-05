@@ -23,6 +23,7 @@ Phase 2 & 3 focused on **bug fixes**, **performance optimization**, and **code q
 | **2.3** | Standardize error handling patterns | ✅ Complete | `569761f` |
 | **2.4** | Add MongoDB to health endpoint | ✅ Complete | `a53a49f` |
 | **2.5** | Implement retry logic for transient failures | ✅ Complete | `569761f` |
+| **2.6** | Startup performance & memory optimization | ✅ Complete | `12c3448` (+ 4 more) |
 
 ### **Phase 3: Performance & Stability Suite** ✅ 100%
 
@@ -545,6 +546,259 @@ The Elysium Attendance Bot now features:
 
 ---
 
+---
+
+## ✅ PHASE 2.6: STARTUP PERFORMANCE & MEMORY OPTIMIZATION
+
+**Implemented**: Dec 4, 2025 (Post-Deployment Hotfix)
+**Branch**: `claude/bot-bug-fixes-performance-01GasewJyVqTRjV4e8Yvd6VE`
+**Status**: ✅ Complete and Deployed
+**Documentation**: See [STARTUP_PERFORMANCE_ANALYSIS.md](./STARTUP_PERFORMANCE_ANALYSIS.md) and [PERFORMANCE_FIXES_SUMMARY.md](./PERFORMANCE_FIXES_SUMMARY.md)
+
+### Critical Issue Discovered
+
+After deploying Phase 2 & 3 to Koyeb production, **critical memory pressure issues** were discovered:
+- ⚠️ **91% heap memory usage** immediately after startup
+- 🔄 **Triple MongoDB index creation** (69 operations total)
+- 📊 **Aggressive cache warmup** loading 14,809 attendance records
+- 🚨 **--optimize-for-size flag** forcing tiny 35MB heap despite 512MB allocated
+
+**Risk Level**: 🔴 CRITICAL - Bot at risk of OOM crashes
+
+### Root Causes Identified
+
+#### 1. --optimize-for-size Flag (THE KEY ISSUE)
+```javascript
+// scripts/startup.js, package.json, Dockerfile (OLD)
+'--optimize-for-size',  // ← Forced V8 to keep heap at ~35MB!
+'--max-semi-space-size=8',
+```
+
+**Impact**: V8 couldn't grow heap beyond 35MB even with 512MB allocated, causing constant GC thrashing and 91% heap pressure.
+
+#### 2. Aggressive Cache Warmup
+```javascript
+// index2.js:4637-4643 (OLD)
+await Promise.all([
+  sheetAPI.call('getAllWeeklyAttendance', { forceFresh: true }),  // 14,809 records!
+  sheetAPI.call('getBiddingPointsSummary', { forceFresh: true }),
+  sheetAPI.call('getLearningMetrics', { forceFresh: true })
+]);
+```
+
+**Impact**: Loading 14,809+ records during startup consumed ~30MB memory before bot was ready.
+
+#### 3. Triple Index Creation
+```javascript
+// Each of 3 startup scripts created indexes independently
+Step 1 (sync):   Created: 23, Skipped: 0  ❌
+Step 2 (import): Created: 23, Skipped: 0  ❌
+Step 3 (bot):    Created: 23, Skipped: 0  ❌
+Total: 69 index operations (wasteful!)
+```
+
+**Impact**: Redundant index creation wasted time and memory across 3 separate Node.js processes.
+
+#### 4. Attendance Sync Always Running
+```javascript
+// scripts/sync-sheets-to-mongodb.js (OLD)
+const response = await sheetAPI.call('getAllWeeklyAttendance');  // Always loads all records
+```
+
+**Impact**: Even when 14,809 records already existed in MongoDB, sync would re-fetch all data from Sheets.
+
+### Fixes Implemented
+
+#### Fix #1: Remove --optimize-for-size (THE CRITICAL FIX) ⭐
+**Files**: `scripts/startup.js`, `package.json`, `Dockerfile`
+**Commit**: `12c3448`
+
+```javascript
+// NEW configuration
+const botProcess = spawn('node', [
+  '--expose-gc',
+  '--max-old-space-size=512',  // Match Koyeb allocation
+  '--max-semi-space-size=16',  // Increased from 8MB
+  // REMOVED: '--optimize-for-size'  ← This was the main culprit!
+  botPath
+]);
+```
+
+**Impact**: Heap can now grow naturally from 35MB → 50MB, reducing pressure from 91% → 69%
+
+#### Fix #2: Lazy Loading
+**File**: `index2.js:4636-4639`
+**Commit**: `f98f7b1`
+
+```javascript
+// NEW: Lazy loading
+console.log('✅ Cache configured for lazy loading (on-demand) - reduced startup memory pressure');
+// Removed Promise.all cache warmup - data cached on first access
+```
+
+**Impact**: Eliminated 30MB memory spike during startup, faster bot readiness
+
+#### Fix #3: Smart Attendance Sync Skip
+**File**: `scripts/sync-sheets-to-mongodb.js:461-470`
+**Commit**: `dd11f61`
+
+```javascript
+// NEW: Check before expensive fetch
+const existingCount = await attendanceCollection.countDocuments();
+if (existingCount > 14000 && !process.argv.includes('--force-attendance')) {
+  log('⏭️ Attendance already synced - skipping to save memory');
+  return { synced: 0, skipped: existingCount };
+}
+```
+
+**Impact**: Saved ~30MB by skipping redundant 14,809 record fetch when data already exists
+
+#### Fix #4: Persistent Index Check
+**File**: `utils/database-api.js:139-165`
+**Commit**: `dd11f61`
+
+```javascript
+// NEW: Query MongoDB directly instead of in-memory flag
+async checkIndexesExist() {
+  const criticalChecks = [
+    { collection: 'attendance', index: 'member_history' },
+    { collection: 'members', index: 'username_unique' },
+    { collection: 'eventReminders', index: 'due_reminders' }
+  ];
+
+  for (const check of criticalChecks) {
+    const indexes = await this.db.collection(check.collection).indexes();
+    if (!indexes.some(idx => idx.name === check.index)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+async createIndexes() {
+  if (await this.checkIndexesExist()) {
+    console.log('⏭️ Database indexes already exist - skipping creation');
+    return { created: [], failed: [], verified: [], skipped: [] };
+  }
+  // ... create indexes ...
+}
+```
+
+**Impact**: Indexes created once, then skipped on subsequent process startups
+
+#### Fix #5: Startup Metrics Visibility
+**File**: `index2.js:4476-4477, 4834-4850`
+**Commit**: `aaef868`
+
+```javascript
+// NEW: Track and display startup metrics
+const startupStartTime = Date.now();
+// ... bot initialization ...
+
+const startupDuration = Date.now() - startupStartTime;
+const memUsage = process.memoryUsage();
+console.log('═══════════════════════════════════════════════════════════════');
+console.log('📊 STARTUP METRICS');
+console.log('═══════════════════════════════════════════════════════════════');
+console.log(`⏱️  Startup Time: ${(startupDuration / 1000).toFixed(1)}s`);
+console.log(`💾 Heap: ${heapUsedMB}MB / ${heapTotalMB}MB (${heapPercent}%)`);
+console.log(`📈 RSS: ${rssMB}MB`);
+```
+
+**Impact**: Clear visibility into memory health after every startup
+
+### Results
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| **Heap Usage** | 86-94% | 69% | **-21%** ✅ |
+| **Heap Size** | 35.6MB | 50.6MB | **+42%** ✅ |
+| **Memory Warnings** | HIGH PRESSURE | None | **Resolved** ✅ |
+| **Index Operations** | 69 (3×23) | 23 (1×) | **-66%** ✅ |
+| **Attendance Load** | 14,809 records | 0 (skipped) | **-30MB** ✅ |
+| **GC Frequency** | Every 3min | Every 10-15min | **Improved** ✅ |
+| **Startup Time** | 19.1s (with issues) | 22.7s (stable) | **+3.6s but stable** ✅ |
+
+### Commits (5 total)
+
+```
+12c3448 - perf: Remove --optimize-for-size flag causing 90% memory pressure
+6b76a36 - fix: Remove duplicate attendanceCollection declaration
+dd11f61 - perf: Fix triple index creation and 90% memory pressure
+aaef868 - perf: Additional startup optimizations - memory allocation, logging, and metrics
+f98f7b1 - perf: Fix critical startup memory pressure and redundant operations
+```
+
+### Verification
+
+✅ **Tested and verified on Koyeb production:**
+```
+📊 STARTUP METRICS
+⏱️  Startup Time: 22.7s
+💾 Heap: 34.7MB / 50.6MB (69%)  ← Healthy! ✅
+📈 RSS: 128.5MB
+✅ Bot ready for operations!  ← No warnings!
+```
+
+- [x] No "HIGH MEMORY PRESSURE" warnings
+- [x] Heap usage < 80% (achieved 69%)
+- [x] Indexes only created once (2× "skipping" messages)
+- [x] Attendance sync skipped when data exists
+- [x] Bot starts successfully
+- [x] All commands working (!report, !mypoints, !stats)
+
+### Files Modified
+
+**Performance & Memory**:
+1. `scripts/startup.js:29-30` - Removed --optimize-for-size, increased semi-space
+2. `package.json:8` - Updated start:direct command
+3. `Dockerfile:42` - Updated CMD with optimized flags
+4. `index2.js:4636-4639` - Removed cache warmup, added lazy loading
+5. `index2.js:4476-4477, 4834-4850` - Added startup metrics tracking
+
+**Index Creation**:
+6. `utils/database-api.js:139-165` - Added checkIndexesExist() method
+7. `utils/database-api.js:175-184` - Check before creating indexes
+
+**Attendance Sync**:
+8. `scripts/sync-sheets-to-mongodb.js:461-470` - Added smart skip check
+9. `scripts/sync-sheets-to-mongodb.js:502` - Fixed duplicate variable declaration
+
+### Bug Fixes During Implementation
+
+#### Bug #1: Duplicate Variable Declaration
+**Error**: `SyntaxError: Identifier 'attendanceCollection' has already been declared`
+**Fix**: Removed duplicate declaration at line 502 (Commit `6b76a36`)
+
+### Deployment Status
+
+**Branch**: `claude/bot-bug-fixes-performance-01GasewJyVqTRjV4e8Yvd6VE`
+**Status**: ✅ Merged to main and deployed to Koyeb production
+**Deployment Date**: Dec 4, 2025
+
+**To merge** (already done):
+```bash
+git checkout main
+git merge claude/bot-bug-fixes-performance-01GasewJyVqTRjV4e8Yvd6VE
+git push origin main
+```
+
+### Related Documentation
+
+- **Full Technical Analysis**: [STARTUP_PERFORMANCE_ANALYSIS.md](./STARTUP_PERFORMANCE_ANALYSIS.md)
+- **Quick Reference**: [PERFORMANCE_FIXES_SUMMARY.md](./PERFORMANCE_FIXES_SUMMARY.md)
+- **Phase 2 & 3 Core Work**: This document (sections above)
+
+### Lessons Learned
+
+1. **--optimize-for-size is dangerous** for apps with available memory headroom
+2. **In-memory flags don't persist** across separate Node.js processes - use MongoDB queries
+3. **Cache warmup can be harmful** - lazy loading is better for startup performance
+4. **Smart skip checks** prevent redundant expensive operations
+5. **Startup metrics visibility** is critical for diagnosing production issues
+
+---
+
 **Documentation Author**: Claude Code Agent
-**Last Updated**: 2025-12-04
-**Bot Version**: 3.0 (Phase 2 & 3 Complete)
+**Last Updated**: 2025-12-05
+**Bot Version**: 3.1 (Phase 2, 3, & 2.6 Complete)
