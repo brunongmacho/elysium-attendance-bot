@@ -499,7 +499,7 @@ async function syncAttendance(db, sheetAPI) {
       return { synced: attendanceRecords.length, skipped: 0 };
     }
 
-    const attendanceCollection = db.collection('attendance');
+    // Reuse attendanceCollection from above (already declared at line 463)
     const membersCollection = db.collection('members');
 
     // ═══════════════════════════════════════════════════════════════════════════
