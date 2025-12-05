@@ -27,7 +27,7 @@ function startBot() {
   const botProcess = spawn('node', [
     '--expose-gc',
     '--max-old-space-size=512',
-    '--max-semi-space-size=16',  // Increased from 8MB to 16MB for young generation
+    '--max-semi-space-size=32',  // Increased from 8MB to 32MB for young generation
     botPath
   ], {
     stdio: 'inherit',
