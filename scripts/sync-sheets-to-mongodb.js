@@ -458,6 +458,17 @@ async function syncAttendance(db, sheetAPI) {
   log('🔄', 'Syncing attendance records...');
 
   try {
+    // PERF FIX: Quick check - if we already have records in MongoDB,
+    // and this isn't a forced sync, we can skip the expensive Sheet fetch
+    const attendanceCollection = db.collection('attendance');
+    const existingCount = await attendanceCollection.countDocuments();
+
+    if (existingCount > 14000 && !process.argv.includes('--force-attendance')) {
+      log('⏭️', `Attendance already synced (${existingCount} records) - skipping to save memory`);
+      log('ℹ️', 'Use --force-attendance flag to force re-sync');
+      return { synced: 0, skipped: existingCount };
+    }
+
     // Fetch all attendance from Google Sheets
     log('📥', 'Fetching attendance from Google Sheets...');
     const response = await sheetAPI.call('getAllWeeklyAttendance');
