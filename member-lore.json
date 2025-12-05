@@ -63,6 +63,14 @@
     "stats": "Spell Power 100 | Accuracy 100 | Intended Effect 0 | Reverse Mastery 95",
     "skills": ["Inverse Fireball", "Healing Nuke", "Accidental Immortality Grant"]
   },
+  "DevilJin": {
+    "title": "The Demonic Pacifist",
+    "lore": "Named after Tekken's most fearsome demon fighter with devastating devil powers and ruthless combos. Afraid of conflict. Apologizes before every attack. The demonic transformation triggers anxiety attacks instead of rage. Devil Gene causes panic, not power. Enemies comfort him mid-battle. Has defeated zero opponents through combat, hundreds through making them feel too guilty to fight. The Devil cries.",
+    "specialty": "Psychological warfare through weaponized guilt and demonic anxiety",
+    "reputation": "The demon everyone wants to protect instead of fear",
+    "stats": "Devil Gene 100 | Aggression 0 | Apologies 999 | Guilt Induction 95",
+    "skills": ["Apologetic Devil Beam", "Anxious Transformation", "Guilt-Trip Combo"]
+  },
   "DEMIURGE": {
     "title": "The 10,000 IQ Strategist (Self-Proclaimed)",
     "lore": "Named after Overlord's supreme strategist demon with godlike intellect and master plans. IQ of 47. Actual plans are crayon drawings. Calls tic-tac-toe '10-dimensional warfare'. Enemies assume sarcasm, discover it's genuine. The confidence in stupidity creates accidental brilliance. Nazarick disowns this imposter daily.",
@@ -255,14 +263,6 @@
     "stats": "Accuracy 100 | Argument Wins 0 | Evidence 95 | Frustration 999",
     "skills": ["Factual Defense", "Evidence Presentation", "Losing Despite Being Right"]
   },
-  "Mervzs": {
-    "title": "The Mysterious Collector",
-    "lore": "Collects mysterious orbs of immense power with unknown purpose. They're marbles. Literally children's toys. The 'mysterious explosions' were tantrums over losing favorites. Guild too afraid to ask. Defeated raid bosses with playground equipment. Still terrifying somehow.",
-    "specialty": "Mysterious orb manipulation (of common glass spheres)",
-    "reputation": "The member nobody questions because the truth is too ridiculous",
-    "stats": "Orb Power 100 | Actual Mystery 0 | Tantrum 85 | Boss Defeats (Marble) 5",
-    "skills": ["Marble Mayhem", "Tantrum Explosion", "Playground Devastation"]
-  },
   "Miang": {
     "title": "The Silent Reckoning",
     "lore": "Speaks rarely, every word calculated and purposeful with maximum impact. Can't stop talking. Verbal diarrhea is constant. The 'silence' is enemies interrupting to beg for quiet. Defeats foes through exhaustive conversation. Strategic silence via enemy surrender to noise.",
@@ -294,14 +294,6 @@
     "reputation": "The guild's most confusingly normal member",
     "stats": "Normalcy 100 | Mystique 0 | Confusion Generated 95 | Reverse Skills 0",
     "skills": ["Normal Strike", "Forward Attack", "Regular Combat"]
-  },
-  "Pinayflix": {
-    "title": "The Streaming Sensation",
-    "lore": "Treats every battle like professional livestream with running commentary for viewers. Zero followers. Streams to empty void. The dedication to non-existent audience is concerning. Enemies confused by sponsorship shoutouts nobody hears. Parasocial relationship with imaginary fans.",
-    "specialty": "Combat entertainment for audience of zero",
-    "reputation": "The guild's most entertaining narrator with no viewers",
-    "stats": "Followers 0 | Production Value 95 | Dedication 100 | Imaginary Fans 1000",
-    "skills": ["Void Commentary", "Sponsorship to Nobody", "Parasocial Projection"]
   },
   "PotatoCheese": {
     "title": "The Carb Crusader",
@@ -351,6 +343,14 @@
     "stats": "Info Network 100 | Memory 10 | Fabrication 90 | Accuracy 60",
     "skills": ["Fabricated Intelligence", "Strategic Forgetfulness", "Rumor Generation"]
   },
+  "xSelah": {
+    "title": "The Mistimed Maestro",
+    "lore": "Named after the ancient Hebrew musical term meaning 'pause' or 'interlude' - the perfect moment of silence between notes. Cannot stop moving. Physically incapable of pausing. The 'selah' moments are manic flailing. Ruins every dramatic pause with interpretive dance. Strategic silence replaced by aggressive fidgeting. Enemies wait for the pause that never comes. Most mistimed interlude in musical history.",
+    "specialty": "Strategic pauses that manifest as chaotic continuous motion",
+    "reputation": "The musical interlude that forgot how to stop",
+    "stats": "Pause Ability 0 | Continuous Motion 999 | Fidgeting 100 | Musical Timing -50",
+    "skills": ["Eternal Flailing", "Anti-Pause Dance", "Mistimed Interlude"]
+  },
   "xLunox": {
     "title": "The Moonlit Performer",
     "lore": "Legendary warrior who requires perfect entrance music and dramatic staging. Tone deaf. The music is always off-key. Enemies wait politely because the confidence is incredible. The show must go on, regardless of musical accuracy. Style over substance over talent.",
@@ -366,14 +366,6 @@
     "reputation": "The reason allies wear helmets and enemies pay protection money",
     "stats": "Precision 100 | Ally Hits 999 | Enemy Hits 5 | Bans Ignored 3",
     "skills": ["Ally-Seeking Shot", "Friendly Fire Mastery", "Ban Immunity"]
-  },
-  "卂几几": {
-    "title": "The Symbolic Force",
-    "lore": "Named in mysterious symbols, communicates beyond language itself. Name is 'Ann'. Autocorrect betrayed them once. Too committed to admit it. Fully leaning into the 'mystery'. Guild plays along. The legend is typo. Nobody tells enemies the truth.",
-    "specialty": "Symbolic warfare powered by autocorrect failure",
-    "reputation": "The member whose name is typo but legend is real",
-    "stats": "Mystery 100 | Actual Name Complexity 0 | Commitment to Bit 95 | Autocorrect Rage 85",
-    "skills": ["Typo Transcendence", "Autocorrect Mastery", "Accidental Symbolism"]
   },
   "PanCoco": {
     "title": "The Coconut Commander",
