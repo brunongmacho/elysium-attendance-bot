@@ -29,7 +29,6 @@ class DatabaseAPI {
     this.maxConnectAttempts = 5;
     this.connectionPromise = null; // CRIT-002 FIX: Mutex to prevent race condition
     this.adminChannel = null; // For alert notifications
-    this.indexesCreated = false; // PERF FIX: Skip redundant index creation on subsequent connects
   }
 
   /**
@@ -137,6 +136,35 @@ class DatabaseAPI {
   }
 
   /**
+   * Check if critical indexes already exist (PERF FIX)
+   * Prevents redundant index creation during startup
+   * @returns {Promise<boolean>} True if all critical indexes exist
+   */
+  async checkIndexesExist() {
+    try {
+      // Check a few critical indexes to determine if indexes are already created
+      const criticalChecks = [
+        { collection: 'attendance', index: 'member_history' },
+        { collection: 'members', index: 'username_unique' },
+        { collection: 'eventReminders', index: 'due_reminders' }
+      ];
+
+      for (const check of criticalChecks) {
+        const indexes = await this.db.collection(check.collection).indexes();
+        const exists = indexes.some(idx => idx.name === check.index);
+        if (!exists) {
+          return false; // At least one critical index missing
+        }
+      }
+
+      return true; // All critical indexes exist
+    } catch (error) {
+      console.error('⚠️ Error checking indexes:', error.message);
+      return false; // On error, proceed with creation to be safe
+    }
+  }
+
+  /**
    * Create database indexes for performance (PHASE 1: CRIT-005 Enhanced)
    * Indexes dramatically improve query speed (100x faster!)
    * Tracks individual index creation and alerts admins on failures
@@ -148,10 +176,11 @@ class DatabaseAPI {
       throw new Error('Database not connected');
     }
 
-    // PERF FIX: Skip if indexes already created this session
-    // Prevents triple index creation on startup (sync → import → bot)
-    if (this.indexesCreated) {
-      console.log('⏭️  Database indexes already created this session - skipping');
+    // PERF FIX: Check if indexes already exist before attempting creation
+    // This prevents redundant index operations during startup (sync → import → bot)
+    const indexesExist = await this.checkIndexesExist();
+    if (indexesExist) {
+      console.log('⏭️  Database indexes already exist - skipping creation');
       return { created: [], failed: [], verified: [], skipped: [] };
     }
 
@@ -288,9 +317,6 @@ class DatabaseAPI {
       }
       await this.alertIndexFailure(indexResults);
     }
-
-    // Mark indexes as created for this session
-    this.indexesCreated = true;
 
     return indexResults;
   }
