@@ -26,8 +26,8 @@ function startBot() {
   const botPath = path.join(__dirname, '..', 'index2.js');
   const botProcess = spawn('node', [
     '--expose-gc',
-    '--max-old-space-size=512',
-    '--max-semi-space-size=64',  // 128MB young generation (64MB * 2 semi-spaces)
+    '--max-old-space-size=360',  // 360MB old space to fit in 512MB total RAM
+    '--max-semi-space-size=40',  // 80MB young generation (40MB * 2 semi-spaces)
     botPath
   ], {
     stdio: 'inherit',
