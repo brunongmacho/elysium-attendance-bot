@@ -254,6 +254,7 @@ async function forceCloseAllAttendance(message) {
         try {
           await thread.send(`${EMOJI.EMERGENCY} **EMERGENCY CLOSURE** by admin ${message.author.username}`);
           await attendance.cleanupAllThreadReactions(thread);
+          await thread.setLocked(true, "Emergency closure by admin");
           await thread.setArchived(true, "Emergency closure by admin");
 
           // Delete rotation warning if this was a rotating boss thread
@@ -385,6 +386,7 @@ async function forceCloseAttendanceThread(message, args) {
 
     await thread.send(`${EMOJI.EMERGENCY} **FORCE CLOSED** by admin ${message.author.username}`);
     await attendance.cleanupAllThreadReactions(thread);
+    await thread.setLocked(true, `Emergency closure by ${message.author.username}`);
     await thread.setArchived(true, `Emergency closure by ${message.author.username}`);
 
     // Clear from state
