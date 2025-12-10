@@ -79,13 +79,15 @@ async function handleSlashCommand(interaction, modules, config, client) {
       const boss = interaction.options.getString('boss');
       const timestamp = interaction.options.getString('timestamp') || 'now';
 
+      await interaction.deferReply();
+
       // Create a synthetic message object for compatibility with existing handler
       const syntheticMessage = {
         content: `!killed ${boss} ${timestamp}`,
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
-        reply: async (content) => interaction.reply(content)
+        reply: async (content) => interaction.editReply(content)
       };
 
       const args = [boss];
@@ -93,17 +95,10 @@ async function handleSlashCommand(interaction, modules, config, client) {
         args.push(timestamp);
       }
 
-      // Defer reply for potentially long-running operation
-      await interaction.deferReply();
-
       try {
         // Call existing boss timer command handler
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleKilled(syntheticMessage, args, config);
-
-        // Edit the deferred reply
-        await interaction.editReply({
-          content: `✅ Boss marked as killed: **${boss}** at ${timestamp}\n\n💡 **Tip:** Slash commands support autocomplete for boss names!`
-        });
       } catch (error) {
         console.error('Error in /killed command:', error);
         await interaction.editReply({
@@ -128,10 +123,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
       };
 
       try {
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleSpawned(syntheticMessage, [boss], config);
-        await interaction.editReply({
-          content: `✅ Boss marked as spawned: **${boss}**\n\n💡 **Tip:** Try /killed for recording boss kills!`
-        });
       } catch (error) {
         console.error('Error in /spawned command:', error);
         await interaction.editReply({
@@ -180,10 +173,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
       };
 
       try {
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleUnkill(syntheticMessage, [boss], config);
-        await interaction.editReply({
-          content: `✅ Boss kill record removed: **${boss}**`
-        });
       } catch (error) {
         console.error('Error in /unkill command:', error);
         await interaction.editReply({
@@ -209,10 +200,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
       };
 
       try {
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleSetBoss(syntheticMessage, [boss, status], config);
-        await interaction.editReply({
-          content: `✅ Boss status set: **${boss}** → ${status}`
-        });
       } catch (error) {
         console.error('Error in /setboss command:', error);
         await interaction.editReply({
@@ -237,10 +226,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
       };
 
       try {
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleNoSpawn(syntheticMessage, [boss], config);
-        await interaction.editReply({
-          content: `✅ Boss marked as not spawning: **${boss}**`
-        });
       } catch (error) {
         console.error('Error in /nospawn command:', error);
         await interaction.editReply({
@@ -275,10 +262,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
       };
 
       try {
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleMaintenance(syntheticMessage);
-        await interaction.editReply({
-          content: `✅ All bosses spawned (server maintenance mode)`
-        });
       } catch (error) {
         console.error('Error in /maintenance command:', error);
         await interaction.editReply({
@@ -313,10 +298,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
       };
 
       try {
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleServerDown(syntheticMessage);
-        await interaction.editReply({
-          content: `✅ Server down mode activated`
-        });
       } catch (error) {
         console.error('Error in /serverdown command:', error);
         await interaction.editReply({
@@ -351,10 +334,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
       };
 
       try {
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleClearKills(syntheticMessage);
-        await interaction.editReply({
-          content: `✅ All boss kill records cleared`
-        });
       } catch (error) {
         console.error('Error in /clearkills command:', error);
         await interaction.editReply({
