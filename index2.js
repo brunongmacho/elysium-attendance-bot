@@ -4737,12 +4737,13 @@ client.once(Events.ClientReady, async () => {
   scheduleDailyDigest();
 
   // PHASE 3.3: Periodic memory monitoring (every 10 minutes)
-  const memoryCheckInterval = setInterval(() => {
-    discordMonitoring.checkMemoryUsage();
-  }, 10 * 60 * 1000); // 10 minutes
+  // DISABLED: Heap warnings removed from admin logs
+  // const memoryCheckInterval = setInterval(() => {
+  //   discordMonitoring.checkMemoryUsage();
+  // }, 10 * 60 * 1000); // 10 minutes
 
-  shutdownManager.registerInterval('memory-monitoring', memoryCheckInterval, { frequency: '10 minutes' });
-  console.log('✅ Memory monitoring active (checks every 10 minutes)');
+  // shutdownManager.registerInterval('memory-monitoring', memoryCheckInterval, { frequency: '10 minutes' });
+  // console.log('✅ Memory monitoring active (checks every 10 minutes)');
 
   // Register GC task (every 3 minutes - more aggressive for 512MB)
   if (global.gc) {
