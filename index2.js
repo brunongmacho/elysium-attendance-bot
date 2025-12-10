@@ -4830,10 +4830,15 @@ client.once(Events.ClientReady, async () => {
 
     for (const [threadId, thread] of archivedThreads.threads) {
       if (thread.archived && !thread.locked) {
-        await thread.setLocked(true, "Startup: Lock archived thread").catch(err => {
+        try {
+          // Discord requires unarchiving before locking
+          await thread.setArchived(false, "Temporarily unarchive to lock");
+          await thread.setLocked(true, "Startup: Lock thread");
+          await thread.setArchived(true, "Re-archive after locking");
+          lockedCount++;
+        } catch (err) {
           console.error(`Failed to lock thread ${threadId}:`, err.message);
-        });
-        lockedCount++;
+        }
       }
     }
 
