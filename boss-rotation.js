@@ -230,6 +230,9 @@ async function refreshRotationCache() {
   try {
     console.log('🔄 Refreshing rotation cache from Google Sheets...');
 
+    // Get current bosses in cache/MongoDB before fetching new list
+    const oldBosses = Object.keys(rotationCache);
+
     // Fetch latest list of rotating bosses from sheet
     await fetchRotatingBosses();
 
@@ -260,8 +263,30 @@ async function refreshRotationCache() {
       }
     }
 
+    // Remove bosses that are no longer in the sheet
+    const bossesToRemove = oldBosses.filter(boss => !ROTATING_BOSSES.includes(boss));
+    let removedCount = 0;
+
+    for (const boss of bossesToRemove) {
+      // Remove from cache
+      delete rotationCache[boss];
+
+      // Remove from MongoDB
+      try {
+        const db = await dbAPI.connect();
+        const rotationCollection = db.collection('bossRotation');
+        const bossId = boss.toLowerCase().replace(/\s+/g, '_');
+
+        await rotationCollection.deleteOne({ _id: bossId });
+        removedCount++;
+        console.log(`  ├─ 🗑️  Removed ${boss} (no longer in sheet)`);
+      } catch (err) {
+        console.error(`  ├─ ⚠️  Failed to remove ${boss} from MongoDB:`, err.message);
+      }
+    }
+
     lastCacheRefresh = Date.now();
-    console.log(`✅ Rotation cache refreshed: ${syncedCount} bosses synced to MongoDB`);
+    console.log(`✅ Rotation cache refreshed: ${syncedCount} bosses synced, ${removedCount} bosses removed`);
 
   } catch (err) {
     console.error('❌ Error refreshing rotation cache:', err.message);
@@ -697,11 +722,13 @@ async function deleteRotationWarning(bossName) {
 
 /**
  * Start periodic spawn monitoring for rotation warnings
+ * Prevents duplicate timers by clearing any existing interval first
  */
 function startSpawnMonitor() {
-  // Clear any existing timer
+  // Clear any existing timer to prevent duplicates
   if (spawnMonitorTimer) {
     clearInterval(spawnMonitorTimer);
+    console.log('⚠️ Cleared existing spawn monitor timer (preventing duplicates)');
   }
 
   // Run check immediately on startup
@@ -711,6 +738,8 @@ function startSpawnMonitor() {
   spawnMonitorTimer = setInterval(() => {
     checkUpcomingSpawns();
   }, SPAWN_CHECK_INTERVAL);
+
+  console.log(`✅ Spawn monitor started (checking every ${SPAWN_CHECK_INTERVAL / 60000} minutes)`);
 }
 
 /**
@@ -742,7 +771,9 @@ async function checkUpcomingSpawns() {
         // Check if spawn is within warning window (15-20 minutes)
         if (minutesUntilSpawn >= WARNING_WINDOW_MINUTES && minutesUntilSpawn <= (WARNING_WINDOW_MINUTES + 5)) {
           // Create unique key for this predicted spawn
-          const spawnKey = `${bossName}-${predictedTime.toISOString().slice(0, 16)}`; // Truncate to minute precision
+          // Use timestamp as primary key to avoid issues with boss names containing dashes
+          const timestampKey = predictedTime.toISOString().slice(0, 16); // Truncate to minute precision
+          const spawnKey = `${bossName}::${timestampKey}`; // Use :: separator to avoid dash conflicts
 
           // Skip if already warned
           if (warnedSpawns[spawnKey]) {
@@ -756,8 +787,8 @@ async function checkUpcomingSpawns() {
             // Send warning!
             await sendRotationWarning(bossName, predictedTime);
 
-            // Mark as warned
-            warnedSpawns[spawnKey] = true;
+            // Mark as warned with timestamp
+            warnedSpawns[spawnKey] = now.getTime();
 
             console.log(`🟢 Sent 15-min rotation warning for ${bossName} (our turn, spawning at ${predictedTime.toISOString()})`);
           }
@@ -766,8 +797,9 @@ async function checkUpcomingSpawns() {
         // Clean up old warned spawns (older than 2 hours)
         const twoHoursAgo = now.getTime() - (2 * 60 * 60 * 1000);
         for (const key in warnedSpawns) {
-          const timestamp = key.split('-').slice(1).join('-');
-          if (new Date(timestamp).getTime() < twoHoursAgo) {
+          // Extract timestamp from value (not key) for reliable cleanup
+          const warnTime = warnedSpawns[key];
+          if (typeof warnTime === 'number' && warnTime < twoHoursAgo) {
             delete warnedSpawns[key];
           }
         }

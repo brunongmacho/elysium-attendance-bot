@@ -3220,30 +3220,13 @@ stats: async (message, member, args) => {
                 console.log(`   ✅ Loaded ${existingMembers.length} existing members from MongoDB (${attendanceRecords.length} records)`);
                 await loadMsg.edit(`✅ Loaded ${existingMembers.length} existing member(s) from MongoDB`);
               } else {
-                console.log(`   ℹ️ No records found in MongoDB, trying Sheets...`);
+                console.log(`   ℹ️ No records found in MongoDB for this boss/timestamp`);
               }
             }
 
-            // FALLBACK PATH: Load from Google Sheets if MongoDB returned nothing
+            // No Sheets fallback needed - MongoDB is the source of truth for attendance
             if (existingMembers.length === 0) {
-              const checkResp = await attendance.postToSheet({
-                action: "getColumnData",
-                boss: bossName,
-                timestamp: parsed.timestamp
-              });
-
-              if (checkResp.ok) {
-                const data = JSON.parse(checkResp.text);
-                if (data.members && Array.isArray(data.members)) {
-                  existingMembers = data.members;
-                  console.log(`   ✅ Loaded ${existingMembers.length} existing members from Sheets`);
-                  await loadMsg.edit(`✅ Loaded ${existingMembers.length} existing member(s) from Google Sheets`);
-                }
-              }
-            }
-
-            if (existingMembers.length === 0) {
-              await loadMsg.edit(`ℹ️ No existing attendance found`);
+              await loadMsg.edit(`ℹ️ No existing attendance found in MongoDB`);
             }
           } catch (err) {
             console.log(`   ⚠️ Could not load existing members: ${err.message}`);
