@@ -125,6 +125,13 @@ const DualWriteManager = require('./utils/dual-write-manager'); // CRIT-003: Dat
 // ═══════════════════════════════════════════════════════════════════════════
 const discordMonitoring = require('./utils/discord-monitoring');
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SLASH COMMANDS - Phase 1 Implementation
+// ═══════════════════════════════════════════════════════════════════════════
+const { registerCommands } = require('./commands/register-commands'); // Slash command registration
+const { handleSlashCommand } = require('./commands/handlers'); // Slash command handlers
+const { handleAutocomplete } = require('./commands/autocomplete'); // Autocomplete handlers
+
 // =====================================================================
 // SECTION 1B: COMMAND ALIASES (moved to config/command-aliases.js)
 // =====================================================================
@@ -4874,6 +4881,20 @@ client.once(Events.ClientReady, async () => {
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('');
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REGISTER SLASH COMMANDS
+  // ═══════════════════════════════════════════════════════════════════════════
+  try {
+    console.log('🔧 Registering slash commands...');
+    // Register as guild commands for instant updates during development/testing
+    // Switch to global (null) for production after testing phase
+    await registerCommands(client, config.main_guild_id);
+    console.log('✅ Slash commands registered successfully!');
+  } catch (error) {
+    console.error('❌ Failed to register slash commands:', error);
+    console.log('⚠️ Bot will continue with prefix commands only');
+  }
+
   console.log("✅ Bot ready for operations!");
 });
 
@@ -6866,15 +6887,42 @@ client.on(Events.MessageCreate, async (message) => {
 
 /**
  * =========================================================================
- * BUTTON INTERACTION EVENT HANDLER
+ * INTERACTION EVENT HANDLER
  * =========================================================================
  *
- * Handles button interactions for:
- * - Attendance verification (✅ Verify / ❌ Deny)
- * - Thread closure confirmation (✅ Confirm / ❌ Cancel)
+ * Handles all Discord interactions:
+ * - Slash Commands (/killed, /verify, /rotation, etc.)
+ * - Autocomplete (boss names, members, etc.)
+ * - Button Interactions (✅ Verify / ❌ Deny, Thread closure)
  */
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SLASH COMMAND HANDLING
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (interaction.isChatInputCommand()) {
+      const modules = {
+        attendance,
+        bossTimer,
+        bossTimerCommands,
+        bossRotation
+      };
+
+      await handleSlashCommand(interaction, modules, config, client);
+      return;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // AUTOCOMPLETE HANDLING
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (interaction.isAutocomplete()) {
+      await handleAutocomplete(interaction, attendance);
+      return;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // BUTTON INTERACTION HANDLING
+    // ═══════════════════════════════════════════════════════════════════════════
     if (!interaction.isButton()) return;
     if (!interaction.message.guild) return;
     if (interaction.message.guild.id !== config.main_guild_id) return;
