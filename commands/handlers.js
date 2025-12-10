@@ -371,25 +371,133 @@ async function handleSlashCommand(interaction, modules, config, client) {
       const subcommand = interaction.options.getSubcommand();
 
       if (subcommand === 'status') {
-        await interaction.reply(`🚧 /rotation status - Implementation in progress`);
+        await interaction.deferReply();
+
+        try {
+          const allRotations = await bossRotation.getAllRotations();
+          const rotationBosses = Object.keys(allRotations);
+
+          if (rotationBosses.length === 0) {
+            await interaction.editReply({
+              content: '❌ No rotating bosses found in the system'
+            });
+            return;
+          }
+
+          // Build status message
+          let statusMessage = '**🔄 Boss Rotation Status**\n\n';
+
+          for (const bossName of rotationBosses) {
+            const rotation = allRotations[bossName];
+            const emoji = rotation.isOurTurn ? '🟢' : '🔴';
+            const status = rotation.isOurTurn ? 'ELYSIUM' : rotation.currentGuild;
+
+            statusMessage += `${emoji} **${bossName}**\n`;
+            statusMessage += `   Position: ${rotation.currentIndex}/${rotation.guilds.length} (${status})\n`;
+            statusMessage += `   Next: ${rotation.nextGuild}\n\n`;
+          }
+
+          await interaction.editReply({
+            content: statusMessage
+          });
+
+        } catch (error) {
+          console.error('Error in /rotation status:', error);
+          await interaction.editReply({
+            content: `❌ Failed to get rotation status: ${error.message}`
+          });
+        }
+
         return;
       }
 
       if (subcommand === 'set') {
         const boss = interaction.options.getString('boss');
         const position = interaction.options.getInteger('position');
-        await interaction.reply(`🚧 /rotation set ${boss} ${position} - Implementation in progress`);
+
+        await interaction.deferReply();
+
+        try {
+          const result = await bossRotation.setRotation(boss, position);
+
+          if (result.success) {
+            const data = result.data;
+            const emoji = data.isOurTurn ? '🟢' : '🔴';
+
+            await interaction.editReply({
+              content: `✅ Rotation updated: **${boss}**\n` +
+                       `${data.oldIndex} (${data.oldGuild}) → ${data.newIndex} (${data.newGuild})\n\n` +
+                       `${emoji} Status: ${data.isOurTurn ? 'ELYSIUM\'S TURN' : data.newGuild + '\'s turn'}`
+            });
+          } else {
+            await interaction.editReply({
+              content: `❌ Failed to set rotation: ${result.message}`
+            });
+          }
+
+        } catch (error) {
+          console.error('Error in /rotation set:', error);
+          await interaction.editReply({
+            content: `❌ Failed to set rotation: ${error.message}`
+          });
+        }
+
         return;
       }
 
       if (subcommand === 'increment') {
         const boss = interaction.options.getString('boss');
-        await interaction.reply(`🚧 /rotation increment ${boss} - Implementation in progress`);
+
+        await interaction.deferReply();
+
+        try {
+          const result = await bossRotation.incrementRotation(boss);
+
+          if (result.updated !== false) {
+            const emoji = result.isNowOurTurn ? '🟢' : '🔴';
+
+            await interaction.editReply({
+              content: `✅ Rotation incremented: **${boss}**\n` +
+                       `${result.oldIndex} (${result.oldGuild}) → ${result.newIndex} (${result.newGuild})\n\n` +
+                       `${emoji} Status: ${result.isNowOurTurn ? 'ELYSIUM\'S TURN' : result.newGuild + '\'s turn'}`
+            });
+          } else {
+            await interaction.editReply({
+              content: `❌ Failed to increment rotation: ${result.error || 'Unknown error'}`
+            });
+          }
+
+        } catch (error) {
+          console.error('Error in /rotation increment:', error);
+          await interaction.editReply({
+            content: `❌ Failed to increment rotation: ${error.message}`
+          });
+        }
+
         return;
       }
 
       if (subcommand === 'refresh') {
-        await interaction.reply(`🚧 /rotation refresh - Implementation in progress`);
+        await interaction.deferReply();
+
+        try {
+          await bossRotation.refreshRotationCache();
+
+          const allRotations = await bossRotation.getAllRotations();
+          const rotationBosses = Object.keys(allRotations);
+
+          await interaction.editReply({
+            content: `✅ Rotation cache refreshed from Google Sheets!\n\n` +
+                     `Synced ${rotationBosses.length} rotating bosses: ${rotationBosses.join(', ')}`
+          });
+
+        } catch (error) {
+          console.error('Error in /rotation refresh:', error);
+          await interaction.editReply({
+            content: `❌ Failed to refresh rotation cache: ${error.message}`
+          });
+        }
+
         return;
       }
     }
