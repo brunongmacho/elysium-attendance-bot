@@ -2659,6 +2659,7 @@ stats: async (message, member, args) => {
 
               // Archive the thread
               await thread
+                .setLocked(true, `Mass close by ${member.user.username}`)
                 .setArchived(true, `Mass close by ${member.user.username}`)
                 .catch(err => errorHandler.silentError(err, 'mass close archive empty thread'));
 
@@ -2713,6 +2714,7 @@ stats: async (message, member, args) => {
                   .setLocked(true, `Mass locked by ${member.user.username} (duplicate prevented)`)
                   .catch(err => errorHandler.silentError(err, 'mass close lock duplicate thread'));
                 await thread
+                  .setLocked(true, `Mass close by ${member.user.username} (duplicate prevented)`)
                   .setArchived(true, `Mass close by ${member.user.username} (duplicate prevented)`)
                   .catch(err => errorHandler.silentError(err, 'mass close archive duplicate thread'));
 
@@ -4818,6 +4820,28 @@ client.once(Events.ClientReady, async () => {
   if (await crashRecovery.checkMissedWeeklyReport()) {
     await leaderboardSystem.sendWeeklyReport();
     await crashRecovery.markWeeklyReportCompleted();
+  }
+
+  // Lock all archived threads on startup
+  try {
+    const attChannel = await discordCache.getChannel('attendance_channel_id');
+    const archivedThreads = await attChannel.threads.fetchArchived();
+    let lockedCount = 0;
+
+    for (const [threadId, thread] of archivedThreads.threads) {
+      if (thread.archived && !thread.locked) {
+        await thread.setLocked(true, "Startup: Lock archived thread").catch(err => {
+          console.error(`Failed to lock thread ${threadId}:`, err.message);
+        });
+        lockedCount++;
+      }
+    }
+
+    if (lockedCount > 0) {
+      console.log(`🔒 Locked ${lockedCount} archived thread(s) on startup`);
+    }
+  } catch (err) {
+    console.error('Failed to lock archived threads on startup:', err.message);
   }
 
   // Log startup performance metrics

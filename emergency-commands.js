@@ -386,6 +386,7 @@ async function forceCloseAttendanceThread(message, args) {
 
     await thread.send(`${EMOJI.EMERGENCY} **FORCE CLOSED** by admin ${message.author.username}`);
     await attendance.cleanupAllThreadReactions(thread);
+    await thread.setLocked(true, `Emergency closure by ${message.author.username}`);
     await thread.setArchived(true, `Emergency closure by ${message.author.username}`);
 
     // Clear from state
