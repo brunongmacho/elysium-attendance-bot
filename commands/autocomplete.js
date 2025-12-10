@@ -12,6 +12,7 @@
 
 const fs = require('fs');
 const levenshtein = require('fast-levenshtein');
+const mongoHelpers = require('../utils/mongodb-helpers');
 
 // Load boss configuration
 const bossConfig = JSON.parse(fs.readFileSync('./boss_spawn_config.json', 'utf-8'));
@@ -146,53 +147,72 @@ function getPendingMembers(attendance, focusedValue) {
 
 /**
  * Get guild members for autocomplete (for stats command)
+ * Fetches from MongoDB to include all members (active and inactive)
  *
  * @param {Guild} guild - Discord guild
  * @param {string} focusedValue - User's current input
- * @returns {Array} Array of autocomplete choices
+ * @returns {Promise<Array>} Array of autocomplete choices
  */
-function getGuildMembers(guild, focusedValue) {
+async function getGuildMembers(guild, focusedValue) {
   if (!guild) return [];
 
   const lowerInput = focusedValue.toLowerCase();
 
-  // Get all members from cache
-  const members = Array.from(guild.members.cache.values())
-    .filter(member => !member.user.bot) // Exclude bots
-    .map(member => ({
-      displayName: member.displayName,
-      username: member.user.username
-    }));
+  try {
+    // Fetch all members from MongoDB (includes inactive members)
+    const members = await mongoHelpers.getAllMembers({ isActive: true });
 
-  // Filter by user input
-  const filtered = members
-    .filter(m =>
-      m.displayName.toLowerCase().includes(lowerInput) ||
-      m.username.toLowerCase().includes(lowerInput)
-    )
-    .sort((a, b) => {
-      // Exact match first
-      const aExact = a.displayName.toLowerCase() === lowerInput;
-      const bExact = b.displayName.toLowerCase() === lowerInput;
-      if (aExact && !bExact) return -1;
-      if (!aExact && bExact) return 1;
+    // Extract usernames
+    const memberNames = members
+      .map(m => m.username)
+      .filter(name => name); // Filter out any null/undefined
 
-      // Then by starts with
-      const aStarts = a.displayName.toLowerCase().startsWith(lowerInput);
-      const bStarts = b.displayName.toLowerCase().startsWith(lowerInput);
-      if (aStarts && !bStarts) return -1;
-      if (!aStarts && bStarts) return 1;
+    // Filter by user input
+    const filtered = memberNames
+      .filter(name => name.toLowerCase().includes(lowerInput))
+      .sort((a, b) => {
+        // Exact match first
+        const aExact = a.toLowerCase() === lowerInput;
+        const bExact = b.toLowerCase() === lowerInput;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
 
-      // Then alphabetically
-      return a.displayName.localeCompare(b.displayName);
-    })
-    .slice(0, 25)
-    .map(m => ({
-      name: m.displayName,
-      value: m.displayName
-    }));
+        // Then by starts with
+        const aStarts = a.toLowerCase().startsWith(lowerInput);
+        const bStarts = b.toLowerCase().startsWith(lowerInput);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
 
-  return filtered;
+        // Then alphabetically
+        return a.localeCompare(b);
+      })
+      .slice(0, 25)
+      .map(name => ({
+        name: name,
+        value: name
+      }));
+
+    return filtered;
+
+  } catch (error) {
+    console.error('❌ Failed to fetch members from MongoDB for autocomplete:', error);
+
+    // Fallback to Discord cache if MongoDB fails
+    const members = Array.from(guild.members.cache.values())
+      .filter(member => !member.user.bot)
+      .map(member => member.displayName);
+
+    const filtered = members
+      .filter(name => name.toLowerCase().includes(lowerInput))
+      .sort((a, b) => a.localeCompare(b))
+      .slice(0, 25)
+      .map(name => ({
+        name: name,
+        value: name
+      }));
+
+    return filtered;
+  }
 }
 
 /**
@@ -244,7 +264,7 @@ async function handleAutocomplete(interaction, attendance, bossRotation = null) 
       commandName === 'stats' &&
       focusedOption.name === 'member'
     ) {
-      choices = getGuildMembers(interaction.guild, focusedValue);
+      choices = await getGuildMembers(interaction.guild, focusedValue);
     }
 
     await interaction.respond(choices);
