@@ -114,15 +114,16 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
     if (commandName === 'spawned') {
       const boss = interaction.options.getString('boss');
+
+      await interaction.deferReply();
+
       const syntheticMessage = {
         content: `!spawned ${boss}`,
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
-        reply: async (content) => interaction.reply(content)
+        reply: async (content) => interaction.editReply(content)
       };
-
-      await interaction.deferReply();
 
       try {
         await bossTimerCommands.handleSpawned(syntheticMessage, [boss], config);
@@ -140,19 +141,19 @@ async function handleSlashCommand(interaction, modules, config, client) {
     }
 
     if (commandName === 'nextspawn') {
+      await interaction.deferReply();
+
       const syntheticMessage = {
         content: `!nextspawn`,
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
-        reply: async (content) => interaction.reply(content)
+        reply: async (content) => interaction.editReply(content)
       };
-
-      await interaction.deferReply();
 
       try {
         await bossTimerCommands.handleNextSpawn(syntheticMessage);
-        // The handler will reply via syntheticMessage.reply which maps to interaction.editReply
+        // Handler replies via syntheticMessage.reply which now maps to interaction.editReply
       } catch (error) {
         console.error('Error in /nextspawn command:', error);
         await interaction.editReply({
@@ -165,15 +166,16 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
     if (commandName === 'unkill') {
       const boss = interaction.options.getString('boss');
+
+      await interaction.deferReply();
+
       const syntheticMessage = {
         content: `!unkill ${boss}`,
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
-        reply: async (content) => interaction.reply(content)
+        reply: async (content) => interaction.editReply(content)
       };
-
-      await interaction.deferReply();
 
       try {
         await bossTimerCommands.handleUnkill(syntheticMessage, [boss], config);
@@ -194,15 +196,15 @@ async function handleSlashCommand(interaction, modules, config, client) {
       const boss = interaction.options.getString('boss');
       const status = interaction.options.getString('status');
 
+      await interaction.deferReply();
+
       const syntheticMessage = {
         content: `!setboss ${boss} ${status}`,
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
-        reply: async (content) => interaction.reply(content)
+        reply: async (content) => interaction.editReply(content)
       };
-
-      await interaction.deferReply();
 
       try {
         await bossTimerCommands.handleSetBoss(syntheticMessage, [boss, status], config);
@@ -222,15 +224,15 @@ async function handleSlashCommand(interaction, modules, config, client) {
     if (commandName === 'nospawn') {
       const boss = interaction.options.getString('boss');
 
+      await interaction.deferReply();
+
       const syntheticMessage = {
         content: `!nospawn ${boss}`,
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
-        reply: async (content) => interaction.reply(content)
+        reply: async (content) => interaction.editReply(content)
       };
-
-      await interaction.deferReply();
 
       try {
         await bossTimerCommands.handleNoSpawn(syntheticMessage, [boss], config);
@@ -260,15 +262,15 @@ async function handleSlashCommand(interaction, modules, config, client) {
         return;
       }
 
+      await interaction.deferReply();
+
       const syntheticMessage = {
         content: `!maintenance`,
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
-        reply: async (content) => interaction.reply(content)
+        reply: async (content) => interaction.editReply(content)
       };
-
-      await interaction.deferReply();
 
       try {
         await bossTimerCommands.handleMaintenance(syntheticMessage);
@@ -298,15 +300,15 @@ async function handleSlashCommand(interaction, modules, config, client) {
         return;
       }
 
+      await interaction.deferReply();
+
       const syntheticMessage = {
         content: `!serverdown`,
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
-        reply: async (content) => interaction.reply(content)
+        reply: async (content) => interaction.editReply(content)
       };
-
-      await interaction.deferReply();
 
       try {
         await bossTimerCommands.handleServerDown(syntheticMessage);
@@ -336,15 +338,15 @@ async function handleSlashCommand(interaction, modules, config, client) {
         return;
       }
 
+      await interaction.deferReply();
+
       const syntheticMessage = {
         content: `!clearkills`,
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
-        reply: async (content) => interaction.reply(content)
+        reply: async (content) => interaction.editReply(content)
       };
-
-      await interaction.deferReply();
 
       try {
         await bossTimerCommands.handleClearKills(syntheticMessage);
