@@ -32,11 +32,12 @@ COPY --from=builder /app ./
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV NODE_OPTIONS="--expose-gc --max-old-space-size=360 --max-semi-space-size=40"
 
 EXPOSE 3000
 EXPOSE 8000
 
 # ✅ Entry file is index2.js with GC flags optimized for 512MB RAM
 # Memory allocation: 360MB old space + 80MB young gen + ~70MB overhead = ~510MB total
-# Removed --optimize-for-size to allow heap to grow naturally (was causing 90% memory pressure)
-CMD ["--expose-gc", "--max-old-space-size=360", "--max-semi-space-size=40", "index2.js"]
+# Using NODE_OPTIONS env var for reliable flag passing across all deployment platforms
+CMD ["index2.js"]
