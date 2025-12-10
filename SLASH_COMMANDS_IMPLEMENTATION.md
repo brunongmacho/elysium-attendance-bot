@@ -1252,6 +1252,67 @@ describe('Slash /verify command', () => {
 
 ---
 
+## Command Aliases
+
+### Current Prefix Command Aliases
+
+The bot currently supports **100+ command aliases** via `config/command-aliases.js`:
+
+**Examples:**
+- `!b` → `!bid`
+- `!v` → `!verify`
+- `!st` → `!status`
+- `!pts` → `!mypoints`
+- `!vall` → `!verifyall`
+- `!lb` → `!leaderboards`
+- And many more...
+
+### Alias Strategy for Slash Commands
+
+**Recommendation: Canonical Names Only (No Slash Aliases)**
+
+**Why:**
+1. **Discord has built-in command autocomplete** - typing `/b` shows `/bid` automatically
+2. **Cleaner command list** - 50 commands instead of 150+ with aliases
+3. **Still fast** - autocomplete is just as quick as aliases
+4. **Easier to maintain** - one command definition instead of multiple
+
+**Comparison:**
+
+```
+PREFIX COMMANDS (with aliases):
+!b 500              ✅ Works (resolves to !bid via alias system)
+!bid 500            ✅ Works
+
+SLASH COMMANDS (with autocomplete):
+/b                  Discord shows "/bid" in autocomplete menu
+/bid 500            ✅ Works
+```
+
+**What This Means:**
+
+1. **All prefix aliases continue working:**
+   - `!b`, `!v`, `!pts`, `!st`, etc. - all work exactly as now
+   - `resolveCommandAlias()` function unchanged
+   - Zero impact on existing alias behavior
+
+2. **Slash commands use canonical names:**
+   - Only `/bid`, `/verify`, `/stats`, `/leaderboard`, etc. registered
+   - No `/b`, `/v`, `/pts` aliases needed
+   - Discord's autocomplete replaces alias functionality
+
+3. **Users can choose their preference:**
+   - Veterans who like `!b` - keep using it
+   - Users who want autocomplete - use `/bid`
+   - Both call the same underlying function
+
+**If needed later:**
+- We could register a few key aliases (e.g., `/b` for `/bid`)
+- But Discord autocomplete makes this unnecessary
+- Better to keep command list clean
+
+---
+
 ## Open Questions
 
 1. **Command naming:** Keep exact names (`/bid`) or use longer (`/placebid`)?
@@ -1262,6 +1323,7 @@ describe('Slash /verify command', () => {
 6. **Error handling:** Match existing error message style?
 7. **Confirmation prompts:** Keep for dangerous operations (`/resetauction`)?
 8. **Boss timer help:** `/help` in boss timer channel shows slash or prefix syntax?
+9. **Slash aliases:** Register any common aliases (e.g., `/b` for `/bid`) or rely on autocomplete?
 
 ---
 
