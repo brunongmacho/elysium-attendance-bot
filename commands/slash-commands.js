@@ -10,7 +10,7 @@
  * @author ELYSIUM Development Team
  */
 
-const { ApplicationCommandOptionType } = require('discord.js');
+const { ApplicationCommandOptionType, PermissionFlagsBits } = require('discord.js');
 
 /**
  * Phase 1A: Attendance System Commands
@@ -19,6 +19,8 @@ const attendanceCommands = [
   {
     name: 'verify',
     description: 'Verify a member\'s attendance submission',
+    default_member_permissions: PermissionFlagsBits.Administrator,
+    dm_permission: false,
     options: [
       {
         name: 'member',
@@ -32,6 +34,8 @@ const attendanceCommands = [
   {
     name: 'deny',
     description: 'Deny a member\'s attendance submission',
+    default_member_permissions: PermissionFlagsBits.Administrator,
+    dm_permission: false,
     options: [
       {
         name: 'member',
@@ -50,15 +54,21 @@ const attendanceCommands = [
   },
   {
     name: 'verifyall',
-    description: 'Verify all pending attendance submissions'
+    description: 'Verify all pending attendance submissions',
+    default_member_permissions: PermissionFlagsBits.Administrator,
+    dm_permission: false
   },
   {
     name: 'denyall',
-    description: 'Deny all pending attendance submissions'
+    description: 'Deny all pending attendance submissions',
+    default_member_permissions: PermissionFlagsBits.Administrator,
+    dm_permission: false
   },
   {
     name: 'close',
     description: 'Close an attendance thread',
+    default_member_permissions: PermissionFlagsBits.Administrator,
+    dm_permission: false,
     options: [
       {
         name: 'thread',
@@ -70,11 +80,15 @@ const attendanceCommands = [
   },
   {
     name: 'closeall',
-    description: 'Close all open attendance threads'
+    description: 'Close all open attendance threads',
+    default_member_permissions: PermissionFlagsBits.Administrator,
+    dm_permission: false
   },
   {
     name: 'resetpending',
-    description: 'Clear the pending attendance queue'
+    description: 'Clear the pending attendance queue',
+    default_member_permissions: PermissionFlagsBits.Administrator,
+    dm_permission: false
   }
 ];
 
@@ -85,6 +99,7 @@ const bossTimerCommands = [
   {
     name: 'killed',
     description: 'Mark a boss as killed',
+    dm_permission: false,
     options: [
       {
         name: 'boss',
@@ -104,6 +119,7 @@ const bossTimerCommands = [
   {
     name: 'spawned',
     description: 'Mark a boss as spawned',
+    dm_permission: false,
     options: [
       {
         name: 'boss',
@@ -116,11 +132,14 @@ const bossTimerCommands = [
   },
   {
     name: 'nextspawn',
-    description: 'Check the next boss spawn time'
+    description: 'Check the next boss spawn time',
+    dm_permission: false
   },
   {
     name: 'unkill',
     description: 'Undo a boss kill record',
+    default_member_permissions: PermissionFlagsBits.Administrator,
+    dm_permission: false,
     options: [
       {
         name: 'boss',
@@ -134,6 +153,8 @@ const bossTimerCommands = [
   {
     name: 'setboss',
     description: 'Set a boss status manually',
+    default_member_permissions: PermissionFlagsBits.Administrator,
+    dm_permission: false,
     options: [
       {
         name: 'boss',
@@ -158,6 +179,7 @@ const bossTimerCommands = [
   {
     name: 'nospawn',
     description: 'Mark a boss as not spawning',
+    dm_permission: false,
     options: [
       {
         name: 'boss',
@@ -170,15 +192,21 @@ const bossTimerCommands = [
   },
   {
     name: 'maintenance',
-    description: 'Spawn all bosses (after server maintenance)'
+    description: 'Spawn all bosses (after server maintenance)',
+    default_member_permissions: PermissionFlagsBits.Administrator,
+    dm_permission: false
   },
   {
     name: 'serverdown',
-    description: 'Handle server downtime'
+    description: 'Handle server downtime',
+    default_member_permissions: PermissionFlagsBits.Administrator,
+    dm_permission: false
   },
   {
     name: 'clearkills',
-    description: 'Clear all boss kill records'
+    description: 'Clear all boss kill records',
+    default_member_permissions: PermissionFlagsBits.Administrator,
+    dm_permission: false
   }
 ];
 
@@ -189,6 +217,8 @@ const rotationCommands = [
   {
     name: 'rotation',
     description: 'Manage boss rotation system',
+    default_member_permissions: PermissionFlagsBits.Administrator,
+    dm_permission: false,
     options: [
       {
         name: 'status',
