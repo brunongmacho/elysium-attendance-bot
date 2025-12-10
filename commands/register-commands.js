@@ -55,6 +55,18 @@ async function fetchChannelNames(client, guildId) {
       }
     }
 
+    // Fetch bidding channel name
+    if (config.bidding_channel_id) {
+      try {
+        const biddingChannel = await guild.channels.fetch(config.bidding_channel_id);
+        if (biddingChannel) {
+          channelNames.bidding = biddingChannel.name;
+        }
+      } catch (error) {
+        console.warn(`⚠️ Could not fetch bidding channel: ${error.message}`);
+      }
+    }
+
     console.log(`📝 Fetched channel names:`, channelNames);
     return channelNames;
 

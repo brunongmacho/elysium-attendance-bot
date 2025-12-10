@@ -17,13 +17,13 @@ const tipSystem = require('./tip-system');
  * Handle slash commands
  *
  * @param {CommandInteraction} interaction - Discord command interaction
- * @param {Object} modules - Bot modules (attendance, bossTimer, bossTimerCommands, bossRotation)
+ * @param {Object} modules - Bot modules (attendance, bossTimer, bossTimerCommands, bossRotation, bidding, auctioneering)
  * @param {Object} config - Bot configuration
  * @param {Client} client - Discord client
  * @returns {Promise<void>}
  */
 async function handleSlashCommand(interaction, modules, config, client) {
-  const { attendance, bossTimer, bossTimerCommands, bossRotation} = modules;
+  const { attendance, bossTimer, bossTimerCommands, bossRotation, bidding, auctioneering } = modules;
   const commandName = interaction.commandName;
 
   // Track slash command usage for tip system
@@ -1093,6 +1093,313 @@ async function handleSlashCommand(interaction, modules, config, client) {
           });
         }
 
+        return;
+      }
+    }
+
+    // =========================================================================
+    // AUCTION/BIDDING COMMANDS
+    // =========================================================================
+
+    // /bid command - Place a bid
+    if (commandName === 'bid') {
+      const amount = interaction.options.getInteger('amount');
+
+      // Create synthetic message for compatibility with existing bidding.handleCommand
+      const syntheticMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        content: `!bid ${amount}`,
+        reply: async (content) => {
+          if (typeof content === 'string') {
+            return await interaction.editReply({ content });
+          } else if (content.embeds) {
+            return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+          } else {
+            return await interaction.editReply(content);
+          }
+        }
+      };
+
+      await interaction.deferReply();
+      await bidding.handleCommand(syntheticMessage, config);
+      return;
+    }
+
+    // /bidstatus command
+    if (commandName === 'bidstatus') {
+      const syntheticMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        content: '!bidstatus',
+        reply: async (content) => {
+          if (typeof content === 'string') {
+            return await interaction.editReply({ content });
+          } else if (content.embeds) {
+            return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+          } else {
+            return await interaction.editReply(content);
+          }
+        }
+      };
+
+      await interaction.deferReply();
+      await auctioneering.handleBidStatus(syntheticMessage, config);
+      return;
+    }
+
+    // /mypoints command
+    if (commandName === 'mypoints') {
+      const syntheticMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        content: '!mypoints',
+        reply: async (content) => {
+          if (typeof content === 'string') {
+            return await interaction.editReply({ content });
+          } else if (content.embeds) {
+            return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+          } else {
+            return await interaction.editReply(content);
+          }
+        }
+      };
+
+      await interaction.deferReply();
+      await auctioneering.handleMyPoints(syntheticMessage, bidding, config);
+      return;
+    }
+
+    // /auction subcommands
+    if (commandName === 'auction') {
+      const subcommand = interaction.options.getSubcommand();
+
+      await interaction.deferReply();
+
+      if (subcommand === 'start') {
+        // Check if auction is already running
+        const auctState = auctioneering.getAuctionState();
+        if (auctState.active) {
+          await interaction.editReply({
+            content: '❌ Auction is already running!'
+          });
+          return;
+        }
+
+        // Start auction
+        await auctioneering.startAuctioneering(interaction.guild, config, client);
+        await interaction.editReply({
+          content: '✅ Auction session started!'
+        });
+        return;
+      }
+
+      if (subcommand === 'pause') {
+        await auctioneering.pauseSession(interaction.channel);
+        await interaction.editReply({
+          content: '⏸️ Auction paused'
+        });
+        return;
+      }
+
+      if (subcommand === 'resume') {
+        await auctioneering.resumeSession(interaction.channel, config);
+        await interaction.editReply({
+          content: '▶️ Auction resumed'
+        });
+        return;
+      }
+
+      if (subcommand === 'extend') {
+        const minutes = interaction.options.getInteger('minutes');
+
+        const auctState = auctioneering.getAuctionState();
+        if (!auctState.active || !auctState.currentItem) {
+          await interaction.editReply({
+            content: '❌ No active auction to extend'
+          });
+          return;
+        }
+
+        await auctioneering.extendCurrentItem(minutes);
+        await interaction.editReply({
+          content: `⏱️ Extended auction by ${minutes} minute(s)`
+        });
+        return;
+      }
+
+      if (subcommand === 'skip') {
+        const syntheticMessage = {
+          author: interaction.user,
+          member: interaction.member,
+          channel: interaction.channel,
+          guild: interaction.guild,
+          content: '!skipitem',
+          reply: async (content) => {
+            if (typeof content === 'string') {
+              return await interaction.editReply({ content });
+            } else if (content.embeds) {
+              return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+            } else {
+              return await interaction.editReply(content);
+            }
+          }
+        };
+
+        await auctioneering.handleSkipItem(syntheticMessage);
+        return;
+      }
+
+      if (subcommand === 'cancel') {
+        const syntheticMessage = {
+          author: interaction.user,
+          member: interaction.member,
+          channel: interaction.channel,
+          guild: interaction.guild,
+          content: '!cancelitem',
+          reply: async (content) => {
+            if (typeof content === 'string') {
+              return await interaction.editReply({ content });
+            } else if (content.embeds) {
+              return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+            } else {
+              return await interaction.editReply(content);
+            }
+          }
+        };
+
+        await auctioneering.handleCancelItem(syntheticMessage);
+        return;
+      }
+
+      if (subcommand === 'forceend') {
+        const syntheticMessage = {
+          author: interaction.user,
+          member: interaction.member,
+          channel: interaction.channel,
+          guild: interaction.guild,
+          content: '!forcesubmitresults',
+          reply: async (content) => {
+            if (typeof content === 'string') {
+              return await interaction.editReply({ content });
+            } else if (content.embeds) {
+              return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+            } else {
+              return await interaction.editReply(content);
+            }
+          }
+        };
+
+        await auctioneering.handleForceSubmitResults(syntheticMessage, config, bidding);
+        return;
+      }
+    }
+
+    // /queue subcommands
+    if (commandName === 'queue') {
+      const subcommand = interaction.options.getSubcommand();
+
+      await interaction.deferReply();
+
+      if (subcommand === 'list') {
+        const syntheticMessage = {
+          author: interaction.user,
+          member: interaction.member,
+          channel: interaction.channel,
+          guild: interaction.guild,
+          content: '!queuelist',
+          reply: async (content) => {
+            if (typeof content === 'string') {
+              return await interaction.editReply({ content });
+            } else if (content.embeds) {
+              return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+            } else {
+              return await interaction.editReply(content);
+            }
+          }
+        };
+
+        await auctioneering.handleQueueList(syntheticMessage, bidding.getBiddingState());
+        return;
+      }
+
+      if (subcommand === 'add') {
+        const item = interaction.options.getString('item');
+        const minBid = interaction.options.getInteger('min_bid');
+
+        const command = minBid ? `!additem ${item} ${minBid}` : `!additem ${item}`;
+
+        const syntheticMessage = {
+          author: interaction.user,
+          member: interaction.member,
+          channel: interaction.channel,
+          guild: interaction.guild,
+          content: command,
+          reply: async (content) => {
+            if (typeof content === 'string') {
+              return await interaction.editReply({ content });
+            } else if (content.embeds) {
+              return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+            } else {
+              return await interaction.editReply(content);
+            }
+          }
+        };
+
+        // Use bidding.handleCommand which handles !additem
+        await bidding.handleCommand(syntheticMessage, config);
+        return;
+      }
+
+      if (subcommand === 'remove') {
+        const item = interaction.options.getString('item');
+
+        const syntheticMessage = {
+          author: interaction.user,
+          member: interaction.member,
+          channel: interaction.channel,
+          guild: interaction.guild,
+          content: `!removeitem ${item}`,
+          reply: async (content) => {
+            if (typeof content === 'string') {
+              return await interaction.editReply({ content });
+            } else if (content.embeds) {
+              return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+            } else {
+              return await interaction.editReply(content);
+            }
+          }
+        };
+
+        await bidding.handleCommand(syntheticMessage, config);
+        return;
+      }
+
+      if (subcommand === 'clear') {
+        const syntheticMessage = {
+          author: interaction.user,
+          member: interaction.member,
+          channel: interaction.channel,
+          guild: interaction.guild,
+          content: '!clearqueue',
+          reply: async (content) => {
+            if (typeof content === 'string') {
+              return await interaction.editReply({ content });
+            } else if (content.embeds) {
+              return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+            } else {
+              return await interaction.editReply(content);
+            }
+          }
+        };
+
+        await bidding.handleCommand(syntheticMessage, config);
         return;
       }
     }

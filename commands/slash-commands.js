@@ -292,28 +292,183 @@ function generateRotationCommands() {
 }
 
 /**
+ * Generate auction system commands with dynamic channel names
+ *
+ * @param {string} biddingChannelName - Name of bidding channel (e.g., "bidding")
+ * @returns {Array} Auction command definitions
+ */
+function generateAuctionCommands(biddingChannelName = 'bidding') {
+  const channelContext = `(use in #${biddingChannelName})`;
+  const threadContext = `(use in #${biddingChannelName} threads)`;
+
+  return [
+    // /bid command - Member command
+    {
+      name: 'bid',
+      description: `Place a bid on the current auction item ${threadContext}`,
+      dm_permission: false,
+      options: [
+        {
+          name: 'amount',
+          type: ApplicationCommandOptionType.Integer,
+          description: 'Bid amount in points',
+          required: true,
+          min_value: 1
+        }
+      ]
+    },
+
+    // /auction subcommands - Admin commands
+    {
+      name: 'auction',
+      description: `Manage auction sessions ${channelContext}`,
+      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
+      dm_permission: false,
+      options: [
+        {
+          name: 'start',
+          type: ApplicationCommandOptionType.Subcommand,
+          description: 'Start an auction session manually'
+        },
+        {
+          name: 'pause',
+          type: ApplicationCommandOptionType.Subcommand,
+          description: 'Pause the current auction (use in thread)'
+        },
+        {
+          name: 'resume',
+          type: ApplicationCommandOptionType.Subcommand,
+          description: 'Resume a paused auction (use in thread)'
+        },
+        {
+          name: 'extend',
+          type: ApplicationCommandOptionType.Subcommand,
+          description: 'Add time to current auction item (use in thread)',
+          options: [
+            {
+              name: 'minutes',
+              type: ApplicationCommandOptionType.Integer,
+              description: 'Minutes to add',
+              required: true,
+              min_value: 1,
+              max_value: 60
+            }
+          ]
+        },
+        {
+          name: 'skip',
+          type: ApplicationCommandOptionType.Subcommand,
+          description: 'Skip current item with point refund'
+        },
+        {
+          name: 'cancel',
+          type: ApplicationCommandOptionType.Subcommand,
+          description: 'Cancel current item with point refund'
+        },
+        {
+          name: 'forceend',
+          type: ApplicationCommandOptionType.Subcommand,
+          description: 'Emergency auction termination (force submit results)'
+        }
+      ]
+    },
+
+    // /queue subcommands - Admin commands
+    {
+      name: 'queue',
+      description: `Manage auction queue ${channelContext}`,
+      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
+      dm_permission: false,
+      options: [
+        {
+          name: 'add',
+          type: ApplicationCommandOptionType.Subcommand,
+          description: 'Add item to auction queue',
+          options: [
+            {
+              name: 'item',
+              type: ApplicationCommandOptionType.String,
+              description: 'Item name',
+              required: true
+            },
+            {
+              name: 'min_bid',
+              type: ApplicationCommandOptionType.Integer,
+              description: 'Minimum bid (optional)',
+              required: false,
+              min_value: 0
+            }
+          ]
+        },
+        {
+          name: 'remove',
+          type: ApplicationCommandOptionType.Subcommand,
+          description: 'Remove item from auction queue',
+          options: [
+            {
+              name: 'item',
+              type: ApplicationCommandOptionType.String,
+              description: 'Item name to remove',
+              required: true
+            }
+          ]
+        },
+        {
+          name: 'list',
+          type: ApplicationCommandOptionType.Subcommand,
+          description: 'Show current auction queue'
+        },
+        {
+          name: 'clear',
+          type: ApplicationCommandOptionType.Subcommand,
+          description: 'Clear entire auction queue'
+        }
+      ]
+    },
+
+    // /bidstatus command - Anyone can use
+    {
+      name: 'bidstatus',
+      description: `Show current auction status ${channelContext}`,
+      dm_permission: false
+    },
+
+    // /mypoints command - ELYSIUM members only
+    {
+      name: 'mypoints',
+      description: `Check your bidding points ${channelContext}`,
+      dm_permission: false
+    }
+  ];
+}
+
+/**
  * Generate all commands with dynamic channel names
  *
  * @param {Object} channelNames - Object containing channel names
  * @param {string} channelNames.attendance - Attendance channel name
  * @param {string} channelNames.bossTimer - Boss timer channel name
+ * @param {string} channelNames.bidding - Bidding channel name
  * @returns {Object} Object containing command arrays
  */
 function generateAllCommands(channelNames = {}) {
-  const { attendance = 'attendance', bossTimer = 'boss-timer' } = channelNames;
+  const { attendance = 'attendance', bossTimer = 'boss-timer', bidding = 'bidding' } = channelNames;
 
   const attendanceCommands = generateAttendanceCommands(attendance);
   const bossTimerCommands = generateBossTimerCommands(bossTimer);
   const rotationCommands = generateRotationCommands();
+  const auctionCommands = generateAuctionCommands(bidding);
 
   return {
     attendanceCommands,
     bossTimerCommands,
     rotationCommands,
+    auctionCommands,
     allCommands: [
       ...attendanceCommands,
       ...bossTimerCommands,
-      ...rotationCommands
+      ...rotationCommands,
+      ...auctionCommands
     ]
   };
 }
@@ -322,5 +477,6 @@ module.exports = {
   generateAllCommands,
   generateAttendanceCommands,
   generateBossTimerCommands,
-  generateRotationCommands
+  generateRotationCommands,
+  generateAuctionCommands
 };
