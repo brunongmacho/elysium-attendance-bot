@@ -4822,12 +4822,19 @@ client.once(Events.ClientReady, async () => {
   const heapPercent = Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100);
   const rssMB = (memUsage.rss / 1024 / 1024).toFixed(1);
 
+  // Get V8 heap statistics to verify memory limits
+  const v8 = require('v8');
+  const heapStats = v8.getHeapStatistics();
+  const heapLimitMB = (heapStats.heap_size_limit / 1024 / 1024).toFixed(0);
+  const totalHeapMB = (heapStats.total_heap_size / 1024 / 1024).toFixed(1);
+
   console.log('');
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('📊 STARTUP METRICS');
   console.log('═══════════════════════════════════════════════════════════════');
   console.log(`⏱️  Startup Time: ${(startupDuration / 1000).toFixed(1)}s`);
   console.log(`💾 Heap: ${heapUsedMB}MB / ${heapTotalMB}MB (${heapPercent}%)`);
+  console.log(`🎯 Heap Limit: ${heapLimitMB}MB (V8 max)`);
   console.log(`📈 RSS: ${rssMB}MB`);
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('');
