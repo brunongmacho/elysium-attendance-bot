@@ -11,6 +11,7 @@
  */
 
 const { EmbedBuilder } = require('discord.js');
+const tipSystem = require('./tip-system');
 
 /**
  * Handle slash commands
@@ -22,8 +23,11 @@ const { EmbedBuilder } = require('discord.js');
  * @returns {Promise<void>}
  */
 async function handleSlashCommand(interaction, modules, config, client) {
-  const { attendance, bossTimer, bossTimerCommands, bossRotation } = modules;
+  const { attendance, bossTimer, bossTimerCommands, bossRotation} = modules;
   const commandName = interaction.commandName;
+
+  // Track slash command usage for tip system
+  tipSystem.trackSlashCommandUsage(interaction.user.id, commandName);
 
   try {
     // =========================================================================
