@@ -19,7 +19,7 @@ const attendanceCommands = [
   {
     name: 'verify',
     description: 'Verify a member\'s attendance submission',
-    default_member_permissions: PermissionFlagsBits.Administrator,
+    default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false,
     options: [
       {
@@ -34,7 +34,7 @@ const attendanceCommands = [
   {
     name: 'deny',
     description: 'Deny a member\'s attendance submission',
-    default_member_permissions: PermissionFlagsBits.Administrator,
+    default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false,
     options: [
       {
@@ -55,19 +55,19 @@ const attendanceCommands = [
   {
     name: 'verifyall',
     description: 'Verify all pending attendance submissions',
-    default_member_permissions: PermissionFlagsBits.Administrator,
+    default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false
   },
   {
     name: 'denyall',
     description: 'Deny all pending attendance submissions',
-    default_member_permissions: PermissionFlagsBits.Administrator,
+    default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false
   },
   {
     name: 'close',
     description: 'Close an attendance thread',
-    default_member_permissions: PermissionFlagsBits.Administrator,
+    default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false,
     options: [
       {
@@ -81,13 +81,13 @@ const attendanceCommands = [
   {
     name: 'closeall',
     description: 'Close all open attendance threads',
-    default_member_permissions: PermissionFlagsBits.Administrator,
+    default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false
   },
   {
     name: 'resetpending',
     description: 'Clear the pending attendance queue',
-    default_member_permissions: PermissionFlagsBits.Administrator,
+    default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false
   }
 ];
@@ -138,7 +138,7 @@ const bossTimerCommands = [
   {
     name: 'unkill',
     description: 'Undo a boss kill record',
-    default_member_permissions: PermissionFlagsBits.Administrator,
+    default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false,
     options: [
       {
@@ -153,7 +153,7 @@ const bossTimerCommands = [
   {
     name: 'setboss',
     description: 'Set a boss status manually',
-    default_member_permissions: PermissionFlagsBits.Administrator,
+    default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false,
     options: [
       {
@@ -193,19 +193,19 @@ const bossTimerCommands = [
   {
     name: 'maintenance',
     description: 'Spawn all bosses (after server maintenance)',
-    default_member_permissions: PermissionFlagsBits.Administrator,
+    default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false
   },
   {
     name: 'serverdown',
     description: 'Handle server downtime',
-    default_member_permissions: PermissionFlagsBits.Administrator,
+    default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false
   },
   {
     name: 'clearkills',
     description: 'Clear all boss kill records',
-    default_member_permissions: PermissionFlagsBits.Administrator,
+    default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false
   }
 ];
@@ -217,7 +217,7 @@ const rotationCommands = [
   {
     name: 'rotation',
     description: 'Manage boss rotation system',
-    default_member_permissions: PermissionFlagsBits.Administrator,
+    default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false,
     options: [
       {
