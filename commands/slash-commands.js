@@ -18,7 +18,7 @@ const { ApplicationCommandOptionType, PermissionFlagsBits } = require('discord.j
 const attendanceCommands = [
   {
     name: 'verify',
-    description: 'Verify a member\'s attendance submission',
+    description: 'Verify a member\'s attendance submission (use inside attendance thread)',
     default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false,
     options: [
@@ -33,7 +33,7 @@ const attendanceCommands = [
   },
   {
     name: 'deny',
-    description: 'Deny a member\'s attendance submission',
+    description: 'Deny a member\'s attendance submission (use inside attendance thread)',
     default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false,
     options: [
@@ -54,19 +54,19 @@ const attendanceCommands = [
   },
   {
     name: 'verifyall',
-    description: 'Verify all pending attendance submissions',
+    description: 'Verify all pending submissions in thread (use inside attendance thread)',
     default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false
   },
   {
     name: 'denyall',
-    description: 'Deny all pending attendance submissions',
+    description: 'Deny all pending submissions in thread (use inside attendance thread)',
     default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false
   },
   {
     name: 'close',
-    description: 'Close an attendance thread',
+    description: 'Close an attendance thread (use inside attendance thread)',
     default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false,
     options: [
@@ -80,13 +80,13 @@ const attendanceCommands = [
   },
   {
     name: 'closeall',
-    description: 'Close all open attendance threads',
+    description: 'Close all open attendance threads (use in attendance channel)',
     default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false
   },
   {
     name: 'resetpending',
-    description: 'Clear the pending attendance queue',
+    description: 'Clear the pending attendance queue (use in attendance channel)',
     default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false
   }
@@ -98,7 +98,7 @@ const attendanceCommands = [
 const bossTimerCommands = [
   {
     name: 'killed',
-    description: 'Mark a boss as killed',
+    description: 'Mark a boss as killed (use in boss timer channel)',
     dm_permission: false,
     options: [
       {
@@ -118,7 +118,7 @@ const bossTimerCommands = [
   },
   {
     name: 'spawned',
-    description: 'Mark a boss as spawned',
+    description: 'Mark a boss as spawned (use in boss timer channel)',
     dm_permission: false,
     options: [
       {
@@ -132,12 +132,12 @@ const bossTimerCommands = [
   },
   {
     name: 'nextspawn',
-    description: 'Check the next boss spawn time',
+    description: 'Check the next boss spawn time (use in boss timer channel)',
     dm_permission: false
   },
   {
     name: 'unkill',
-    description: 'Undo a boss kill record',
+    description: 'Undo a boss kill record (use in boss timer channel)',
     default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false,
     options: [
@@ -152,7 +152,7 @@ const bossTimerCommands = [
   },
   {
     name: 'setboss',
-    description: 'Set a boss status manually',
+    description: 'Set a boss status manually (use in boss timer channel)',
     default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false,
     options: [
@@ -178,7 +178,7 @@ const bossTimerCommands = [
   },
   {
     name: 'nospawn',
-    description: 'Mark a boss as not spawning',
+    description: 'Mark a boss as not spawning (use in boss timer channel)',
     dm_permission: false,
     options: [
       {
@@ -192,19 +192,19 @@ const bossTimerCommands = [
   },
   {
     name: 'maintenance',
-    description: 'Spawn all bosses (after server maintenance)',
+    description: 'Spawn all bosses after server maintenance (admin command)',
     default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false
   },
   {
     name: 'serverdown',
-    description: 'Handle server downtime',
+    description: 'Handle server downtime (admin command)',
     default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false
   },
   {
     name: 'clearkills',
-    description: 'Clear all boss kill records',
+    description: 'Clear all boss kill records (admin command)',
     default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false
   }
@@ -216,7 +216,7 @@ const bossTimerCommands = [
 const rotationCommands = [
   {
     name: 'rotation',
-    description: 'Manage boss rotation system',
+    description: 'Manage boss rotation system (admin command)',
     default_member_permissions: PermissionFlagsBits.Administrator.toString(),
     dm_permission: false,
     options: [
