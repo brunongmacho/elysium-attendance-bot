@@ -230,6 +230,9 @@ async function refreshRotationCache() {
   try {
     console.log('🔄 Refreshing rotation cache from Google Sheets...');
 
+    // Get current bosses in cache/MongoDB before fetching new list
+    const oldBosses = Object.keys(rotationCache);
+
     // Fetch latest list of rotating bosses from sheet
     await fetchRotatingBosses();
 
@@ -260,8 +263,30 @@ async function refreshRotationCache() {
       }
     }
 
+    // Remove bosses that are no longer in the sheet
+    const bossesToRemove = oldBosses.filter(boss => !ROTATING_BOSSES.includes(boss));
+    let removedCount = 0;
+
+    for (const boss of bossesToRemove) {
+      // Remove from cache
+      delete rotationCache[boss];
+
+      // Remove from MongoDB
+      try {
+        const db = await dbAPI.connect();
+        const rotationCollection = db.collection('bossRotation');
+        const bossId = boss.toLowerCase().replace(/\s+/g, '_');
+
+        await rotationCollection.deleteOne({ _id: bossId });
+        removedCount++;
+        console.log(`  ├─ 🗑️  Removed ${boss} (no longer in sheet)`);
+      } catch (err) {
+        console.error(`  ├─ ⚠️  Failed to remove ${boss} from MongoDB:`, err.message);
+      }
+    }
+
     lastCacheRefresh = Date.now();
-    console.log(`✅ Rotation cache refreshed: ${syncedCount} bosses synced to MongoDB`);
+    console.log(`✅ Rotation cache refreshed: ${syncedCount} bosses synced, ${removedCount} bosses removed`);
 
   } catch (err) {
     console.error('❌ Error refreshing rotation cache:', err.message);
