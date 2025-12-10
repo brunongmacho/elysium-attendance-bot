@@ -520,6 +520,26 @@ class SheetAPI {
         const errorCode = String(error.code || '');
         const errorMessage = String(error.message || '');
 
+        // Logical errors that shouldn't be retried
+        const nonRetryableErrors = [
+          "not found",
+          "does not exist",
+          "invalid member",
+          "already exists",
+          "duplicate"
+        ];
+
+        const isNonRetryable = nonRetryableErrors.some(
+          phrase => errorMessage.toLowerCase().includes(phrase)
+        );
+
+        // If it's a logical error, fail immediately without retrying
+        if (isNonRetryable) {
+          console.error(`❌ API error on ${action}: ${errorMessage}`);
+          recordFailure();
+          throw error;
+        }
+
         const isTransient = transientErrors.some(
           code => errorCode.includes(code) || errorMessage.includes(code)
         );
