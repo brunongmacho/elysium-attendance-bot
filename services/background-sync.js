@@ -74,10 +74,9 @@ class BackgroundSync {
     console.log(`🔄 [Sync #${this.syncCount}] Starting background MongoDB → Sheets sync...`);
 
     try {
-      // Run ALL syncs in parallel for maximum performance
-      const [attendanceResult, pointsResult, rotationResult] = await Promise.all([
+      // Run syncs in parallel (bidding/auction removed - now Sheets-only)
+      const [attendanceResult, rotationResult] = await Promise.all([
         this.syncAttendanceToSheets().catch(err => ({ error: err.message, synced: 0 })),
-        this.syncPointsToSheets().catch(err => ({ error: err.message, synced: 0 })),
         this.syncRotationToSheets().catch(err => ({ error: err.message, synced: 0 }))
       ]);
 
@@ -86,7 +85,6 @@ class BackgroundSync {
 
       console.log(`✅ [Sync #${this.syncCount}] Background sync completed in ${duration}ms`);
       console.log(`   📊 Attendance: ${attendanceResult.synced} records ${attendanceResult.error ? `(⚠️ ${attendanceResult.error})` : ''}`);
-      console.log(`   💰 Points: ${pointsResult.synced} members ${pointsResult.error ? `(⚠️ ${pointsResult.error})` : ''}`);
       console.log(`   🔄 Rotation: ${rotationResult.synced} bosses ${rotationResult.error ? `(⚠️ ${rotationResult.error})` : ''}`);
 
       // Force garbage collection to reduce memory pressure
