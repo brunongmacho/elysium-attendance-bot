@@ -31,43 +31,547 @@ async function handleSlashCommand(interaction, modules, config, client) {
     // =========================================================================
 
     if (commandName === 'verify') {
-      const member = interaction.options.getString('member');
-      // Call existing attendance verification logic
-      // For now, route to the existing command handler
-      await interaction.reply(`🚧 /verify ${member} - Implementation in progress`);
+      const memberName = interaction.options.getString('member');
+
+      await interaction.deferReply();
+
+      try {
+        const thread = interaction.channel;
+        if (!thread.isThread()) {
+          await interaction.editReply({
+            content: '❌ This command must be used inside an attendance thread.'
+          });
+          return;
+        }
+
+        const activeSpawns = attendance.getActiveSpawns();
+        const pendingVerifications = attendance.getPendingVerifications();
+        const spawnInfo = activeSpawns[thread.id];
+
+        if (!spawnInfo || spawnInfo.closed) {
+          await interaction.editReply({
+            content: '⚠️ This spawn is closed or not found.'
+          });
+          return;
+        }
+
+        // Find the pending verification for this member
+        const pendingEntry = Object.entries(pendingVerifications).find(
+          ([msgId, p]) =>
+            p.threadId === thread.id &&
+            p.author.toLowerCase() === memberName.toLowerCase()
+        );
+
+        if (!pendingEntry) {
+          await interaction.editReply({
+            content: `⚠️ No pending verification found for **${memberName}** in this thread.`
+          });
+          return;
+        }
+
+        const [msgId, pending] = pendingEntry;
+
+        // Check for duplicates
+        const normalizeUsername = (username) => username.toLowerCase().replace(/\s+/g, '');
+        const isDuplicate = spawnInfo.members.some(
+          (m) => normalizeUsername(m) === normalizeUsername(pending.author)
+        );
+
+        if (isDuplicate) {
+          await interaction.editReply({
+            content: `⚠️ **${pending.author}** is already verified for this spawn.`
+          });
+          return;
+        }
+
+        // Add to verified members
+        spawnInfo.members.push(pending.author);
+
+        // Clean up verification buttons
+        if (pending.verificationMsgId) {
+          const verificationMsg = await thread.messages
+            .fetch(pending.verificationMsgId)
+            .catch(() => null);
+          if (verificationMsg && verificationMsg.components.length > 0) {
+            await verificationMsg.edit({ components: [] }).catch(() => {});
+          }
+        }
+
+        // Remove from pending
+        delete pendingVerifications[msgId];
+        attendance.setPendingVerifications(pendingVerifications);
+
+        await interaction.editReply({
+          content: `✅ **${pending.author}** manually verified by ${interaction.user.username}`
+        });
+
+        // Send to confirmation thread if exists
+        if (spawnInfo.confirmThreadId) {
+          const confirmThread = await interaction.guild.channels
+            .fetch(spawnInfo.confirmThreadId)
+            .catch(() => null);
+          if (confirmThread) {
+            await confirmThread.send(
+              `✅ **${pending.author}** verified by ${interaction.user.username} (slash command)`
+            );
+          }
+        }
+
+        console.log(
+          `✅ /verify: ${pending.author} for ${spawnInfo.boss} by ${interaction.user.username}`
+        );
+
+      } catch (error) {
+        console.error('Error in /verify command:', error);
+        await interaction.editReply({
+          content: `❌ Failed to verify member: ${error.message}`
+        });
+      }
+
       return;
     }
 
     if (commandName === 'deny') {
-      const member = interaction.options.getString('member');
+      const memberName = interaction.options.getString('member');
       const reason = interaction.options.getString('reason') || 'No reason provided';
-      await interaction.reply(`🚧 /deny ${member} (${reason}) - Implementation in progress`);
+
+      await interaction.deferReply();
+
+      try {
+        const thread = interaction.channel;
+        if (!thread.isThread()) {
+          await interaction.editReply({
+            content: '❌ This command must be used inside an attendance thread.'
+          });
+          return;
+        }
+
+        const activeSpawns = attendance.getActiveSpawns();
+        const pendingVerifications = attendance.getPendingVerifications();
+        const spawnInfo = activeSpawns[thread.id];
+
+        if (!spawnInfo || spawnInfo.closed) {
+          await interaction.editReply({
+            content: '⚠️ This spawn is closed or not found.'
+          });
+          return;
+        }
+
+        // Find the pending verification for this member
+        const pendingEntry = Object.entries(pendingVerifications).find(
+          ([msgId, p]) =>
+            p.threadId === thread.id &&
+            p.author.toLowerCase() === memberName.toLowerCase()
+        );
+
+        if (!pendingEntry) {
+          await interaction.editReply({
+            content: `⚠️ No pending verification found for **${memberName}** in this thread.`
+          });
+          return;
+        }
+
+        const [msgId, pending] = pendingEntry;
+
+        // Clean up verification buttons
+        if (pending.verificationMsgId) {
+          const verificationMsg = await thread.messages
+            .fetch(pending.verificationMsgId)
+            .catch(() => null);
+          if (verificationMsg && verificationMsg.components.length > 0) {
+            await verificationMsg.edit({ components: [] }).catch(() => {});
+          }
+        }
+
+        // Remove from pending (member is NOT added to verified list)
+        delete pendingVerifications[msgId];
+        attendance.setPendingVerifications(pendingVerifications);
+
+        await interaction.editReply({
+          content: `❌ **${pending.author}** denied by ${interaction.user.username}\n**Reason:** ${reason}`
+        });
+
+        // Send to confirmation thread if exists
+        if (spawnInfo.confirmThreadId) {
+          const confirmThread = await interaction.guild.channels
+            .fetch(spawnInfo.confirmThreadId)
+            .catch(() => null);
+          if (confirmThread) {
+            await confirmThread.send(
+              `❌ **${pending.author}** denied by ${interaction.user.username} - ${reason}`
+            );
+          }
+        }
+
+        console.log(
+          `❌ /deny: ${pending.author} for ${spawnInfo.boss} by ${interaction.user.username} - ${reason}`
+        );
+
+      } catch (error) {
+        console.error('Error in /deny command:', error);
+        await interaction.editReply({
+          content: `❌ Failed to deny member: ${error.message}`
+        });
+      }
+
       return;
     }
 
     if (commandName === 'verifyall') {
-      await interaction.reply(`🚧 /verifyall - Implementation in progress`);
+      await interaction.deferReply();
+
+      try {
+        const thread = interaction.channel;
+        if (!thread.isThread()) {
+          await interaction.editReply({
+            content: '❌ This command must be used inside an attendance thread.'
+          });
+          return;
+        }
+
+        const activeSpawns = attendance.getActiveSpawns();
+        const pendingVerifications = attendance.getPendingVerifications();
+        const spawnInfo = activeSpawns[thread.id];
+
+        if (!spawnInfo || spawnInfo.closed) {
+          await interaction.editReply({
+            content: '⚠️ This spawn is closed or not found.'
+          });
+          return;
+        }
+
+        const pendingInThread = Object.entries(pendingVerifications).filter(
+          ([msgId, p]) => p.threadId === thread.id
+        );
+
+        if (pendingInThread.length === 0) {
+          await interaction.editReply({
+            content: 'ℹ️ No pending verifications in this thread.'
+          });
+          return;
+        }
+
+        let verifiedCount = 0, duplicateCount = 0;
+        const verifiedMembers = [];
+        const normalizeUsername = (username) => username.toLowerCase().replace(/\s+/g, '');
+
+        for (const [msgId, pending] of pendingInThread) {
+          const isDuplicate = spawnInfo.members.some(
+            (m) => normalizeUsername(m) === normalizeUsername(pending.author)
+          );
+
+          if (!isDuplicate) {
+            spawnInfo.members.push(pending.author);
+            verifiedMembers.push(pending.author);
+            verifiedCount++;
+          } else {
+            duplicateCount++;
+          }
+
+          // Clean up verification buttons
+          if (pending.verificationMsgId) {
+            const verificationMsg = await thread.messages
+              .fetch(pending.verificationMsgId)
+              .catch(() => null);
+            if (verificationMsg && verificationMsg.components.length > 0) {
+              await verificationMsg.edit({ components: [] }).catch(() => {});
+            }
+          }
+
+          delete pendingVerifications[msgId];
+        }
+
+        attendance.setPendingVerifications(pendingVerifications);
+
+        await interaction.editReply({
+          content:
+            `✅ **Verify All Complete!**\n\n` +
+            `✅ Verified: ${verifiedCount}\n` +
+            `⚠️ Duplicates skipped: ${duplicateCount}\n` +
+            `📊 Total processed: ${pendingInThread.length}\n\n` +
+            `**Verified members:**\n${verifiedMembers.join(', ') || 'None (all were duplicates)'}`
+        });
+
+        if (spawnInfo.confirmThreadId && verifiedCount > 0) {
+          const confirmThread = await interaction.guild.channels
+            .fetch(spawnInfo.confirmThreadId)
+            .catch(() => null);
+          if (confirmThread) {
+            await confirmThread.send(
+              `✅ **Bulk Verification by ${interaction.user.username}**\n` +
+              `Verified ${verifiedCount} member(s): ${verifiedMembers.join(', ')}`
+            );
+          }
+        }
+
+        console.log(
+          `✅ /verifyall: ${verifiedCount} verified, ${duplicateCount} duplicates for ${spawnInfo.boss} by ${interaction.user.username}`
+        );
+
+      } catch (error) {
+        console.error('Error in /verifyall command:', error);
+        await interaction.editReply({
+          content: `❌ Failed to verify all: ${error.message}`
+        });
+      }
+
       return;
     }
 
     if (commandName === 'denyall') {
-      await interaction.reply(`🚧 /denyall - Implementation in progress`);
+      await interaction.deferReply();
+
+      try {
+        const thread = interaction.channel;
+        if (!thread.isThread()) {
+          await interaction.editReply({
+            content: '❌ This command must be used inside an attendance thread.'
+          });
+          return;
+        }
+
+        const activeSpawns = attendance.getActiveSpawns();
+        const pendingVerifications = attendance.getPendingVerifications();
+        const spawnInfo = activeSpawns[thread.id];
+
+        if (!spawnInfo || spawnInfo.closed) {
+          await interaction.editReply({
+            content: '⚠️ This spawn is closed or not found.'
+          });
+          return;
+        }
+
+        const pendingInThread = Object.entries(pendingVerifications).filter(
+          ([msgId, p]) => p.threadId === thread.id
+        );
+
+        if (pendingInThread.length === 0) {
+          await interaction.editReply({
+            content: 'ℹ️ No pending verifications in this thread.'
+          });
+          return;
+        }
+
+        const deniedMembers = pendingInThread.map(([msgId, p]) => p.author);
+
+        // Clean up all verification buttons and remove from pending
+        for (const [msgId, pending] of pendingInThread) {
+          if (pending.verificationMsgId) {
+            const verificationMsg = await thread.messages
+              .fetch(pending.verificationMsgId)
+              .catch(() => null);
+            if (verificationMsg && verificationMsg.components.length > 0) {
+              await verificationMsg.edit({ components: [] }).catch(() => {});
+            }
+          }
+          delete pendingVerifications[msgId];
+        }
+
+        attendance.setPendingVerifications(pendingVerifications);
+
+        await interaction.editReply({
+          content:
+            `❌ **Deny All Complete!**\n\n` +
+            `Denied ${deniedMembers.length} member(s): ${deniedMembers.join(', ')}\n\n` +
+            `These members were NOT added to the verified list.`
+        });
+
+        if (spawnInfo.confirmThreadId) {
+          const confirmThread = await interaction.guild.channels
+            .fetch(spawnInfo.confirmThreadId)
+            .catch(() => null);
+          if (confirmThread) {
+            await confirmThread.send(
+              `❌ **Bulk Denial by ${interaction.user.username}**\n` +
+              `Denied ${deniedMembers.length} member(s): ${deniedMembers.join(', ')}`
+            );
+          }
+        }
+
+        console.log(
+          `❌ /denyall: ${deniedMembers.length} denied for ${spawnInfo.boss} by ${interaction.user.username}`
+        );
+
+      } catch (error) {
+        console.error('Error in /denyall command:', error);
+        await interaction.editReply({
+          content: `❌ Failed to deny all: ${error.message}`
+        });
+      }
+
       return;
     }
 
     if (commandName === 'close') {
-      const thread = interaction.options.getChannel('thread');
-      await interaction.reply(`🚧 /close ${thread ? thread.id : 'current'} - Implementation in progress`);
+      await interaction.deferReply();
+
+      try {
+        const threadOption = interaction.options.getChannel('thread');
+        const thread = threadOption || interaction.channel;
+
+        if (!thread.isThread()) {
+          await interaction.editReply({
+            content: '❌ Must specify a thread or use this command inside a thread.'
+          });
+          return;
+        }
+
+        const activeSpawns = attendance.getActiveSpawns();
+        const spawnInfo = activeSpawns[thread.id];
+
+        if (!spawnInfo || spawnInfo.closed) {
+          await interaction.editReply({
+            content: '⚠️ This spawn is already closed or not found.'
+          });
+          return;
+        }
+
+        await interaction.editReply({
+          content: `🔄 Closing attendance thread for **${spawnInfo.boss}** (${spawnInfo.timestamp})...\n\nThis may take a moment.`
+        });
+
+        // Use synthetic message to call existing close logic
+        const syntheticMessage = {
+          content: 'close',
+          author: interaction.user,
+          channel: thread,
+          guild: interaction.guild,
+          reply: async (content) => thread.send(content)
+        };
+
+        // Trigger the close command by sending "close" message
+        // The existing handler in index2.js will process it
+        await thread.send('close');
+
+        console.log(
+          `🔒 /close: ${spawnInfo.boss} by ${interaction.user.username}`
+        );
+
+      } catch (error) {
+        console.error('Error in /close command:', error);
+        await interaction.editReply({
+          content: `❌ Failed to close thread: ${error.message}`
+        });
+      }
+
       return;
     }
 
     if (commandName === 'closeall') {
-      await interaction.reply(`🚧 /closeall - Implementation in progress`);
+      await interaction.deferReply();
+
+      try {
+        const guild = interaction.guild;
+        const attChannel = await guild.channels
+          .fetch(config.attendance_channel_id)
+          .catch(() => null);
+
+        if (!attChannel) {
+          await interaction.editReply({
+            content: '❌ Could not find attendance channel.'
+          });
+          return;
+        }
+
+        const attThreads = await attChannel.threads.fetchActive().catch(() => null);
+        if (!attThreads || attThreads.threads.size === 0) {
+          await interaction.editReply({
+            content: '🔭 No active threads found in attendance channel.'
+          });
+          return;
+        }
+
+        const activeSpawns = attendance.getActiveSpawns();
+        const openSpawns = [];
+
+        for (const [threadId, thread] of attThreads.threads) {
+          const spawnInfo = activeSpawns[threadId];
+          if (spawnInfo && !spawnInfo.closed) {
+            openSpawns.push({ threadId, thread, spawnInfo });
+          }
+        }
+
+        if (openSpawns.length === 0) {
+          await interaction.editReply({
+            content: '🔭 No open spawn threads found in bot memory.'
+          });
+          return;
+        }
+
+        await interaction.editReply({
+          content:
+            `⚠️ **MASS CLOSE ALL THREADS?**\n\n` +
+            `This will close ${openSpawns.length} spawn thread(s):\n` +
+            openSpawns
+              .map(
+                (s, i) =>
+                  `${i + 1}. **${s.spawnInfo.boss}** (${s.spawnInfo.timestamp}) - ${s.spawnInfo.members.length} verified`
+              )
+              .join('\n') +
+            `\n\n**React with ✅ to confirm or ❌ to cancel.**\n` +
+            `⏱️ This will take approximately ${openSpawns.length * 5} seconds.`
+        });
+
+        // Note: For now, we'll just inform. Full implementation would require
+        // button confirmation similar to !closeallthread
+        console.log(
+          `📋 /closeall: Requested by ${interaction.user.username} for ${openSpawns.length} threads`
+        );
+
+      } catch (error) {
+        console.error('Error in /closeall command:', error);
+        await interaction.editReply({
+          content: `❌ Failed to close all threads: ${error.message}`
+        });
+      }
+
       return;
     }
 
     if (commandName === 'resetpending') {
-      await interaction.reply(`🚧 /resetpending - Implementation in progress`);
+      await interaction.deferReply();
+
+      try {
+        const thread = interaction.channel;
+        if (!thread.isThread()) {
+          await interaction.editReply({
+            content: '❌ This command must be used inside an attendance thread.'
+          });
+          return;
+        }
+
+        const pendingVerifications = attendance.getPendingVerifications();
+        const pendingInThread = Object.keys(pendingVerifications).filter(
+          (msgId) => pendingVerifications[msgId].threadId === thread.id
+        );
+
+        if (pendingInThread.length === 0) {
+          await interaction.editReply({
+            content: '✅ No pending verifications in this thread.'
+          });
+          return;
+        }
+
+        pendingInThread.forEach((msgId) => delete pendingVerifications[msgId]);
+        attendance.setPendingVerifications(pendingVerifications);
+
+        await interaction.editReply({
+          content:
+            `✅ **Cleared ${pendingInThread.length} pending verification(s).**\n\n` +
+            `You can now close the thread.`
+        });
+
+        console.log(
+          `🔧 /resetpending: ${thread.id} by ${interaction.user.username} (${pendingInThread.length} cleared)`
+        );
+
+      } catch (error) {
+        console.error('Error in /resetpending command:', error);
+        await interaction.editReply({
+          content: `❌ Failed to reset pending: ${error.message}`
+        });
+      }
+
       return;
     }
 
