@@ -563,34 +563,31 @@ async function setRotation(bossName, newIndex) {
  */
 async function sendRotationUpdateNotification(rotationData) {
   try {
+    // Only notify when it becomes ELYSIUM's turn (not other guilds' turns)
+    if (!rotationData.isNowOurTurn) {
+      return;
+    }
+
     const adminLogsChannelId = config.admin_logs_channel_id;
     if (!adminLogsChannelId) return;
 
     const channel = await client.channels.fetch(adminLogsChannelId);
     if (!channel) return;
 
-    const emoji = rotationData.isNowOurTurn ? '🟢' : '🔴';
-    const status = rotationData.isNowOurTurn ? 'ELYSIUM\'S TURN' : `${rotationData.newGuild}'s turn`;
-
     const embed = new EmbedBuilder()
-      .setColor(rotationData.isNowOurTurn ? 0x00ff00 : 0xff0000)
-      .setTitle(`${emoji} Boss Rotation Updated`)
-      .setDescription(`**${rotationData.bossName}** rotation advanced`)
+      .setColor(0x00ff00)
+      .setTitle(`🟢 Boss Rotation Updated - ELYSIUM's Turn`)
+      .setDescription(`**${rotationData.bossName}** is now ELYSIUM's rotation`)
       .addFields(
         {
-          name: 'Previous',
-          value: `Index ${rotationData.oldIndex} (${rotationData.oldGuild})`,
+          name: 'Previous Guild',
+          value: `${rotationData.oldGuild} (Index ${rotationData.oldIndex})`,
           inline: true
         },
         {
-          name: 'Current',
-          value: `Index ${rotationData.newIndex} (${rotationData.newGuild})`,
+          name: 'Current Guild',
+          value: `ELYSIUM (Index ${rotationData.newIndex})`,
           inline: true
-        },
-        {
-          name: 'Status',
-          value: status,
-          inline: false
         }
       )
       .setTimestamp();

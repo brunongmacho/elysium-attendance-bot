@@ -385,7 +385,13 @@ function getPeakErrorRate(errors) {
  */
 function checkMemoryUsage() {
   const memUsage = process.memoryUsage();
-  const usagePercent = Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100);
+
+  // Use V8's heap limit instead of current allocation for accurate pressure calculation
+  const v8 = require('v8');
+  const heapStats = v8.getHeapStatistics();
+  const heapLimitMB = Math.round(heapStats.heap_size_limit / 1024 / 1024);
+  const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+  const usagePercent = Math.round((heapUsedMB / heapLimitMB) * 100);
 
   if (usagePercent >= ERROR_THRESHOLDS.MEMORY_WARNING_PERCENT) {
     alertHighMemory(usagePercent, memUsage);
