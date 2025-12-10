@@ -864,42 +864,7 @@ function clearAllTimers() {
  * @returns {Promise<Object|null>} Points object or null on failure
  */
 async function fetchPts(url) {
-  // Phase 4: Try MongoDB first if enabled
-  if (FEATURE_FLAGS.USE_MONGODB_BIDDING) {
-    try {
-      const pointsFromMongo = await mongoBiddingCircuit.execute(
-        // Primary operation: MongoDB
-        async () => {
-          const pointsMap = await mongoHelpers.getAllMemberPoints();
-          console.log(`✅ [MongoDB] Fetched ${Object.keys(pointsMap).length} member points`);
-          return pointsMap;
-        },
-        // Fallback operation: Google Sheets
-        FEATURE_FLAGS.MONGODB_FALLBACK_ENABLED ? async () => {
-          console.warn('⚠️ [MongoDB] Fallback to Sheets for points fetch');
-          const result = await sheetAPI.call('getBiddingPointsSummary');
-          return result.points || {};
-        } : null
-      );
-      return pointsFromMongo || {};
-    } catch (e) {
-      console.error("❌ [MongoDB] Fetch pts error:", e);
-      // If both MongoDB and fallback failed, try Sheets directly
-      if (FEATURE_FLAGS.MONGODB_FALLBACK_ENABLED) {
-        console.log('🔄 Final fallback attempt to Sheets...');
-        try {
-          const result = await sheetAPI.call('getBiddingPointsSummary');
-          return result.points || {};
-        } catch (sheetError) {
-          console.error("❌ [Sheets] Fetch pts error:", sheetError);
-          return null;
-        }
-      }
-      return null;
-    }
-  }
-
-  // Legacy path: Use Google Sheets
+  // Use Google Sheets only (MongoDB removed per user request)
   try {
     const result = await sheetAPI.call('getBiddingPointsSummary');
     return result.points || {};
@@ -910,7 +875,7 @@ async function fetchPts(url) {
 }
 
 /**
- * Submits auction results with PARALLEL DUAL-WRITE (MongoDB + Sheets simultaneously)
+ * Submits auction results to Google Sheets
  *
  * RESULT FORMAT:
  * - Array of objects: { member: username, totalSpent: points }
@@ -942,114 +907,28 @@ async function submitRes(url, res, time) {
   if (!time || !res || res.length === 0)
     return { ok: false, err: "Missing data" };
 
-  // Phase 4: PARALLEL DUAL-WRITE to MongoDB + Google Sheets (simultaneous)
-  if (FEATURE_FLAGS.USE_MONGODB_BIDDING) {
-    console.log(`💾 [DUAL-WRITE] Submitting ${res.length} member results to MongoDB + Sheets (parallel)...`);
-    const startTime = Date.now();
+  // Submit to Google Sheets only (MongoDB removed per user request)
+  console.log(`💾 Submitting ${res.length} member results to Google Sheets...`);
+  const startTime = Date.now();
 
-    // Prepare MongoDB save promise
-    const mongoSavePromise = (async () => {
-      try {
-        console.log(`   🔹 [MongoDB] Starting parallel write...`);
-
-        // Update each member's points in MongoDB
-        for (const result of res) {
-          if (result.totalSpent > 0) {
-            try {
-              await mongoHelpers.updateMemberPoints(
-                result.member,
-                -result.totalSpent, // Negative to deduct points
-                `Auction session ${time}`
-              );
-              console.log(`   ✅ [MongoDB] ${result.member}: -${result.totalSpent} points`);
-            } catch (memberError) {
-              console.error(`   ❌ [MongoDB] Failed to update ${result.member}:`, memberError.message);
-              // Continue with other members even if one fails
-            }
-          }
-        }
-
-        console.log(`   ✅ [MongoDB] Points updated successfully`);
-        return { success: true, source: 'MongoDB' };
-      } catch (error) {
-        console.error(`   ❌ [MongoDB] Failed to submit results:`, error.message);
-        return { success: false, source: 'MongoDB', error };
-      }
-    })();
-
-    // Prepare Google Sheets save promise
-    const sheetSavePromise = (async () => {
-      try {
-        console.log(`   🔹 [Sheets] Starting parallel write...`);
-
-        const d = await sheetAPI.call('submitBiddingResults', {
-          results: res,
-          timestamp: time,
-        });
-
-        if (d.status === "ok") {
-          console.log(`   ✅ [Sheets] Results submitted successfully`);
-          return { success: true, source: 'Google Sheets' };
-        } else {
-          return { success: false, source: 'Google Sheets', error: d.message || d.err };
-        }
-      } catch (error) {
-        console.error(`   ❌ [Sheets] Failed to submit results:`, error.message);
-        return { success: false, source: 'Google Sheets', error };
-      }
-    })();
-
-    // Execute both saves in parallel
-    const [mongoResult, sheetResult] = await Promise.all([
-      mongoSavePromise,
-      sheetSavePromise
-    ]);
-
-    const duration = Date.now() - startTime;
-
-    // Determine success and source
-    if (mongoResult.success || sheetResult.success) {
-      const successSources = [
-        mongoResult.success ? 'MongoDB' : null,
-        sheetResult.success ? 'Sheets' : null
-      ].filter(Boolean).join(' + ');
-
-      console.log(`✅ [DUAL-WRITE] Results submitted successfully via ${successSources} (${duration}ms)`);
-
-      // Warn if one failed
-      if (!mongoResult.success) {
-        console.warn(`⚠️ [MongoDB] Write failed, but Sheets succeeded - data saved`);
-      }
-      if (!sheetResult.success) {
-        console.warn(`⚠️ [Sheets] Write failed, but MongoDB succeeded - data saved`);
-      }
-
-      return { ok: true, d: { status: "ok", source: successSources } };
-    } else {
-      // Both failed
-      console.error(`❌ [DUAL-WRITE] BOTH MongoDB AND Sheets failed - results NOT saved!`);
-      return {
-        ok: false,
-        err: `MongoDB: ${mongoResult.error?.message || 'Unknown'}, Sheets: ${sheetResult.error?.message || 'Unknown'}`,
-        res
-      };
-    }
-  }
-
-  // Legacy path: Use Google Sheets only
   try {
     const d = await sheetAPI.call('submitBiddingResults', {
       results: res,
       timestamp: time,
     });
+
+    const duration = Date.now() - startTime;
+
     if (d.status === "ok") {
-      console.log("✅ Submitted");
-      return { ok: true, d };
+      console.log(`✅ [Sheets] Results submitted successfully (${duration}ms)`);
+      return { ok: true, d: { status: "ok", source: 'Google Sheets' } };
+    } else {
+      console.error(`❌ [Sheets] Failed to submit results: ${d.message || d.err}`);
+      return { ok: false, err: d.message || d.err, res };
     }
-    throw new Error(d.message || "Unknown");
-  } catch (e) {
-    console.error(`❌ Submit error:`, e.message);
-    return { ok: false, err: e.message, res };
+  } catch (error) {
+    console.error(`❌ [Sheets] Failed to submit results:`, error.message);
+    return { ok: false, err: error.message, res };
   }
 }
 

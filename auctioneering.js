@@ -432,51 +432,8 @@ const { formatUptime: fmtTime } = require('./utils/common');
  */
 async function fetchSheetItems(url, retries = 3, allowCache = true) {
   // ═══════════════════════════════════════════════════════════════════════════
-  // MONGODB-FIRST PATH (Phase 4)
   // ═══════════════════════════════════════════════════════════════════════════
-  if (USE_MONGODB_AUCTIONEERING) {
-    try {
-      const startTime = Date.now();
-
-      // Fetch from MongoDB
-      const mongoItems = await mongoHelpers.getAuctionQueue();
-
-      const duration = Date.now() - startTime;
-      console.log(
-        `${EMOJI.SUCCESS} [MongoDB] Fetched ${mongoItems.length} auction items in ${duration}ms`
-      );
-
-      // Convert MongoDB format to legacy format for compatibility
-      const items = mongoItems.map(item => ({
-        item: item.itemName,
-        startPrice: item.startPrice,
-        duration: item.duration,
-        quantity: item.quantity || 1,
-        boss: item.boss || 'Unknown',
-        source: item.source || 'MongoDB',
-        _id: item._id,
-        sheetRow: item.sheetRow
-      }));
-
-      // Queue background sync to Sheets (NORMAL priority - 5s delay)
-      sheetSync.queueSync({
-        action: 'syncAuctionQueue',
-        data: { items: mongoItems },
-        priority: sheetSync.SYNC_PRIORITIES.NORMAL
-      });
-
-      return items;
-
-    } catch (error) {
-      console.error(`${EMOJI.ERROR} [MongoDB] Failed to fetch auction items:`, error.message);
-      console.log(`${EMOJI.WARNING} [MongoDB] Falling back to Google Sheets...`);
-
-      // Fall through to Sheets logic below
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // GOOGLE SHEETS PATH (Legacy + Fallback)
+  // GOOGLE SHEETS PATH (MongoDB removed per user request)
   // ═══════════════════════════════════════════════════════════════════════════
 
   // Check circuit breaker - skip if open and use cache
@@ -585,51 +542,7 @@ async function logAuctionResult(
   itemId = null  // MongoDB item ID (optional, for MongoDB operations)
 ) {
   // ═══════════════════════════════════════════════════════════════════════════
-  // MONGODB-FIRST PATH (Phase 4)
-  // ═══════════════════════════════════════════════════════════════════════════
-  if (USE_MONGODB_AUCTIONEERING && itemId) {
-    try {
-      const startTime = Date.now();
-
-      // Mark item as sold in MongoDB
-      await mongoHelpers.markItemAsSold(
-        itemId,
-        { username: winner || 'No winner', userId: winnerId },
-        winningBid || 0
-      );
-
-      const duration = Date.now() - startTime;
-      console.log(
-        `${EMOJI.SUCCESS} [MongoDB] Result logged: ${winner || "No winner"} - ${winningBid}pts (${duration}ms)`
-      );
-
-      // Queue background sync to Sheets (IMMEDIATE priority - auction result)
-      sheetSync.queueSync({
-        action: 'logAuctionResult',
-        data: {
-          itemIndex,
-          winner,
-          winningBid,
-          totalBids,
-          bidCount,
-          itemSource,
-          timestamp
-        },
-        priority: sheetSync.SYNC_PRIORITIES.IMMEDIATE
-      });
-
-      return true;
-
-    } catch (error) {
-      console.error(`${EMOJI.ERROR} [MongoDB] Failed to log auction result:`, error.message);
-      console.log(`${EMOJI.WARNING} [MongoDB] Falling back to Google Sheets...`);
-
-      // Fall through to Sheets logic below
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // GOOGLE SHEETS PATH (Legacy + Fallback)
+  // GOOGLE SHEETS PATH (MongoDB removed per user request)
   // ═══════════════════════════════════════════════════════════════════════════
   try {
     await sheetAPI.call('logAuctionResult', {
@@ -696,37 +609,7 @@ async function saveAuctionState(url) {
   };
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // MONGODB-FIRST PATH (Phase 4)
-  // ═══════════════════════════════════════════════════════════════════════════
-  if (USE_MONGODB_AUCTIONEERING) {
-    try {
-      const startTime = Date.now();
-
-      // Save to MongoDB bot state
-      await mongoHelpers.saveBotState('auction', stateToSave);
-
-      const duration = Date.now() - startTime;
-      console.log(`${EMOJI.SUCCESS} [MongoDB] Auction state saved (${duration}ms)`);
-
-      // Queue background sync to Sheets (HIGH priority - state save)
-      sheetSync.queueSync({
-        action: 'saveBotState',
-        data: { state: stateToSave },
-        priority: sheetSync.SYNC_PRIORITIES.HIGH
-      });
-
-      return true;
-
-    } catch (error) {
-      console.error(`${EMOJI.ERROR} [MongoDB] Failed to save auction state:`, error.message);
-      console.log(`${EMOJI.WARNING} [MongoDB] Falling back to Google Sheets...`);
-
-      // Fall through to Sheets logic below
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // GOOGLE SHEETS PATH (Legacy + Fallback)
+  // GOOGLE SHEETS PATH (MongoDB removed per user request)
   // ═══════════════════════════════════════════════════════════════════════════
   try {
     await sheetAPI.call('saveBotState', { state: stateToSave });
@@ -2831,53 +2714,22 @@ async function handleMyPoints(message, biddingModule, config) {
   let userPts = null;
 
   // ═════════════════════════════════════════════════════════════════════════
-  // MONGODB-FIRST PATH (Phase 4)
+  // GOOGLE SHEETS PATH (MongoDB removed per user request)
   // ═════════════════════════════════════════════════════════════════════════
-  if (USE_MONGODB_BIDDING) {
-    try {
-      const startTime = Date.now();
-      const members = await mongoHelpers.getAllMembers();
-      const duration = Date.now() - startTime;
-      console.log(`${EMOJI.SUCCESS} [MongoDB] Fetched ${members.length} members for !mypoints in ${duration}ms`);
+  try {
+    const data = await sheetAPI.call('getBiddingPoints');
+    freshPts = data.points || {};
 
-      // Find user by username (case-insensitive)
-      const member = members.find(m =>
-        m.username.toLowerCase() === u.toLowerCase()
-      );
-
-      if (member) {
-        userPts = member.pointsAvailable || 0;
-      } else {
-        // User not found
-        userPts = null;
-      }
-
-    } catch (error) {
-      console.error(`${EMOJI.ERROR} [MongoDB] Failed to fetch points for !mypoints:`, error.message);
-      console.log(`${EMOJI.WARNING} [MongoDB] Falling back to Google Sheets...`);
-      // Fall through to Sheets logic below
-    }
-  }
-
-  // ═════════════════════════════════════════════════════════════════════════
-  // GOOGLE SHEETS PATH (Fallback or when MongoDB disabled)
-  // ═════════════════════════════════════════════════════════════════════════
-  if (!USE_MONGODB_BIDDING || userPts === undefined) {
-    try {
-      const data = await sheetAPI.call('getBiddingPoints');
-      freshPts = data.points || {};
-
-      // Use PointsCache for efficient O(1) lookup
-      const ptsCache = new PointsCache(freshPts);
-      userPts = ptsCache.getPoints(u);
-      if (userPts === 0 && !ptsCache.hasUser(u)) {
-        // User not found in system
-        userPts = null;
-      }
-    } catch (err) {
-      console.error(`❌ Failed to fetch points for !mypoints:`, err.message);
+    // Use PointsCache for efficient O(1) lookup
+    const ptsCache = new PointsCache(freshPts);
+    userPts = ptsCache.getPoints(u);
+    if (userPts === 0 && !ptsCache.hasUser(u)) {
+      // User not found in system
       userPts = null;
     }
+  } catch (err) {
+    console.error(`❌ Failed to fetch points for !mypoints:`, err.message);
+    userPts = null;
   }
 
   let ptsMsg;
