@@ -331,41 +331,6 @@ function generateAuctionCommands(biddingChannelName = 'bidding') {
           description: 'Start an auction session manually'
         },
         {
-          name: 'pause',
-          type: ApplicationCommandOptionType.Subcommand,
-          description: 'Pause the current auction (use in thread)'
-        },
-        {
-          name: 'resume',
-          type: ApplicationCommandOptionType.Subcommand,
-          description: 'Resume a paused auction (use in thread)'
-        },
-        {
-          name: 'extend',
-          type: ApplicationCommandOptionType.Subcommand,
-          description: 'Add time to current auction item (use in thread)',
-          options: [
-            {
-              name: 'minutes',
-              type: ApplicationCommandOptionType.Integer,
-              description: 'Minutes to add',
-              required: true,
-              min_value: 1,
-              max_value: 60
-            }
-          ]
-        },
-        {
-          name: 'skip',
-          type: ApplicationCommandOptionType.Subcommand,
-          description: 'Skip current item with point refund'
-        },
-        {
-          name: 'cancel',
-          type: ApplicationCommandOptionType.Subcommand,
-          description: 'Cancel current item with point refund'
-        },
-        {
           name: 'forceend',
           type: ApplicationCommandOptionType.Subcommand,
           description: 'Emergency auction termination (force submit results)'
@@ -373,71 +338,18 @@ function generateAuctionCommands(biddingChannelName = 'bidding') {
       ]
     },
 
-    // /queue subcommands - Admin commands
+    // /queue subcommand - View queue only (items managed in Google Sheets)
     {
       name: 'queue',
-      description: `Manage auction queue ${channelContext}`,
-      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
+      description: `View auction queue ${channelContext}`,
       dm_permission: false,
       options: [
-        {
-          name: 'add',
-          type: ApplicationCommandOptionType.Subcommand,
-          description: 'Add item to auction queue',
-          options: [
-            {
-              name: 'item',
-              type: ApplicationCommandOptionType.String,
-              description: 'Item name',
-              required: true
-            },
-            {
-              name: 'min_bid',
-              type: ApplicationCommandOptionType.Integer,
-              description: 'Minimum bid (optional)',
-              required: false,
-              min_value: 0
-            }
-          ]
-        },
-        {
-          name: 'remove',
-          type: ApplicationCommandOptionType.Subcommand,
-          description: 'Remove item from auction queue',
-          options: [
-            {
-              name: 'item',
-              type: ApplicationCommandOptionType.String,
-              description: 'Item name to remove',
-              required: true
-            }
-          ]
-        },
         {
           name: 'list',
           type: ApplicationCommandOptionType.Subcommand,
           description: 'Show current auction queue'
-        },
-        {
-          name: 'clear',
-          type: ApplicationCommandOptionType.Subcommand,
-          description: 'Clear entire auction queue'
         }
       ]
-    },
-
-    // /bidstatus command - Anyone can use
-    {
-      name: 'bidstatus',
-      description: `Show current auction status ${channelContext}`,
-      dm_permission: false
-    },
-
-    // /mypoints command - ELYSIUM members only
-    {
-      name: 'mypoints',
-      description: `Check your bidding points ${channelContext}`,
-      dm_permission: false
     }
   ];
 }

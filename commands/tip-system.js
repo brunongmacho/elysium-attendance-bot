@@ -106,18 +106,6 @@ const commandTipMapping = {
     slash: '/bid',
     benefit: 'faster bidding in threads'
   },
-  '!bidstatus': {
-    slash: '/bidstatus',
-    benefit: 'cleaner auction status display'
-  },
-  '!mypoints': {
-    slash: '/mypoints',
-    benefit: 'cleaner points display'
-  },
-  '!mp': {
-    slash: '/mypoints',
-    benefit: 'cleaner points display'
-  },
   '!startauction': {
     slash: '/auction start',
     benefit: 'cleaner interface'
@@ -125,18 +113,6 @@ const commandTipMapping = {
   '!queuelist': {
     slash: '/queue list',
     benefit: 'cleaner queue display'
-  },
-  '!additem': {
-    slash: '/queue add',
-    benefit: 'cleaner interface with validation'
-  },
-  '!removeitem': {
-    slash: '/queue remove',
-    benefit: 'cleaner interface'
-  },
-  '!clearqueue': {
-    slash: '/queue clear',
-    benefit: 'cleaner interface with confirmation'
   },
 };
 
