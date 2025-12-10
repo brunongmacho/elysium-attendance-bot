@@ -580,6 +580,66 @@ async function handleSlashCommand(interaction, modules, config, client) {
     }
 
     // =========================================================================
+    // ATTENDANCE OVERRIDE COMMANDS
+    // =========================================================================
+
+    // /openthread command - Reopen closed attendance thread
+    if (commandName === 'openthread') {
+      await interaction.deferReply();
+
+      // Create synthetic message object to reuse existing !openthread handler
+      const syntheticMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        content: '!openthread',
+        mentions: { members: new Map() },
+        reply: async (content) => {
+          if (typeof content === 'string') {
+            return await interaction.editReply({ content });
+          } else if (content.embeds) {
+            return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+          } else {
+            return await interaction.editReply(content);
+          }
+        }
+      };
+
+      const { commandHandlers } = require('../index2.js');
+      await commandHandlers.openthread(syntheticMessage, interaction.member);
+      return;
+    }
+
+    // /overrideclose command - Close and overwrite attendance
+    if (commandName === 'overrideclose') {
+      await interaction.deferReply();
+
+      // Create synthetic message object to reuse existing !overrideclose handler
+      const syntheticMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        content: '!overrideclose',
+        mentions: { members: new Map() },
+        reply: async (content) => {
+          if (typeof content === 'string') {
+            return await interaction.editReply({ content });
+          } else if (content.embeds) {
+            return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+          } else {
+            return await interaction.editReply(content);
+          }
+        }
+      };
+
+      const { commandHandlers } = require('../index2.js');
+      await commandHandlers.overrideclose(syntheticMessage, interaction.member);
+      return;
+    }
+
+    // =========================================================================
     // BOSS TIMER COMMANDS
     // =========================================================================
 

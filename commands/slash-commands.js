@@ -103,6 +103,31 @@ function generateAttendanceCommands(attendanceChannelName = 'attendance channel'
 }
 
 /**
+ * Generate attendance override commands
+ *
+ * @param {string} attendanceChannelName - Name of attendance channel (e.g., "attendance")
+ * @returns {Array} Attendance override command definitions
+ */
+function generateAttendanceOverrideCommands(attendanceChannelName = 'attendance channel') {
+  const threadContext = `(use inside #${attendanceChannelName} threads)`;
+
+  return [
+    {
+      name: 'openthread',
+      description: `Reopen a closed attendance thread for manual corrections ${threadContext}`,
+      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
+      dm_permission: false
+    },
+    {
+      name: 'overrideclose',
+      description: `Close thread and overwrite existing attendance data ${threadContext}`,
+      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
+      dm_permission: false
+    }
+  ];
+}
+
+/**
  * Generate boss timer commands with dynamic channel names
  *
  * @param {string} bossTimerChannelName - Name of boss timer channel (e.g., "boss-timer")
@@ -406,6 +431,7 @@ function generateAllCommands(channelNames = {}) {
   const { attendance = 'attendance', bossTimer = 'boss-timer', bidding = 'bidding' } = channelNames;
 
   const attendanceCommands = generateAttendanceCommands(attendance);
+  const attendanceOverrideCommands = generateAttendanceOverrideCommands(attendance);
   const bossTimerCommands = generateBossTimerCommands(bossTimer);
   const rotationCommands = generateRotationCommands();
   const auctionCommands = generateAuctionCommands(bidding);
@@ -413,12 +439,14 @@ function generateAllCommands(channelNames = {}) {
 
   return {
     attendanceCommands,
+    attendanceOverrideCommands,
     bossTimerCommands,
     rotationCommands,
     auctionCommands,
     statsCommands,
     allCommands: [
       ...attendanceCommands,
+      ...attendanceOverrideCommands,
       ...bossTimerCommands,
       ...rotationCommands,
       ...auctionCommands,
@@ -430,6 +458,7 @@ function generateAllCommands(channelNames = {}) {
 module.exports = {
   generateAllCommands,
   generateAttendanceCommands,
+  generateAttendanceOverrideCommands,
   generateBossTimerCommands,
   generateRotationCommands,
   generateAuctionCommands,

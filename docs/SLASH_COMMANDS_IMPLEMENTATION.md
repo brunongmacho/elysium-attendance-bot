@@ -1,8 +1,8 @@
 # ELYSIUM Guild Bot - Slash Commands Implementation Plan
 
-**Version:** 4.0
+**Version:** 4.1
 **Date:** 2025-12-10
-**Status:** Implementation Complete ✅ (Phase 1-3 deployed, Phase 4 skipped)
+**Status:** Implementation Complete ✅ (Phase 1-3 + Attendance Overrides deployed, Phase 4 skipped)
 
 ---
 
@@ -213,6 +213,64 @@ All 3 commands implemented, tested, and operational.
 
 ---
 
+## Attendance Override Commands (Added 2025-12-10)
+
+### ✅ What Was Completed
+
+**Date Completed:** 2025-12-10
+
+**Systems Implemented:**
+- ✅ **Attendance Override System** (2 commands) - Error recovery and manual corrections
+
+**Total Commands Implemented:** 2 slash commands
+
+### 🎯 Key Achievements
+
+1. **Thread Reopening:**
+   - `/openthread` - Reopen a closed attendance thread for manual corrections
+     - Must be used inside an attendance thread
+     - Unarchives and unlocks the thread
+     - Re-registers the spawn in bot memory
+     - Loads existing members from MongoDB
+     - Re-queues all check-in messages as pending verifications
+     - Requires confirmation before execution
+     - Admin-only command
+
+2. **Override Close:**
+   - `/overrideclose` - Close thread and overwrite existing attendance data
+     - Must be used in a thread that's in bot memory
+     - Auto-verifies all pending check-ins before closing
+     - Always uses `overwriteAttendance` action (handles both new and existing columns)
+     - Shows warning if column already exists
+     - Skips rotation increment if thread was reopened (fixing attendance, not a new kill)
+     - Requires confirmation before execution
+     - Admin-only command
+
+3. **Use Cases:**
+   - Fixing attendance errors after a thread was closed
+   - Correcting member verifications
+   - Resubmitting attendance with manual adjustments
+   - Frequently used commands for attendance error recovery
+
+### 📝 Implementation Details
+
+**Commands added to:**
+- `commands/slash-commands.js` - Added `generateAttendanceOverrideCommands()`
+- `commands/handlers.js` - Added handlers using synthetic message pattern
+- `commands/tip-system.js` - Added tip mappings for both commands
+
+**Handler implementation:**
+- Both commands use the synthetic message pattern to reuse existing `!openthread` and `!overrideclose` handlers
+- No parameters required (context-based commands that work on current thread)
+- Admin-only permissions enforced
+- Dynamic channel names in descriptions
+
+**Attendance Override Commands are 100% Complete! ✅**
+
+All 2 commands implemented and operational. Frequently used for fixing attendance errors.
+
+---
+
 ## Overview
 
 ### Goals
@@ -236,11 +294,12 @@ Implement Discord slash commands alongside existing `!` prefix commands to provi
 **Original Plan:**
 - **~50 slash commands** across 6 major systems
 
-**Actual Implementation (Phase 1-3):**
-- **27 slash commands** across 5 major systems (simplified from original plan)
+**Actual Implementation (Phase 1-3 + Attendance Overrides):**
+- **29 slash commands** across 5 major systems (simplified from original plan)
   - Phase 1: 20 commands (Boss Timer, Rotation, Attendance)
   - Phase 2: 4 commands (Auction - simplified)
   - Phase 3: 3 commands (Stats & Reports - focused on essentials)
+  - Attendance Overrides: 2 commands (Error recovery tools - frequently used)
 - **Full autocomplete** for boss names (36 bosses), pending members, and MongoDB member lookup
 - **Subcommand grouping** for related operations (`/rotation`, `/auction`, `/queue`)
 - **Permission parity** with existing `!` commands
@@ -435,6 +494,22 @@ Implement Discord slash commands alongside existing `!` prefix commands to provi
 - **Permissions:** Admin only
 - **Channel:** Admin Logs
 - **Equivalent:** `!resetpending`
+
+#### `/openthread`
+- **Description:** Reopen a closed attendance thread for manual corrections
+- **Options:** None (context-based - works on current thread)
+- **Permissions:** Admin only
+- **Channel:** Attendance threads
+- **Equivalent:** `!openthread`
+- **Notes:** Unarchives thread, re-registers spawn, loads members from MongoDB, re-queues check-ins
+
+#### `/overrideclose`
+- **Description:** Close thread and overwrite existing attendance data
+- **Options:** None (context-based - works on current thread)
+- **Permissions:** Admin only
+- **Channel:** Attendance threads
+- **Equivalent:** `!overrideclose`
+- **Notes:** Auto-verifies pending, always overwrites, skips rotation if thread was reopened
 
 ---
 
@@ -1736,26 +1811,28 @@ SLASH COMMANDS (with autocomplete):
 
 ## Implementation Complete! 🎉
 
-**Phase 1-3 Completion Summary:**
+**Phase 1-3 + Attendance Overrides Completion Summary:**
 1. ✅ Phase 1: Boss Timer, Rotation, Attendance (20 commands)
 2. ✅ Phase 2: Auction System (4 commands - simplified)
 3. ✅ Phase 3: Stats & Reports (3 commands)
-4. ✅ MongoDB autocomplete integration for `/stats`
-5. ✅ All systems tested and operational
-6. ✅ Zero breaking changes to existing `!` commands
-7. ✅ Tip system tracking slash command adoption
-8. ⏭️ Phase 4: Skipped (dangerous admin tools stay as `!` commands)
+4. ✅ Attendance Overrides: Error recovery tools (2 commands - frequently used)
+5. ✅ MongoDB autocomplete integration for `/stats`
+6. ✅ All systems tested and operational
+7. ✅ Zero breaking changes to existing `!` commands
+8. ✅ Tip system tracking slash command adoption
+9. ⏭️ Phase 4: Skipped (dangerous admin tools stay as `!` commands)
 
-**Total Implemented:** 27 slash commands across 5 major systems
+**Total Implemented:** 29 slash commands across 5 major systems
 
 ---
 
 ## Final Command Breakdown
 
-### ✅ Slash Commands (27 total)
+### ✅ Slash Commands (29 total)
 - **Boss Timer:** 9 commands (`/killed`, `/spawned`, `/nextspawn`, etc.)
 - **Boss Rotation:** 4 subcommands (`/rotation status/set/increment/refresh`)
-- **Attendance:** 7 commands (`/verify`, `/deny`, `/verifyall`, etc.)
+- **Attendance:** 7 commands (`/verify`, `/deny`, `/verifyall`, `/close`, `/closeall`, `/resetpending`)
+- **Attendance Overrides:** 2 commands (`/openthread`, `/overrideclose`)
 - **Auction:** 4 commands (`/bid`, `/auction start/forceend`, `/queue list`)
 - **Stats & Reports:** 3 commands (`/stats`, `/weekly`, `/monthly`)
 
@@ -1770,10 +1847,11 @@ SLASH COMMANDS (with autocomplete):
 
 ## Success Metrics
 
-**Coverage:** 27 slash commands cover ~95% of daily guild operations
-- ✅ All high-frequency commands migrated
+**Coverage:** 29 slash commands cover ~95% of daily guild operations
+- ✅ All high-frequency commands migrated (including attendance error recovery)
 - ✅ All member-facing commands available as slash
 - ✅ All mobile-critical admin commands available
+- ✅ Frequently-used attendance override tools implemented
 - ⏭️ Dangerous admin tools intentionally kept as prefix only
 
 **Adoption Strategy:**
@@ -1813,6 +1891,6 @@ SLASH COMMANDS (with autocomplete):
 
 ---
 
-**Document Version:** 4.0
+**Document Version:** 4.1
 **Last Updated:** 2025-12-10
-**Status:** Implementation Complete ✅ - 27 slash commands operational | Phase 4 skipped for safety
+**Status:** Implementation Complete ✅ - 29 slash commands operational | Phase 4 skipped for safety

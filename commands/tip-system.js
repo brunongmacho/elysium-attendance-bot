@@ -96,6 +96,14 @@ const commandTipMapping = {
     slash: '/resetpending',
     benefit: 'cleaner interface'
   },
+  '!openthread': {
+    slash: '/openthread',
+    benefit: 'cleaner interface for fixing attendance errors'
+  },
+  '!overrideclose': {
+    slash: '/overrideclose',
+    benefit: 'cleaner interface for column overwrites'
+  },
 
   // Auction/Bidding Commands
   '!bid': {
