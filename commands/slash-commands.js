@@ -355,6 +355,45 @@ function generateAuctionCommands(biddingChannelName = 'bidding') {
 }
 
 /**
+ * Generate stats and reports commands
+ *
+ * @returns {Array} Stats command definitions
+ */
+function generateStatsCommands() {
+  return [
+    // /stats command - Member statistics lookup
+    {
+      name: 'stats',
+      description: 'View member statistics (attendance, points, activity)',
+      dm_permission: false,
+      options: [
+        {
+          name: 'member',
+          type: ApplicationCommandOptionType.String,
+          description: 'Member to lookup (leave empty for yourself)',
+          required: false,
+          autocomplete: true
+        }
+      ]
+    },
+
+    // /weekly command - Weekly report
+    {
+      name: 'weekly',
+      description: 'Generate weekly activity report',
+      dm_permission: false
+    },
+
+    // /monthly command - Monthly report
+    {
+      name: 'monthly',
+      description: 'Generate monthly activity report',
+      dm_permission: false
+    }
+  ];
+}
+
+/**
  * Generate all commands with dynamic channel names
  *
  * @param {Object} channelNames - Object containing channel names
@@ -370,17 +409,20 @@ function generateAllCommands(channelNames = {}) {
   const bossTimerCommands = generateBossTimerCommands(bossTimer);
   const rotationCommands = generateRotationCommands();
   const auctionCommands = generateAuctionCommands(bidding);
+  const statsCommands = generateStatsCommands();
 
   return {
     attendanceCommands,
     bossTimerCommands,
     rotationCommands,
     auctionCommands,
+    statsCommands,
     allCommands: [
       ...attendanceCommands,
       ...bossTimerCommands,
       ...rotationCommands,
-      ...auctionCommands
+      ...auctionCommands,
+      ...statsCommands
     ]
   };
 }
@@ -390,5 +432,6 @@ module.exports = {
   generateAttendanceCommands,
   generateBossTimerCommands,
   generateRotationCommands,
-  generateAuctionCommands
+  generateAuctionCommands,
+  generateStatsCommands
 };

@@ -145,6 +145,57 @@ function getPendingMembers(attendance, focusedValue) {
 }
 
 /**
+ * Get guild members for autocomplete (for stats command)
+ *
+ * @param {Guild} guild - Discord guild
+ * @param {string} focusedValue - User's current input
+ * @returns {Array} Array of autocomplete choices
+ */
+function getGuildMembers(guild, focusedValue) {
+  if (!guild) return [];
+
+  const lowerInput = focusedValue.toLowerCase();
+
+  // Get all members from cache
+  const members = Array.from(guild.members.cache.values())
+    .filter(member => !member.user.bot) // Exclude bots
+    .map(member => ({
+      displayName: member.displayName,
+      username: member.user.username
+    }));
+
+  // Filter by user input
+  const filtered = members
+    .filter(m =>
+      m.displayName.toLowerCase().includes(lowerInput) ||
+      m.username.toLowerCase().includes(lowerInput)
+    )
+    .sort((a, b) => {
+      // Exact match first
+      const aExact = a.displayName.toLowerCase() === lowerInput;
+      const bExact = b.displayName.toLowerCase() === lowerInput;
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
+
+      // Then by starts with
+      const aStarts = a.displayName.toLowerCase().startsWith(lowerInput);
+      const bStarts = b.displayName.toLowerCase().startsWith(lowerInput);
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+
+      // Then alphabetically
+      return a.displayName.localeCompare(b.displayName);
+    })
+    .slice(0, 25)
+    .map(m => ({
+      name: m.displayName,
+      value: m.displayName
+    }));
+
+  return filtered;
+}
+
+/**
  * Main autocomplete handler
  *
  * @param {AutocompleteInteraction} interaction - Discord autocomplete interaction
@@ -188,6 +239,14 @@ async function handleAutocomplete(interaction, attendance, bossRotation = null) 
       choices = getPendingMembers(attendance, focusedValue);
     }
 
+    // Guild member autocomplete (for stats command)
+    else if (
+      commandName === 'stats' &&
+      focusedOption.name === 'member'
+    ) {
+      choices = getGuildMembers(interaction.guild, focusedValue);
+    }
+
     await interaction.respond(choices);
 
   } catch (error) {
@@ -202,5 +261,6 @@ module.exports = {
   getAllBossNames,
   getRotationBossNames,
   filterBossNames,
-  getPendingMembers
+  getPendingMembers,
+  getGuildMembers
 };

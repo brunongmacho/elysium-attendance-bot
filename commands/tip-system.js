@@ -114,6 +114,20 @@ const commandTipMapping = {
     slash: '/queue list',
     benefit: 'cleaner queue display'
   },
+
+  // Stats & Reports Commands
+  '!stats': {
+    slash: '/stats',
+    benefit: 'member autocomplete for easy lookup'
+  },
+  '!weekly': {
+    slash: '/weekly',
+    benefit: 'cleaner interface'
+  },
+  '!monthly': {
+    slash: '/monthly',
+    benefit: 'cleaner interface'
+  },
 };
 
 /**

@@ -1204,6 +1204,95 @@ async function handleSlashCommand(interaction, modules, config, client) {
       }
     }
 
+    // =========================================================================
+    // STATS & REPORTS COMMANDS
+    // =========================================================================
+
+    // /stats command - Member statistics lookup
+    if (commandName === 'stats') {
+      const memberOption = interaction.options.getString('member');
+
+      // Build args array for stats command
+      const args = memberOption ? memberOption.split(' ') : [];
+
+      const syntheticMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        content: memberOption ? `!stats ${memberOption}` : '!stats',
+        mentions: { members: new Map() }, // Empty mentions map
+        reply: async (content) => {
+          if (typeof content === 'string') {
+            return await interaction.editReply({ content });
+          } else if (content.embeds) {
+            return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+          } else {
+            return await interaction.editReply(content);
+          }
+        }
+      };
+
+      await interaction.deferReply();
+
+      // Call stats handler from index2
+      const { commandHandlers } = require('../index2.js');
+      await commandHandlers.stats(syntheticMessage, interaction.member, args);
+      return;
+    }
+
+    // /weekly command - Weekly report
+    if (commandName === 'weekly') {
+      const syntheticMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        content: '!weekly',
+        reply: async (content) => {
+          if (typeof content === 'string') {
+            return await interaction.editReply({ content });
+          } else if (content.embeds) {
+            return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+          } else {
+            return await interaction.editReply(content);
+          }
+        }
+      };
+
+      await interaction.deferReply();
+
+      const { commandHandlers } = require('../index2.js');
+      await commandHandlers.weekly(syntheticMessage, interaction.member);
+      return;
+    }
+
+    // /monthly command - Monthly report
+    if (commandName === 'monthly') {
+      const syntheticMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        content: '!monthly',
+        reply: async (content) => {
+          if (typeof content === 'string') {
+            return await interaction.editReply({ content });
+          } else if (content.embeds) {
+            return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+          } else {
+            return await interaction.editReply(content);
+          }
+        }
+      };
+
+      await interaction.deferReply();
+
+      const { commandHandlers } = require('../index2.js');
+      await commandHandlers.monthly(syntheticMessage, interaction.member);
+      return;
+    }
+
     // Unknown command
     await interaction.reply({
       content: '❌ Unknown command',
