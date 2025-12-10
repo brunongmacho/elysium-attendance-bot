@@ -410,14 +410,25 @@ async function handleSlashCommand(interaction, modules, config, client) {
                 // Silently continue without spawn info
               }
 
-              const guildCount = rotation.guilds ? rotation.guilds.length : 5;
-              const nextGuild = rotation.guilds
-                ? rotation.guilds[rotation.currentIndex % guildCount]
-                : (rotation.nextGuild || rotation.currentGuild || 'Unknown');
+              // Handle guilds array - check if it's empty or missing
+              const hasGuilds = rotation.guilds && Array.isArray(rotation.guilds) && rotation.guilds.length > 0;
+              const guildCount = hasGuilds ? rotation.guilds.length : 5;
+
+              let nextGuild = 'Unknown';
+              if (hasGuilds && rotation.guilds[rotation.currentIndex % guildCount]) {
+                nextGuild = rotation.guilds[rotation.currentIndex % guildCount];
+              } else if (rotation.nextGuild) {
+                nextGuild = rotation.nextGuild;
+              } else if (rotation.currentGuild) {
+                nextGuild = rotation.currentGuild;
+              }
+
+              // Show warning if guilds data is incomplete
+              const dataWarning = !hasGuilds ? '\n⚠️ Guild list incomplete in sheet' : '';
 
               embed.addFields({
                 name: `${emoji} ${boss}`,
-                value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**\nNext: ${nextGuild}${spawnInfo}`,
+                value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**\nNext: ${nextGuild}${spawnInfo}${dataWarning}`,
                 inline: false
               });
             }
@@ -568,11 +579,17 @@ async function handleSlashCommand(interaction, modules, config, client) {
             if (rotation) {
               const emoji = rotation.isOurTurn ? '🟢' : '🔴';
               const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
-              const guildCount = rotation.guilds ? rotation.guilds.length : 5;
+
+              // Handle guilds array - check if it's empty or missing
+              const hasGuilds = rotation.guilds && Array.isArray(rotation.guilds) && rotation.guilds.length > 0;
+              const guildCount = hasGuilds ? rotation.guilds.length : 5;
+
+              // Show warning if guilds data is incomplete
+              const dataWarning = !hasGuilds ? ' ⚠️ (incomplete)' : '';
 
               embed.addFields({
                 name: `${emoji} ${boss}`,
-                value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**`,
+                value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**${dataWarning}`,
                 inline: false
               });
             }
