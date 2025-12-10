@@ -6902,7 +6902,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         attendance,
         bossTimer,
         bossTimerCommands,
-        bossRotation
+        bossRotation,
+        bidding,
+        auctioneering
       };
 
       await handleSlashCommand(interaction, modules, config, client);

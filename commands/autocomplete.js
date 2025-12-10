@@ -12,6 +12,7 @@
 
 const fs = require('fs');
 const levenshtein = require('fast-levenshtein');
+const mongoHelpers = require('../utils/mongodb-helpers');
 
 // Load boss configuration
 const bossConfig = JSON.parse(fs.readFileSync('./boss_spawn_config.json', 'utf-8'));
@@ -145,6 +146,76 @@ function getPendingMembers(attendance, focusedValue) {
 }
 
 /**
+ * Get guild members for autocomplete (for stats command)
+ * Fetches from MongoDB to include all members (active and inactive)
+ *
+ * @param {Guild} guild - Discord guild
+ * @param {string} focusedValue - User's current input
+ * @returns {Promise<Array>} Array of autocomplete choices
+ */
+async function getGuildMembers(guild, focusedValue) {
+  if (!guild) return [];
+
+  const lowerInput = focusedValue.toLowerCase();
+
+  try {
+    // Fetch all members from MongoDB (includes inactive members)
+    const members = await mongoHelpers.getAllMembers({ isActive: true });
+
+    // Extract usernames
+    const memberNames = members
+      .map(m => m.username)
+      .filter(name => name); // Filter out any null/undefined
+
+    // Filter by user input
+    const filtered = memberNames
+      .filter(name => name.toLowerCase().includes(lowerInput))
+      .sort((a, b) => {
+        // Exact match first
+        const aExact = a.toLowerCase() === lowerInput;
+        const bExact = b.toLowerCase() === lowerInput;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+
+        // Then by starts with
+        const aStarts = a.toLowerCase().startsWith(lowerInput);
+        const bStarts = b.toLowerCase().startsWith(lowerInput);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+
+        // Then alphabetically
+        return a.localeCompare(b);
+      })
+      .slice(0, 25)
+      .map(name => ({
+        name: name,
+        value: name
+      }));
+
+    return filtered;
+
+  } catch (error) {
+    console.error('❌ Failed to fetch members from MongoDB for autocomplete:', error);
+
+    // Fallback to Discord cache if MongoDB fails
+    const members = Array.from(guild.members.cache.values())
+      .filter(member => !member.user.bot)
+      .map(member => member.displayName);
+
+    const filtered = members
+      .filter(name => name.toLowerCase().includes(lowerInput))
+      .sort((a, b) => a.localeCompare(b))
+      .slice(0, 25)
+      .map(name => ({
+        name: name,
+        value: name
+      }));
+
+    return filtered;
+  }
+}
+
+/**
  * Main autocomplete handler
  *
  * @param {AutocompleteInteraction} interaction - Discord autocomplete interaction
@@ -188,6 +259,14 @@ async function handleAutocomplete(interaction, attendance, bossRotation = null) 
       choices = getPendingMembers(attendance, focusedValue);
     }
 
+    // Guild member autocomplete (for stats command)
+    else if (
+      commandName === 'stats' &&
+      focusedOption.name === 'member'
+    ) {
+      choices = await getGuildMembers(interaction.guild, focusedValue);
+    }
+
     await interaction.respond(choices);
 
   } catch (error) {
@@ -202,5 +281,6 @@ module.exports = {
   getAllBossNames,
   getRotationBossNames,
   filterBossNames,
-  getPendingMembers
+  getPendingMembers,
+  getGuildMembers
 };

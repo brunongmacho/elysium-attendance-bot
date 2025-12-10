@@ -96,6 +96,46 @@ const commandTipMapping = {
     slash: '/resetpending',
     benefit: 'cleaner interface'
   },
+  '!openthread': {
+    slash: '/openthread',
+    benefit: 'cleaner interface for fixing attendance errors'
+  },
+  '!overrideclose': {
+    slash: '/overrideclose',
+    benefit: 'cleaner interface for column overwrites'
+  },
+
+  // Auction/Bidding Commands
+  '!bid': {
+    slash: '/bid',
+    benefit: 'faster bidding in threads'
+  },
+  '!b': {
+    slash: '/bid',
+    benefit: 'faster bidding in threads'
+  },
+  '!startauction': {
+    slash: '/auction start',
+    benefit: 'cleaner interface'
+  },
+  '!queuelist': {
+    slash: '/queue list',
+    benefit: 'cleaner queue display'
+  },
+
+  // Stats & Reports Commands
+  '!stats': {
+    slash: '/stats',
+    benefit: 'member autocomplete for easy lookup'
+  },
+  '!weekly': {
+    slash: '/weekly',
+    benefit: 'cleaner interface'
+  },
+  '!monthly': {
+    slash: '/monthly',
+    benefit: 'cleaner interface'
+  },
 };
 
 /**

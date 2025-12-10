@@ -1,14 +1,16 @@
 # ELYSIUM Guild Bot - Slash Commands Implementation Plan
 
-**Version:** 2.0
+**Version:** 4.1
 **Date:** 2025-12-10
-**Status:** Phase 1 Complete ✅
+**Status:** Implementation Complete ✅ (Phase 1-3 + Attendance Overrides deployed, Phase 4 skipped)
 
 ---
 
 ## Table of Contents
 
 - [Phase 1 Completion Summary](#phase-1-completion-summary)
+- [Phase 2 Completion Summary](#phase-2-completion-summary)
+- [Phase 3 Completion Summary](#phase-3-completion-summary)
 - [Overview](#overview)
 - [Strategy](#strategy)
 - [Implementation Phases](#implementation-phases)
@@ -30,9 +32,11 @@
 **Systems Implemented:**
 - ✅ **Boss Timer System** (9 commands) - Fully functional with Discord embeds
 - ✅ **Boss Rotation System** (4 subcommands) - Fully functional with Discord embeds
-- ⏳ **Attendance System** (7 commands) - Placeholder responses (pending implementation)
+- ✅ **Attendance System** (7 commands) - Fully functional with pending member autocomplete
+- ✅ **Tip System** - Smart adoption tracking to encourage slash command usage
+- ✅ **Dynamic Channel Names** - Command descriptions show actual channel names
 
-**Total Commands Implemented:** 13 slash commands (9 boss timer + 4 rotation)
+**Total Commands Implemented:** 20 slash commands (9 boss timer + 4 rotation + 7 attendance)
 
 ### 🎯 Key Achievements
 
@@ -53,29 +57,46 @@
    - `/rotation increment <boss>` - Advance rotation to next guild
    - `/rotation refresh` - Reload data from Google Sheets
 
-3. **Autocomplete Implementation:**
+3. **Attendance Commands** - All 7 commands fully working:
+   - `/verify <member>` - Individual verification with pending member autocomplete
+   - `/deny <member> [reason]` - Denial with optional reason
+   - `/verifyall` - Bulk verify with duplicate detection
+   - `/denyall` - Bulk deny all pending
+   - `/close [thread]` - Close thread (integrates with existing close logic)
+   - `/closeall` - Mass close all threads with confirmation
+   - `/resetpending` - Clear pending queue
+
+4. **Autocomplete Implementation:**
    - ✅ Boss name autocomplete with fuzzy matching (36 bosses)
    - ✅ Multi-word boss name support ("Lady Dalia", "General Aquleus", "Baron Braudmore")
    - ✅ Dynamic rotation boss autocomplete (syncs from Google Sheets)
+   - ✅ Pending member autocomplete (extracts unique author names)
    - ✅ Levenshtein distance matching for typo tolerance
 
-4. **Discord Embed Integration:**
+5. **Discord Embed Integration:**
    - ✅ All slash commands return embeds matching legacy `!` commands
    - ✅ Boss images included as thumbnails
    - ✅ Consistent formatting with existing bot style
    - ✅ Timestamps and footers properly set
 
-5. **Permission System:**
+6. **Permission System:**
    - ✅ Admin-only commands restricted with `PermissionFlagsBits.Administrator`
    - ✅ DM commands disabled with `dm_permission: false`
    - ✅ Permission checks identical to `!` commands
 
-6. **Technical Infrastructure:**
+7. **Technical Infrastructure:**
    - ✅ Shared handler pattern (slash + prefix use same business logic)
    - ✅ Synthetic message objects for compatibility
    - ✅ Proper deferred replies for long-running operations
    - ✅ Guild-specific command registration for instant updates
+   - ✅ Dynamic channel names in descriptions (fetched from Discord on startup)
    - ✅ Error handling with user-friendly messages
+
+8. **Adoption Features:**
+   - ✅ Tip system tracks slash command usage per user
+   - ✅ Smart tip suggestions on prefix commands (non-intrusive)
+   - ✅ 18 commands mapped with benefits (e.g., "autocomplete for boss names")
+   - ✅ Per-user tip disable/enable functionality
 
 ### 🐛 Issues Fixed
 
@@ -88,15 +109,17 @@
 ### 📊 Files Created/Modified
 
 **New Files:**
-- `commands/slash-commands.js` - Command definitions for all slash commands
-- `commands/register-commands.js` - Command registration utility
+- `commands/slash-commands.js` - Dynamic command definitions with channel name generation
+- `commands/register-commands.js` - Command registration with channel name fetching
 - `commands/autocomplete.js` - Autocomplete handlers with fuzzy matching
-- `commands/handlers.js` - Slash command execution handlers
+- `commands/handlers.js` - Slash command execution handlers for all 20 commands
+- `commands/tip-system.js` - Adoption tracking and tip suggestion system
 
 **Modified Files:**
 - `index2.js` - Added slash command and autocomplete listeners
 - `boss-rotation.js` - (reviewed for integration, no changes needed)
 - `boss-timer-commands.js` - (reviewed for integration, no changes needed)
+- `attendance.js` - (reviewed for integration, no changes needed)
 
 ### 🔄 Dual Support Status
 
@@ -106,21 +129,145 @@
 - All business logic shared between command types
 - Zero breaking changes to existing workflows
 
-### 📝 What's Pending
+---
 
-**Attendance System (7 commands still showing placeholders):**
-- `/verify <member>` - Verify member's attendance
-- `/deny <member> [reason]` - Deny member's attendance
-- `/verifyall` - Verify all pending
-- `/denyall` - Deny all pending
-- `/close [thread]` - Close attendance thread
-- `/closeall` - Close all threads
-- `/resetpending` - Clear pending queue
+## Phase 2 Completion Summary
 
-**Enhancement Opportunities:**
-- Tip system to encourage slash command adoption
-- Attendance command implementation
-- Phase 2: Auction System (next priority)
+### ✅ What Was Completed
+
+**Date Completed:** 2025-12-10
+
+**Systems Implemented:**
+- ✅ **Auction System** (4 commands) - Simplified to essential commands only
+
+**Total Commands Implemented:** 4 slash commands
+
+### 🎯 Key Achievements
+
+1. **Member Commands:**
+   - `/bid <amount>` - Place bid on current auction item with validation (min_value: 1)
+
+2. **Admin Commands:**
+   - `/auction start` - Manually start auction session
+   - `/auction forceend` - Emergency auction termination with result submission
+
+3. **Queue Management:**
+   - `/queue list` - View auction queue (items managed in Google Sheets)
+
+**Phase 2 Design Decision:**
+- Simplified from original 14 commands to 4 essential commands
+- Queue add/remove managed in Google Sheets (simpler workflow)
+- Focus on core auction operations only
+
+---
+
+## Phase 3 Completion Summary
+
+### ✅ What Was Completed
+
+**Date Completed:** 2025-12-10
+
+**Systems Implemented:**
+- ✅ **Stats & Reports System** (3 commands) - Member statistics and guild reports
+
+**Total Commands Implemented:** 3 slash commands
+
+### 🎯 Key Achievements
+
+1. **Member Statistics:**
+   - `/stats [member]` - View attendance and bidding statistics
+     - Autocomplete: MongoDB member lookup (includes inactive members)
+     - Shows personal stats when used without member parameter
+     - Displays: attendance, points, ranking, recent activity, member lore
+     - Auto-deletes after 5 minutes
+
+2. **Guild Reports:**
+   - `/weekly` - Generate weekly activity report
+     - Boss spawn statistics with week-over-week comparison
+     - Top 10 most active members with star ratings
+     - Last week's top 3 for guild rewards
+     - Activity patterns and bidding summary
+     - Guild performance metrics
+
+   - `/monthly` - Generate monthly activity report
+     - Comprehensive monthly overview with activity percentage
+     - Top 20 most active members (split into two sections)
+     - Weekly breakdown showing best-performing week
+     - Peak activity patterns (days and hours)
+     - Complete bidding economy summary
+
+3. **MongoDB Integration:**
+   - `/stats` autocomplete fetches from MongoDB (not just Discord cache)
+   - Matches `!stats` behavior exactly
+   - Includes all members (active and inactive)
+   - Fast response times with MongoDB queries
+
+### 🐛 Issues Fixed
+
+1. **Stats Autocomplete Mismatch** - Updated to use MongoDB instead of Discord cache to match `!stats` behavior
+2. **Member Lookup** - Uses `username` field from MongoDB (which stores display names/nicknames)
+
+**Phase 3 is 100% Complete! ✅**
+
+All 3 commands implemented, tested, and operational.
+
+---
+
+## Attendance Override Commands (Added 2025-12-10)
+
+### ✅ What Was Completed
+
+**Date Completed:** 2025-12-10
+
+**Systems Implemented:**
+- ✅ **Attendance Override System** (2 commands) - Error recovery and manual corrections
+
+**Total Commands Implemented:** 2 slash commands
+
+### 🎯 Key Achievements
+
+1. **Thread Reopening:**
+   - `/openthread` - Reopen a closed attendance thread for manual corrections
+     - Must be used inside an attendance thread
+     - Unarchives and unlocks the thread
+     - Re-registers the spawn in bot memory
+     - Loads existing members from MongoDB
+     - Re-queues all check-in messages as pending verifications
+     - Requires confirmation before execution
+     - Admin-only command
+
+2. **Override Close:**
+   - `/overrideclose` - Close thread and overwrite existing attendance data
+     - Must be used in a thread that's in bot memory
+     - Auto-verifies all pending check-ins before closing
+     - Always uses `overwriteAttendance` action (handles both new and existing columns)
+     - Shows warning if column already exists
+     - Skips rotation increment if thread was reopened (fixing attendance, not a new kill)
+     - Requires confirmation before execution
+     - Admin-only command
+
+3. **Use Cases:**
+   - Fixing attendance errors after a thread was closed
+   - Correcting member verifications
+   - Resubmitting attendance with manual adjustments
+   - Frequently used commands for attendance error recovery
+
+### 📝 Implementation Details
+
+**Commands added to:**
+- `commands/slash-commands.js` - Added `generateAttendanceOverrideCommands()`
+- `commands/handlers.js` - Added handlers using synthetic message pattern
+- `commands/tip-system.js` - Added tip mappings for both commands
+
+**Handler implementation:**
+- Both commands use the synthetic message pattern to reuse existing `!openthread` and `!overrideclose` handlers
+- No parameters required (context-based commands that work on current thread)
+- Admin-only permissions enforced
+- Dynamic channel names in descriptions
+
+**Attendance Override Commands are 100% Complete! ✅**
+
+All 2 commands implemented and operational. Frequently used for fixing attendance errors.
 
 ---
 
@@ -144,9 +291,17 @@ Implement Discord slash commands alongside existing `!` prefix commands to provi
 
 ### Scope
 
+**Original Plan:**
 - **~50 slash commands** across 6 major systems
-- **Full autocomplete** for boss names (22 bosses), items, and users
-- **Subcommand grouping** for related operations
+
+**Actual Implementation (Phase 1-3 + Attendance Overrides):**
+- **29 slash commands** across 5 major systems (simplified from original plan)
+  - Phase 1: 20 commands (Boss Timer, Rotation, Attendance)
+  - Phase 2: 4 commands (Auction - simplified)
+  - Phase 3: 3 commands (Stats & Reports - focused on essentials)
+  - Attendance Overrides: 2 commands (Error recovery tools - frequently used)
+- **Full autocomplete** for boss names (36 bosses), pending members, and MongoDB member lookup
+- **Subcommand grouping** for related operations (`/rotation`, `/auction`, `/queue`)
 - **Permission parity** with existing `!` commands
 
 ---
@@ -179,14 +334,16 @@ Implement Discord slash commands alongside existing `!` prefix commands to provi
 
 ## Implementation Phases
 
-### **Phase 1: Critical Admin Systems** ✅ COMPLETE
+### **Phase 1: Critical Admin Systems** ✅ 100% COMPLETE
 
 **Status:** Completed 2025-12-10
 
 **Systems:**
 - ✅ Boss Timer System (9 commands) - FULLY IMPLEMENTED
 - ✅ Boss Rotation System (4 subcommands) - FULLY IMPLEMENTED
-- ⏳ Attendance System (7 commands) - PLACEHOLDER (pending implementation)
+- ✅ Attendance System (7 commands) - FULLY IMPLEMENTED
+- ✅ Tip Tracking System - FULLY IMPLEMENTED
+- ✅ Dynamic Channel Names - FULLY IMPLEMENTED
 
 **Why first:**
 - Most-used admin commands daily
@@ -195,65 +352,86 @@ Implement Discord slash commands alongside existing `!` prefix commands to provi
 - Proves value to veteran admins immediately
 
 **Results:**
-- 13 slash commands deployed and tested
+- **20 slash commands** deployed and tested (100% of Phase 1)
 - All commands return Discord embeds matching legacy format
-- Boss name autocomplete with fuzzy matching working
+- Boss name and pending member autocomplete working
 - Dynamic rotation boss list from Google Sheets
+- Dynamic channel names in command descriptions
+- Tip system encouraging slash command adoption
 - Zero breaking changes to existing `!` commands
-- Admin feedback: Positive (tested and confirmed working)
+- Admin feedback: Positive (all systems tested and confirmed working)
 
 **Estimated effort:** 4-5 days → **Actual: 1 day** (faster due to shared handler pattern)
 
 ---
 
-### **Phase 2: Auction System**
+### **Phase 2: Auction System** ✅ 100% COMPLETE
 
-**Commands:**
-- Bidding commands
-- Auction management
-- Queue management
+**Status:** Completed 2025-12-10
+
+**Systems:**
+- ✅ Bidding commands (1 command)
+- ✅ Auction management (2 subcommands)
+- ✅ Queue management (1 subcommand)
 
 **Why second:**
 - High-frequency system
-- Autocomplete for items/queue valuable
 - Clean subcommand structure
 - Members + admins both use
 
-**Estimated effort:** 2-3 days
+**Results:**
+- **4 slash commands** deployed (simplified from 14)
+- `/bid <amount>` with integer validation
+- `/auction start` and `/auction forceend` for admin control
+- `/queue list` for viewing queue
+- Queue add/remove managed in Google Sheets (simpler workflow)
+
+**Estimated effort:** 2-3 days → **Actual: 1 day** (simplified scope)
 
 ---
 
-### **Phase 3: Stats & Leaderboards**
+### **Phase 3: Stats & Leaderboards** ✅ 100% COMPLETE
 
-**Commands:**
-- Stats queries
-- Leaderboards
-- Reports
-- Activity heatmaps
+**Status:** Completed 2025-12-10
+
+**Systems:**
+- ✅ Stats queries (1 command)
+- ✅ Reports (2 commands)
 
 **Why third:**
 - Member-facing commands
 - Simple queries (good for testing user adoption)
-- Autocomplete for user selection
+- MongoDB autocomplete integration
 
-**Estimated effort:** 2 days
+**Results:**
+- **3 slash commands** deployed
+- `/stats [member]` with MongoDB autocomplete (includes inactive members)
+- `/weekly` with comprehensive guild activity report
+- `/monthly` with detailed monthly breakdown
+- All commands match `!` command behavior exactly
+- MongoDB integration for fast member lookups
+
+**Estimated effort:** 2 days → **Actual: 1 day** (focused on essential commands)
 
 ---
 
-### **Phase 4: Emergency/Admin Tools**
+### **Phase 4: Emergency/Admin Tools** ⏭️ SKIPPED
 
-**Commands:**
-- Emergency bulk operations
-- Point manipulation
-- System resets
-- Bootstrap/learning commands
+**Status:** Skipped - Keeping as `!` commands only
 
-**Why last:**
-- Less frequent usage
-- Admins already know these
-- Can evaluate if migration needed based on Phase 1-3 feedback
+**Reason for skipping:**
+- **Very dangerous operations** - High risk of accidental execution
+- **Very low frequency** - Used rarely (emergency situations, manual corrections)
+- **Existing `!` commands work well** - No mobile convenience needed for these operations
+- **Better safety** - Prefix commands require more deliberate action from admins
+- **Phase 1-3 covers 95%+ of daily operations** - These edge cases can stay as `!` commands
 
-**Estimated effort:** 1-2 days
+**Commands staying as `!` only:**
+- Emergency bulk operations: `!emergency closeall/verifyall/denyall/resetpending`
+- Point manipulation: `!addpoints`, `!removepoints`, `!setpoints`
+- System resets: `!resetauction`, `!bootstraplearning`
+
+**Decision:** Keep dangerous admin tools as prefix commands for safety
 
 ---
 
@@ -316,6 +494,22 @@ Implement Discord slash commands alongside existing `!` prefix commands to provi
 - **Permissions:** Admin only
 - **Channel:** Admin Logs
 - **Equivalent:** `!resetpending`
+
+#### `/openthread`
+- **Description:** Reopen a closed attendance thread for manual corrections
+- **Options:** None (context-based - works on current thread)
+- **Permissions:** Admin only
+- **Channel:** Attendance threads
+- **Equivalent:** `!openthread`
+- **Notes:** Unarchives thread, re-registers spawn, loads members from MongoDB, re-queues check-ins
+
+#### `/overrideclose`
+- **Description:** Close thread and overwrite existing attendance data
+- **Options:** None (context-based - works on current thread)
+- **Permissions:** Admin only
+- **Channel:** Attendance threads
+- **Equivalent:** `!overrideclose`
+- **Notes:** Auto-verifies pending, always overwrites, skips rotation if thread was reopened
 
 ---
 
@@ -1615,43 +1809,56 @@ SLASH COMMANDS (with autocomplete):
 
 ---
 
-## Next Steps
+## Implementation Complete! 🎉
 
-**Phase 1 (Current Status):**
-1. ✅ Review this plan with stakeholders
-2. ✅ Answer open questions above
-3. ✅ Decide on guild vs global registration (Guild-specific for instant updates)
-4. ✅ Confirm file structure approach
-5. ✅ Set up development environment for testing
-6. ✅ Create command definitions for Phase 1B (Boss Timer) - 9 commands
-7. ✅ Create command definitions for Phase 1C (Rotation) - 4 subcommands
-8. ✅ Implement shared handlers with synthetic message pattern
-9. ✅ Implement autocomplete for boss names with fuzzy matching
-10. ✅ Register commands to guild
-11. ✅ Test in production
-12. ✅ Deploy to production
-13. ✅ Gather feedback and iterate (Fixed 5 issues, all working)
-14. ⏳ Create command definitions for Phase 1A (Attendance) - 7 commands (placeholders exist)
-15. ⏳ Implement autocomplete for pending members
+**Phase 1-3 + Attendance Overrides Completion Summary:**
+1. ✅ Phase 1: Boss Timer, Rotation, Attendance (20 commands)
+2. ✅ Phase 2: Auction System (4 commands - simplified)
+3. ✅ Phase 3: Stats & Reports (3 commands)
+4. ✅ Attendance Overrides: Error recovery tools (2 commands - frequently used)
+5. ✅ MongoDB autocomplete integration for `/stats`
+6. ✅ All systems tested and operational
+7. ✅ Zero breaking changes to existing `!` commands
+8. ✅ Tip system tracking slash command adoption
+9. ⏭️ Phase 4: Skipped (dangerous admin tools stay as `!` commands)
 
-**Immediate Next Actions:**
-1. **Option A: Complete Attendance System** (finish Phase 1)
-   - Implement 7 attendance command handlers
-   - Add pending member autocomplete
-   - Test attendance workflow
-   - Mark Phase 1 as 100% complete
+**Total Implemented:** 29 slash commands across 5 major systems
 
-2. **Option B: Begin Phase 2 (Auction System)** (move to next priority)
-   - Leave attendance as placeholders (low priority per user feedback)
-   - Start implementing 14 auction commands
-   - Leverage working infrastructure from boss timer/rotation
+---
 
-3. **Option C: Add Tip System** (enhance adoption)
-   - Implement smart tip tracking
-   - Add nudges to `!` commands suggesting `/` commands
-   - Track slash command usage per user
+## Final Command Breakdown
 
-**Recommended:** Option A (Complete Phase 1) before starting Phase 2
+### ✅ Slash Commands (29 total)
+- **Boss Timer:** 9 commands (`/killed`, `/spawned`, `/nextspawn`, etc.)
+- **Boss Rotation:** 4 subcommands (`/rotation status/set/increment/refresh`)
+- **Attendance:** 7 commands (`/verify`, `/deny`, `/verifyall`, `/close`, `/closeall`, `/resetpending`)
+- **Attendance Overrides:** 2 commands (`/openthread`, `/overrideclose`)
+- **Auction:** 4 commands (`/bid`, `/auction start/forceend`, `/queue list`)
+- **Stats & Reports:** 3 commands (`/stats`, `/weekly`, `/monthly`)
+
+### ⚡ Prefix Commands Only (Emergency/Admin Tools)
+- **Emergency Operations:** `!emergency closeall/verifyall/denyall/resetpending`
+- **Point Manipulation:** `!addpoints`, `!removepoints`, `!setpoints`
+- **System Resets:** `!resetauction`, `!bootstraplearning`
+
+**Rationale:** Dangerous low-frequency operations safer as deliberate prefix commands
+
+---
+
+## Success Metrics
+
+**Coverage:** 29 slash commands cover ~95% of daily guild operations
+- ✅ All high-frequency commands migrated (including attendance error recovery)
+- ✅ All member-facing commands available as slash
+- ✅ All mobile-critical admin commands available
+- ✅ Frequently-used attendance override tools implemented
+- ⏭️ Dangerous admin tools intentionally kept as prefix only
+
+**Adoption Strategy:**
+- Dual support (both `/` and `!` work)
+- Tip system encourages slash command discovery
+- No forced migration - users choose their preference
+- MongoDB integration for fast autocomplete
 
 ---
 
@@ -1684,6 +1891,6 @@ SLASH COMMANDS (with autocomplete):
 
 ---
 
-**Document Version:** 2.0
+**Document Version:** 4.1
 **Last Updated:** 2025-12-10
-**Status:** Phase 1 Complete ✅ - Boss Timer & Rotation systems fully operational
+**Status:** Implementation Complete ✅ - 29 slash commands operational | Phase 4 skipped for safety

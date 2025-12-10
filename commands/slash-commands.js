@@ -103,6 +103,31 @@ function generateAttendanceCommands(attendanceChannelName = 'attendance channel'
 }
 
 /**
+ * Generate attendance override commands
+ *
+ * @param {string} attendanceChannelName - Name of attendance channel (e.g., "attendance")
+ * @returns {Array} Attendance override command definitions
+ */
+function generateAttendanceOverrideCommands(attendanceChannelName = 'attendance channel') {
+  const threadContext = `(use inside #${attendanceChannelName} threads)`;
+
+  return [
+    {
+      name: 'openthread',
+      description: `Reopen a closed attendance thread for manual corrections ${threadContext}`,
+      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
+      dm_permission: false
+    },
+    {
+      name: 'overrideclose',
+      description: `Close thread and overwrite existing attendance data ${threadContext}`,
+      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
+      dm_permission: false
+    }
+  ];
+}
+
+/**
  * Generate boss timer commands with dynamic channel names
  *
  * @param {string} bossTimerChannelName - Name of boss timer channel (e.g., "boss-timer")
@@ -292,28 +317,140 @@ function generateRotationCommands() {
 }
 
 /**
+ * Generate auction system commands with dynamic channel names
+ *
+ * @param {string} biddingChannelName - Name of bidding channel (e.g., "bidding")
+ * @returns {Array} Auction command definitions
+ */
+function generateAuctionCommands(biddingChannelName = 'bidding') {
+  const channelContext = `(use in #${biddingChannelName})`;
+  const threadContext = `(use in #${biddingChannelName} threads)`;
+
+  return [
+    // /bid command - Member command
+    {
+      name: 'bid',
+      description: `Place a bid on the current auction item ${threadContext}`,
+      dm_permission: false,
+      options: [
+        {
+          name: 'amount',
+          type: ApplicationCommandOptionType.Integer,
+          description: 'Bid amount in points',
+          required: true,
+          min_value: 1
+        }
+      ]
+    },
+
+    // /auction subcommands - Admin commands
+    {
+      name: 'auction',
+      description: `Manage auction sessions ${channelContext}`,
+      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
+      dm_permission: false,
+      options: [
+        {
+          name: 'start',
+          type: ApplicationCommandOptionType.Subcommand,
+          description: 'Start an auction session manually'
+        },
+        {
+          name: 'forceend',
+          type: ApplicationCommandOptionType.Subcommand,
+          description: 'Emergency auction termination (force submit results)'
+        }
+      ]
+    },
+
+    // /queue subcommand - View queue only (items managed in Google Sheets)
+    {
+      name: 'queue',
+      description: `View auction queue ${channelContext}`,
+      dm_permission: false,
+      options: [
+        {
+          name: 'list',
+          type: ApplicationCommandOptionType.Subcommand,
+          description: 'Show current auction queue'
+        }
+      ]
+    }
+  ];
+}
+
+/**
+ * Generate stats and reports commands
+ *
+ * @returns {Array} Stats command definitions
+ */
+function generateStatsCommands() {
+  return [
+    // /stats command - Member statistics lookup
+    {
+      name: 'stats',
+      description: 'View member statistics (attendance, points, activity)',
+      dm_permission: false,
+      options: [
+        {
+          name: 'member',
+          type: ApplicationCommandOptionType.String,
+          description: 'Member to lookup (leave empty for yourself)',
+          required: false,
+          autocomplete: true
+        }
+      ]
+    },
+
+    // /weekly command - Weekly report
+    {
+      name: 'weekly',
+      description: 'Generate weekly activity report',
+      dm_permission: false
+    },
+
+    // /monthly command - Monthly report
+    {
+      name: 'monthly',
+      description: 'Generate monthly activity report',
+      dm_permission: false
+    }
+  ];
+}
+
+/**
  * Generate all commands with dynamic channel names
  *
  * @param {Object} channelNames - Object containing channel names
  * @param {string} channelNames.attendance - Attendance channel name
  * @param {string} channelNames.bossTimer - Boss timer channel name
+ * @param {string} channelNames.bidding - Bidding channel name
  * @returns {Object} Object containing command arrays
  */
 function generateAllCommands(channelNames = {}) {
-  const { attendance = 'attendance', bossTimer = 'boss-timer' } = channelNames;
+  const { attendance = 'attendance', bossTimer = 'boss-timer', bidding = 'bidding' } = channelNames;
 
   const attendanceCommands = generateAttendanceCommands(attendance);
+  const attendanceOverrideCommands = generateAttendanceOverrideCommands(attendance);
   const bossTimerCommands = generateBossTimerCommands(bossTimer);
   const rotationCommands = generateRotationCommands();
+  const auctionCommands = generateAuctionCommands(bidding);
+  const statsCommands = generateStatsCommands();
 
   return {
     attendanceCommands,
+    attendanceOverrideCommands,
     bossTimerCommands,
     rotationCommands,
+    auctionCommands,
+    statsCommands,
     allCommands: [
       ...attendanceCommands,
+      ...attendanceOverrideCommands,
       ...bossTimerCommands,
-      ...rotationCommands
+      ...rotationCommands,
+      ...auctionCommands,
+      ...statsCommands
     ]
   };
 }
@@ -321,6 +458,9 @@ function generateAllCommands(channelNames = {}) {
 module.exports = {
   generateAllCommands,
   generateAttendanceCommands,
+  generateAttendanceOverrideCommands,
   generateBossTimerCommands,
-  generateRotationCommands
+  generateRotationCommands,
+  generateAuctionCommands,
+  generateStatsCommands
 };
