@@ -111,12 +111,34 @@ function getPendingMembers(attendance, focusedValue) {
   const pending = attendance.getPendingVerifications();
   const lowerInput = focusedValue.toLowerCase();
 
-  const filtered = Object.keys(pending)
-    .filter(username => username.toLowerCase().includes(lowerInput))
+  // Extract unique author names from pending verifications
+  const authorNames = [...new Set(
+    Object.values(pending).map(p => p.author)
+  )];
+
+  // Filter by user input
+  const filtered = authorNames
+    .filter(name => name.toLowerCase().includes(lowerInput))
+    .sort((a, b) => {
+      // Exact match first
+      const aExact = a.toLowerCase() === lowerInput;
+      const bExact = b.toLowerCase() === lowerInput;
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
+
+      // Then by starts with
+      const aStarts = a.toLowerCase().startsWith(lowerInput);
+      const bStarts = b.toLowerCase().startsWith(lowerInput);
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+
+      // Then alphabetically
+      return a.localeCompare(b);
+    })
     .slice(0, 25)
-    .map(username => ({
-      name: username,
-      value: username
+    .map(name => ({
+      name: name,
+      value: name
     }));
 
   return filtered;
