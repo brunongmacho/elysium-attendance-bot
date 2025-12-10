@@ -92,7 +92,6 @@ const auctioneering = require("./auctioneering.js");        // Auction managemen
 const attendance = require("./attendance.js");              // Attendance tracking
 const bossTimer = require("./boss-timer.js");              // Boss timer system
 const bossTimerCommands = require("./boss-timer-commands.js"); // Boss timer commands
-// const lootSystem = require("./loot-system.js");          // Loot distribution (DISABLED: manual loot entry)
 const emergencyCommands = require("./emergency-commands.js"); // Emergency overrides
 const leaderboardSystem = require("./leaderboard-system.js"); // Leaderboards
 const errorHandler = require('./utils/error-handler');      // Centralized error handling
@@ -1846,11 +1845,6 @@ async function awaitConfirmation(
  * @constant
  */
 const commandHandlers = {
-  // Loot command (DISABLED: manual entry now used)
-  // loot: async (message, member, args) => {
-  //   await lootSystem.handleLootCommand(message, args, client);
-  // },
-
   help: async (message, member) => {
     // Use new channel-aware help system
     await helpSystemV2.handleHelpCommand(message, member);
@@ -4622,10 +4616,6 @@ client.once(Events.ClientReady, async () => {
   // Reason: Redundant after implementing parallel dual-write (Phase 7)
   // All MongoDB writes now have simultaneous Sheets writes via Promise.all()
   // Background sync caused circuit breaker issues with non-existent Apps Script actions
-  //
-  // const backgroundSync = new BackgroundSync(config, sheetAPI);
-  // backgroundSync.start();
-  // console.log('✅ Background sync service started (syncs MongoDB → Sheets every 15 minutes)');
   console.log('⏸️ Background sync service disabled (redundant with Phase 7 parallel dual-write)');
 
   // LAZY CACHE LOADING - Cache will be populated on-demand to reduce startup memory
@@ -4944,16 +4934,6 @@ client.on(Events.MessageCreate, async (message) => {
     // This allows timer bot to create spawn threads before being blocked
     if (!message.guild) return; // Skip DMs immediately
     if (message.guild.id !== config.main_guild_id && message.guild.id !== config.timer_server_id) return; // Skip wrong guild (allow timer server)
-
-    // 🧠 NLP LEARNING: DISABLED - Bot now relies on invoked commands only
-    // To re-enable: uncomment the block below
-    // if (nlpLearningSystem && !message.author.bot) {
-    //   try {
-    //     await nlpLearningSystem.learnFromMessage(message);
-    //   } catch (error) {
-    //     console.error(`❌ NLP Learning error: ${error.message}`);
-    //   }
-    // }
 
     // 📊 ACTIVITY TRACKING: Track message for activity heatmap
     // Skip bot messages for more accurate member activity data
@@ -5309,147 +5289,10 @@ client.on(Events.MessageCreate, async (message) => {
         message.channel.parentId === config.elysium_commands_channel_id);
 
     // ═════════════════════════════════════════════════════════════════════
-    // NLP PROCESSING (Natural Language → Commands)
+    // NLP PROCESSING: DISABLED
     // ═════════════════════════════════════════════════════════════════════
-    // Intercepts natural language and converts to command format
-    // Two-tier system:
-    // 1. Learning system (mention-based activation, learns from all messages)
-    // 2. Static handler (admin logs + auction threads)
-    // Does NOT interfere with existing ! commands
-
-    // 🧠 NLP VARIABLES: DISABLED - Bot now relies on invoked commands only
-    // To re-enable: uncomment the block below
-    // let nlpInterpretation = null;
-    // let usedLearningSystem = false;
-    //
-    // // PRIORITY CHECK: If message contains insults/roasts, skip command interpretation
-    // // and go straight to conversation handling to avoid misinterpreting roasts as commands
-    // const botMentioned = message.mentions.users.has(client.user.id);
-    // const contentLower = message.content.toLowerCase().trim();
-    //
-    // // Check if this is a reply to a bot message
-    // let isReplyToBot = false;
-    // if (message.reference && message.reference.messageId) {
-    //   try {
-    //     const repliedMessage = await message.channel.messages.fetch(message.reference.messageId);
-    //     if (repliedMessage && repliedMessage.author.id === client.user.id) {
-    //       isReplyToBot = true;
-    //       console.log(`💬 [NLP] User replying to bot message - treating as conversation`);
-    //     }
-    //   } catch (error) {
-    //     console.error('Error fetching replied message:', error);
-    //   }
-    // }
-    //
-    // // Comprehensive insult pattern check (Filipino + English profanity and gaming taunts)
-    // // Covers: Core Filipino profanity, text speak (including "taena"), regional variants, gaming taunts, English insults
-    // const hasInsult = /(?:putang\s*ina|tang\s*ina|tangina|taena|ta\s*ena|tanginang|kinangina|king\s*ina|kingina|putangina|gago|gagong|gagohan|kagaguhan|ulol|kaulol|bobo|tanga|katangahan|fuck\s+you|fuck\s+off|fuck|hayop|hinayupak|buwisit|bwisit|bwiset|buset|bwesit|bweset|leche|peste|tarantado|puta|pokpok|kupal|pakyu|pakshet|pakingshet|amputa|amfuta|amshet|amshit|ampucha|amputcha|pucha|putcha|yawa|yawaa|yawaon|pisting|ungas|gunggong|ggng|gnggng|engot|shunga|timang|abnoy|hudas|lintik|punyeta|walanghiya|gaga|salot|tite|puke|kantot|supot|bruha|taong\s+grasa|basura|dumi|walang\s+(?:kwenta|silbi|utak|alam|breeding|modo|hiya)|inutil|squammy|skwater|epal|jejemon|jologs|baduy|cheap|mukhang\s+pera|buwakaw|bano|bwesit|hangal|mangmang|ignorante|palpak|sablay|bulok)/i.test(contentLower) ||
-    //   /(?:tng\s*ina|tngnina|taena|t\s*ena|kngn|kngin|pksht|pkyou|fcku|gg0|bb0|tng4|g4g0|ul0l|b0b0|bno|bnong|ngng|nggg)/i.test(contentLower) ||
-    //   /(?:atay|buang|bugo|ambak|giatay|unggoy|baboy|baboyan|pisot|ukinnam|agkakapuy|sakim|takla)/i.test(contentLower) ||
-    //   /(?:shit|damn|ass|bitch|bastard|stupid|idiot|moron|dumb|retard|dumbass|smartass|jackass|asshole|dipshit|piece\s+of\s+shit|useless|trash|garbage|suck|pathetic|loser|clown|joke|waste|failure|disappointment|embarrassment)/i.test(contentLower) ||
-    //   /(?:noob|nub|newb|scrub|weak|rekt|pwned|owned|destroyed|demolished|get\s+(?:rekt|good|gud|wrecked|destroyed|owned|pwned)|mad|salty|tilted|crying|cope|skill\s+issue|ratio|L\s+bozo|hardstuck|boosted|carried|bottom\s+tier|bronze|iron|wood|inting|feeding|griefing|trolling|throwing|cringe|washed|washed\s+up)/i.test(contentLower) ||
-    //   /(?:mahina|duwag|talo|bugbug|bugbog|panalo|malas|walang\s+(?:laban|gana|skill|galing|diskarte)|ang\s+(?:weak|mahina|duwag|talo|bugbog|pangit|bano|bobo|tanga|gago|ulol)\s+mo|bugbog\s+sarado|talo\s+ka|wala\s+kang\s+laban|sablay\s+ka|noob\s+ka|newbie\s+ka|baguhan\s+ka|bobo\s+maglaro|lutang|hina|takot|daya|cheater|feeder|carry\s+mo|dala\s+mo|pasanin|deadweight|pabigat|lag|lagger|mabagal|masakit\s+sa\s+mata|nakakairita|one\s+trick|tryhard|smurf|booster|account\s+buyer)/i.test(contentLower) ||
-    //   /(?:ez\s+lang|easy\s+lang|noob\s+naman|weak\s+naman|bano\s+naman|talo\s+na|bugbog\s+ka|walang\s+laban\s+yan|sablay\s+yarn|git\s+gud|get\s+good|mag\s+(?:practice|training)|balik\s+tutorial|GG\s+ez|gg\s+ka|talo\s+ka\s+na|sayang\s+effort|toxic\s+ka|salty\s+ka|bitter\s+ka|masakit\s+ba|hard\s+carry\s+mo|need\s+carry|pinapabuhat|pasan\s+ka|low\s+elo|trash\s+tier|baba\s+rank)/i.test(contentLower) ||
-    //   /(?:you\s+(?:suck|are\s+(?:bad|trash|garbage|useless|stupid|dumb|weak))|bot\s+(?:sucks|is\s+bad|trash|useless|broken|stupid|bano|tanga|bobo)|your\s+(?:bot|system|code)\s+(?:sucks|trash|broken|pangit|bano)|worst\s+bot|trash\s+bot|useless\s+bot|bano\s+bot|tanga\s+bot|bot\s+mo\s+(?:bano|bobo|tanga|walang\s+kwenta)|buggy|laggy|error|broken|malfunction|crash|shit\s+bot)/i.test(contentLower) ||
-    //   /(?:gago\s+ka|ulol\s+ka|bobo\s+ka|tanga\s+ka|supot\s+ka|bano\s+ka|engot\s+ka|gunggong\s+ka|abnoy\s+ka|timang\s+ka|hangal\s+ka|nakakahiya\s+ka|kahihiyan|basura\s+ka|dumi\s+ka|kingina\s+mo|tangina\s+mo|taena\s+mo|gago\s+ka\s+pala|mas\s+(?:bobo|tanga|bano|mahina|pangit)\s+ka\s+pa|parang\s+(?:bobo|tanga|bano|ungas|gago)\s+ka|mukhang\s+(?:bobo|tanga|gago|ungas|tae))/i.test(contentLower);
-    //
-    // // Check for laughter/reaction (common response to roasts)
-    // // Matches: HAHAHA, HEHEHEHE, LOL, LMAO, etc. (with 4+ repetitions for long laughs)
-    // const isLaughter = /^(?:[ha]{4,}|[he]{4,}|[hi]{4,}|[ho]{4,}|lol+|lmao+|rofl+|aha+ha+|ehe+he+|hue+|kek+|jaja+|jeje+|huhu+|wkwk+|😂+|🤣+|💀+|\s|!|\?|\.)*$/i.test(contentLower);
-    //
-    // // Laughter only treated as conversation if replying to bot (common reaction to roasts)
-    // const isLaughterReply = isLaughter && isReplyToBot;
-
-    // 🔥 NLP CONVERSATION: DISABLED - Bot now relies on invoked commands only
-    // To re-enable: uncomment the block below
-    // if ((hasInsult || isReplyToBot || isLaughterReply) && (botMentioned || isReplyToBot || isLaughterReply) && nlpLearningSystem) {
-    //   // This is likely an insult/roast/laughter or reply to bot - handle as conversation, not command
-    //   const detectionReason = isLaughterReply ? 'laughter reply' : (hasInsult ? 'insult pattern' : 'reply to bot');
-    //   console.log(`🔥 [NLP] Detected ${detectionReason} - skipping command interpretation`);
-    //   const conversationResponse = await nlpLearningSystem.handleConversation(message);
-    //
-    //   if (conversationResponse) {
-    //     console.log(`💬 [NLP Conversation] User: "${message.content.substring(0, 50)}..." → Roasting back`);
-    //     // Try to reply, fall back to channel.send if it's a system message
-    //     try {
-    //       if (message.system) {
-    //         await message.channel.send(conversationResponse);
-    //       } else {
-    //         await message.reply(conversationResponse);
-    //       }
-    //     } catch (error) {
-    //       // If reply fails (e.g., system message), try sending to channel instead
-    //       if (error.code === 50035) {
-    //         await message.channel.send(conversationResponse).catch(console.error);
-    //       } else {
-    //         console.error('❌ Error sending conversation response:', error);
-    //       }
-    //     }
-    //     return; // Return early - this was handled as conversation
-    //   }
-    // }
-
-    // 🧠 NLP INTERPRETATION: DISABLED - Bot now relies on invoked commands only
-    // To re-enable: uncomment the blocks below
-
-    // // Try learning system first (if bot is mentioned or in auction thread)
-    // if (nlpLearningSystem && !message.content.trim().startsWith('!')) {
-    //   const shouldRespond = nlpLearningSystem.shouldRespond(message);
-    //
-    //   if (shouldRespond) {
-    //     nlpInterpretation = await nlpLearningSystem.interpretMessage(message);
-    //     if (nlpInterpretation) {
-    //       usedLearningSystem = true;
-    //       const fuzzyInfo = nlpInterpretation.fuzzyMatch
-    //         ? ` [fuzzy: "${nlpInterpretation.fuzzyMatch.matched}" ${nlpInterpretation.fuzzyMatch.similarity}]`
-    //         : '';
-    //       console.log(`🧠 [NLP Learning] Interpreted: "${message.content}" → ${nlpInterpretation.command} (confidence: ${nlpInterpretation.confidence.toFixed(2)})${fuzzyInfo}`);
-    //     }
-    //   }
-    // }
-    //
-    // // Fall back to static handler if learning system didn't interpret
-    // if (!nlpInterpretation && nlpHandler && !message.content.trim().startsWith('!')) {
-    //   nlpInterpretation = nlpHandler.interpretMessage(message);
-    //
-    //   if (nlpInterpretation) {
-    //     console.log(`💬 [NLP Static] Interpreted: "${message.content}" → ${nlpInterpretation.command}`);
-    //   }
-    // }
-    //
-    // // Apply interpretation if found
-    // if (nlpInterpretation) {
-    //   // Convert natural language to command format
-    //   // This allows the rest of the system to process it normally
-    //   const params = nlpInterpretation.params.join(' ');
-    //   message.content = `${nlpInterpretation.command}${params ? ' ' + params : ''}`;
-    //
-    //   // Optional: Send brief feedback for non-bid commands
-    //   if (!usedLearningSystem && nlpHandler) {
-    //     const contextMessage = nlpHandler.getContextMessage(nlpInterpretation.command, message);
-    //     if (contextMessage) {
-    //       await message.reply(contextMessage).catch(err => errorHandler.silentError(err, 'NLP context message reply'));
-    //     }
-    //   }
-    // } else {
-    //   // No command found - check if bot was mentioned for conversation
-    //   const botMentioned = message.mentions.users.has(client.user.id);
-    //
-    //   if (botMentioned && nlpLearningSystem && !message.content.trim().startsWith('!')) {
-    //     // Bot was tagged but no command recognized - engage in conversation
-    //     const conversationResponse = await nlpLearningSystem.handleConversation(message);
-    //
-    //     if (conversationResponse) {
-    //       console.log(`💬 [NLP Conversation] User: "${message.content.substring(0, 50)}..." → Responding`);
-    //       await message.reply(conversationResponse).catch((error) => {
-    //         console.error('❌ Error sending conversation response:', error);
-    //       });
-    //
-    //       // Return early - this was a conversation, not a command
-    //       return;
-    //     }
-    //   }
-    // }
+    // Bot now relies on invoked commands only (! prefix and slash commands)
+    // Natural language interpretation, conversation, and learning systems are disabled
 
     // ✅ HANDLE !BID AND ALIASES IMMEDIATELY
     const rawCmd = message.content.trim().toLowerCase().split(/\s+/)[0];
@@ -6512,18 +6355,6 @@ client.on(Events.MessageCreate, async (message) => {
     if (inAdminLogs) {
       const adminCmd = resolveCommandAlias(rawCmd);
       const args = message.content.trim().split(/\s+/).slice(1);
-
-      // LOOT COMMAND - DISABLED (manual loot entry now used)
-      // const lootCmd = resolveCommandAlias(rawCmd);
-      // if (lootCmd === "!loot") {
-      //   console.log(`🎯 Loot command detected`);
-      //   await lootSystem.handleLootCommand(
-      //     message,
-      //     message.content.trim().split(/\s+/).slice(1),
-      //     client
-      //   );
-      //   return;
-      // }
 
       // Admin logs override commands
       if (
@@ -7786,5 +7617,8 @@ if (!config.token) {
   console.error("❌ Discord token not found! Set DISCORD_TOKEN environment variable or add token to config.json");
   process.exit(1);
 }
+
+// Export commandHandlers for slash command reuse
+module.exports = { commandHandlers };
 
 client.login(config.token);
