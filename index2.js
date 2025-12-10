@@ -4744,7 +4744,13 @@ client.once(Events.ClientReady, async () => {
       const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
       const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
       const rssMB = Math.round(memUsage.rss / 1024 / 1024);
-      const memoryPressure = (heapUsedMB / heapTotalMB) * 100;
+
+      // Calculate memory pressure based on HEAP LIMIT, not current allocation
+      // This prevents false high-pressure warnings when V8 allocates conservatively
+      const v8 = require('v8');
+      const heapStats = v8.getHeapStatistics();
+      const heapLimitMB = Math.round(heapStats.heap_size_limit / 1024 / 1024);
+      const memoryPressure = (heapUsedMB / heapLimitMB) * 100;
 
       // Run garbage collection
       global.gc();

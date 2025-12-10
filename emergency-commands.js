@@ -247,6 +247,9 @@ async function forceCloseAllAttendance(message) {
       let closedCount = 0;
       let errorCount = 0;
 
+      // Get active spawns before the loop to check for rotation warnings
+      const activeSpawns = attendance.getActiveSpawns();
+
       for (const [threadId, thread] of threads.threads) {
         try {
           await thread.send(`${EMOJI.EMERGENCY} **EMERGENCY CLOSURE** by admin ${message.author.username}`);
@@ -268,7 +271,6 @@ async function forceCloseAllAttendance(message) {
       }
 
       // Clear all state
-      const activeSpawns = attendance.getActiveSpawns();
       const activeColumns = attendance.getActiveColumns();
       const pendingVerifications = attendance.getPendingVerifications();
       const pendingClosures = attendance.getPendingClosures();
