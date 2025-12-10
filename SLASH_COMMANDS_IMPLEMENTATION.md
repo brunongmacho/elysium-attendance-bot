@@ -724,6 +724,36 @@ class CommandContext {
       // Simplified for now
     }
   }
+
+  // Add tip to response (only for prefix commands)
+  addTip(message, slashCommand) {
+    if (this.type !== 'prefix') return message;
+
+    // Check if user should see tip
+    if (!shouldShowTip(this.user.id, slashCommand)) return message;
+
+    // Append tip to message
+    const tip = `\n\n💡 **Tip:** Try \`/${slashCommand}\` for autocomplete and a better experience!`;
+
+    // Handle different message types
+    if (typeof message === 'string') {
+      return message + tip;
+    } else if (message.embeds && message.embeds.length > 0) {
+      // For embeds, add tip as footer or separate text
+      return {
+        ...message,
+        content: (message.content || '') + tip
+      };
+    } else {
+      return message;
+    }
+  }
+
+  // Reply with optional tip
+  async replyWithTip(message, slashCommand) {
+    const messageWithTip = this.addTip(message, slashCommand);
+    return await this.reply(messageWithTip);
+  }
 }
 ```
 
@@ -736,7 +766,12 @@ async function handleVerify(ctx, member) {
   }
 
   // Business logic...
-  await ctx.reply(`✅ Verified ${member}`);
+
+  // Option 1: Manual tip
+  await ctx.replyWithTip(`✅ Verified ${member}`, 'verify');
+
+  // Option 2: Regular reply (no tip)
+  // await ctx.reply(`✅ Verified ${member}`);
 }
 
 // Slash command
@@ -754,6 +789,21 @@ if (content.startsWith('!verify')) {
   ctx.isAdmin = isAdmin(member);
   await handleVerify(ctx, args[0]);
 }
+```
+
+**With tips, the behavior is:**
+
+```
+User uses !verify TestMember:
+✅ Verified TestMember
+💡 **Tip:** Try `/verify` for autocomplete and a better experience!
+
+User uses /verify TestMember:
+✅ Verified TestMember
+(no tip - already using slash command)
+
+User uses /verify again:
+(system tracks they've used it, tip won't show for !verify anymore)
 ```
 
 ---
@@ -988,13 +1038,137 @@ We now support modern Discord slash commands! Try:
 
 ---
 
-### Phase 4: Gentle Nudges (Optional)
+### Phase 4: Gentle Nudges
 
 **Week 4+:**
-- When user uses `!killed`, bot replies: "✅ Boss marked killed. 💡 Tip: Try `/killed` for boss name autocomplete!"
-- Make nudges opt-out: Use `!disabletips` to disable
-- Track adoption metrics
-- Never force migration
+
+Add helpful tips to prefix command responses to encourage slash command adoption:
+
+**Implementation approach:**
+
+```javascript
+// After successful command execution, append a tip
+async function sendResponseWithTip(context, message, slashEquivalent) {
+  const fullMessage = context.type === 'prefix'
+    ? `${message}\n\n💡 **Tip:** Try \`${slashEquivalent}\` for autocomplete and a better experience!`
+    : message;
+
+  await context.reply(fullMessage);
+}
+```
+
+**Examples:**
+
+| Command | Response with Tip |
+|---------|------------------|
+| `!killed Lady Dalia` | ✅ Boss marked killed at 14:30. Next spawn: 17:30<br>💡 **Tip:** Try `/killed` for boss name autocomplete! |
+| `!verify TestMember` | ✅ Verified TestMember's attendance (+10 points)<br>💡 **Tip:** Try `/verify` for autocomplete of pending members! |
+| `!bid 500` | ✅ Bid placed: 500 points<br>💡 **Tip:** Try `/bid` for a cleaner experience! |
+| `!stats` | [Stats embed]<br>💡 **Tip:** Try `/stats` for the same info! |
+
+**Tip frequency settings:**
+
+1. **Option A: Always show (recommended for early adoption)**
+   - Show tip on every prefix command
+   - Until user tries slash command version
+   - Then stop showing for that command
+
+2. **Option B: Periodic (less intrusive)**
+   - Show tip once per day per command
+   - Or once every 10 uses
+   - Track in memory or database
+
+3. **Option C: Opt-out**
+   - Show tips by default
+   - Users can disable with `!disabletips`
+   - Re-enable with `!enabletips`
+
+**Recommended approach: Option A + Opt-out**
+- Show tips always initially
+- Track which slash commands user has tried
+- Stop showing tips for commands they've used
+- Allow `!disabletips` to disable completely
+
+**Implementation details:**
+
+```javascript
+// Track slash command usage per user
+const slashCommandUsage = new Map(); // userId -> Set of command names
+
+// Check if user has used slash version
+function shouldShowTip(userId, commandName) {
+  // Check if tips disabled globally for user
+  if (tipsDisabled.has(userId)) return false;
+
+  // Check if user has already tried this slash command
+  const userCommands = slashCommandUsage.get(userId);
+  if (userCommands && userCommands.has(commandName)) return false;
+
+  return true;
+}
+
+// Track slash command usage
+client.on('interactionCreate', async interaction => {
+  if (interaction.isCommand()) {
+    const userId = interaction.user.id;
+    if (!slashCommandUsage.has(userId)) {
+      slashCommandUsage.set(userId, new Set());
+    }
+    slashCommandUsage.get(userId).add(interaction.commandName);
+  }
+});
+```
+
+**Which commands get tips:**
+
+Priority 1 (Always show tips):
+- `!killed`, `!spawned` - Autocomplete is huge win
+- `!verify`, `!deny` - Autocomplete pending members
+- `!bid` - Better mobile experience
+
+Priority 2 (Show tips):
+- `!stats`, `!leaderboard` - Simple promotion
+- `!rotation` - Subcommands cleaner
+
+Priority 3 (Optional tips):
+- Admin emergency commands - Less critical
+- Rare commands - Not worth the noise
+
+**Tip message variants:**
+
+For commands with autocomplete benefits:
+```
+💡 **Tip:** Try `/killed` for boss name autocomplete!
+```
+
+For commands with mobile benefits:
+```
+💡 **Tip:** Try `/bid` - easier on mobile!
+```
+
+For commands with cleaner syntax:
+```
+💡 **Tip:** Try `/auction start` for a cleaner experience!
+```
+
+**Testing plan:**
+- [ ] Tips appear on prefix commands
+- [ ] Tips don't appear on slash commands
+- [ ] Tips stop showing after user tries slash version
+- [ ] `!disabletips` works
+- [ ] Tips don't break existing functionality
+- [ ] Tips are unobtrusive (at end of message)
+
+**Rollback:**
+- If tips annoy users, easy to remove
+- Just stop appending tip text
+- No data loss, no breaking changes
+
+**Success metrics:**
+- Track tip impression rate
+- Track slash command adoption rate
+- Monitor user feedback
+- Adjust frequency based on response
 
 ---
 
