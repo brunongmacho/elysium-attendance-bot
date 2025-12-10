@@ -1247,6 +1247,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
           member: interaction.member,
           channel: interaction.channel,
           guild: interaction.guild,
+          client: client,
           content: '!queuelist',
           reply: async (content) => {
             if (typeof content === 'string') {
