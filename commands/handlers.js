@@ -10,6 +10,8 @@
  * @author ELYSIUM Development Team
  */
 
+const { EmbedBuilder } = require('discord.js');
+
 /**
  * Handle slash commands
  *
@@ -77,13 +79,15 @@ async function handleSlashCommand(interaction, modules, config, client) {
       const boss = interaction.options.getString('boss');
       const timestamp = interaction.options.getString('timestamp') || 'now';
 
+      await interaction.deferReply();
+
       // Create a synthetic message object for compatibility with existing handler
       const syntheticMessage = {
         content: `!killed ${boss} ${timestamp}`,
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
-        reply: async (content) => interaction.reply(content)
+        reply: async (content) => interaction.editReply(content)
       };
 
       const args = [boss];
@@ -91,17 +95,10 @@ async function handleSlashCommand(interaction, modules, config, client) {
         args.push(timestamp);
       }
 
-      // Defer reply for potentially long-running operation
-      await interaction.deferReply();
-
       try {
         // Call existing boss timer command handler
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleKilled(syntheticMessage, args, config);
-
-        // Edit the deferred reply
-        await interaction.editReply({
-          content: `✅ Boss marked as killed: **${boss}** at ${timestamp}\n\n💡 **Tip:** Slash commands support autocomplete for boss names!`
-        });
       } catch (error) {
         console.error('Error in /killed command:', error);
         await interaction.editReply({
@@ -126,10 +123,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
       };
 
       try {
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleSpawned(syntheticMessage, [boss], config);
-        await interaction.editReply({
-          content: `✅ Boss marked as spawned: **${boss}**\n\n💡 **Tip:** Try /killed for recording boss kills!`
-        });
       } catch (error) {
         console.error('Error in /spawned command:', error);
         await interaction.editReply({
@@ -178,10 +173,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
       };
 
       try {
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleUnkill(syntheticMessage, [boss], config);
-        await interaction.editReply({
-          content: `✅ Boss kill record removed: **${boss}**`
-        });
       } catch (error) {
         console.error('Error in /unkill command:', error);
         await interaction.editReply({
@@ -207,10 +200,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
       };
 
       try {
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleSetBoss(syntheticMessage, [boss, status], config);
-        await interaction.editReply({
-          content: `✅ Boss status set: **${boss}** → ${status}`
-        });
       } catch (error) {
         console.error('Error in /setboss command:', error);
         await interaction.editReply({
@@ -235,10 +226,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
       };
 
       try {
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleNoSpawn(syntheticMessage, [boss], config);
-        await interaction.editReply({
-          content: `✅ Boss marked as not spawning: **${boss}**`
-        });
       } catch (error) {
         console.error('Error in /nospawn command:', error);
         await interaction.editReply({
@@ -273,10 +262,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
       };
 
       try {
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleMaintenance(syntheticMessage);
-        await interaction.editReply({
-          content: `✅ All bosses spawned (server maintenance mode)`
-        });
       } catch (error) {
         console.error('Error in /maintenance command:', error);
         await interaction.editReply({
@@ -311,10 +298,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
       };
 
       try {
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleServerDown(syntheticMessage);
-        await interaction.editReply({
-          content: `✅ Server down mode activated`
-        });
       } catch (error) {
         console.error('Error in /serverdown command:', error);
         await interaction.editReply({
@@ -349,10 +334,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
       };
 
       try {
+        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
         await bossTimerCommands.handleClearKills(syntheticMessage);
-        await interaction.editReply({
-          content: `✅ All boss kill records cleared`
-        });
       } catch (error) {
         console.error('Error in /clearkills command:', error);
         await interaction.editReply({
@@ -375,31 +358,64 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
         try {
           const allRotations = await bossRotation.getAllRotations();
-          const rotationBosses = Object.keys(allRotations);
+          const rotatingBosses = bossRotation.getRotatingBosses();
 
-          if (rotationBosses.length === 0) {
+          if (Object.keys(allRotations).length === 0) {
             await interaction.editReply({
-              content: '❌ No rotating bosses found in the system'
+              content: '⚠️ No rotation data available. BossRotation sheet may not be set up.'
             });
             return;
           }
 
-          // Build status message
-          let statusMessage = '**🔄 Boss Rotation Status**\n\n';
+          const embed = new EmbedBuilder()
+            .setColor(0x4a90e8)
+            .setTitle('🔄 Boss Rotation Status')
+            .setDescription('Current rotation for 5-guild system')
+            .setTimestamp();
 
-          for (const bossName of rotationBosses) {
-            const rotation = allRotations[bossName];
-            const emoji = rotation.isOurTurn ? '🟢' : '🔴';
-            const status = rotation.isOurTurn ? 'ELYSIUM' : rotation.currentGuild;
+          for (const boss of rotatingBosses) {
+            const rotation = allRotations[boss];
+            if (rotation) {
+              const emoji = rotation.isOurTurn ? '🟢' : '🔴';
+              const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
 
-            statusMessage += `${emoji} **${bossName}**\n`;
-            statusMessage += `   Position: ${rotation.currentIndex}/${rotation.guilds.length} (${status})\n`;
-            statusMessage += `   Next: ${rotation.nextGuild}\n\n`;
+              // Get spawn time from boss timer if available
+              let spawnInfo = '';
+              try {
+                const timerData = bossTimer.getNextSpawn(boss);
+                if (timerData && timerData.nextSpawn) {
+                  const spawnTimestamp = Math.floor(timerData.nextSpawn.getTime() / 1000);
+                  spawnInfo = `\n📍 Next Spawn: <t:${spawnTimestamp}:R> ⏱️`;
+                }
+              } catch (timerError) {
+                // Silently continue without spawn info
+              }
+
+              // Handle guilds array - check if it's empty or missing
+              const hasGuilds = rotation.guilds && Array.isArray(rotation.guilds) && rotation.guilds.length > 0;
+              const guildCount = hasGuilds ? rotation.guilds.length : 5;
+
+              let nextGuild = 'Unknown';
+              if (hasGuilds && rotation.guilds[rotation.currentIndex % guildCount]) {
+                nextGuild = rotation.guilds[rotation.currentIndex % guildCount];
+              } else if (rotation.nextGuild) {
+                nextGuild = rotation.nextGuild;
+              } else if (rotation.currentGuild) {
+                nextGuild = rotation.currentGuild;
+              }
+
+              // Show warning if guilds data is incomplete
+              const dataWarning = !hasGuilds ? '\n⚠️ Guild list incomplete in sheet' : '';
+
+              embed.addFields({
+                name: `${emoji} ${boss}`,
+                value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**\nNext: ${nextGuild}${spawnInfo}${dataWarning}`,
+                inline: false
+              });
+            }
           }
 
-          await interaction.editReply({
-            content: statusMessage
-          });
+          await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
           console.error('Error in /rotation status:', error);
@@ -423,12 +439,32 @@ async function handleSlashCommand(interaction, modules, config, client) {
           if (result.success) {
             const data = result.data;
             const emoji = data.isOurTurn ? '🟢' : '🔴';
+            const status = data.isOurTurn ? 'ELYSIUM\'S TURN' : `${data.currentGuild}'s turn`;
 
-            await interaction.editReply({
-              content: `✅ Rotation updated: **${boss}**\n` +
-                       `${data.oldIndex} (${data.oldGuild}) → ${data.newIndex} (${data.newGuild})\n\n` +
-                       `${emoji} Status: ${data.isOurTurn ? 'ELYSIUM\'S TURN' : data.newGuild + '\'s turn'}`
-            });
+            const embed = new EmbedBuilder()
+              .setColor(data.isOurTurn ? 0x00ff00 : 0xff0000)
+              .setTitle(`${emoji} Rotation Updated`)
+              .setDescription(`**${boss}** rotation manually set`)
+              .addFields(
+                {
+                  name: 'Previous',
+                  value: `Index ${data.oldIndex} (${data.oldGuild})`,
+                  inline: true
+                },
+                {
+                  name: 'Current',
+                  value: `Index ${data.newIndex} (${data.newGuild})`,
+                  inline: true
+                },
+                {
+                  name: 'Status',
+                  value: `**${status}**`,
+                  inline: false
+                }
+              )
+              .setTimestamp();
+
+            await interaction.editReply({ embeds: [embed] });
           } else {
             await interaction.editReply({
               content: `❌ Failed to set rotation: ${result.message}`
@@ -455,12 +491,32 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
           if (result.updated !== false) {
             const emoji = result.isNowOurTurn ? '🟢' : '🔴';
+            const status = result.isNowOurTurn ? 'ELYSIUM\'S TURN' : `${result.newGuild}'s turn`;
 
-            await interaction.editReply({
-              content: `✅ Rotation incremented: **${boss}**\n` +
-                       `${result.oldIndex} (${result.oldGuild}) → ${result.newIndex} (${result.newGuild})\n\n` +
-                       `${emoji} Status: ${result.isNowOurTurn ? 'ELYSIUM\'S TURN' : result.newGuild + '\'s turn'}`
-            });
+            const embed = new EmbedBuilder()
+              .setColor(result.isNowOurTurn ? 0x00ff00 : 0xff0000)
+              .setTitle(`${emoji} Rotation Advanced`)
+              .setDescription(`**${boss}** rotation incremented`)
+              .addFields(
+                {
+                  name: 'Previous',
+                  value: `Index ${result.oldIndex} (${result.oldGuild})`,
+                  inline: true
+                },
+                {
+                  name: 'Current',
+                  value: `Index ${result.newIndex} (${result.newGuild})`,
+                  inline: true
+                },
+                {
+                  name: 'Status',
+                  value: `**${status}**`,
+                  inline: false
+                }
+              )
+              .setTimestamp();
+
+            await interaction.editReply({ embeds: [embed] });
           } else {
             await interaction.editReply({
               content: `❌ Failed to increment rotation: ${result.error || 'Unknown error'}`
@@ -484,12 +540,43 @@ async function handleSlashCommand(interaction, modules, config, client) {
           await bossRotation.refreshRotationCache();
 
           const allRotations = await bossRotation.getAllRotations();
-          const rotationBosses = Object.keys(allRotations);
+          const rotatingBosses = bossRotation.getRotatingBosses();
 
-          await interaction.editReply({
-            content: `✅ Rotation cache refreshed from Google Sheets!\n\n` +
-                     `Synced ${rotationBosses.length} rotating bosses: ${rotationBosses.join(', ')}`
-          });
+          if (Object.keys(allRotations).length === 0) {
+            await interaction.editReply({
+              content: '⚠️ No rotation data found after refresh. BossRotation sheet may not be set up.'
+            });
+            return;
+          }
+
+          const embed = new EmbedBuilder()
+            .setColor(0x00ff00)
+            .setTitle('✅ Rotation Data Refreshed')
+            .setDescription(`Loaded ${rotatingBosses.length} rotating bosses from Google Sheets`)
+            .setTimestamp();
+
+          for (const boss of rotatingBosses) {
+            const rotation = allRotations[boss];
+            if (rotation) {
+              const emoji = rotation.isOurTurn ? '🟢' : '🔴';
+              const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
+
+              // Handle guilds array - check if it's empty or missing
+              const hasGuilds = rotation.guilds && Array.isArray(rotation.guilds) && rotation.guilds.length > 0;
+              const guildCount = hasGuilds ? rotation.guilds.length : 5;
+
+              // Show warning if guilds data is incomplete
+              const dataWarning = !hasGuilds ? ' ⚠️ (incomplete)' : '';
+
+              embed.addFields({
+                name: `${emoji} ${boss}`,
+                value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**${dataWarning}`,
+                inline: false
+              });
+            }
+          }
+
+          await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
           console.error('Error in /rotation refresh:', error);

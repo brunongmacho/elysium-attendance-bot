@@ -6913,7 +6913,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     // AUTOCOMPLETE HANDLING
     // ═══════════════════════════════════════════════════════════════════════════
     if (interaction.isAutocomplete()) {
-      await handleAutocomplete(interaction, attendance);
+      await handleAutocomplete(interaction, attendance, bossRotation);
       return;
     }
 

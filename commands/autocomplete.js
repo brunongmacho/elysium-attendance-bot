@@ -30,10 +30,16 @@ function getAllBossNames() {
 }
 
 /**
- * Get rotation boss names (Amentis, General Aquleus, Baron Braudmore)
+ * Get rotation boss names from boss rotation module (dynamic list from Google Sheets)
+ * @param {Object} bossRotation - Boss rotation module
  * @returns {string[]} Array of rotation boss names
  */
-function getRotationBossNames() {
+function getRotationBossNames(bossRotation) {
+  if (bossRotation && typeof bossRotation.getRotatingBosses === 'function') {
+    const bosses = bossRotation.getRotatingBosses();
+    return bosses.length > 0 ? bosses : ['Amentis', 'General Aquleus', 'Baron Braudmore'];
+  }
+  // Fallback to default if module not available
   return ['Amentis', 'General Aquleus', 'Baron Braudmore'];
 }
 
@@ -121,9 +127,10 @@ function getPendingMembers(attendance, focusedValue) {
  *
  * @param {AutocompleteInteraction} interaction - Discord autocomplete interaction
  * @param {Object} attendance - Attendance module
+ * @param {Object} bossRotation - Boss rotation module
  * @returns {Promise<void>}
  */
-async function handleAutocomplete(interaction, attendance) {
+async function handleAutocomplete(interaction, attendance, bossRotation = null) {
   const commandName = interaction.commandName;
   const focusedOption = interaction.options.getFocused(true);
   const focusedValue = focusedOption.value;
@@ -143,12 +150,12 @@ async function handleAutocomplete(interaction, attendance) {
       choices = filterBossNames(focusedValue);
     }
 
-    // Rotation boss autocomplete (only Amentis, Aquleus, Braudmore)
+    // Rotation boss autocomplete (dynamic list from Google Sheets)
     else if (
       commandName === 'rotation' &&
       focusedOption.name === 'boss'
     ) {
-      choices = filterBossNames(focusedValue, getRotationBossNames());
+      choices = filterBossNames(focusedValue, getRotationBossNames(bossRotation));
     }
 
     // Pending member autocomplete (for verify/deny)
