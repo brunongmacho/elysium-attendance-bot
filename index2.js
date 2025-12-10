@@ -2657,10 +2657,10 @@ stats: async (message, member, args) => {
                 );
               }
 
-              // Archive the thread
-              await thread
-                .setLocked(true, `Mass close by ${member.user.username}`)
-                .setArchived(true, `Mass close by ${member.user.username}`)
+              // Lock and archive the thread
+              await thread.setLocked(true, `Mass close by ${member.user.username}`)
+                .catch(err => errorHandler.silentError(err, 'mass close lock empty thread'));
+              await thread.setArchived(true, `Mass close by ${member.user.username}`)
                 .catch(err => errorHandler.silentError(err, 'mass close archive empty thread'));
 
               // Clean up state
@@ -2710,12 +2710,9 @@ stats: async (message, member, args) => {
                   }
                 }
 
-                await thread
-                  .setLocked(true, `Mass locked by ${member.user.username} (duplicate prevented)`)
+                await thread.setLocked(true, `Mass close by ${member.user.username} (duplicate prevented)`)
                   .catch(err => errorHandler.silentError(err, 'mass close lock duplicate thread'));
-                await thread
-                  .setLocked(true, `Mass close by ${member.user.username} (duplicate prevented)`)
-                  .setArchived(true, `Mass close by ${member.user.username} (duplicate prevented)`)
+                await thread.setArchived(true, `Mass close by ${member.user.username} (duplicate prevented)`)
                   .catch(err => errorHandler.silentError(err, 'mass close archive duplicate thread'));
 
                 // Note: activeColumns already removed before check, but keeping for safety
