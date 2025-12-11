@@ -4492,6 +4492,17 @@ client.once(Events.ClientReady, async () => {
     // Get database stats
     const stats = await dbAPI.getStats();
     console.log(`📦 Database: ${stats.database} | Collections: ${stats.collections} | Size: ${stats.dataSize}`);
+
+    // Sync Discord IDs for members with temp IDs (auto-fix on startup)
+    try {
+      const guild = await client.guilds.fetch(config.main_guild_id);
+      const syncResult = await mongoHelpers.syncDiscordIds(guild);
+      if (syncResult.updated > 0) {
+        console.log(`🔄 Discord ID sync: ${syncResult.updated} members updated`);
+      }
+    } catch (syncError) {
+      console.error('⚠️ Discord ID sync failed (non-critical):', syncError.message);
+    }
   } catch (error) {
     console.error('⚠️ MongoDB connection failed (non-critical for now):', error.message);
     console.log('📝 Bot will continue with Google Sheets only until Phase 4');
