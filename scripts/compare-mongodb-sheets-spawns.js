@@ -129,10 +129,13 @@ async function compareMongoDBvsSheets() {
         hour12: false
       });
 
-      const key = `${spawn._id.boss}|${dateStr} ${timeStr}`;
+      // Use uppercase boss name for case-insensitive comparison
+      const bossUpper = spawn._id.boss.toUpperCase();
+      const key = `${bossUpper}|${dateStr} ${timeStr}`;
       mongoKeys.add(key);
       mongoDetails.set(key, {
         boss: spawn._id.boss,
+        bossUpper: bossUpper,
         timestamp: `${dateStr} ${timeStr}`,
         members: spawn.members.length,
         rawTimestamp: spawn._id.timestamp
@@ -173,10 +176,13 @@ async function compareMongoDBvsSheets() {
       });
 
       const formattedTimestamp = `${dateStr} ${timeStr}`;
-      const key = `${col.boss}|${formattedTimestamp}`;
+      // Use uppercase boss name for case-insensitive comparison (col.boss is already uppercase from Code.js)
+      const bossUpper = col.boss.toUpperCase();
+      const key = `${bossUpper}|${formattedTimestamp}`;
       sheetKeys.add(key);
       sheetDetails.set(key, {
         boss: col.boss,
+        bossUpper: bossUpper,
         timestamp: formattedTimestamp,
         originalTimestamp: col.timestamp,
         column: col.column
