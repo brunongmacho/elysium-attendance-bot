@@ -10,12 +10,8 @@ const dbAPI = require('../utils/database-api');
 const fs = require('fs');
 const path = require('path');
 
-// Load environment variables (optional - env vars may already be set)
-try {
-  require('dotenv').config();
-} catch (e) {
-  // dotenv not installed, environment variables should already be set
-}
+// Environment variables (DISCORD_TOKEN, MONGODB_URI) should be set in the environment
+// No need for dotenv - the bot loads these from the deployment environment
 
 // Load config
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'config.json'), 'utf8'));
