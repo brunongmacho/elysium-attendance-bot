@@ -156,7 +156,7 @@ function getPendingMembers(attendance, focusedValue) {
 async function getGuildMembers(guild, focusedValue) {
   if (!guild) return [];
 
-  const lowerInput = focusedValue.toLowerCase();
+  const lowerInput = (focusedValue || '').toLowerCase();
 
   try {
     // Fetch all members from MongoDB (includes inactive members)
@@ -167,10 +167,13 @@ async function getGuildMembers(guild, focusedValue) {
       .map(m => m.username)
       .filter(name => name); // Filter out any null/undefined
 
-    // Filter by user input
+    // Filter by user input (if empty, show all)
     const filtered = memberNames
-      .filter(name => name.toLowerCase().includes(lowerInput))
+      .filter(name => !lowerInput || name.toLowerCase().includes(lowerInput))
       .sort((a, b) => {
+        // If no input, just sort alphabetically
+        if (!lowerInput) return a.localeCompare(b);
+
         // Exact match first
         const aExact = a.toLowerCase() === lowerInput;
         const bExact = b.toLowerCase() === lowerInput;
