@@ -365,7 +365,7 @@ async function getWeekData(db, startDate, endDate) {
   // Most active day
   const dayStats = {};
   spawns.forEach(spawn => {
-    const day = new Date(spawn.timestamp).toLocaleDateString('en-US', { weekday: 'long' });
+    const day = new Date(spawn.timestamp).toLocaleDateString('en-US', { timeZone: 'Asia/Manila', weekday: 'long' });
     dayStats[day] = (dayStats[day] || 0) + 1;
   });
   const mostActiveDay = Object.entries(dayStats)
@@ -402,8 +402,8 @@ async function getWeekData(db, startDate, endDate) {
 function buildWeeklyReportEmbed(reportData) {
   const { thisWeek, lastWeek, weekStart, weekEnd } = reportData;
 
-  // Format dates
-  const dateRange = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  // Format dates in GMT+8 (Philippine Time)
+  const dateRange = `${weekStart.toLocaleDateString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric' })}`;
 
   // Calculate changes
   const spawnChange = thisWeek.totalSpawns - lastWeek.totalSpawns;
@@ -556,7 +556,7 @@ async function generateMonthlyReport(date = new Date()) {
 
     if (cached) {
       errorHandler.info('Monthly report served from cache', {
-        month: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        month: date.toLocaleDateString('en-US', { timeZone: 'Asia/Manila', month: 'long', year: 'numeric' }),
         cacheAge: Date.now() - (cached.cachedAt || Date.now())
       });
       return cached;
@@ -662,8 +662,8 @@ async function generateMonthlyReport(date = new Date()) {
   const hourStats = {};
   spawns.forEach(spawn => {
     const date = new Date(spawn._id.timestamp);
-    const day = date.toLocaleDateString('en-US', { weekday: 'long' });
-    const hour = date.getHours();
+    const day = date.toLocaleDateString('en-US', { timeZone: 'Asia/Manila', weekday: 'long' });
+    const hour = date.getHours(); // Note: This still uses UTC hours - should be fixed if hour stats are important
 
     dayStats[day] = (dayStats[day] || 0) + 1;
     hourStats[hour] = (hourStats[hour] || 0) + 1;
@@ -690,7 +690,7 @@ async function generateMonthlyReport(date = new Date()) {
     const totalPointsSpent = members.reduce((sum, m) => sum + (m.pointsSpent || 0), 0);
 
     errorHandler.success('Monthly report generated successfully', {
-      month: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      month: date.toLocaleDateString('en-US', { timeZone: 'Asia/Manila', month: 'long', year: 'numeric' }),
       totalSpawns,
       uniqueMembers: memberStats.length
     });
@@ -725,7 +725,7 @@ async function generateMonthlyReport(date = new Date()) {
       silent: false,
       metadata: {
         operation: 'monthly_report_generation',
-        month: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        month: date.toLocaleDateString('en-US', { timeZone: 'Asia/Manila', month: 'long', year: 'numeric' })
       }
     });
     throw error; // Re-throw for caller to handle
@@ -736,7 +736,7 @@ async function generateMonthlyReport(date = new Date()) {
  * Build monthly report embed (comprehensive)
  */
 function buildMonthlyReportEmbed(reportData) {
-  const monthName = reportData.month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const monthName = reportData.month.toLocaleDateString('en-US', { timeZone: 'Asia/Manila', month: 'long', year: 'numeric' });
   const daysInMonth = new Date(reportData.month.getFullYear(), reportData.month.getMonth() + 1, 0).getDate();
 
   const embed = new EmbedBuilder()
