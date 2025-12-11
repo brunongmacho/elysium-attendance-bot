@@ -1049,7 +1049,9 @@ async function syncDiscordIds(guild) {
 
       if (!discordMember) {
         // Enhanced logging: show similar names to help debug
-        const similarMembers = discordMembers
+        // Convert Collection to array for array methods
+        const discordMembersArray = Array.from(discordMembers.values());
+        const similarMembers = discordMembersArray
           .filter(dm => {
             const username = dm.user.username.toLowerCase();
             const nickname = dm.nickname ? dm.nickname.toLowerCase() : '';
