@@ -214,26 +214,64 @@ async function batchMigrateAllMembers(discordClient, guildId) {
   // Migrate each member
   for (const member of tempMembers) {
     try {
-      // Find Discord member by nickname (in-game name) first, then username
-      let discordMember = guild.members.cache.find(
+      const cleanUsername = member.username.toLowerCase().replace(/[\s_-]/g, '');
+      let discordMember = null;
+      let matchStrategy = '';
+
+      // Strategy 1: Exact nickname match (case-insensitive)
+      discordMember = guild.members.cache.find(
         m => m.nickname && m.nickname.toLowerCase() === member.username.toLowerCase()
       );
+      if (discordMember) matchStrategy = 'nickname (exact)';
 
-      // If not found by nickname, try by Discord username as fallback
+      // Strategy 2: Exact username match (case-insensitive)
       if (!discordMember) {
         discordMember = guild.members.cache.find(
           m => m.user.username.toLowerCase() === member.username.toLowerCase()
         );
+        if (discordMember) matchStrategy = 'username (exact)';
+      }
+
+      // Strategy 3: Nickname match ignoring spaces, underscores, hyphens
+      if (!discordMember) {
+        discordMember = guild.members.cache.find(
+          m => m.nickname && m.nickname.toLowerCase().replace(/[\s_-]/g, '') === cleanUsername
+        );
+        if (discordMember) matchStrategy = 'nickname (fuzzy)';
+      }
+
+      // Strategy 4: Username match ignoring spaces, underscores, hyphens
+      if (!discordMember) {
+        discordMember = guild.members.cache.find(
+          m => m.user.username.toLowerCase().replace(/[\s_-]/g, '') === cleanUsername
+        );
+        if (discordMember) matchStrategy = 'username (fuzzy)';
+      }
+
+      // Strategy 5: DisplayName match (case-insensitive)
+      if (!discordMember) {
+        discordMember = guild.members.cache.find(
+          m => m.displayName && m.displayName.toLowerCase() === member.username.toLowerCase()
+        );
+        if (discordMember) matchStrategy = 'displayName (exact)';
+      }
+
+      // Strategy 6: DisplayName match ignoring spaces, underscores, hyphens
+      if (!discordMember) {
+        discordMember = guild.members.cache.find(
+          m => m.displayName && m.displayName.toLowerCase().replace(/[\s_-]/g, '') === cleanUsername
+        );
+        if (discordMember) matchStrategy = 'displayName (fuzzy)';
       }
 
       if (!discordMember) {
         console.warn(`⚠️ [Discord ID Mapper] Discord member not found for: ${member.username}`);
-        console.warn(`   Tried: nickname="${member.username}" and username="${member.username}"`);
+        console.warn(`   Tried: nickname, username, displayName (with variations)`);
         stats.notFound++;
         continue;
       }
 
-      console.log(`🔍 Found ${member.username} → Discord ID: ${discordMember.id} (matched by ${discordMember.nickname ? 'nickname' : 'username'})`);
+      console.log(`🔍 Found ${member.username} → Discord ID: ${discordMember.id} (matched by ${matchStrategy})`);
 
       // Migrate this member
       await mapDiscordIdToMember(member.username, discordMember.id);
