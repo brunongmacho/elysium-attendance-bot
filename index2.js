@@ -1368,17 +1368,24 @@ function buildStatsEmbed(stats, member, countdown = 300) {
   // 🎭 ADD MEMBER LORE IF AVAILABLE
   // CRITICAL FIX: Case-insensitive lookup for lore
   const loreKey = Object.keys(memberLore).find(
-    key => key.toLowerCase() === memberName.toLowerCase()
+    key => key.toLowerCase() === memberName.toLowerCase() && !key.startsWith('_')
   );
-  const lore = loreKey ? memberLore[loreKey] : null;
+  // Fall back to future member template if no specific lore found
+  const lore = loreKey ? memberLore[loreKey] : memberLore['_FUTURE_MEMBER_TEMPLATE'];
+  const isTemplateLore = !loreKey && memberLore['_FUTURE_MEMBER_TEMPLATE'];
 
   if (lore) {
     const skillsList = lore.skills ? lore.skills.join(', ') : 'None';
+    // Personalize the template title for the member
+    const displayTitle = isTemplateLore ? `${memberName}'s Destiny Awaits` : lore.title;
     embed.addFields({
-      name: `✨ ${lore.title}`,
+      name: `✨ ${displayTitle}`,
       value: `${lore.lore}\n\n**Specialty:** ${lore.specialty}\n**Reputation:** ${lore.reputation}\n**Stats:** ${lore.stats}\n**Skills:** ${skillsList}`,
       inline: false
     });
+    if (isTemplateLore) {
+      console.log(`ℹ️ Using template lore for: ${memberName}`);
+    }
   } else {
     console.log(`ℹ️ No lore found for: ${memberName} (checked ${Object.keys(memberLore).length} entries)`);
   }
