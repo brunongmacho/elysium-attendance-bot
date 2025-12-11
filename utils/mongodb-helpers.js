@@ -961,6 +961,134 @@ function resetCircuit() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// DISCORD ID SYNC (Auto-fix temp IDs on startup)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Sync Discord IDs for members with temp IDs
+ * Fetches guild members from Discord and updates MongoDB members + attendance records
+ *
+ * @param {Guild} guild - Discord guild object
+ * @returns {Promise<Object>} - Sync results { updated, failed, skipped }
+ */
+async function syncDiscordIds(guild) {
+  const db = await dbAPI.connect();
+
+  console.log('🔄 [MongoDB] Syncing Discord IDs for members with temp IDs...');
+
+  // Step 1: Find all members with temp IDs
+  const tempMembers = await db.collection('members')
+    .find({ _id: /^temp_/ })
+    .toArray();
+
+  if (tempMembers.length === 0) {
+    console.log('✅ [MongoDB] No temp IDs found - all members have real Discord IDs');
+    return { updated: 0, failed: 0, skipped: 0 };
+  }
+
+  console.log(`   Found ${tempMembers.length} members with temp IDs`);
+
+  // Step 2: Fetch all Discord guild members
+  console.log('   Fetching Discord guild members...');
+  await guild.members.fetch(); // Ensure cache is populated
+  const discordMembers = guild.members.cache;
+  console.log(`   Loaded ${discordMembers.size} Discord members`);
+
+  let updated = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  // Step 3: Update each temp member
+  for (const tempMember of tempMembers) {
+    try {
+      // Find matching Discord member by username (case-insensitive)
+      const discordMember = discordMembers.find(dm =>
+        dm.user.username.toLowerCase() === tempMember.username.toLowerCase() ||
+        (dm.nickname && dm.nickname.toLowerCase() === tempMember.username.toLowerCase())
+      );
+
+      if (!discordMember) {
+        console.log(`   ⚠️ No Discord member found for: ${tempMember.username}`);
+        skipped++;
+        continue;
+      }
+
+      const realDiscordId = discordMember.id;
+      const tempId = tempMember._id;
+
+      // Check if real Discord ID already exists (prevent duplicates)
+      const existing = await db.collection('members').findOne({ _id: realDiscordId });
+      if (existing) {
+        console.log(`   ⚠️ Discord ID ${realDiscordId} already exists, merging data for ${tempMember.username}...`);
+
+        // Merge attendance data
+        const tempAttendance = tempMember.attendance || { total: 0, byBoss: {} };
+        const existingAttendance = existing.attendance || { total: 0, byBoss: {} };
+
+        // Update existing member with merged data
+        await db.collection('members').updateOne(
+          { _id: realDiscordId },
+          {
+            $set: {
+              'attendance.total': Math.max(tempAttendance.total, existingAttendance.total),
+              'attendance.byBoss': { ...existingAttendance.byBoss, ...tempAttendance.byBoss },
+              pointsAvailable: Math.max(tempMember.pointsAvailable || 0, existing.pointsAvailable || 0),
+              pointsEarned: Math.max(tempMember.pointsEarned || 0, existing.pointsEarned || 0),
+              lastUpdated: new Date()
+            }
+          }
+        );
+
+        // Update attendance records to use real Discord ID
+        await db.collection('attendance').updateMany(
+          { memberId: tempId },
+          { $set: { memberId: realDiscordId } }
+        );
+
+        // Delete temp member
+        await db.collection('members').deleteOne({ _id: tempId });
+
+        console.log(`   ✅ Merged: ${tempMember.username} (${tempId} → ${realDiscordId})`);
+      } else {
+        // Simple case: just rename the member ID
+
+        // Step 3a: Insert new member with real Discord ID
+        const newMemberDoc = {
+          ...tempMember,
+          _id: realDiscordId,
+          lastUpdated: new Date()
+        };
+        delete newMemberDoc._id; // Remove old _id
+        newMemberDoc._id = realDiscordId; // Set new _id
+
+        await db.collection('members').insertOne(newMemberDoc);
+
+        // Step 3b: Update all attendance records to use real Discord ID
+        const attendanceUpdateResult = await db.collection('attendance').updateMany(
+          { memberId: tempId },
+          { $set: { memberId: realDiscordId } }
+        );
+
+        // Step 3c: Delete old temp member
+        await db.collection('members').deleteOne({ _id: tempId });
+
+        console.log(`   ✅ Updated: ${tempMember.username} (${tempId} → ${realDiscordId}, ${attendanceUpdateResult.modifiedCount} records)`);
+      }
+
+      updated++;
+
+    } catch (error) {
+      console.error(`   ❌ Failed to update ${tempMember.username}:`, error.message);
+      failed++;
+    }
+  }
+
+  console.log(`✅ [MongoDB] Discord ID sync complete: ${updated} updated, ${failed} failed, ${skipped} skipped`);
+
+  return { updated, failed, skipped };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1019,5 +1147,8 @@ module.exports = {
 
   // Utilities
   getCircuitStatus,
-  resetCircuit
+  resetCircuit,
+
+  // Discord ID sync
+  syncDiscordIds
 };
