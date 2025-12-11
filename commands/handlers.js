@@ -585,7 +585,16 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
     // /openthread command - Reopen closed attendance thread
     if (commandName === 'openthread') {
-      await interaction.deferReply();
+      // Defer with ephemeral to acknowledge interaction
+      // The handler sends confirmation buttons to channel, not as interaction response
+      await interaction.deferReply({ ephemeral: true });
+
+      try {
+        // Delete the "thinking" message since handler will send its own messages
+        await interaction.deleteReply().catch(() => {});
+      } catch (e) {
+        // Ignore errors
+      }
 
       // Create synthetic message object to reuse existing !openthread handler
       const syntheticMessage = {
@@ -596,12 +605,14 @@ async function handleSlashCommand(interaction, modules, config, client) {
         content: '!openthread',
         mentions: { members: new Map() },
         reply: async (content) => {
+          // Send directly to channel (not as interaction response)
+          // This allows the handler's confirmation flow to work naturally
           if (typeof content === 'string') {
-            return await interaction.editReply({ content });
+            return await interaction.channel.send({ content });
           } else if (content.embeds) {
-            return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+            return await interaction.channel.send({ embeds: content.embeds, content: content.content || null });
           } else {
-            return await interaction.editReply(content);
+            return await interaction.channel.send(content);
           }
         }
       };
@@ -613,7 +624,16 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
     // /overrideclose command - Close and overwrite attendance
     if (commandName === 'overrideclose') {
-      await interaction.deferReply();
+      // Defer with ephemeral to acknowledge interaction
+      // The handler sends confirmation buttons and status messages to channel
+      await interaction.deferReply({ ephemeral: true });
+
+      try {
+        // Delete the "thinking" message since handler will send its own messages
+        await interaction.deleteReply().catch(() => {});
+      } catch (e) {
+        // Ignore errors
+      }
 
       // Create synthetic message object to reuse existing !overrideclose handler
       const syntheticMessage = {
@@ -624,12 +644,14 @@ async function handleSlashCommand(interaction, modules, config, client) {
         content: '!overrideclose',
         mentions: { members: new Map() },
         reply: async (content) => {
+          // Send directly to channel (not as interaction response)
+          // This allows the handler's confirmation and status messages to work
           if (typeof content === 'string') {
-            return await interaction.editReply({ content });
+            return await interaction.channel.send({ content });
           } else if (content.embeds) {
-            return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+            return await interaction.channel.send({ embeds: content.embeds, content: content.content || null });
           } else {
-            return await interaction.editReply(content);
+            return await interaction.channel.send(content);
           }
         }
       };
