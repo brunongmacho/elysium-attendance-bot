@@ -2283,7 +2283,7 @@ const commandHandlers = {
   stats: async (message, member, args) => {
   let targetMember = member;
   let targetDisplayName = member.displayName; // For display purposes
-  let targetQueryName = member.user.username; // For MongoDB/Sheets query
+  let targetQueryName = member.nickname || member.user.username; // For MongoDB/Sheets query (use nickname to match check-in format)
   let matchInfo = null;
 
   // Parse target from args
@@ -2292,7 +2292,7 @@ const commandHandlers = {
       // @mention provided - highest priority
       targetMember = message.mentions.members.first();
       targetDisplayName = targetMember.displayName;
-      targetQueryName = targetMember.user.username;
+      targetQueryName = targetMember.nickname || targetMember.user.username;
     } else {
       // User provided a name without @mention - use fuzzy matching
       const searchName = args.join(" ");
@@ -2304,7 +2304,7 @@ const commandHandlers = {
         if (matchInfo) {
           targetMember = matchInfo.member;
           targetDisplayName = matchInfo.matchedName; // For display
-          targetQueryName = matchInfo.member.user.username; // For query
+          targetQueryName = matchInfo.member.nickname || matchInfo.member.user.username; // For query (use nickname to match check-in format)
 
           // Log match quality for debugging
           console.log(`🔍 Stats fuzzy match: "${searchName}" → "${targetDisplayName}" (${matchInfo.matchType}, ${matchInfo.confidence}% confidence)`);
