@@ -144,11 +144,41 @@ async function compareMongoDBvsSheets() {
     const sheetDetails = new Map();
 
     sheetColumns.forEach(col => {
-      const key = `${col.boss}|${col.timestamp}`;
+      // Parse Google Sheets timestamp (might be a Date string or formatted string)
+      let parsedDate;
+      try {
+        parsedDate = new Date(col.timestamp);
+        if (isNaN(parsedDate.getTime())) {
+          console.log(`⚠️ Invalid date in sheet: ${col.timestamp}`);
+          return;
+        }
+      } catch (e) {
+        console.log(`⚠️ Error parsing sheet timestamp: ${col.timestamp}`);
+        return;
+      }
+
+      // Format to match MongoDB format: MM/DD/YY H:MM
+      const dateStr = parsedDate.toLocaleDateString('en-US', {
+        timeZone: 'Asia/Manila',
+        month: '2-digit',
+        day: '2-digit',
+        year: '2-digit'
+      });
+
+      const timeStr = parsedDate.toLocaleTimeString('en-US', {
+        timeZone: 'Asia/Manila',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: false
+      });
+
+      const formattedTimestamp = `${dateStr} ${timeStr}`;
+      const key = `${col.boss}|${formattedTimestamp}`;
       sheetKeys.add(key);
       sheetDetails.set(key, {
         boss: col.boss,
-        timestamp: col.timestamp,
+        timestamp: formattedTimestamp,
+        originalTimestamp: col.timestamp,
         column: col.column
       });
     });
