@@ -77,7 +77,7 @@ async function migrateDiscordIds() {
 
     // Wait for client to be ready
     await new Promise((resolve) => {
-      client.once('ready', resolve);
+      client.once('clientReady', resolve);
     });
 
     console.log(`✅ Bot ready as ${client.user.tag}\n`);
