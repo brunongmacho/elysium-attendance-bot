@@ -655,6 +655,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
+        client: client,
         reply: async (content) => interaction.editReply(content)
       };
 
@@ -687,6 +688,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
+        client: client,
         reply: async (content) => interaction.editReply(content)
       };
 
@@ -711,6 +713,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
+        client: client,
         reply: async (content) => interaction.editReply(content)
       };
 
@@ -737,6 +740,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
+        client: client,
         reply: async (content) => interaction.editReply(content)
       };
 
@@ -764,6 +768,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
+        client: client,
         reply: async (content) => interaction.editReply(content)
       };
 
@@ -790,6 +795,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
+        client: client,
         reply: async (content) => interaction.editReply(content)
       };
 
@@ -826,6 +832,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
+        client: client,
         reply: async (content) => interaction.editReply(content)
       };
 
@@ -862,6 +869,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
+        client: client,
         reply: async (content) => interaction.editReply(content)
       };
 
@@ -898,6 +906,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
         author: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
+        client: client,
         reply: async (content) => interaction.editReply(content)
       };
 
