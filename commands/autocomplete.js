@@ -159,8 +159,8 @@ async function getGuildMembers(guild, focusedValue) {
   const lowerInput = (focusedValue || '').toLowerCase();
 
   try {
-    // Get Discord members and create a map for nickname lookup
-    await guild.members.fetch(); // Ensure cache is populated
+    // Get Discord members from cache and create a map for nickname lookup
+    // Note: We use cache only to avoid rate limits. Members are cached from bot startup.
     const discordMembersMap = new Map();
 
     for (const [id, member] of guild.members.cache) {
