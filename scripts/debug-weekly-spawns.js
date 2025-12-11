@@ -6,29 +6,27 @@
 
 const dbAPI = require('../utils/database-api');
 
-function toGMT8(date = new Date()) {
-  const d = new Date(date);
-  const utcTime = d.getTime() + (d.getTimezoneOffset() * 60000);
-  const gmt8Time = new Date(utcTime + (8 * 3600000));
-  return gmt8Time;
-}
-
 function getWeekStart(date = new Date()) {
-  const d = toGMT8(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day;
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  // Get the date in GMT+8
+  const gmt8Date = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+
+  // Get day of week (0 = Sunday)
+  const day = gmt8Date.getDay();
+
+  // Calculate Sunday of this week
+  const sunday = new Date(gmt8Date);
+  sunday.setDate(gmt8Date.getDate() - day);
+  sunday.setHours(0, 0, 0, 0);
+
+  return sunday;
 }
 
 function getWeekEnd(date = new Date()) {
-  const d = toGMT8(date);
-  const day = d.getDay();
-  const diff = d.getDate() + (6 - day);
-  d.setDate(diff);
-  d.setHours(23, 59, 59, 999);
-  return d;
+  const start = getWeekStart(date);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return end;
 }
 
 async function debugWeeklySpawns() {
