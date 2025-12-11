@@ -211,6 +211,8 @@ async function batchMigrateAllMembers(discordClient, guildId) {
   // Fetch all guild members
   await guild.members.fetch();
 
+  console.log(`📋 [Discord ID Mapper] Guild has ${guild.members.cache.size} total members`);
+
   // Migrate each member
   for (const member of tempMembers) {
     try {
@@ -267,6 +269,25 @@ async function batchMigrateAllMembers(discordClient, guildId) {
       if (!discordMember) {
         console.warn(`⚠️ [Discord ID Mapper] Discord member not found for: ${member.username}`);
         console.warn(`   Tried: nickname, username, displayName (with variations)`);
+
+        // Debug: Show similar Discord members (partial match)
+        const searchTerm = member.username.toLowerCase().substring(0, 4);
+        const similar = guild.members.cache
+          .filter(m => {
+            const username = m.user.username.toLowerCase();
+            const nickname = m.nickname ? m.nickname.toLowerCase() : '';
+            const displayName = m.displayName ? m.displayName.toLowerCase() : '';
+            return username.includes(searchTerm) || nickname.includes(searchTerm) || displayName.includes(searchTerm);
+          })
+          .first(3);
+
+        if (similar.length > 0) {
+          console.warn(`   💡 Similar Discord members found:`);
+          similar.forEach(m => {
+            console.warn(`      - Username: "${m.user.username}" | Nickname: "${m.nickname || 'none'}" | Display: "${m.displayName}"`);
+          });
+        }
+
         stats.notFound++;
         continue;
       }
