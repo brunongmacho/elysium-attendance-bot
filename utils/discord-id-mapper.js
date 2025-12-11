@@ -22,6 +22,21 @@
  */
 
 const dbAPI = require('./database-api');
+const fs = require('fs');
+const path = require('path');
+
+// Load manual Discord ID mappings (if exists)
+let manualMappings = {};
+try {
+  const mappingPath = path.join(__dirname, '..', 'config', 'discord-id-mapping.json');
+  if (fs.existsSync(mappingPath)) {
+    const mappingFile = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
+    manualMappings = mappingFile.mappings || {};
+    console.log(`📋 [Discord ID Mapper] Loaded ${Object.keys(manualMappings).filter(k => manualMappings[k]).length} manual ID mappings`);
+  }
+} catch (error) {
+  console.warn(`⚠️ [Discord ID Mapper] Could not load manual mappings: ${error.message}`);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DISCORD ID MAPPING
@@ -220,11 +235,25 @@ async function batchMigrateAllMembers(discordClient, guildId) {
       let discordMember = null;
       let matchStrategy = '';
 
+      // Strategy 0: Check manual mapping first
+      if (manualMappings[member.username] && manualMappings[member.username].trim()) {
+        const manualDiscordId = manualMappings[member.username].trim();
+        discordMember = guild.members.cache.get(manualDiscordId);
+        if (discordMember) {
+          matchStrategy = 'manual mapping';
+          console.log(`🗺️ [Discord ID Mapper] Using manual mapping for ${member.username} → ${manualDiscordId}`);
+        } else {
+          console.warn(`⚠️ [Discord ID Mapper] Manual mapping for ${member.username} points to ${manualDiscordId} but user not found in guild`);
+        }
+      }
+
       // Strategy 1: Exact nickname match (case-insensitive)
-      discordMember = guild.members.cache.find(
-        m => m.nickname && m.nickname.toLowerCase() === member.username.toLowerCase()
-      );
-      if (discordMember) matchStrategy = 'nickname (exact)';
+      if (!discordMember) {
+        discordMember = guild.members.cache.find(
+          m => m.nickname && m.nickname.toLowerCase() === member.username.toLowerCase()
+        );
+        if (discordMember) matchStrategy = 'nickname (exact)';
+      }
 
       // Strategy 2: Exact username match (case-insensitive)
       if (!discordMember) {
