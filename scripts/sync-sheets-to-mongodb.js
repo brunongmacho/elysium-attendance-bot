@@ -458,15 +458,34 @@ async function syncAttendance(db, sheetAPI) {
   log('🔄', 'Syncing attendance records...');
 
   try {
-    // PERF FIX: Quick check - if we already have records in MongoDB,
-    // and this isn't a forced sync, we can skip the expensive Sheet fetch
+    // PERF FIX: Smart check - compare counts and timestamps
+    // Instead of blindly skipping, check if there are new records to sync
     const attendanceCollection = db.collection('attendance');
     const existingCount = await attendanceCollection.countDocuments();
 
+    // If we have a lot of records, check if there are NEW ones before doing expensive fetch
     if (existingCount > 14000 && !process.argv.includes('--force-attendance')) {
-      log('⏭️', `Attendance already synced (${existingCount} records) - skipping to save memory`);
-      log('ℹ️', 'Use --force-attendance flag to force re-sync');
-      return { synced: 0, skipped: existingCount };
+      // Quick check: Get latest timestamp in MongoDB
+      const latestRecord = await attendanceCollection
+        .find({})
+        .sort({ timestamp: -1 })
+        .limit(1)
+        .toArray();
+
+      const latestTimestamp = latestRecord.length > 0 ? latestRecord[0].timestamp : null;
+
+      if (latestTimestamp) {
+        const hoursSinceLastSync = (Date.now() - new Date(latestTimestamp).getTime()) / (1000 * 60 * 60);
+
+        // If last record is less than 1 hour old, likely no new spawns yet
+        if (hoursSinceLastSync < 1) {
+          log('⏭️', `Attendance recently synced (${existingCount} records, last: ${new Date(latestTimestamp).toLocaleString()})`);
+          log('ℹ️', 'Use --force-attendance flag to force re-sync');
+          return { synced: 0, skipped: existingCount };
+        } else {
+          log('🔍', `Checking for new attendance records (last sync: ${hoursSinceLastSync.toFixed(1)}h ago)...`);
+        }
+      }
     }
 
     // Fetch all attendance from Google Sheets
