@@ -118,19 +118,25 @@ function toGMT8(date = new Date()) {
 }
 
 /**
- * Get week start date (Sunday) in GMT+8
+ * Get week start date (Sunday 00:00:00) in GMT+8
  */
 function getWeekStart(date = new Date()) {
-  const d = toGMT8(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day;
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  // Get the date in GMT+8
+  const gmt8Date = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+
+  // Get day of week (0 = Sunday)
+  const day = gmt8Date.getDay();
+
+  // Calculate Sunday of this week
+  const sunday = new Date(gmt8Date);
+  sunday.setDate(gmt8Date.getDate() - day);
+  sunday.setHours(0, 0, 0, 0);
+
+  return sunday;
 }
 
 /**
- * Get week end date (Saturday) in GMT+8
+ * Get week end date (Saturday 23:59:59) in GMT+8
  */
 function getWeekEnd(date = new Date()) {
   const start = getWeekStart(date);
@@ -141,24 +147,24 @@ function getWeekEnd(date = new Date()) {
 }
 
 /**
- * Get month start date in GMT+8
+ * Get month start date (1st day 00:00:00) in GMT+8
  */
 function getMonthStart(date = new Date()) {
-  const d = toGMT8(date);
-  d.setDate(1);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  const gmt8Date = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  gmt8Date.setDate(1);
+  gmt8Date.setHours(0, 0, 0, 0);
+  return gmt8Date;
 }
 
 /**
- * Get month end date in GMT+8
+ * Get month end date (last day 23:59:59) in GMT+8
  */
 function getMonthEnd(date = new Date()) {
-  const d = toGMT8(date);
-  d.setMonth(d.getMonth() + 1);
-  d.setDate(0);
-  d.setHours(23, 59, 59, 999);
-  return d;
+  const gmt8Date = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  gmt8Date.setMonth(gmt8Date.getMonth() + 1);
+  gmt8Date.setDate(0);
+  gmt8Date.setHours(23, 59, 59, 999);
+  return gmt8Date;
 }
 
 // ============================================================================
