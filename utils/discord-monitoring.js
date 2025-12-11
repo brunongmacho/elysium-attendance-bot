@@ -195,10 +195,17 @@ async function alertReportFailure(reportType, error) {
 
 /**
  * Alert about high memory usage
+ * DISABLED: Memory warnings disabled per user request
  * @param {number} usagePercent - Current heap usage percentage
  * @param {Object} memoryStats - Full memory statistics
  */
 async function alertHighMemory(usagePercent, memoryStats) {
+  // DISABLED: Memory warnings disabled - only log to console
+  console.log(`📊 Memory: ${usagePercent}% heap usage`);
+  return;
+
+  // Original code disabled below:
+  /*
   if (!adminChannel) return;
 
   const isCritical = usagePercent >= ERROR_THRESHOLDS.MEMORY_CRITICAL_PERCENT;
@@ -229,6 +236,7 @@ async function alertHighMemory(usagePercent, memoryStats) {
   } catch (err) {
     console.error('❌ Failed to send memory alert:', err.message);
   }
+  */
 }
 
 /**
