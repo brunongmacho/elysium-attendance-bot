@@ -4493,15 +4493,20 @@ client.once(Events.ClientReady, async () => {
     const stats = await dbAPI.getStats();
     console.log(`📦 Database: ${stats.database} | Collections: ${stats.collections} | Size: ${stats.dataSize}`);
 
-    // Sync Discord IDs for members with temp IDs (auto-fix on startup)
+    // Migrate temp IDs to real Discord IDs on startup
     try {
-      const guild = await client.guilds.fetch(config.main_guild_id);
-      const syncResult = await mongoHelpers.syncDiscordIds(guild);
-      if (syncResult.updated > 0) {
-        console.log(`🔄 Discord ID sync: ${syncResult.updated} members updated`);
+      const discordIdMapper = require('./utils/discord-id-mapper');
+      const stats = await discordIdMapper.getMigrationStats();
+
+      if (stats.withTempId > 0) {
+        console.log(`🔄 [MongoDB] Migrating ${stats.withTempId} members with temp IDs...`);
+        const migrationResult = await discordIdMapper.batchMigrateAllMembers(client, config.main_guild_id);
+        console.log(`✅ [MongoDB] Migration complete: ${migrationResult.migrated} migrated, ${migrationResult.notFound} not found`);
+      } else {
+        console.log(`✅ [MongoDB] All members have real Discord IDs`);
       }
-    } catch (syncError) {
-      console.error('⚠️ Discord ID sync failed (non-critical):', syncError.message);
+    } catch (migrationError) {
+      console.error('⚠️ Discord ID migration failed (non-critical):', migrationError.message);
     }
   } catch (error) {
     console.error('⚠️ MongoDB connection failed (non-critical for now):', error.message);
