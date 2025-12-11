@@ -2282,7 +2282,8 @@ const commandHandlers = {
   // Replace the !stats command handler (around line 1380-1469)
   stats: async (message, member, args) => {
   let targetMember = member;
-  let targetName = member.displayName; // Use displayName for Google Sheets matching
+  let targetDisplayName = member.displayName; // For display purposes
+  let targetQueryName = member.user.username; // For MongoDB/Sheets query
   let matchInfo = null;
 
   // Parse target from args
@@ -2290,7 +2291,8 @@ const commandHandlers = {
     if (message.mentions.members.size > 0) {
       // @mention provided - highest priority
       targetMember = message.mentions.members.first();
-      targetName = targetMember.displayName;
+      targetDisplayName = targetMember.displayName;
+      targetQueryName = targetMember.user.username;
     } else {
       // User provided a name without @mention - use fuzzy matching
       const searchName = args.join(" ");
@@ -2301,29 +2303,32 @@ const commandHandlers = {
 
         if (matchInfo) {
           targetMember = matchInfo.member;
-          targetName = matchInfo.matchedName;
+          targetDisplayName = matchInfo.matchedName; // For display
+          targetQueryName = matchInfo.member.user.username; // For query
 
           // Log match quality for debugging
-          console.log(`🔍 Stats fuzzy match: "${searchName}" → "${targetName}" (${matchInfo.matchType}, ${matchInfo.confidence}% confidence)`);
+          console.log(`🔍 Stats fuzzy match: "${searchName}" → "${targetDisplayName}" (${matchInfo.matchType}, ${matchInfo.confidence}% confidence)`);
         } else {
-          // No match found - use raw search name for Google Sheets lookup
-          targetName = searchName;
+          // No match found - use raw search name for both display and query
+          targetDisplayName = searchName;
+          targetQueryName = searchName;
           targetMember = null;
-          console.log(`⚠️ Stats: No Discord match found for "${searchName}", trying Google Sheets...`);
+          console.log(`⚠️ Stats: No Discord match found for "${searchName}", trying database...`);
         }
       } else {
-        targetName = searchName;
+        targetDisplayName = searchName;
+        targetQueryName = searchName;
       }
     }
   }
   // If no args provided, show own stats (already set to member above)
 
   // Check cache first (use normalized name for cache key)
-  const cacheKey = targetName.toLowerCase().trim();
+  const cacheKey = targetQueryName.toLowerCase().trim();
   const cached = statsCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < STATS_CACHE_DURATION)) {
-    console.log(`📦 Using cached stats for ${targetName}`);
-    
+    console.log(`📦 Using cached stats for ${targetDisplayName}`);
+
     // CRITICAL FIX: Try to find member by the actual name returned from sheets
     if (!targetMember && message.guild) {
       const actualName = cached.data.memberName;
@@ -2335,7 +2340,7 @@ const commandHandlers = {
         targetMember = foundMember;
       }
     }
-    
+
     const embed = buildStatsEmbed(cached.data, targetMember, 300);
     const statsMsg = await message.reply({ embeds: [embed] });
 
@@ -2346,7 +2351,7 @@ const commandHandlers = {
   }
 
   // Show loading message
-  const loadingMsg = await message.reply(`⏳ Fetching stats for **${targetName}**...`);
+  const loadingMsg = await message.reply(`⏳ Fetching stats for **${targetDisplayName}**...`);
 
   try {
     // ═══════════════════════════════════════════════════════════════════════════
@@ -2356,11 +2361,11 @@ const commandHandlers = {
 
     if (USE_MONGODB_ATTENDANCE) {
       try {
-        // Fetch stats from MongoDB
-        result = await mongoHelpers.getMemberStats(targetName);
+        // Fetch stats from MongoDB using username (not display name)
+        result = await mongoHelpers.getMemberStats(targetQueryName);
 
         if (result.status !== 'ok') {
-          await loadingMsg.edit(`❌ Could not find stats for **${targetName}**`);
+          await loadingMsg.edit(`❌ Could not find stats for **${targetDisplayName}**`);
           return;
         }
 
@@ -2378,10 +2383,10 @@ const commandHandlers = {
     // ═══════════════════════════════════════════════════════════════════════════
     if (!result) {
       // Fetch stats from Google Sheets (with fuzzy matching support)
-      result = await sheetAPI.call('getMemberStats', { memberName: targetName });
+      result = await sheetAPI.call('getMemberStats', { memberName: targetQueryName });
 
       if (result.status !== 'ok') {
-        await loadingMsg.edit(`❌ Could not find stats for **${targetName}**`);
+        await loadingMsg.edit(`❌ Could not find stats for **${targetDisplayName}**`);
         return;
       }
 
@@ -2419,7 +2424,7 @@ const commandHandlers = {
     // Start countdown deletion
     startCountdownDeletion(message, loadingMsg, result, targetMember, buildStatsEmbed, 300);
 
-    console.log(`✅ Stats sent for ${actualMemberName} (searched: ${targetName})`);
+    console.log(`✅ Stats sent for ${actualMemberName} (searched: ${targetDisplayName})`);
 
   } catch (error) {
     console.error('Stats error:', error);

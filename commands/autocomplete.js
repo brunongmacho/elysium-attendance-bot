@@ -159,16 +159,42 @@ async function getGuildMembers(guild, focusedValue) {
   const lowerInput = (focusedValue || '').toLowerCase();
 
   try {
+    // Get Discord members and create a map for nickname lookup
+    await guild.members.fetch(); // Ensure cache is populated
+    const discordMembersMap = new Map();
+
+    for (const [id, member] of guild.members.cache) {
+      if (!member.user.bot) {
+        // Map both username and display name to the display name
+        const displayName = member.displayName;
+        const username = member.user.username.toLowerCase();
+
+        discordMembersMap.set(username, displayName);
+        discordMembersMap.set(displayName.toLowerCase(), displayName);
+      }
+    }
+
     // Fetch all members from MongoDB (includes inactive members)
     const members = await mongoHelpers.getAllMembers({ isActive: true });
 
-    // Extract usernames
-    const memberNames = members
-      .map(m => m.username)
+    // Map MongoDB usernames to Discord display names
+    const memberDisplayNames = members
+      .map(m => {
+        // Try to find Discord display name for this MongoDB username
+        const mongoUsername = m.username?.toLowerCase();
+        if (mongoUsername && discordMembersMap.has(mongoUsername)) {
+          return discordMembersMap.get(mongoUsername);
+        }
+        // If no Discord match, use MongoDB username as fallback
+        return m.username;
+      })
       .filter(name => name); // Filter out any null/undefined
 
+    // Remove duplicates (in case multiple MongoDB entries map to same Discord name)
+    const uniqueNames = [...new Set(memberDisplayNames)];
+
     // Filter by user input (if empty, show all)
-    const filtered = memberNames
+    const filtered = uniqueNames
       .filter(name => !lowerInput || name.toLowerCase().includes(lowerInput))
       .sort((a, b) => {
         // If no input, just sort alphabetically
@@ -206,7 +232,7 @@ async function getGuildMembers(guild, focusedValue) {
       .map(member => member.displayName);
 
     const filtered = members
-      .filter(name => name.toLowerCase().includes(lowerInput))
+      .filter(name => !lowerInput || name.toLowerCase().includes(lowerInput))
       .sort((a, b) => a.localeCompare(b))
       .slice(0, 25)
       .map(name => ({
