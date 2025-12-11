@@ -7,14 +7,6 @@
     "stats": "STR 75 | DEX 60 | Hunger 999 | Satisfaction 0",
     "skills": ["Perpetual Snacking", "Emergency Jerky Deploy", "Tactical Starvation"]
   },
-  "Andromach3": {
-    "title": "The Glitched Trojan Warrior",
-    "lore": "Named after Andromache, legendary Trojan warrior princess of ancient Greece. Also a cyborg. The fusion went wrong. Ancient combat tactics run on Windows 95. Spear attacks cause blue screen of death. Enemies defeated by system crashes mid-combat. Troy.exe has stopped working. Homer wept, IT support gave up.",
-    "specialty": "Ancient warfare corrupted by obsolete software",
-    "reputation": "The warrior-princess running on deprecated operating systems",
-    "stats": "Trojan Skill 95 | System Stability 0 | Blue Screens 999 | RAM 256MB",
-    "skills": ["Blue Screen Spear", "Windows 95 Shield Bash", "Ancient Greece.exe Error"]
-  },
   "Azryth": {
     "title": "Nightblade Philosopher",
     "lore": "Elysium's deadly shadow assassin who strikes with lethal precision from the darkness. Afraid of the dark. Carries a nightlight to every guild assassination. Philosophical debates help distract from crippling fear of shadows. Enemies die laughing at the irony before the blade even reaches them. Requests LXRDGRIM's therapy for darkness phobia. Goblok assigned them 'Night Raids' anyway. Elysium's most ironic shadow warrior.",
@@ -63,30 +55,6 @@
     "stats": "Spell Power 100 | Accuracy 100 | Intended Effect 0 | Reverse Mastery 95",
     "skills": ["Inverse Fireball", "Healing Nuke", "Accidental Immortality Grant"]
   },
-  "DevilJin": {
-    "title": "The Demonic Pacifist",
-    "lore": "Named after Tekken's most fearsome demon fighter with devastating devil powers and ruthless combos. Afraid of conflict. Apologizes before every attack. The demonic transformation triggers anxiety attacks instead of rage. Devil Gene causes panic, not power. Enemies comfort him mid-battle. Has defeated zero opponents through combat, hundreds through making them feel too guilty to fight. The Devil cries.",
-    "specialty": "Psychological warfare through weaponized guilt and demonic anxiety",
-    "reputation": "The demon everyone wants to protect instead of fear",
-    "stats": "Devil Gene 100 | Aggression 0 | Apologies 999 | Guilt Induction 95",
-    "skills": ["Apologetic Devil Beam", "Anxious Transformation", "Guilt-Trip Combo"]
-  },
-  "DEMIURGE": {
-    "title": "The 10,000 IQ Strategist (Self-Proclaimed)",
-    "lore": "Named after Overlord's supreme strategist demon with godlike intellect and master plans. IQ of 47. Actual plans are crayon drawings. Calls tic-tac-toe '10-dimensional warfare'. Enemies assume sarcasm, discover it's genuine. The confidence in stupidity creates accidental brilliance. Nazarick disowns this imposter daily.",
-    "specialty": "Supreme idiocy mistaken for supreme strategy",
-    "reputation": "The demon whose plans work despite negative brain cells",
-    "stats": "Self-Assessed IQ 10000 | Actual IQ 47 | Crayon Mastery 100 | Accidental Wins 95",
-    "skills": ["Tic-Tac-Toe Supremacy", "Crayon Tactics", "Confident Stupidity"]
-  },
-  "Draxiimov": {
-    "title": "The Meme Lord",
-    "lore": "Elysium's internet culture weaponization expert with encyclopedic knowledge of every meme. Completely out of touch - uses memes from 2008 unironically. Enemies cringe so hard they physically cannot continue fighting. Undefeated through sheer outdated references. Still thinks 'Epic Fail' is cutting edge. Goblok appointed them 'Guild Meme Officer' - Elysium's propaganda is stuck in 2008. Guild discord filled with ancient memes. Still thinks 'Epic Fail' is cutting edge.",
-    "specialty": "Weaponized cringe from the ancient meme archives",
-    "reputation": "Banned from three enemy guilds for emotional damage via dead memes",
-    "stats": "Meme Knowledge 100 | Relevance 0 | Cringe 999 | Self-Awareness 2",
-    "skills": ["Epic Fail Barrage", "Rickroll Resurrection", "LOLcat Launcher"]
-  },
   "Enaira": {
     "title": "The Digital Currency Disaster",
     "lore": "Named after Nigeria's eNaira digital currency meant to revolutionize the economy. Revolutionized nothing. Adoption rate: 0%. Every transaction fails. Blockchain permanently broken. Created to digitize wealth, actually digitizes poverty. The Central Bank pretends this never happened. Most unsuccessful cryptocurrency named after a successful person.",
@@ -129,7 +97,7 @@
   },
   "Goblok": {
     "title": "The Unpredictable Leader",
-    "lore": "Elysium Guild's fearless leader renowned for brilliant unpredictable strategies that no one can counter. Completely predictable - does the exact opposite of logic every time. Enemies predict this and prepare, but Goblok's illogical patterns are so consistent they become logical again. Paradox incarnate. Named the guild 'Elysium' (paradise for heroes) despite the guild being absolute chaos. Relies on the Vice Trinity (Joco, Hesucrypto, Inihaw) to translate his vision into... slightly less chaos.",
+    "lore": "Elysium Guild's fearless leader renowned for brilliant unpredictable strategies that no one can counter. Completely predictable - does the exact opposite of logic every time. Enemies predict this and prepare, but Goblok's illogical patterns are so consistent they become logical again. Paradox incarnate. Named the guild 'Elysium' (paradise for heroes) despite the guild being absolute chaos. Relies on the Vice Duo (Hesucrypto and Inihaw) to translate his vision into... slightly less chaos.",
     "specialty": "Strategic unpredictability that's predictably unpredictable",
     "reputation": "Elysium's genius who thinks with zero brain cells and maximum results",
     "stats": "Leadership 100 | Logic 0 | Paradox 999 | Brain Cells 0.5",
@@ -153,7 +121,7 @@
   },
   "Hesucrypto": {
     "title": "The Crypto Vice King",
-    "lore": "Elysium's Vice Guild Leader, bot creator, and investment mastermind who sees every opportunity. Made millions in crypto. Lost it all. Made it back. Lost it again. Currently broke but owns NFTs worth 'millions' (according to him). Created the legendary Jalo Bot to track attendance - the guild's only profitable investment. Part of the Vice Trinity with Joco and Inihaw. Still Vice Leader because motivation speeches about 'diamond hands' somehow inspire Elysium victories. Manages guild funds nobody trusts exist.",
+    "lore": "Elysium's Vice Guild Leader, bot creator, and investment mastermind who sees every opportunity. Made millions in crypto. Lost it all. Made it back. Lost it again. Currently broke but owns NFTs worth 'millions' (according to him). Created the legendary Jalo Bot to track attendance - the guild's only profitable investment. Partners with Inihaw as Elysium's Vice Duo. Still Vice Leader because motivation speeches about 'diamond hands' somehow inspire Elysium victories. Manages guild funds nobody trusts exist.",
     "specialty": "Economic warfare funded by imaginary profits",
     "reputation": "Elysium's richest poor person and bot daddy",
     "stats": "Investment Skill 95 | Actual Profit 0 | NFT Value 999 | Bank Account -50",
@@ -169,19 +137,11 @@
   },
   "Inihaw": {
     "title": "The BBQ Vice Commander",
-    "lore": "Elysium's Vice Guild Leader, defensive specialist, and guild chef who protects allies with impenetrable shields. Vegan. Grills enemies to perfection while preaching about plant-based diets to the guild. The cognitive dissonance is weaponized. Completes the Vice Trinity with Joco and Hesucrypto. Hosts guild BBQs where everyone dies from heart disease and confusion about the mixed messages. Maia's plants wilt from the grill smoke. Elysium's most contradictory protector.",
-    "specialty": "Defensive grilling with a side of moral contradiction",
+    "lore": "Elysium's Vice Guild Leader, defensive specialist, and guild chef who protects allies with impenetrable shields. Also wields a massive greatsword for 'precision grilling'. Vegan. Grills enemies to perfection while preaching about plant-based diets to the guild. The cognitive dissonance is weaponized. Partners with Hesucrypto as Elysium's Vice Duo. Hosts guild BBQs where everyone dies from heart disease and confusion about the mixed messages. The greatsword doubles as a spatula. Maia's plants wilt from the grill smoke. Elysium's most contradictory protector.",
+    "specialty": "Defensive grilling with greatsword precision and moral contradiction",
     "reputation": "Elysium's shield that barbecues while condemning meat",
-    "stats": "Defense 95 | Grilling 90 | Veganism 100 | Hypocrisy 85",
-    "skills": ["Vegan BBQ Paradox", "Shield Grill", "Plant-Based Lecture Mid-Roast"]
-  },
-  "IZANAGI": {
-    "title": "The Failed Creator Deity",
-    "lore": "Named after the Japanese god who created the world from primordial chaos. Destroys everything touched. Tried to create a sandwich - kitchen exploded. Attempted crafting - guild hall collapsed. Divine creation powers work in reverse. The most destructive 'creator' in existence. Ancestors weep from the heavens.",
-    "specialty": "Divine destruction disguised as creation attempts",
-    "reputation": "The creator deity who unmakes reality with every craft attempt",
-    "stats": "Creation Power 100 | Actual Creation 0 | Destruction 999 | Divine Shame 95",
-    "skills": ["Reverse Genesis", "Catastrophic Crafting", "Primordial Chaos (Accidental)"]
+    "stats": "Defense 95 | Grilling 90 | Greatsword 85 | Veganism 100 | Hypocrisy 85",
+    "skills": ["Vegan BBQ Paradox", "Shield Grill", "Greatsword Spatula Slash", "Plant-Based Lecture Mid-Roast"]
   },
   "Jalo": {
     "title": "The Legendary Namesake",
@@ -206,14 +166,6 @@
     "reputation": "The name everyone questions, the person nobody could doubt",
     "stats": "Kindness 100 | Name Controversy 100 | Cookie Quality 95 | Orphan Smiles 999",
     "skills": ["Wholesome Confusion", "Cookie Combat", "Name Paradox Strike"]
-  },
-  "Joco": {
-    "title": "The Strategic Vice",
-    "lore": "Elysium's Vice Guild Leader who turns Goblok's chaos into calculated victories with brilliant strategic planning. Never follows his own plans. Spends hours creating detailed battle strategies for the guild, then improvises everything when combat starts. Somehow still wins. Partners with Hesucrypto and Inihaw to form the 'Vice Trinity of Controlled Chaos'. The guild's most organized mess and Goblok's strategic translator.",
-    "specialty": "Creating perfect plans and ignoring them completely",
-    "reputation": "Elysium's voice of reason who never listens to himself",
-    "stats": "INT 95 | Planning 99 | Plan Adherence 0 | Improvisation 100",
-    "skills": ["Strategic Amnesia", "Accidental Genius", "Controlled Chaos Management"]
   },
   "ladyhoho": {
     "title": "The Laughing Warrior",
@@ -279,14 +231,6 @@
     "stats": "Etiquette 100 | Handwriting 5 | Politeness 95 | Calligraphy Classes 50",
     "skills": ["Illegible Apology", "Courteous Kill", "Scribbly Sorry Strike"]
   },
-  "Nyegerls": {
-    "title": "The Accidental Hybrid",
-    "lore": "Multiclassed into the perfect combination of warrior and mage. Both skill trees are level 1. Has been level 1 for three years. Defeats max-level enemies through sheer confusion. The system doesn't know how to handle it. Neither does anyone else.",
-    "specialty": "Identity confusion warfare at permanent beginner level",
-    "reputation": "The class system's biggest paradox who never levels up but always wins",
-    "stats": "Warrior Level 1 | Mage Level 1 | Years Stuck 3 | Victory Rate 100",
-    "skills": ["Eternal Level 1", "System Confusion", "Paradox Victory"]
-  },
   "Onirgerep": {
     "title": "The Reverse Enigma",
     "lore": "Everything done backwards - name, combat, strategy - for mysterious power. Completely normal. Most straightforward fighter in guild. The 'reverse' thing is elaborate joke nobody gets. Just fighting regular. Guild still doesn't understand. The confusion is the strategy.",
@@ -327,14 +271,6 @@
     "stats": "Shadow Eating 90 | Solar Power 95 | Biology Logic 0 | Confusion 100",
     "skills": ["Photosynthetic Shadow Bite", "Solar Darkness Meal", "Science Violation"]
   },
-  "Sweeney": {
-    "title": "The Demon Barber (of Bad Haircuts)",
-    "lore": "Named after Sweeney Todd, the demon barber of Fleet Street who gave fatal shaves. Gives haircuts instead. Terrible at it. Every cut is a disaster. Enemies flee from the scissors, not the blade. Has inadvertently created psychological warfare through bad bangs. The throat-slitting razor sits unused - the safety scissors are deadlier.",
-    "specialty": "Follicle-based psychological warfare",
-    "reputation": "The demon barber whose cuts are more terrifying than murder",
-    "stats": "Barber Skill 5 | Kill Count (Hair) 999 | Actual Kills 0 | Bad Bangs 100",
-    "skills": ["Catastrophic Fade", "Asymmetric Trauma", "Safety Scissor Menace"]
-  },
   "Varys": {
     "title": "The Whisper Network",
     "lore": "Knows every secret in the realm with perfect information network. Terrible memory. Forgets secrets immediately. Makes up new ones. 60% accuracy because half is fabricated. Strategic value somehow high. Misinformation is still information. Guild intelligence at its finest.",
@@ -350,14 +286,6 @@
     "reputation": "The musical interlude that forgot how to stop",
     "stats": "Pause Ability 0 | Continuous Motion 999 | Fidgeting 100 | Musical Timing -50",
     "skills": ["Eternal Flailing", "Anti-Pause Dance", "Mistimed Interlude"]
-  },
-  "xLunox": {
-    "title": "The Moonlit Performer",
-    "lore": "Legendary warrior who requires perfect entrance music and dramatic staging. Tone deaf. The music is always off-key. Enemies wait politely because the confidence is incredible. The show must go on, regardless of musical accuracy. Style over substance over talent.",
-    "specialty": "Theatrical combat staging with questionable audio quality",
-    "reputation": "The guild's most dramatic entrance specialist who can't carry a tune",
-    "stats": "Drama 100 | Musical Talent 5 | Confidence 95 | Entrance Quality 50",
-    "skills": ["Off-Key Entrance", "Dramatic Mistiming", "Tone-Deaf Performance"]
   },
   "Ztig": {
     "title": "The Friendly Fire Legend",
@@ -398,5 +326,45 @@
     "reputation": "The member who weaponized probability without knowing what it means",
     "stats": "Math Skill 0 | Fake Precision 100 | Vibes 95 | Accidental Genius 85",
     "skills": ["Random Number Generation", "Vibes-Based Calculation", "Butterfly Effect (Literal)"]
+  },
+  "Ayane69": {
+    "title": "The Graceful Klutz",
+    "lore": "Named after the graceful kunoichi from fighting games, master of elegant assassination techniques. Trips over everything. The '69' was meant to be intimidating. Falls face-first into enemies instead. Accidentally discovered the most effective combat technique - pure chaos trajectory. Enemies can't predict what she can't control. The floor is her greatest enemy and ally. Elegance through catastrophic clumsiness.",
+    "specialty": "Tactical stumbling that somehow hits every target",
+    "reputation": "The ninja whose grace exists only in her imagination",
+    "stats": "Grace 0 | Trip Frequency 999 | Accidental Kills 95 | Floor Relationship Complicated",
+    "skills": ["Graceful Faceplant", "Tumbling Strike", "Elegant Disaster"]
+  },
+  "Tinitira": {
+    "title": "The Melodic Menace",
+    "lore": "Named after the Filipino word for 'to look at' - supposedly sees all with perfect perception. Blind. The staring is intense eye contact with nothing. Has memorized the entire battlefield through sound alone. Enemies assume mind games, it's actual blindness. Uses echolocation like a bat. The most 'perceptive' member who can't see a thing. Sonar warfare pioneer.",
+    "specialty": "Visual intimidation without visual capability",
+    "reputation": "The all-seeing member who sees absolutely nothing",
+    "stats": "Vision 0 | Echolocation 95 | Staring Intensity 100 | Perception (Non-Visual) 90",
+    "skills": ["Blind Stare", "Sonic Perception", "Sightless Strike"]
+  },
+  "Hayacinth": {
+    "title": "The Wilting Wonder",
+    "lore": "Named after the beautiful Hyacinth flower, symbol of rebirth and spring beauty. Allergic to flowers. Every bloom causes sneezing fits. Gardens are war zones. Maia kills plants, Hayacinth is killed BY plants. The duo has created the guild's most dysfunctional botanical disaster team. Spring is personal hell. Carries antihistamines like weapons. The flower-named member who flowers wage war against.",
+    "specialty": "Floral-themed combat interrupted by constant sneezing",
+    "reputation": "The only member whose namesake is their greatest weakness",
+    "stats": "Flower Knowledge 95 | Flower Tolerance 0 | Sneeze Power 100 | Antihistamine Stock 999",
+    "skills": ["Allergic Explosion", "Sneezing Barrage", "Pollen Panic"]
+  },
+  "LaxusLawliet": {
+    "title": "The Lightning Detective",
+    "lore": "Named after Fairy Tail's lightning dragon slayer Laxus and Death Note's genius detective L. Has neither lightning powers nor detective skills. Afraid of thunder. Can't solve basic puzzles. The name is pure aspiration. Enemies expect genius lightning strikes, receive confused person asking for clues during storms. Sits in weird positions hoping it helps. It doesn't. Eats sweets for 'brain power' - still no brain power. Most misleading name in guild history.",
+    "specialty": "Intimidating nomenclature with zero delivery",
+    "reputation": "The lightning detective who fears storms and can't find his keys",
+    "stats": "Lightning Power 0 | Detective Skill 5 | Name Intimidation 100 | Sweet Consumption 999",
+    "skills": ["Confused Investigation", "Thunder Panic", "Name Drop Intimidation"]
+  },
+  "_FUTURE_MEMBER_TEMPLATE": {
+    "title": "The Undefined Paradox",
+    "lore": "A placeholder warrior awaiting their destiny in Elysium's chaos. Identity pending. Skills unknown. Contradictions not yet discovered. The guild eagerly anticipates what ironic weakness will define their legendary incompetence. Every new member brings fresh disasters and creative failures. Elysium's tradition of paradoxical excellence continues with each recruit. The chaos grows stronger.",
+    "specialty": "Potential disasters waiting to be unlocked",
+    "reputation": "Elysium's next legendary contradiction in waiting",
+    "stats": "Potential 100 | Defined Skills 0 | Chaos Contribution TBD | Paradox Level Pending",
+    "skills": ["Undiscovered Weakness", "Hidden Incompetence", "Future Legendary Failure"]
   }
 }

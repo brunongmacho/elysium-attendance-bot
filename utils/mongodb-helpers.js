@@ -586,10 +586,48 @@ async function getMemberStats(memberName) {
     };
   }
 
-  // Step 4: Calculate attendance rate (need total possible spawns)
-  // For now, use a reasonable estimate or get from separate tracking
-  const totalPossibleSpawns = 100; // TODO: Calculate actual total spawns
-  const attendanceRate = totalPossibleSpawns > 0 ? Math.round((totalKills / totalPossibleSpawns) * 100) : 0;
+  // Step 4: Calculate attendance rate based on unique spawns
+  // Get total unique spawns (unique bossName + timestamp combinations)
+  const uniqueSpawns = await db.collection('attendance').aggregate([
+    {
+      $group: {
+        _id: {
+          bossName: '$bossName',
+          timestamp: '$timestamp'
+        }
+      }
+    },
+    {
+      $count: 'total'
+    }
+  ]).toArray();
+
+  const totalPossibleSpawns = uniqueSpawns.length > 0 ? uniqueSpawns[0].total : 0;
+
+  // Get member's unique spawn attendance (deduplicate by bossName + timestamp)
+  const memberUniqueSpawns = await db.collection('attendance').aggregate([
+    {
+      $match: { memberId: member._id }
+    },
+    {
+      $group: {
+        _id: {
+          bossName: '$bossName',
+          timestamp: '$timestamp'
+        }
+      }
+    },
+    {
+      $count: 'total'
+    }
+  ]).toArray();
+
+  const memberSpawnsAttended = memberUniqueSpawns.length > 0 ? memberUniqueSpawns[0].total : 0;
+
+  // Rate = (spawns attended / total spawns) * 100, capped at 100%
+  const attendanceRate = totalPossibleSpawns > 0
+    ? Math.min(100, Math.round((memberSpawnsAttended / totalPossibleSpawns) * 100))
+    : 0;
 
   // Step 5: Calculate streak
   // TODO: Implement streak calculation from attendance records
