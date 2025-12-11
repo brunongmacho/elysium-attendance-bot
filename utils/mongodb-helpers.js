@@ -1027,7 +1027,27 @@ async function syncDiscordIds(guild) {
       });
 
       if (!discordMember) {
+        // Enhanced logging: show similar names to help debug
+        const similarMembers = discordMembers
+          .filter(dm => {
+            const username = dm.user.username.toLowerCase();
+            const nickname = dm.nickname ? dm.nickname.toLowerCase() : '';
+            const displayName = dm.displayName.toLowerCase();
+
+            // Show members that have ANY partial match
+            return username.includes(searchName.substring(0, 4)) ||
+                   searchName.includes(username.substring(0, 4)) ||
+                   nickname.includes(searchName.substring(0, 4)) ||
+                   displayName.includes(searchName.substring(0, 4));
+          })
+          .slice(0, 3)
+          .map(dm => `${dm.user.username} (nick: ${dm.nickname || 'none'}, display: ${dm.displayName})`)
+          .join(', ');
+
         console.log(`   ⚠️ No Discord member found for: ${tempMember.username}`);
+        if (similarMembers) {
+          console.log(`      Similar names: ${similarMembers}`);
+        }
         skipped++;
         continue;
       }
