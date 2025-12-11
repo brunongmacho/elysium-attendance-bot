@@ -1001,11 +1001,30 @@ async function syncDiscordIds(guild) {
   // Step 3: Update each temp member
   for (const tempMember of tempMembers) {
     try {
-      // Find matching Discord member by username (case-insensitive)
-      const discordMember = discordMembers.find(dm =>
-        dm.user.username.toLowerCase() === tempMember.username.toLowerCase() ||
-        (dm.nickname && dm.nickname.toLowerCase() === tempMember.username.toLowerCase())
-      );
+      const searchName = tempMember.username.toLowerCase();
+
+      // Find matching Discord member with multiple strategies
+      let discordMember = discordMembers.find(dm => {
+        const username = dm.user.username.toLowerCase();
+        const nickname = dm.nickname ? dm.nickname.toLowerCase() : null;
+        const displayName = dm.displayName.toLowerCase();
+
+        // Strategy 1: Exact match on username
+        if (username === searchName) return true;
+
+        // Strategy 2: Exact match on nickname
+        if (nickname && nickname === searchName) return true;
+
+        // Strategy 3: Exact match on displayName
+        if (displayName === searchName) return true;
+
+        // Strategy 4: Partial match (contains) - helps with variations
+        if (username.includes(searchName) || searchName.includes(username)) return true;
+        if (nickname && (nickname.includes(searchName) || searchName.includes(nickname))) return true;
+        if (displayName.includes(searchName) || searchName.includes(displayName)) return true;
+
+        return false;
+      });
 
       if (!discordMember) {
         console.log(`   ⚠️ No Discord member found for: ${tempMember.username}`);
@@ -1070,7 +1089,11 @@ async function syncDiscordIds(guild) {
 
         await db.collection('members').insertOne(newMemberDoc);
 
-        console.log(`   ✅ Updated: ${tempMember.username} (${tempId} → ${realDiscordId}, ${attendanceUpdateResult.modifiedCount} records)`);
+        // Log which name matched
+        const matchedAs = discordMember.user.username !== tempMember.username
+          ? ` [matched as ${discordMember.user.username}]`
+          : '';
+        console.log(`   ✅ Updated: ${tempMember.username}${matchedAs} (${tempId} → ${realDiscordId}, ${attendanceUpdateResult.modifiedCount} records)`);
       }
 
       updated++;
