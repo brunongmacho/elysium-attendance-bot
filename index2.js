@@ -2280,7 +2280,7 @@ const commandHandlers = {
   // STATS COMMAND - Show member statistics
   // =========================================================================
   // Replace the !stats command handler (around line 1380-1469)
-stats: async (message, member, args) => {
+  stats: async (message, member, args) => {
   let targetMember = member;
   let targetName = member.displayName; // Use displayName for Google Sheets matching
   let matchInfo = null;
