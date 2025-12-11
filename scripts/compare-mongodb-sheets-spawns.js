@@ -37,6 +37,27 @@ function getWeekEnd(date = new Date()) {
   return new Date(gmt8Start.getTime() - gmt8Offset);
 }
 
+function getWeekNumber(date) {
+  // Convert to GMT+8 for week calculation
+  const gmt8Offset = 8 * 60 * 60 * 1000;
+  const gmt8Time = new Date(date.getTime() + gmt8Offset);
+
+  const d = new Date(Date.UTC(gmt8Time.getUTCFullYear(), gmt8Time.getUTCMonth(), gmt8Time.getUTCDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+function getWeekLabel(date = new Date()) {
+  // Convert to GMT+8 for proper year calculation
+  const gmt8Offset = 8 * 60 * 60 * 1000;
+  const gmt8Time = new Date(date.getTime() + gmt8Offset);
+  const year = gmt8Time.getUTCFullYear();
+  const weekNum = getWeekNumber(date);
+  return `ELYSIUM_WEEK_${year}_${weekNum}`;
+}
+
 async function compareMongoDBvsSheets() {
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('🔍 COMPARE: MongoDB Spawns vs Google Sheets Columns');
@@ -49,15 +70,17 @@ async function compareMongoDBvsSheets() {
 
     const thisWeekStart = getWeekStart();
     const thisWeekEnd = getWeekEnd();
+    const weekLabel = getWeekLabel(thisWeekStart);
 
     console.log('📅 Week Range (GMT+8):');
     console.log(`   Start: ${thisWeekStart.toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`);
     console.log(`   End:   ${thisWeekEnd.toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`);
+    console.log(`   Week Label: ${weekLabel}`);
     console.log('');
 
     // Get all columns from Google Sheets
     console.log('📥 Fetching columns from Google Sheets...');
-    const sheetsResponse = await sheetAPI.call('getAllSpawnColumns');
+    const sheetsResponse = await sheetAPI.call('getAllSpawnColumns', { weekSheet: weekLabel });
     const sheetColumns = sheetsResponse.columns || [];
     console.log(`✅ Found ${sheetColumns.length} columns in Google Sheets`);
     console.log('');
