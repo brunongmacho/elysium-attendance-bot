@@ -10,8 +10,12 @@ const dbAPI = require('../utils/database-api');
 const fs = require('fs');
 const path = require('path');
 
-// Load environment variables
-require('dotenv').config();
+// Load environment variables (optional - env vars may already be set)
+try {
+  require('dotenv').config();
+} catch (e) {
+  // dotenv not installed, environment variables should already be set
+}
 
 // Load config
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'config.json'), 'utf8'));
