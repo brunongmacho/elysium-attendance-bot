@@ -1052,25 +1052,23 @@ async function syncDiscordIds(guild) {
       } else {
         // Simple case: just rename the member ID
 
-        // Step 3a: Insert new member with real Discord ID
-        const newMemberDoc = {
-          ...tempMember,
-          _id: realDiscordId,
-          lastUpdated: new Date()
-        };
-        delete newMemberDoc._id; // Remove old _id
-        newMemberDoc._id = realDiscordId; // Set new _id
-
-        await db.collection('members').insertOne(newMemberDoc);
-
-        // Step 3b: Update all attendance records to use real Discord ID
+        // Step 3a: Update all attendance records to use real Discord ID FIRST
         const attendanceUpdateResult = await db.collection('attendance').updateMany(
           { memberId: tempId },
           { $set: { memberId: realDiscordId } }
         );
 
-        // Step 3c: Delete old temp member
+        // Step 3b: Delete temp member BEFORE inserting new one (avoids unique constraint violation on username)
         await db.collection('members').deleteOne({ _id: tempId });
+
+        // Step 3c: Insert new member with real Discord ID
+        const newMemberDoc = {
+          ...tempMember,
+          _id: realDiscordId,
+          lastUpdated: new Date()
+        };
+
+        await db.collection('members').insertOne(newMemberDoc);
 
         console.log(`   ✅ Updated: ${tempMember.username} (${tempId} → ${realDiscordId}, ${attendanceUpdateResult.modifiedCount} records)`);
       }
