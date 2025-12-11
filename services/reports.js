@@ -280,7 +280,7 @@ async function getWeekData(db, startDate, endDate) {
           _id: {
             memberName: '$memberName',
             timestamp: '$timestamp',
-            boss: '$boss'
+            boss: '$bossName'
           }
         }
       },
