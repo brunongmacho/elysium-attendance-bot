@@ -10,12 +10,23 @@ async function debugWeeklyReport() {
   console.log('═══════════════════════════════════════════════════════════════\n');
 
   const today = new Date();
-  console.log(`📅 Today: ${today.toISOString()} (${today.toLocaleDateString()})`);
+  console.log(`📅 Today (UTC): ${today.toISOString()} (${today.toLocaleDateString()})`);
+
+  // Convert to GMT+8
+  function toGMT8(date = new Date()) {
+    const d = new Date(date);
+    const utcTime = d.getTime() + (d.getTimezoneOffset() * 60000);
+    const gmt8Time = new Date(utcTime + (8 * 3600000));
+    return gmt8Time;
+  }
+
+  const todayGMT8 = toGMT8(today);
+  console.log(`📅 Today (GMT+8): ${todayGMT8.toISOString()} (${todayGMT8.toLocaleDateString()})`);
   console.log('');
 
-  // Replicate the getWeekStart logic
+  // Replicate the getWeekStart logic (using GMT+8)
   function getWeekStart(date = new Date()) {
-    const d = new Date(date);
+    const d = toGMT8(date);
     const day = d.getDay();
     const diff = d.getDate() - day;
     d.setDate(diff);

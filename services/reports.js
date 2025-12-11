@@ -102,14 +102,26 @@ async function retryOperation(operation, operationName, maxRetries = 3) {
 }
 
 // ============================================================================
+// ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
 /**
- * Get week start date (Sunday)
+ * Convert date to GMT+8 timezone
+ */
+function toGMT8(date = new Date()) {
+  const d = new Date(date);
+  // Get UTC time and add 8 hours for GMT+8
+  const utcTime = d.getTime() + (d.getTimezoneOffset() * 60000);
+  const gmt8Time = new Date(utcTime + (8 * 3600000));
+  return gmt8Time;
+}
+
+/**
+ * Get week start date (Sunday) in GMT+8
  */
 function getWeekStart(date = new Date()) {
-  const d = new Date(date);
+  const d = toGMT8(date);
   const day = d.getDay();
   const diff = d.getDate() - day;
   d.setDate(diff);
@@ -118,7 +130,7 @@ function getWeekStart(date = new Date()) {
 }
 
 /**
- * Get week end date (Saturday)
+ * Get week end date (Saturday) in GMT+8
  */
 function getWeekEnd(date = new Date()) {
   const start = getWeekStart(date);
@@ -129,20 +141,20 @@ function getWeekEnd(date = new Date()) {
 }
 
 /**
- * Get month start date
+ * Get month start date in GMT+8
  */
 function getMonthStart(date = new Date()) {
-  const d = new Date(date);
+  const d = toGMT8(date);
   d.setDate(1);
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
 /**
- * Get month end date
+ * Get month end date in GMT+8
  */
 function getMonthEnd(date = new Date()) {
-  const d = new Date(date);
+  const d = toGMT8(date);
   d.setMonth(d.getMonth() + 1);
   d.setDate(0);
   d.setHours(23, 59, 59, 999);
