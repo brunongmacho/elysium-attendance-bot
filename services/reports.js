@@ -121,18 +121,20 @@ function toGMT8(date = new Date()) {
  * Get week start date (Sunday 00:00:00) in GMT+8
  */
 function getWeekStart(date = new Date()) {
-  // Get the date in GMT+8
-  const gmt8Date = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  // Add 8 hours to get GMT+8 time
+  const gmt8Offset = 8 * 60 * 60 * 1000;
+  const gmt8Time = new Date(date.getTime() + gmt8Offset);
 
-  // Get day of week (0 = Sunday)
-  const day = gmt8Date.getDay();
+  // Get day of week using UTC methods (which now represent GMT+8)
+  const day = gmt8Time.getUTCDay();
 
   // Calculate Sunday of this week
-  const sunday = new Date(gmt8Date);
-  sunday.setDate(gmt8Date.getDate() - day);
-  sunday.setHours(0, 0, 0, 0);
+  const sunday = new Date(gmt8Time);
+  sunday.setUTCDate(gmt8Time.getUTCDate() - day);
+  sunday.setUTCHours(0, 0, 0, 0);
 
-  return sunday;
+  // Convert back to actual UTC (subtract 8 hours)
+  return new Date(sunday.getTime() - gmt8Offset);
 }
 
 /**
@@ -140,31 +142,46 @@ function getWeekStart(date = new Date()) {
  */
 function getWeekEnd(date = new Date()) {
   const start = getWeekStart(date);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 6);
-  end.setHours(23, 59, 59, 999);
-  return end;
+  const gmt8Offset = 8 * 60 * 60 * 1000;
+
+  // Add 6 days and set to end of day in GMT+8
+  const gmt8Start = new Date(start.getTime() + gmt8Offset);
+  gmt8Start.setUTCDate(gmt8Start.getUTCDate() + 6);
+  gmt8Start.setUTCHours(23, 59, 59, 999);
+
+  // Convert back to UTC
+  return new Date(gmt8Start.getTime() - gmt8Offset);
 }
 
 /**
  * Get month start date (1st day 00:00:00) in GMT+8
  */
 function getMonthStart(date = new Date()) {
-  const gmt8Date = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-  gmt8Date.setDate(1);
-  gmt8Date.setHours(0, 0, 0, 0);
-  return gmt8Date;
+  const gmt8Offset = 8 * 60 * 60 * 1000;
+  const gmt8Time = new Date(date.getTime() + gmt8Offset);
+
+  // Set to 1st day of month using UTC methods
+  gmt8Time.setUTCDate(1);
+  gmt8Time.setUTCHours(0, 0, 0, 0);
+
+  // Convert back to UTC
+  return new Date(gmt8Time.getTime() - gmt8Offset);
 }
 
 /**
  * Get month end date (last day 23:59:59) in GMT+8
  */
 function getMonthEnd(date = new Date()) {
-  const gmt8Date = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-  gmt8Date.setMonth(gmt8Date.getMonth() + 1);
-  gmt8Date.setDate(0);
-  gmt8Date.setHours(23, 59, 59, 999);
-  return gmt8Date;
+  const gmt8Offset = 8 * 60 * 60 * 1000;
+  const gmt8Time = new Date(date.getTime() + gmt8Offset);
+
+  // Set to last day of month (next month day 0)
+  gmt8Time.setUTCMonth(gmt8Time.getUTCMonth() + 1);
+  gmt8Time.setUTCDate(0);
+  gmt8Time.setUTCHours(23, 59, 59, 999);
+
+  // Convert back to UTC
+  return new Date(gmt8Time.getTime() - gmt8Offset);
 }
 
 // ============================================================================
