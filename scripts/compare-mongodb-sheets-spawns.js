@@ -37,6 +37,19 @@ function getWeekEnd(date = new Date()) {
   return new Date(gmt8Start.getTime() - gmt8Offset);
 }
 
+function getWeekLabel(weekStartDate) {
+  // Format Sunday date as YYYYMMDD for sheet name
+  // Convert to GMT+8 to get the correct date
+  const gmt8Offset = 8 * 60 * 60 * 1000;
+  const gmt8Time = new Date(weekStartDate.getTime() + gmt8Offset);
+
+  const year = gmt8Time.getUTCFullYear();
+  const month = String(gmt8Time.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(gmt8Time.getUTCDate()).padStart(2, '0');
+
+  return `ELYSIUM_WEEK_${year}${month}${day}`;
+}
+
 async function compareMongoDBvsSheets() {
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('🔍 COMPARE: MongoDB Spawns vs Google Sheets Columns');
@@ -49,15 +62,17 @@ async function compareMongoDBvsSheets() {
 
     const thisWeekStart = getWeekStart();
     const thisWeekEnd = getWeekEnd();
+    const weekLabel = getWeekLabel(thisWeekStart);
 
     console.log('📅 Week Range (GMT+8):');
     console.log(`   Start: ${thisWeekStart.toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`);
     console.log(`   End:   ${thisWeekEnd.toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`);
+    console.log(`   Week Label: ${weekLabel}`);
     console.log('');
 
     // Get all columns from Google Sheets
     console.log('📥 Fetching columns from Google Sheets...');
-    const sheetsResponse = await sheetAPI.call('getAllSpawnColumns');
+    const sheetsResponse = await sheetAPI.call('getAllSpawnColumns', { weekSheet: weekLabel });
     const sheetColumns = sheetsResponse.columns || [];
     console.log(`✅ Found ${sheetColumns.length} columns in Google Sheets`);
     console.log('');
