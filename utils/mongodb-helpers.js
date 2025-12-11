@@ -994,6 +994,25 @@ async function syncDiscordIds(guild) {
   const discordMembers = guild.members.cache;
   console.log(`   Loaded ${discordMembers.size} Discord members`);
 
+  // Debug: Show sample of members with nicknames
+  const membersWithNicknames = Array.from(discordMembers.values())
+    .filter(m => m.nickname)
+    .slice(0, 5);
+  if (membersWithNicknames.length > 0) {
+    console.log('   Sample members with nicknames:');
+    membersWithNicknames.forEach(m => {
+      console.log(`     - ${m.user.username} (nick: ${m.nickname}, display: ${m.displayName}, ID: ${m.id})`);
+    });
+  }
+
+  // Debug: Check if specific known member exists (user: .biogesic, ID: 182081219062661120)
+  const testMember = discordMembers.get('182081219062661120');
+  if (testMember) {
+    console.log(`   ✅ Test user found: ${testMember.user.username} (nick: ${testMember.nickname || 'none'}, display: ${testMember.displayName})`);
+  } else {
+    console.log(`   ❌ Test user (ID: 182081219062661120) NOT found in fetched members!`);
+  }
+
   let updated = 0;
   let failed = 0;
   let skipped = 0;
