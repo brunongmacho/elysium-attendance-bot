@@ -999,9 +999,12 @@ async function syncDiscordIds(guild) {
   let skipped = 0;
 
   // Step 3: Update each temp member
+  const skippedDetails = []; // Track skipped members for detailed logging
+
   for (const tempMember of tempMembers) {
     try {
       const searchName = tempMember.username.toLowerCase();
+      console.log(`\n   🔍 Searching for: "${tempMember.username}" (temp ID: ${tempMember._id})`);
 
       // Find matching Discord member with multiple strategies
       let discordMember = discordMembers.find(dm => {
@@ -1010,18 +1013,36 @@ async function syncDiscordIds(guild) {
         const displayName = dm.displayName.toLowerCase();
 
         // Strategy 1: Exact match on username
-        if (username === searchName) return true;
+        if (username === searchName) {
+          console.log(`      ✅ Exact match on username: ${dm.user.username}`);
+          return true;
+        }
 
         // Strategy 2: Exact match on nickname
-        if (nickname && nickname === searchName) return true;
+        if (nickname && nickname === searchName) {
+          console.log(`      ✅ Exact match on nickname: ${dm.nickname}`);
+          return true;
+        }
 
         // Strategy 3: Exact match on displayName
-        if (displayName === searchName) return true;
+        if (displayName === searchName) {
+          console.log(`      ✅ Exact match on displayName: ${dm.displayName}`);
+          return true;
+        }
 
         // Strategy 4: Partial match (contains) - helps with variations
-        if (username.includes(searchName) || searchName.includes(username)) return true;
-        if (nickname && (nickname.includes(searchName) || searchName.includes(nickname))) return true;
-        if (displayName.includes(searchName) || searchName.includes(displayName)) return true;
+        if (username.includes(searchName) || searchName.includes(username)) {
+          console.log(`      ✅ Partial match on username: ${dm.user.username}`);
+          return true;
+        }
+        if (nickname && (nickname.includes(searchName) || searchName.includes(nickname))) {
+          console.log(`      ✅ Partial match on nickname: ${dm.nickname}`);
+          return true;
+        }
+        if (displayName.includes(searchName) || searchName.includes(displayName)) {
+          console.log(`      ✅ Partial match on displayName: ${dm.displayName}`);
+          return true;
+        }
 
         return false;
       });
@@ -1040,14 +1061,23 @@ async function syncDiscordIds(guild) {
                    nickname.includes(searchName.substring(0, 4)) ||
                    displayName.includes(searchName.substring(0, 4));
           })
-          .slice(0, 3)
-          .map(dm => `${dm.user.username} (nick: ${dm.nickname || 'none'}, display: ${dm.displayName})`)
-          .join(', ');
+          .slice(0, 5)
+          .map(dm => `${dm.user.username} (nick: ${dm.nickname || 'none'}, display: ${dm.displayName}, ID: ${dm.id})`)
+          .join('\n         ');
 
-        console.log(`   ⚠️ No Discord member found for: ${tempMember.username}`);
+        console.log(`      ❌ No Discord match found!`);
         if (similarMembers) {
-          console.log(`      Similar names: ${similarMembers}`);
+          console.log(`      💡 Similar Discord members found:`);
+          console.log(`         ${similarMembers}`);
         }
+
+        // Store details for summary
+        skippedDetails.push({
+          mongoUsername: tempMember.username,
+          tempId: tempMember._id,
+          similarMembers: similarMembers || 'none'
+        });
+
         skipped++;
         continue;
       }
@@ -1097,6 +1127,14 @@ async function syncDiscordIds(guild) {
           { $set: { memberId: realDiscordId } }
         );
 
+        // Check if attendance records already have real Discord ID
+        if (attendanceUpdateResult.modifiedCount === 0) {
+          const existingRecordsCount = await db.collection('attendance').countDocuments({ memberId: realDiscordId });
+          if (existingRecordsCount > 0) {
+            console.log(`      ℹ️  Attendance records already use Discord ID (${existingRecordsCount} records with ID ${realDiscordId})`);
+          }
+        }
+
         // Step 3b: Delete temp member BEFORE inserting new one (avoids unique constraint violation on username)
         await db.collection('members').deleteOne({ _id: tempId });
 
@@ -1113,7 +1151,10 @@ async function syncDiscordIds(guild) {
         const matchedAs = discordMember.user.username !== tempMember.username
           ? ` [matched as ${discordMember.user.username}]`
           : '';
-        console.log(`   ✅ Updated: ${tempMember.username}${matchedAs} (${tempId} → ${realDiscordId}, ${attendanceUpdateResult.modifiedCount} records)`);
+        const recordsInfo = attendanceUpdateResult.modifiedCount > 0
+          ? `${attendanceUpdateResult.modifiedCount} records updated`
+          : 'member synced (records already correct)';
+        console.log(`      ✅ Updated: ${tempMember.username}${matchedAs} (${tempId} → ${realDiscordId}, ${recordsInfo})`);
       }
 
       updated++;
@@ -1124,7 +1165,33 @@ async function syncDiscordIds(guild) {
     }
   }
 
-  console.log(`✅ [MongoDB] Discord ID sync complete: ${updated} updated, ${failed} failed, ${skipped} skipped`);
+  console.log(`\n✅ [MongoDB] Discord ID sync complete: ${updated} updated, ${failed} failed, ${skipped} skipped`);
+
+  // Show detailed summary of skipped members
+  if (skippedDetails.length > 0) {
+    console.log(`\n⚠️  SKIPPED MEMBERS SUMMARY:`);
+    console.log(`   The following ${skippedDetails.length} members could not be matched to Discord:`);
+    console.log('');
+    skippedDetails.forEach((detail, index) => {
+      console.log(`   ${index + 1}. MongoDB username: "${detail.mongoUsername}"`);
+      console.log(`      Temp ID: ${detail.tempId}`);
+      if (detail.similarMembers !== 'none') {
+        console.log(`      Similar Discord members:`);
+        detail.similarMembers.split('\n').forEach(line => {
+          console.log(`      ${line.trim()}`);
+        });
+      } else {
+        console.log(`      No similar Discord members found`);
+      }
+      console.log('');
+    });
+    console.log(`   💡 Possible solutions:`);
+    console.log(`      1. Check if these users have left the Discord server`);
+    console.log(`      2. Check if usernames have changed in Discord`);
+    console.log(`      3. Update usernames in Google Sheets to match Discord`);
+    console.log(`      4. Run: node scripts/debug-discord-match.js <username>`);
+    console.log('');
+  }
 
   return { updated, failed, skipped };
 }
