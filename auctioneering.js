@@ -2558,13 +2558,20 @@ async function handleQueueList(message, biddingState) {
     return;
   }
 
-  await errorHandler.safeDelete(loadingMsg, 'message deletion');
+  // For slash commands, don't delete the loading message - we'll edit it with the final content
+  if (!message.isSlashCommand) {
+    await errorHandler.safeDelete(loadingMsg, 'message deletion');
+  }
 
   if (sheetItems.length === 0) {
-    return await message.reply(
-      `${EMOJI.LIST} No items in auction queue.\n\n` +
-        `Add items to the **BiddingItems** sheet in Google Sheets with proper boss data.`
-    );
+    const noItemsMsg = `${EMOJI.LIST} No items in auction queue.\n\n` +
+      `Add items to the **BiddingItems** sheet in Google Sheets with proper boss data.`;
+
+    if (message.isSlashCommand) {
+      return await loadingMsg.edit({ content: noItemsMsg, embeds: [] });
+    } else {
+      return await message.reply(noItemsMsg);
+    }
   }
 
   // Group sheet items by boss for preview
@@ -2679,7 +2686,12 @@ async function handleQueueList(message, biddingState) {
     })
     .setTimestamp();
 
-  await message.reply({ embeds: [embed] });
+  // For slash commands, edit the loading message instead of sending a new reply
+  if (message.isSlashCommand) {
+    await loadingMsg.edit({ content: null, embeds: [embed] });
+  } else {
+    await message.reply({ embeds: [embed] });
+  }
 }
 
 /**
