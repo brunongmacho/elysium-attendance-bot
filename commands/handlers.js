@@ -1280,6 +1280,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
           guild: interaction.guild,
           client: client,
           content: '!queuelist',
+          isSlashCommand: true, // Flag to indicate this is a slash command
           reply: async (content) => {
             if (typeof content === 'string') {
               return await interaction.editReply({ content });
