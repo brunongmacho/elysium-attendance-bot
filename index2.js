@@ -1383,11 +1383,6 @@ function buildStatsEmbed(stats, member, countdown = 300) {
       value: `${lore.lore}\n\n**Specialty:** ${lore.specialty}\n**Reputation:** ${lore.reputation}\n**Stats:** ${lore.stats}\n**Skills:** ${skillsList}`,
       inline: false
     });
-    if (isTemplateLore) {
-      console.log(`ℹ️ Using template lore for: ${memberName}`);
-    }
-  } else {
-    console.log(`ℹ️ No lore found for: ${memberName} (checked ${Object.keys(memberLore).length} entries)`);
   }
 
   // Footer with favorite boss and percentile
