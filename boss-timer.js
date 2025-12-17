@@ -641,15 +641,17 @@ async function triggerSpawnReminder(bossName, spawnTime) {
       )
       .setTimestamp();
 
+    // Fetch guild for branding and boss image fallback
+    const guild = await client.guilds.fetch(config.main_guild_id);
+
     // Add boss image if available
     const bossImage = getBossImageAttachment(bossName);
-    const bossImageURL = getBossImageAttachmentURL(bossName);
+    const bossImageURL = getBossImageAttachmentURL(bossName, guild);
     if (bossImageURL) {
       embed.setThumbnail(bossImageURL);
     }
 
     // Add guild branding
-    const guild = await client.guilds.fetch(config.main_guild_id);
     addGuildFooter(embed, guild);
 
     const messagePayload = { content: '@everyone', embeds: [embed] };
@@ -1165,15 +1167,17 @@ async function handleSpawned(bossName, userId) {
         })
         .setTimestamp();
 
+      // Fetch guild for branding and boss image fallback
+      const guild = await client.guilds.fetch(config.main_guild_id);
+
       // Add boss image if available
       const bossImage = getBossImageAttachment(bossName);
-      const bossImageURL = getBossImageAttachmentURL(bossName);
+      const bossImageURL = getBossImageAttachmentURL(bossName, guild);
       if (bossImageURL) {
         embed.setThumbnail(bossImageURL);
       }
 
       // Add guild branding
-      const guild = await client.guilds.fetch(config.main_guild_id);
       addGuildFooter(embed, guild);
 
       const messagePayload = { embeds: [embed] };

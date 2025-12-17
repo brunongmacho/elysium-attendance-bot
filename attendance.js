@@ -623,7 +623,7 @@ async function createSpawnThreads(
 
   // Add boss image if available
   const bossImage = getBossImageAttachment(bossName);
-  const bossImageURL = getBossImageAttachmentURL(bossName);
+  const bossImageURL = getBossImageAttachmentURL(bossName, mainGuild);
   if (bossImageURL) {
     embed.setThumbnail(bossImageURL);
   }
@@ -1522,6 +1522,10 @@ async function checkAndAutoCloseThreads(client) {
 
         // AUTO-VERIFY all pending check-ins for this thread
         console.log(`   🔍 Checking pending verifications for thread ${threadId}`);
+        console.log(`   📊 Already verified members BEFORE auto-verification: ${spawnInfo.members.length}`);
+        if (spawnInfo.members.length > 0) {
+          console.log(`      ├─ Already verified: ${spawnInfo.members.join(', ')}`);
+        }
         console.log(`   📋 Total pending verifications in system: ${Object.keys(pendingVerifications).length}`);
 
         const pendingInThread = Object.entries(pendingVerifications).filter(
@@ -1548,9 +1552,28 @@ async function checkAndAutoCloseThreads(client) {
             // Remove from pending
             delete pendingVerifications[msgId];
           }
+          console.log(`   📊 Total verified members AFTER auto-verification: ${spawnInfo.members.length}`);
+        } else {
+          console.log(`   ℹ️ No pending verifications to auto-verify`);
         }
 
-        // Mark as closed
+        console.log(`   📊 Final member count for submission: ${spawnInfo.members.length}`);
+        if (spawnInfo.members.length > 0) {
+          console.log(`      ├─ Members to submit: ${spawnInfo.members.join(', ')}`);
+        }
+
+        // RE-CHECK: Verify this thread wasn't closed by manual close while we were processing
+        // This prevents race condition where manual close happens during auto-close
+        const liveSpawnInfo = activeSpawns[threadId];
+        if (!liveSpawnInfo || liveSpawnInfo.closed) {
+          console.log(`   ⚠️ Thread was closed by another process (manual close). Skipping auto-close submission.`);
+          closed++;
+          closedBosses.push(spawnInfo.boss);
+          continue;
+        }
+
+        // Mark as closed in live state to prevent other processes from submitting
+        liveSpawnInfo.closed = true;
         spawnInfo.closed = true;
 
         // Remove from activeColumns cache BEFORE checking Google Sheets
@@ -1685,6 +1708,9 @@ async function checkAndAutoCloseThreads(client) {
           // ═════════════════════════════════════════════════════════════════
           // MONGODB-FIRST PATH (Phase 4)
           // ═════════════════════════════════════════════════════════════════
+          console.log(`📊 AUTO-CLOSE: Submitting ${spawnInfo.members.length} members for ${spawnInfo.boss} (${spawnInfo.timestamp})`);
+          console.log(`   ├─ Members: ${spawnInfo.members.join(', ')}`);
+
           let submitted = false;
           let submissionSource = 'Unknown';
 

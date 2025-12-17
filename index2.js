@@ -5180,7 +5180,7 @@ client.on(Events.MessageCreate, async (message) => {
 
                 // Add boss image if available
                 const bossImage = getBossImageAttachment(bossName);
-                const bossImageURL = getBossImageAttachmentURL(bossName);
+                const bossImageURL = getBossImageAttachmentURL(bossName, message.guild);
                 if (bossImageURL) {
                   embed.setThumbnail(bossImageURL);
                 }
@@ -6856,6 +6856,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         attendance.setActiveSpawns(activeSpawns);
 
         console.log(`✅ VERIFY: ${pending.author} added to ${spawnInfo.boss} (${spawnInfo.timestamp}) by ${user.username} | Total: ${spawnInfo.members.length} members`);
+        console.log(`   📊 Current verified members: ${spawnInfo.members.join(', ')}`);
 
         await interaction.update({
           embeds: [EmbedBuilder.from(msg.embeds[0]).setColor(0x00ff00).setFooter({ text: `Verified by ${user.username}` })],
@@ -6950,6 +6951,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return;
         }
 
+        console.log(`🔒 MANUAL CLOSE: Marking ${spawnInfo.boss} (${spawnInfo.timestamp}) as closed by ${user.username}`);
         spawnInfo.closed = true;
         attendance.setActiveSpawns(activeSpawns);
 
@@ -7058,6 +7060,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
           content: `🔒 Closing spawn **${spawnInfo.boss}**... Submitting ${spawnInfo.members.length} members...`,
           ephemeral: false
         });
+
+        console.log(`📊 MANUAL CLOSE: Submitting ${spawnInfo.members.length} members for ${spawnInfo.boss} (${spawnInfo.timestamp})`);
+        console.log(`   ├─ Members: ${spawnInfo.members.join(', ')}`);
 
         const payload = {
           action: "submitAttendance",

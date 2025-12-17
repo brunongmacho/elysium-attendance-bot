@@ -13,6 +13,7 @@
 const path = require('path');
 const fs = require('fs');
 const { AttachmentBuilder } = require('discord.js');
+const { getGuildIconURL } = require('./embed-branding');
 
 // ============================================================================
 // CONSTANTS
@@ -139,13 +140,22 @@ function getBossImageAttachment(bossName) {
 /**
  * Get attachment URL for embedding in Discord embed
  * @param {string} bossName - Name of the boss
- * @returns {string|null} Attachment URL for use in embed, or null if not found
+ * @param {Guild} guild - Optional Discord guild object for fallback to guild icon
+ * @returns {string|null} Attachment URL for use in embed, or guild icon URL if boss image not found
  */
-function getBossImageAttachmentURL(bossName) {
+function getBossImageAttachmentURL(bossName, guild = null) {
   const normalized = normalizeBossName(bossName);
   const imagePath = getBossImagePath(bossName);
 
   if (!imagePath) {
+    // Fallback to guild icon if available
+    if (guild) {
+      const guildIconURL = getGuildIconURL(guild);
+      if (guildIconURL) {
+        console.log(`ℹ️ Using guild icon as fallback for: ${bossName}`);
+        return guildIconURL;
+      }
+    }
     return null;
   }
 
