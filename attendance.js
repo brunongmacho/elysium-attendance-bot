@@ -575,6 +575,7 @@ async function createSpawnThreads(
     time: timeStr,
     timestamp: fullTimestamp,
     members: [],
+    memberIds: {}, // Map display names to Discord IDs for reliable identification
     confirmThreadId: confirmThread ? confirmThread.id : null,
     closed: false,
     createdAt: Date.now(), // Track when thread was created for auto-close
@@ -1544,6 +1545,9 @@ async function checkAndAutoCloseThreads(client) {
 
             if (!isDuplicate) {
               spawnInfo.members.push(pending.author);
+              // Store Discord ID for reliable MongoDB lookup
+              if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
+              spawnInfo.memberIds[pending.author] = pending.authorId;
               console.log(`      ├─ ✅ ${pending.author}`);
             } else {
               console.log(`      ├─ ⚠️ ${pending.author} (duplicate, skipped)`);
@@ -1725,8 +1729,12 @@ async function checkAndAutoCloseThreads(client) {
               try {
                 // Add attendance records for each member
                 for (const memberName of spawnInfo.members) {
+                  // Get Discord ID from memberIds map if available
+                  const discordId = spawnInfo.memberIds?.[memberName];
+
                   await mongoHelpers.addAttendance({
                     username: memberName,
+                    discordId: discordId, // Pass Discord ID for reliable identification
                     boss: spawnInfo.boss,
                     timestamp: spawnInfo.timestamp,
                     date: spawnInfo.date,

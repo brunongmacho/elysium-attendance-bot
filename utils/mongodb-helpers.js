@@ -35,13 +35,16 @@ const mongoBreaker = new CircuitBreaker({
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Get member by username
+ * Get member by username (case-insensitive)
  * @param {string} username - Member username
  * @returns {Promise<Object|null>} - Member document or null
  */
 async function getMemberByUsername(username) {
   const db = await dbAPI.connect();
-  return await db.collection('members').findOne({ username });
+  // Case-insensitive search to prevent duplicates from case variations
+  return await db.collection('members').findOne({
+    username: { $regex: new RegExp(`^${username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+  });
 }
 
 /**
@@ -55,7 +58,7 @@ async function getMemberByDiscordId(userId) {
 }
 
 /**
- * Get member by either Discord ID or username
+ * Get member by either Discord ID or username (case-insensitive)
  * @param {string} identifier - Discord ID or username
  * @returns {Promise<Object|null>} - Member document or null
  */
@@ -65,9 +68,11 @@ async function getMember(identifier) {
   // Try by Discord ID first
   let member = await db.collection('members').findOne({ _id: identifier });
 
-  // If not found, try by username
+  // If not found, try by username (case-insensitive)
   if (!member) {
-    member = await db.collection('members').findOne({ username: identifier });
+    member = await db.collection('members').findOne({
+      username: { $regex: new RegExp(`^${identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+    });
   }
 
   return member;
@@ -478,7 +483,8 @@ async function updateAttendanceStats(identifier, attendanceData) {
  * It creates the attendance record AND updates the member's stats/points.
  *
  * @param {Object} data - Attendance data
- * @param {string} data.username - Member username
+ * @param {string} data.username - Member display name (nickname or username)
+ * @param {string} data.discordId - Discord user ID (optional but recommended)
  * @param {string} data.boss - Boss name
  * @param {string} data.timestamp - Timestamp string
  * @param {string} data.date - Date string (MM/DD/YY)
@@ -490,16 +496,25 @@ async function updateAttendanceStats(identifier, attendanceData) {
 async function addAttendance(data) {
   const db = await dbAPI.connect();
 
-  // Step 1: Find or create member by username
-  let member = await getMemberByUsername(data.username);
+  // Step 1: Find member by Discord ID first (most reliable), then by username (case-insensitive)
+  let member = null;
+
+  if (data.discordId) {
+    member = await getMemberByDiscordId(data.discordId);
+  }
+
+  // Fallback to username lookup if Discord ID not provided or not found
+  if (!member) {
+    member = await getMemberByUsername(data.username);
+  }
 
   if (!member) {
-    // Member doesn't exist - create with temp ID
-    console.log(`➕ [MongoDB] Creating new member: ${data.username}`);
-    const tempId = `temp_${data.username.toLowerCase().replace(/\s+/g, '_')}`;
+    // Member doesn't exist - create with Discord ID or temp ID
+    const memberId = data.discordId || `temp_${data.username.toLowerCase().replace(/\s+/g, '_')}`;
+    console.log(`➕ [MongoDB] Creating new member: ${data.username} (ID: ${memberId})`);
 
     await db.collection('members').insertOne({
-      _id: tempId,
+      _id: memberId,
       username: data.username,
       pointsAvailable: 0,
       pointsEarned: 0,
@@ -516,7 +531,7 @@ async function addAttendance(data) {
       lastUpdated: new Date()
     });
 
-    member = await getMemberByUsername(data.username);
+    member = data.discordId ? await getMemberByDiscordId(data.discordId) : await getMemberByUsername(data.username);
   }
 
   // Step 2: Add attendance record

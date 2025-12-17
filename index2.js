@@ -2569,16 +2569,19 @@ const commandHandlers = {
                 `   ├─ Found ${pendingInThread.length} pending verification(s)... Auto-verifying all...`
               );
 
-              const newMembers = pendingInThread
-                .filter(
-                  ([msgId, p]) =>
-                    !spawnInfo.members.some(
-                      (m) => normalizeUsername(m) === normalizeUsername(p.author)
-                    )
-                )
-                .map(([msgId, p]) => p.author);
+              const newMembers = pendingInThread.filter(
+                ([msgId, p]) =>
+                  !spawnInfo.members.some(
+                    (m) => normalizeUsername(m) === normalizeUsername(p.author)
+                  )
+              );
 
-              spawnInfo.members.push(...newMembers);
+              // Add members and store Discord IDs
+              if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
+              for (const [msgId, p] of newMembers) {
+                spawnInfo.members.push(p.author);
+                spawnInfo.memberIds[p.author] = p.authorId;
+              }
 
               const messageIds = pendingInThread.map(([msgId, p]) => msgId);
               const messagePromises = messageIds.map((msgId) =>
@@ -3387,6 +3390,9 @@ const commandHandlers = {
 
             if (!isDuplicate) {
               spawnInfo.members.push(pending.author);
+              // Store Discord ID for reliable MongoDB lookup
+              if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
+              spawnInfo.memberIds[pending.author] = pending.authorId;
             }
 
             delete pendingVerifications[msgId];
@@ -5867,6 +5873,9 @@ client.on(Events.MessageCreate, async (message) => {
 
               if (!isDuplicate) {
                 spawnInfo.members.push(pending.author);
+                // Store Discord ID for reliable MongoDB lookup
+                if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
+                spawnInfo.memberIds[pending.author] = pending.authorId;
                 verifiedMembers.push(pending.author);
                 verifiedCount++;
               } else {
@@ -5961,6 +5970,9 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         spawnInfo.members.push(username);
+        // Store Discord ID for reliable MongoDB lookup
+        if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
+        spawnInfo.memberIds[username] = mentioned.id;
 
         // Find and disable verification buttons for this user
         const pendingInThread = Object.entries(pendingVerifications).filter(
@@ -6022,16 +6034,19 @@ client.on(Events.MessageCreate, async (message) => {
           );
 
           // Filter out duplicates and add new members
-          const newMembers = pendingInThread
-            .filter(
-              ([msgId, p]) =>
-                !spawnInfo.members.some(
-                  (m) => normalizeUsername(m) === normalizeUsername(p.author)
-                )
-            )
-            .map(([msgId, p]) => p.author);
+          const newMembers = pendingInThread.filter(
+            ([msgId, p]) =>
+              !spawnInfo.members.some(
+                (m) => normalizeUsername(m) === normalizeUsername(p.author)
+              )
+          );
 
-          spawnInfo.members.push(...newMembers);
+          // Add members and store Discord IDs
+          if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
+          for (const [msgId, p] of newMembers) {
+            spawnInfo.members.push(p.author);
+            spawnInfo.memberIds[p.author] = p.authorId;
+          }
 
           // Clean up verification button messages
           const messageIds = pendingInThread.map(([msgId, p]) => msgId);
@@ -6853,6 +6868,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
 
         spawnInfo.members.push(pending.author);
+        // Store Discord ID for reliable MongoDB lookup
+        if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
+        spawnInfo.memberIds[pending.author] = pending.authorId;
         attendance.setActiveSpawns(activeSpawns);
 
         console.log(`✅ VERIFY: ${pending.author} added to ${spawnInfo.boss} (${spawnInfo.timestamp}) by ${user.username} | Total: ${spawnInfo.members.length} members`);
@@ -7276,6 +7294,9 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         }
 
         spawnInfo.members.push(pending.author);
+        // Store Discord ID for reliable MongoDB lookup
+        if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
+        spawnInfo.memberIds[pending.author] = pending.authorId;
         attendance.setActiveSpawns(activeSpawns); // Sync
 
         await attendance.removeAllReactionsWithRetry(msg); // CHANGED
