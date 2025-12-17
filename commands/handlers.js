@@ -1308,6 +1308,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
       // Build args array for stats command
       const args = memberOption ? memberOption.split(' ') : [];
 
+      await interaction.deferReply();
+
       const syntheticMessage = {
         author: interaction.user,
         member: interaction.member,
@@ -1326,16 +1328,21 @@ async function handleSlashCommand(interaction, modules, config, client) {
         }
       };
 
-      await interaction.deferReply();
-
-      // Call stats handler from index2
-      const { commandHandlers } = require('../index2.js');
-      await commandHandlers.stats(syntheticMessage, interaction.member, args);
+      try {
+        // Call stats handler from index2
+        const { commandHandlers } = require('../index2.js');
+        await commandHandlers.stats(syntheticMessage, interaction.member, args);
+      } catch (error) {
+        console.error('Error in /stats command:', error);
+        await interaction.editReply({ content: `❌ Error: ${error.message}` });
+      }
       return;
     }
 
     // /weekly command - Weekly report
     if (commandName === 'weekly') {
+      await interaction.deferReply();
+
       const syntheticMessage = {
         author: interaction.user,
         member: interaction.member,
@@ -1353,15 +1360,24 @@ async function handleSlashCommand(interaction, modules, config, client) {
         }
       };
 
-      await interaction.deferReply();
-
-      const { commandHandlers } = require('../index2.js');
-      await commandHandlers.weekly(syntheticMessage, interaction.member);
+      try {
+        const { commandHandlers } = require('../index2.js');
+        await commandHandlers.weekly(syntheticMessage, interaction.member);
+        // Handler uses channel.send(), so manually resolve the deferred interaction
+        if (!interaction.replied) {
+          await interaction.editReply({ content: '✅ Weekly report generated' });
+        }
+      } catch (error) {
+        console.error('Error in /weekly command:', error);
+        await interaction.editReply({ content: `❌ Error: ${error.message}` });
+      }
       return;
     }
 
     // /monthly command - Monthly report
     if (commandName === 'monthly') {
+      await interaction.deferReply();
+
       const syntheticMessage = {
         author: interaction.user,
         member: interaction.member,
@@ -1379,10 +1395,17 @@ async function handleSlashCommand(interaction, modules, config, client) {
         }
       };
 
-      await interaction.deferReply();
-
-      const { commandHandlers } = require('../index2.js');
-      await commandHandlers.monthly(syntheticMessage, interaction.member);
+      try {
+        const { commandHandlers } = require('../index2.js');
+        await commandHandlers.monthly(syntheticMessage, interaction.member);
+        // Handler uses channel.send(), so manually resolve the deferred interaction
+        if (!interaction.replied) {
+          await interaction.editReply({ content: '✅ Monthly report generated' });
+        }
+      } catch (error) {
+        console.error('Error in /monthly command:', error);
+        await interaction.editReply({ content: `❌ Error: ${error.message}` });
+      }
       return;
     }
 
