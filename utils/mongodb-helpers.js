@@ -520,12 +520,35 @@ async function addAttendance(data) {
   }
 
   // Step 2: Add attendance record
+  // Parse timestamp properly: it's in GMT+8 format (MM/DD/YY HH:MM)
+  // Need to convert to UTC for MongoDB storage
+  let timestampDate;
+  if (data.timestamp instanceof Date) {
+    timestampDate = data.timestamp;
+  } else {
+    // Parse string timestamp (format: "MM/DD/YY HH:MM" or "MM-DD HH:MM")
+    const match = data.timestamp.match(/(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2}))?\s+(\d{1,2}):(\d{2})/);
+    if (match) {
+      const [_, month, day, year, hours, minutes] = match;
+      const fullYear = year ? 2000 + parseInt(year) : new Date().getFullYear();
+
+      // Create timestamp as GMT+8, then convert to UTC
+      const gmt8Timestamp = Date.UTC(fullYear, parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(minutes), 0, 0);
+      const TIMEZONE_OFFSET_MS = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+      timestampDate = new Date(gmt8Timestamp - TIMEZONE_OFFSET_MS);
+    } else {
+      // Fallback: use current time if parse fails
+      timestampDate = new Date();
+      console.warn(`Failed to parse timestamp: ${data.timestamp}, using current time`);
+    }
+  }
+
   await addAttendanceRecord({
     memberId: member._id,
     memberName: data.username,
     bossName: data.boss,
     bossPoints: data.points || 0,
-    timestamp: new Date(data.timestamp),
+    timestamp: timestampDate,
     weekStartDate: getWeekStart(),
     weekLabel: getWeekLabel(),
     verified: true,

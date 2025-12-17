@@ -1009,7 +1009,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
                   if (lastSpawn && lastSpawn.timestamp && bossSpawnConfig && bossSpawnConfig.timerBasedBosses[boss]) {
                     const bossConfig = bossSpawnConfig.timerBasedBosses[boss];
                     const lastSpawnDate = new Date(lastSpawn.timestamp);
-                    // Calculate next spawn based on interval
+                    // Attendance timestamp is stored in UTC, add spawn interval
                     nextSpawnDate = new Date(lastSpawnDate.getTime() + (bossConfig.spawnIntervalHours * 60 * 60 * 1000));
                     spawnSource = 'attendance';
                   }
