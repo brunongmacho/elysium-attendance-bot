@@ -1018,7 +1018,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
                 if (nextSpawnDate) {
                   const spawnTimestamp = Math.floor(nextSpawnDate.getTime() / 1000);
                   const sourceIndicator = spawnSource === 'attendance' ? '📋' : '⏱️';
-                  spawnInfo = `\n📍 Next Spawn: <t:${spawnTimestamp}:R> ${sourceIndicator}`;
+                  spawnInfo = `\n    📍 Next Spawn: <t:${spawnTimestamp}:R> ${sourceIndicator}`;
 
                   // Calculate time until Elysium's turn if not currently our turn
                   if (!rotation.isOurTurn && bossSpawnConfig && bossSpawnConfig.timerBasedBosses[boss]) {
@@ -1049,7 +1049,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
                     const elysiumTimestamp = Math.floor(elysiumTurnDate.getTime() / 1000);
 
                     const spawnsText = spawnsUntilElysium === 1 ? '1 spawn' : `${spawnsUntilElysium} spawns`;
-                    elysiumTurnInfo = `\n🟢 Elysium's Turn: <t:${elysiumTimestamp}:R> (~${spawnsText}, ~${hoursUntilElysium}h)`;
+                    elysiumTurnInfo = `\n    🎯 Elysium's Turn: <t:${elysiumTimestamp}:R> (~${spawnsText}, ~${hoursUntilElysium}h)`;
                   }
                 }
               } catch (timerError) {
