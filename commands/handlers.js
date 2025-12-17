@@ -1049,7 +1049,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
                     const elysiumTimestamp = Math.floor(elysiumTurnDate.getTime() / 1000);
 
                     const spawnsText = spawnsUntilElysium === 1 ? '1 spawn' : `${spawnsUntilElysium} spawns`;
-                    elysiumTurnInfo = `\n🟢 Elysium's Turn: <t:${elysiumTimestamp}:R> (~${spawnsText}, ~${hoursUntilElysium}h)`;
+                    elysiumTurnInfo = `\n🎯 Elysium's Turn: <t:${elysiumTimestamp}:R> (~${spawnsText}, ~${hoursUntilElysium}h)`;
                   }
                 }
               } catch (timerError) {
