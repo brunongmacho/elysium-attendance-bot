@@ -15,7 +15,12 @@
  *   Before: "12/17/24 14:39" stored as 2024-12-17T14:39:00Z (UTC)
  *   After:  "12/17/24 14:39" stored as 2024-12-17T06:39:00Z (UTC, which = 14:39 GMT+8)
  *
- * Usage: node scripts/fix-attendance-timezones.js [--dry-run]
+ * Usage:
+ *   node scripts/fix-attendance-timezones.js [--dry-run] [--days=90]
+ *
+ * Options:
+ *   --dry-run    Test mode, no changes made to database
+ *   --days=N     Only update records from last N days (default: 90)
  *
  * =============================================================================
  */
@@ -24,6 +29,10 @@ const dbAPI = require('../utils/database-api');
 
 const TIMEZONE_OFFSET_MS = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
 const DRY_RUN = process.argv.includes('--dry-run');
+const BATCH_SIZE = 1000; // Process in batches of 1000 for performance
+
+// Only update records from the last N days (older records don't affect current predictions)
+const DAYS_TO_UPDATE = parseInt(process.argv.find(arg => arg.startsWith('--days='))?.split('=')[1]) || 90; // Default 90 days
 
 async function main() {
   console.log('=============================================================================');
@@ -42,61 +51,101 @@ async function main() {
     const db = await dbAPI.connect();
     console.log('✅ Connected to MongoDB\n');
 
-    // Get all attendance records
-    console.log('📊 Fetching all attendance records...');
-    const attendanceRecords = await db.collection('attendance').find({}).toArray();
-    console.log(`✅ Found ${attendanceRecords.length} attendance records\n`);
+    // Calculate date cutoff
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - DAYS_TO_UPDATE);
+
+    console.log(`📅 Date filter: Only updating records from last ${DAYS_TO_UPDATE} days`);
+    console.log(`   Cutoff date: ${cutoffDate.toISOString()}\n`);
+
+    // Get attendance records from last N days
+    console.log('📊 Fetching attendance records...');
+    const attendanceRecords = await db.collection('attendance')
+      .find({
+        timestamp: { $gte: cutoffDate }
+      })
+      .toArray();
+    console.log(`✅ Found ${attendanceRecords.length} attendance records (last ${DAYS_TO_UPDATE} days)\n`);
 
     if (attendanceRecords.length === 0) {
       console.log('ℹ️  No records to process. Exiting.');
       process.exit(0);
     }
 
-    // Process records
+    // Process records in batches
     let updatedCount = 0;
     let skippedCount = 0;
     let errorCount = 0;
+    const totalRecords = attendanceRecords.length;
 
-    console.log('🔄 Processing records...\n');
+    console.log('🔄 Processing records in batches...\n');
 
-    for (const record of attendanceRecords) {
-      try {
-        const oldTimestamp = record.timestamp;
+    // Show first 5 examples
+    const exampleRecords = attendanceRecords.slice(0, 5);
+    for (const record of exampleRecords) {
+      if (!record.timestamp) continue;
 
-        if (!oldTimestamp) {
-          console.log(`⚠️  Skipping record ${record._id} - no timestamp`);
-          skippedCount++;
-          continue;
+      const oldDate = new Date(record.timestamp);
+      const newDate = new Date(oldDate.getTime() - TIMEZONE_OFFSET_MS);
+
+      console.log(`📝 Example ${updatedCount + 1}:`);
+      console.log(`   Boss: ${record.bossName}`);
+      console.log(`   Member: ${record.memberName}`);
+      console.log(`   Old: ${oldDate.toISOString()} (${oldDate.toLocaleString('en-US', { timeZone: 'Asia/Manila' })} Manila)`);
+      console.log(`   New: ${newDate.toISOString()} (${newDate.toLocaleString('en-US', { timeZone: 'Asia/Manila' })} Manila)`);
+      console.log('');
+      updatedCount++;
+    }
+
+    // Process remaining records in batches
+    if (!DRY_RUN) {
+      console.log('🚀 Starting batch updates...\n');
+
+      for (let i = 0; i < totalRecords; i += BATCH_SIZE) {
+        const batch = attendanceRecords.slice(i, i + BATCH_SIZE);
+        const bulkOps = [];
+
+        for (const record of batch) {
+          if (!record.timestamp) {
+            skippedCount++;
+            continue;
+          }
+
+          try {
+            const oldDate = new Date(record.timestamp);
+            const newDate = new Date(oldDate.getTime() - TIMEZONE_OFFSET_MS);
+
+            bulkOps.push({
+              updateOne: {
+                filter: { _id: record._id },
+                update: { $set: { timestamp: newDate } }
+              }
+            });
+          } catch (error) {
+            console.error(`❌ Error preparing record ${record._id}:`, error.message);
+            errorCount++;
+          }
         }
 
-        // Calculate corrected timestamp (subtract 8 hours)
-        const oldDate = new Date(oldTimestamp);
-        const newDate = new Date(oldDate.getTime() - TIMEZONE_OFFSET_MS);
+        // Execute batch update
+        if (bulkOps.length > 0) {
+          try {
+            await db.collection('attendance').bulkWrite(bulkOps, { ordered: false });
+            updatedCount += bulkOps.length;
 
-        // Show sample of changes
-        if (updatedCount < 5) {
-          console.log(`📝 Example ${updatedCount + 1}:`);
-          console.log(`   Boss: ${record.bossName}`);
-          console.log(`   Member: ${record.memberName}`);
-          console.log(`   Old: ${oldDate.toISOString()} (${oldDate.toLocaleString('en-US', { timeZone: 'Asia/Manila' })} Manila)`);
-          console.log(`   New: ${newDate.toISOString()} (${newDate.toLocaleString('en-US', { timeZone: 'Asia/Manila' })} Manila)`);
-          console.log('');
+            // Show progress
+            const progress = Math.min(i + BATCH_SIZE, totalRecords);
+            const percentage = ((progress / totalRecords) * 100).toFixed(1);
+            console.log(`   ⏳ Progress: ${progress}/${totalRecords} (${percentage}%) - Updated ${updatedCount} records`);
+          } catch (error) {
+            console.error(`❌ Batch update error:`, error.message);
+            errorCount += bulkOps.length;
+          }
         }
-
-        // Update the record
-        if (!DRY_RUN) {
-          await db.collection('attendance').updateOne(
-            { _id: record._id },
-            { $set: { timestamp: newDate } }
-          );
-        }
-
-        updatedCount++;
-
-      } catch (error) {
-        console.error(`❌ Error processing record ${record._id}:`, error.message);
-        errorCount++;
       }
+    } else {
+      // Dry run - just count
+      updatedCount = totalRecords;
     }
 
     // Summary
