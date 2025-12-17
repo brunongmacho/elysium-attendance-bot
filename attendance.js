@@ -1562,7 +1562,18 @@ async function checkAndAutoCloseThreads(client) {
           console.log(`      ├─ Members to submit: ${spawnInfo.members.join(', ')}`);
         }
 
-        // Mark as closed
+        // RE-CHECK: Verify this thread wasn't closed by manual close while we were processing
+        // This prevents race condition where manual close happens during auto-close
+        const liveSpawnInfo = activeSpawns[threadId];
+        if (!liveSpawnInfo || liveSpawnInfo.closed) {
+          console.log(`   ⚠️ Thread was closed by another process (manual close). Skipping auto-close submission.`);
+          closed++;
+          closedBosses.push(spawnInfo.boss);
+          continue;
+        }
+
+        // Mark as closed in live state to prevent other processes from submitting
+        liveSpawnInfo.closed = true;
         spawnInfo.closed = true;
 
         // Remove from activeColumns cache BEFORE checking Google Sheets
@@ -1697,6 +1708,9 @@ async function checkAndAutoCloseThreads(client) {
           // ═════════════════════════════════════════════════════════════════
           // MONGODB-FIRST PATH (Phase 4)
           // ═════════════════════════════════════════════════════════════════
+          console.log(`📊 AUTO-CLOSE: Submitting ${spawnInfo.members.length} members for ${spawnInfo.boss} (${spawnInfo.timestamp})`);
+          console.log(`   ├─ Members: ${spawnInfo.members.join(', ')}`);
+
           let submitted = false;
           let submissionSource = 'Unknown';
 

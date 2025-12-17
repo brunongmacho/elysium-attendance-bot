@@ -6951,6 +6951,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return;
         }
 
+        console.log(`🔒 MANUAL CLOSE: Marking ${spawnInfo.boss} (${spawnInfo.timestamp}) as closed by ${user.username}`);
         spawnInfo.closed = true;
         attendance.setActiveSpawns(activeSpawns);
 
@@ -7059,6 +7060,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
           content: `🔒 Closing spawn **${spawnInfo.boss}**... Submitting ${spawnInfo.members.length} members...`,
           ephemeral: false
         });
+
+        console.log(`📊 MANUAL CLOSE: Submitting ${spawnInfo.members.length} members for ${spawnInfo.boss} (${spawnInfo.timestamp})`);
+        console.log(`   ├─ Members: ${spawnInfo.members.join(', ')}`);
 
         const payload = {
           action: "submitAttendance",
