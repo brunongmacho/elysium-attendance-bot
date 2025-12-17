@@ -1,11 +1,11 @@
 {
   "AmielJohn": {
     "title": "The Caloric Warlord",
-    "lore": "Legend says AmielJohn's hunger once collapsed a dungeon's economy by eating all the loot drops. Invented 'Snack Diplomacy' — a foreign policy where enemies are bribed with jerky. Currently in a Cold Snack War with M1ssy over the last protein bar, mediated by LXRDGRIM every Tuesday. Goblok appointed him Supply General; the supplies vanished within the hour. His battle cry is just aggressive chewing.",
-    "specialty": "Caloric warfare & aggressive mid-combat mastication",
-    "reputation": "The only member who treats boss raids like buffets",
-    "stats": "Hunger 9999 | Snack Hoarding 300 | Digestion Speed 0.5 | Treaty Violations 47",
-    "skills": ["Snack Phalanx", "Jerky Diplomacy", "Crumb Trail Trap", "Metabolic Rage"]
+    "lore": "Legend says AmielJohn's hunger once collapsed a dungeon's economy by eating all the loot drops. Invented 'Snack Diplomacy' — a foreign policy where enemies are bribed with jerky. The Cold Snack War with M1ssy has escalated to MAD (Mutually Assured Digestion) — LXRDGRIM now mediates twice weekly. Recently promoted to Supply General by Goblok; all supplies vanished within the hour as predicted. Discovered that AE28's stone tablets are technically 'grain-based' and has been eyeing them hungrily. His battle cry evolved from aggressive chewing to motivational eating speeches.",
+    "specialty": "Caloric warfare & inspirational mid-combat consumption",
+    "reputation": "The only member who treats boss raids like all-you-can-eat buffets",
+    "stats": "Hunger 9999 | Snack Hoarding 500 | Treaty Violations 89 | Stone Tablets Considered Edible 3",
+    "skills": ["Snack Phalanx", "Jerky Diplomacy", "Motivational Eating", "Supply Vanishing Act"]
   },
   "Azryth": {
     "title": "The Nightlight Ninja",
@@ -25,11 +25,11 @@
   },
   "Carrera": {
     "title": "The Supersonic Latecomer",
-    "lore": "Named after the Porsche Carrera — fastest thing on wheels. Somehow always 3 hours late. Has broken the sound barrier 47 times trying to be punctual; still missed every boss spawn. Einstein wrote a paper about him titled 'The Carrera Paradox.' Once ran so fast he arrived at yesterday's raid. The guild stopped telling him event times; he still shows up late to the wrong information.",
-    "specialty": "Breaking physics to achieve perfect tardiness",
-    "reputation": "Proof that speed and punctuality are mortal enemies",
-    "stats": "Speed ∞ | Punctuality -999 | Time Crimes 200 | Excuses Per Second 50",
-    "skills": ["Lightspeed Lateness", "Temporal Oopsie", "Yesterday's Raid", "Fashionably Supersonic"]
+    "lore": "Named after the Porsche Carrera — fastest thing on wheels. Somehow always 3 hours late. Has broken the sound barrier 89 times trying to be punctual; still missed every boss spawn. Recently ran SO fast he arrived at NEXT WEEK'S raid early — then fell asleep and missed it anyway. Goblok weaponized this by sending him to 'yesterday's battle' — he shows up to active warzones by accident. Time crimes increased to 347. The guild now uses his lateness as a time-travel strategy. Einstein's ghost is filing a complaint.",
+    "specialty": "Breaking spacetime to achieve legendary tardiness",
+    "reputation": "The speedster who accidentally became a time warrior",
+    "stats": "Speed ∞ | Punctuality -1500 | Time Crimes 347 | Accidental Time Travel 12",
+    "skills": ["Lightspeed Lateness", "Temporal Weaponization", "Yesterday's Raid (On Purpose)", "Fashionably Supersonic"]
   },
   "CheeseCakee": {
     "title": "The Lactose Martyr",
@@ -41,11 +41,11 @@
   },
   "Chunchunmaru": {
     "title": "The Legendary Meme Blade",
-    "lore": "Wields a sword named 'Chunchunmaru' — a name so ridiculous that Kazuma himself would be proud. Enemies laugh themselves into defeat. Applied for legendary weapon registration; was denied because the clerk couldn't stop giggling. The sword has higher meme value than actual damage. Once defeated a dragon because it choked on its own laughter. Refuses to rename it 'for strategic purposes.' The strategy is comedy. The comedy is lethal.",
-    "specialty": "Psychological warfare through aggressive naming conventions",
-    "reputation": "The reason enemy morale reports include 'death by comedy'",
-    "stats": "Sword Power 150 | Name Dignity -999 | Comedy Damage 9999 | Straight Face 0",
-    "skills": ["Legendary Ridicule", "Pun Parry", "Meme Slash", "Chunchun Strike"]
+    "lore": "Wields a sword named 'Chunchunmaru' — a name so ridiculous that Kazuma himself would be proud. Enemies laugh themselves into defeat. The sword has evolved — it now has LORE. Internet historians argue about its 'deep meaning.' There is no deep meaning. The meme value has achieved sentience. Recently defeated an entire battalion because they were arguing about whether it's pronounced 'Chun-chun-maru' or 'Chunchu-nmaru.' DadaXxD communicates with the sword exclusively through meme energy. The sword understands. Weapon registration gave up and created a new category: 'Legendary (Derogatory).'",
+    "specialty": "Memetic warfare that transcends dimensions",
+    "reputation": "The blade that weaponized Internet culture",
+    "stats": "Sword Power 150 | Meme Sentience YES | Comedy Damage 15000 | Academic Papers Written About It 7",
+    "skills": ["Legendary Ridicule", "Meme Slash", "Pronunciation Paradox", "Sentient Comedy"]
   },
   "Daleee": {
     "title": "The Inverse Catastrophe",
@@ -62,14 +62,6 @@
     "reputation": "The only member banned from using money",
     "stats": "Transaction Success 0% | Economic Destruction ∞ | Pity Donations 9999 | Wanted Level 7 KINGDOMS",
     "skills": ["Market Crash Touch", "Blockchain Collapse", "Inflation Aura", "Accidental Profit"]
-  },
-  "EoriuX": {
-    "title": "The Self-Inflicted Legend",
-    "lore": "An assassin with the edgy X in their name but zero edge in execution. Has stabbed himself more times than all enemies combined. Created the guild's first insurance policy. His enemies surrender out of secondhand embarrassment. Medical suppliers send him Christmas cards. Once won a duel because the opponent couldn't watch anymore. LXRDGRIM has a dedicated 'EoriuX Emergency Fund' for therapy and bandages.",
-    "specialty": "Winning through catastrophic self-harm & pity damage",
-    "reputation": "The reason Elysium has a group health plan",
-    "stats": "Self-Stab Count 9999 | Enemy Kills 12 | Bandage Budget ∞ | Survival (Somehow) YES",
-    "skills": ["Reflexive Self-Stab", "Pity Victory", "Accidental Intimidation", "Sympathy Surrender"]
   },
   "erwarrr": {
     "title": "The Glitched Silence",
@@ -97,11 +89,11 @@
   },
   "Goblok": {
     "title": "The Glorious Idiot King",
-    "lore": "Name literally means 'stupid' in Indonesian — wears it as a crown. Every decision defies logic so hard that logic filed a restraining order. Enemies prepare for his stupidity; he out-stupids their preparations. Declared a 3-day siege 'a 20-minute nap with extra steps.' WON. His battle plans are drawn in crayon and include stick figures. They work. Military academies study him as 'What Not To Do (But It Works).'",
-    "specialty": "Transcendent idiocy that breaks the meta",
-    "reputation": "The dumbest genius or the smartest idiot — nobody knows",
-    "stats": "IQ ??? | Logic 0 | Victory Rate 99% | Sense Made 0",
-    "skills": ["Crayon Strategy", "Idiot Savant", "Stupidity Transcendence", "4D Chess (Accidentally)"]
+    "lore": "Name literally means 'stupid' in Indonesian — wears it as a crown. Every decision defies logic so hard that logic filed a restraining order. Enemies prepare for his stupidity; he out-stupids their preparations. Recently declared Hayacinth as 'Biological Siege Artillery' after witnessing a sneeze shatter a fortress wall. His latest battle plan involves AE28's carrier pigeons attacking in 'analog formation' — somehow it worked. The crayon drawings now include stick figures of new members. Military academies have created a new course: 'Applied Goblokian Theory.' He's banned from teaching it.",
+    "specialty": "Transcendent idiocy that evolves with each impossibility",
+    "reputation": "The guild leader who promotes people based on their failures",
+    "stats": "IQ ??? | Logic -1 | Victory Rate 99.7% | New Strategies (Crayon-Based) 12",
+    "skills": ["Crayon Strategy Evolution", "Failure Promotion", "Stupidity Transcendence", "Biological Artillery Command"]
   },
   "Helvenica": {
     "title": "The Comic Sans Crusader",
@@ -121,19 +113,19 @@
   },
   "Hesucrypto": {
     "title": "The Broke Billionaire",
-    "lore": "Made millions. Lost millions. Made millions again. Lost it faster. Currently owns NFTs of his own debt. Created the Jalo Bot as 'the only profitable thing in his life.' Gives motivational speeches that start with 'diamond hands' and end with 'we're spiritually wealthy.' The guild treasury is just his vibes. Predicted 47 market crashes — was right about 46 — invested in the 47th anyway. Enaira is forbidden from touching anything he touches.",
-    "specialty": "Turning financial ruin into motivational content",
-    "reputation": "The richest broke person in three kingdoms",
-    "stats": "Net Worth VIBES | Actual Money -9999 | NFT Collection 'PRICELESS' | Copium ∞",
-    "skills": ["Diamond Hands", "HODL Aura", "Motivational Bankruptcy", "Jalo Bot Summon"]
+    "lore": "Made millions. Lost millions. Made millions again. Lost it faster. Currently owns NFTs of his own debt — they're somehow appreciating. The Jalo Bot has become sentient and now manages Elysium's finances better than any treasurer could. Latest scheme: selling AE28's stone tablets as 'blockchain-free NFTs' to confused investors. Gives motivational speeches that start with 'diamond hands' and end with 'we're spiritually AND financially wealthy now???' The guild treasury runs on Jalo Bot algorithms and prayer. Enaira tried touching his latest investment — it somehow made profit. He's questioning everything.",
+    "specialty": "Turning financial chaos into accidental profit",
+    "reputation": "The broke billionaire who weaponized a misinformation bot into a CFO",
+    "stats": "Net Worth FLUCTUATING | Jalo Bot Accuracy 100% | Stone Tablet Sales 47 | Enaira Paradox 1",
+    "skills": ["Diamond Hands", "HODL Aura", "Jalo Bot Supremacy", "Accidental Profit"]
   },
   "Iguro": {
     "title": "The Portal Disaster",
-    "lore": "Named after the Snake Pillar — graceful, precise, deadly. Opens portals like a drunk GPS. Aimed for the enemy throne room, arrived in Inihaw's BBQ mid-flip. Three boss monsters joined Elysium because Iguro teleported them into the welcome party. Has a spreadsheet titled 'Accidental Recruits (Good PR).' The enemy's best infiltration defense is hoping Iguro tries to send reinforcements. He'll send them to the wrong dimension.",
-    "specialty": "Dimensional dysfunction with recruitment side effects",
-    "reputation": "The worst navigator with the best accidental HR record",
-    "stats": "Portal Accuracy 0% | Recruitment Rate 999% | Dimensions Confused ∞ | GPS Trust -9999",
-    "skills": ["Wrong Warp", "Accidental Recruitment", "BBQ Teleport", "Dimensional Oops"]
+    "lore": "Named after the Snake Pillar — graceful, precise, deadly. Opens portals like a drunk GPS. Recently tried to send supplies to the frontlines; AE28's carrier pigeon ended up in a demon lord's bathroom. The demon lord joined Elysium out of sheer confusion. 'Accidental Recruits' spreadsheet now has 12 entries — Goblok officially made him Head of Unintentional Recruitment. Attempted to visit 惡1ce's charity bake sale, arrived at enemy headquarters with cookies. The enemy surrendered AND donated. Dimensional chaos is now a diplomatic strategy.",
+    "specialty": "Dimensional dysfunction turned recruitment department",
+    "reputation": "The portal master who accidentally built an empire",
+    "stats": "Portal Accuracy 0% | Recruitment Rate 1200% | Diplomatic Accidents 47 | Correct Destinations 0",
+    "skills": ["Strategic Wrong Warp", "Recruitment Teleport", "Cookie Diplomacy Portal", "Unintentional HR"]
   },
   "Inihaw": {
     "title": "The Vegan BBQ Warlord",
@@ -177,11 +169,11 @@
   },
   "LXRDGRIM": {
     "title": "The Therapeutic Edgelord",
-    "lore": "The edgiest name in the guild attached to a certified therapist. His scythe has a 'EMOTIONAL SUPPORT' sticker. Provides therapy to: Azryth (darkness phobia), EoriuX (self-harm incidents), ladyhoho (everything), and half the enemy army (they surrender for life advice). His brooding is professionally required. Files 'Emotional Incident Reports' after every battle. The most wholesome death entity in existence.",
-    "specialty": "Intimidation that comes with a therapy session",
-    "reputation": "Death's friendliest representative with excellent listening skills",
-    "stats": "Brooding 9999 | Therapy Skill 9999 | Scythe Hugs Given 9999 | Edge (Actual) 100",
-    "skills": ["Therapeutic Dread", "Scythe Hug", "Emotional Support Slash", "Licensed Death"]
+    "lore": "The edgiest name in the guild attached to a certified therapist. His scythe now has TWO 'EMOTIONAL SUPPORT' stickers. Client list has expanded: Azryth (darkness phobia), ladyhoho (everything), AmielJohn & M1ssy (twice-weekly snack war mediation), and AE28 (technology trust issues). Recently added 惡1ce as a CO-THERAPIST after realizing wholesomeness is contagious. Now runs group therapy sessions called 'Death & Cookies.' The enemy army has a waiting list. His 'Emotional Incident Reports' are published as self-help books. The royalties fund the guild's expanding therapy budget.",
+    "specialty": "Death therapy with cookie-based healing",
+    "reputation": "The reaper who heals what he reaps",
+    "stats": "Brooding 9999 | Therapy Clients 47 | Scythe Hugs 15000 | Self-Help Books Published 3",
+    "skills": ["Therapeutic Dread", "Group Scythe Hug", "Death & Cookies Session", "Published Wisdom"]
   },
   "M1ssy": {
     "title": "The Anaphylactic Anarchist",
@@ -190,14 +182,6 @@
     "reputation": "The only member whose lunch is a combat decision",
     "stats": "Allergies ALL | Snack Dedication 9999 | Epipen Uses ∞ | Medical Advice Ignored 100%",
     "skills": ["Anaphylactic Assault", "Epipen Quickdraw", "Allergy Bomb", "Snack Roulette"]
-  },
-  "Maia": {
-    "title": "The Botanical Grim Reaper",
-    "lore": "Named after the Greek goddess of GROWTH. Kills plants by existing near them. Has formed the 'Green Disaster Duo' with Hayacinth — one murders plants, the other is murdered BY plants. Mother Gaia sends weekly cease-and-desist letters. Once walked through a forest; it's now a desert with excellent parking. Garden centers have her wanted poster. Even fake plants wilt when she enters the room. It's psychological at this point.",
-    "specialty": "Accidental botanical genocide & divine disappointment",
-    "reputation": "Spring's least favorite daughter",
-    "stats": "Plant Kill Rate 100% | Nature Affinity CURSED | Gaia's Disappointment ∞ | Gardens Destroyed 9999",
-    "skills": ["Death Blossom", "Wilting Aura", "Botanical Apocalypse", "Fake Plant Fear"]
   },
   "Maria": {
     "title": "The Incorrectly Victorious Twin",
@@ -345,11 +329,11 @@
   },
   "Hayacinth": {
     "title": "The Pollen Victim",
-    "lore": "Named after the beautiful Hyacinth flower. Allergic to flowers. ALL flowers. Forms the 'Green Disaster Duo' with Maia — Maia kills plants, Hayacinth is killed BY plants. Spring is their personal Vietnam. Carries antihistamines like grenades. Sneezes have been weaponized into AOE attacks. Once sneezed so hard it counted as siege damage. Gardens are war zones. Nature wants them dead specifically.",
-    "specialty": "Allergy-based AOE damage & botanical suffering",
-    "reputation": "The flower child that flowers declared war on",
-    "stats": "Flower Allergy ∞ | Sneeze Damage 9999 | Antihistamine Stock ∞ | Nature's Enemy YES",
-    "skills": ["Allergic Explosion", "Sneeze Bomb", "Pollen Panic", "Histamine Havoc"]
+    "lore": "Named after the beautiful Hyacinth flower. Allergic to flowers. ALL flowers. Spring is their personal Vietnam. Carries antihistamines like grenades. Sneezes have been weaponized into AOE attacks. Once sneezed so hard it counted as siege damage. Gardens are war zones. Nature wants them dead specifically. Recently discovered their sneezes can shatter magical barriers — now Goblok deploys them as 'Biological Siege Artillery.' The irony of becoming useful through suffering is not lost on them.",
+    "specialty": "Allergy-based AOE damage & botanical suffering turned tactical",
+    "reputation": "The flower child promoted to living siege weapon",
+    "stats": "Flower Allergy ∞ | Sneeze Damage 9999 | Antihistamine Stock ∞ | Barrier Breaks 47",
+    "skills": ["Allergic Explosion", "Sneeze Bomb", "Pollen Panic", "Barrier-Breaking Sneeze"]
   },
   "LaxusLawliet": {
     "title": "The Misleading Name",
@@ -375,12 +359,28 @@
     "stats": "Verbal Communication 0 | Meme Fluency 9999 | XD Energy ∞ | Comprehensibility ???",
     "skills": ["Meme Command", "Reaction Rally", "Sticker Strike", "XD Burst"]
   },
+  "AE28": {
+    "title": "The Analog Anomaly",
+    "lore": "Named with cutting-edge alphanumeric designation suggesting advanced AI or experimental tech. Writes everything on stone tablets. Distrusts computers so much they carved their guild application into granite. Enemies expect cyber warfare — get hit with rocks instead. Has a carrier pigeon named 'PingBot.' Once hacked a mainframe by throwing a brick through the window. The guild's IT department has banned them from all electronics. Their 'neural network' is literally a web of string connecting cave paintings.",
+    "specialty": "Stone Age solutions to digital Age problems",
+    "reputation": "The most advanced member stuck in 10,000 BC",
+    "stats": "Tech Level PALEOLITHIC | Problem Solving 9999 | Electronics Trust -∞ | Carrier Pigeons 47",
+    "skills": ["Tablet Toss", "Stone Encryption", "Analog Assault", "Pigeon DDoS"]
+  },
+  "惡1ce": {
+    "title": "The Benevolent Evil",
+    "lore": "Name combines the Chinese character for 'evil' (惡) with '1ce' — meant to sound like frozen malevolence. Bakes cookies for orphans. Volunteers at animal shelters. The 'evil' manifests as aggressively wholesome acts that make villains uncomfortable. Once defeated a dark lord by organizing a charity bake sale SO successful the dark lord felt inadequate and retired. Their 'ice magic' is just really good at making popsicles for sad people. Enemies surrender because the guilt is unbearable.",
+    "specialty": "Weaponized kindness disguised as villainy",
+    "reputation": "The evil that makes you feel bad for not donating",
+    "stats": "Evil Intent 0 | Wholesomeness 9999 | Popsicle Mastery ∞ | Guilt Damage DEVASTATING",
+    "skills": ["Charity Freeze", "Cookie Corruption", "Kindness Curse", "Guilt Trip Ice"]
+  },
   "_FUTURE_MEMBER_TEMPLATE": {
     "title": "The Undefined Disaster",
-    "lore": "A placeholder warrior whose chaos has not yet been defined. Prophecy says they will be excellent at something nobody can name, terrible at something obvious, and their contradictions will fit perfectly into Elysium's beautiful mess. Until then, this template waits — patient, ironic, and ready to be overwritten by fresh catastrophe.",
-    "specialty": "Potential disasters pending definition",
-    "reputation": "Elysium's next legendary contradiction (loading...)",
-    "stats": "Potential ∞ | Definition 0 | Chaos Reserved YES | Paradox Pending",
-    "skills": ["Undiscovered Weakness", "Hidden Incompetence", "Future Legendary Failure", "Plot Armor (Temporary)"]
+    "lore": "A warrior whose legend has yet to unfold within Elysium's chaotic embrace. They will excel at something absurd, fail spectacularly at the obvious, and their contradictions will weave perfectly into the guild's tapestry of beautiful disasters. Goblok awaits their arrival with crayon-drawn plans. LXRDGRIM has pre-scheduled their therapy sessions. The snacks are ready. The chaos is patient.",
+    "specialty": "Undiscovered paradoxes waiting to emerge",
+    "reputation": "Elysium's next legendary contradiction (pending arrival)",
+    "stats": "Potential ∞ | Chaos Reserved YES | Therapy Pre-Booked | Guild Integration INEVITABLE",
+    "skills": ["Unrevealed Weakness", "Hidden Disaster", "Legendary Failure (TBD)", "Elysium Destiny"]
   }
 }
