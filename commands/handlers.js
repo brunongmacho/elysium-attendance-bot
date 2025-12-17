@@ -12,6 +12,8 @@
 
 const { EmbedBuilder } = require('discord.js');
 const tipSystem = require('./tip-system');
+const fs = require('fs');
+const path = require('path');
 
 /**
  * Handle slash commands
@@ -966,10 +968,20 @@ async function handleSlashCommand(interaction, modules, config, client) {
             return;
           }
 
+          // Load boss spawn config for time calculations
+          let bossSpawnConfig = null;
+          try {
+            const configPath = path.join(__dirname, '..', 'boss_spawn_config.json');
+            const rawData = fs.readFileSync(configPath, 'utf8');
+            bossSpawnConfig = JSON.parse(rawData);
+          } catch (configError) {
+            console.error('Failed to load boss spawn config:', configError);
+          }
+
           const embed = new EmbedBuilder()
             .setColor(0x4a90e8)
             .setTitle('🔄 Boss Rotation Status')
-            .setDescription('Current rotation for 5-guild system')
+            .setDescription('Track which guild\'s turn it is for rotating bosses')
             .setTimestamp();
 
           for (const boss of rotatingBosses) {
@@ -980,11 +992,45 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
               // Get spawn time from boss timer if available
               let spawnInfo = '';
+              let elysiumTurnInfo = '';
               try {
                 const timerData = bossTimer.getNextSpawn(boss);
                 if (timerData && timerData.nextSpawn) {
                   const spawnTimestamp = Math.floor(timerData.nextSpawn.getTime() / 1000);
                   spawnInfo = `\n📍 Next Spawn: <t:${spawnTimestamp}:R> ⏱️`;
+
+                  // Calculate time until Elysium's turn if not currently our turn
+                  if (!rotation.isOurTurn && bossSpawnConfig && bossSpawnConfig.timerBasedBosses[boss]) {
+                    const bossConfig = bossSpawnConfig.timerBasedBosses[boss];
+                    const spawnIntervalHours = bossConfig.spawnIntervalHours;
+
+                    // Calculate spawns until Elysium's turn (index 1)
+                    const currentIndex = rotation.currentIndex;
+                    const totalGuilds = rotation.guilds && rotation.guilds.length > 0 ? rotation.guilds.length : 5;
+                    const elysiumIndex = 1;
+
+                    let spawnsUntilElysium;
+                    if (currentIndex >= elysiumIndex) {
+                      // Need to loop around: current -> end of cycle -> Elysium
+                      spawnsUntilElysium = (totalGuilds - currentIndex) + elysiumIndex;
+                    } else {
+                      // Direct path
+                      spawnsUntilElysium = elysiumIndex - currentIndex;
+                    }
+
+                    // Calculate predicted time for Elysium's turn
+                    // The next spawn is for the guild at currentIndex
+                    // spawnsUntilElysium represents moves needed in the rotation to reach Elysium
+                    // Each move = one spawn interval (kill -> respawn -> next guild's turn)
+                    const nextSpawnDate = new Date(timerData.nextSpawn);
+                    const hoursUntilElysium = spawnsUntilElysium * spawnIntervalHours;
+
+                    const elysiumTurnDate = new Date(nextSpawnDate.getTime() + (hoursUntilElysium * 60 * 60 * 1000));
+                    const elysiumTimestamp = Math.floor(elysiumTurnDate.getTime() / 1000);
+
+                    const spawnsText = spawnsUntilElysium === 1 ? '1 spawn' : `${spawnsUntilElysium} spawns`;
+                    elysiumTurnInfo = `\n🟢 Elysium's Turn: <t:${elysiumTimestamp}:R> (~${spawnsText}, ~${hoursUntilElysium}h)`;
+                  }
                 }
               } catch (timerError) {
                 // Silently continue without spawn info
@@ -1008,7 +1054,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
               embed.addFields({
                 name: `${emoji} ${boss}`,
-                value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**\nNext: ${nextGuild}${spawnInfo}${dataWarning}`,
+                value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**\nNext: ${nextGuild}${spawnInfo}${elysiumTurnInfo}${dataWarning}`,
                 inline: false
               });
             }
