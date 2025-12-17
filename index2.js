@@ -6856,6 +6856,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         attendance.setActiveSpawns(activeSpawns);
 
         console.log(`✅ VERIFY: ${pending.author} added to ${spawnInfo.boss} (${spawnInfo.timestamp}) by ${user.username} | Total: ${spawnInfo.members.length} members`);
+        console.log(`   📊 Current verified members: ${spawnInfo.members.join(', ')}`);
 
         await interaction.update({
           embeds: [EmbedBuilder.from(msg.embeds[0]).setColor(0x00ff00).setFooter({ text: `Verified by ${user.username}` })],
