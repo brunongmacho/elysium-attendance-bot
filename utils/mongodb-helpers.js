@@ -398,6 +398,37 @@ async function getMemberAttendance(identifier, filter = {}) {
 }
 
 /**
+ * Get the last spawn time for a boss from attendance records
+ * @param {string} bossName - Boss name to search for
+ * @returns {Promise<Object|null>} - Object with {timestamp, threadId} or null if not found
+ */
+async function getLastBossSpawn(bossName) {
+  try {
+    const db = await dbAPI.connect();
+
+    // Find the most recent attendance record for this boss
+    const lastRecord = await db.collection('attendance')
+      .find({ bossName: bossName })
+      .sort({ timestamp: -1 })
+      .limit(1)
+      .toArray();
+
+    if (lastRecord && lastRecord.length > 0) {
+      return {
+        timestamp: lastRecord[0].timestamp,
+        threadId: lastRecord[0].threadId,
+        weekLabel: lastRecord[0].weekLabel
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`Error getting last spawn for ${bossName}:`, error);
+    return null;
+  }
+}
+
+/**
  * Update member attendance stats
  * @param {string} identifier - Discord ID or username
  * @param {Object} attendanceData - Attendance data
@@ -1286,6 +1317,7 @@ module.exports = {
   addAttendance,           // High-level wrapper (creates record + updates stats)
   addAttendanceRecord,     // Low-level: just creates record
   getMemberAttendance,
+  getLastBossSpawn,        // Get last spawn time for a boss from attendance records
   updateAttendanceStats,
   getMemberStats,          // Get member stats for !stats command
 

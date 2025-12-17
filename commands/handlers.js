@@ -14,6 +14,7 @@ const { EmbedBuilder } = require('discord.js');
 const tipSystem = require('./tip-system');
 const fs = require('fs');
 const path = require('path');
+const mongoHelpers = require('../utils/mongodb-helpers');
 
 /**
  * Handle slash commands
@@ -990,14 +991,34 @@ async function handleSlashCommand(interaction, modules, config, client) {
               const emoji = rotation.isOurTurn ? '🟢' : '🔴';
               const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
 
-              // Get spawn time from boss timer if available
+              // Get spawn time - try boss timer first, then attendance records
               let spawnInfo = '';
               let elysiumTurnInfo = '';
               try {
+                let nextSpawnDate = null;
+                let spawnSource = '';
+
+                // Try getting from boss timer first
                 const timerData = bossTimer.getNextSpawn(boss);
                 if (timerData && timerData.nextSpawn) {
-                  const spawnTimestamp = Math.floor(timerData.nextSpawn.getTime() / 1000);
-                  spawnInfo = `\n📍 Next Spawn: <t:${spawnTimestamp}:R> ⏱️`;
+                  nextSpawnDate = timerData.nextSpawn;
+                  spawnSource = 'timer';
+                } else {
+                  // Fallback: Get last spawn from attendance records
+                  const lastSpawn = await mongoHelpers.getLastBossSpawn(boss);
+                  if (lastSpawn && lastSpawn.timestamp && bossSpawnConfig && bossSpawnConfig.timerBasedBosses[boss]) {
+                    const bossConfig = bossSpawnConfig.timerBasedBosses[boss];
+                    const lastSpawnDate = new Date(lastSpawn.timestamp);
+                    // Calculate next spawn based on interval
+                    nextSpawnDate = new Date(lastSpawnDate.getTime() + (bossConfig.spawnIntervalHours * 60 * 60 * 1000));
+                    spawnSource = 'attendance';
+                  }
+                }
+
+                if (nextSpawnDate) {
+                  const spawnTimestamp = Math.floor(nextSpawnDate.getTime() / 1000);
+                  const sourceIndicator = spawnSource === 'attendance' ? '📋' : '⏱️';
+                  spawnInfo = `\n📍 Next Spawn: <t:${spawnTimestamp}:R> ${sourceIndicator}`;
 
                   // Calculate time until Elysium's turn if not currently our turn
                   if (!rotation.isOurTurn && bossSpawnConfig && bossSpawnConfig.timerBasedBosses[boss]) {
@@ -1022,7 +1043,6 @@ async function handleSlashCommand(interaction, modules, config, client) {
                     // The next spawn is for the guild at currentIndex
                     // spawnsUntilElysium represents moves needed in the rotation to reach Elysium
                     // Each move = one spawn interval (kill -> respawn -> next guild's turn)
-                    const nextSpawnDate = new Date(timerData.nextSpawn);
                     const hoursUntilElysium = spawnsUntilElysium * spawnIntervalHours;
 
                     const elysiumTurnDate = new Date(nextSpawnDate.getTime() + (hoursUntilElysium * 60 * 60 * 1000));
