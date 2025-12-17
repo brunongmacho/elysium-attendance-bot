@@ -127,7 +127,7 @@ async function handleKilled(message, args, config) {
 
       // Add boss image if available
       const bossImage = getBossImageAttachment(bossName);
-      const bossImageURL = getBossImageAttachmentURL(bossName);
+      const bossImageURL = getBossImageAttachmentURL(bossName, message.guild);
       if (bossImageURL) {
         embed.setThumbnail(bossImageURL);
       }
@@ -172,7 +172,7 @@ async function handleKilled(message, args, config) {
 
     // Add boss image if available
     const bossImage = getBossImageAttachment(result.bossName);
-    const bossImageURL = getBossImageAttachmentURL(result.bossName);
+    const bossImageURL = getBossImageAttachmentURL(result.bossName, message.guild);
     if (bossImageURL) {
       embed.setThumbnail(bossImageURL);
     }
@@ -432,7 +432,7 @@ async function handleNoSpawn(message, args, config) {
 
     // Add boss image if available
     const bossImage = getBossImageAttachment(bossName);
-    const bossImageURL = getBossImageAttachmentURL(bossName);
+    const bossImageURL = getBossImageAttachmentURL(bossName, message.guild);
     if (bossImageURL) {
       embed.setThumbnail(bossImageURL);
     }
@@ -501,7 +501,7 @@ async function handleSpawned(message, args, config) {
 
     // Add boss image if available
     const bossImage = getBossImageAttachment(bossName);
-    const bossImageURL = getBossImageAttachmentURL(bossName);
+    const bossImageURL = getBossImageAttachmentURL(bossName, message.guild);
     if (bossImageURL) {
       embed.setThumbnail(bossImageURL);
     }
@@ -603,7 +603,7 @@ async function handleSetBoss(message, args, config) {
 
     // Add boss image if available
     const bossImage = getBossImageAttachment(bossName);
-    const bossImageURL = getBossImageAttachmentURL(bossName);
+    const bossImageURL = getBossImageAttachmentURL(bossName, message.guild);
     if (bossImageURL) {
       embed.setThumbnail(bossImageURL);
     }

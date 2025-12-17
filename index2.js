@@ -5180,7 +5180,7 @@ client.on(Events.MessageCreate, async (message) => {
 
                 // Add boss image if available
                 const bossImage = getBossImageAttachment(bossName);
-                const bossImageURL = getBossImageAttachmentURL(bossName);
+                const bossImageURL = getBossImageAttachmentURL(bossName, message.guild);
                 if (bossImageURL) {
                   embed.setThumbnail(bossImageURL);
                 }

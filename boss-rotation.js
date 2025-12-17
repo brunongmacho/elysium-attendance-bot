@@ -649,7 +649,7 @@ async function sendRotationWarning(bossName, predictedSpawnTime) {
 
     // Add boss image if available
     const bossImage = getBossImageAttachment(bossName);
-    const bossImageURL = getBossImageAttachmentURL(bossName);
+    const bossImageURL = getBossImageAttachmentURL(bossName, channel.guild);
     if (bossImageURL) {
       embed.setThumbnail(bossImageURL);
     }

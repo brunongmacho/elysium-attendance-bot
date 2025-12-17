@@ -623,7 +623,7 @@ async function createSpawnThreads(
 
   // Add boss image if available
   const bossImage = getBossImageAttachment(bossName);
-  const bossImageURL = getBossImageAttachmentURL(bossName);
+  const bossImageURL = getBossImageAttachmentURL(bossName, mainGuild);
   if (bossImageURL) {
     embed.setThumbnail(bossImageURL);
   }
