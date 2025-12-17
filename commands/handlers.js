@@ -589,13 +589,6 @@ async function handleSlashCommand(interaction, modules, config, client) {
       // The handler sends confirmation buttons to channel, not as interaction response
       await interaction.deferReply({ ephemeral: true });
 
-      try {
-        // Delete the "thinking" message since handler will send its own messages
-        await interaction.deleteReply().catch(() => {});
-      } catch (e) {
-        // Ignore errors
-      }
-
       // Create synthetic message object to reuse existing !openthread handler
       const syntheticMessage = {
         author: interaction.user,
@@ -617,8 +610,15 @@ async function handleSlashCommand(interaction, modules, config, client) {
         }
       };
 
-      const { commandHandlers } = require('../index2.js');
-      await commandHandlers.openthread(syntheticMessage, interaction.member);
+      try {
+        const { commandHandlers } = require('../index2.js');
+        await commandHandlers.openthread(syntheticMessage, interaction.member);
+        // Properly resolve the deferred interaction (ephemeral, only user sees this)
+        await interaction.editReply({ content: '✅ Command processed' });
+      } catch (error) {
+        console.error('Error in /openthread command:', error);
+        await interaction.editReply({ content: `❌ Error: ${error.message}` });
+      }
       return;
     }
 
@@ -627,13 +627,6 @@ async function handleSlashCommand(interaction, modules, config, client) {
       // Defer with ephemeral to acknowledge interaction
       // The handler sends confirmation buttons and status messages to channel
       await interaction.deferReply({ ephemeral: true });
-
-      try {
-        // Delete the "thinking" message since handler will send its own messages
-        await interaction.deleteReply().catch(() => {});
-      } catch (e) {
-        // Ignore errors
-      }
 
       // Create synthetic message object to reuse existing !overrideclose handler
       const syntheticMessage = {
@@ -656,8 +649,15 @@ async function handleSlashCommand(interaction, modules, config, client) {
         }
       };
 
-      const { commandHandlers } = require('../index2.js');
-      await commandHandlers.overrideclose(syntheticMessage, interaction.member);
+      try {
+        const { commandHandlers } = require('../index2.js');
+        await commandHandlers.overrideclose(syntheticMessage, interaction.member);
+        // Properly resolve the deferred interaction (ephemeral, only user sees this)
+        await interaction.editReply({ content: '✅ Command processed' });
+      } catch (error) {
+        console.error('Error in /overrideclose command:', error);
+        await interaction.editReply({ content: `❌ Error: ${error.message}` });
+      }
       return;
     }
 
