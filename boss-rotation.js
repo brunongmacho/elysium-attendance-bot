@@ -912,6 +912,18 @@ async function restoreDailyScheduleFromMongoDB() {
 
     } else {
       console.log(`ℹ️ No daily schedule found in MongoDB for ${todayDate}`);
+
+      // MISSED CRON RECOVERY: If bot was down at midnight, post schedule now
+      // Only if it's after 12:00 AM and before 11:59 PM (same day)
+      const hourOfDay = manilaTime.getHours();
+      if (hourOfDay >= 0 && hourOfDay <= 23) {
+        console.log(`🔧 [MISSED-CRON] Bot was down at midnight - posting today's schedule now`);
+
+        // Post schedule immediately (async, don't wait)
+        postDailyRotationSchedule().catch(err =>
+          console.error('❌ Failed to post missed daily schedule:', err.message)
+        );
+      }
     }
 
   } catch (err) {
