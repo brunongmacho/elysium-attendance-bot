@@ -154,6 +154,26 @@ function initialize(cfg, discordClient, bossTimer = null) {
   restoreDailyScheduleFromMongoDB().catch(err =>
     console.error('⚠️ Failed to restore daily schedule from MongoDB:', err.message)
   );
+
+  // Clean up old daily schedules from MongoDB (every 6 hours)
+  setInterval(async () => {
+    try {
+      const db = await dbAPI.connect();
+      const scheduleCollection = db.collection('dailyRotationSchedule');
+
+      // Delete schedules older than 2 days
+      const twoDaysAgo = new Date();
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+      const cutoffDate = twoDaysAgo.toISOString().split('T')[0];
+
+      const result = await scheduleCollection.deleteMany({ _id: { $lt: cutoffDate } });
+      if (result.deletedCount > 0) {
+        console.log(`🧹 Cleaned up ${result.deletedCount} old daily schedule(s) from MongoDB`);
+      }
+    } catch (err) {
+      console.error('⚠️ Failed to clean up old schedules:', err.message);
+    }
+  }, 6 * 60 * 60 * 1000); // Run every 6 hours
 }
 
 // ============================================================================
@@ -844,14 +864,52 @@ async function restoreDailyScheduleFromMongoDB() {
     const existingSchedule = await scheduleCollection.findOne({ _id: todayDate });
 
     if (existingSchedule) {
+      // Restore tracking
       dailyScheduleMessage = {
         messageId: existingSchedule.messageId,
         channelId: existingSchedule.channelId,
         date: existingSchedule.date,
         bosses: existingSchedule.bosses || [],
-        autoDeleteTimer: null // Timer lost on restart, but that's OK
+        autoDeleteTimer: null
       };
-      console.log(`✅ Restored daily schedule tracking from MongoDB (${todayDate}, ${dailyScheduleMessage.bosses.length} bosses)`);
+
+      console.log(`✅ Restored daily schedule from MongoDB (${todayDate}, ${dailyScheduleMessage.bosses.length} bosses)`);
+
+      // CRASH RECOVERY: Check if schedule should be deleted
+      const bosses = existingSchedule.bosses || [];
+      const postedAt = existingSchedule.postedAt ? new Date(existingSchedule.postedAt) : null;
+
+      // Case 1: All bosses completed → delete immediately
+      if (bosses.length === 0) {
+        console.log(`🔧 [CRASH-RECOVERY] All bosses completed - deleting schedule immediately`);
+        await deleteDailySchedule();
+        return;
+      }
+
+      // Case 2: "No rotations" posted more than 1 hour ago → delete immediately
+      if (bosses.length === 0 && postedAt) {
+        const hoursSincePosted = (Date.now() - postedAt.getTime()) / (1000 * 60 * 60);
+        if (hoursSincePosted > 1) {
+          console.log(`🔧 [CRASH-RECOVERY] No rotations schedule expired (${hoursSincePosted.toFixed(1)}h old) - deleting`);
+          await deleteDailySchedule();
+          return;
+        } else {
+          // Re-schedule the 1-hour auto-delete timer
+          const remainingMs = (1 * 60 * 60 * 1000) - (Date.now() - postedAt.getTime());
+          if (remainingMs > 0) {
+            dailyScheduleMessage.autoDeleteTimer = setTimeout(async () => {
+              try {
+                await deleteDailySchedule();
+                console.log('🗑️ Auto-deleted "no rotations" schedule after crash recovery');
+              } catch (err) {
+                console.error('❌ Failed to auto-delete schedule:', err.message);
+              }
+            }, remainingMs);
+            console.log(`⏰ [CRASH-RECOVERY] Re-scheduled auto-delete timer (${Math.round(remainingMs / 60000)} minutes remaining)`);
+          }
+        }
+      }
+
     } else {
       console.log(`ℹ️ No daily schedule found in MongoDB for ${todayDate}`);
     }
