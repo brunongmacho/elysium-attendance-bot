@@ -10,11 +10,14 @@
  * @author ELYSIUM Development Team
  */
 
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const tipSystem = require('./tip-system');
 const fs = require('fs');
 const path = require('path');
 const mongoHelpers = require('../utils/mongodb-helpers');
+
+// Constants
+const CONFIRMATION_TIMEOUT = 30000; // 30 seconds
 
 /**
  * Handle slash commands
@@ -511,31 +514,222 @@ async function handleSlashCommand(interaction, modules, config, client) {
           return;
         }
 
-        await interaction.editReply({
+        // Create confirmation buttons
+        const confirmButton = new ButtonBuilder()
+          .setCustomId(`closeall_confirm_${interaction.user.id}_${Date.now()}`)
+          .setLabel('✅ Confirm')
+          .setStyle(ButtonStyle.Success);
+
+        const cancelButton = new ButtonBuilder()
+          .setCustomId(`closeall_cancel_${interaction.user.id}_${Date.now()}`)
+          .setLabel('❌ Cancel')
+          .setStyle(ButtonStyle.Secondary);
+
+        const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+        const confirmMsg = await interaction.editReply({
           content:
             `⚠️ **MASS CLOSE ALL THREADS?**\n\n` +
-            `This will close ${openSpawns.length} spawn thread(s):\n` +
+            `This will:\n` +
+            `• Verify ALL pending members in ALL threads\n` +
+            `• Close and submit ${openSpawns.length} spawn thread(s)\n` +
+            `• Process one thread at a time (to avoid rate limits)\n\n` +
+            `**Threads to close:**\n` +
             openSpawns
               .map(
                 (s, i) =>
                   `${i + 1}. **${s.spawnInfo.boss}** (${s.spawnInfo.timestamp}) - ${s.spawnInfo.members.length} verified`
               )
               .join('\n') +
-            `\n\n**React with ✅ to confirm or ❌ to cancel.**\n` +
-            `⏱️ This will take approximately ${openSpawns.length * 5} seconds.`
+            `\n\nClick ✅ Confirm or ❌ Cancel button below.\n\n` +
+            `⏱️ This will take approximately ${openSpawns.length * 5} seconds.`,
+          components: [row]
         });
 
-        // Note: For now, we'll just inform. Full implementation would require
-        // button confirmation similar to !closeallthread
-        console.log(
-          `📋 /closeall: Requested by ${interaction.user.username} for ${openSpawns.length} threads`
-        );
+        console.log(`🔘 [BUTTON] /closeall confirmation sent to ${interaction.user.tag} (${interaction.user.id})`);
+
+        // Create button collector
+        const collector = confirmMsg.createMessageComponentCollector({
+          componentType: ComponentType.Button,
+          time: CONFIRMATION_TIMEOUT,
+          filter: i => i.user.id === interaction.user.id
+        });
+
+        collector.on('collect', async (buttonInteraction) => {
+          try {
+            const isConfirm = buttonInteraction.customId.includes('confirm');
+            console.log(`🔘 [BUTTON] ${interaction.user.tag} clicked ${isConfirm ? 'Confirm' : 'Cancel'}`);
+
+            // Disable buttons
+            const disabledRow = new ActionRowBuilder().addComponents(
+              ButtonBuilder.from(confirmButton).setDisabled(true),
+              ButtonBuilder.from(cancelButton).setDisabled(true)
+            );
+
+            await buttonInteraction.update({ components: [disabledRow] });
+
+            if (!isConfirm) {
+              await interaction.followUp({
+                content: '❌ Mass close cancelled.',
+                ephemeral: true
+              });
+              collector.stop();
+              return;
+            }
+
+            // Process the mass close
+            await interaction.followUp({
+              content:
+                `📁 **Starting mass close...**\n\n` +
+                `Processing ${openSpawns.length} thread(s) one by one...\n` +
+                `Please wait, this may take a few minutes.`
+            });
+
+            const normalizeUsername = (username) => username.toLowerCase().replace(/\s+/g, '');
+            const pendingVerifications = attendance.getPendingVerifications();
+
+            let successCount = 0;
+            let failCount = 0;
+            const results = [];
+
+            for (let i = 0; i < openSpawns.length; i++) {
+              const { threadId, thread, spawnInfo } = openSpawns[i];
+
+              try {
+                const progress = Math.floor(((i + 1) / openSpawns.length) * 20);
+                const progressBar = '█'.repeat(progress) + '░'.repeat(20 - progress);
+                const progressPercent = Math.floor(((i + 1) / openSpawns.length) * 100);
+
+                await interaction.followUp({
+                  content:
+                    `📋 **[${i + 1}/${openSpawns.length}]** ${progressBar} ${progressPercent}%\n` +
+                    `Processing: **${spawnInfo.boss}** (${spawnInfo.timestamp})...`
+                });
+
+                // Auto-verify pending members
+                const pendingInThread = Object.entries(pendingVerifications).filter(
+                  ([msgId, p]) => p.threadId === threadId
+                );
+
+                if (pendingInThread.length > 0) {
+                  const newMembers = pendingInThread.filter(
+                    ([msgId, p]) =>
+                      !spawnInfo.members.some(
+                        (m) => normalizeUsername(m) === normalizeUsername(p.author)
+                      )
+                  );
+
+                  if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
+                  for (const [msgId, p] of newMembers) {
+                    spawnInfo.members.push(p.author);
+                    spawnInfo.memberIds[p.author] = p.authorId;
+                  }
+
+                  pendingInThread.forEach(([msgId]) => delete pendingVerifications[msgId]);
+
+                  await interaction.followUp({
+                    content: `   ✅ Auto-verified ${newMembers.length} member(s) (${pendingInThread.length - newMembers.length} duplicates)`
+                  });
+                }
+
+                spawnInfo.closed = true;
+
+                // Submit to Google Sheets if there are members
+                if (spawnInfo.members.length === 0) {
+                  await thread.setLocked(true).catch(() => {});
+                  await thread.setArchived(true).catch(() => {});
+
+                  delete activeSpawns[threadId];
+                  successCount++;
+                  results.push(`⚠️ **${spawnInfo.boss}** - 0 members (no submission)`);
+
+                  console.log(`📍 /closeall: ${spawnInfo.boss} at ${spawnInfo.timestamp} (0 members)`);
+                } else {
+                  const payload = {
+                    action: 'submitAttendance',
+                    boss: spawnInfo.boss,
+                    date: spawnInfo.date,
+                    time: spawnInfo.time,
+                    timestamp: spawnInfo.timestamp,
+                    members: spawnInfo.members
+                  };
+
+                  const resp = await attendance.postToSheet(payload);
+
+                  if (resp.ok) {
+                    await thread.setLocked(true).catch(() => {});
+                    await thread.setArchived(true).catch(() => {});
+
+                    delete activeSpawns[threadId];
+                    successCount++;
+                    results.push(`✅ **${spawnInfo.boss}** - ${spawnInfo.members.length} members submitted`);
+
+                    console.log(`📍 /closeall: ${spawnInfo.boss} at ${spawnInfo.timestamp} (${spawnInfo.members.length} members)`);
+                  } else {
+                    failCount++;
+                    results.push(`❌ **${spawnInfo.boss}** - Failed: ${resp.text || resp.err}`);
+                    console.error(`❌ /closeall failed for ${spawnInfo.boss}:`, resp.text || resp.err);
+                  }
+                }
+
+                // Rate limiting delay
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+              } catch (threadError) {
+                failCount++;
+                results.push(`❌ **${spawnInfo.boss}** - Error: ${threadError.message}`);
+                console.error(`❌ /closeall error processing ${spawnInfo.boss}:`, threadError);
+              }
+            }
+
+            // Send summary
+            const summaryEmbed = new EmbedBuilder()
+              .setColor(failCount === 0 ? 0x00ff00 : 0xffa500)
+              .setTitle('📋 Mass Close Complete')
+              .setDescription(
+                `**Summary:**\n` +
+                `✅ Success: ${successCount}\n` +
+                `❌ Failed: ${failCount}\n\n` +
+                `**Results:**\n${results.join('\n')}`
+              )
+              .setTimestamp();
+
+            await interaction.followUp({ embeds: [summaryEmbed] });
+
+            collector.stop();
+
+          } catch (error) {
+            console.error('❌ [BUTTON] Error in /closeall button handler:', error);
+            await buttonInteraction.followUp({
+              content: `❌ An error occurred: ${error.message}`,
+              ephemeral: true
+            }).catch(() => {});
+          }
+        });
+
+        collector.on('end', async (collected, reason) => {
+          console.log(`🔘 [BUTTON] /closeall collector ended: ${reason} (${collected.size} interactions)`);
+
+          if (reason === 'time' && collected.size === 0) {
+            const disabledRow = new ActionRowBuilder().addComponents(
+              ButtonBuilder.from(confirmButton).setDisabled(true),
+              ButtonBuilder.from(cancelButton).setDisabled(true)
+            );
+
+            await interaction.editReply({ components: [disabledRow] }).catch(() => {});
+            await interaction.followUp({
+              content: '⏱️ Confirmation timed out.',
+              ephemeral: true
+            }).catch(() => {});
+          }
+        });
 
       } catch (error) {
         console.error('Error in /closeall command:', error);
         await interaction.editReply({
-          content: `❌ Failed to close all threads: ${error.message}`
-        });
+          content: `❌ Failed to process closeall: ${error.message}`,
+          components: []
+        }).catch(() => {});
       }
 
       return;
