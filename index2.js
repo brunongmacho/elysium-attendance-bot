@@ -2762,6 +2762,7 @@ const commandHandlers = {
 
               // Delete rotation warning message to avoid flooding
               await bossRotation.deleteRotationWarning(spawnInfo.boss);
+              await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
               await thread
                 .send(
@@ -3008,6 +3009,7 @@ const commandHandlers = {
 
           // Delete rotation warning message to avoid flooding
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           await message.channel.send(
             `✅ **Attendance submitted successfully!**\n\n` +
@@ -3428,6 +3430,7 @@ const commandHandlers = {
 
           // Delete rotation warning message (prevent channel flooding)
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           delete activeSpawns[message.channel.id];
           const cacheKey = `${spawnInfo.boss.toUpperCase()}|${attendance.getCurrentTimestamp().full}`;
@@ -6247,6 +6250,7 @@ client.on(Events.MessageCreate, async (message) => {
 
           // Delete rotation warning message to avoid flooding
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           await message.channel.send(
             `✅ Attendance submitted successfully! (${spawnInfo.members.length} members)`
@@ -7020,6 +7024,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
           // Delete rotation warning message (prevent channel flooding)
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7068,6 +7073,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
           // Delete rotation warning message (prevent channel flooding)
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7108,6 +7114,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
           // Delete rotation warning message to avoid flooding
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           await interaction.channel.send(`✅ Attendance submitted! Archiving...`);
 
@@ -7133,6 +7140,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
           // Delete rotation warning message (prevent channel flooding)
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7416,6 +7424,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 
           // Delete rotation warning message (prevent channel flooding)
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7451,6 +7460,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 
           // Delete rotation warning message to avoid flooding
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           await msg.channel.send(`✅ Attendance submitted! Archiving...`);
 
@@ -7478,6 +7488,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 
           // Delete rotation warning message (prevent channel flooding)
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7530,6 +7541,7 @@ client.on(Events.ThreadUpdate, async (oldThread, newThread) => {
 
         // Delete rotation warning message (prevent channel flooding)
         await bossRotation.deleteRotationWarning(spawnInfo.boss);
+        await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
         console.log(`🗑️ Cleaned up rotation warning for ${spawnInfo.boss}`);
 
         // Clean up spawn from active state

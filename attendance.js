@@ -1620,6 +1620,9 @@ async function checkAndAutoCloseThreads(client) {
           // Delete rotation warning message (prevent channel flooding)
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
 
+          // Check if this was the last boss in daily schedule and delete if so
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
+
           // Clean up state
           delete activeSpawns[threadId];
           const noMembersKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
@@ -1672,6 +1675,9 @@ async function checkAndAutoCloseThreads(client) {
 
           // Delete rotation warning message (prevent channel flooding)
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
+
+          // Check if this was the last boss in daily schedule and delete if so
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           // Clean up state
           delete activeSpawns[threadId];
@@ -1873,6 +1879,9 @@ async function checkAndAutoCloseThreads(client) {
 
             // Delete rotation warning message (prevent channel flooding)
             await bossRotation.deleteRotationWarning(spawnInfo.boss);
+
+            // Check if this was the last boss in daily schedule and delete if so
+            await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
             // Clean up state
             delete activeSpawns[threadId];
