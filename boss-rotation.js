@@ -1004,23 +1004,18 @@ async function postDailyRotationSchedule() {
       inline: false
     });
 
-    // Add thumbnail (use first boss image)
-    const firstBoss = elysiumRotations[0].bossName;
-    const bossImageURL = getBossImageAttachmentURL(firstBoss, channel.guild);
-    if (bossImageURL) {
-      embed.setThumbnail(bossImageURL);
+    // Add thumbnail (use ELYSIUM server icon)
+    const serverIcon = channel.guild.iconURL({ dynamic: true, size: 256 });
+    if (serverIcon) {
+      embed.setThumbnail(serverIcon);
     }
 
     // Add guild branding
     addGuildFooter(embed, channel.guild, 'ELYSIUM Daily Schedule');
     embed.setTimestamp();
 
-    // Send message
-    const bossImage = getBossImageAttachment(firstBoss);
+    // Send message (no attachment needed - using server icon)
     const messagePayload = { embeds: [embed] };
-    if (bossImage) {
-      messagePayload.files = [bossImage];
-    }
 
     const sentMessage = await channel.send(messagePayload);
 
