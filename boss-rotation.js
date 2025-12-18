@@ -339,6 +339,8 @@ async function refreshRotationCache() {
         try {
           // First, check if boss timer already has a schedule (getNextSpawn)
           const existingTimer = bossTimerModule.getNextSpawn(boss);
+          console.log(`  │  🔍 getNextSpawn("${boss}"):`, existingTimer ? `nextSpawn=${existingTimer.nextSpawn ? existingTimer.nextSpawn.toISOString() : 'null'}` : 'null');
+
           if (existingTimer && existingTimer.nextSpawn) {
             console.log(`  │  ✅ ${boss} already has a timer (spawns at ${existingTimer.nextSpawn.toISOString()})`);
             scheduledCount++;
@@ -1092,13 +1094,22 @@ async function postDailyRotationSchedule() {
         const spawnTime = timerData.nextSpawn;
 
         // Check if spawn is within today (12am to 11:59pm Manila)
-        if (spawnTime >= startOfDay && spawnTime <= endOfDay) {
-          elysiumRotations.push({
-            bossName,
-            spawnTime,
-            rotation,
-            timerData
-          });
+        // Include past spawns from today (may be waiting to be killed)
+        if (spawnTime <= endOfDay) {
+          // Also check if spawn is from today (not from previous days)
+          const spawnDate = new Date(spawnTime);
+          const spawnDayStart = new Date(spawnDate);
+          spawnDayStart.setHours(0, 0, 0, 0);
+
+          if (spawnDayStart.getTime() === startOfDay.getTime()) {
+            elysiumRotations.push({
+              bossName,
+              spawnTime,
+              rotation,
+              timerData,
+              isPast: spawnTime < now
+            });
+          }
         }
 
       } catch (bossError) {
@@ -1203,7 +1214,7 @@ async function postDailyRotationSchedule() {
       if (bosses.length === 0) continue;
 
       let fieldValue = '';
-      for (const { bossName, spawnTime, rotation, timerData } of bosses) {
+      for (const { bossName, spawnTime, rotation, timerData, isPast } of bosses) {
         const spawnTimestamp = Math.floor(spawnTime.getTime() / 1000);
         const confidence = timerData.confidence || 0;
 
@@ -1211,8 +1222,11 @@ async function postDailyRotationSchedule() {
         const bossImageURL = getBossImageAttachmentURL(bossName, channel.guild);
         const thumbnail = bossImageURL ? `[🖼️](${bossImageURL})` : '';
 
-        fieldValue += `**${bossName}** ${thumbnail}\n`;
-        fieldValue += `├ 🕐 <t:${spawnTimestamp}:t> (<t:${spawnTimestamp}:R>)\n`;
+        // Mark if already spawned
+        const statusEmoji = isPast ? '🔴 SPAWNED' : '🟢';
+
+        fieldValue += `**${bossName}** ${thumbnail} ${isPast ? '🔴' : ''}\n`;
+        fieldValue += `├ 🕐 <t:${spawnTimestamp}:t> (<t:${spawnTimestamp}:R>) ${isPast ? '**[LIVE NOW]**' : ''}\n`;
         fieldValue += `├ 🎯 Guild ${rotation.currentIndex}/5 - **ELYSIUM**\n`;
         fieldValue += `└ 📊 ${Math.round(confidence)}% confidence\n\n`;
       }
