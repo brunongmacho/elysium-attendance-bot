@@ -337,19 +337,29 @@ async function refreshRotationCache() {
       // Auto-schedule from last attendance if available
       if (bossTimerModule) {
         try {
-          // Get last attendance from MongoDB to find when boss was last killed
+          // First, check if boss timer already has a schedule (getNextSpawn)
+          const existingTimer = bossTimerModule.getNextSpawn(boss);
+          if (existingTimer && existingTimer.nextSpawn) {
+            console.log(`  │  ✅ ${boss} already has a timer (spawns at ${existingTimer.nextSpawn.toISOString()})`);
+            scheduledCount++;
+            continue;
+          }
+
+          // No existing timer - try to auto-schedule from last attendance
           const dbAPI = require('./utils/database-api');
           const db = await dbAPI.connect();
           const attendanceCollection = db.collection('attendance');
 
-          // Find most recent attendance for this boss
+          // Find most recent attendance for this boss (case-insensitive)
           const lastAttendanceArray = await attendanceCollection
-            .find({ boss: boss })
+            .find({ boss: { $regex: new RegExp(`^${boss}$`, 'i') } })
             .sort({ timestamp: -1 })
             .limit(1)
             .toArray();
 
           const lastAttendance = lastAttendanceArray[0];
+
+          console.log(`  │  🔍 Searching attendance for "${boss}": ${lastAttendance ? 'Found' : 'Not found'}`);
 
           if (lastAttendance && lastAttendance.timestamp) {
             // Parse timestamp (format: "MM/DD/YY HH:MM")
@@ -371,7 +381,7 @@ async function refreshRotationCache() {
               console.log(`  │  ⚠️ ${boss} has attendance but could not parse timestamp: ${lastAttendance.timestamp}`);
             }
           } else {
-            console.log(`  │  ⚠️ ${boss} has no attendance history - needs manual /bosskill to schedule`);
+            console.log(`  │  ⚠️ ${boss} has no attendance history - needs manual /killed to schedule`);
           }
         } catch (error) {
           console.error(`  │  ❌ Failed to auto-schedule ${boss}:`, error.message);
