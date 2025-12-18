@@ -158,22 +158,21 @@ function initialize(cfg, discordClient, bossTimer = null) {
   // Clean up old daily schedules from MongoDB (every 6 hours)
   setInterval(async () => {
     try {
-      const db = await dbAPI.connect();
-      const scheduleCollection = db.collection('dailyRotationSchedule');
-
-      // Delete schedules older than 2 days
-      const twoDaysAgo = new Date();
-      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-      const cutoffDate = twoDaysAgo.toISOString().split('T')[0];
-
-      const result = await scheduleCollection.deleteMany({ _id: { $lt: cutoffDate } });
-      if (result.deletedCount > 0) {
-        console.log(`🧹 Cleaned up ${result.deletedCount} old daily schedule(s) from MongoDB`);
-      }
+      await cleanupOldSchedules();
     } catch (err) {
       console.error('⚠️ Failed to clean up old schedules:', err.message);
     }
   }, 6 * 60 * 60 * 1000); // Run every 6 hours
+
+  // Also run cleanup on startup (to catch any stale messages from crashes)
+  setTimeout(async () => {
+    try {
+      console.log('🧹 Running startup cleanup for old daily schedules...');
+      await cleanupOldSchedules();
+    } catch (err) {
+      console.error('⚠️ Failed startup cleanup:', err.message);
+    }
+  }, 10000); // Wait 10 seconds after startup to let Discord client fully initialize
 }
 
 // ============================================================================
@@ -844,6 +843,71 @@ async function deleteRotationWarning(bossName) {
 // ============================================================================
 // DAILY ROTATION SCHEDULE
 // ============================================================================
+
+/**
+ * Clean up old daily schedules (both Discord messages and MongoDB documents)
+ * Called on startup and every 6 hours
+ */
+async function cleanupOldSchedules() {
+  try {
+    const db = await dbAPI.connect();
+    const scheduleCollection = db.collection('dailyRotationSchedule');
+
+    // Get today's date to avoid deleting today's schedule
+    const now = new Date();
+    const manilaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+    const startOfToday = new Date(manilaTime);
+    startOfToday.setHours(0, 0, 0, 0);
+    const todayDate = startOfToday.toISOString().split('T')[0];
+
+    // Find all old schedules (not today)
+    const oldSchedules = await scheduleCollection.find({ _id: { $ne: todayDate } }).toArray();
+
+    if (oldSchedules.length === 0) {
+      console.log('🧹 No old daily schedules to clean up');
+      return;
+    }
+
+    console.log(`🧹 Found ${oldSchedules.length} old daily schedule(s) to clean up`);
+
+    let deletedMessages = 0;
+    let deletedDocs = 0;
+
+    for (const schedule of oldSchedules) {
+      try {
+        // Try to delete the Discord message
+        if (schedule.messageId && schedule.channelId) {
+          try {
+            const channel = await client.channels.fetch(schedule.channelId);
+            if (channel) {
+              const message = await channel.messages.fetch(schedule.messageId);
+              if (message) {
+                await message.delete();
+                deletedMessages++;
+                console.log(`   🗑️ Deleted old schedule message from ${schedule._id}`);
+              }
+            }
+          } catch (discordErr) {
+            // Message might already be deleted or channel inaccessible
+            console.log(`   ⚠️ Could not delete message for ${schedule._id}: ${discordErr.message}`);
+          }
+        }
+
+        // Delete from MongoDB
+        await scheduleCollection.deleteOne({ _id: schedule._id });
+        deletedDocs++;
+
+      } catch (scheduleErr) {
+        console.error(`   ❌ Error cleaning up schedule ${schedule._id}:`, scheduleErr.message);
+      }
+    }
+
+    console.log(`✅ Cleanup complete: ${deletedMessages} Discord messages deleted, ${deletedDocs} MongoDB documents removed`);
+
+  } catch (err) {
+    console.error('❌ Error in cleanupOldSchedules:', err.message);
+  }
+}
 
 /**
  * Restore daily rotation schedule tracking from MongoDB on bot startup
