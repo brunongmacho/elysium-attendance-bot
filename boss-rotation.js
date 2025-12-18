@@ -350,14 +350,16 @@ async function refreshRotationCache() {
           const db = await dbAPI.connect();
           const attendanceCollection = db.collection('attendance');
 
-          // Find most recent attendance for this boss
+          // Find most recent attendance for this boss (case-insensitive)
           const lastAttendanceArray = await attendanceCollection
-            .find({ boss: boss })
+            .find({ boss: { $regex: new RegExp(`^${boss}$`, 'i') } })
             .sort({ timestamp: -1 })
             .limit(1)
             .toArray();
 
           const lastAttendance = lastAttendanceArray[0];
+
+          console.log(`  │  🔍 Searching attendance for "${boss}": ${lastAttendance ? 'Found' : 'Not found'}`);
 
           if (lastAttendance && lastAttendance.timestamp) {
             // Parse timestamp (format: "MM/DD/YY HH:MM")
