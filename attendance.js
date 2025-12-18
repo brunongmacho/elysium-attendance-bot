@@ -1617,6 +1617,12 @@ async function checkAndAutoCloseThreads(client) {
           await thread.setLocked(true, `Auto-locked after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - no members`).catch(err => errorHandler.silentError(err, 'lock thread no members'));
           await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - no members`).catch(err => errorHandler.silentError(err, 'archive thread no members'));
 
+          // Delete rotation warning message (prevent channel flooding)
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+
+          // Check if this was the last boss in daily schedule and delete if so
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
+
           // Clean up state
           delete activeSpawns[threadId];
           const noMembersKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
@@ -1666,6 +1672,12 @@ async function checkAndAutoCloseThreads(client) {
           // Lock and archive the thread to prevent spam
           await thread.setLocked(true, "Auto-locked - duplicate prevented").catch(err => errorHandler.silentError(err, 'lock thread duplicate'));
           await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes - duplicate prevented`).catch(err => errorHandler.silentError(err, 'archive thread duplicate'));
+
+          // Delete rotation warning message (prevent channel flooding)
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+
+          // Check if this was the last boss in daily schedule and delete if so
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           // Clean up state
           delete activeSpawns[threadId];
@@ -1834,8 +1846,8 @@ async function checkAndAutoCloseThreads(client) {
             clientCache.invalidate('getAllWeeklyAttendance:{}');
             console.log(`🧹 Invalidated client cache (new attendance submitted)`);
 
-            // Auto-increment boss rotation if it's a rotating boss
-            await bossRotation.handleBossKill(spawnInfo.boss);
+            // Auto-increment boss rotation and auto-schedule next spawn (no /bosskill needed!)
+            await bossRotation.handleBossKill(spawnInfo.boss, spawnInfo.timestamp);
 
             await errorHandler.safeSend(thread,
               `✅ Attendance submitted! (${spawnInfo.members.length} members)\n` +
@@ -1864,6 +1876,12 @@ async function checkAndAutoCloseThreads(client) {
             // Lock and archive the thread to prevent spam
             await thread.setLocked(true, `Auto-locked after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes`).catch(err => errorHandler.silentError(err, 'lock thread success'));
             await thread.setArchived(true, `Auto-closed after ${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes`).catch(err => errorHandler.silentError(err, 'archive thread success'));
+
+            // Delete rotation warning message (prevent channel flooding)
+            await bossRotation.deleteRotationWarning(spawnInfo.boss);
+
+            // Check if this was the last boss in daily schedule and delete if so
+            await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
             // Clean up state
             delete activeSpawns[threadId];

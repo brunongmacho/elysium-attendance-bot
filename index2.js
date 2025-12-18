@@ -2762,6 +2762,7 @@ const commandHandlers = {
 
               // Delete rotation warning message to avoid flooding
               await bossRotation.deleteRotationWarning(spawnInfo.boss);
+              await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
               await thread
                 .send(
@@ -3008,6 +3009,7 @@ const commandHandlers = {
 
           // Delete rotation warning message to avoid flooding
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           await message.channel.send(
             `✅ **Attendance submitted successfully!**\n\n` +
@@ -3425,6 +3427,10 @@ const commandHandlers = {
 
           await message.channel.setLocked(true, `Override closed by ${member.user.username}`).catch(err => errorHandler.silentError(err, 'override close lock empty'));
           await message.channel.setArchived(true, `Override closed by ${member.user.username}`).catch(err => errorHandler.silentError(err, 'override close archive empty'));
+
+          // Delete rotation warning message (prevent channel flooding)
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           delete activeSpawns[message.channel.id];
           const cacheKey = `${spawnInfo.boss.toUpperCase()}|${attendance.getCurrentTimestamp().full}`;
@@ -6244,6 +6250,7 @@ client.on(Events.MessageCreate, async (message) => {
 
           // Delete rotation warning message to avoid flooding
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           await message.channel.send(
             `✅ Attendance submitted successfully! (${spawnInfo.members.length} members)`
@@ -7015,6 +7022,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
             .setArchived(true, `Closed by ${user.username} (duplicate prevented)`)
             .catch(err => errorHandler.silentError(err, 'button close archive duplicate thread'));
 
+          // Delete rotation warning message (prevent channel flooding)
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
+
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
           delete pendingClosures[msg.id];
@@ -7060,6 +7071,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
             .setArchived(true, `Closed by ${user.username} (no members)`)
             .catch(err => errorHandler.silentError(err, 'button close archive no members'));
 
+          // Delete rotation warning message (prevent channel flooding)
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
+
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
           delete pendingClosures[msg.id];
@@ -7099,6 +7114,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
           // Delete rotation warning message to avoid flooding
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           await interaction.channel.send(`✅ Attendance submitted! Archiving...`);
 
@@ -7121,6 +7137,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
           await interaction.channel
             .setArchived(true, `Closed by ${user.username}`)
             .catch(err => errorHandler.silentError(err, 'button close archive thread'));
+
+          // Delete rotation warning message (prevent channel flooding)
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7402,6 +7422,10 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
             .setArchived(true, `Closed by ${user.username} (duplicate prevented)`)
             .catch(err => errorHandler.silentError(err, 'reaction close archive duplicate thread'));
 
+          // Delete rotation warning message (prevent channel flooding)
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
+
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
           delete pendingClosures[msg.id];
@@ -7436,6 +7460,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 
           // Delete rotation warning message to avoid flooding
           await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           await msg.channel.send(`✅ Attendance submitted! Archiving...`);
 
@@ -7460,6 +7485,10 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
           await msg.channel
             .setArchived(true, `Closed by ${user.username}`)
             .catch(err => errorHandler.silentError(err, 'reaction close archive thread'));
+
+          // Delete rotation warning message (prevent channel flooding)
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7489,6 +7518,47 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     }
   } catch (err) {
     console.error("❌ Reaction handler error:", err);
+  }
+});
+
+// ==========================================
+// THREAD UPDATE HANDLING (Manual Discord UI Archiving)
+// ==========================================
+
+/**
+ * Handle thread updates (detects manual archiving through Discord UI)
+ * Cleans up rotation warning messages when threads are manually archived
+ */
+client.on(Events.ThreadUpdate, async (oldThread, newThread) => {
+  try {
+    // Only process if thread was archived
+    if (!oldThread.archived && newThread.archived) {
+      // Check if this is an attendance thread in our active spawns
+      const spawnInfo = activeSpawns[newThread.id];
+
+      if (spawnInfo) {
+        console.log(`🔔 Thread manually archived: ${spawnInfo.boss} (${spawnInfo.timestamp})`);
+
+        // Delete rotation warning message (prevent channel flooding)
+        await bossRotation.deleteRotationWarning(spawnInfo.boss);
+        await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
+        console.log(`🗑️ Cleaned up rotation warning for ${spawnInfo.boss}`);
+
+        // Clean up spawn from active state
+        delete activeSpawns[newThread.id];
+        const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
+        delete activeColumns[cacheKey];
+        delete confirmationMessages[newThread.id];
+
+        attendance.setActiveSpawns(activeSpawns);
+        attendance.setActiveColumns(activeColumns);
+        attendance.setConfirmationMessages(confirmationMessages);
+
+        console.log(`✅ Cleaned up manually archived thread: ${spawnInfo.boss}`);
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error handling thread update:', error.message);
   }
 });
 

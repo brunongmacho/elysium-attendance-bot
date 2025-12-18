@@ -35,6 +35,7 @@ const { SheetAPI } = require('./utils/sheet-api');
 const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images');
 const { addGuildFooter } = require('./utils/embed-branding');
 const dbAPI = require('./utils/database-api');
+const cron = require('node-cron');
 
 // ============================================================================
 // MODULE STATE
@@ -70,6 +71,12 @@ let warnedSpawns = {};
  * Format: { "Amentis": { messageId: "123456", channelId: "789012" }, ... }
  */
 let rotationWarningMessages = {};
+
+/**
+ * Track daily rotation schedule message for cleanup
+ * Format: { messageId: "123456", channelId: "789012", date: "2025-01-15", bosses: ["Amentis", "General Aquleus"], autoDeleteTimer: timeout }
+ */
+let dailyScheduleMessage = null;
 
 /**
  * Spawn warning monitoring timer
@@ -109,6 +116,63 @@ function initialize(cfg, discordClient, bossTimer = null) {
   } else {
     console.warn('⚠️ Boss timer not provided - rotation warnings disabled');
   }
+
+  // Start automatic rotation list refresh (every 6 hours)
+  // High bosses respawn ~29-32 hours, so 6-hour checks are sufficient
+  setInterval(async () => {
+    try {
+      console.log('⏰ [AUTO-REFRESH] Starting scheduled rotation cache refresh (6-hour interval)');
+      await refreshRotationCache();
+      console.log('✅ [AUTO-REFRESH] Rotation cache refresh complete');
+    } catch (error) {
+      console.error('❌ [AUTO-REFRESH] Failed to refresh rotation cache:', error.message);
+    }
+  }, 6 * 60 * 60 * 1000); // 6 hours
+
+  console.log('✅ Automatic rotation refresh scheduled (every 6 hours)');
+
+  // Schedule daily rotation summary at 12:00 AM Manila time (UTC+8)
+  // Cron expression: '0 0 * * *' means "at 00:00 (midnight) every day"
+  // Manila is UTC+8, so we need to adjust: 00:00 Manila = 16:00 UTC (previous day)
+  // But node-cron runs in server's timezone, so we'll use Manila time directly
+  cron.schedule('0 0 * * *', async () => {
+    try {
+      console.log('⏰ [DAILY-SCHEDULE] Running daily rotation schedule (12:00 AM Manila time)');
+      await postDailyRotationSchedule();
+      console.log('✅ [DAILY-SCHEDULE] Daily rotation schedule posted');
+    } catch (error) {
+      console.error('❌ [DAILY-SCHEDULE] Failed to post daily rotation schedule:', error.message);
+    }
+  }, {
+    scheduled: true,
+    timezone: "Asia/Manila"
+  });
+
+  console.log('✅ Daily rotation schedule configured (posts at 12:00 AM Manila time)');
+
+  // Restore daily schedule tracking from MongoDB (in case of bot restart)
+  restoreDailyScheduleFromMongoDB().catch(err =>
+    console.error('⚠️ Failed to restore daily schedule from MongoDB:', err.message)
+  );
+
+  // Clean up old daily schedules from MongoDB (every 6 hours)
+  setInterval(async () => {
+    try {
+      await cleanupOldSchedules();
+    } catch (err) {
+      console.error('⚠️ Failed to clean up old schedules:', err.message);
+    }
+  }, 6 * 60 * 60 * 1000); // Run every 6 hours
+
+  // Also run cleanup on startup (to catch any stale messages from crashes)
+  setTimeout(async () => {
+    try {
+      console.log('🧹 Running startup cleanup for old daily schedules...');
+      await cleanupOldSchedules();
+    } catch (err) {
+      console.error('⚠️ Failed startup cleanup:', err.message);
+    }
+  }, 10000); // Wait 10 seconds after startup to let Discord client fully initialize
 }
 
 // ============================================================================
@@ -263,6 +327,56 @@ async function refreshRotationCache() {
       }
     }
 
+    // Find newly added bosses (need to schedule timers)
+    const newBosses = ROTATING_BOSSES.filter(boss => !oldBosses.includes(boss));
+    let scheduledCount = 0;
+
+    for (const boss of newBosses) {
+      console.log(`  ├─ ➕ New rotating boss detected: ${boss}`);
+
+      // Auto-schedule from last attendance if available
+      if (bossTimerModule) {
+        try {
+          // Get last attendance from MongoDB to find when boss was last killed
+          const dbAPI = require('./utils/database-api');
+          const db = await dbAPI.connect();
+          const attendanceCollection = db.collection('attendance');
+
+          // Find most recent attendance for this boss
+          const lastAttendance = await attendanceCollection
+            .findOne({ boss: boss })
+            .sort({ timestamp: -1 });
+
+          if (lastAttendance && lastAttendance.timestamp) {
+            // Parse timestamp (format: "MM/DD/YY HH:MM")
+            const match = lastAttendance.timestamp.match(/(\d{2})\/(\d{2})\/(\d{2})\s+(\d{1,2}):(\d{2})/);
+            if (match) {
+              const [_, month, day, year, hour, minute] = match;
+              const fullYear = 2000 + parseInt(year);
+
+              // Timestamp is in Manila time (UTC+8), convert to UTC
+              const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
+              const killTimeUTC = Date.UTC(fullYear, parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute)) - MANILA_OFFSET_MS;
+              const killTime = new Date(killTimeUTC);
+
+              // Schedule next spawn
+              await bossTimerModule.recordKill(boss, killTime, 'auto-sync');
+              scheduledCount++;
+              console.log(`  │  ✅ Auto-scheduled ${boss} from last attendance (${lastAttendance.timestamp})`);
+            } else {
+              console.log(`  │  ⚠️ ${boss} has attendance but could not parse timestamp: ${lastAttendance.timestamp}`);
+            }
+          } else {
+            console.log(`  │  ⚠️ ${boss} has no attendance history - needs manual /bosskill to schedule`);
+          }
+        } catch (error) {
+          console.error(`  │  ❌ Failed to auto-schedule ${boss}:`, error.message);
+        }
+      } else {
+        console.log(`  │  ⚠️ Boss timer module not available - cannot auto-schedule ${boss}`);
+      }
+    }
+
     // Remove bosses that are no longer in the sheet
     const bossesToRemove = oldBosses.filter(boss => !ROTATING_BOSSES.includes(boss));
     let removedCount = 0;
@@ -279,14 +393,24 @@ async function refreshRotationCache() {
 
         await rotationCollection.deleteOne({ _id: bossId });
         removedCount++;
-        console.log(`  ├─ 🗑️  Removed ${boss} (no longer in sheet)`);
+        console.log(`  ├─ 🗑️  Removed ${boss} from rotation cache (no longer in sheet)`);
       } catch (err) {
         console.error(`  ├─ ⚠️  Failed to remove ${boss} from MongoDB:`, err.message);
+      }
+
+      // Cancel timer for removed boss
+      if (bossTimerModule) {
+        try {
+          await bossTimerModule.cancelTimer(boss);
+          console.log(`  ├─ ⏹️  Cancelled spawn timer for ${boss}`);
+        } catch (err) {
+          console.error(`  ├─ ⚠️  Failed to cancel timer for ${boss}:`, err.message);
+        }
       }
     }
 
     lastCacheRefresh = Date.now();
-    console.log(`✅ Rotation cache refreshed: ${syncedCount} bosses synced, ${removedCount} bosses removed`);
+    console.log(`✅ Rotation cache refreshed: ${syncedCount} bosses synced, ${newBosses.length} added & scheduled, ${removedCount} removed & cancelled`);
 
   } catch (err) {
     console.error('❌ Error refreshing rotation cache:', err.message);
@@ -717,6 +841,522 @@ async function deleteRotationWarning(bossName) {
 }
 
 // ============================================================================
+// DAILY ROTATION SCHEDULE
+// ============================================================================
+
+/**
+ * Clean up old daily schedules (both Discord messages and MongoDB documents)
+ * Called on startup and every 6 hours
+ */
+async function cleanupOldSchedules() {
+  try {
+    const db = await dbAPI.connect();
+    const scheduleCollection = db.collection('dailyRotationSchedule');
+
+    // Get today's date to avoid deleting today's schedule
+    const now = new Date();
+    const manilaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+    const startOfToday = new Date(manilaTime);
+    startOfToday.setHours(0, 0, 0, 0);
+    const todayDate = startOfToday.toISOString().split('T')[0];
+
+    // Find all old schedules (not today)
+    const oldSchedules = await scheduleCollection.find({ _id: { $ne: todayDate } }).toArray();
+
+    if (oldSchedules.length === 0) {
+      console.log('🧹 No old daily schedules to clean up');
+      return;
+    }
+
+    console.log(`🧹 Found ${oldSchedules.length} old daily schedule(s) to clean up`);
+
+    let deletedMessages = 0;
+    let deletedDocs = 0;
+
+    for (const schedule of oldSchedules) {
+      try {
+        // Try to delete the Discord message
+        if (schedule.messageId && schedule.channelId) {
+          try {
+            const channel = await client.channels.fetch(schedule.channelId);
+            if (channel) {
+              const message = await channel.messages.fetch(schedule.messageId);
+              if (message) {
+                await message.delete();
+                deletedMessages++;
+                console.log(`   🗑️ Deleted old schedule message from ${schedule._id}`);
+              }
+            }
+          } catch (discordErr) {
+            // Message might already be deleted or channel inaccessible
+            console.log(`   ⚠️ Could not delete message for ${schedule._id}: ${discordErr.message}`);
+          }
+        }
+
+        // Delete from MongoDB
+        await scheduleCollection.deleteOne({ _id: schedule._id });
+        deletedDocs++;
+
+      } catch (scheduleErr) {
+        console.error(`   ❌ Error cleaning up schedule ${schedule._id}:`, scheduleErr.message);
+      }
+    }
+
+    console.log(`✅ Cleanup complete: ${deletedMessages} Discord messages deleted, ${deletedDocs} MongoDB documents removed`);
+
+  } catch (err) {
+    console.error('❌ Error in cleanupOldSchedules:', err.message);
+  }
+}
+
+/**
+ * Restore daily rotation schedule tracking from MongoDB on bot startup
+ * Prevents loss of tracking after bot restarts
+ */
+async function restoreDailyScheduleFromMongoDB() {
+  try {
+    // Get today's date in Manila timezone
+    const now = new Date();
+    const manilaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+    const startOfDay = new Date(manilaTime);
+    startOfDay.setHours(0, 0, 0, 0);
+    const todayDate = startOfDay.toISOString().split('T')[0];
+
+    // Check MongoDB for today's schedule
+    const db = await dbAPI.connect();
+    const scheduleCollection = db.collection('dailyRotationSchedule');
+    const existingSchedule = await scheduleCollection.findOne({ _id: todayDate });
+
+    if (existingSchedule) {
+      // Restore tracking
+      dailyScheduleMessage = {
+        messageId: existingSchedule.messageId,
+        channelId: existingSchedule.channelId,
+        date: existingSchedule.date,
+        bosses: existingSchedule.bosses || [],
+        autoDeleteTimer: null
+      };
+
+      console.log(`✅ Restored daily schedule from MongoDB (${todayDate}, ${dailyScheduleMessage.bosses.length} bosses)`);
+
+      // CRASH RECOVERY: Check if schedule should be deleted
+      const bosses = existingSchedule.bosses || [];
+      const postedAt = existingSchedule.postedAt ? new Date(existingSchedule.postedAt) : null;
+
+      // Case 1: All bosses completed → delete immediately
+      if (bosses.length === 0) {
+        console.log(`🔧 [CRASH-RECOVERY] All bosses completed - deleting schedule immediately`);
+        await deleteDailySchedule();
+        return;
+      }
+
+      // Case 2: "No rotations" posted more than 1 hour ago → delete immediately
+      if (bosses.length === 0 && postedAt) {
+        const hoursSincePosted = (Date.now() - postedAt.getTime()) / (1000 * 60 * 60);
+        if (hoursSincePosted > 1) {
+          console.log(`🔧 [CRASH-RECOVERY] No rotations schedule expired (${hoursSincePosted.toFixed(1)}h old) - deleting`);
+          await deleteDailySchedule();
+          return;
+        } else {
+          // Re-schedule the 1-hour auto-delete timer
+          const remainingMs = (1 * 60 * 60 * 1000) - (Date.now() - postedAt.getTime());
+          if (remainingMs > 0) {
+            dailyScheduleMessage.autoDeleteTimer = setTimeout(async () => {
+              try {
+                await deleteDailySchedule();
+                console.log('🗑️ Auto-deleted "no rotations" schedule after crash recovery');
+              } catch (err) {
+                console.error('❌ Failed to auto-delete schedule:', err.message);
+              }
+            }, remainingMs);
+            console.log(`⏰ [CRASH-RECOVERY] Re-scheduled auto-delete timer (${Math.round(remainingMs / 60000)} minutes remaining)`);
+          }
+        }
+      }
+
+    } else {
+      console.log(`ℹ️ No daily schedule found in MongoDB for ${todayDate}`);
+
+      // MISSED CRON RECOVERY: If bot was down at midnight, post schedule now
+      // Only if it's after 12:00 AM and before 11:59 PM (same day)
+      const hourOfDay = manilaTime.getHours();
+      if (hourOfDay >= 0 && hourOfDay <= 23) {
+        console.log(`🔧 [MISSED-CRON] Bot was down at midnight - posting today's schedule now`);
+
+        // Post schedule immediately (async, don't wait)
+        postDailyRotationSchedule().catch(err =>
+          console.error('❌ Failed to post missed daily schedule:', err.message)
+        );
+      }
+    }
+
+  } catch (err) {
+    console.error('❌ Error restoring daily schedule from MongoDB:', err.message);
+  }
+}
+
+/**
+ * Post daily rotation schedule at 12:00 AM Manila time
+ * Shows all ELYSIUM rotations for the next 24 hours (12am to 11:59pm)
+ * Auto-deletes when last boss attendance closes (or after 1 hour if no spawns)
+ */
+async function postDailyRotationSchedule() {
+  try {
+    if (!bossTimerModule) {
+      console.warn('⚠️ Boss timer module not available - cannot generate daily schedule');
+      return;
+    }
+
+    const elysiumCommandsChannelId = config.elysium_commands_channel_id;
+    if (!elysiumCommandsChannelId) {
+      console.warn('⚠️ ELYSIUM commands channel not configured - cannot post daily schedule');
+      return;
+    }
+
+    const channel = await client.channels.fetch(elysiumCommandsChannelId);
+    if (!channel) {
+      console.warn('⚠️ ELYSIUM commands channel not found');
+      return;
+    }
+
+    // Define time window: next 24 hours (12:00 AM to 11:59 PM Manila time)
+    const now = new Date();
+    const manilaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+
+    // Start of today (12:00 AM Manila)
+    const startOfDay = new Date(manilaTime);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    // End of today (11:59:59 PM Manila)
+    const endOfDay = new Date(manilaTime);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const todayDate = startOfDay.toISOString().split('T')[0];
+
+    console.log(`📅 Checking rotations from ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
+
+    // DUPLICATE PREVENTION: Check if we already posted today's schedule
+    const db = await dbAPI.connect();
+    const scheduleCollection = db.collection('dailyRotationSchedule');
+
+    const existingSchedule = await scheduleCollection.findOne({ _id: todayDate });
+    if (existingSchedule) {
+      console.log(`⚠️ Daily schedule already posted for ${todayDate} - skipping to prevent duplicates`);
+
+      // Restore in-memory tracking if lost (e.g., after bot restart)
+      if (!dailyScheduleMessage) {
+        dailyScheduleMessage = {
+          messageId: existingSchedule.messageId,
+          channelId: existingSchedule.channelId,
+          date: existingSchedule.date,
+          bosses: existingSchedule.bosses || [],
+          autoDeleteTimer: null // Timer lost on restart, but that's OK
+        };
+        console.log(`✅ Restored daily schedule tracking from MongoDB`);
+      }
+      return;
+    }
+
+    // Collect all ELYSIUM rotations for the next 24 hours
+    const elysiumRotations = [];
+
+    for (const bossName of ROTATING_BOSSES) {
+      try {
+        // Check rotation status
+        const rotation = await getRotationStatus(bossName);
+
+        if (!rotation.isRotating || !rotation.isOurTurn) {
+          continue; // Not our turn, skip
+        }
+
+        // Get spawn time from boss timer
+        const timerData = bossTimerModule.getNextSpawn(bossName);
+        if (!timerData || !timerData.nextSpawn) {
+          continue; // No spawn time available
+        }
+
+        const spawnTime = timerData.nextSpawn;
+
+        // Check if spawn is within today (12am to 11:59pm Manila)
+        if (spawnTime >= startOfDay && spawnTime <= endOfDay) {
+          elysiumRotations.push({
+            bossName,
+            spawnTime,
+            rotation,
+            timerData
+          });
+        }
+
+      } catch (bossError) {
+        console.error(`❌ Error checking rotation for ${bossName}:`, bossError.message);
+      }
+    }
+
+    // Sort by spawn time
+    elysiumRotations.sort((a, b) => a.spawnTime - b.spawnTime);
+
+    console.log(`📊 Found ${elysiumRotations.length} ELYSIUM rotations today`);
+
+    // Delete previous daily schedule message if exists
+    if (dailyScheduleMessage) {
+      await deleteDailySchedule();
+    }
+
+    // Case 1: No ELYSIUM rotations today
+    if (elysiumRotations.length === 0) {
+      const embed = new EmbedBuilder()
+        .setColor(0x808080) // Gray
+        .setTitle('📅 Daily Boss Rotation - ELYSIUM')
+        .setDescription('**No ELYSIUM rotations scheduled for today.**\n\nEnjoy your day off! 🌴')
+        .setTimestamp();
+
+      addGuildFooter(embed, channel.guild, 'ELYSIUM Daily Schedule');
+
+      const sentMessage = await channel.send({ embeds: [embed] });
+
+      // Store message info and auto-delete after 1 hour
+      const autoDeleteTimer = setTimeout(async () => {
+        try {
+          const msg = await channel.messages.fetch(sentMessage.id);
+          if (msg) {
+            await msg.delete();
+            console.log('🗑️ Auto-deleted "no rotations" daily schedule (1 hour expired)');
+          }
+        } catch (err) {
+          console.error('❌ Failed to auto-delete daily schedule:', err.message);
+        }
+        dailyScheduleMessage = null;
+      }, 60 * 60 * 1000); // 1 hour
+
+      dailyScheduleMessage = {
+        messageId: sentMessage.id,
+        channelId: channel.id,
+        date: todayDate,
+        bosses: [],
+        autoDeleteTimer
+      };
+
+      // Save to MongoDB to prevent duplicates on bot restart
+      await scheduleCollection.updateOne(
+        { _id: todayDate },
+        {
+          $set: {
+            messageId: sentMessage.id,
+            channelId: channel.id,
+            date: todayDate,
+            bosses: [],
+            postedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
+
+      console.log('✅ Posted "no rotations" daily schedule (will auto-delete in 1 hour)');
+      return;
+    }
+
+    // Case 2: ELYSIUM has rotations today - create enhanced visual
+    // Group bosses by time of day
+    const timeGroups = {
+      'Night (12am - 6am)': [],
+      'Morning (6am - 12pm)': [],
+      'Afternoon (12pm - 6pm)': [],
+      'Evening (6pm - 12am)': []
+    };
+
+    for (const rotation of elysiumRotations) {
+      const hour = rotation.spawnTime.getHours();
+
+      if (hour >= 0 && hour < 6) {
+        timeGroups['Night (12am - 6am)'].push(rotation);
+      } else if (hour >= 6 && hour < 12) {
+        timeGroups['Morning (6am - 12pm)'].push(rotation);
+      } else if (hour >= 12 && hour < 18) {
+        timeGroups['Afternoon (12pm - 6pm)'].push(rotation);
+      } else {
+        timeGroups['Evening (6pm - 12am)'].push(rotation);
+      }
+    }
+
+    // Build embed with enhanced visual
+    const embed = new EmbedBuilder()
+      .setColor(0x00ff00) // Green for ELYSIUM
+      .setTitle('🟢 Daily Boss Rotation - ELYSIUM')
+      .setDescription(`**${elysiumRotations.length} boss${elysiumRotations.length > 1 ? 'es' : ''} rotating today!** Get ready!\n\u200B`);
+
+    // Add fields for each time group (only if has bosses)
+    for (const [timeLabel, bosses] of Object.entries(timeGroups)) {
+      if (bosses.length === 0) continue;
+
+      let fieldValue = '';
+      for (const { bossName, spawnTime, rotation, timerData } of bosses) {
+        const spawnTimestamp = Math.floor(spawnTime.getTime() / 1000);
+        const confidence = timerData.confidence || 0;
+
+        // Get boss thumbnail URL
+        const bossImageURL = getBossImageAttachmentURL(bossName, channel.guild);
+        const thumbnail = bossImageURL ? `[🖼️](${bossImageURL})` : '';
+
+        fieldValue += `**${bossName}** ${thumbnail}\n`;
+        fieldValue += `├ 🕐 <t:${spawnTimestamp}:t> (<t:${spawnTimestamp}:R>)\n`;
+        fieldValue += `├ 🎯 Guild ${rotation.currentIndex}/5 - **ELYSIUM**\n`;
+        fieldValue += `└ 📊 ${Math.round(confidence)}% confidence\n\n`;
+      }
+
+      embed.addFields({
+        name: `⏰ ${timeLabel}`,
+        value: fieldValue.trim(),
+        inline: false
+      });
+    }
+
+    // Add summary footer
+    const totalPoints = elysiumRotations.length; // Could calculate actual points if needed
+    embed.addFields({
+      name: '\u200B',
+      value: `**Total Rotations:** ${elysiumRotations.length}\n**Stay alert and check #elysium-commands for 15-min warnings!**`,
+      inline: false
+    });
+
+    // Add thumbnail (use ELYSIUM server icon)
+    const serverIcon = channel.guild.iconURL({ dynamic: true, size: 256 });
+    if (serverIcon) {
+      embed.setThumbnail(serverIcon);
+    }
+
+    // Add guild branding
+    addGuildFooter(embed, channel.guild, 'ELYSIUM Daily Schedule');
+    embed.setTimestamp();
+
+    // Send message (no attachment needed - using server icon)
+    const messagePayload = { embeds: [embed] };
+
+    const sentMessage = await channel.send(messagePayload);
+
+    // Store message info (will be deleted when last boss attendance closes)
+    dailyScheduleMessage = {
+      messageId: sentMessage.id,
+      channelId: channel.id,
+      date: todayDate,
+      bosses: elysiumRotations.map(r => r.bossName),
+      autoDeleteTimer: null // No timer - deleted when last boss attendance closes
+    };
+
+    // Save to MongoDB to prevent duplicates on bot restart
+    await scheduleCollection.updateOne(
+      { _id: todayDate },
+      {
+        $set: {
+          messageId: sentMessage.id,
+          channelId: channel.id,
+          date: todayDate,
+          bosses: elysiumRotations.map(r => r.bossName),
+          postedAt: new Date()
+        }
+      },
+      { upsert: true }
+    );
+
+    console.log(`✅ Posted daily rotation schedule: ${elysiumRotations.length} ELYSIUM rotations`);
+
+  } catch (err) {
+    console.error('❌ Error posting daily rotation schedule:', err.message);
+  }
+}
+
+/**
+ * Delete daily rotation schedule message
+ * Called when last boss attendance closes or when posting new schedule
+ */
+async function deleteDailySchedule() {
+  try {
+    if (!dailyScheduleMessage) {
+      return; // No message to delete
+    }
+
+    const scheduleDate = dailyScheduleMessage.date;
+
+    // Clear auto-delete timer if exists
+    if (dailyScheduleMessage.autoDeleteTimer) {
+      clearTimeout(dailyScheduleMessage.autoDeleteTimer);
+    }
+
+    // Delete message from Discord
+    try {
+      const channel = await client.channels.fetch(dailyScheduleMessage.channelId);
+      if (channel) {
+        const message = await channel.messages.fetch(dailyScheduleMessage.messageId);
+        if (message) {
+          await message.delete();
+          console.log('🗑️ Deleted daily rotation schedule (attendance thread closed)');
+        }
+      }
+    } catch (err) {
+      console.log(`⚠️ Could not delete daily schedule message: ${err.message}`);
+    }
+
+    // Remove from MongoDB to allow re-posting
+    try {
+      const db = await dbAPI.connect();
+      const scheduleCollection = db.collection('dailyRotationSchedule');
+      await scheduleCollection.deleteOne({ _id: scheduleDate });
+      console.log(`🗑️ Removed daily schedule from MongoDB (${scheduleDate})`);
+    } catch (err) {
+      console.error(`⚠️ Failed to remove daily schedule from MongoDB: ${err.message}`);
+    }
+
+    dailyScheduleMessage = null;
+
+  } catch (err) {
+    console.error('❌ Error deleting daily schedule:', err.message);
+  }
+}
+
+/**
+ * Check if a boss is the last one in today's daily schedule
+ * If yes, delete the daily schedule message
+ * @param {string} bossName - Name of the boss whose attendance just closed
+ */
+async function checkAndDeleteDailySchedule(bossName) {
+  try {
+    if (!dailyScheduleMessage) {
+      return; // No daily schedule posted
+    }
+
+    if (!dailyScheduleMessage.bosses.includes(bossName)) {
+      return; // This boss wasn't in today's schedule
+    }
+
+    // Remove this boss from the list
+    const updatedBosses = dailyScheduleMessage.bosses.filter(b => b !== bossName);
+    dailyScheduleMessage.bosses = updatedBosses;
+
+    console.log(`📋 Boss ${bossName} completed. Remaining in daily schedule: ${updatedBosses.length}`);
+
+    // Update MongoDB with the new boss list
+    try {
+      const db = await dbAPI.connect();
+      const scheduleCollection = db.collection('dailyRotationSchedule');
+      await scheduleCollection.updateOne(
+        { _id: dailyScheduleMessage.date },
+        { $set: { bosses: updatedBosses } }
+      );
+    } catch (err) {
+      console.error(`⚠️ Failed to update daily schedule in MongoDB: ${err.message}`);
+    }
+
+    // If this was the last boss, delete the daily schedule
+    if (updatedBosses.length === 0) {
+      console.log('🎯 Last boss of the day completed - deleting daily schedule');
+      await deleteDailySchedule();
+    }
+
+  } catch (err) {
+    console.error('❌ Error checking daily schedule:', err.message);
+  }
+}
+
+// ============================================================================
 // SPAWN WARNING MONITOR
 // ============================================================================
 
@@ -853,23 +1493,52 @@ async function getAllRotations() {
 }
 
 /**
- * Handle boss kill - auto-increment rotation if it's a rotating boss
+ * Handle boss kill - auto-increment rotation and auto-schedule next spawn
  * Call this after successful attendance submission
  * @param {string} bossName - Name of the boss that was killed
+ * @param {string} killTimestamp - Kill timestamp in "MM/DD/YY HH:MM" format (Manila time)
  * @returns {Promise<void>}
  */
-async function handleBossKill(bossName) {
+async function handleBossKill(bossName, killTimestamp = null) {
   try {
     if (!isRotatingBoss(bossName)) {
       return; // Not a rotating boss, nothing to do
     }
 
-    console.log(`🔄 Boss killed: ${bossName} (rotating boss - incrementing rotation counter)`);
+    console.log(`🔄 Boss killed: ${bossName} (rotating boss - incrementing rotation & auto-scheduling next spawn)`);
 
+    // Increment rotation index
     const result = await incrementRotation(bossName);
 
     if (result.updated !== false) {
       console.log(`✅ Rotation updated: ${bossName} ${result.oldIndex} → ${result.newIndex} (${result.newGuild})`);
+    }
+
+    // Auto-schedule next spawn (no /bosskill needed!)
+    if (bossTimerModule && killTimestamp) {
+      try {
+        // Parse timestamp (format: "MM/DD/YY HH:MM")
+        const match = killTimestamp.match(/(\d{2})\/(\d{2})\/(\d{2})\s+(\d{1,2}):(\d{2})/);
+        if (match) {
+          const [_, month, day, year, hour, minute] = match;
+          const fullYear = 2000 + parseInt(year);
+
+          // Timestamp is in Manila time (UTC+8), convert to UTC
+          const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
+          const killTimeUTC = Date.UTC(fullYear, parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute)) - MANILA_OFFSET_MS;
+          const killTime = new Date(killTimeUTC);
+
+          // Schedule next spawn automatically
+          await bossTimerModule.recordKill(bossName, killTime, 'auto-detected');
+          console.log(`🎯 Auto-scheduled next spawn for ${bossName} (killed at ${killTimestamp})`);
+        } else {
+          console.warn(`⚠️ Could not parse kill timestamp for ${bossName}: ${killTimestamp}`);
+        }
+      } catch (scheduleErr) {
+        console.error(`❌ Failed to auto-schedule ${bossName}:`, scheduleErr.message);
+      }
+    } else if (!killTimestamp) {
+      console.warn(`⚠️ No kill timestamp provided for ${bossName} - cannot auto-schedule (will need manual /bosskill)`);
     }
 
   } catch (err) {
@@ -891,5 +1560,6 @@ module.exports = {
   handleBossKill,
   isRotatingBoss,
   getRotatingBosses,
-  getAllRotations
+  getAllRotations,
+  checkAndDeleteDailySchedule
 };
