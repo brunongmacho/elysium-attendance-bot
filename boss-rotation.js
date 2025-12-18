@@ -348,24 +348,15 @@ async function refreshRotationCache() {
           }
 
           // No existing timer - try to auto-schedule from last attendance
-          const dbAPI = require('./utils/database-api');
-          const db = await dbAPI.connect();
-          const attendanceCollection = db.collection('attendance');
+          // Use same method as /rotation status command
+          const mongoHelpers = require('./utils/mongodb-helpers');
+          const lastSpawn = await mongoHelpers.getLastBossSpawn(boss);
 
-          // Find most recent attendance for this boss (case-insensitive)
-          const lastAttendanceArray = await attendanceCollection
-            .find({ boss: { $regex: new RegExp(`^${boss}$`, 'i') } })
-            .sort({ timestamp: -1 })
-            .limit(1)
-            .toArray();
+          console.log(`  │  🔍 Searching attendance (bossName field) for "${boss}": ${lastSpawn ? 'Found' : 'Not found'}`);
 
-          const lastAttendance = lastAttendanceArray[0];
-
-          console.log(`  │  🔍 Searching attendance for "${boss}": ${lastAttendance ? 'Found' : 'Not found'}`);
-
-          if (lastAttendance && lastAttendance.timestamp) {
+          if (lastSpawn && lastSpawn.timestamp) {
             // Parse timestamp (format: "MM/DD/YY HH:MM")
-            const match = lastAttendance.timestamp.match(/(\d{2})\/(\d{2})\/(\d{2})\s+(\d{1,2}):(\d{2})/);
+            const match = lastSpawn.timestamp.match(/(\d{2})\/(\d{2})\/(\d{2})\s+(\d{1,2}):(\d{2})/);
             if (match) {
               const [_, month, day, year, hour, minute] = match;
               const fullYear = 2000 + parseInt(year);
@@ -378,9 +369,9 @@ async function refreshRotationCache() {
               // Schedule next spawn
               await bossTimerModule.recordKill(boss, killTime, 'auto-sync');
               scheduledCount++;
-              console.log(`  │  ✅ Auto-scheduled ${boss} from last attendance (${lastAttendance.timestamp})`);
+              console.log(`  │  ✅ Auto-scheduled ${boss} from last attendance (${lastSpawn.timestamp})`);
             } else {
-              console.log(`  │  ⚠️ ${boss} has attendance but could not parse timestamp: ${lastAttendance.timestamp}`);
+              console.log(`  │  ⚠️ ${boss} has attendance but could not parse timestamp: ${lastSpawn.timestamp}`);
             }
           } else {
             console.log(`  │  ⚠️ ${boss} has no attendance history - needs manual /killed to schedule`);
