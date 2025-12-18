@@ -979,7 +979,11 @@ async function postDailyRotationSchedule() {
         const spawnTimestamp = Math.floor(spawnTime.getTime() / 1000);
         const confidence = timerData.confidence || 0;
 
-        fieldValue += `**${bossName}**\n`;
+        // Get boss thumbnail URL
+        const bossImageURL = getBossImageAttachmentURL(bossName, channel.guild);
+        const thumbnail = bossImageURL ? `[🖼️](${bossImageURL})` : '';
+
+        fieldValue += `**${bossName}** ${thumbnail}\n`;
         fieldValue += `├ 🕐 <t:${spawnTimestamp}:t> (<t:${spawnTimestamp}:R>)\n`;
         fieldValue += `├ 🎯 Guild ${rotation.currentIndex}/5 - **ELYSIUM**\n`;
         fieldValue += `└ 📊 ${Math.round(confidence)}% confidence\n\n`;
