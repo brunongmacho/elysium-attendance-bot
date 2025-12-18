@@ -7511,6 +7511,46 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 });
 
 // ==========================================
+// THREAD UPDATE HANDLING (Manual Discord UI Archiving)
+// ==========================================
+
+/**
+ * Handle thread updates (detects manual archiving through Discord UI)
+ * Cleans up rotation warning messages when threads are manually archived
+ */
+client.on(Events.ThreadUpdate, async (oldThread, newThread) => {
+  try {
+    // Only process if thread was archived
+    if (!oldThread.archived && newThread.archived) {
+      // Check if this is an attendance thread in our active spawns
+      const spawnInfo = activeSpawns[newThread.id];
+
+      if (spawnInfo) {
+        console.log(`🔔 Thread manually archived: ${spawnInfo.boss} (${spawnInfo.timestamp})`);
+
+        // Delete rotation warning message (prevent channel flooding)
+        await bossRotation.deleteRotationWarning(spawnInfo.boss);
+        console.log(`🗑️ Cleaned up rotation warning for ${spawnInfo.boss}`);
+
+        // Clean up spawn from active state
+        delete activeSpawns[newThread.id];
+        const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
+        delete activeColumns[cacheKey];
+        delete confirmationMessages[newThread.id];
+
+        attendance.setActiveSpawns(activeSpawns);
+        attendance.setActiveColumns(activeColumns);
+        attendance.setConfirmationMessages(confirmationMessages);
+
+        console.log(`✅ Cleaned up manually archived thread: ${spawnInfo.boss}`);
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error handling thread update:', error.message);
+  }
+});
+
+// ==========================================
 // ERROR HANDLING
 // ==========================================
 
