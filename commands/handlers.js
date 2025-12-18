@@ -93,6 +93,9 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
         // Add to verified members
         spawnInfo.members.push(pending.author);
+        // Store Discord ID for reliable MongoDB lookup
+        if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
+        spawnInfo.memberIds[pending.author] = pending.authorId;
 
         // Clean up verification buttons
         if (pending.verificationMsgId) {
@@ -269,6 +272,9 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
           if (!isDuplicate) {
             spawnInfo.members.push(pending.author);
+            // Store Discord ID for reliable MongoDB lookup
+            if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
+            spawnInfo.memberIds[pending.author] = pending.authorId;
             verifiedMembers.push(pending.author);
             verifiedCount++;
           } else {
