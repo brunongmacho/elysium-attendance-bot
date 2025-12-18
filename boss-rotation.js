@@ -343,9 +343,13 @@ async function refreshRotationCache() {
           const attendanceCollection = db.collection('attendance');
 
           // Find most recent attendance for this boss
-          const lastAttendance = await attendanceCollection
-            .findOne({ boss: boss })
-            .sort({ timestamp: -1 });
+          const lastAttendanceArray = await attendanceCollection
+            .find({ boss: boss })
+            .sort({ timestamp: -1 })
+            .limit(1)
+            .toArray();
+
+          const lastAttendance = lastAttendanceArray[0];
 
           if (lastAttendance && lastAttendance.timestamp) {
             // Parse timestamp (format: "MM/DD/YY HH:MM")
