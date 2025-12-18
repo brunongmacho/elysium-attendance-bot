@@ -109,6 +109,20 @@ function initialize(cfg, discordClient, bossTimer = null) {
   } else {
     console.warn('⚠️ Boss timer not provided - rotation warnings disabled');
   }
+
+  // Start automatic rotation list refresh (every 6 hours)
+  // High bosses respawn ~29-32 hours, so 6-hour checks are sufficient
+  setInterval(async () => {
+    try {
+      console.log('⏰ [AUTO-REFRESH] Starting scheduled rotation cache refresh (6-hour interval)');
+      await refreshRotationCache();
+      console.log('✅ [AUTO-REFRESH] Rotation cache refresh complete');
+    } catch (error) {
+      console.error('❌ [AUTO-REFRESH] Failed to refresh rotation cache:', error.message);
+    }
+  }, 6 * 60 * 60 * 1000); // 6 hours
+
+  console.log('✅ Automatic rotation refresh scheduled (every 6 hours)');
 }
 
 // ============================================================================
@@ -263,6 +277,56 @@ async function refreshRotationCache() {
       }
     }
 
+    // Find newly added bosses (need to schedule timers)
+    const newBosses = ROTATING_BOSSES.filter(boss => !oldBosses.includes(boss));
+    let scheduledCount = 0;
+
+    for (const boss of newBosses) {
+      console.log(`  ├─ ➕ New rotating boss detected: ${boss}`);
+
+      // Auto-schedule from last attendance if available
+      if (bossTimerModule) {
+        try {
+          // Get last attendance from MongoDB to find when boss was last killed
+          const dbAPI = require('./utils/database-api');
+          const db = await dbAPI.connect();
+          const attendanceCollection = db.collection('attendance');
+
+          // Find most recent attendance for this boss
+          const lastAttendance = await attendanceCollection
+            .findOne({ boss: boss })
+            .sort({ timestamp: -1 });
+
+          if (lastAttendance && lastAttendance.timestamp) {
+            // Parse timestamp (format: "MM/DD/YY HH:MM")
+            const match = lastAttendance.timestamp.match(/(\d{2})\/(\d{2})\/(\d{2})\s+(\d{1,2}):(\d{2})/);
+            if (match) {
+              const [_, month, day, year, hour, minute] = match;
+              const fullYear = 2000 + parseInt(year);
+
+              // Timestamp is in Manila time (UTC+8), convert to UTC
+              const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
+              const killTimeUTC = Date.UTC(fullYear, parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute)) - MANILA_OFFSET_MS;
+              const killTime = new Date(killTimeUTC);
+
+              // Schedule next spawn
+              await bossTimerModule.recordKill(boss, killTime, 'auto-sync');
+              scheduledCount++;
+              console.log(`  │  ✅ Auto-scheduled ${boss} from last attendance (${lastAttendance.timestamp})`);
+            } else {
+              console.log(`  │  ⚠️ ${boss} has attendance but could not parse timestamp: ${lastAttendance.timestamp}`);
+            }
+          } else {
+            console.log(`  │  ⚠️ ${boss} has no attendance history - needs manual /bosskill to schedule`);
+          }
+        } catch (error) {
+          console.error(`  │  ❌ Failed to auto-schedule ${boss}:`, error.message);
+        }
+      } else {
+        console.log(`  │  ⚠️ Boss timer module not available - cannot auto-schedule ${boss}`);
+      }
+    }
+
     // Remove bosses that are no longer in the sheet
     const bossesToRemove = oldBosses.filter(boss => !ROTATING_BOSSES.includes(boss));
     let removedCount = 0;
@@ -279,14 +343,24 @@ async function refreshRotationCache() {
 
         await rotationCollection.deleteOne({ _id: bossId });
         removedCount++;
-        console.log(`  ├─ 🗑️  Removed ${boss} (no longer in sheet)`);
+        console.log(`  ├─ 🗑️  Removed ${boss} from rotation cache (no longer in sheet)`);
       } catch (err) {
         console.error(`  ├─ ⚠️  Failed to remove ${boss} from MongoDB:`, err.message);
+      }
+
+      // Cancel timer for removed boss
+      if (bossTimerModule) {
+        try {
+          await bossTimerModule.cancelTimer(boss);
+          console.log(`  ├─ ⏹️  Cancelled spawn timer for ${boss}`);
+        } catch (err) {
+          console.error(`  ├─ ⚠️  Failed to cancel timer for ${boss}:`, err.message);
+        }
       }
     }
 
     lastCacheRefresh = Date.now();
-    console.log(`✅ Rotation cache refreshed: ${syncedCount} bosses synced, ${removedCount} bosses removed`);
+    console.log(`✅ Rotation cache refreshed: ${syncedCount} bosses synced, ${newBosses.length} added & scheduled, ${removedCount} removed & cancelled`);
 
   } catch (err) {
     console.error('❌ Error refreshing rotation cache:', err.message);
@@ -853,23 +927,52 @@ async function getAllRotations() {
 }
 
 /**
- * Handle boss kill - auto-increment rotation if it's a rotating boss
+ * Handle boss kill - auto-increment rotation and auto-schedule next spawn
  * Call this after successful attendance submission
  * @param {string} bossName - Name of the boss that was killed
+ * @param {string} killTimestamp - Kill timestamp in "MM/DD/YY HH:MM" format (Manila time)
  * @returns {Promise<void>}
  */
-async function handleBossKill(bossName) {
+async function handleBossKill(bossName, killTimestamp = null) {
   try {
     if (!isRotatingBoss(bossName)) {
       return; // Not a rotating boss, nothing to do
     }
 
-    console.log(`🔄 Boss killed: ${bossName} (rotating boss - incrementing rotation counter)`);
+    console.log(`🔄 Boss killed: ${bossName} (rotating boss - incrementing rotation & auto-scheduling next spawn)`);
 
+    // Increment rotation index
     const result = await incrementRotation(bossName);
 
     if (result.updated !== false) {
       console.log(`✅ Rotation updated: ${bossName} ${result.oldIndex} → ${result.newIndex} (${result.newGuild})`);
+    }
+
+    // Auto-schedule next spawn (no /bosskill needed!)
+    if (bossTimerModule && killTimestamp) {
+      try {
+        // Parse timestamp (format: "MM/DD/YY HH:MM")
+        const match = killTimestamp.match(/(\d{2})\/(\d{2})\/(\d{2})\s+(\d{1,2}):(\d{2})/);
+        if (match) {
+          const [_, month, day, year, hour, minute] = match;
+          const fullYear = 2000 + parseInt(year);
+
+          // Timestamp is in Manila time (UTC+8), convert to UTC
+          const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
+          const killTimeUTC = Date.UTC(fullYear, parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute)) - MANILA_OFFSET_MS;
+          const killTime = new Date(killTimeUTC);
+
+          // Schedule next spawn automatically
+          await bossTimerModule.recordKill(bossName, killTime, 'auto-detected');
+          console.log(`🎯 Auto-scheduled next spawn for ${bossName} (killed at ${killTimestamp})`);
+        } else {
+          console.warn(`⚠️ Could not parse kill timestamp for ${bossName}: ${killTimestamp}`);
+        }
+      } catch (scheduleErr) {
+        console.error(`❌ Failed to auto-schedule ${bossName}:`, scheduleErr.message);
+      }
+    } else if (!killTimestamp) {
+      console.warn(`⚠️ No kill timestamp provided for ${bossName} - cannot auto-schedule (will need manual /bosskill)`);
     }
 
   } catch (err) {

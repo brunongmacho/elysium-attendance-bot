@@ -1834,8 +1834,8 @@ async function checkAndAutoCloseThreads(client) {
             clientCache.invalidate('getAllWeeklyAttendance:{}');
             console.log(`🧹 Invalidated client cache (new attendance submitted)`);
 
-            // Auto-increment boss rotation if it's a rotating boss
-            await bossRotation.handleBossKill(spawnInfo.boss);
+            // Auto-increment boss rotation and auto-schedule next spawn (no /bosskill needed!)
+            await bossRotation.handleBossKill(spawnInfo.boss, spawnInfo.timestamp);
 
             await errorHandler.safeSend(thread,
               `✅ Attendance submitted! (${spawnInfo.members.length} members)\n` +
