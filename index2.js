@@ -3426,6 +3426,9 @@ const commandHandlers = {
           await message.channel.setLocked(true, `Override closed by ${member.user.username}`).catch(err => errorHandler.silentError(err, 'override close lock empty'));
           await message.channel.setArchived(true, `Override closed by ${member.user.username}`).catch(err => errorHandler.silentError(err, 'override close archive empty'));
 
+          // Delete rotation warning message (prevent channel flooding)
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+
           delete activeSpawns[message.channel.id];
           const cacheKey = `${spawnInfo.boss.toUpperCase()}|${attendance.getCurrentTimestamp().full}`;
           delete activeColumns[cacheKey];
@@ -7015,6 +7018,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
             .setArchived(true, `Closed by ${user.username} (duplicate prevented)`)
             .catch(err => errorHandler.silentError(err, 'button close archive duplicate thread'));
 
+          // Delete rotation warning message (prevent channel flooding)
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
           delete pendingClosures[msg.id];
@@ -7059,6 +7065,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
           await interaction.channel
             .setArchived(true, `Closed by ${user.username} (no members)`)
             .catch(err => errorHandler.silentError(err, 'button close archive no members'));
+
+          // Delete rotation warning message (prevent channel flooding)
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7121,6 +7130,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
           await interaction.channel
             .setArchived(true, `Closed by ${user.username}`)
             .catch(err => errorHandler.silentError(err, 'button close archive thread'));
+
+          // Delete rotation warning message (prevent channel flooding)
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
@@ -7402,6 +7414,9 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
             .setArchived(true, `Closed by ${user.username} (duplicate prevented)`)
             .catch(err => errorHandler.silentError(err, 'reaction close archive duplicate thread'));
 
+          // Delete rotation warning message (prevent channel flooding)
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
           delete pendingClosures[msg.id];
@@ -7460,6 +7475,9 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
           await msg.channel
             .setArchived(true, `Closed by ${user.username}`)
             .catch(err => errorHandler.silentError(err, 'reaction close archive thread'));
+
+          // Delete rotation warning message (prevent channel flooding)
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
 
           delete activeSpawns[closePending.threadId];
           delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
