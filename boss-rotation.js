@@ -355,23 +355,17 @@ async function refreshRotationCache() {
           console.log(`  │  🔍 Searching attendance (bossName field) for "${boss}": ${lastSpawn ? 'Found' : 'Not found'}`);
 
           if (lastSpawn && lastSpawn.timestamp) {
-            // Parse timestamp (format: "MM/DD/YY HH:MM")
-            const match = lastSpawn.timestamp.match(/(\d{2})\/(\d{2})\/(\d{2})\s+(\d{1,2}):(\d{2})/);
-            if (match) {
-              const [_, month, day, year, hour, minute] = match;
-              const fullYear = 2000 + parseInt(year);
+            // Timestamp from MongoDB is stored as Date object (ISODate in UTC)
+            // Same approach as /rotation status command
+            const lastSpawnDate = new Date(lastSpawn.timestamp);
 
-              // Timestamp is in Manila time (UTC+8), convert to UTC
-              const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
-              const killTimeUTC = Date.UTC(fullYear, parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute)) - MANILA_OFFSET_MS;
-              const killTime = new Date(killTimeUTC);
-
-              // Schedule next spawn
-              await bossTimerModule.recordKill(boss, killTime, 'auto-sync');
+            if (!isNaN(lastSpawnDate.getTime())) {
+              // Schedule next spawn using the last kill time
+              await bossTimerModule.recordKill(boss, lastSpawnDate, 'auto-sync');
               scheduledCount++;
-              console.log(`  │  ✅ Auto-scheduled ${boss} from last attendance (${lastSpawn.timestamp})`);
+              console.log(`  │  ✅ Auto-scheduled ${boss} from last attendance (${lastSpawnDate.toISOString()})`);
             } else {
-              console.log(`  │  ⚠️ ${boss} has attendance but could not parse timestamp: ${lastSpawn.timestamp}`);
+              console.log(`  │  ⚠️ ${boss} has attendance but invalid timestamp: ${lastSpawn.timestamp}`);
             }
           } else {
             console.log(`  │  ⚠️ ${boss} has no attendance history - needs manual /killed to schedule`);
