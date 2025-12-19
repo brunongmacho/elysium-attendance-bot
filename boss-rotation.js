@@ -327,55 +327,11 @@ async function refreshRotationCache() {
       }
     }
 
-    // Find newly added bosses (need to schedule timers)
+    // Find newly added bosses (logged for visibility)
     const newBosses = ROTATING_BOSSES.filter(boss => !oldBosses.includes(boss));
-    let scheduledCount = 0;
 
     for (const boss of newBosses) {
-      console.log(`  ├─ ➕ New rotating boss detected: ${boss}`);
-
-      // Auto-schedule from last attendance if available
-      if (bossTimerModule) {
-        try {
-          // First, check if boss timer already has a schedule (getNextSpawn)
-          const existingTimer = bossTimerModule.getNextSpawn(boss);
-          console.log(`  │  🔍 getNextSpawn("${boss}"):`, existingTimer ? `nextSpawn=${existingTimer.nextSpawn ? existingTimer.nextSpawn.toISOString() : 'null'}` : 'null');
-
-          if (existingTimer && existingTimer.nextSpawn) {
-            console.log(`  │  ✅ ${boss} already has a timer (spawns at ${existingTimer.nextSpawn.toISOString()})`);
-            scheduledCount++;
-            continue;
-          }
-
-          // No existing timer - try to auto-schedule from last attendance
-          // Use same method as /rotation status command
-          const mongoHelpers = require('./utils/mongodb-helpers');
-          const lastSpawn = await mongoHelpers.getLastBossSpawn(boss);
-
-          console.log(`  │  🔍 Searching attendance (bossName field) for "${boss}": ${lastSpawn ? 'Found' : 'Not found'}`);
-
-          if (lastSpawn && lastSpawn.timestamp) {
-            // Timestamp from MongoDB is stored as Date object (ISODate in UTC)
-            // Same approach as /rotation status command
-            const lastSpawnDate = new Date(lastSpawn.timestamp);
-
-            if (!isNaN(lastSpawnDate.getTime())) {
-              // Schedule next spawn using the last kill time
-              await bossTimerModule.recordKill(boss, lastSpawnDate, 'auto-sync');
-              scheduledCount++;
-              console.log(`  │  ✅ Auto-scheduled ${boss} from last attendance (${lastSpawnDate.toISOString()})`);
-            } else {
-              console.log(`  │  ⚠️ ${boss} has attendance but invalid timestamp: ${lastSpawn.timestamp}`);
-            }
-          } else {
-            console.log(`  │  ⚠️ ${boss} has no attendance history - needs manual /killed to schedule`);
-          }
-        } catch (error) {
-          console.error(`  │  ❌ Failed to auto-schedule ${boss}:`, error.message);
-        }
-      } else {
-        console.log(`  │  ⚠️ Boss timer module not available - cannot auto-schedule ${boss}`);
-      }
+      console.log(`  ├─ ➕ New rotating boss detected: ${boss} (use /killed to schedule spawn timer)`);
     }
 
     // Remove bosses that are no longer in the sheet
@@ -411,7 +367,7 @@ async function refreshRotationCache() {
     }
 
     lastCacheRefresh = Date.now();
-    console.log(`✅ Rotation cache refreshed: ${syncedCount} bosses synced, ${newBosses.length} added & scheduled, ${removedCount} removed & cancelled`);
+    console.log(`✅ Rotation cache refreshed: ${syncedCount} bosses synced, ${newBosses.length} added, ${removedCount} removed & cancelled`);
 
   } catch (err) {
     console.error('❌ Error refreshing rotation cache:', err.message);
