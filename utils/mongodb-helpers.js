@@ -411,9 +411,9 @@ async function getLastBossSpawn(bossName) {
   try {
     const db = await dbAPI.connect();
 
-    // Find the most recent attendance record for this boss
+    // Find the most recent attendance record for this boss (case-insensitive)
     const lastRecord = await db.collection('attendance')
-      .find({ bossName: bossName })
+      .find({ bossName: { $regex: new RegExp(`^${bossName}$`, 'i') } })
       .sort({ timestamp: -1 })
       .limit(1)
       .toArray();
