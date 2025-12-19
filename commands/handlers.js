@@ -636,6 +636,11 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
                 // Submit to Google Sheets if there are members
                 if (spawnInfo.members.length === 0) {
+                  // Even with 0 members, increment boss rotation
+                  await bossRotation.handleBossKill(spawnInfo.boss);
+                  await bossRotation.deleteRotationWarning(spawnInfo.boss);
+                  await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
+
                   await thread.setLocked(true).catch(() => {});
                   await thread.setArchived(true).catch(() => {});
 
@@ -657,6 +662,11 @@ async function handleSlashCommand(interaction, modules, config, client) {
                   const resp = await attendance.postToSheet(payload);
 
                   if (resp.ok) {
+                    // Auto-increment boss rotation
+                    await bossRotation.handleBossKill(spawnInfo.boss);
+                    await bossRotation.deleteRotationWarning(spawnInfo.boss);
+                    await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
+
                     await thread.setLocked(true).catch(() => {});
                     await thread.setArchived(true).catch(() => {});
 

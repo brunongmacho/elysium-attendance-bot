@@ -2637,6 +2637,13 @@ const commandHandlers = {
                   )
                 );
 
+              // Even with 0 members, increment boss rotation
+              await bossRotation.handleBossKill(spawnInfo.boss);
+
+              // Delete rotation warning message to avoid flooding
+              await bossRotation.deleteRotationWarning(spawnInfo.boss);
+              await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
+
               // Close confirmation thread if it exists
               if (spawnInfo.confirmThreadId) {
                 const confirmThread = await guild.channels
@@ -3471,12 +3478,12 @@ const commandHandlers = {
           clientCache.invalidate('getAllWeeklyAttendance:{}');
           console.log(`🧹 Invalidated client cache (overwrite attendance)`);
 
-          // Auto-increment boss rotation if it's a rotating boss (but NOT if thread was reopened)
-          if (!spawnInfo.reopened) {
-            await bossRotation.handleBossKill(spawnInfo.boss);
-          } else {
-            console.log(`⏭️ Skipping rotation increment for ${spawnInfo.boss} (thread was reopened - fixing attendance, not a new kill)`);
-          }
+          // Override close should NOT increment rotation (it's for fixing data, not new kills)
+          console.log(`⏭️ Skipping rotation increment for ${spawnInfo.boss} (override close - fixing attendance)`);
+
+          // Delete rotation warning message (prevent channel flooding)
+          await bossRotation.deleteRotationWarning(spawnInfo.boss);
+          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
           await message.channel.send(
             `✅ **Attendance ${columnExists ? 'overwritten' : 'submitted'} successfully!**\n\n` +
