@@ -1595,6 +1595,9 @@ async function checkAndAutoCloseThreads(client) {
             `Attendance window closed. No members verified - no data submitted to Google Sheets.`
           ).catch(err => console.log(`   ⚠️ Could not send notification: ${err.message}`));
 
+          // Even with 0 members, increment boss rotation
+          await bossRotation.handleBossKill(spawnInfo.boss, spawnInfo.timestamp);
+
           // Clean up reactions
           await cleanupAllThreadReactions(thread);
 
