@@ -89,6 +89,30 @@ function formatPreview(items, formatFn, label = 'items') {
 }
 
 /**
+ * Parse timestamp string from Google Sheets as Manila time (GMT+8) and convert to UTC
+ * Handles formats like: "12/19/25 13:48", "1/5/25 9:30", etc.
+ * @param {string} timestampStr - Timestamp string from Google Sheets
+ * @returns {Date} UTC Date object
+ */
+function parseManilaTimeToUTC(timestampStr) {
+  // Parse the timestamp string (format: "MM/DD/YY HH:MM" or similar)
+  const parsed = new Date(timestampStr);
+
+  // If parsing failed, return invalid date
+  if (isNaN(parsed.getTime())) {
+    return parsed;
+  }
+
+  // The parsed date is interpreted in local timezone (UTC on server)
+  // But it should be interpreted as Manila time (GMT+8)
+  // So we need to shift it by -8 hours to get the correct UTC time
+  const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
+  const utcTimestamp = parsed.getTime() - MANILA_OFFSET_MS;
+
+  return new Date(utcTimestamp);
+}
+
+/**
  * Format summary output (Discord-safe)
  * Keeps output under 1500 chars to stay well below Discord's 2000 limit
  */
@@ -601,7 +625,8 @@ async function syncAttendance(db, sheetAPI) {
           return null;
         }
 
-        const timestamp = new Date(record.timestamp || record.date);
+        // Parse timestamp as Manila time (GMT+8) and convert to UTC
+        const timestamp = parseManilaTimeToUTC(record.timestamp || record.date);
         const uniqueKey = {
           memberId: member._id,
           memberName: record.memberName,
@@ -613,13 +638,13 @@ async function syncAttendance(db, sheetAPI) {
           updateOne: {
             filter: uniqueKey,
             update: {
-              $setOnInsert: {
+              $set: {
                 memberId: member._id,
                 memberName: record.memberName,
                 bossName: record.bossName,
                 bossPoints: record.points || 1,
                 timestamp: timestamp,
-                weekStartDate: record.weekStartDate ? new Date(record.weekStartDate) : null,
+                weekStartDate: record.weekStartDate ? parseManilaTimeToUTC(record.weekStartDate) : null,
                 weekLabel: record.weekLabel || 'Unknown',
                 verified: true,
                 syncedFromSheet: true,
