@@ -16,6 +16,12 @@ const fs = require('fs');
 const path = require('path');
 const mongoHelpers = require('../utils/mongodb-helpers');
 
+// Feature Flags
+const USE_MONGODB_ATTENDANCE = process.env.USE_MONGODB_ATTENDANCE === 'true';
+
+// Load boss points configuration
+const bossPoints = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'boss_points.json')));
+
 // Constants
 const CONFIRMATION_TIMEOUT = 30000; // 30 seconds
 
@@ -650,18 +656,117 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
                   console.log(`📍 /closeall: ${spawnInfo.boss} at ${spawnInfo.timestamp} (0 members)`);
                 } else {
-                  const payload = {
-                    action: 'submitAttendance',
-                    boss: spawnInfo.boss,
-                    date: spawnInfo.date,
-                    time: spawnInfo.time,
-                    timestamp: spawnInfo.timestamp,
-                    members: spawnInfo.members
-                  };
+                  // ═══════════════════════════════════════════════════════════════
+                  // PARALLEL SAVE: MongoDB + Google Sheets (SIMULTANEOUS)
+                  // ═══════════════════════════════════════════════════════════════
+                  let submitted = false;
+                  let submissionSource = 'Unknown';
 
-                  const resp = await attendance.postToSheet(payload);
+                  if (USE_MONGODB_ATTENDANCE) {
+                    console.log(`📊 /closeall: Submitting ${spawnInfo.members.length} members for ${spawnInfo.boss} (${spawnInfo.timestamp})`);
 
-                  if (resp.ok) {
+                    // Prepare MongoDB save promise
+                    const mongoSavePromise = (async () => {
+                      try {
+                        // Add attendance records for each member
+                        for (const memberName of spawnInfo.members) {
+                          // Get Discord ID from memberIds map if available
+                          const discordId = spawnInfo.memberIds?.[memberName];
+
+                          await mongoHelpers.addAttendance({
+                            username: memberName,
+                            discordId: discordId, // Pass Discord ID for reliable identification
+                            boss: spawnInfo.boss,
+                            timestamp: spawnInfo.timestamp,
+                            date: spawnInfo.date,
+                            time: spawnInfo.time,
+                            points: bossPoints[spawnInfo.boss]?.points || 1
+                          });
+                        }
+                        return { success: true, source: 'MongoDB' };
+                      } catch (error) {
+                        console.error(`   ❌ [MongoDB] Failed to submit attendance:`, error.message);
+                        return { success: false, source: 'MongoDB', error };
+                      }
+                    })();
+
+                    // Prepare Google Sheets save promise
+                    const sheetSavePromise = (async () => {
+                      try {
+                        const payload = {
+                          action: 'submitAttendance',
+                          boss: spawnInfo.boss,
+                          date: spawnInfo.date,
+                          time: spawnInfo.time,
+                          timestamp: spawnInfo.timestamp,
+                          members: spawnInfo.members
+                        };
+
+                        const resp = await attendance.postToSheet(payload);
+
+                        if (resp.ok) {
+                          return { success: true, source: 'Google Sheets' };
+                        } else {
+                          return { success: false, source: 'Google Sheets', error: resp.text || resp.err };
+                        }
+                      } catch (error) {
+                        console.error(`   ❌ [Sheets] Failed to submit attendance:`, error.message);
+                        return { success: false, source: 'Google Sheets', error };
+                      }
+                    })();
+
+                    // Execute both saves in parallel
+                    const [mongoResult, sheetResult] = await Promise.all([
+                      mongoSavePromise,
+                      sheetSavePromise
+                    ]);
+
+                    // Log results
+                    if (mongoResult.success) {
+                      console.log(`   ✅ [MongoDB] Submitted ${spawnInfo.members.length} attendance records`);
+                    }
+                    if (sheetResult.success) {
+                      console.log(`   ✅ [Sheets] Submitted ${spawnInfo.members.length} attendance records`);
+                    }
+
+                    // Consider successful if at least one succeeded
+                    if (mongoResult.success || sheetResult.success) {
+                      submitted = true;
+                      submissionSource = [
+                        mongoResult.success ? 'MongoDB' : null,
+                        sheetResult.success ? 'Sheets' : null
+                      ].filter(Boolean).join(' + ');
+                    } else {
+                      console.error(`   ❌ Both MongoDB and Sheets failed!`);
+                    }
+
+                  } else {
+                    // ═════════════════════════════════════════════════════════════════
+                    // SHEETS ONLY PATH (when MongoDB disabled)
+                    // ═════════════════════════════════════════════════════════════════
+                    const payload = {
+                      action: 'submitAttendance',
+                      boss: spawnInfo.boss,
+                      date: spawnInfo.date,
+                      time: spawnInfo.time,
+                      timestamp: spawnInfo.timestamp,
+                      members: spawnInfo.members
+                    };
+
+                    const resp = await attendance.postToSheet(payload);
+
+                    if (resp.ok) {
+                      console.log(`   ✅ Submitted ${spawnInfo.members.length} members to Google Sheets`);
+                      submitted = true;
+                      submissionSource = 'Google Sheets';
+                    } else {
+                      console.log(`   ❌ Failed to submit attendance: ${resp.text || resp.err}`);
+                    }
+                  }
+
+                  if (submitted) {
+                    console.log(`   📊 Submission source: ${submissionSource}`);
+
                     // Auto-increment boss rotation
                     await bossRotation.handleBossKill(spawnInfo.boss);
                     await bossRotation.deleteRotationWarning(spawnInfo.boss);
@@ -672,13 +777,13 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
                     delete activeSpawns[threadId];
                     successCount++;
-                    results.push(`✅ **${spawnInfo.boss}** - ${spawnInfo.members.length} members submitted`);
+                    results.push(`✅ **${spawnInfo.boss}** - ${spawnInfo.members.length} members submitted (${submissionSource})`);
 
                     console.log(`📍 /closeall: ${spawnInfo.boss} at ${spawnInfo.timestamp} (${spawnInfo.members.length} members)`);
                   } else {
                     failCount++;
-                    results.push(`❌ **${spawnInfo.boss}** - Failed: ${resp.text || resp.err}`);
-                    console.error(`❌ /closeall failed for ${spawnInfo.boss}:`, resp.text || resp.err);
+                    results.push(`❌ **${spawnInfo.boss}** - Failed to submit to both MongoDB and Sheets`);
+                    console.error(`❌ /closeall failed for ${spawnInfo.boss}: Both MongoDB and Sheets failed`);
                   }
                 }
 
