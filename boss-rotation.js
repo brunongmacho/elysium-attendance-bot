@@ -1508,10 +1508,11 @@ async function getAllRotations() {
 }
 
 /**
- * Handle boss kill - auto-increment rotation and auto-schedule next spawn
+ * Handle boss kill - increment rotation index only
  * Call this after successful attendance submission
+ * Note: Spawn scheduling must be done manually via /killed command
  * @param {string} bossName - Name of the boss that was killed
- * @param {string} killTimestamp - Kill timestamp in "MM/DD/YY HH:MM" format (Manila time)
+ * @param {string} killTimestamp - Kill timestamp (unused, kept for backwards compatibility)
  * @returns {Promise<void>}
  */
 async function handleBossKill(bossName, killTimestamp = null) {
@@ -1520,40 +1521,14 @@ async function handleBossKill(bossName, killTimestamp = null) {
       return; // Not a rotating boss, nothing to do
     }
 
-    console.log(`🔄 Boss killed: ${bossName} (rotating boss - incrementing rotation & auto-scheduling next spawn)`);
+    console.log(`🔄 Boss killed: ${bossName} (rotating boss - incrementing rotation index)`);
 
     // Increment rotation index
     const result = await incrementRotation(bossName);
 
     if (result.updated !== false) {
       console.log(`✅ Rotation updated: ${bossName} ${result.oldIndex} → ${result.newIndex} (${result.newGuild})`);
-    }
-
-    // Auto-schedule next spawn (no /bosskill needed!)
-    if (bossTimerModule && killTimestamp) {
-      try {
-        // Parse timestamp (format: "MM/DD/YY HH:MM")
-        const match = killTimestamp.match(/(\d{2})\/(\d{2})\/(\d{2})\s+(\d{1,2}):(\d{2})/);
-        if (match) {
-          const [_, month, day, year, hour, minute] = match;
-          const fullYear = 2000 + parseInt(year);
-
-          // Timestamp is in Manila time (UTC+8), convert to UTC
-          const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
-          const killTimeUTC = Date.UTC(fullYear, parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute)) - MANILA_OFFSET_MS;
-          const killTime = new Date(killTimeUTC);
-
-          // Schedule next spawn automatically
-          await bossTimerModule.recordKill(bossName, killTime, 'auto-detected');
-          console.log(`🎯 Auto-scheduled next spawn for ${bossName} (killed at ${killTimestamp})`);
-        } else {
-          console.warn(`⚠️ Could not parse kill timestamp for ${bossName}: ${killTimestamp}`);
-        }
-      } catch (scheduleErr) {
-        console.error(`❌ Failed to auto-schedule ${bossName}:`, scheduleErr.message);
-      }
-    } else if (!killTimestamp) {
-      console.warn(`⚠️ No kill timestamp provided for ${bossName} - cannot auto-schedule (will need manual /bosskill)`);
+      console.log(`ℹ️  Use /killed ${bossName} to schedule next spawn time`);
     }
 
   } catch (err) {
