@@ -1175,7 +1175,9 @@ async function postDailyRotationSchedule() {
     };
 
     for (const rotation of elysiumRotations) {
-      const hour = rotation.spawnTime.getHours();
+      // Convert spawn time to Manila timezone before getting hour
+      const spawnTimeManila = new Date(rotation.spawnTime.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+      const hour = spawnTimeManila.getHours();
 
       if (hour >= 0 && hour < 6) {
         timeGroups['Night (12am - 6am)'].push(rotation);
