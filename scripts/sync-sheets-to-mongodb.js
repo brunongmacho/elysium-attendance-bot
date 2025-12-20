@@ -90,43 +90,45 @@ function formatPreview(items, formatFn, label = 'items') {
 
 /**
  * Parse timestamp string from Google Sheets as Manila time (GMT+8) and convert to UTC
- * Handles formats like: "12/19/25 13:48", "1/5/25 9:30", etc.
+ * Handles two formats:
+ * 1. "MM/DD/YY HH:MM" (manual format)
+ * 2. "Sat Nov 01 2025 03:16:00 GMT+0800 (Philippine Standard Time)" (Google Sheets Date toString)
  * @param {string} timestampStr - Timestamp string from Google Sheets
  * @returns {Date} UTC Date object
  */
 function parseManilaTimeToUTC(timestampStr) {
-  // Parse the timestamp string manually to avoid JavaScript's ambiguous parsing
-  // Expected format: "MM/DD/YY HH:MM" or "M/D/YY H:MM"
-  const match = timestampStr.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})\s+(\d{1,2}):(\d{2})$/);
+  const str = timestampStr.trim();
 
-  if (!match) {
-    // Fallback to default Date parsing if format doesn't match
-    console.warn(`⚠️ Unexpected timestamp format: "${timestampStr}"`);
-    return new Date(timestampStr);
+  // Format 1: Try "MM/DD/YY HH:MM" pattern first
+  const shortMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})\s+(\d{1,2}):(\d{2})$/);
+  if (shortMatch) {
+    const [_, month, day, year, hour, minute] = shortMatch;
+    const fullYear = 2000 + parseInt(year);
+    const manilaDate = new Date(Date.UTC(
+      fullYear,
+      parseInt(month) - 1,
+      parseInt(day),
+      parseInt(hour),
+      parseInt(minute),
+      0,
+      0
+    ));
+    // Subtract 8 hours to convert Manila time to UTC
+    const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
+    return new Date(manilaDate.getTime() - MANILA_OFFSET_MS);
   }
 
-  const [_, month, day, year, hour, minute] = match;
-  const fullYear = 2000 + parseInt(year);
+  // Format 2: Google Sheets Date toString format (already includes timezone)
+  // Example: "Sat Nov 01 2025 03:16:00 GMT+0800 (Philippine Standard Time)"
+  // This format already has timezone offset, so JavaScript Date() will parse correctly
+  const date = new Date(str);
 
-  // Create date in Manila time (GMT+8) using Date.UTC
-  // We want: MM/DD/YYYY HH:MM Manila = MM/DD/YYYY (HH-8):MM UTC
-  const manilaHour = parseInt(hour);
-  const manilaMinute = parseInt(minute);
+  if (isNaN(date.getTime())) {
+    console.warn(`⚠️ Failed to parse timestamp: "${str}"`);
+    return new Date(); // Fallback to current time
+  }
 
-  // Create UTC timestamp by treating the time as if it were UTC, then subtracting 8 hours
-  const utcDate = new Date(Date.UTC(
-    fullYear,
-    parseInt(month) - 1,  // Month is 0-indexed
-    parseInt(day),
-    manilaHour,
-    manilaMinute,
-    0,
-    0
-  ));
-
-  // Subtract 8 hours to convert Manila time to UTC
-  const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
-  return new Date(utcDate.getTime() - MANILA_OFFSET_MS);
+  return date; // Already in correct UTC after parsing GMT+0800
 }
 
 /**
