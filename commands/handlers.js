@@ -1323,9 +1323,16 @@ async function handleSlashCommand(interaction, modules, config, client) {
                   const lastSpawn = await mongoHelpers.getLastBossSpawn(boss);
                   if (lastSpawn && lastSpawn.timestamp && bossSpawnConfig && bossSpawnConfig.timerBasedBosses[boss]) {
                     const bossConfig = bossSpawnConfig.timerBasedBosses[boss];
+                    const intervalMs = bossConfig.spawnIntervalHours * 60 * 60 * 1000;
                     const lastSpawnDate = new Date(lastSpawn.timestamp);
-                    // Attendance timestamp is stored in UTC, add spawn interval
-                    nextSpawnDate = new Date(lastSpawnDate.getTime() + (bossConfig.spawnIntervalHours * 60 * 60 * 1000));
+                    const now = new Date();
+
+                    // Calculate next spawn by adding intervals until we get a future time
+                    nextSpawnDate = new Date(lastSpawnDate.getTime() + intervalMs);
+                    while (nextSpawnDate < now) {
+                      nextSpawnDate = new Date(nextSpawnDate.getTime() + intervalMs);
+                    }
+
                     spawnSource = 'attendance';
                   }
                 }

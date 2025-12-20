@@ -111,6 +111,7 @@ const dbAPI = require('./utils/database-api'); // MongoDB Database API
 const mongoHelpers = require('./utils/mongodb-helpers'); // MongoDB helper functions (Phase 4)
 const memberLore = JSON.parse(fs.readFileSync("./member-lore.json")); // Member lore data
 const { COMMAND_ALIASES, resolveCommandAlias } = require('./config/command-aliases'); // Command alias mapping
+const bossSpawnConfig = JSON.parse(fs.readFileSync("./boss_spawn_config.json")); // Boss spawn configuration
 const BackgroundSync = require('./services/background-sync'); // Background MongoDB → Sheets sync (Phase 5.1)
 const reports = require('./services/reports'); // Weekly & monthly reports (Phase 6)
 
@@ -4264,7 +4265,7 @@ const commandHandlers = {
             const emoji = rotation.isOurTurn ? '🟢' : '🔴';
             const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
 
-            // Get spawn time - check boss timer first, then fall back to predictions
+            // Get spawn time - check boss timer first, then fall back to attendance predictions
             let spawnInfo = '';
             let spawnTimestamp = null;
             let mlWindow = '';
@@ -4281,6 +4282,29 @@ const commandHandlers = {
               // Silently continue to prediction fallback
             }
 
+            // Fallback: Get last spawn from attendance records
+            if (!spawnTimestamp) {
+              try {
+                const lastSpawn = await mongoHelpers.getLastBossSpawn(boss);
+                if (lastSpawn && lastSpawn.timestamp && bossSpawnConfig && bossSpawnConfig.timerBasedBosses[boss]) {
+                  const bossConfig = bossSpawnConfig.timerBasedBosses[boss];
+                  const intervalMs = bossConfig.spawnIntervalHours * 60 * 60 * 1000;
+                  const lastSpawnDate = new Date(lastSpawn.timestamp);
+                  const now = new Date();
+
+                  // Calculate next spawn by adding intervals until we get a future time
+                  let nextSpawnDate = new Date(lastSpawnDate.getTime() + intervalMs);
+                  while (nextSpawnDate < now) {
+                    nextSpawnDate = new Date(nextSpawnDate.getTime() + intervalMs);
+                  }
+
+                  spawnTimestamp = Math.floor(nextSpawnDate.getTime() / 1000);
+                  mlWindow = ' 📋'; // Attendance-based prediction
+                }
+              } catch (attendanceError) {
+                // Silently continue without spawn info
+              }
+            }
 
             if (spawnTimestamp) {
               const sourceIndicator = isFromTimer ? ' ⏱️' : mlWindow;
