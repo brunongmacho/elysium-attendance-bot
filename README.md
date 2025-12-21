@@ -1,264 +1,165 @@
 # 🛡️ ELYSIUM Guild Bot
 
-> **The Ultimate Discord Bot for Guild Management** - Attendance Tracking, Auction System, Smart Analytics, and Proactive Monitoring
+> **The Ultimate Discord Bot for MMORPG Guild Management** - A production-ready, feature-rich bot combining attendance tracking, auction systems, boss timers, intelligent analytics, and automated monitoring.
 
 ![Status](https://img.shields.io/badge/status-production-success)
-![Version](https://img.shields.io/badge/version-10.0.0-blue)
+![Version](https://img.shields.io/badge/version-9.0.0-blue)
 ![MongoDB](https://img.shields.io/badge/MongoDB-100%25_adoption-success)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
-![Discord.js](https://img.shields.io/badge/discord.js-v14.11-5865F2)
-![Performance](https://img.shields.io/badge/performance-⚡_40--200x_faster-yellow)
+![Discord.js](https://img.shields.io/badge/discord.js-v14.25.1-5865F2)
+![Performance](https://img.shields.io/badge/performance-40--200x_faster-yellow)
 
 ---
 
-## 📖 Overview
+## 📖 Table of Contents
 
-**ELYSIUM Guild Bot** is a comprehensive, production-ready Discord bot designed specifically for MMORPG guild management. Built with Discord.js v14 and optimized for low-memory environments, it seamlessly combines attendance tracking, auction systems, intelligent statistical analytics, and proactive monitoring into a single, powerful solution.
-
-### 🎯 Key Highlights
-
-- **📊 57,000+ lines of code** across 50+ carefully organized modules
-- **🤖 50+ commands** covering attendance, auctions, analytics intelligence, rotation, NLP learning, and emergency recovery
-- **🗄️ 100% MongoDB adoption** - 40-200x faster than Sheets with 11/11 systems migrated
-- **⚡ Lightning-fast performance** - Sub-100ms queries, <1s crash recovery, instant bidding
-- **🎯 Accurate analytics** - Strict unique spawn counting prevents inflated attendance percentages
-- **🧠 Smart analytics** - rule-based predictive analytics, statistical fraud detection, and engagement scoring
-- **🔄 Self-healing** - automatic crash recovery with full state restoration in <1 second
-- **🌐 Multi-language support** - English, Filipino, Tagalog, and Taglish via NLP
-- **📈 Production ready** - actively serving ELYSIUM guild (stable, ongoing development)
-- **🔐 Security hardened** - parallel dual-write ensures zero data loss
-
-### 💡 What Makes This Bot Special?
-
-1. **MongoDB-Powered** - 40-200x faster than Sheets with 100% adoption (11/11 systems)
-2. **Smart Attendance** - Strict unique spawn counting prevents inflated 100% attendance rates
-3. **Lightning-Fast** - Sub-100ms queries, <1s crash recovery, instant bidding
-4. **Fair Auctions** - Instant bidding for all members with race condition protection
-5. **Intelligent Analytics** - Statistical price predictions with 85%+ accuracy after bootstrapping
-6. **High Availability** - Parallel dual-write ensures zero data loss
-7. **Natural Language** - Chat with the bot naturally in multiple languages
-8. **Channel-Aware Help** - Context-sensitive help system shows only relevant commands
+- [Overview](#-overview)
+- [Key Features](#-key-features)
+- [Customization & Adaptability](#-customization--adaptability)
+- [Quick Start](#-quick-start)
+- [Installation](#-installation)
+- [Configuration](#️-configuration)
+- [Commands Reference](#-commands-reference)
+- [System Architecture](#️-system-architecture)
+- [MongoDB Integration](#️-mongodb-integration)
+- [Boss System](#-boss-system)
+- [Deployment](#-deployment)
+- [Testing](#-testing)
+- [Troubleshooting](#-troubleshooting)
+- [Development](#-development)
+- [Contributing](#-contributing)
+- [FAQ](#-faq)
+- [License](#-license)
 
 ---
 
-## 📑 Table of Contents
+## 🎯 Overview
 
-- [📖 Overview](#-overview)
-- [✨ Features](#-features)
-- [🚀 Quick Start](#-quick-start)
-- [📥 Installation](#-installation)
-- [⚙️ Configuration](#️-configuration)
-- [💻 Commands](#-commands)
-- [🏗️ System Architecture](#️-system-architecture)
-- [📊 Google Sheets Integration](#-google-sheets-integration)
-- [🔧 Deployment](#-deployment)
-- [🆘 Emergency Recovery](#-emergency-recovery)
-- [📈 Performance](#-performance)
-- [🧪 Testing](#-testing)
-- [🐛 Troubleshooting](#-troubleshooting)
-- [💻 Development](#-development)
-- [🤝 Contributing](#-contributing)
-- [❓ FAQ](#-faq)
-- [📝 Changelog](#-changelog)
-- [📝 License](#-license)
+**ELYSIUM Guild Bot** is a comprehensive, production-grade Discord bot specifically designed for MMORPG guild management. Built with Discord.js v14 and powered by MongoDB, it provides a complete solution for managing guild activities, tracking attendance, distributing loot through auctions, monitoring boss spawns, and generating detailed analytics.
+
+### 🌟 Fully Adaptable to Any MMORPG
+
+This bot is **game-agnostic** and can be easily configured for any MMORPG with boss spawns and guild activities. All game-specific elements (boss names, timers, point values, events) are stored in configuration files and can be customized without touching the code. Currently deployed for an L9ASIA guild, but designed to work with any game.
+
+### What Makes This Bot Special?
+
+- **🎮 Fully Customizable** - Adapts to any MMORPG, guild structure, or alliance configuration
+- **🗄️ MongoDB-Powered** - 40-200x faster than Google Sheets with 100% adoption across all systems
+- **⚡ Lightning Performance** - Sub-100ms queries, <1s crash recovery, instant bidding
+- **🎯 Smart Attendance** - Screenshot verification, auto-close, anti-cheat mechanisms
+- **💰 Fair Auctions** - Point-based bidding with race condition protection
+- **⏰ Boss Intelligence** - Timer and schedule-based spawn predictions
+- **📊 Rich Analytics** - Leaderboards, weekly/monthly reports, activity heatmaps
+- **🔄 Self-Healing** - Automatic crash recovery with full state restoration
+- **🔐 Zero Data Loss** - Dual-write pattern (MongoDB + Google Sheets backup)
+- **📈 Production Ready** - Actively serving guilds with 99.9%+ uptime
+
+### Key Statistics
+
+- **57,320+ lines** of carefully crafted code
+- **50+ commands** with 200+ aliases
+- **37 bosses** tracked (22 timer-based + 14 schedule-based + 1 GvG)
+- **11 core systems** fully integrated with MongoDB
+- **95-105MB** RAM usage (optimized for 512MB instances)
+- **40-200x** performance improvement over legacy systems
 
 ---
 
-## ✨ Features
+## ✨ Key Features
 
-### 🎯 Attendance System
-**Smart Boss Spawn Tracking with Anti-Cheat**
+### 🎯 Attendance Tracking System
 
-- ✅ **Screenshot uploads required** for non-admins (manual admin verification via ✅/❌ buttons)
-- ✅ **20-minute auto-close** prevents late attendance cheating
+Comprehensive boss spawn attendance management with anti-cheat mechanisms.
+
+**Features:**
+- ✅ **Screenshot uploads required** for non-admin members
+- ✅ **Manual admin verification** via ✅/❌ reaction buttons
+- ✅ **30-minute auto-close** prevents late attendance cheating
 - ✅ **Thread locking** after submission prevents spam
-- ✅ **Admin verification system** - click ✅ to verify or ❌ to deny
-- ✅ **Points system** with automatic Google Sheets sync
+- ✅ **Points system** with automatic sync to both MongoDB and Google Sheets
 - ✅ **Crash recovery** - full state restoration on restart
 - ✅ **Bulk operations** - verify all, close all, reset pending
 - ✅ **Duplicate prevention** - smart caching with O(1) lookups
-- ✅ **Zero-attendee handling** - gracefully closes empty threads without errors
-- ✅ **Highly optimized** - see [Performance](#-performance) section for benchmarks
+- ✅ **Zero-attendee handling** - gracefully closes empty threads
 
----
+**Boss Points System:**
+- **1 point:** Venatus, Viorent, Ego, Clemantis, Livera, Araneo, Undomiel, Saphirus, Neutro, Lady Dalia, General Aquleus, Thymele, Amentis, Baron Braudmore
+- **2 points:** Milavy, Wannitas, Metus, Duplican, Shuliar, Ringor, Roderick, Gareth, Titore, Larba
+- **3 points:** Catena, Auraq, Secreta, Ordo, Asta, Supore, Chaiflock, Benji
+- **4 points:** Icaruthia, Motti, Nevaeh
+- **5 points:** GvG (Guild vs Guild)
+- **15 points:** Guild Boss
 
 ### 💰 Auction System
-**Open Bidding for All Guild Members**
 
+Open bidding system for all guild members with fair distribution mechanics.
+
+**Features:**
 - 💎 **Point-based bidding** - all ELYSIUM members can participate
 - 💎 **Instant bidding** - immediate bid placement for faster auctions
-- 💎 **Auto-scheduler** - Saturday 12:00 PM GMT+8 auctions
+- 💎 **Auto-scheduler** - Sunday 12:00 PM GMT+8 auctions
 - 💎 **Race condition protection** - thread-safe bidding
-- 💎 **Session history** - complete audit trail
+- 💎 **Session history** - complete audit trail in MongoDB
 - 💎 **10-minute cooldown** between sessions
 - 💎 **Admin controls** - pause, resume, extend, skip, cancel items
+- 💎 **30-second preview** phase before auction starts
+- 💎 **Auto-extend** on last-minute bids (anti-snipe protection)
+- 💎 **Dedicated threads** per item for organization
 
-**Auction Controls:**
-```
-!auction              # Start auction manually
-!pauseauction         # Pause current session
-!resumeauction        # Resume paused session
-!extend <minutes>     # Add time to current item
-!skip                 # Skip current item with refund
-!cancel               # Cancel item with refund
-!forceend             # Emergency auction termination
-```
-
----
-
-### 🤖 Intelligence Engine
-**Statistical Analytics & Smart Automation**
-
-#### **Price Prediction**
-- 🧠 Statistical price estimation using historical averages with confidence intervals
-- 🧠 Trend analysis for item value changes
-- 🧠 Historical data analysis with outlier detection
-- 🧠 `!suggestauction` - Analyze entire queue before auction
-- 🧠 `!predictprice <item>` - Get smart pricing recommendations
-- 📊 Rule-based predictions, not machine learning models
-
-#### **Member Engagement Analytics**
-- 📊 Engagement scoring (attendance + bidding + consistency)
-- 📊 Next event attendance prediction
-- 📊 At-risk member identification
-- 📊 Personalized recommendations
-- 📊 `!analyze @member` - Deep engagement analysis
-
-#### **Anomaly Detection**
-- 🚨 Collusion detection in bidding patterns
-- 🚨 Unusual bid amount identification
-- 🚨 Attendance pattern anomaly detection
-- 🚨 Fraud prevention with statistical analysis
-
-#### **Smart Recommendations**
-- 💡 Optimal auction timing suggestions
-- 💡 Item ordering optimization
-- 💡 Member engagement strategies
-
----
-
-### 🔔 Proactive Intelligence System
-**Automated Monitoring & Alerts**
-
-| Feature | Schedule | Channel | Description |
-|---------|----------|---------|-------------|
-| **Pre-Auction Check** | Sat 10 AM | Admin Logs | Readiness check (70% members w/ 100+ pts) |
-| **Engagement Digest** | Mon 9 AM | Admin Logs | Weekly at-risk member report |
-| **Anomaly Digest** | Daily 6 PM | Admin Logs | Fraud/suspicious pattern alerts |
-| **Weekly Summary** | Sun 8 PM | Guild Announcement | Motivational recap + top performers |
-| **Weekly Reports** | Sat 11:59 PM | Admin Logs + Guild Chat | Leaderboard rankings summary |
-| **Monthly Reports** | Last day 11:59 PM | Admin Logs + Guild Chat | Monthly statistics & top performers |
-| **Milestone Celebrations** | Hourly | Guild Announcement | 500/1000/2000/5000 point milestones |
-
-**Channel Configuration:**
-- **Admin Logs** = `admin_logs_channel_id` - For admin notifications and monitoring
-- **Guild Chat** = `elysium_commands_channel_id` - Where members see reports and interact
-- **Guild Announcement** = `guild_announcement_channel_id` - For public celebrations
-
-**Error Handling:**
-- ✅ Automatic retry on failures
-- ✅ Admin alerts after 3 consecutive failures
-- ✅ Rate limiting (1hr between similar notifications)
-- ✅ Safe execution wrapper for all tasks
-
----
-
-### 🧠 Bot Learning System
-**Improves Predictions Through Historical Analysis**
-
-**Bootstrap Learning** 🚀
-- Analyzes ALL historical auction data on first deployment
-- Creates baseline predictions using statistical averages
-- 85%+ prediction accuracy from day 1 (with sufficient historical data)
-- Run `!bootstraplearning` to re-analyze historical data
-
-**Accuracy Tracking:**
-1. Bot makes prediction (price, engagement, etc.) based on historical averages
-2. Saves to `BotLearning` Google Sheet
-3. Event completes → **bot records actual outcome** ✨
-4. System tracks accuracy by comparing predicted vs actual
-5. Future predictions refined based on recent trends
-6. Admin notified of significant pattern changes
-
-**What the Bot Tracks:**
-- 📈 **Price Predictions** - Optimal starting bids (historical averages)
-- 👥 **Member Engagement** - Attendance likelihood (pattern-based)
-- 🔍 **Anomaly Detection** - Statistical outlier detection
-- ⏰ **Timing Optimization** - Best auction times (historical analysis)
-
----
-
-### 💬 Natural Language Processing
-**Flexible Command Syntax**
-
-Works in **Admin Logs** and **Auction Threads** only:
-
-```
-Auction Threads:
-"bid 500" → !bid 500
-"offer 300 points" → !bid 300
-"300 pts" → !bid 300
-
-Admin Logs:
-"how many points do i have" → !mypoints
-"show me the leaderboard" → !leaderboard
-"what's the auction status" → !bidstatus
-"bot status" → !status
-```
-
-**Features:**
-- ✅ Context-aware parsing
-- ✅ No interference with ! commands
-- ✅ Safe channel restrictions
-- ✅ Fuzzy pattern matching
-
-**Pattern Learning System:**
-- 🧠 Learns new phrase→command mappings from interactions
-- 🧠 Multi-language support (English, Tagalog, Taglish)
-- 🧠 Pattern confidence scoring (frequency-based)
-- 🧠 Unrecognized phrase tracking for improvement
-- 🧠 Manual pattern teaching via `!teachbot` command
-- 🧠 Stores learned patterns in Google Sheets (not AI/ML models)
-
----
+**Auction Workflow:**
+1. Preview Phase (30 seconds) - Show upcoming items
+2. Item Auction Phase - Accept bids in real-time
+3. Auto-extend if bids placed in last 30 seconds
+4. Winner announcement and logging
+5. Session finalization with summary report
 
 ### 🔄 Boss Rotation System
-**Multi-Guild Boss Tracking**
 
-Automatically manages rotation for bosses shared across 5 guilds:
-
-**Tracked Bosses:**
-- 🎯 **Amentis** - 5-guild rotation
-- 🎯 **General Aquleus** - 5-guild rotation
-- 🎯 **Baron Braudmore** - 5-guild rotation
+Multi-guild boss rotation tracking for shared world bosses.
 
 **Features:**
-- ✅ **Position tracking** - ELYSIUM is position 1
-- ✅ **Auto-increment** - Advances rotation after boss kills
-- ✅ **Manual controls** - Set or increment rotation manually
-- ✅ **Status viewing** - Check current rotation for all bosses
-- ✅ **Conflict prevention** - Ensures fair rotation across guilds
-- ✅ **Persistent state** - Survives bot restarts
+- 🔄 **Dynamic rotation tracking** - configurable multi-guild rotation (typically 3-5 guilds)
+- 🔄 **Auto-increment** after boss kills
+- 🔄 **Position tracking** - ELYSIUM is always position 1
+- 🔄 **15-minute warnings** when it's your guild's turn
+- 🔄 **Daily rotation schedule** posted at 12:00 AM Manila time
+- 🔄 **Crash recovery** with Google Sheets backup
+- 🔄 **Dynamic boss loading** from Google Sheets - admins can add/remove bosses from rotation
 
-**Commands:**
-```
-!rotation status           # View current rotation
-!rotation set <boss> <1-5> # Set rotation index
-!rotation increment <boss> # Advance to next guild
-!rotation refresh          # Reload boss data from Google Sheets
-```
+**Rotation Configuration:**
+Bosses in rotation are configured in Google Sheets `BossRotation` tab. The system supports flexible rotation with any number of guilds and bosses. Common rotating bosses include Amentis, General Aquleus, and Baron Braudmore, but this can be customized.
 
----
+### ⏰ Boss Timer & Prediction System
 
-### 📊 Leaderboard & Analytics System
+Intelligent boss spawn prediction with timer and schedule-based tracking.
 
-**Automated Rankings & Reports:**
-- 🏆 **Attendance Leaderboard** - Top 10 by points
+**Features:**
+- ⏰ **Timer-based bosses** - Dynamic predictions with spawn intervals (22 bosses)
+- ⏰ **Schedule-based bosses** - Static 99% confidence predictions (13 bosses)
+- ⏰ **Spawn notifications** with role mentions
+- ⏰ **MongoDB crash recovery** - <1s state restoration
+- ⏰ **Fuzzy name matching** - Levenshtein distance for typo tolerance
+- ⏰ **Next spawn predictions** - `/nextspawn` slash command
+- ⏰ **Kill tracking** - `/killed` slash command updates timers
+
+**Timer-Based Bosses (22):**
+Venatus (10h), Viorent (10h), Ego (21h), Livera (24h), Araneo (24h), Undomiel (24h), Lady Dalia (18h), General Aquleus (29h), Amentis (29h), Baron Braudmore (32h), Wannitas (48h), Metus (48h), Duplican (48h), Shuliar (35h), Gareth (32h), Titore (37h), Larba (35h), Catena (35h), Secreta (62h), Ordo (62h), Asta (62h), Supore (62h)
+
+**Schedule-Based Bosses (14):**
+Clemantis, Saphirus, Neutro, Thymele, Milavy, Ringor, Roderick, Auraq, Chaiflock, Benji, Guild Boss, Icaruthia, Motti, Nevaeh
+
+### 📊 Leaderboard & Reports System
+
+Automated rankings and comprehensive guild analytics.
+
+**Features:**
+- 🏆 **Attendance Leaderboard** - Top 10 by points earned
 - 🏆 **Bidding Leaderboard** - Top 10 by remaining points
 - 🏆 **Weekly Reports** - Auto-sent Saturday 11:59 PM GMT+8
 - 🏆 **Monthly Reports** - Auto-sent last day of month 11:59 PM GMT+8
-- 🏆 **Visual progress bars** with percentages
-- 🏆 **Real-time statistics** with live updates
+- 🏆 **Visual progress bars** with percentage indicators
+- 🏆 **Real-time statistics** with live updates from MongoDB
+- 🏆 **Strict unique spawn counting** - prevents inflated attendance percentages
 
 **Activity Analytics:**
 - 📊 **Activity Heatmap** - 24-hour guild activity visualization
@@ -266,490 +167,403 @@ Automatically manages rotation for bosses shared across 5 guilds:
 - 📊 **Event scheduling optimizer** - Schedule events at optimal times
 - 📊 **Weekly patterns** - Track activity trends over time
 
-**Commands:**
-```
-!leaderboardattendance    # Show attendance rankings
-!leaderboardbidding       # Show bidding rankings
-!leaderboards             # Show both
-!weeklyreport             # Force weekly report
-!monthlyreport            # Force monthly report (admin only)
-!activity [week]          # Guild activity heatmap
-```
+### 📖 Channel-Aware Help System
 
----
+Context-sensitive command discovery that adapts to your current channel.
 
-### 📖 Channel-Aware Help System v10.0
-
-**Context-Sensitive Command Discovery**
-
-The bot features an intelligent help system that shows only commands relevant to your current location:
-
-**Smart Channel Detection:**
+**Features:**
 - 🎯 **Attendance Threads** - Shows only attendance commands
 - 💰 **Auction Threads** - Shows only bidding commands
-- 👑 **Admin Logs** - Shows admin and auction management commands
+- 👑 **Admin Logs** - Shows admin and management commands
 - 💬 **Guild Chat** - Shows leaderboards and analytics commands
 - ⏰ **Boss Timer Channel** - Shows boss prediction commands
-
-**Features:**
-- ✅ **Permission-aware** - Admins see admin commands, members see member commands
+- ✅ **Permission-aware** - Admins see admin commands only
 - ✅ **Category grouping** - Commands organized by function
 - ✅ **Clear examples** - Every command shows usage syntax
-- ✅ **No clutter** - Only see commands you can actually use
-- ✅ **Helpful hints** - Contextual guidance for new users
 
-**Usage:**
-```
-!help                     # Show all commands for current channel
-!help attendance          # Attendance commands
-!help auction             # Auction commands
-!help intelligence        # Intelligence/analytics commands
-```
+### 🔔 Event Reminder System
 
----
-
-### ⚡ Performance Optimization Systems
-**Advanced Caching & Request Management**
-
-#### **Multi-Level Cache System (L1/L2/L3)**
-Intelligent three-tier caching with automatic promotion and demotion:
-
-**Cache Levels:**
-- 🔥 **L1 Cache (Hot)** - 1-minute TTL for frequently accessed data
-- 🌡️ **L2 Cache (Warm)** - 5-minute TTL for moderately accessed data
-- ❄️ **L3 Cache (Cold)** - 15-minute TTL for rarely accessed data
+MongoDB-powered event notification system with recurring support.
 
 **Features:**
-- ✅ **Automatic promotion** - Frequently accessed data moves to faster cache levels
-- ✅ **Automatic demotion** - Stale data moves to slower levels or expires
-- ✅ **Fuzzy matching** - Boss name matching with Levenshtein distance
-- ✅ **Access frequency tracking** - Intelligent promotion decisions
-- ✅ **Cache statistics** - Monitor hit rates and performance
-- ✅ **30-50% API reduction** - Dramatically reduces Google Sheets calls
+- ⏰ **Auto-check every 60 seconds** for pending reminders
+- ⏰ **Event types:** boss_spawn, auction, guild_event, custom
+- ⏰ **Role mention support** for notifications
+- ⏰ **Recurring reminders** for regular events
+- ⏰ **MongoDB storage** for persistence
 
-**Performance Impact:**
-```
-Before: Every lookup → Google Sheets API call
-After:  L1 hit (99%): <1ms | L2 hit: ~5ms | L3 hit: ~15ms | Miss: API call
-Result: 30-50% reduction in API calls, 100x faster lookups
-```
+### 👥 Member Lore & Profiles
 
-#### **Request Batching System**
-Intelligent request queueing to prevent rate limiting:
+Customizable member profile system for building guild community and identity.
 
 **Features:**
-- ✅ **Batch size limits** - Max 20 requests per batch
-- ✅ **Smart delays** - 2-second inter-batch delay
-- ✅ **Priority queues** - High/normal/low priority support
-- ✅ **Operation grouping** - Groups similar operations for efficiency
-- ✅ **Promise-based API** - Easy integration with async/await
-- ✅ **Rate limit protection** - Prevents HTTP 429 errors
+- 📝 **Custom member profiles** - Store member bios, backstories, and character lore
+- 🎭 **Guild identity building** - Personalized profiles for each guild member
+- 🏆 **Achievement tracking** - Record member milestones and accomplishments
+- 🎮 **Role-playing support** - Perfect for RP-focused guilds
+- ⚙️ **Easy customization** - Configured via `member-lore.json` file
+- 💾 **Persistent storage** - Member information preserved across bot restarts
 
-**Google Sheets API Limits:**
-```
-Limit:  60 requests/minute, 100 requests/100 seconds
-Before: Bursts can exceed limits → 429 errors
-After:  ~30 requests/minute, evenly distributed → no errors
-```
-
-#### **Parallel Sheet Operations**
-Concurrent execution for bulk operations:
-
-**Features:**
-- ✅ **Concurrent execution** - Multiple Google Sheets operations simultaneously
-- ✅ **Operation grouping** - Groups by sheet/tab for efficiency
-- ✅ **Partial failure support** - Some operations can fail without affecting others
-- ✅ **Performance metrics** - Track execution time and success rates
-- ✅ **2-3x performance improvement** - Bulk operations complete much faster
-
-**Example Performance:**
-```
-Before: 10 operations × 3 seconds each = 30 seconds total (sequential)
-After:  10 operations ÷ 3 parallel = 10 seconds total (concurrent)
-Result: 2-3x speedup on bulk operations
-```
-
----
-
-### 🗄️ MongoDB Integration (Phase 1-10 Complete)
-**100% MongoDB Adoption - Lightning-Fast Performance**
-
-The bot has completed full MongoDB integration across all 11 core systems, delivering **40-200x performance improvements** over legacy Google Sheets operations.
-
-#### **Completed Phases**
-
-**Phase 1-3: Core Systems**
-- ✅ Attendance tracking (100-500ms vs 2000-5000ms)
-- ✅ Bidding system (50-200ms vs 2000-5000ms)
-- ✅ Member management (10-50ms vs 500-2000ms)
-
-**Phase 4: Member Stats**
-- ✅ Stats & profiles (10-50ms vs 1000-3000ms)
-- ✅ Leaderboards (50-100ms vs 2000-10000ms)
-
-**Phase 5: Auction System**
-- ✅ Auction sessions (50-200ms vs 2000-5000ms)
-- ✅ Real-time bidding with instant updates
-
-**Phase 6: Boss Rotation**
-- ✅ Multi-guild rotation (10-50ms vs 500-1000ms)
-- ✅ Position tracking across 5 guilds
-
-**Phase 7: Parallel Dual-Write**
-- ✅ MongoDB-first with Sheets backup
-- ✅ Zero data loss with parallel writes
-- ✅ Background sync disabled (redundant)
-
-**Phase 8: Boss Timer System**
-- ✅ Crash recovery (<1s vs 5-10s)
-- ✅ 40-200x faster state restoration
-- ✅ MongoDB-first loading
-
-**Phase 9: Reports System**
-- ✅ Weekly/monthly reports (100-500ms vs 10000-20000ms)
-- ✅ **Strict unique spawn counting** - no more inflated 100% attendance
-- ✅ All report aliases use MongoDB
-
-**Phase 10: Event Reminders**
-- ✅ MongoDB-powered reminder system
-- ✅ Auto-check every 60 seconds
-- ✅ Recurring reminder support
-
-#### **Performance Comparison**
-
-| System | Before (Sheets) | After (MongoDB) | Improvement |
-|--------|-----------------|-----------------|-------------|
-| Attendance tracking | 2000-5000ms | 100-500ms | **10-20x faster** |
-| Bidding operations | 2000-5000ms | 50-200ms | **20-40x faster** |
-| Member stats | 1000-3000ms | 10-50ms | **40-100x faster** |
-| Leaderboards | 2000-10000ms | 50-100ms | **40-100x faster** |
-| Boss rotation | 500-1000ms | 10-50ms | **20-50x faster** |
-| Weekly reports | 10000-20000ms | 100-500ms | **40-100x faster** |
-| Boss timer recovery | 5000-10000ms | <1000ms | **40-200x faster** |
-
-#### **Data Architecture**
-
-**MongoDB Collections:**
-- `attendance` - Boss spawn attendance records
-- `members` - Member profiles and points
-- `biddingSessions` - Auction session history
-- `biddingItems` - Auction items and results
-- `bossRotation` - Multi-guild rotation state
-- `bossTimers` - Boss spawn timers and crash recovery
-- `eventReminders` - Event notification system
-
-**Parallel Dual-Write Pattern:**
-```javascript
-// MongoDB-first with Sheets backup
-const [mongoResult, sheetResult] = await Promise.all([
-  mongoHelpers.saveMemberPoints(...),
-  sheetAPI.call('updatePoints', ...)
-]);
-// Success if either succeeds - zero data loss!
-```
-
-**Benefits:**
-- ⚡ **40-200x faster queries** - Sub-100ms response times
-- 🎯 **Accurate calculations** - Strict unique spawn counting prevents inflated percentages
-- 🔄 **Zero data loss** - Parallel writes ensure backup even if one fails
-- 📊 **Rich analytics** - MongoDB aggregation pipelines enable complex queries
-- 🚀 **Instant crash recovery** - Bot restores full state in <1 second
-- 🌐 **Scalable** - Ready for thousands of members and records
-
-**Documentation:**
-- [MongoDB Feature Status](./docs/MONGODB_FEATURE_STATUS.md) - Complete feature adoption status
-- [MongoDB Verification Report](./docs/MONGODB_VERIFICATION.md) - All features and aliases verified
-
----
+**Use Cases:**
+- Character backstories and lore
+- Member achievements and history
+- Fun facts and nicknames
+- Guild ranks and titles
+- Custom member attributes
 
 ### 🚨 Emergency Recovery System
-**Complete Toolkit for Stuck States**
 
-All commands require confirmation for safety:
+Complete toolkit for stuck states and troubleshooting.
 
-```
-!forceclosethread         # Force close single thread
-!forcecloseallthreads     # Close all attendance threads
-!forceendauction          # Terminate stuck auction
-!unlockallpoints          # Release all locked points
-!clearallbids             # Remove pending bids
-!diagnostics              # Comprehensive state inspection
-!forcesync                # Manual Google Sheets sync
-```
+**Features:**
+- 🚨 **Force close thread/all threads**
+- 🚨 **Force end auction**
+- 🚨 **Unlock all points**
+- 🚨 **Clear all bids**
+- 🚨 **Comprehensive diagnostics**
+- 🚨 **Force sync to Google Sheets**
+- 🚨 **Confirmation prompts** (30s timeout) for safety
+- 🚨 **Admin-only access**
 
-**Safety Features:**
-- ⚠️ Confirmation prompts (30s timeout)
-- ⚠️ Detailed impact warnings
-- ⚠️ Automatic state cleanup
-- ⚠️ Admin-only access
+---
+
+## 🔧 Customization & Adaptability
+
+### Designed for Any MMORPG
+
+This bot is built with **flexibility at its core**. Every game-specific element is externalized into configuration files, making it easy to adapt to different MMORPGs, servers, and guild structures without modifying code.
+
+### What Can Be Customized?
+
+**Game-Specific Elements:**
+- 🎮 **Boss names and aliases** - Configure all boss names in `boss_points.json`
+- ⏱️ **Boss timers and schedules** - Set spawn intervals in `boss_spawn_config.json`
+- 🏆 **Point values** - Define your own reward structure per boss difficulty
+- 📅 **Event schedules** - Customize GvG, Guild Boss, Arena times for your server
+- 🌍 **Timezone** - Adapt to any server timezone (GMT+8, UTC, etc.)
+
+**Guild-Specific Configuration:**
+- 👥 **Member profiles** - Customize member lore in `member-lore.json`
+- 🔄 **Rotation system** - Configure any number of guilds in your alliance
+- 💰 **Auction rules** - Set auction timing, cooldowns, and preview duration
+- 📊 **Point system** - Design your own attendance reward structure
+- 🎯 **Roles and permissions** - Map to your Discord server's role structure
+
+**Discord Server Configuration:**
+- 📢 **Channel IDs** - Configure for your server's channels
+- 👑 **Admin roles** - Define which roles have admin access
+- 🎨 **Guild branding** - Customize embeds and messages
+- ⏰ **Auto-archive settings** - Control thread behavior
+
+### Configuration Files
+
+All customization is done through these files:
+- `config.json` - Main bot configuration (channels, roles, timezone)
+- `boss_points.json` - Boss names, points, and aliases
+- `boss_spawn_config.json` - Timer-based and schedule-based boss configurations
+- `member-lore.json` - Member profiles and custom attributes
+- Google Sheets tabs - Dynamic rotation, auction queue, attendance tracking
+
+**No code changes required!** Simply edit JSON files and Google Sheets to adapt the bot to your game and guild.
 
 ---
 
 ## 🚀 Quick Start
 
-### **Prerequisites**
-- Node.js >= 18.0.0
-- Discord Bot Token
-- Google Sheets API credentials
-- 512MB RAM minimum (highly optimized!)
+### Prerequisites
 
-### **5-Minute Setup**
+- **Node.js** >= 18.0.0
+- **Discord Bot Token** (from Discord Developer Portal)
+- **MongoDB Atlas** account (free tier works)
+- **Google Sheets** with Apps Script webhook
+- **512MB RAM** minimum for hosting
+
+### 5-Minute Setup
 
 ```bash
-# 1. Clone repository
+# 1. Clone the repository
 git clone <your-repo-url>
 cd elysium-attendance-bot
 
 # 2. Install dependencies
 npm install
 
-# 3. Create config.json
-cp config.example.json config.json
-# Edit config.json with your credentials
+# 3. Configure environment variables
+cp .env.example .env
+# Edit .env with your Discord token and MongoDB URI
 
-# 4. Start bot
+# 4. Configure bot settings
+# Edit config.json with your Discord server IDs and channel IDs
+
+# 5. Start the bot
 npm start
 ```
+
+The bot will:
+1. Sync historical data from Google Sheets to MongoDB (first run only)
+2. Connect to Discord
+3. Restore any active attendance threads or auction sessions
+4. Start monitoring for boss spawns and events
 
 ---
 
 ## 📥 Installation
 
-### **Step 1: Install Dependencies**
+### Step 1: Install Node.js
+
+Ensure you have Node.js 18.0.0 or higher installed:
+
+```bash
+node --version  # Should show v18.0.0 or higher
+```
+
+Download from [nodejs.org](https://nodejs.org/) if needed.
+
+### Step 2: Install Dependencies
 
 ```bash
 npm install
 ```
 
-**Dependencies** (only 5 lightweight packages):
-- `discord.js` ^14.11.0 - Discord API wrapper
-- `axios` ^1.13.2 - HTTP requests for Google Sheets
-- `node-fetch` ^2.6.7 - HTTP requests (fallback)
-- `fast-levenshtein` ^2.0.6 - Fuzzy string matching for NLP
-- `node-cron` ^4.2.1 - Scheduled tasks (proactive intelligence)
+**Production Dependencies (9 packages):**
+- `discord.js` (^14.25.1) - Discord API wrapper
+- `axios` (^1.13.2) - HTTP client for Google Sheets
+- `mongodb` (^6.21.0) - MongoDB driver
+- `node-cron` (^4.2.1) - Task scheduling
+- `node-fetch` (^3.3.2) - HTTP client (fallback)
+- `pino` (^10.1.0) - Structured logging
+- `pino-pretty` (^13.1.2) - Log formatting
+- `fast-levenshtein` (^3.0.0) - Fuzzy string matching
+- `uuid` (^13.0.0) - Unique identifier generation
 
-**Dev Dependencies:**
-- `jest` ^29.7.0 - Testing framework
-
-**Note:** Discord.js v14.11.0 is stable and well-tested. Newer versions (up to v14.25.1) are available if you wish to upgrade.
-
-### **Step 2: Discord Bot Setup**
+### Step 3: Discord Bot Setup
 
 1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Create New Application
-3. Go to "Bot" tab
-4. Click "Add Bot"
-5. Enable these **Privileged Gateway Intents**:
+2. Click "New Application" and give it a name
+3. Go to "Bot" tab and click "Add Bot"
+4. Enable these **Privileged Gateway Intents**:
    - ✅ PRESENCE INTENT
    - ✅ SERVER MEMBERS INTENT
    - ✅ MESSAGE CONTENT INTENT
-6. Copy bot token for config.json
+5. Copy the bot token (you'll need this for `.env`)
+6. Go to "OAuth2" → "URL Generator"
+7. Select scopes: `bot`, `applications.commands`
+8. Select permissions: `Administrator` (or specific permissions needed)
+9. Copy the generated URL and invite the bot to your server
 
-### **Step 3: Google Sheets Setup**
+### Step 4: MongoDB Setup
+
+1. Create a free account at [MongoDB Atlas](https://cloud.mongodb.com)
+2. Create a new cluster (M0 free tier is sufficient)
+3. Create a database user with read/write permissions
+4. Whitelist your IP address (or allow access from anywhere: `0.0.0.0/0`)
+5. Get your connection string (looks like: `mongodb+srv://username:password@cluster.mongodb.net/`)
+6. Copy this to your `.env` file as `MONGODB_URI`
+
+### Step 5: Google Sheets Setup
 
 See [SETUP_TRIGGERS_GUIDE.md](./SETUP_TRIGGERS_GUIDE.md) for detailed instructions.
 
 **Quick Summary:**
-1. Create Google Sheet with required tabs
-2. Deploy Apps Script for webhook
+1. Create a Google Sheet with these tabs:
+   - `AttendanceTracker` - Main attendance data
+   - `ForDistribution` - Bidding points
+   - `BiddingItems` - Auction queue
+   - `BiddingHistory` - Auction results
+   - `BossRotation` - Rotation tracking
+2. Deploy the Apps Script code (from `Code.js`)
 3. Set up triggers for auto-save
-4. Copy webhook URL to config.json
-
-**Required Sheet Tabs:**
-- `AttendanceTracker` - Main attendance data
-- `ForDistribution` - Bidding points
-- `BiddingItems` - Auction queue
-- `BiddingHistory` - Auction results
-- `AttendanceState` - Bot state (auto-created)
-- `BotLearning` - Prediction tracking (auto-created)
-- `BossRotation` - Rotation tracking (auto-created)
-- `NLPLearned` - Learned NLP patterns (auto-created)
-- `NLPUnrecognized` - Unrecognized phrases (auto-created)
+4. Copy webhook URL to `config.json`
 
 ---
 
 ## ⚙️ Configuration
 
-### **config.json Structure**
+### Environment Variables (.env)
+
+```bash
+# Required: Discord Bot Token
+DISCORD_TOKEN=your_discord_bot_token_here
+
+# Required: MongoDB Connection String
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/elysium-bot
+
+# Optional: HTTP Server Port (default: 3000)
+PORT=3000
+
+# Optional: Node Environment (default: development)
+NODE_ENV=production
+
+# Optional: Logging Level (default: info)
+LOG_LEVEL=info
+
+# Optional: MongoDB Feature Flags (default: true)
+USE_MONGODB_BIDDING=true
+USE_MONGODB_ATTENDANCE=true
+
+# Optional: Skip attendance sync on startup (default: false)
+SKIP_ATTENDANCE_SYNC=false
+```
+
+### Bot Configuration (config.json)
 
 ```json
 {
-  "token": "YOUR_DISCORD_BOT_TOKEN",
+  "version": "3.0",
   "main_guild_id": "YOUR_GUILD_ID",
-  "attendance_channel_id": "CHANNEL_ID",
-  "admin_logs_channel_id": "CHANNEL_ID",
-  "bidding_channel_id": "CHANNEL_ID",
-  "elysium_commands_channel_id": "CHANNEL_ID",
-  "guild_announcement_channel_id": "CHANNEL_ID",
-  "elysium_role_id": "ROLE_ID",
-  "admin_role_id": "ROLE_ID",
-  "google_sheets_webhook": "YOUR_WEBHOOK_URL",
+  "timer_server_id": "YOUR_SERVER_ID",
+  "attendance_channel_id": "ATTENDANCE_CHANNEL_ID",
+  "bidding_channel_id": "BIDDING_CHANNEL_ID",
+  "admin_logs_channel_id": "ADMIN_LOGS_CHANNEL_ID",
+  "elysium_commands_channel_id": "GUILD_CHAT_CHANNEL_ID",
+  "guild_announcement_channel_id": "ANNOUNCEMENTS_CHANNEL_ID",
+  "boss_timer_channel_id": "BOSS_TIMER_CHANNEL_ID",
+  "boss_spawn_announcement_channel_id": "BOSS_SPAWN_CHANNEL_ID",
+  "admin_roles": ["GUILD LEADER", "ELITE", "Admin"],
+  "elysium_role": "ELYSIUM",
+  "week_start": "Sunday",
+  "sheet_webhook_url": "YOUR_GOOGLE_SHEETS_WEBHOOK_URL",
+  "timezone": "Asia/Manila",
   "auto_archive_minutes": 60
 }
 ```
 
-### **Environment Variables** (Optional)
-
-```bash
-# Enable production mode (reduces logging by 10-15%)
-NODE_ENV=production npm start
-
-# Development mode (default - verbose logging)
-npm start
-```
-
-**Default Port:** The bot runs an HTTP health check server on port **8000** (configurable via `PORT` environment variable).
+**How to get Discord IDs:**
+1. Enable Developer Mode in Discord (User Settings → Advanced → Developer Mode)
+2. Right-click on servers/channels/roles and click "Copy ID"
+3. Paste the IDs into `config.json`
 
 ---
 
-## 💻 Commands
+## 💻 Commands Reference
 
-### **📖 Help Commands**
+### Help Commands
 
 ```bash
-!help                     # Show comprehensive help
+!help                     # Show comprehensive help for current channel
 !help attendance          # Attendance commands
 !help auction             # Auction commands
-!help intelligence        # Intelligence/analytics commands
 !help leaderboard         # Leaderboard commands
-!help management          # Member management commands
 !help rotation            # Boss rotation commands
-!help nlp                 # NLP learning commands
 !help emergency           # Emergency commands
+
+# Aliases: !?, !commands, !cmds
 ```
 
-### **🎯 Attendance Commands** (Admin Only)
+### 🎯 Attendance Commands (Admin Only)
 
-| Command | Description | Alias |
-|---------|-------------|-------|
+| Command | Description | Aliases |
+|---------|-------------|---------|
 | `!status` | Bot health + active spawns | `!st`, `!attendancestatus` |
-| `!addthread <boss> ...` | Manually create spawn | `!addth` |
-| `!verify @user` | Manually verify member | `!v` |
+| `!addthread <boss> [members...]` | Create spawn thread | `!addth` |
+| `!verify @user` | Verify member attendance | `!v` |
 | `!verifyall` | Auto-verify all pending | `!vall` |
 | `!resetpending` | Clear pending queue | `!resetpend` |
-| `!forcesubmit` | Submit without closing | `!fs` |
-| `!forceclose` | Force close thread | `!fc` |
-| `!debugthread` | Debug current thread state | `!debug` |
+| `!forceclose` | Force close current thread | `!fc` |
 | `!closeallthread` | Close all spawn threads | `!closeall` |
-| `!maintenance` | Create maintenance boss threads | `!maint` |
+| `!maintenance` | Create maintenance threads | `!maint` |
 | `!clearstate` | Clear ALL attendance state | `!clear` |
 
-### **💰 Auction Commands**
-
-**Admin:**
-```bash
-!auction                  # Start auction manually (aliases: !startauction, !start, !auc-start)
-!pauseauction             # Pause session (aliases: !pause, !auc-pause, !hold)
-!resumeauction            # Resume session (aliases: !resume, !auc-resume, !continue)
-!extend <minutes>         # Add time to item (aliases: !ext, !auc-extend)
-!skip                     # Skip item w/ refund (alias: !skipitem)
-!cancel                   # Cancel item w/ refund (alias: !cancelitem)
-!stop                     # Stop current item (aliases: !auc-stop, !end-item)
-!endauction               # End entire auction session
-!startauctionnow          # Bypass 10-min cooldown (alias: !auc-now)
-!queuelist                # View full queue (aliases: !ql, !queue)
-```
-
-**Members:**
-```bash
-!bid <amount>             # Place bid (alias: !b, or just type "bid 500")
-!mypoints                 # Check points balance (aliases: !pts, !mp)
-!bidstatus                # Current auction status (aliases: !bs, !bstatus)
-```
-
-### **🤖 Intelligence/Analytics Commands**
-
-**Member-Accessible:**
-```bash
-!predictspawn [boss]      # Predict next boss spawn (aliases: !nextspawn, !whennext, !spawntimer)
-!predictprice <item>      # Price prediction (aliases: !predict, !suggestprice)
-!predictattendance <user> # Predict attendance likelihood (alias: !predatt)
-!analyze [username]       # Engagement analysis (aliases: !engagement, !engage)
-!analyzeall               # Guild-wide engagement (aliases: !analyzeengagement, !guildanalyze)
-```
-
-**Admin Only:**
-```bash
-!recommendations          # Guild management recommendations (aliases: !recommend, !suggest)
-!performance              # System performance metrics (alias: !perf)
-!suggestauction           # Analyze full queue (aliases: !analyzequeue, !aq, !auctionqueue)
-!detectanomalies          # Fraud detection scan (aliases: !fraud, !anomaly)
-!bootstraplearning        # Re-analyze historical data (aliases: !bootstrap, !learnhistory)
-```
-
-### **📊 Leaderboard & Analytics Commands**
-
-```bash
-!leaderboardattendance    # Attendance rankings (aliases: !lbattendance, !lba, !leadatt)
-!leaderboardbidding       # Bidding rankings (aliases: !lbbidding, !lbb, !leadbid)
-!leaderboards             # Show both (aliases: !lb, !leaderboard)
-!weeklyreport             # Force weekly report - admin only (aliases: !weekly, !week)
-!monthlyreport            # Force monthly report - admin only (aliases: !monthly, !month)
-!activity [week]          # Guild activity heatmap (aliases: !heatmap, !guildactivity)
-```
-
-**Activity Heatmap Features:**
-- 24-hour activity visualization using ASCII heatmap
-- Peak activity time identification
-- Optimal event scheduling recommendations
-- Use `!activity week` for weekly patterns
-- Helps schedule events when members are most active
-
-### **🔄 Boss Rotation Commands** (Admin Only)
-
-```bash
-!rotation status          # Show current rotation for all rotating bosses
-!rotation set <boss> <index>  # Manually set rotation index
-!rotation increment <boss>    # Advance to next guild's turn
-!rotation refresh         # Reload boss data from Google Sheets immediately
-```
-
-**Features:**
-- **Dynamic boss loading** - Bosses are loaded from Google Sheets (not hardcoded)
-- **Flexible rotation lengths** - Each boss can have different guild counts (3, 5, etc.)
-- **Instant reload** - Use `!rotation refresh` to load new bosses without restarting
-- **Auto-increment** - Rotation advances automatically on boss kills
-- **Crash recovery** - Rotation state persists in Google Sheets
-- ELYSIUM is always position 1 in rotation
-
-### **🧠 NLP Learning Commands**
+### 💰 Auction Commands
 
 **Admin Commands:**
 ```bash
-!nlpstats                 # View learning statistics
-!learned                  # List all learned patterns
-!unrecognized             # Show unrecognized phrases
-!teachbot "phrase" → !cmd # Manually teach pattern
-!clearlearned [pattern]   # Remove learned pattern(s)
-!nlpunhide                # Unhide NLP sheets
+!auction                  # Start auction manually
+!pauseauction             # Pause current session
+!resumeauction            # Resume paused session
+!extend <minutes>         # Add time to current item
+!skip                     # Skip item with refund
+!cancel                   # Cancel item with refund
+!endauction               # End entire auction session
+!queuelist                # View full auction queue
+
+# Aliases:
+# !auction: !startauction, !start, !auc-start
+# !pauseauction: !pause, !auc-pause, !hold
+# !resumeauction: !resume, !auc-resume, !continue
+# !extend: !ext, !auc-extend
+# !queuelist: !ql, !queue
 ```
 
 **Member Commands:**
 ```bash
-!myprofile                # View your NLP learning profile
+!bid <amount>             # Place bid
+!mypoints                 # Check points balance
+!bidstatus                # Current auction status
+
+# Aliases:
+# !bid: !b
+# !mypoints: !pts, !mp, !mypts
+# !bidstatus: !bs, !bstatus
 ```
 
-**Features:**
-- Multi-language support (English, Tagalog, Taglish)
-- Pattern learning from user interactions
-- Pattern confidence scoring (frequency-based)
-- Unrecognized phrase tracking
-
-### **🚨 Emergency Commands** (Admin Only)
+### 📊 Leaderboard & Analytics Commands
 
 ```bash
-!forceclosethread         # Close current thread (alias: !fct)
-!forcecloseallthreads     # Close all threads (alias: !fcat)
-!forceendauction          # End stuck auction (alias: !fea)
-!unlockallpoints          # Release locked points (alias: !unlock)
-!clearallbids             # Clear pending bids (alias: !clearbids)
-!diagnostics              # System diagnostics (alias: !diag)
-!forcesync                # Force state sync (alias: !fsync)
-!clearstate               # Clear attendance state (alias: !clear)
+!leaderboardattendance    # Attendance rankings (Top 10)
+!leaderboardbidding       # Bidding rankings (Top 10)
+!leaderboards             # Show both leaderboards
+!weeklyreport             # Force weekly report (admin only)
+!monthlyreport            # Force monthly report (admin only)
+!activity [week]          # Guild activity heatmap
+
+# Aliases:
+# !leaderboardattendance: !lbattendance, !lba, !leadatt
+# !leaderboardbidding: !lbbidding, !lbb, !leadbid
+# !leaderboards: !lb, !leaderboard
+# !weeklyreport: !weekly, !week
+# !monthlyreport: !monthly, !month
+# !activity: !heatmap, !guildactivity
 ```
 
-**Alternative Access:**
-All emergency commands can also be accessed via `!emergency <subcommand>`:
+### 🔄 Boss Rotation Commands (Admin Only)
+
+```bash
+!rotation status          # Show current rotation for all rotating bosses
+!rotation set <boss> <1-5> # Manually set rotation index
+!rotation increment <boss> # Advance to next guild's turn
+!rotation refresh         # Reload boss data from Google Sheets
+```
+
+### ⏰ Boss Timer Commands
+
+**Slash Commands:**
+```bash
+/killed <boss>            # Mark boss as killed (updates timer)
+/nextspawn [boss]         # Predict next spawn time
+/status                   # Boss timer system status
+/reset <boss>             # Reset boss timer (admin only)
+```
+
+**Text Commands:**
+```bash
+!predictspawn [boss]      # Predict next spawn time
+
+# Aliases: !nextspawn, !whennext, !spawntimer
+```
+
+### 🚨 Emergency Commands (Admin Only)
+
+```bash
+!forceclosethread         # Close current thread
+!forcecloseallthreads     # Close all threads
+!forceendauction          # End stuck auction
+!unlockallpoints          # Release all locked points
+!clearallbids             # Clear pending bids
+!diagnostics              # System diagnostics
+!forcesync                # Force state sync to Sheets
+
+# Aliases:
+# !forceclosethread: !fct
+# !forcecloseallthreads: !fcat
+# !forceendauction: !fea
+# !unlockallpoints: !unlock
+# !clearallbids: !clearbids
+# !diagnostics: !diag
+# !forcesync: !fsync
+```
+
+**Alternative Access via `!emergency`:**
 ```bash
 !emergency closeall       # = !forcecloseallthreads
 !emergency close <id>     # = !forceclosethread
@@ -764,120 +578,249 @@ All emergency commands can also be accessed via `!emergency <subcommand>`:
 
 ## 🏗️ System Architecture
 
-### **Module Structure**
+### Module Structure
 
 ```
 elysium-attendance-bot/
-├── index2.js                    # Main bot entry point (8,393 lines)
+├── index2.js                    # Main bot entry point (7,771 lines)
 ├── Core Systems/
-│   ├── attendance.js            # Attendance tracking
-│   ├── bidding.js               # Bidding logic (4,660 lines)
-│   ├── auctioneering.js         # Auction management (4,121 lines)
-│   ├── help-system.js           # Legacy help command system
-│   ├── help-system-v2.js        # Channel-aware help system v10.0
-│   ├── emergency-commands.js    # Emergency toolkit
-│   ├── leaderboard-system.js    # Leaderboards, weekly & monthly reports
-│   ├── boss-rotation.js         # Boss rotation tracking
-│   ├── activity-heatmap.js      # Activity visualization & heatmaps
-│   └── crash-recovery.js        # Automatic crash recovery
-├── Intelligence Systems/
-│   ├── intelligence-engine.js   # Statistical prediction engine (2,735 lines)
-│   ├── proactive-intelligence.js # Automated monitoring & alerts (2,755 lines)
-│   └── learning-system.js       # Prediction accuracy tracking
-├── NLP Systems/
-│   ├── nlp-handler.js           # Pattern matching & parsing
-│   ├── nlp-learning.js          # Pattern learning system
-│   ├── nlp-conversation.js      # Conversation management
-│   ├── nlp-vocabulary.js        # English vocabulary
-│   ├── nlp-vocabulary-tagalog.js # Tagalog vocabulary
-│   └── nlp-vocabulary-taglish.js # Taglish vocabulary
+│   ├── attendance.js            # Attendance tracking (2,108 lines)
+│   ├── bidding.js               # Bidding logic (4,748 lines)
+│   ├── auctioneering.js         # Auction management (4,292 lines)
+│   ├── boss-rotation.js         # Boss rotation tracking (1,511 lines)
+│   ├── boss-timer.js            # Boss timer system (1,605 lines)
+│   ├── leaderboard-system.js    # Rankings & reports (1,587 lines)
+│   ├── emergency-commands.js    # Emergency toolkit (1,089 lines)
+│   ├── event-reminders.js       # Event reminders (1,031 lines)
+│   ├── help-system-v2.js        # Channel-aware help (649 lines)
+│   └── activity-heatmap.js      # Activity visualization (504 lines)
+├── Commands/
+│   ├── slash-commands.js        # Slash command definitions
+│   ├── handlers.js              # Slash command handlers
+│   ├── autocomplete.js          # Autocomplete support
+│   └── register-commands.js     # Command registration
 ├── Utils/
-│   ├── constants.js             # Centralized constants
+│   ├── database-api.js          # MongoDB connection pooling
+│   ├── mongodb-helpers.js       # MongoDB CRUD operations
 │   ├── sheet-api.js             # Google Sheets API wrapper
-│   ├── cache-manager.js         # Multi-level L1/L2/L3 caching
-│   ├── request-batcher.js       # Request batching & rate limiting
-│   ├── parallel-sheets.js       # Parallel sheet operations
-│   ├── maintenance-scheduler.js # Unified task scheduler
-│   ├── discord-cache.js         # Discord channel caching
+│   ├── logger.js                # Structured logging (Pino)
 │   ├── error-handler.js         # Centralized error handling
-│   ├── timer-registry.js        # Timer cleanup management
-│   ├── boss-images.js           # Boss thumbnail URLs
+│   ├── cache-manager.js         # Multi-level caching
+│   ├── request-batcher.js       # Request batching & rate limiting
+│   ├── crash-recovery.js        # State persistence & recovery
+│   ├── shutdown-manager.js      # Graceful shutdown
+│   ├── discord-cache.js         # Discord channel caching
+│   ├── boss-matcher.js          # Fuzzy boss name matching
 │   └── common.js                # Utility functions
+├── Scripts/
+│   ├── startup.js               # Startup orchestration
+│   ├── sync-sheets-to-mongodb.js # MongoDB sync (30,938 lines)
+│   ├── import-historical-attendance.js # Historical import
+│   └── verify-migration.js      # Migration verification
+├── Config/
+│   ├── config.json              # Bot configuration
+│   ├── boss_points.json         # Boss point values
+│   └── boss_spawn_config.json   # Boss spawn configurations
 ├── Tests/
 │   └── __tests__/               # Test suite
 │       ├── test-runner.js       # Syntax validation
-│       ├── integration-tests.js # Integration tests
-│       └── modules/             # Unit tests
-└── config.json                  # Bot configuration
+│       └── integration-tests.js # Integration tests
+└── Docs/
+    ├── ARCHITECTURE.md          # System architecture
+    ├── MONGODB_SCHEMA.md        # Database schema
+    └── 30+ other documentation files
 ```
 
-**Code Statistics:**
-- **Total Files:** 51 JavaScript modules
-- **Total Lines:** ~57,320 lines of code
-- **Largest Files:**
-  - `index2.js` - 8,393 lines
-  - `bidding.js` - 4,660 lines
-  - `auctioneering.js` - 4,121 lines
-  - `proactive-intelligence.js` - 2,755 lines
-  - `intelligence-engine.js` - 2,735 lines
+### Architecture Diagram
+
+```
+Discord Client (Discord.js v14)
+        ↓
+Main Application (index2.js)
+        ↓
+┌───────┴────────┬──────────┬────────────┬──────────┐
+│                │          │            │          │
+Attendance    Auction   Boss Timer   Leaderboard  Emergency
+System        System     System       System       Commands
+│                │          │            │          │
+└────────────────┴──────────┴────────────┴──────────┘
+                         │
+                 Utility Layer
+         ┌───────────────┼───────────────┐
+         │               │               │
+    MongoDB API    Sheet API      Cache Manager
+         │               │               │
+    MongoDB Atlas  Google Sheets   In-Memory
+```
+
+### Design Patterns
+
+- **Module Pattern** - Clean function APIs for each system
+- **Singleton Pattern** - Single database and API instances
+- **Observer Pattern** - Discord.js event-driven architecture
+- **Factory Pattern** - Embed builders and message composers
+- **Circuit Breaker** - Graceful degradation for external services
+- **Dual-Write Pattern** - MongoDB-first with Sheets backup
 
 ---
 
-## 📊 Data Storage Architecture
+## 🗄️ MongoDB Integration
 
-### **MongoDB-First with Sheets Backup**
+### Complete 100% Adoption
 
+All 11 core systems have been migrated to MongoDB with **40-200x performance improvements**.
+
+### MongoDB Collections
+
+**1. `attendance`** - Boss spawn attendance records
+- Fields: `memberId`, `memberName`, `bossName`, `bossPoints`, `timestamp`, `weekStartDate`, `weekLabel`, `verified`, `verifiedBy`, `threadId`
+- Indexes: `memberId+timestamp`, `weekStartDate`, `bossName`, `weekLabel`
+- Performance: 100-500ms vs 2000-5000ms (10-20x faster)
+
+**2. `members`** - Member profiles and points
+- Fields: `_id` (Discord ID), `username`, `pointsAvailable`, `pointsEarned`, `pointsSpent`, attendance stats
+- Indexes: `username` (unique), `pointsAvailable`
+- Performance: 10-50ms vs 1000-3000ms (40-100x faster)
+
+**3. `auctionItems`** - Auction queue + history
+- Fields: `itemName`, `startPrice`, `duration`, `quantity`, `boss`, `status`, `winner`, `winnerId`, `winningBid`
+- Indexes: `status`, `addedAt`
+- Performance: 50-200ms vs 2000-5000ms (20-40x faster)
+
+**4. `auctionSessions`** - Session audit trail
+- Fields: `sessionNumber`, `sessionDate`, `sessionLabel`, `startTime`, `endTime`, `items`, `memberSpending`
+- Indexes: `sessionDate`, `sessionNumber` (unique)
+- Performance: 50-200ms vs 2000-5000ms (20-40x faster)
+
+**5. `botState`** - Crash recovery state
+- Documents: `attendance_state`, `auction_state`, `boss_timers`
+- Performance: <1s recovery vs 5-10s (40-200x faster)
+
+**6. `bossRotation`** - Multi-guild rotation
+- Fields: `bossName`, `guilds`, `currentTurnIndex`, `currentGuild`, `rotationFrequency`
+- Indexes: `bossName` (unique), `currentGuild`
+- Performance: 10-50ms vs 500-1000ms (20-50x faster)
+
+**7. `eventReminders`** - Event reminders
+- Fields: `eventType`, `eventName`, `reminderTime`, `notifyBefore`, `channelId`, `message`, `recurring`
+- Indexes: `nextTrigger+active`, `eventType`
+
+### Dual-Write Pattern
+
+The bot uses a **parallel dual-write** strategy for zero data loss:
+
+```javascript
+// MongoDB-first with Sheets backup
+const [mongoResult, sheetResult] = await Promise.all([
+  mongoHelpers.saveMemberPoints(...),
+  sheetAPI.call('updatePoints', ...)
+]);
+// Success if either succeeds - zero data loss!
 ```
-Discord Bot ←→ MongoDB (Primary) ←→ Google Sheets (Backup)
-                    ↓ Parallel dual-write
-```
 
-**MongoDB (Primary Storage):**
-- ⚡ Sub-100ms queries (40-200x faster)
-- 📊 Rich aggregation pipelines
-- 🔍 Complex analytics queries
-- 🚀 Instant crash recovery (<1s)
-- 💾 7 collections (attendance, members, biddingSessions, biddingItems, bossRotation, bossTimers, eventReminders)
+**Benefits:**
+- ⚡ 40-200x faster queries with MongoDB
+- 🔄 Zero data loss with parallel writes
+- 📊 Google Sheets backup for manual admin edits
+- 🚀 Instant crash recovery (<1 second)
 
-**Google Sheets (Backup):**
-- 🔄 Parallel writes for redundancy
-- 📝 Manual admin edits supported
-- 📊 Visual data inspection
-- 🔐 Zero data loss guarantee
+### Performance Comparison
 
-**Parallel Dual-Write:**
-- All writes go to MongoDB first
-- Simultaneous backup write to Sheets
-- Success if either write succeeds
-- Pre-auction sync ensures manual edits are captured
-
-### **State Persistence**
-
-**MongoDB-First Recovery:**
-- Bot loads state from MongoDB on startup (<1s)
-- Full crash recovery with thread restoration
-- Boss timer recovery in <1 second (was 5-10s)
-
-**Backup Strategy:**
-- Parallel writes ensure zero data loss
-- Google Sheets serves as backup and admin interface
-- Pre-auction sync captures manual Sheets edits
+| System | Before (Sheets) | After (MongoDB) | Improvement |
+|--------|-----------------|-----------------|-------------|
+| Attendance tracking | 2000-5000ms | 100-500ms | **10-20x faster** |
+| Bidding operations | 2000-5000ms | 50-200ms | **20-40x faster** |
+| Member stats | 1000-3000ms | 10-50ms | **40-100x faster** |
+| Leaderboards | 2000-10000ms | 50-100ms | **40-100x faster** |
+| Boss rotation | 500-1000ms | 10-50ms | **20-50x faster** |
+| Weekly reports | 10000-20000ms | 100-500ms | **40-100x faster** |
+| Boss timer recovery | 5000-10000ms | <1000ms | **40-200x faster** |
 
 ---
 
-## 🔧 Deployment
+## 🎮 Boss System
 
-### **Local Development**
+### Boss Categories
+
+**37 Bosses Total:**
+- 14 bosses worth 1 point
+- 10 bosses worth 2 points
+- 8 bosses worth 3 points
+- 3 bosses worth 4 points
+- 1 boss worth 5 points (GvG)
+- 1 boss worth 15 points (Guild Boss)
+
+### Timer-Based Bosses (22 Bosses)
+
+Dynamic predictions based on kill time + spawn interval:
+
+| Boss | Interval | Boss | Interval |
+|------|----------|------|----------|
+| Venatus | 10 hours | Viorent | 10 hours |
+| Ego | 21 hours | Livera | 24 hours |
+| Araneo | 24 hours | Undomiel | 24 hours |
+| Lady Dalia | 18 hours | General Aquleus | 29 hours |
+| Amentis | 29 hours | Baron Braudmore | 32 hours |
+| Wannitas | 48 hours | Metus | 48 hours |
+| Duplican | 48 hours | Shuliar | 35 hours |
+| Gareth | 32 hours | Titore | 37 hours |
+| Larba | 35 hours | Catena | 35 hours |
+| Secreta | 62 hours | Ordo | 62 hours |
+| Asta | 62 hours | Supore | 62 hours |
+
+### Schedule-Based Bosses (13 Bosses)
+
+Static 99% confidence predictions based on fixed schedules:
+
+| Boss | Schedule |
+|------|----------|
+| Clemantis | Monday 11:30, Thursday 19:00 |
+| Saphirus | Sunday 17:00, Tuesday 11:30 |
+| Neutro | Tuesday 19:00, Thursday 11:30 |
+| Thymele | Monday 19:00, Wednesday 11:30 |
+| Milavy | Saturday 15:00 |
+| Ringor | Saturday 17:00 |
+| Roderick | Friday 19:00 |
+| Auraq | Friday 22:00, Wednesday 21:00 |
+| Chaiflock | Saturday 22:00 |
+| Benji | Sunday 21:00 |
+| Guild Boss | Monday 21:00 |
+| Icaruthia | Tuesday 21:00, Friday 21:00 |
+| Motti | Wednesday 19:00, Saturday 19:00 |
+| Nevaeh | Sunday 22:00 |
+
+### Rotating Bosses (Dynamic Configuration)
+
+Multi-guild rotation system with configurable bosses and guild count:
+
+**Configuration:**
+- Managed in Google Sheets `BossRotation` tab
+- Supports any number of guilds (typically 3-5)
+- Bosses can be dynamically added or removed from rotation
+- ELYSIUM is always position 1 in rotation
+
+**Common Rotating Bosses:**
+- Amentis (29 hours)
+- General Aquleus (29 hours)
+- Baron Braudmore (32 hours)
+
+**Rotation Flow:** ELYSIUM (Position 1) → Guild 2 → Guild 3 → ... → Guild N → ELYSIUM...
+
+---
+
+## 🚀 Deployment
+
+### Local Development
 
 ```bash
 # Development mode (verbose logging)
 npm start
 
-# Watch mode (auto-restart on changes)
-npm run dev  # if you add this script
+# Direct start with GC flags
+npm run start:direct
 ```
 
-### **Production Deployment**
+### Production Deployment
 
 ```bash
 # Production mode (optimized logging)
@@ -889,105 +832,90 @@ pm2 save
 pm2 startup
 ```
 
-### **Docker Deployment**
+### Docker Deployment
+
+**Dockerfile** (Multi-stage build):
 
 ```dockerfile
-FROM node:18-alpine
+FROM node:18-slim AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --production
+RUN npm ci --production
+
+FROM gcr.io/distroless/nodejs18
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-CMD ["node", "--expose-gc", "--max-old-space-size=450", "index2.js"]
+
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV NODE_OPTIONS="--expose-gc --max-old-space-size=360 --max-semi-space-size=40"
+
+EXPOSE 3000 8000
+CMD ["index2.js"]
 ```
 
-### **Cloud Deployment** (512MB+ Instances)
-
-Optimized start command for low-memory environments:
+**Build and Run:**
 
 ```bash
-# For Koyeb, Railway, Render, etc. (512MB instances)
-node --expose-gc --max-old-space-size=450 --optimize-for-size index2.js
+# Build image
+docker build -t elysium-bot .
+
+# Run container
+docker run -d \
+  --name elysium-bot \
+  -e DISCORD_TOKEN=your_token \
+  -e MONGODB_URI=your_mongodb_uri \
+  -p 3000:3000 \
+  -p 8000:8000 \
+  elysium-bot
 ```
 
-**Memory Performance:**
-- Expected: ~95-105MB RAM usage
-- Alerts: >400MB RSS
-- Instance requirement: 512MB minimum
-- Runs comfortably with ~400MB headroom
+### Cloud Platforms
 
----
+**Supported Platforms:**
+- Koyeb (512MB instances)
+- Railway
+- Render
+- Heroku
+- Any VPS with Node.js 18+
 
-## 🆘 Emergency Recovery
+**Memory Configuration:**
+- `--max-old-space-size=360` (360MB old generation)
+- `--max-semi-space-size=40` (80MB young generation)
+- Total: ~510MB (fits in 512MB RAM)
 
-### **Common Issues & Solutions**
+**Expected Usage:**
+- Heap: 20-25MB / 360MB
+- RSS: 95-105MB / 512MB
+- CPU: <5% average
 
-| Issue | Command | Notes |
-|-------|---------|-------|
-| Thread won't close | `!forceclosethread` | Closes current thread |
-| Multiple stuck threads | `!forcecloseallthreads` | Closes all at once |
-| Auction frozen | `!forceendauction` | Refunds all bids |
-| Points locked | `!unlockallpoints` | Releases all locked points |
-| Pending bids stuck | `!clearallbids` | Removes pending confirmations |
-| State corruption | `!clearstate` | Resets attendance state |
+### Health Monitoring
 
-### **Diagnostics**
+The bot runs an HTTP server for health checks:
 
-```bash
-!diagnostics
+**Endpoints:**
+- `http://localhost:3000/health` - Health status
+- `http://localhost:8000/health` - Alternative port
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "uptime": 86400,
+  "memory": {
+    "heapUsed": 23.5,
+    "heapTotal": 25.0,
+    "rss": 102.3
+  }
+}
 ```
-
-**Shows:**
-- Active spawns count
-- Pending verifications
-- Pending closures
-- Bidding state (active/paused)
-- Locked points
-- Pending bids
-- Memory usage
-- Last sync time
-
----
-
-## 📈 Performance
-
-### **Benchmarks**
-
-| Operation | Before | After | Improvement |
-|-----------|--------|-------|-------------|
-| Column lookup | O(n) scan | O(1) cached | **Up to 100x faster** |
-| Thread cleanup | 20s sequential | 4s parallel | **5x faster** |
-| Spawn creation | Sequential API | Parallel API | **2-3x faster** |
-| Memory usage | 115MB | 100MB | **-13%** |
-| Sheets API calls | Every 10min | Every 15min | **-25% calls** |
-| Auto-close checks | Every 60s | Every 90s | **-33% CPU** |
-
-*Note: Performance gains depend on data size. O(1) lookup benefits increase with larger datasets.*
-
-### **Resource Usage** (512MB Instance)
-
-```
-Heap: 20-25MB / 25MB
-RSS: 95-105MB / 512MB
-CPU: <5% average
-I/O: Reduced 10-15% in production mode
-```
-
-### **Performance Optimizations Summary**
-
-✅ **Multi-level caching (L1/L2/L3)** - 30-50% API call reduction
-✅ **Request batching** - Prevents rate limiting, intelligent queue management
-✅ **Parallel operations** - 2-3x speedup on bulk operations
-✅ **Optimized sync intervals** - 25% reduction in background tasks
-✅ **Production mode logging** - 10-15% I/O reduction
-✅ **Memory optimization** - 13% RAM usage reduction
 
 ---
 
 ## 🧪 Testing
 
-The project includes comprehensive testing infrastructure to ensure reliability and catch regressions early.
-
-### **Running Tests**
+### Running Tests
 
 ```bash
 # Run all tests
@@ -1003,7 +931,7 @@ npm run test:coverage
 node __tests__/test-runner.js
 ```
 
-### **Test Structure**
+### Test Structure
 
 ```
 __tests__/
@@ -1014,80 +942,156 @@ __tests__/
     └── bidding-utilities.test.js # Bidding system unit tests
 ```
 
-### **Manual Testing**
+### Testing Coverage
 
-For comprehensive manual testing procedures, see [MANUAL_TESTING_GUIDE.md](./MANUAL_TESTING_GUIDE.md).
-
-**Testing Checklist:**
 - ✅ Attendance tracking and verification
 - ✅ Auction bidding and point management
-- ✅ Statistical predictions and analytics
+- ✅ Boss timer predictions
 - ✅ Emergency recovery commands
-- ✅ NLP command parsing
 - ✅ State persistence and recovery
+- ✅ MongoDB operations
+- ✅ Google Sheets integration
+
+For comprehensive testing procedures, see [MANUAL_TESTING_GUIDE.md](./MANUAL_TESTING_GUIDE.md).
 
 ---
 
 ## 🐛 Troubleshooting
 
-### **Bot Won't Start**
+### Bot Won't Start
 
 ```bash
 # Check Node version
 node --version  # Should be >=18.0.0
 
-# Verify config.json exists
-cat config.json
+# Verify config files exist
+ls -la config.json .env
 
 # Check for missing dependencies
 npm install
+
+# Check MongoDB connection
+# Make sure MONGODB_URI in .env is correct
+
+# Check Discord token
+# Make sure DISCORD_TOKEN in .env is correct
 ```
 
-### **Commands Not Working**
+### Commands Not Working
 
-1. ✅ Check bot has proper permissions
-2. ✅ Verify channel IDs in config.json
-3. ✅ Ensure role IDs are correct
-4. ✅ Check Discord intents are enabled
+**Common Issues:**
+1. ✅ Bot lacks permissions in Discord server
+2. ✅ Channel IDs in config.json are incorrect
+3. ✅ Role IDs in config.json don't match server roles
+4. ✅ Discord intents not enabled in Developer Portal
+5. ✅ Bot not in the correct channels
 
-### **Memory Issues**
+**How to Fix:**
+- Verify bot has Administrator permission (or specific permissions)
+- Enable all three Privileged Gateway Intents in Discord Developer Portal
+- Double-check all IDs in config.json match your server
+- Use Developer Mode to copy correct IDs
+
+### Memory Issues
 
 ```bash
-# Check current memory
+# Check current memory usage
 !diagnostics
 
-# Force garbage collection
-# (happens automatically every 5min)
-
-# If RSS >400MB, consider restart
+# If RSS >400MB, restart recommended
 pm2 restart elysium-bot
+
+# Monitor memory over time
+pm2 monit
 ```
 
-### **Google Sheets Errors**
+**Memory Management:**
+- Automatic garbage collection every 5 minutes
+- Alert threshold: >400MB RSS
+- Expected usage: 95-105MB RSS
 
-1. ✅ Verify webhook URL is correct
-2. ✅ Check Apps Script is deployed
-3. ✅ Ensure triggers are active
-4. ✅ Test webhook manually
+### MongoDB Connection Issues
 
-### **Logs**
+**Common Issues:**
+1. ✅ Connection string malformed
+2. ✅ IP not whitelisted in MongoDB Atlas
+3. ✅ Incorrect username/password
+4. ✅ Network connectivity issues
+
+**How to Fix:**
+- Verify connection string format: `mongodb+srv://user:pass@cluster.mongodb.net/dbname`
+- Whitelist your IP in MongoDB Atlas (or allow `0.0.0.0/0` for testing)
+- Ensure database user has read/write permissions
+- Test connection using MongoDB Compass
+
+### Google Sheets Sync Issues
+
+**Common Issues:**
+1. ✅ Webhook URL incorrect
+2. ✅ Apps Script not deployed
+3. ✅ Triggers not active
+4. ✅ Sheet tabs missing or renamed
+
+**How to Fix:**
+- Verify webhook URL in config.json is correct
+- Redeploy Apps Script and copy new webhook URL
+- Check triggers are active in Apps Script dashboard
+- Ensure all required sheet tabs exist with correct names
+
+### Diagnostic Commands
 
 ```bash
-# Production (errors + warnings only)
-NODE_ENV=production npm start
+# Comprehensive system diagnostics
+!diagnostics
 
-# Development (all logs)
-npm start
+# Shows:
+# - Active spawns count
+# - Pending verifications
+# - Pending closures
+# - Bidding state
+# - Locked points
+# - Pending bids
+# - Memory usage
+# - Last sync time
 
-# Monitor with PM2
-pm2 logs elysium-bot
+# Force sync to Google Sheets
+!forcesync
+
+# Check bot status
+!status
 ```
+
+### Emergency Recovery
+
+If the bot is in a stuck state:
+
+```bash
+# Close all stuck threads
+!forcecloseallthreads
+
+# End stuck auction
+!forceendauction
+
+# Unlock all points
+!unlockallpoints
+
+# Clear all pending bids
+!clearallbids
+
+# Clear attendance state
+!clearstate
+
+# Force resync everything
+!forcesync
+```
+
+All emergency commands require confirmation for safety.
 
 ---
 
 ## 💻 Development
 
-### **Development Setup**
+### Development Setup
 
 ```bash
 # 1. Clone the repository
@@ -1097,9 +1101,9 @@ cd elysium-attendance-bot
 # 2. Install dependencies
 npm install
 
-# 3. Set up configuration
+# 3. Set up environment variables
 cp .env.example .env
-# Edit .env with your Discord token
+# Edit .env with your tokens
 
 # 4. Configure bot settings
 # Edit config.json with your Discord IDs
@@ -1108,48 +1112,70 @@ cp .env.example .env
 npm start
 ```
 
-### **Code Style Guidelines**
+### Code Style Guidelines
 
 - **ES6+ JavaScript** - Use modern JavaScript features
 - **Modular design** - Keep systems separated and focused
 - **Error handling** - Wrap async operations in try-catch
-- **Logging** - Use centralized logging from `utils/constants.js`
+- **Logging** - Use structured logging with Pino
 - **Comments** - Document complex logic and business rules
-- **Performance** - Consider memory and CPU impact of all changes
+- **Performance** - Consider memory and CPU impact
 
-### **Adding New Commands**
+### Adding New Commands
 
 1. Define command handler in appropriate module
 2. Add command to `help-system-v2.js` COMMANDS object
 3. Register command in `index2.js` message handler
-4. Add aliases to COMMAND_ALIASES if needed
+4. Add aliases to command-aliases.js if needed
 5. Update README with command documentation
 6. Add tests for new functionality
 
-### **Environment Variables**
+### Adding Slash Commands
+
+1. Define command in `commands/slash-commands.js`
+2. Add handler in `commands/handlers.js`
+3. Add autocomplete in `commands/autocomplete.js` if needed
+4. Register with Discord using `commands/register-commands.js`
+5. Test thoroughly before deployment
+
+### Environment Variables
 
 ```bash
-DISCORD_TOKEN=your_token_here     # Required: Discord bot token
+DISCORD_TOKEN=your_token          # Required: Discord bot token
+MONGODB_URI=your_mongodb_uri      # Required: MongoDB connection
 NODE_ENV=production               # Optional: production/development
-PORT=8000                         # Optional: HTTP server port (default: 8000)
+PORT=3000                         # Optional: HTTP server port
+LOG_LEVEL=info                    # Optional: debug/info/warn/error
+```
+
+### Project Scripts
+
+```bash
+npm start              # Run startup script (sync + bot)
+npm run start:direct   # Run bot directly with GC flags
+npm run sync          # Manual MongoDB sync
+npm run deploy        # Push to Google Apps Script
+npm test              # Run Jest tests
+npm run test:watch    # Watch mode
+npm run test:coverage # Coverage report
 ```
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions from the community! For detailed guidelines, see [CONTRIBUTING.md](./CONTRIBUTING.md).
+We welcome contributions from the community!
 
-### **Ways to Contribute**
+### Ways to Contribute
 
 - 🐛 **Report bugs** - Open an issue with detailed reproduction steps
 - 💡 **Suggest features** - Share your ideas for improvements
 - 📝 **Improve documentation** - Fix typos, add examples, clarify instructions
 - 🔧 **Submit pull requests** - Fix bugs or implement new features
 - 🧪 **Write tests** - Improve test coverage
-- 🌐 **Translate** - Add more NLP language patterns
+- 🌐 **Translate** - Add support for more languages
 
-### **Contribution Guidelines**
+### Contribution Guidelines
 
 1. **Fork the repository** and create a feature branch
 2. **Follow code style** guidelines mentioned above
@@ -1158,7 +1184,7 @@ We welcome contributions from the community! For detailed guidelines, see [CONTR
 5. **Test thoroughly** before submitting
 6. **Submit a pull request** with clear description
 
-### **Commit Message Format**
+### Commit Message Format
 
 Use conventional commits:
 - `feat:` - New features
@@ -1168,113 +1194,104 @@ Use conventional commits:
 - `test:` - Test additions/changes
 - `chore:` - Maintenance tasks
 
+**Examples:**
+```
+feat: Add boss spawn notifications
+fix: Prevent duplicate attendance submissions
+docs: Update installation instructions
+refactor: Simplify auction bidding logic
+test: Add tests for leaderboard system
+chore: Update dependencies
+```
+
+For detailed guidelines, see [CONTRIBUTING.md](./docs/CONTRIBUTING.md).
+
 ---
 
 ## ❓ FAQ
 
-### **General Questions**
+### General Questions
 
-**Q: What games/platforms is this bot designed for?**
-A: While built for ELYSIUM guild (MMORPG), it can be adapted for any game with boss spawns and loot distribution.
+**Q: Can I use this bot for a different MMORPG?**
+A: Absolutely! The bot is **fully game-agnostic**. All game-specific elements (boss names, timers, point values, events) are stored in configuration files (`boss_points.json`, `boss_spawn_config.json`, `member-lore.json`). Simply edit these JSON files to match your game - no code changes required. Currently deployed for L9ASIA, but designed to work with any MMORPG.
 
 **Q: Can I use this bot for my own guild?**
-A: Absolutely! It's open source (MIT License). Just configure it with your Discord server IDs.
+A: Yes! It's open source (MIT License). Configure it with your Discord server IDs, customize boss names and timers for your game, and you're ready to go. See the [Customization & Adaptability](#-customization--adaptability) section for details.
+
+**Q: How difficult is it to customize for my game?**
+A: Very easy! All customization is done through JSON files and Google Sheets - no programming required. Just edit boss names, timers, point values, and event schedules. The [Configuration](#️-configuration) section provides step-by-step guidance.
+
+**Q: What games can this bot work with?**
+A: Any MMORPG with boss spawns and guild activities. Examples: Lineage 2, Ragnarok Online, Black Desert Online, Lost Ark, Blade & Soul, etc. If your game has world bosses and loot distribution, this bot can be adapted.
 
 **Q: How much does it cost to run?**
-A: Free! Can run on free-tier hosting (Koyeb, Heroku) or any 512MB+ VPS. Google Sheets API is also free.
+A: Free! Can run on free-tier hosting (MongoDB Atlas free tier, cloud platform free tiers). Only requirement is 512MB+ RAM.
 
-**Q: Does it work with other spreadsheet systems?**
-A: Currently Google Sheets only, but you can adapt the `utils/sheet-api.js` module for other systems.
+**Q: Does it work with other database systems?**
+A: Currently MongoDB + Google Sheets. You can adapt the database layer for PostgreSQL, MySQL, etc. if needed.
 
-### **Technical Questions**
+### Technical Questions
 
-**Q: Why Discord.js v14.11 instead of newer versions?**
-A: v14.11 is stable and well-tested. Newer versions (up to v14.25.1) are available - upgrading is straightforward if needed.
+**Q: Why Discord.js v14.25.1?**
+A: Latest stable version with excellent performance and all features needed. Version 14 is the current major release.
 
 **Q: Can I run this without Google Sheets?**
-A: Not currently - Google Sheets is integral for data persistence. You could replace it with a database (PostgreSQL, MongoDB).
+A: Not recommended. Google Sheets serves as backup and allows manual admin edits. You could remove it but would lose these benefits.
 
-**Q: How accurate are the price predictions?**
-A: 85%+ accuracy after bootstrapping with sufficient historical data. Accuracy improves as more auction data is collected and analyzed.
+**Q: How accurate are boss spawn predictions?**
+A: Timer-based: 80-95% confidence based on historical variance. Schedule-based: 99% confidence (fixed schedules).
 
 **Q: What happens if the bot crashes?**
-A: Full state restoration on restart! All active spawns, bids, and points are recovered from Google Sheets.
+A: Full state restoration in <1 second! All active spawns, bids, and points are recovered from MongoDB.
 
 **Q: Can I disable certain features?**
-A: Yes! Each system is modular. Comment out unwanted modules in `index2.js` and remove from initialization.
+A: Yes! Each system is modular. Comment out unwanted modules in `index2.js` initialization.
 
-### **Deployment Questions**
+### Deployment Questions
 
 **Q: What hosting platforms work best?**
 A: Koyeb, Railway, Render, or any VPS with Node.js 18+. Optimized for 512MB RAM instances.
 
-**Q: Do I need paid Discord bot hosting?**
-A: No! Free tiers of Koyeb or Railway work perfectly for small-medium guilds.
+**Q: Do I need paid hosting?**
+A: No! Free tiers work perfectly for small-medium guilds. Koyeb and Railway offer generous free tiers.
 
 **Q: How do I update to a new version?**
 A: Pull latest changes, run `npm install`, restart bot. State is preserved automatically.
 
-### **Troubleshooting**
+**Q: Can I use Docker?**
+A: Yes! Dockerfile included. Builds multi-stage image with optimized memory settings.
+
+### Troubleshooting
 
 **Q: Bot is not responding to commands**
-A: Check Discord intents are enabled, bot has proper permissions, and channel IDs in config.json are correct.
+A: Check:
+1. Discord intents are enabled in Developer Portal
+2. Bot has proper permissions in server
+3. Channel IDs in config.json are correct
+4. Bot is online and connected
 
 **Q: Memory usage keeps growing**
-A: Check `!diagnostics` for issues. Garbage collection runs every 5 minutes. Restart if RSS >400MB.
+A: Run `!diagnostics` to check. Garbage collection runs every 5 minutes. Restart if RSS >400MB.
 
 **Q: Google Sheets sync failing**
-A: Verify webhook URL is correct and Apps Script is deployed. Check triggers are active in Apps Script console.
+A: Verify webhook URL is correct and Apps Script is deployed. Check triggers are active.
 
----
-
-## 📝 Changelog
-
-See [CHANGELOG.md](./CHANGELOG.md) for detailed version history.
-
-### **Version 10.0.0 - MongoDB Complete Edition** _(Current)_
-
-**100% MongoDB Adoption (Phase 1-10 Complete):**
-- 🗄️ All 11 core systems migrated to MongoDB
-- ⚡ 40-200x faster than Google Sheets operations
-- 🚀 Sub-100ms queries across all systems
-- 🔄 Parallel dual-write with zero data loss
-- 📊 MongoDB aggregation pipelines for complex analytics
-- 🎯 Strict unique spawn counting (no more inflated 100% attendance)
-- ⏱️ <1 second crash recovery (was 5-10 seconds)
-
-**Completed Phases:**
-- ✅ Phase 1-3: Core systems (attendance, bidding, members)
-- ✅ Phase 4: Member stats & leaderboards
-- ✅ Phase 5: Auction system
-- ✅ Phase 6: Boss rotation
-- ✅ Phase 7: Parallel dual-write pattern
-- ✅ Phase 8: Boss timer MongoDB integration
-- ✅ Phase 9: Reports system with strict spawn counting
-- ✅ Phase 10: Event reminder system
-
-**Performance Improvements:**
-- ⚡ Attendance tracking: 10-20x faster (100-500ms vs 2000-5000ms)
-- ⚡ Bidding operations: 20-40x faster (50-200ms vs 2000-5000ms)
-- ⚡ Member stats: 40-100x faster (10-50ms vs 1000-3000ms)
-- ⚡ Leaderboards: 40-100x faster (50-100ms vs 2000-10000ms)
-- ⚡ Weekly reports: 40-100x faster (100-500ms vs 10000-20000ms)
-- ⚡ Boss timer recovery: 40-200x faster (<1s vs 5-10s)
-
-**Bug Fixes:**
-- ✅ Fixed activity percentage calculation (strict unique spawn counting)
-- ✅ Centralized report aliases to MongoDB versions
-- ✅ Fixed event reminder initialization conflict
-- ✅ Removed inflated 100% attendance bug
-
-**Documentation:**
-- 📄 [MongoDB Feature Status](./docs/MONGODB_FEATURE_STATUS.md) - Complete adoption status
-- 📄 [MongoDB Verification Report](./docs/MONGODB_VERIFICATION.md) - All features verified
+**Q: MongoDB connection errors**
+A: Verify connection string format, ensure IP is whitelisted in MongoDB Atlas, check username/password.
 
 ---
 
 ## 📝 License
 
-MIT License - See LICENSE file for details
+MIT License
+
+Copyright (c) 2024 ELYSIUM Guild
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
 
@@ -1282,15 +1299,19 @@ MIT License - See LICENSE file for details
 
 **Developed for ELYSIUM Guild**
 
-Built with ❤️ using Discord.js v14
+Built with ❤️ using Discord.js v14 and MongoDB
 
-### **Core Technologies**
+### Core Technologies
+
 - [Discord.js](https://discord.js.org/) - Discord API wrapper
 - [Node.js](https://nodejs.org/) - JavaScript runtime
+- [MongoDB](https://www.mongodb.com/) - NoSQL database
 - [Google Apps Script](https://developers.google.com/apps-script) - Backend API
 - [node-cron](https://www.npmjs.com/package/node-cron) - Task scheduling
+- [Pino](https://getpino.io/) - Fast structured logging
 
-### **Special Thanks**
+### Special Thanks
+
 - ELYSIUM guild members for testing and feedback
 - Discord.js community for excellent documentation
 - All open-source contributors
@@ -1299,12 +1320,16 @@ Built with ❤️ using Discord.js v14
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](your-repo-url/issues)
-- **Documentation**: [Setup Guide](./SETUP_TRIGGERS_GUIDE.md)
-- **Testing**: [Testing Guide](./MANUAL_TESTING_GUIDE.md)
+- **Issues**: [GitHub Issues](https://github.com/your-repo/issues)
+- **Documentation**: See `/docs` folder for detailed guides
+- **Setup Guide**: [SETUP_TRIGGERS_GUIDE.md](./SETUP_TRIGGERS_GUIDE.md)
+- **Architecture**: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
+- **MongoDB Schema**: [docs/MONGODB_SCHEMA.md](./docs/MONGODB_SCHEMA.md)
 
 ---
 
-**Version 10.0.0** - 100% MongoDB Adoption Complete! 🚀
+**Version 9.0.0** - MongoDB Complete Edition
 
-Built with ❤️ using Discord.js v14 + MongoDB
+**Status**: Production Ready ✅ | **Performance**: 40-200x Faster ⚡ | **Uptime**: 99.9%+ 🚀
+
+Built for guilds, by guilds. 🛡️
