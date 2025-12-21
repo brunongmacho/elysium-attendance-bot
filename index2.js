@@ -1368,22 +1368,31 @@ function buildStatsEmbed(stats, member, countdown = 300) {
 
   // 🎭 ADD MEMBER LORE IF AVAILABLE
   // CRITICAL FIX: Case-insensitive lookup for lore
+  console.log(`🎭 [LORE DEBUG] Looking up lore for member: "${memberName}"`);
   const loreKey = Object.keys(memberLore).find(
     key => key.toLowerCase() === memberName.toLowerCase() && !key.startsWith('_')
   );
+  console.log(`🎭 [LORE DEBUG] Found loreKey: ${loreKey || 'NOT FOUND'}`);
+
   // Fall back to future member template if no specific lore found
   const lore = loreKey ? memberLore[loreKey] : memberLore['_FUTURE_MEMBER_TEMPLATE'];
   const isTemplateLore = !loreKey && memberLore['_FUTURE_MEMBER_TEMPLATE'];
+  console.log(`🎭 [LORE DEBUG] Using ${isTemplateLore ? 'TEMPLATE' : 'SPECIFIC'} lore: ${lore ? 'YES' : 'NO'}`);
 
   if (lore) {
     const skillsList = lore.skills ? lore.skills.join(', ') : 'None';
     // Personalize the template title for the member
     const displayTitle = isTemplateLore ? `${memberName}'s Destiny Awaits` : lore.title;
+    const loreValue = `${lore.lore}\n\n**Specialty:** ${lore.specialty}\n**Reputation:** ${lore.reputation}\n**Stats:** ${lore.stats}\n**Skills:** ${skillsList}`;
+    console.log(`🎭 [LORE DEBUG] Adding lore field (${loreValue.length} chars) with title: "${displayTitle}"`);
     embed.addFields({
       name: `✨ ${displayTitle}`,
-      value: `${lore.lore}\n\n**Specialty:** ${lore.specialty}\n**Reputation:** ${lore.reputation}\n**Stats:** ${lore.stats}\n**Skills:** ${skillsList}`,
+      value: loreValue,
       inline: false
     });
+    console.log(`🎭 [LORE DEBUG] Lore field added successfully`);
+  } else {
+    console.log(`🎭 [LORE DEBUG] ⚠️  No lore found - field NOT added`);
   }
 
   // Footer with favorite boss and percentile
