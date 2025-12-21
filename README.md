@@ -15,6 +15,7 @@
 
 - [Overview](#-overview)
 - [Key Features](#-key-features)
+- [Customization & Adaptability](#-customization--adaptability)
 - [Quick Start](#-quick-start)
 - [Installation](#-installation)
 - [Configuration](#️-configuration)
@@ -36,8 +37,13 @@
 
 **ELYSIUM Guild Bot** is a comprehensive, production-grade Discord bot specifically designed for MMORPG guild management. Built with Discord.js v14 and powered by MongoDB, it provides a complete solution for managing guild activities, tracking attendance, distributing loot through auctions, monitoring boss spawns, and generating detailed analytics.
 
+### 🌟 Fully Adaptable to Any MMORPG
+
+This bot is **game-agnostic** and can be easily configured for any MMORPG with boss spawns and guild activities. All game-specific elements (boss names, timers, point values, events) are stored in configuration files and can be customized without touching the code. Currently deployed for an L9ASIA guild, but designed to work with any game.
+
 ### What Makes This Bot Special?
 
+- **🎮 Fully Customizable** - Adapts to any MMORPG, guild structure, or alliance configuration
 - **🗄️ MongoDB-Powered** - 40-200x faster than Google Sheets with 100% adoption across all systems
 - **⚡ Lightning Performance** - Sub-100ms queries, <1s crash recovery, instant bidding
 - **🎯 Smart Attendance** - Screenshot verification, auto-close, anti-cheat mechanisms
@@ -186,6 +192,25 @@ MongoDB-powered event notification system with recurring support.
 - ⏰ **Recurring reminders** for regular events
 - ⏰ **MongoDB storage** for persistence
 
+### 👥 Member Lore & Profiles
+
+Customizable member profile system for building guild community and identity.
+
+**Features:**
+- 📝 **Custom member profiles** - Store member bios, backstories, and character lore
+- 🎭 **Guild identity building** - Personalized profiles for each guild member
+- 🏆 **Achievement tracking** - Record member milestones and accomplishments
+- 🎮 **Role-playing support** - Perfect for RP-focused guilds
+- ⚙️ **Easy customization** - Configured via `member-lore.json` file
+- 💾 **Persistent storage** - Member information preserved across bot restarts
+
+**Use Cases:**
+- Character backstories and lore
+- Member achievements and history
+- Fun facts and nicknames
+- Guild ranks and titles
+- Custom member attributes
+
 ### 🚨 Emergency Recovery System
 
 Complete toolkit for stuck states and troubleshooting.
@@ -199,6 +224,47 @@ Complete toolkit for stuck states and troubleshooting.
 - 🚨 **Force sync to Google Sheets**
 - 🚨 **Confirmation prompts** (30s timeout) for safety
 - 🚨 **Admin-only access**
+
+---
+
+## 🔧 Customization & Adaptability
+
+### Designed for Any MMORPG
+
+This bot is built with **flexibility at its core**. Every game-specific element is externalized into configuration files, making it easy to adapt to different MMORPGs, servers, and guild structures without modifying code.
+
+### What Can Be Customized?
+
+**Game-Specific Elements:**
+- 🎮 **Boss names and aliases** - Configure all boss names in `boss_points.json`
+- ⏱️ **Boss timers and schedules** - Set spawn intervals in `boss_spawn_config.json`
+- 🏆 **Point values** - Define your own reward structure per boss difficulty
+- 📅 **Event schedules** - Customize GvG, Guild Boss, Arena times for your server
+- 🌍 **Timezone** - Adapt to any server timezone (GMT+8, UTC, etc.)
+
+**Guild-Specific Configuration:**
+- 👥 **Member profiles** - Customize member lore in `member-lore.json`
+- 🔄 **Rotation system** - Configure any number of guilds in your alliance
+- 💰 **Auction rules** - Set auction timing, cooldowns, and preview duration
+- 📊 **Point system** - Design your own attendance reward structure
+- 🎯 **Roles and permissions** - Map to your Discord server's role structure
+
+**Discord Server Configuration:**
+- 📢 **Channel IDs** - Configure for your server's channels
+- 👑 **Admin roles** - Define which roles have admin access
+- 🎨 **Guild branding** - Customize embeds and messages
+- ⏰ **Auto-archive settings** - Control thread behavior
+
+### Configuration Files
+
+All customization is done through these files:
+- `config.json` - Main bot configuration (channels, roles, timezone)
+- `boss_points.json` - Boss names, points, and aliases
+- `boss_spawn_config.json` - Timer-based and schedule-based boss configurations
+- `member-lore.json` - Member profiles and custom attributes
+- Google Sheets tabs - Dynamic rotation, auction queue, attendance tracking
+
+**No code changes required!** Simply edit JSON files and Google Sheets to adapt the bot to your game and guild.
 
 ---
 
@@ -1146,17 +1212,23 @@ For detailed guidelines, see [CONTRIBUTING.md](./docs/CONTRIBUTING.md).
 
 ### General Questions
 
-**Q: What games/platforms is this bot designed for?**
-A: Built for ELYSIUM guild (MMORPG), but can be adapted for any game with boss spawns and loot distribution.
+**Q: Can I use this bot for a different MMORPG?**
+A: Absolutely! The bot is **fully game-agnostic**. All game-specific elements (boss names, timers, point values, events) are stored in configuration files (`boss_points.json`, `boss_spawn_config.json`, `member-lore.json`). Simply edit these JSON files to match your game - no code changes required. Currently deployed for L9ASIA, but designed to work with any MMORPG.
 
 **Q: Can I use this bot for my own guild?**
-A: Absolutely! It's open source. Configure it with your Discord server IDs and customize as needed.
+A: Yes! It's open source (MIT License). Configure it with your Discord server IDs, customize boss names and timers for your game, and you're ready to go. See the [Customization & Adaptability](#-customization--adaptability) section for details.
+
+**Q: How difficult is it to customize for my game?**
+A: Very easy! All customization is done through JSON files and Google Sheets - no programming required. Just edit boss names, timers, point values, and event schedules. The [Configuration](#️-configuration) section provides step-by-step guidance.
+
+**Q: What games can this bot work with?**
+A: Any MMORPG with boss spawns and guild activities. Examples: Lineage 2, Ragnarok Online, Black Desert Online, Lost Ark, Blade & Soul, etc. If your game has world bosses and loot distribution, this bot can be adapted.
 
 **Q: How much does it cost to run?**
 A: Free! Can run on free-tier hosting (MongoDB Atlas free tier, cloud platform free tiers). Only requirement is 512MB+ RAM.
 
 **Q: Does it work with other database systems?**
-A: Currently MongoDB + Google Sheets. You can adapt the database layer for PostgreSQL, MySQL, etc.
+A: Currently MongoDB + Google Sheets. You can adapt the database layer for PostgreSQL, MySQL, etc. if needed.
 
 ### Technical Questions
 
