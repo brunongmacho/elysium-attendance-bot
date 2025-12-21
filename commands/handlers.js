@@ -1294,11 +1294,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
             console.error('Failed to load boss spawn config:', configError);
           }
 
-          const embed = new EmbedBuilder()
-            .setColor(0x4a90e8)
-            .setTitle('🔄 Boss Rotation Status')
-            .setDescription('Track which guild\'s turn it is for rotating bosses')
-            .setTimestamp();
+          // Collect all boss data with spawn times for sorting
+          const bossData = [];
 
           for (const boss of rotatingBosses) {
             const rotation = allRotations[boss];
@@ -1309,8 +1306,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
               // Get spawn time - try boss timer first, then attendance records
               let spawnInfo = '';
               let elysiumTurnInfo = '';
+              let nextSpawnDate = null;
               try {
-                let nextSpawnDate = null;
                 let spawnSource = '';
 
                 // Try getting from boss timer first
@@ -1387,12 +1384,38 @@ async function handleSlashCommand(interaction, modules, config, client) {
               // Show warning if guilds data is incomplete
               const dataWarning = !hasGuilds ? '\n⚠️ Guild list incomplete in sheet' : '';
 
-              embed.addFields({
-                name: `${emoji} ${boss}`,
-                value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**\nNext: ${nextGuild}${spawnInfo}${elysiumTurnInfo}${dataWarning}`,
-                inline: false
+              bossData.push({
+                boss,
+                emoji,
+                status,
+                rotation,
+                spawnInfo,
+                elysiumTurnInfo,
+                nextGuild,
+                guildCount,
+                dataWarning,
+                nextSpawnDate,
+                sortKey: nextSpawnDate ? nextSpawnDate.getTime() : Number.MAX_SAFE_INTEGER
               });
             }
+          }
+
+          // Sort by next predicted spawn time (earliest first, bosses without spawn times at the end)
+          bossData.sort((a, b) => a.sortKey - b.sortKey);
+
+          const embed = new EmbedBuilder()
+            .setColor(0x4a90e8)
+            .setTitle('🔄 Boss Rotation Status')
+            .setDescription('Track which guild\'s turn it is for rotating bosses\n*(Sorted by next predicted spawn)*')
+            .setTimestamp();
+
+          // Add sorted boss fields to embed
+          for (const data of bossData) {
+            embed.addFields({
+              name: `${data.emoji} ${data.boss}`,
+              value: `Guild ${data.rotation.currentIndex}/${data.guildCount} - **${data.status}**\nNext: ${data.nextGuild}${data.spawnInfo}${data.elysiumTurnInfo}${data.dataWarning}`,
+              inline: false
+            });
           }
 
           await interaction.editReply({ embeds: [embed] });
