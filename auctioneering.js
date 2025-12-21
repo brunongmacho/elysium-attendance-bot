@@ -52,7 +52,7 @@
  * ✓ Pause/resume functionality for admin control
  * ✓ Skip/cancel individual items
  * ✓ Force-submit results for error recovery
- * ✓ Scheduled weekly auctions (Every Saturday 12:00 PM GMT+8)
+ * ✓ Scheduled weekly auctions (Every Sunday 12:00 PM GMT+8)
  * ✓ Comprehensive error handling and logging
  *
  * ───────────────────────────────────────────────────────────────────────────
@@ -3657,7 +3657,7 @@ async function handleMoveToDistribution(message, config, client) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Timer reference for weekly Saturday auction scheduler.
+ * Timer reference for weekly Sunday auction scheduler.
  * Prevents duplicate schedulers from being created.
  * @type {NodeJS.Timeout|null}
  */
@@ -3904,19 +3904,19 @@ function scheduleSession2AfterCompletion(client, config) {
 }
 
 /**
- * Schedules automatic weekly auctions every Saturday at 12:00 PM GMT+8 (Manila Time).
+ * Schedules automatic weekly auctions every Sunday at 12:00 PM GMT+8 (Manila Time).
  *
  * FEATURES:
- * - Calculates next Saturday at 12:00 PM in GMT+8 timezone
+ * - Calculates next Sunday at 12:00 PM in GMT+8 timezone
  * - Automatically schedules next week's auction after completion
  * - Logs countdown until next auction
  * - Handles auction-already-running case
  *
  * PROCESS:
- * 1. Calculates time until next Saturday 12:00 PM GMT+8
+ * 1. Calculates time until next Sunday 12:00 PM GMT+8
  * 2. Sets timeout for that duration
  * 3. On trigger: starts auction if not already running
- * 4. Reschedules for next Saturday
+ * 4. Reschedules for next Sunday
  *
  * ERROR HANDLING:
  * - Skips if auction already active
@@ -3926,16 +3926,16 @@ function scheduleSession2AfterCompletion(client, config) {
  * @param {Discord.Client} client - Discord bot client
  * @param {Object} config - Bot configuration
  */
-function scheduleWeeklySaturdayAuction(client, config) {
+function scheduleWeeklySundayAuction(client, config) {
   // Prevent duplicate schedulers
   if (weeklyAuctionTimer) {
     console.log(`${EMOJI.WARNING} Weekly auction scheduler already running, skipping initialization`);
     return;
   }
 
-  console.log(`${EMOJI.CLOCK} Initializing weekly Saturday auction scheduler...`);
+  console.log(`${EMOJI.CLOCK} Initializing weekly Sunday auction scheduler...`);
 
-  const calculateNextSaturday12PM = () => {
+  const calculateNextSunday12PM = () => {
     const now = new Date();
 
     // GMT+8 offset in milliseconds
@@ -3951,25 +3951,24 @@ function scheduleWeeklySaturdayAuction(client, config) {
     // Get current day of week (0 = Sunday, 6 = Saturday)
     const currentDay = targetGMT8.getUTCDay();
 
-    // Calculate days until next Saturday
-    let daysUntilSaturday;
-    if (currentDay === 6) {
-      // Today is Saturday
+    // Calculate days until next Sunday
+    let daysUntilSunday;
+    if (currentDay === 0) {
+      // Today is Sunday
       if (targetGMT8.getTime() > nowGMT8.getTime()) {
         // Haven't reached 12:00 PM yet today
-        daysUntilSaturday = 0;
+        daysUntilSunday = 0;
       } else {
-        // Already past 12:00 PM, schedule for next Saturday
-        daysUntilSaturday = 7;
+        // Already past 12:00 PM, schedule for next Sunday
+        daysUntilSunday = 7;
       }
     } else {
-      // Not Saturday, calculate days until next Saturday
-      daysUntilSaturday = (6 - currentDay + 7) % 7;
-      if (daysUntilSaturday === 0) daysUntilSaturday = 7;
+      // Not Sunday, calculate days until next Sunday
+      daysUntilSunday = 7 - currentDay;
     }
 
     // Add days to target date
-    targetGMT8.setUTCDate(targetGMT8.getUTCDate() + daysUntilSaturday);
+    targetGMT8.setUTCDate(targetGMT8.getUTCDate() + daysUntilSunday);
 
     // Convert back to UTC for the actual timer
     const targetUTC = new Date(targetGMT8.getTime() - GMT8_OFFSET);
@@ -3978,7 +3977,7 @@ function scheduleWeeklySaturdayAuction(client, config) {
   };
 
   const scheduleNext = () => {
-    const nextUTC = calculateNextSaturday12PM();
+    const nextUTC = calculateNextSunday12PM();
     const now = new Date();
     const delay = nextUTC.getTime() - now.getTime();
 
@@ -3992,7 +3991,7 @@ function scheduleWeeklySaturdayAuction(client, config) {
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const dayName = dayNames[displayTime.getUTCDay()];
 
-    console.log(`${EMOJI.CLOCK} Next Saturday auction scheduled for: ${dayName}, ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${days}d ${hours}h ${minutes}m)`);
+    console.log(`${EMOJI.CLOCK} Next Sunday auction scheduled for: ${dayName}, ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${days}d ${hours}h ${minutes}m)`);
 
     // Schedule announcement 15 minutes before auction
     const ANNOUNCEMENT_LEAD_TIME = 15 * 60 * 1000; // 15 minutes
@@ -4031,7 +4030,7 @@ function scheduleWeeklySaturdayAuction(client, config) {
     }
 
     weeklyAuctionTimer = setTimeout(async () => {
-      console.log(`${EMOJI.AUCTION} Saturday auction time! Starting auction...`);
+      console.log(`${EMOJI.AUCTION} Sunday auction time! Starting auction...`);
 
       try {
         // Check if auction is already running
@@ -4052,7 +4051,7 @@ function scheduleWeeklySaturdayAuction(client, config) {
 
         // Start Session 1 of the auction
         await startAuctioneering(client, config, biddingChannel);
-        console.log(`${EMOJI.SUCCESS} Scheduled Saturday auction Session 1 started successfully`);
+        console.log(`${EMOJI.SUCCESS} Scheduled Sunday auction Session 1 started successfully`);
 
         // Schedule Session 2 to start after Session 1 completes
         // This monitors when Session 1 ends and schedules Session 2 after rest period
@@ -4067,7 +4066,7 @@ function scheduleWeeklySaturdayAuction(client, config) {
           if (adminLogs) {
             await adminLogs.send(
               `${EMOJI.ERROR} **Scheduled Auction Failed**\n` +
-              `Failed to start Saturday auction at 12:00 PM GMT+8.\n` +
+              `Failed to start Sunday auction at 12:00 PM GMT+8.\n` +
               `**Error:** ${err.message}\n\n` +
               `Please check bot logs and try running \`!startauction\` manually.`
             );
@@ -4077,22 +4076,22 @@ function scheduleWeeklySaturdayAuction(client, config) {
         }
       }
 
-      // Schedule next Saturday's auction
+      // Schedule next Sunday's auction
       scheduleNext();
     }, delay);
   };
 
   scheduleNext();
-  console.log(`${EMOJI.SUCCESS} Weekly Saturday auction scheduler initialized (12:00 PM GMT+8)`);
+  console.log(`${EMOJI.SUCCESS} Weekly Sunday auction scheduler initialized (12:00 PM GMT+8)`);
 }
 
 /**
- * Schedule pre-auction sync (Sheets → MongoDB) 1 hour before Saturday auction
+ * Schedule pre-auction sync (Sheets → MongoDB) 1 hour before Sunday auction
  * Ensures all manual Google Sheets edits to bidding points are synced to MongoDB
  * before the auction starts and loads points from MongoDB.
  *
  * TIMING:
- * - Runs every Saturday at 11:00 AM GMT+8 (1 hour before 12:00 PM auction)
+ * - Runs every Sunday at 11:00 AM GMT+8 (1 hour before 12:00 PM auction)
  * - Syncs: BiddingPoints (Google Sheets → MongoDB)
  * - Also syncs: Boss Rotation (for good measure)
  *
@@ -4115,7 +4114,7 @@ function schedulePreAuctionSync(sheetAPI, bossRotation) {
 
   console.log(`${EMOJI.CLOCK} Initializing pre-auction sync scheduler (1 hour before auction)...`);
 
-  const calculateNextSaturday11AM = () => {
+  const calculateNextSunday11AM = () => {
     const now = new Date();
     const GMT8_OFFSET = 8 * 60 * 60 * 1000;
     const nowGMT8 = new Date(now.getTime() + GMT8_OFFSET);
@@ -4125,26 +4124,25 @@ function schedulePreAuctionSync(sheetAPI, bossRotation) {
     targetGMT8.setUTCHours(11, 0, 0, 0);
 
     const currentDay = targetGMT8.getUTCDay();
-    let daysUntilSaturday;
+    let daysUntilSunday;
 
-    if (currentDay === 6) {
-      // Today is Saturday
+    if (currentDay === 0) {
+      // Today is Sunday
       if (targetGMT8.getTime() > nowGMT8.getTime()) {
-        daysUntilSaturday = 0;
+        daysUntilSunday = 0;
       } else {
-        daysUntilSaturday = 7;
+        daysUntilSunday = 7;
       }
     } else {
-      daysUntilSaturday = (6 - currentDay + 7) % 7;
-      if (daysUntilSaturday === 0) daysUntilSaturday = 7;
+      daysUntilSunday = 7 - currentDay;
     }
 
-    targetGMT8.setUTCDate(targetGMT8.getUTCDate() + daysUntilSaturday);
+    targetGMT8.setUTCDate(targetGMT8.getUTCDate() + daysUntilSunday);
     return new Date(targetGMT8.getTime() - GMT8_OFFSET);
   };
 
   const scheduleNext = () => {
-    const nextUTC = calculateNextSaturday11AM();
+    const nextUTC = calculateNextSunday11AM();
     const now = new Date();
     const delay = nextUTC.getTime() - now.getTime();
 
@@ -4224,7 +4222,7 @@ function schedulePreAuctionSync(sheetAPI, bossRotation) {
   };
 
   scheduleNext();
-  console.log(`${EMOJI.SUCCESS} Pre-auction sync scheduler initialized (11:00 AM GMT+8 every Saturday)`);
+  console.log(`${EMOJI.SUCCESS} Pre-auction sync scheduler initialized (11:00 AM GMT+8 every Sunday)`);
 }
 
 /**
@@ -4287,7 +4285,7 @@ module.exports = {
   handleSkipItem,
   handleForceSubmitResults,
   handleMoveToDistribution,
-  scheduleWeeklySaturdayAuction, // Weekly Saturday 12:00 PM GMT+8 auction scheduler
+  scheduleWeeklySundayAuction, // Weekly Sunday 12:00 PM GMT+8 auction scheduler
   schedulePreAuctionSync, // Pre-auction sync (Sheets → MongoDB) 1 hour before auction
   resetSessionState, // Reset sessionFinalized flag and clear Session 2 timers
   // getCurrentSessionBoss: () => currentSessionBoss - REMOVED: Not used anywhere
