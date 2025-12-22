@@ -114,7 +114,7 @@ async function handleKilled(message, args, config) {
         .setDescription(`**${bossName}** killed at <t:${killTimestamp}:t>`)
         .addFields({
           name: '📌 Next Scheduled Spawn',
-          value: `<t:${timestamp}:F> - ${bossTimer.formatCountdown(timestamp)}`,
+          value: `<t:${timestamp}:F> - <t:${timestamp}:R>`,
           inline: false
         })
         .addFields({
@@ -153,7 +153,7 @@ async function handleKilled(message, args, config) {
       .setDescription(`**${result.bossName}** killed at <t:${killTimestamp}:t>`)
       .addFields({
         name: '⏰ Next Spawn',
-        value: `<t:${timestamp}:F> - ${bossTimer.formatCountdown(timestamp)}`,
+        value: `<t:${timestamp}:F> - <t:${timestamp}:R>`,
         inline: false
       });
 
@@ -200,7 +200,7 @@ async function handleNextSpawn(message) {
       return message.reply('📋 No bosses spawning in the next 24 hours.');
     }
 
-    // Build embed
+    // Build embed with Discord's native relative timestamps
     const embed = new EmbedBuilder()
       .setColor(0x5865f2)
       .setTitle('🕒 Boss Spawns in Next 24 Hours')
@@ -211,7 +211,7 @@ async function handleNextSpawn(message) {
 
     for (const boss of upcoming) {
       const timestamp = Math.floor(boss.nextSpawn.getTime() / 1000);
-      const bossLabel = boss.type === 'schedule' ? `${boss.bossName} (Scheduled)` : boss.bossName;
+      const bossLabel = boss.type === 'schedule' ? `${boss.bossName} (SCHEDULED)` : boss.bossName;
 
       // Check if tomorrow
       const spawnDate = boss.nextSpawn.toDateString();
@@ -224,14 +224,16 @@ async function handleNextSpawn(message) {
       }
 
       description += `\n**${bossLabel.toUpperCase()}**\n`;
-      description += `${timePrefix}<t:${timestamp}:t> - ${bossTimer.formatCountdown(timestamp)}\n`;
+      description += `${timePrefix}<t:${timestamp}:t> - <t:${timestamp}:R>\n`;
     }
 
     embed.setDescription(description);
     embed.setFooter({ text: `Total: ${upcoming.length} boss${upcoming.length > 1 ? 'es' : ''}` });
     embed.setTimestamp();
 
+    // Send message
     await message.reply({ embeds: [embed] });
+
   } catch (error) {
     console.error('Error in !nextspawn command:', error);
     return message.reply(`❌ Error: ${error.message}`);
@@ -304,7 +306,7 @@ async function handleMaintenance(message) {
       const timestamp = Math.floor(firstSpawn.nextSpawn.getTime() / 1000);
       embed.addFields({
         name: '⏰ Next Scheduled Boss',
-        value: `**${firstSpawn.bossName}** at <t:${timestamp}:F> - ${bossTimer.formatCountdown(timestamp)}`,
+        value: `**${firstSpawn.bossName}** at <t:${timestamp}:F> - <t:${timestamp}:R>`,
         inline: false
       });
     }
@@ -566,7 +568,7 @@ async function handleSetBoss(message, args, config) {
   if (bossType === 'schedule') {
     const nextSpawn = bossTimer.getNextScheduledSpawn(bossName);
     const timestamp = Math.floor(nextSpawn.getTime() / 1000);
-    return message.reply(`⚠️ **${bossName}** is a scheduled boss with fixed spawn times.\nNext spawn: <t:${timestamp}:F> - ${bossTimer.formatCountdown(timestamp)}\n\nUse \`!setboss\` only for timer-based bosses.`);
+    return message.reply(`⚠️ **${bossName}** is a scheduled boss with fixed spawn times.\nNext spawn: <t:${timestamp}:F> - <t:${timestamp}:R>\n\nUse \`!setboss\` only for timer-based bosses.`);
   }
 
   try {
@@ -590,7 +592,7 @@ async function handleSetBoss(message, args, config) {
       .setDescription(`**${bossName}** spawn time set directly`)
       .addFields({
         name: '🎯 Spawn Time',
-        value: `<t:${timestamp}:F>\n${bossTimer.formatCountdown(timestamp)}`,
+        value: `<t:${timestamp}:F>\n<t:${timestamp}:R>`,
         inline: true
       })
       .addFields({

@@ -148,6 +148,14 @@ Venatus (10h), Viorent (10h), Ego (21h), Livera (24h), Araneo (24h), Undomiel (2
 **Schedule-Based Bosses (14):**
 Clemantis, Saphirus, Neutro, Thymele, Milavy, Ringor, Roderick, Auraq, Chaiflock, Benji, Guild Boss, Icaruthia, Motti, Nevaeh
 
+**⚡ Discord Native Real-Time Countdowns:**
+All boss spawn predictions and command timers use Discord's native relative timestamp feature for automatic client-side updates:
+- 🕐 **Live boss spawn countdowns** - Updates automatically ("in 5 hours" → "in 4 hours 59 minutes")
+- 🕐 **Auto-delete timers** - Real-time countdown until message removal
+- 🕐 **Timezone-aware** - Shows relative time based on each user's timezone
+- 🕐 **Zero server load** - No bot updates needed, Discord handles it
+- 🕐 **Commands affected:** `/nextspawn`, `/killed`, `/status`, `/stats`, `!stats`, `!mypoints`, `!setboss`
+
 ### 📊 Leaderboard & Reports System
 
 Automated rankings and comprehensive guild analytics.

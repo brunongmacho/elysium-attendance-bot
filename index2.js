@@ -1304,7 +1304,7 @@ function findBestMemberMatch(searchName, guild) {
  * @param {GuildMember} member - Discord guild member
  * @returns {EmbedBuilder} Formatted stats embed
  */
-function buildStatsEmbed(stats, member, countdown = 300) {
+function buildStatsEmbed(stats, member, deleteTimestamp = null) {
   const { memberName, attendance, bidding, rank, totalMembers } = stats;
 
   // Calculate percentile (handle null/0 rank)
@@ -1368,35 +1368,61 @@ function buildStatsEmbed(stats, member, countdown = 300) {
 
   // 🎭 ADD MEMBER LORE IF AVAILABLE
   // CRITICAL FIX: Case-insensitive lookup for lore
+  console.log(`🎭 [LORE DEBUG] Looking up lore for member: "${memberName}"`);
   const loreKey = Object.keys(memberLore).find(
     key => key.toLowerCase() === memberName.toLowerCase() && !key.startsWith('_')
   );
+  console.log(`🎭 [LORE DEBUG] Found loreKey: ${loreKey || 'NOT FOUND'}`);
+
   // Fall back to future member template if no specific lore found
   const lore = loreKey ? memberLore[loreKey] : memberLore['_FUTURE_MEMBER_TEMPLATE'];
   const isTemplateLore = !loreKey && memberLore['_FUTURE_MEMBER_TEMPLATE'];
+  console.log(`🎭 [LORE DEBUG] Using ${isTemplateLore ? 'TEMPLATE' : 'SPECIFIC'} lore: ${lore ? 'YES' : 'NO'}`);
 
   if (lore) {
     const skillsList = lore.skills ? lore.skills.join(', ') : 'None';
     // Personalize the template title for the member
     const displayTitle = isTemplateLore ? `${memberName}'s Destiny Awaits` : lore.title;
+
+    // Build main lore field (original backstory + stats)
+    const loreValue = `${lore.lore}\n\n**Specialty:** ${lore.specialty}\n**Reputation:** ${lore.reputation}\n**Stats:** ${lore.stats}\n**Skills:** ${skillsList}`;
+
+    console.log(`🎭 [LORE DEBUG] Adding lore field (${loreValue.length} chars) with title: "${displayTitle}"`);
+
     embed.addFields({
       name: `✨ ${displayTitle}`,
-      value: `${lore.lore}\n\n**Specialty:** ${lore.specialty}\n**Reputation:** ${lore.reputation}\n**Stats:** ${lore.stats}\n**Skills:** ${skillsList}`,
+      value: loreValue,
       inline: false
     });
+
+    // Add recent developments as a separate field (if available)
+    // This prevents exceeding Discord's 1024 char limit per field
+    if (lore.recent_developments) {
+      console.log(`🎭 [LORE DEBUG] Adding recent_developments field (${lore.recent_developments.length} chars)`);
+      embed.addFields({
+        name: `📜 Recent Developments`,
+        value: lore.recent_developments,
+        inline: false
+      });
+    }
+
+    console.log(`🎭 [LORE DEBUG] Lore fields added successfully`);
+  } else {
+    console.log(`🎭 [LORE DEBUG] ⚠️  No lore found - field NOT added`);
   }
 
   // Footer with favorite boss and percentile
   const percentileText = percentile > 0 ? `Top ${percentile}%` : 'New Member';
-  const countdownText = countdown > 0 ? ` • Auto-deletes in ${countdown}s` : '';
+  // Use Discord's native relative timestamp for auto-delete countdown
+  const deleteText = deleteTimestamp ? ` • Auto-deletes <t:${deleteTimestamp}:R>` : '';
 
   if (attendance.favoriteBoss) {
     embed.setFooter({
-      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText}${countdownText}`
+      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText}${deleteText}`
     });
   } else {
     embed.setFooter({
-      text: `${percentileText}${countdownText}`
+      text: `${percentileText}${deleteText}`
     });
   }
 
@@ -2344,11 +2370,26 @@ const commandHandlers = {
       }
     }
 
-    const embed = buildStatsEmbed(cached.data, targetMember, 300);
+    // Calculate delete timestamp (5 minutes from now)
+    const deleteTimestamp = Math.floor(Date.now() / 1000) + 300;
+    const embed = buildStatsEmbed(cached.data, targetMember, deleteTimestamp);
     const statsMsg = await message.reply({ embeds: [embed] });
 
-    // Start countdown deletion
-    startCountdownDeletion(message, statsMsg, cached.data, targetMember, buildStatsEmbed, 300);
+    // Delete user's command message immediately
+    try {
+      await errorHandler.safeDelete(message, 'message deletion');
+    } catch (e) {
+      console.warn(`⚠️ Could not delete user message: ${e.message}`);
+    }
+
+    // Auto-delete after 5 minutes
+    setTimeout(async () => {
+      try {
+        await errorHandler.safeDelete(statsMsg, 'message deletion');
+      } catch (e) {
+        console.warn(`⚠️ Could not delete stats message: ${e.message}`);
+      }
+    }, 300000); // 5 minutes
 
     return;
   }
@@ -2420,12 +2461,28 @@ const commandHandlers = {
       timestamp: Date.now()
     });
 
+    // Calculate delete timestamp (5 minutes from now)
+    const deleteTimestamp = Math.floor(Date.now() / 1000) + 300;
+
     // Build and send embed (now with proper targetMember for lore lookup)
-    const embed = buildStatsEmbed(result, targetMember, 300);
+    const embed = buildStatsEmbed(result, targetMember, deleteTimestamp);
     await loadingMsg.edit({ content: null, embeds: [embed] });
 
-    // Start countdown deletion
-    startCountdownDeletion(message, loadingMsg, result, targetMember, buildStatsEmbed, 300);
+    // Delete user's command message immediately
+    try {
+      await errorHandler.safeDelete(message, 'message deletion');
+    } catch (e) {
+      console.warn(`⚠️ Could not delete user message: ${e.message}`);
+    }
+
+    // Auto-delete after 5 minutes
+    setTimeout(async () => {
+      try {
+        await errorHandler.safeDelete(loadingMsg, 'message deletion');
+      } catch (e) {
+        console.warn(`⚠️ Could not delete stats message: ${e.message}`);
+      }
+    }, 300000); // 5 minutes
 
     console.log(`✅ Stats sent for ${actualMemberName} (searched: ${targetDisplayName})`);
 
