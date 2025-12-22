@@ -1383,14 +1383,30 @@ function buildStatsEmbed(stats, member, countdown = 300) {
     const skillsList = lore.skills ? lore.skills.join(', ') : 'None';
     // Personalize the template title for the member
     const displayTitle = isTemplateLore ? `${memberName}'s Destiny Awaits` : lore.title;
+
+    // Build main lore field (original backstory + stats)
     const loreValue = `${lore.lore}\n\n**Specialty:** ${lore.specialty}\n**Reputation:** ${lore.reputation}\n**Stats:** ${lore.stats}\n**Skills:** ${skillsList}`;
+
     console.log(`🎭 [LORE DEBUG] Adding lore field (${loreValue.length} chars) with title: "${displayTitle}"`);
+
     embed.addFields({
       name: `✨ ${displayTitle}`,
       value: loreValue,
       inline: false
     });
-    console.log(`🎭 [LORE DEBUG] Lore field added successfully`);
+
+    // Add recent developments as a separate field (if available)
+    // This prevents exceeding Discord's 1024 char limit per field
+    if (lore.recent_developments) {
+      console.log(`🎭 [LORE DEBUG] Adding recent_developments field (${lore.recent_developments.length} chars)`);
+      embed.addFields({
+        name: `📜 Recent Developments`,
+        value: lore.recent_developments,
+        inline: false
+      });
+    }
+
+    console.log(`🎭 [LORE DEBUG] Lore fields added successfully`);
   } else {
     console.log(`🎭 [LORE DEBUG] ⚠️  No lore found - field NOT added`);
   }

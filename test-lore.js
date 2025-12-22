@@ -53,9 +53,21 @@ try {
   checkMembers.forEach(name => {
     if (memberLore[name]) {
       const skills = memberLore[name].skills ? memberLore[name].skills.join(', ') : 'None';
-      const fullValue = `${memberLore[name].lore}\n\n**Specialty:** ${memberLore[name].specialty}\n**Reputation:** ${memberLore[name].reputation}\n**Stats:** ${memberLore[name].stats}\n**Skills:** ${skills}`;
-      const status = fullValue.length > 1024 ? '⚠️  EXCEEDS LIMIT!' : '✅';
-      console.log(`  ${status} ${name}: ${fullValue.length} chars`);
+
+      // Field 1: Main lore
+      const mainLore = `${memberLore[name].lore}\n\n**Specialty:** ${memberLore[name].specialty}\n**Reputation:** ${memberLore[name].reputation}\n**Stats:** ${memberLore[name].stats}\n**Skills:** ${skills}`;
+
+      // Field 2: Recent developments
+      const recentDev = memberLore[name].recent_developments || '';
+
+      const mainStatus = mainLore.length > 1024 ? '⚠️  EXCEEDS!' : '✅';
+      const devStatus = recentDev.length > 1024 ? '⚠️  EXCEEDS!' : '✅';
+
+      console.log(`  ${name}:`);
+      console.log(`    ${mainStatus} Main Lore: ${mainLore.length} chars`);
+      if (recentDev) {
+        console.log(`    ${devStatus} Recent Developments: ${recentDev.length} chars`);
+      }
     }
   });
 
