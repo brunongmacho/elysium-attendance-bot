@@ -1304,7 +1304,7 @@ function findBestMemberMatch(searchName, guild) {
  * @param {GuildMember} member - Discord guild member
  * @returns {EmbedBuilder} Formatted stats embed
  */
-function buildStatsEmbed(stats, member, countdown = 300) {
+function buildStatsEmbed(stats, member, deleteTimestamp = null) {
   const { memberName, attendance, bidding, rank, totalMembers } = stats;
 
   // Calculate percentile (handle null/0 rank)
@@ -1413,15 +1413,16 @@ function buildStatsEmbed(stats, member, countdown = 300) {
 
   // Footer with favorite boss and percentile
   const percentileText = percentile > 0 ? `Top ${percentile}%` : 'New Member';
-  const countdownText = countdown > 0 ? ` • Auto-deletes in ${countdown}s` : '';
+  // Use Discord's native relative timestamp for auto-delete countdown
+  const deleteText = deleteTimestamp ? ` • Auto-deletes <t:${deleteTimestamp}:R>` : '';
 
   if (attendance.favoriteBoss) {
     embed.setFooter({
-      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText}${countdownText}`
+      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText}${deleteText}`
     });
   } else {
     embed.setFooter({
-      text: `${percentileText}${countdownText}`
+      text: `${percentileText}${deleteText}`
     });
   }
 
@@ -2369,11 +2370,26 @@ const commandHandlers = {
       }
     }
 
-    const embed = buildStatsEmbed(cached.data, targetMember, 300);
+    // Calculate delete timestamp (5 minutes from now)
+    const deleteTimestamp = Math.floor(Date.now() / 1000) + 300;
+    const embed = buildStatsEmbed(cached.data, targetMember, deleteTimestamp);
     const statsMsg = await message.reply({ embeds: [embed] });
 
-    // Start countdown deletion
-    startCountdownDeletion(message, statsMsg, cached.data, targetMember, buildStatsEmbed, 300);
+    // Delete user's command message immediately
+    try {
+      await errorHandler.safeDelete(message, 'message deletion');
+    } catch (e) {
+      console.warn(`⚠️ Could not delete user message: ${e.message}`);
+    }
+
+    // Auto-delete after 5 minutes
+    setTimeout(async () => {
+      try {
+        await errorHandler.safeDelete(statsMsg, 'message deletion');
+      } catch (e) {
+        console.warn(`⚠️ Could not delete stats message: ${e.message}`);
+      }
+    }, 300000); // 5 minutes
 
     return;
   }
@@ -2445,12 +2461,28 @@ const commandHandlers = {
       timestamp: Date.now()
     });
 
+    // Calculate delete timestamp (5 minutes from now)
+    const deleteTimestamp = Math.floor(Date.now() / 1000) + 300;
+
     // Build and send embed (now with proper targetMember for lore lookup)
-    const embed = buildStatsEmbed(result, targetMember, 300);
+    const embed = buildStatsEmbed(result, targetMember, deleteTimestamp);
     await loadingMsg.edit({ content: null, embeds: [embed] });
 
-    // Start countdown deletion
-    startCountdownDeletion(message, loadingMsg, result, targetMember, buildStatsEmbed, 300);
+    // Delete user's command message immediately
+    try {
+      await errorHandler.safeDelete(message, 'message deletion');
+    } catch (e) {
+      console.warn(`⚠️ Could not delete user message: ${e.message}`);
+    }
+
+    // Auto-delete after 5 minutes
+    setTimeout(async () => {
+      try {
+        await errorHandler.safeDelete(loadingMsg, 'message deletion');
+      } catch (e) {
+        console.warn(`⚠️ Could not delete stats message: ${e.message}`);
+      }
+    }, 300000); // 5 minutes
 
     console.log(`✅ Stats sent for ${actualMemberName} (searched: ${targetDisplayName})`);
 
