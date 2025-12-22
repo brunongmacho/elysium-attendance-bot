@@ -1304,7 +1304,7 @@ function findBestMemberMatch(searchName, guild) {
  * @param {GuildMember} member - Discord guild member
  * @returns {EmbedBuilder} Formatted stats embed
  */
-function buildStatsEmbed(stats, member, deleteTimestamp = null) {
+function buildStatsEmbed(stats, member) {
   const { memberName, attendance, bidding, rank, totalMembers } = stats;
 
   // Calculate percentile (handle null/0 rank)
@@ -1413,16 +1413,14 @@ function buildStatsEmbed(stats, member, deleteTimestamp = null) {
 
   // Footer with favorite boss and percentile
   const percentileText = percentile > 0 ? `Top ${percentile}%` : 'New Member';
-  // Use Discord's native relative timestamp for auto-delete countdown
-  const deleteText = deleteTimestamp ? ` • Auto-deletes <t:${deleteTimestamp}:R>` : '';
 
   if (attendance.favoriteBoss) {
     embed.setFooter({
-      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText}${deleteText}`
+      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText}`
     });
   } else {
     embed.setFooter({
-      text: `${percentileText}${deleteText}`
+      text: `${percentileText}`
     });
   }
 
@@ -2370,9 +2368,7 @@ const commandHandlers = {
       }
     }
 
-    // Calculate delete timestamp (5 minutes from now)
-    const deleteTimestamp = Math.floor(Date.now() / 1000) + 300;
-    const embed = buildStatsEmbed(cached.data, targetMember, deleteTimestamp);
+    const embed = buildStatsEmbed(cached.data, targetMember);
     const statsMsg = await message.reply({ embeds: [embed] });
 
     // Delete user's command message immediately
@@ -2461,11 +2457,8 @@ const commandHandlers = {
       timestamp: Date.now()
     });
 
-    // Calculate delete timestamp (5 minutes from now)
-    const deleteTimestamp = Math.floor(Date.now() / 1000) + 300;
-
     // Build and send embed (now with proper targetMember for lore lookup)
-    const embed = buildStatsEmbed(result, targetMember, deleteTimestamp);
+    const embed = buildStatsEmbed(result, targetMember);
     await loadingMsg.edit({ content: null, embeds: [embed] });
 
     // Delete user's command message immediately
