@@ -2759,12 +2759,9 @@ async function handleMyPoints(message, biddingModule, config) {
       ],
     });
   } else {
-    // Calculate delete timestamp (30 seconds from now)
-    const deleteTimestamp = Math.floor(Date.now() / 1000) + 30;
-
     ptsMsg = await message.channel.send({
       embeds: [
-        buildMyPointsEmbed(u, userPts, deleteTimestamp)
+        buildMyPointsEmbed(u, userPts)
       ],
     });
   }
@@ -2789,15 +2786,12 @@ async function handleMyPoints(message, biddingModule, config) {
 }
 
 /**
- * Build the MyPoints embed with Discord native countdown
+ * Build the MyPoints embed
  * @param {string} username - User's display name
  * @param {number} points - User's available points
- * @param {number|null} deleteTimestamp - Unix timestamp when message will auto-delete (null for no countdown)
  * @returns {EmbedBuilder}
  */
-function buildMyPointsEmbed(username, points, deleteTimestamp = null) {
-  const countdownText = deleteTimestamp ? `Auto-deletes <t:${deleteTimestamp}:R>` : '';
-
+function buildMyPointsEmbed(username, points) {
   return new EmbedBuilder()
     .setColor(0x00ff00)
     .setTitle(`${EMOJI.BID} Your Points`)
@@ -2807,7 +2801,6 @@ function buildMyPointsEmbed(username, points, deleteTimestamp = null) {
       value: `${points} pts`,
       inline: true,
     })
-    .setFooter({ text: countdownText })
     .setTimestamp();
 }
 
