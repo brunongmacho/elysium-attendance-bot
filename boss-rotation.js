@@ -1038,8 +1038,10 @@ async function postDailyRotationSchedule() {
         // Include past spawns from today (may be waiting to be killed)
         if (spawnTime <= endOfDay) {
           // Also check if spawn is from today (not from previous days)
+          // IMPORTANT: Convert spawn time to Manila timezone before getting start of day
           const spawnDate = new Date(spawnTime);
-          const spawnDayStart = new Date(spawnDate);
+          const spawnDateManila = new Date(spawnDate.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+          const spawnDayStart = new Date(spawnDateManila);
           spawnDayStart.setHours(0, 0, 0, 0);
 
           if (spawnDayStart.getTime() === startOfDay.getTime()) {
