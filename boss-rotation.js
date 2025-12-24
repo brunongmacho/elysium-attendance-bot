@@ -1232,26 +1232,12 @@ async function postDailyRotationSchedule() {
       for (const { bossName, spawnTime, rotation, timerData, isPast } of bosses) {
         const spawnTimestamp = Math.floor(spawnTime.getTime() / 1000);
 
-        // Set confidence: use timer confidence, or default to 95% for timer-based, 75% for attendance-based
-        let confidence = 0;
-        if (timerData.confidence !== undefined) {
-          confidence = timerData.confidence;
-        } else if (timerData.source === 'attendance') {
-          confidence = 75;
-        } else {
-          confidence = 95; // Default for timer-based spawns without explicit confidence
-        }
-
         // Get guild count from rotation data
         const guildCount = (rotation.guilds && rotation.guilds.length > 0) ? rotation.guilds.length : 5;
 
-        // Mark if already spawned
-        const statusEmoji = isPast ? '🔴 SPAWNED' : '🟢';
-
         fieldValue += `**${bossName}**${isPast ? ' 🔴' : ''}\n`;
         fieldValue += `├ 🕐 <t:${spawnTimestamp}:t> (<t:${spawnTimestamp}:R>) ${isPast ? '**[LIVE NOW]**' : ''}\n`;
-        fieldValue += `├ 🎯 Guild ${rotation.currentIndex}/${guildCount} - **ELYSIUM**\n`;
-        fieldValue += `└ 📊 ${Math.round(confidence)}% confidence\n\n`;
+        fieldValue += `└ 🎯 Guild ${rotation.currentIndex}/${guildCount} - **ELYSIUM**\n\n`;
       }
 
       embed.addFields({
