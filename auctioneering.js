@@ -108,7 +108,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-const { EmbedBuilder } = require("discord.js");
+const { EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, ComponentType } = require("discord.js");
 const { Timeout } = require("timers");
 const errorHandler = require('./utils/error-handler');
 const { PointsCache } = require('./utils/points-cache');
@@ -2477,6 +2477,122 @@ function getAuctionState() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
+ * Creates pagination buttons for queue navigation.
+ * @param {number} currentPage - Current page number (0-indexed)
+ * @param {number} totalPages - Total number of pages
+ * @param {string} userId - User ID for button interaction filtering
+ * @returns {ActionRowBuilder} Button row with Previous/Next buttons
+ */
+function createPaginationButtons(currentPage, totalPages, userId) {
+  const prevButton = new ButtonBuilder()
+    .setCustomId(`queuelist_prev_${userId}_${Date.now()}`)
+    .setLabel('◀ Previous')
+    .setStyle(ButtonStyle.Primary)
+    .setDisabled(currentPage === 0);
+
+  const nextButton = new ButtonBuilder()
+    .setCustomId(`queuelist_next_${userId}_${Date.now()}`)
+    .setLabel('Next ▶')
+    .setStyle(ButtonStyle.Primary)
+    .setDisabled(currentPage >= totalPages - 1);
+
+  return new ActionRowBuilder().addComponents(prevButton, nextButton);
+}
+
+/**
+ * Builds an embed for a specific page of the queue.
+ * @param {Array} sheetItems - All items from the sheet
+ * @param {Object} bossGroups - Items grouped by boss
+ * @param {Array} noBossItems - Items without boss assignment
+ * @param {number} currentPage - Current page number (0-indexed)
+ * @param {number} itemsPerPage - Number of items to show per page
+ * @returns {Object} Object containing the embed and metadata
+ */
+function buildQueuePage(sheetItems, bossGroups, noBossItems, currentPage, itemsPerPage = 15) {
+  let queueText = "";
+  let itemsShown = 0;
+  let position = currentPage * itemsPerPage + 1;
+  const startIndex = currentPage * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+
+  // Flatten all items in order
+  const allOrderedItems = [];
+  let sessionNum = 1;
+
+  for (const [boss, items] of Object.entries(bossGroups)) {
+    allOrderedItems.push({ type: 'header', boss, sessionNum });
+    items.forEach(item => {
+      allOrderedItems.push({ type: 'item', ...item, boss, sessionNum });
+    });
+    sessionNum++;
+  }
+
+  // Add no-boss items if they exist
+  if (noBossItems.length > 0) {
+    allOrderedItems.push({ type: 'header', boss: 'GENERAL ITEMS', sessionNum });
+    noBossItems.forEach(item => {
+      allOrderedItems.push({ type: 'item', ...item, boss: 'GENERAL ITEMS', sessionNum });
+    });
+  }
+
+  // Filter to get only items (not headers) for pagination
+  const itemsOnly = allOrderedItems.filter(x => x.type === 'item');
+  const pageItems = itemsOnly.slice(startIndex, endIndex);
+
+  // Track which session we're in
+  let currentSession = null;
+
+  // Build the queue text for this page
+  pageItems.forEach((item, idx) => {
+    // Add session header if we're entering a new session
+    if (currentSession !== item.sessionNum) {
+      currentSession = item.sessionNum;
+      queueText += `**🔥 SESSION ${item.sessionNum} - ${item.boss}**\n`;
+    }
+
+    const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
+    const globalPosition = startIndex + idx + 1;
+    queueText += `${globalPosition}. ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
+    itemsShown++;
+  });
+
+  const totalPages = Math.ceil(itemsOnly.length / itemsPerPage);
+  const totalSessions = Object.keys(bossGroups).length + (noBossItems.length > 0 ? 1 : 0);
+  const totalItems = sheetItems.length;
+
+  const footerNote = `\n**ℹ️ Note:** Order shown is how items will auction when you run \`!startauction\`\n✅ **All ELYSIUM members can bid!**`;
+  queueText += footerNote;
+
+  const embed = new EmbedBuilder()
+    .setColor(0x4a90e2)
+    .setTitle(`${EMOJI.LIST} Auction Queue (Preview)`)
+    .setDescription(queueText)
+    .addFields(
+      {
+        name: `${EMOJI.FIRE} Sessions`,
+        value: `${totalSessions}`,
+        inline: true,
+      },
+      {
+        name: `${EMOJI.LIST} Total Items`,
+        value: `${totalItems}`,
+        inline: true,
+      },
+      {
+        name: `📄 Page`,
+        value: `${currentPage + 1}/${totalPages}`,
+        inline: true,
+      }
+    )
+    .setFooter({
+      text: `Showing items ${startIndex + 1}-${Math.min(endIndex, totalItems)} of ${totalItems} • Use !startauction to begin`,
+    })
+    .setTimestamp();
+
+  return { embed, totalPages, itemsShown };
+}
+
+/**
  * Handles the !queue command to display current auction queue.
  *
  * DISPLAY MODES:
@@ -2591,106 +2707,94 @@ async function handleQueueList(message, biddingState) {
     bossGroups[boss].push(item);
   });
 
-  // 🔧 FIX: Limit items shown to prevent exceeding 4096 character limit
-  const MAX_ITEMS_TO_SHOW = 50; // Show first 50 items max
-  const MAX_CHARS = 3800; // Leave buffer for headers/footers
+  // Build the first page
+  const ITEMS_PER_PAGE = 15;
+  let currentPage = 0;
+  const { embed: initialEmbed, totalPages } = buildQueuePage(
+    sheetItems,
+    bossGroups,
+    noBossItems,
+    currentPage,
+    ITEMS_PER_PAGE
+  );
 
-  let queueText = "";
-  let position = 1;
-  let sessionNum = 1;
-  let itemsShown = 0;
-  let charsUsed = 0;
+  // Get user ID for button filtering
+  const userId = message.author?.id || message.user?.id;
 
-  // All items must have boss data now
-  for (const [boss, items] of Object.entries(bossGroups)) {
-    // Check if we've hit limits
-    if (itemsShown >= MAX_ITEMS_TO_SHOW || charsUsed >= MAX_CHARS) {
-      const remaining = sheetItems.length - itemsShown;
-      queueText += `\n*...and ${remaining} more items (use !startauction to see all)*\n`;
-      break;
-    }
+  // Create pagination buttons (only if more than 1 page)
+  const components = totalPages > 1
+    ? [createPaginationButtons(currentPage, totalPages, userId)]
+    : [];
 
-    const sessionHeader = `**🔥 SESSION ${sessionNum} - ${boss}**\n`;
-    
-    // Estimate chars for this section
-    const estimatedChars = sessionHeader.length + 
-      items.reduce((sum, item) => {
-        const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
-        return sum + `${position}. ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`.length;
-      }, 0) + 30; // +30 for attendance line
-
-    // Check if adding this session would exceed limits
-    if (charsUsed + estimatedChars > MAX_CHARS && itemsShown > 0) {
-      const remaining = sheetItems.length - itemsShown;
-      queueText += `\n*...and ${remaining} more items in ${Object.keys(bossGroups).length - sessionNum + 1} more sessions*\n`;
-      break;
-    }
-
-    queueText += sessionHeader;
-    
-    for (const item of items) {
-      if (itemsShown >= MAX_ITEMS_TO_SHOW) break;
-      
-      const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
-      const itemLine = `${position}. ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
-      queueText += itemLine;
-      charsUsed += itemLine.length;
-      position++;
-      itemsShown++;
-    }
-
-    queueText += `\n`;
-    charsUsed += sessionHeader.length;
-    sessionNum++;
-  }
-
-  // Items without boss - include them in the display
-  if (noBossItems.length > 0 && itemsShown < MAX_ITEMS_TO_SHOW) {
-    queueText += `**🔥 SESSION ${sessionNum} - GENERAL ITEMS**\n`;
-    noBossItems.slice(0, Math.min(5, MAX_ITEMS_TO_SHOW - itemsShown)).forEach((item) => {
-      const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
-      queueText += `${position}. ${item.item}${qty} - ${item.startPrice}pts • ${item.duration}m\n`;
-      position++;
-      itemsShown++;
-    });
-    if (noBossItems.length > 5 && itemsShown < MAX_ITEMS_TO_SHOW) {
-      queueText += `*...and ${noBossItems.length - 5} more*\n`;
-    }
-    queueText += `\n`;
-  }
-
-  const footerNote = `\n**ℹ️ Note:** Order shown is how items will auction when you run \`!startauction\`\n✅ **All ELYSIUM members can bid!**`;
-  queueText += footerNote;
-
-  const totalSessions = Object.keys(bossGroups).length;
-  const totalItems = sheetItems.length;
-
-  const embed = new EmbedBuilder()
-    .setColor(0x4a90e2)
-    .setTitle(`${EMOJI.LIST} Auction Queue (Preview)`)
-    .setDescription(queueText)
-    .addFields(
-      {
-        name: `${EMOJI.FIRE} Sessions`,
-        value: `${totalSessions}`,
-        inline: true,
-      },
-      {
-        name: `${EMOJI.LIST} Total Items`,
-        value: `${totalItems}`,
-        inline: true,
-      }
-    )
-    .setFooter({
-      text: `Showing ${itemsShown}/${totalItems} items • Use !startauction to begin`,
-    })
-    .setTimestamp();
-
-  // For slash commands, edit the loading message instead of sending a new reply
+  // Send the initial message with buttons
+  let queueMessage;
   if (message.isSlashCommand) {
-    await loadingMsg.edit({ content: null, embeds: [embed] });
+    await loadingMsg.edit({ content: null, embeds: [initialEmbed], components });
+    queueMessage = loadingMsg;
   } else {
-    await message.reply({ embeds: [embed] });
+    queueMessage = await message.reply({ embeds: [initialEmbed], components });
+  }
+
+  // Only create collector if we have multiple pages
+  if (totalPages > 1) {
+    const collector = queueMessage.createMessageComponentCollector({
+      componentType: ComponentType.Button,
+      time: 300000, // 5 minutes timeout
+      filter: (i) => i.user.id === userId
+    });
+
+    collector.on('collect', async (interaction) => {
+      // Determine if it's previous or next
+      const isPrevious = interaction.customId.includes('_prev_');
+
+      if (isPrevious) {
+        currentPage = Math.max(0, currentPage - 1);
+      } else {
+        currentPage = Math.min(totalPages - 1, currentPage + 1);
+      }
+
+      // Build the new page
+      const { embed: newEmbed } = buildQueuePage(
+        sheetItems,
+        bossGroups,
+        noBossItems,
+        currentPage,
+        ITEMS_PER_PAGE
+      );
+
+      // Update buttons with new disabled states
+      const newButtons = createPaginationButtons(currentPage, totalPages, userId);
+
+      // Update the message
+      await interaction.update({
+        embeds: [newEmbed],
+        components: [newButtons]
+      });
+    });
+
+    collector.on('end', async (collected, reason) => {
+      // Disable buttons when collector expires
+      if (reason === 'time') {
+        try {
+          const disabledRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId('prev_disabled')
+              .setLabel('◀ Previous')
+              .setStyle(ButtonStyle.Primary)
+              .setDisabled(true),
+            new ButtonBuilder()
+              .setCustomId('next_disabled')
+              .setLabel('Next ▶')
+              .setStyle(ButtonStyle.Primary)
+              .setDisabled(true)
+          );
+
+          await queueMessage.edit({ components: [disabledRow] });
+        } catch (error) {
+          // Message might have been deleted, ignore error
+        }
+      }
+    });
   }
 }
 
