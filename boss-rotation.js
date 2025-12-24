@@ -110,7 +110,7 @@ const WARNING_WINDOW_MINUTES = 15; // Warn when spawn is 15-20 mins away
  * @param {Client} discordClient - Discord.js client instance
  * @param {Object} bossTimer - Boss timer module for spawn time tracking
  */
-function initialize(cfg, discordClient, bossTimer = null) {
+async function initialize(cfg, discordClient, bossTimer = null) {
   config = cfg;
   client = discordClient;
   bossTimerModule = bossTimer;
@@ -119,10 +119,12 @@ function initialize(cfg, discordClient, bossTimer = null) {
   console.log('✅ Boss Rotation System initialized');
 
   // Ensure BossRotation sheet exists on startup
-  ensureRotationSheetExists();
+  await ensureRotationSheetExists();
 
-  // Load initial rotation status
-  refreshRotationCache();
+  // Load initial rotation status (MUST finish before daily schedule posts)
+  console.log('⏳ Loading rotation cache before starting schedulers...');
+  await refreshRotationCache();
+  console.log('✅ Rotation cache loaded - ready to post daily schedules');
 
   // Start spawn warning monitor if boss timer available
   if (bossTimerModule) {
@@ -166,9 +168,8 @@ function initialize(cfg, discordClient, bossTimer = null) {
   console.log('✅ Daily rotation schedule configured (posts at 12:00 AM Manila time)');
 
   // Restore daily schedule tracking from MongoDB (in case of bot restart)
-  restoreDailyScheduleFromMongoDB().catch(err =>
-    console.error('⚠️ Failed to restore daily schedule from MongoDB:', err.message)
-  );
+  // IMPORTANT: This must run AFTER rotation cache is loaded (which it is now, since we awaited above)
+  await restoreDailyScheduleFromMongoDB();
 
   // Clean up old daily schedules from MongoDB (every 6 hours)
   setInterval(async () => {

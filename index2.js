@@ -4668,7 +4668,10 @@ client.once(Events.ClientReady, async () => {
   emergencyCommands.initialize(config, attendance, bidding, auctioneering, isAdmin, discordCache);
   leaderboardSystem.init(client, config, discordCache);
   activityHeatmap.init(client, config);
-  bossRotation.initialize(config, client, bossTimer);
+
+  // CRITICAL: Await boss rotation initialization to ensure rotation cache is loaded
+  // before daily schedule posts (prevents showing "no bosses" when bosses exist)
+  await bossRotation.initialize(config, client, bossTimer);
 
   console.log("🔄 Running state recovery...");
   isRecovering = true;
