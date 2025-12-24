@@ -115,7 +115,7 @@ Open bidding system for all guild members with fair distribution mechanics.
 
 ### 🔄 Boss Rotation System
 
-Multi-guild boss rotation tracking for shared world bosses.
+Multi-guild boss rotation tracking for shared world bosses with intelligent spawn prediction.
 
 **Features:**
 - 🔄 **Dynamic rotation tracking** - configurable multi-guild rotation (typically 3-5 guilds)
@@ -123,11 +123,30 @@ Multi-guild boss rotation tracking for shared world bosses.
 - 🔄 **Position tracking** - ELYSIUM is always position 1
 - 🔄 **15-minute warnings** when it's your guild's turn
 - 🔄 **Daily rotation schedule** posted at 12:00 AM Manila time
+- 🔄 **Smart spawn prediction** - falls back to attendance records when timers unavailable
+- 🔄 **Timezone-aware** - properly handles Manila time (Asia/Manila)
 - 🔄 **Crash recovery** with Google Sheets backup
 - 🔄 **Dynamic boss loading** from Google Sheets - admins can add/remove bosses from rotation
+- 🔄 **Debug logging** - comprehensive troubleshooting capabilities
 
 **Rotation Configuration:**
 Bosses in rotation are configured in Google Sheets `BossRotation` tab. The system supports flexible rotation with any number of guilds and bosses. Common rotating bosses include Amentis, General Aquleus, and Baron Braudmore, but this can be customized.
+
+**Daily Rotation Schedule:**
+The system posts a daily schedule at 12:00 AM Manila time showing all ELYSIUM rotations for the next 24 hours:
+- ✅ **Automatic posting** at midnight (Manila timezone)
+- ✅ **Spawn time predictions** from boss timer or attendance records
+- ✅ **Time grouping** - organizes bosses by time of day (Night/Morning/Afternoon/Evening)
+- ✅ **Live Discord timestamps** - countdowns update automatically
+- ✅ **Auto-cleanup** - deletes when all bosses complete or after 1 hour if no rotations
+- ✅ **Duplicate prevention** - MongoDB tracking prevents multiple posts
+
+**Recent Improvements (v9.0.1):**
+1. **Fixed timezone conversion bug** - Spawn dates now properly converted to Manila time before comparison
+2. **Added attendance fallback** - Calculates spawn times from historical records when timer unavailable
+3. **Fixed race condition** - Rotation cache now fully loads before daily schedule posts
+4. **Improved display** - Removed redundant attachment links, cleaner embed formatting
+5. **Enhanced logging** - Detailed debug logs for troubleshooting spawn prediction issues
 
 ### ⏰ Boss Timer & Prediction System
 
@@ -1049,6 +1068,43 @@ pm2 monit
 - Redeploy Apps Script and copy new webhook URL
 - Check triggers are active in Apps Script dashboard
 - Ensure all required sheet tabs exist with correct names
+
+### Boss Rotation Scheduler Issues
+
+**Issue: Daily schedule shows "No ELYSIUM rotations" but `/rotation status` shows bosses**
+
+This was a critical bug fixed in v9.0.1. If you're experiencing this issue, update to the latest version.
+
+**Root Causes (All Fixed):**
+1. ✅ **Timezone conversion bug** - Spawn dates compared in different timezones (UTC vs Manila)
+2. ✅ **Missing attendance fallback** - Only checked boss timer, ignored attendance records
+3. ✅ **Race condition** - Daily schedule posted before rotation cache loaded all bosses
+
+**How to Verify Fix:**
+```bash
+# Restart bot and check console logs
+# You should see:
+⏳ Loading rotation cache before starting schedulers...
+✅ Loaded 11 rotating bosses: Amentis, General Aquleus, Baron Braudmore, ...
+✅ Rotation cache loaded - ready to post daily schedules
+📅 [DAILY-SCHEDULE] Checking rotations from ...
+📅 [DAILY-SCHEDULE] Wannitas: ELYSIUM's turn - checking spawn time...
+📅 [DAILY-SCHEDULE] Wannitas: ✅ INCLUDED in daily schedule
+```
+
+**Debug Commands:**
+```bash
+/rotation status      # Check current rotation for all bosses
+/rotation refresh     # Force reload from Google Sheets
+!status               # Check bot health and active spawns
+```
+
+**Expected Behavior:**
+- Daily schedule posts at 12:00 AM Manila time
+- Shows all ELYSIUM rotations spawning within next 24 hours (12am-11:59pm)
+- Falls back to attendance records if boss timer unavailable
+- Properly converts all timestamps to Manila timezone
+- Loads all rotating bosses before posting schedule
 
 ### Diagnostic Commands
 

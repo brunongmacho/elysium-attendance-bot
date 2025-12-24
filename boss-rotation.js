@@ -1231,19 +1231,13 @@ async function postDailyRotationSchedule() {
       let fieldValue = '';
       for (const { bossName, spawnTime, rotation, timerData, isPast } of bosses) {
         const spawnTimestamp = Math.floor(spawnTime.getTime() / 1000);
-        const confidence = timerData.confidence || 0;
 
-        // Get boss thumbnail URL
-        const bossImageURL = getBossImageAttachmentURL(bossName, channel.guild);
-        const thumbnail = bossImageURL ? `[🖼️](${bossImageURL})` : '';
+        // Get guild count from rotation data
+        const guildCount = (rotation.guilds && rotation.guilds.length > 0) ? rotation.guilds.length : 5;
 
-        // Mark if already spawned
-        const statusEmoji = isPast ? '🔴 SPAWNED' : '🟢';
-
-        fieldValue += `**${bossName}** ${thumbnail} ${isPast ? '🔴' : ''}\n`;
+        fieldValue += `**${bossName}**${isPast ? ' 🔴' : ''}\n`;
         fieldValue += `├ 🕐 <t:${spawnTimestamp}:t> (<t:${spawnTimestamp}:R>) ${isPast ? '**[LIVE NOW]**' : ''}\n`;
-        fieldValue += `├ 🎯 Guild ${rotation.currentIndex}/5 - **ELYSIUM**\n`;
-        fieldValue += `└ 📊 ${Math.round(confidence)}% confidence\n\n`;
+        fieldValue += `└ 🎯 Guild ${rotation.currentIndex}/${guildCount} - **ELYSIUM**\n\n`;
       }
 
       embed.addFields({
