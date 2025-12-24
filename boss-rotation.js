@@ -1005,7 +1005,9 @@ async function postDailyRotationSchedule() {
 
     const todayDate = startOfDay.toISOString().split('T')[0];
 
-    console.log(`📅 Checking rotations from ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
+    console.log(`📅 [DAILY-SCHEDULE] Checking rotations from ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
+    console.log(`📅 [DAILY-SCHEDULE] Current time: ${now.toISOString()}`);
+    console.log(`📅 [DAILY-SCHEDULE] Manila time: ${manilaTime.toISOString()}`);
 
     // DUPLICATE PREVENTION: Check if we already posted today's schedule
     const db = await dbAPI.connect();
@@ -1038,8 +1040,11 @@ async function postDailyRotationSchedule() {
         const rotation = await getRotationStatus(bossName);
 
         if (!rotation.isRotating || !rotation.isOurTurn) {
+          console.log(`📅 [DAILY-SCHEDULE] ${bossName}: Not our turn (${rotation.currentGuild})`);
           continue; // Not our turn, skip
         }
+
+        console.log(`📅 [DAILY-SCHEDULE] ${bossName}: ELYSIUM's turn - checking spawn time...`);
 
         // Get spawn time - try boss timer first, then attendance records
         let spawnTime = null;
@@ -1084,12 +1089,16 @@ async function postDailyRotationSchedule() {
 
         // Skip if no spawn time available from either source
         if (!spawnTime) {
+          console.log(`📅 [DAILY-SCHEDULE] ${bossName}: No spawn time available - skipping`);
           continue;
         }
+
+        console.log(`📅 [DAILY-SCHEDULE] ${bossName}: Spawn time: ${spawnTime.toISOString()}`);
 
         // Check if spawn is within today (12am to 11:59pm Manila)
         // Include past spawns from today (may be waiting to be killed)
         if (spawnTime <= endOfDay) {
+          console.log(`📅 [DAILY-SCHEDULE] ${bossName}: Spawn is before end of day - checking if today...`);
           // Also check if spawn is from today (not from previous days)
           // IMPORTANT: Convert spawn time to Manila timezone before getting start of day
           const spawnDate = new Date(spawnTime);
@@ -1097,7 +1106,10 @@ async function postDailyRotationSchedule() {
           const spawnDayStart = new Date(spawnDateManila);
           spawnDayStart.setHours(0, 0, 0, 0);
 
+          console.log(`📅 [DAILY-SCHEDULE] ${bossName}: spawnDayStart=${spawnDayStart.toISOString()}, startOfDay=${startOfDay.toISOString()}`);
+
           if (spawnDayStart.getTime() === startOfDay.getTime()) {
+            console.log(`📅 [DAILY-SCHEDULE] ${bossName}: ✅ INCLUDED in daily schedule`);
             elysiumRotations.push({
               bossName,
               spawnTime,
@@ -1105,7 +1117,11 @@ async function postDailyRotationSchedule() {
               timerData,
               isPast: spawnTime < now
             });
+          } else {
+            console.log(`📅 [DAILY-SCHEDULE] ${bossName}: ❌ EXCLUDED - spawn is from a different day`);
           }
+        } else {
+          console.log(`📅 [DAILY-SCHEDULE] ${bossName}: ❌ EXCLUDED - spawn is after end of day (${spawnTime.toISOString()} > ${endOfDay.toISOString()})`);
         }
 
       } catch (bossError) {
