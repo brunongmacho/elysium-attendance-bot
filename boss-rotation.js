@@ -36,6 +36,9 @@ const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/b
 const { addGuildFooter } = require('./utils/embed-branding');
 const dbAPI = require('./utils/database-api');
 const cron = require('node-cron');
+const mongoHelpers = require('./utils/mongodb-helpers');
+const fs = require('fs');
+const path = require('path');
 
 // ============================================================================
 // MODULE STATE
@@ -45,6 +48,18 @@ let config = null;
 let sheetAPI = null;
 let client = null;
 let bossTimerModule = null; // Reference to boss timer for recorded spawn times
+
+/**
+ * Boss spawn configuration for predicting spawn times from attendance records
+ */
+let bossSpawnConfig = null;
+try {
+  const configPath = path.join(__dirname, 'boss_spawn_config.json');
+  const rawData = fs.readFileSync(configPath, 'utf8');
+  bossSpawnConfig = JSON.parse(rawData);
+} catch (configError) {
+  console.error('⚠️ Failed to load boss spawn config:', configError.message);
+}
 
 /**
  * Rotating bosses list (dynamically loaded from Google Sheets)
@@ -1026,13 +1041,51 @@ async function postDailyRotationSchedule() {
           continue; // Not our turn, skip
         }
 
-        // Get spawn time from boss timer
-        const timerData = bossTimerModule.getNextSpawn(bossName);
-        if (!timerData || !timerData.nextSpawn) {
-          continue; // No spawn time available
+        // Get spawn time - try boss timer first, then attendance records
+        let spawnTime = null;
+        let timerData = null;
+
+        // Try boss timer first
+        if (bossTimerModule) {
+          timerData = bossTimerModule.getNextSpawn(bossName);
+          if (timerData && timerData.nextSpawn) {
+            spawnTime = timerData.nextSpawn;
+          }
         }
 
-        const spawnTime = timerData.nextSpawn;
+        // Fallback: Calculate from attendance records if no timer data
+        if (!spawnTime && bossSpawnConfig && bossSpawnConfig.timerBasedBosses[bossName]) {
+          try {
+            const lastSpawn = await mongoHelpers.getLastBossSpawn(bossName);
+            if (lastSpawn && lastSpawn.timestamp) {
+              const bossConfig = bossSpawnConfig.timerBasedBosses[bossName];
+              const intervalMs = bossConfig.spawnIntervalHours * 60 * 60 * 1000;
+              const lastSpawnDate = new Date(lastSpawn.timestamp);
+
+              // Calculate next spawn by adding intervals until we get a future time
+              spawnTime = new Date(lastSpawnDate.getTime() + intervalMs);
+              while (spawnTime < now) {
+                spawnTime = new Date(spawnTime.getTime() + intervalMs);
+              }
+
+              // Create timerData object for compatibility with existing code
+              timerData = {
+                nextSpawn: spawnTime,
+                confidence: 75, // Lower confidence for calculated spawns
+                source: 'attendance'
+              };
+
+              console.log(`📋 [DAILY-SCHEDULE] Calculated ${bossName} spawn from attendance: ${spawnTime.toISOString()}`);
+            }
+          } catch (attendanceError) {
+            console.error(`⚠️ [DAILY-SCHEDULE] Failed to calculate ${bossName} spawn from attendance:`, attendanceError.message);
+          }
+        }
+
+        // Skip if no spawn time available from either source
+        if (!spawnTime) {
+          continue;
+        }
 
         // Check if spawn is within today (12am to 11:59pm Manila)
         // Include past spawns from today (may be waiting to be killed)
