@@ -31,6 +31,51 @@ const mongoBreaker = new CircuitBreaker({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Calculate consecutive days streak from attendance records
+ * @param {Array} attendanceRecords - Array of attendance records sorted by timestamp desc
+ * @returns {number} - Current streak in days
+ */
+function calculateMemberStreak(attendanceRecords) {
+  if (attendanceRecords.length === 0) return 0;
+
+  // Get unique dates (normalized to day)
+  const attendanceDates = [];
+  const seenDates = new Set();
+
+  for (let i = 0; i < attendanceRecords.length; i++) {
+    const date = new Date(attendanceRecords[i].timestamp);
+    date.setHours(0, 0, 0, 0);
+    const dateStr = date.toDateString();
+
+    if (!seenDates.has(dateStr)) {
+      seenDates.add(dateStr);
+      attendanceDates.push(date);
+    }
+  }
+
+  // Sort dates descending (most recent first)
+  attendanceDates.sort((a, b) => b - a);
+
+  let streak = 1;
+  for (let i = 0; i < attendanceDates.length - 1; i++) {
+    const dayDiff = Math.floor((attendanceDates[i] - attendanceDates[i + 1]) / (1000 * 60 * 60 * 24));
+
+    if (dayDiff === 1) {
+      streak++;
+    } else if (dayDiff > 1) {
+      break; // Streak broken
+    }
+    // If dayDiff === 0, same day (already handled by seenDates)
+  }
+
+  return streak;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MEMBER OPERATIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -698,9 +743,8 @@ async function getMemberStats(memberName) {
     ? Math.min(100, Math.round((memberSpawnsAttended / totalPossibleSpawns) * 100))
     : 0;
 
-  // Step 5: Calculate streak
-  // TODO: Implement streak calculation from attendance records
-  const currentStreak = member.attendance?.streak?.current || 0;
+  // Step 5: Calculate streak from attendance records
+  const currentStreak = calculateMemberStreak(attendanceRecords);
 
   // Step 6: Get ranking
   const allMembers = members.filter(m => m.isActive);
