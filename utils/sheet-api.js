@@ -150,18 +150,19 @@ const clientCache = {
 
   /**
    * Cache TTL for different data types (in milliseconds)
+   * Optimized to reduce API calls while maintaining data freshness
    */
   TTL: {
-    WEEKLY_ATTENDANCE: 30 * 60 * 1000,  // 30 min - historical data
-    LEARNING_METRICS: 30 * 60 * 1000,   // 30 min - historical data
-    BIDDING_POINTS: 5 * 60 * 1000,      // 5 min - frequently updated
-    FOR_DISTRIBUTION: 30 * 60 * 1000,   // 30 min - historical data
-    MEMBER_STATS: 5 * 60 * 1000,        // 5 min - member lookups
-    ROTATING_BOSSES: 30 * 60 * 1000,    // 30 min - boss rotation data
-    WEEKLY_MILESTONES: 30 * 60 * 1000,  // 30 min - milestone history
-    STREAK_DATA: 24 * 60 * 60 * 1000,   // 24 hours - user streaks
-    BIDDING_ITEMS: 30 * 1000,           // 30 sec - auction setup
-    DEFAULT: 5 * 60 * 1000              // 5 min - default
+    WEEKLY_ATTENDANCE: 30 * 60 * 1000,  // 30 min - historical data (rarely changes)
+    LEARNING_METRICS: 30 * 60 * 1000,   // 30 min - historical data (rarely changes)
+    BIDDING_POINTS: 5 * 60 * 1000,      // 5 min - frequently updated (keep aggressive)
+    FOR_DISTRIBUTION: 30 * 60 * 1000,   // 30 min - historical data (rarely changes)
+    MEMBER_STATS: 15 * 60 * 1000,       // 15 min - member lookups (was 5 min, stats change infrequently)
+    ROTATING_BOSSES: 30 * 60 * 1000,    // 30 min - boss rotation data (could be event-driven)
+    WEEKLY_MILESTONES: 30 * 60 * 1000,  // 30 min - milestone history (rarely changes)
+    STREAK_DATA: 24 * 60 * 60 * 1000,   // 24 hours - user streaks (daily calculation)
+    BIDDING_ITEMS: 2 * 60 * 1000,       // 2 min - auction setup (was 30 sec, items rarely change mid-auction)
+    DEFAULT: 5 * 60 * 1000              // 5 min - default fallback
   },
 
   /**

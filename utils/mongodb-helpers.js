@@ -710,42 +710,47 @@ async function getMemberStats(memberName) {
   }
 
   // Step 4: Calculate attendance rate based on unique spawns
-  // Get total unique spawns (unique bossName + timestamp combinations)
-  const uniqueSpawns = await db.collection('attendance').aggregate([
+  // OPTIMIZED: Use $facet to run both queries in parallel (single database call)
+  const [attendanceStats] = await db.collection('attendance').aggregate([
     {
-      $group: {
-        _id: {
-          bossName: '$bossName',
-          timestamp: '$timestamp'
-        }
+      $facet: {
+        // Pipeline 1: Count total unique spawns (all members)
+        totalSpawns: [
+          {
+            $group: {
+              _id: {
+                bossName: '$bossName',
+                timestamp: '$timestamp'
+              }
+            }
+          },
+          {
+            $count: 'total'
+          }
+        ],
+        // Pipeline 2: Count member's unique spawns (this member only)
+        memberSpawns: [
+          {
+            $match: { memberId: member._id }
+          },
+          {
+            $group: {
+              _id: {
+                bossName: '$bossName',
+                timestamp: '$timestamp'
+              }
+            }
+          },
+          {
+            $count: 'total'
+          }
+        ]
       }
-    },
-    {
-      $count: 'total'
     }
   ]).toArray();
 
-  const totalPossibleSpawns = uniqueSpawns.length > 0 ? uniqueSpawns[0].total : 0;
-
-  // Get member's unique spawn attendance (deduplicate by bossName + timestamp)
-  const memberUniqueSpawns = await db.collection('attendance').aggregate([
-    {
-      $match: { memberId: member._id }
-    },
-    {
-      $group: {
-        _id: {
-          bossName: '$bossName',
-          timestamp: '$timestamp'
-        }
-      }
-    },
-    {
-      $count: 'total'
-    }
-  ]).toArray();
-
-  const memberSpawnsAttended = memberUniqueSpawns.length > 0 ? memberUniqueSpawns[0].total : 0;
+  const totalPossibleSpawns = attendanceStats.totalSpawns[0]?.total || 0;
+  const memberSpawnsAttended = attendanceStats.memberSpawns[0]?.total || 0;
 
   // Rate = (spawns attended / total spawns) * 100, capped at 100%
   const attendanceRate = totalPossibleSpawns > 0
