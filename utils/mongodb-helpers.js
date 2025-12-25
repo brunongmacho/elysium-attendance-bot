@@ -626,6 +626,15 @@ async function addAttendance(data) {
 }
 
 /**
+ * Helper function to escape special regex characters
+ * @param {string} str - String to escape
+ * @returns {string} - Escaped string safe for regex
+ */
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Get member stats (for !stats command)
  * Aggregates attendance, points, and ranking data from MongoDB
  * Returns data in same format as Google Sheets for compatibility
@@ -636,22 +645,22 @@ async function addAttendance(data) {
 async function getMemberStats(memberName) {
   const db = await dbAPI.connect();
 
-  // Step 1: Find member (case-insensitive fuzzy match)
-  const members = await db.collection('members').find({ isActive: true }).toArray();
-
+  // Step 1: Find member using database queries (more efficient than loading all members)
   let member = null;
   let actualMemberName = memberName;
 
-  // Try exact match first (case-insensitive)
-  member = members.find(m => m.username.toLowerCase() === memberName.toLowerCase());
+  // Try exact match first (case-insensitive) - uses username index
+  member = await db.collection('members').findOne({
+    username: { $regex: new RegExp(`^${escapeRegex(memberName)}$`, 'i') },
+    isActive: true
+  });
 
-  // If no exact match, try fuzzy match
+  // If no exact match, try fuzzy match (contains search)
   if (!member) {
-    const searchLower = memberName.toLowerCase();
-    member = members.find(m =>
-      m.username.toLowerCase().includes(searchLower) ||
-      searchLower.includes(m.username.toLowerCase())
-    );
+    member = await db.collection('members').findOne({
+      username: { $regex: new RegExp(escapeRegex(memberName), 'i') },
+      isActive: true
+    });
   }
 
   if (!member) {
@@ -746,14 +755,13 @@ async function getMemberStats(memberName) {
   // Step 5: Calculate streak from attendance records
   const currentStreak = calculateMemberStreak(attendanceRecords);
 
-  // Step 6: Get ranking
-  const allMembers = members.filter(m => m.isActive);
-  const sortedByAttendance = allMembers
-    .map(m => ({
-      username: m.username,
-      total: m.attendance?.total || 0
-    }))
-    .sort((a, b) => b.total - a.total);
+  // Step 6: Get ranking (optimized: only fetch needed fields, sort in database)
+  const sortedByAttendance = await db.collection('members').find(
+    { isActive: true },
+    { projection: { username: 1, 'attendance.total': 1 } }
+  )
+    .sort({ 'attendance.total': -1 })
+    .toArray();
 
   const rank = sortedByAttendance.findIndex(m => m.username === actualMemberName) + 1;
 
