@@ -47,6 +47,11 @@ const { SheetAPI } = require('./utils/sheet-api');
 const { addGuildThumbnail } = require('./utils/embed-branding');
 const mongoHelpers = require('./utils/mongodb-helpers'); // Phase 4: MongoDB integration
 const dbAPI = require('./utils/database-api'); // Phase 4.5: Direct MongoDB access
+const shutdownManager = require('./utils/shutdown-manager');
+const { createLogger } = require('./utils/logger');
+
+// Create logger instance for this module
+const logger = createLogger('leaderboard');
 
 // ============================================================================
 // FEATURE FLAGS
@@ -1137,12 +1142,12 @@ function scheduleWeeklyReport() {
     const displayTime = new Date(nextSaturdayUTC.getTime() + 8 * 60 * 60 * 1000);
     const hours = Math.floor(delay / 1000 / 60 / 60);
 
-    console.log(`📅 Next weekly report scheduled for: ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${hours} hours)`);
+    logger.info(`📅 Next weekly report scheduled for: ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${hours} hours)`);
 
     // Save schedule to crash recovery
     if (crashRecovery) {
       crashRecovery.saveLeaderboardReportSchedule(nextSaturdayUTC).catch(err => {
-        console.error('⚠️ Failed to save report schedule to crash recovery:', err.message);
+        logger.error('⚠️ Failed to save report schedule to crash recovery:', err.message);
       });
     }
 
@@ -1151,11 +1156,13 @@ function scheduleWeeklyReport() {
       await sendWeeklyReport();
       scheduleNext(); // Automatically schedule next week's report
     }, delay);
+
+    shutdownManager.registerTimeout('weekly-report-timer', weeklyReportTimer, { nextReport: displayTime.toISOString() });
   };
 
   // Start the scheduling cycle
   scheduleNext();
-  console.log('✅ Weekly report scheduler initialized (Saturday 11:59pm GMT+8)');
+  logger.info('✅ Weekly report scheduler initialized (Saturday 11:59pm GMT+8)');
 }
 
 // ============================================================================
@@ -1543,22 +1550,26 @@ function scheduleMonthlyReport() {
       // If delay exceeds max safe timeout, use intermediate timeout
       if (remainingDelay > MAX_TIMEOUT_DELAY) {
         const intermediateDays = Math.floor(MAX_TIMEOUT_DELAY / (24 * 60 * 60 * 1000));
-        console.log(`⏳ Delay exceeds safe limit (${days} days). Scheduling intermediate checkpoint in ${intermediateDays} days...`);
-        
+        logger.info(`⏳ Delay exceeds safe limit (${days} days). Scheduling intermediate checkpoint in ${intermediateDays} days...`);
+
         monthlyReportTimer = setTimeout(() => {
-          console.log(`✅ Intermediate checkpoint reached. Recalculating remaining delay...`);
+          logger.info(`✅ Intermediate checkpoint reached. Recalculating remaining delay...`);
           // Recalculate delay (in case system clock changed)
           const newNow = new Date();
           const newRemainingDelay = nextLastDayUTC.getTime() - newNow.getTime();
           scheduleWithOverflowProtection(newRemainingDelay);
         }, MAX_TIMEOUT_DELAY);
+
+        shutdownManager.registerTimeout('monthly-report-timer', monthlyReportTimer, { type: 'intermediate-checkpoint' });
       } else {
         // Delay is safe, schedule final timeout
         monthlyReportTimer = setTimeout(async () => {
-          console.log('📅 Monthly report time reached, generating report...');
+          logger.info('📅 Monthly report time reached, generating report...');
           await sendMonthlyReport();
           scheduleNext(); // Automatically schedule next month's report
         }, remainingDelay);
+
+        shutdownManager.registerTimeout('monthly-report-timer', monthlyReportTimer, { type: 'final', nextReport: nextLastDayUTC.toISOString() });
       }
     };
 
@@ -1568,7 +1579,7 @@ function scheduleMonthlyReport() {
 
   // Start the scheduling cycle
   scheduleNext();
-  console.log('✅ Monthly report scheduler initialized (last day of month 11:59pm GMT+8)');
+  logger.info('✅ Monthly report scheduler initialized (last day of month 11:59pm GMT+8)');
 }
 
 // ============================================================================

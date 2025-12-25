@@ -113,6 +113,7 @@ const { Timeout } = require("timers");
 const errorHandler = require('./utils/error-handler');
 const { PointsCache } = require('./utils/points-cache');
 const { SheetAPI } = require('./utils/sheet-api');
+const { createLogger } = require('./utils/logger');
 const {
   getCurrentTimestamp,
   getSundayOfWeek,
@@ -121,6 +122,9 @@ const {
 } = require("./utils/common");
 const auctionCache = require('./utils/auction-cache');
 const attendance = require("./attendance");
+
+// Create logger instance for this module
+const logger = createLogger('auctioneering');
 
 // MongoDB integration (Phase 4)
 const mongoHelpers = require('./utils/mongodb-helpers');
@@ -168,7 +172,7 @@ let currentSessionBoss = null;
  */
 function setPostToSheet(fn) {
   postToSheetFunc = fn;
-  console.log(`${EMOJI.SUCCESS} postToSheet function initialized`);
+  logger.info(`${EMOJI.SUCCESS} postToSheet function initialized`);
 }
 
 /**
@@ -360,19 +364,19 @@ function initialize(config, isAdminFunc, biddingModuleRef, cache = null, intelli
   sheetAPI = new SheetAPI(config.sheet_webhook_url);
   discordCache = cache;
   intelligenceEngine = intelligenceEngineRef;
-  console.log(`${EMOJI.SUCCESS} Auctioneering system initialized`);
+  logger.info(`${EMOJI.SUCCESS} Auctioneering system initialized`);
 
   // MongoDB integration status (Phase 4)
   if (USE_MONGODB_AUCTIONEERING) {
-    console.log(`${EMOJI.SUCCESS} [MongoDB] Auctioneering using MongoDB-first architecture`);
-    console.log(`${EMOJI.INFO} [MongoDB] Background Sheet sync enabled (priorities: IMMEDIATE/HIGH/NORMAL/LOW)`);
+    logger.info(`${EMOJI.SUCCESS} [MongoDB] Auctioneering using MongoDB-first architecture`);
+    logger.info(`${EMOJI.INFO} [MongoDB] Background Sheet sync enabled (priorities: IMMEDIATE/HIGH/NORMAL/LOW)`);
   } else {
-    console.log(`${EMOJI.INFO} Auctioneering using Google Sheets (legacy mode)`);
-    console.log(`${EMOJI.INFO} Set USE_MONGODB_AUCTIONEERING=true to enable MongoDB`);
+    logger.info(`${EMOJI.INFO} Auctioneering using Google Sheets (legacy mode)`);
+    logger.info(`${EMOJI.INFO} Set USE_MONGODB_AUCTIONEERING=true to enable MongoDB`);
   }
 
   if (intelligenceEngine) {
-    console.log(`${EMOJI.SUCCESS} Intelligence Engine linked to auctioneering (auto-learning enabled)`);
+    logger.info(`${EMOJI.SUCCESS} Intelligence Engine linked to auctioneering (auto-learning enabled)`);
   }
 }
 
@@ -438,14 +442,14 @@ async function fetchSheetItems(url, retries = 3, allowCache = true) {
 
   // Check circuit breaker - skip if open and use cache
   if (!auctionCache.canAttemptFetch()) {
-    console.log(`${EMOJI.WARNING} Circuit breaker OPEN - using cached items`);
+    logger.info(`${EMOJI.WARNING} Circuit breaker OPEN - using cached items`);
     const cachedItems = auctionCache.getCachedItems();
 
     if (cachedItems.length > 0) {
-      console.log(`${EMOJI.INFO} Using ${cachedItems.length} cached items from ${auctionCache.cache.lastUpdate}`);
+      logger.info(`${EMOJI.INFO} Using ${cachedItems.length} cached items from ${auctionCache.cache.lastUpdate}`);
       return cachedItems;
     } else {
-      console.error(`${EMOJI.ERROR} No cached items available and circuit is open!`);
+      logger.error(`${EMOJI.ERROR} No cached items available and circuit is open!`);
       return []; // Return empty array instead of null
     }
   }
@@ -456,7 +460,7 @@ async function fetchSheetItems(url, retries = 3, allowCache = true) {
       const data = await sheetAPI.call('getBiddingItems');
       const items = data.items || [];
 
-      console.log(
+      logger.info(
         `${EMOJI.SUCCESS} Fetched ${items.length} items from Google Sheets`
       );
 
@@ -465,7 +469,7 @@ async function fetchSheetItems(url, retries = 3, allowCache = true) {
 
       return items;
     } catch (e) {
-      console.error(
+      logger.error(
         `${EMOJI.ERROR} Fetch items attempt ${attempt}/${retries}:`,
         e.message
       );
@@ -483,14 +487,14 @@ async function fetchSheetItems(url, retries = 3, allowCache = true) {
           2000 * Math.pow(2, attempt) + Math.random() * 1000,
           30000 // Max 30s
         );
-        console.log(`${EMOJI.WARNING} Retrying in ${Math.round(backoff / 1000)}s...`);
+        logger.info(`${EMOJI.WARNING} Retrying in ${Math.round(backoff / 1000)}s...`);
         await new Promise((resolve) => setTimeout(resolve, backoff));
       }
     }
   }
 
   // All retries failed - use fallback cache
-  console.error(
+  logger.error(
     `${EMOJI.ERROR} Failed to fetch items after ${retries} attempts`
   );
 
@@ -502,13 +506,13 @@ async function fetchSheetItems(url, retries = 3, allowCache = true) {
         ? Math.floor((Date.now() - auctionCache.cache.lastFetch) / 1000 / 60)
         : '∞';
 
-      console.log(
+      logger.info(
         `${EMOJI.WARNING} FALLBACK: Using ${cachedItems.length} cached items (age: ${cacheAge} minutes)`
       );
 
       return cachedItems;
     } else {
-      console.error(`${EMOJI.ERROR} CRITICAL: No cached items available!`);
+      logger.error(`${EMOJI.ERROR} CRITICAL: No cached items available!`);
       return []; // Return empty array instead of null
     }
   }
@@ -554,14 +558,14 @@ async function logAuctionResult(
       itemSource,
       timestamp,
     });
-    console.log(
+    logger.info(
       `${EMOJI.SUCCESS} Result logged: ${
         winner || "No winner"
       } - ${winningBid}pts`
     );
     return true;
   } catch (e) {
-    console.error(`${EMOJI.ERROR} Log result:`, e);
+    logger.error(`${EMOJI.ERROR} Log result:`, e);
     return false;
   }
 }
@@ -613,10 +617,10 @@ async function saveAuctionState(url) {
   // ═══════════════════════════════════════════════════════════════════════════
   try {
     await sheetAPI.call('saveBotState', { state: stateToSave });
-    console.log(`${EMOJI.SUCCESS} Auction state saved`);
+    logger.info(`${EMOJI.SUCCESS} Auction state saved`);
     return true;
   } catch (e) {
-    console.error(`${EMOJI.ERROR} Save auction state:`, e);
+    logger.error(`${EMOJI.ERROR} Save auction state:`, e);
     return false;
   }
 }
@@ -651,7 +655,7 @@ async function saveAuctionState(url) {
 async function startAuctioneering(client, config, channel) {
   // Validate parameters
   if (!client || !config || !channel) {
-    console.error(`${EMOJI.ERROR} Invalid parameters to startAuctioneering`);
+    logger.error(`${EMOJI.ERROR} Invalid parameters to startAuctioneering`);
     return;
   }
 
@@ -665,7 +669,7 @@ async function startAuctioneering(client, config, channel) {
     const biddingChannel = await discordCache.getChannel('bidding_channel_id');
 
     if (!biddingChannel) {
-      console.error(`❌ Could not fetch bidding channel with ID: ${config.bidding_channel_id}`);
+      logger.error(`❌ Could not fetch bidding channel with ID: ${config.bidding_channel_id}`);
       await channel.send(`❌ Bidding channel not found. Please check config.`);
       return;
     }
@@ -673,11 +677,11 @@ async function startAuctioneering(client, config, channel) {
     // Use the fetched channel instead of the parameter
     channel = biddingChannel;
 
-    console.log(`✅ Using bidding channel: ${channel.name} (${channel.id}), Type: ${channel.type}`);
+    logger.info(`✅ Using bidding channel: ${channel.name} (${channel.id}), Type: ${channel.type}`);
 
     // Validate it's a text channel (0 = GUILD_TEXT, 5 = GUILD_ANNOUNCEMENT)
     if (![0, 5].includes(channel.type)) {
-      console.error(
+      logger.error(
         `❌ Invalid channel type (${channel.type}) for bidding channel.\n` +
         `   Channel: ${channel.name} (${channel.id})\n` +
         `   Expected: Text (0) or Announcement (5)\n` +
@@ -697,7 +701,7 @@ async function startAuctioneering(client, config, channel) {
       return;
     }
   } catch (err) {
-    console.error(`❌ Failed to fetch bidding channel:`, err);
+    logger.error(`❌ Failed to fetch bidding channel:`, err);
     await channel.send(`❌ Failed to fetch bidding channel: ${err.message}`).catch(errorHandler.safeCatch('send fetch bidding channel error'));
     return;
   }
@@ -730,9 +734,9 @@ async function startAuctioneering(client, config, channel) {
     biddingState.ct = Date.now();
     biddingModule.saveBiddingState();
 
-    console.log(`✅ Loaded ${biddingState.cp.size()} members' points`);
+    logger.info(`✅ Loaded ${biddingState.cp.size()} members' points`);
   } catch (err) {
-    console.error(`❌ Failed to load points:`, err);
+    logger.error(`❌ Failed to load points:`, err);
     await channel.send(`❌ Failed to load points: ${err.message}`);
     return;
   }
@@ -768,7 +772,7 @@ async function startAuctioneering(client, config, channel) {
       winner.toString().trim() !== "";
 
     if (hasWinner) {
-      console.log(`⭐ Skipping "${item.item}" - already has winner: ${winner}`);
+      logger.info(`⭐ Skipping "${item.item}" - already has winner: ${winner}`);
     }
     return !hasWinner;
   });
@@ -782,7 +786,7 @@ async function startAuctioneering(client, config, channel) {
     return;
   }
 
-  console.log(
+  logger.info(
     `✅ Filtered items: ${availableItems.length}/${
       sheetItems.length
     } available (${
@@ -794,7 +798,7 @@ async function startAuctioneering(client, config, channel) {
   const LARGE_DATASET_WARNING = 1000;
   const CRITICAL_DATASET_SIZE = 5000;
   if (availableItems.length >= CRITICAL_DATASET_SIZE) {
-    console.error(`${EMOJI.ERROR} CRITICAL: ${availableItems.length} items exceeds safe limit (${CRITICAL_DATASET_SIZE})!`);
+    logger.error(`${EMOJI.ERROR} CRITICAL: ${availableItems.length} items exceeds safe limit (${CRITICAL_DATASET_SIZE})!`);
     await channel.send(
       `${EMOJI.ERROR} **Too many items!** (${availableItems.length})\n` +
       `The bot can safely handle up to ${CRITICAL_DATASET_SIZE} items.\n` +
@@ -802,7 +806,7 @@ async function startAuctioneering(client, config, channel) {
     );
     return;
   } else if (availableItems.length >= LARGE_DATASET_WARNING) {
-    console.warn(`${EMOJI.WARNING} Large dataset: ${availableItems.length} items (may impact performance)`);
+    logger.warn(`${EMOJI.WARNING} Large dataset: ${availableItems.length} items (may impact performance)`);
     await channel.send(
       `${EMOJI.WARNING} **Large auction session** (${availableItems.length} items)\n` +
       `Consider splitting into multiple sessions for better performance.`
@@ -886,11 +890,11 @@ async function startAuctioneering(client, config, channel) {
         await feedbackMsg
           .edit({ embeds: [countdownEmbed] })
           .catch((err) =>
-            console.warn(`⚠️ Failed to update countdown:`, err.message)
+            logger.warn(`⚠️ Failed to update countdown:`, err.message)
           );
       }
     } catch (error) {
-      console.error("❌ Error in countdown interval:", error.message);
+      logger.error("❌ Error in countdown interval:", error.message);
       // Continue interval, don't break it
     }
   }, 5000);
@@ -905,12 +909,12 @@ async function startAuctioneering(client, config, channel) {
       // Always use the configured bidding channel
       const biddingChannel = await discordCache.getChannel('bidding_channel_id');
 
-      console.log(
+      logger.info(
         `✅ Using bidding channel: ${biddingChannel.name} (${biddingChannel.id})`
       );
       await auctionNextItem(client, config, biddingChannel);
     } catch (err) {
-      console.error("❌ Failed to fetch bidding channel:", err);
+      logger.error("❌ Failed to fetch bidding channel:", err);
 
       // Cleanup on error
       auctionState.active = false;
@@ -958,10 +962,10 @@ async function ensureThreadCapacity(channel) {
     const THREAD_LIMIT = 50; // Discord's per-channel active thread limit
     const THREAD_WARNING = 40; // Start cleanup at this threshold
 
-    console.log(`📊 Active threads in ${channel.name}: ${activeCount}/${THREAD_LIMIT}`);
+    logger.info(`📊 Active threads in ${channel.name}: ${activeCount}/${THREAD_LIMIT}`);
 
     if (activeCount >= THREAD_WARNING) {
-      console.log(`⚠️ Approaching thread limit (${activeCount}/${THREAD_LIMIT}) - cleaning up...`);
+      logger.info(`⚠️ Approaching thread limit (${activeCount}/${THREAD_LIMIT}) - cleaning up...`);
 
       // Find and archive old auction threads
       let archivedCount = 0;
@@ -988,7 +992,7 @@ async function ensureThreadCapacity(channel) {
           if (!thread.archived) {
             await thread.setArchived(true, 'Auto-cleanup for thread capacity');
             archivedCount++;
-            console.log(`📦 Auto-archived thread: ${thread.name}`);
+            logger.info(`📦 Auto-archived thread: ${thread.name}`);
 
             // Rate limit: Wait between archives
             if (archivedCount % 5 === 0) {
@@ -996,17 +1000,17 @@ async function ensureThreadCapacity(channel) {
             }
           }
         } catch (err) {
-          console.warn(`⚠️ Failed to archive thread ${thread.name}:`, err.message);
+          logger.warn(`⚠️ Failed to archive thread ${thread.name}:`, err.message);
         }
       }
 
-      console.log(`✅ Cleaned up ${archivedCount} old auction threads`);
+      logger.info(`✅ Cleaned up ${archivedCount} old auction threads`);
 
       // Recheck after cleanup
       const activeAfterCleanup = await channel.threads.fetchActive();
       const newCount = activeAfterCleanup.threads.size;
 
-      console.log(`📊 After cleanup: ${newCount}/${THREAD_LIMIT} active threads`);
+      logger.info(`📊 After cleanup: ${newCount}/${THREAD_LIMIT} active threads`);
 
       if (newCount >= THREAD_LIMIT - 2) {
         throw new Error(
@@ -1018,7 +1022,7 @@ async function ensureThreadCapacity(channel) {
   } catch (err) {
     // If thread capacity check fails, log but continue
     // (Better to try creating thread and handle failure than block auction)
-    console.error(`❌ Thread capacity check failed:`, err.message);
+    logger.error(`❌ Thread capacity check failed:`, err.message);
 
     if (err.message.includes('Thread limit reached')) {
       throw err; // Rethrow limit errors
@@ -1058,31 +1062,31 @@ async function ensureThreadCapacity(channel) {
 async function auctionNextItem(client, config, channel) {
   // ✅ Ensure we're using a proper guild text channel
   if (![0, 5].includes(channel.type)) {
-    console.warn(
+    logger.warn(
       `⚠️ Channel type ${channel.type} invalid – refetching bidding channel...`
     );
     try {
       channel = await discordCache.getChannel('bidding_channel_id');
-      console.log(
+      logger.info(
         `✅ Corrected to bidding channel: ${channel.name} (${channel.id})`
       );
     } catch (err) {
-      console.error("❌ Could not refetch bidding channel:", err);
+      logger.error("❌ Could not refetch bidding channel:", err);
       return;
     }
   }
 
   // ✅ Ensure channel reference is valid
   if (!channel) {
-    console.warn("⚠️ Channel is undefined, attempting to refetch...");
+    logger.warn("⚠️ Channel is undefined, attempting to refetch...");
     try {
       channel = await discordCache.getChannel('bidding_channel_id');
       if (!channel) {
-        console.error("❌ Failed to refetch bidding channel.");
+        logger.error("❌ Failed to refetch bidding channel.");
         return;
       }
     } catch (err) {
-      console.error("❌ Error refetching bidding channel:", err);
+      logger.error("❌ Error refetching bidding channel:", err);
       return;
     }
   }
@@ -1100,7 +1104,7 @@ async function auctionNextItem(client, config, channel) {
 
   const item = auctionState.sessionItems[auctionState.currentItemIndex];
   if (!item) {
-    console.error("❌ No item at current index, finalizing...");
+    logger.error("❌ No item at current index, finalizing...");
     await finalizeSession(client, config, channel);
     return;
   }
@@ -1150,7 +1154,7 @@ async function auctionNextItem(client, config, channel) {
     embeds: [previewEmbed],
   });
 
-  console.log(`${EMOJI.CLOCK} 30-second preview for: ${item.item}`);
+  logger.info(`${EMOJI.CLOCK} 30-second preview for: ${item.item}`);
 
   // Wait 30 seconds before starting
   await new Promise((resolve) => setTimeout(resolve, TIMEOUTS.PREVIEW_DELAY));
@@ -1181,7 +1185,7 @@ async function auctionNextItem(client, config, channel) {
       });
     } else {
       // ✅ Fallback: send starter message and create thread from it
-      console.warn(
+      logger.warn(
         "⚠️ channel.threads.create not available – using message.startThread() fallback"
       );
       const starterMsg = await channel.send({
@@ -1240,8 +1244,8 @@ async function auctionNextItem(client, config, channel) {
       });
     }
   } catch (err) {
-    console.error("❌ Failed to create auction thread:", err);
-    console.error(
+    logger.error("❌ Failed to create auction thread:", err);
+    logger.error(
       "→ Check: Bot needs 'Create Public Threads' & 'Send Messages in Threads' in the bidding channel."
     );
 
@@ -1261,9 +1265,9 @@ async function auctionNextItem(client, config, channel) {
       const biddingState = biddingModule.getBiddingState();
       biddingState.lp = {};
       biddingModule.saveBiddingState();
-      console.log(`${EMOJI.SUCCESS} Cleared locked points after thread creation failure`);
+      logger.info(`${EMOJI.SUCCESS} Cleared locked points after thread creation failure`);
     } catch (unlockErr) {
-      console.error(`${EMOJI.ERROR} Failed to clear locked points:`, unlockErr);
+      logger.error(`${EMOJI.ERROR} Failed to clear locked points:`, unlockErr);
     }
 
     // Save state
@@ -1280,7 +1284,7 @@ async function auctionNextItem(client, config, channel) {
         `❌ Unable to create thread for **${item.item}**. Thread creation failed. Auction cancelled.`
       );
     } catch (e) {
-      console.error("❌ Also failed to send fallback message:", e);
+      logger.error("❌ Also failed to send fallback message:", e);
     }
     return;
   }
@@ -1334,11 +1338,11 @@ async function auctionNextItem(client, config, channel) {
     // Schedule the auction end timers (go1, go2, go3, itemEnd)
     scheduleItemTimers(client, config, auctionThread);
 
-    console.log(
+    logger.info(
       `${EMOJI.SUCCESS} Auction started for: ${item.item} (${duration/60000} min)`
     );
   } catch (err) {
-    console.error("❌ Error starting item auction:", err);
+    logger.error("❌ Error starting item auction:", err);
     await channel.send(`❌ Failed to start auction for ${item.item}: ${err.message}`);
 
     // Clean up on error
@@ -1372,7 +1376,7 @@ async function auctionNextItem(client, config, channel) {
 function scheduleItemTimers(client, config, channel) {
   // Validate parameters
   if (!client || !config || !channel || !auctionState.currentItem) {
-    console.error(`${EMOJI.ERROR} Invalid parameters to scheduleItemTimers`);
+    logger.error(`${EMOJI.ERROR} Invalid parameters to scheduleItemTimers`);
     return;
   }
 
@@ -1555,7 +1559,7 @@ function safelyCleanupTimers(...timerKeys) {
  */
 async function itemEnd(client, config, channel) {
   if (!client || !config || !channel) {
-    console.error(`${EMOJI.ERROR} Invalid parameters to itemEnd`);
+    logger.error(`${EMOJI.ERROR} Invalid parameters to itemEnd`);
     return;
   }
 
@@ -1623,7 +1627,7 @@ async function itemEnd(client, config, channel) {
         item._id        // MongoDB item ID (if available)
       );
     } catch (err) {
-      console.error(`${EMOJI.ERROR} Failed to log auction result:`, err);
+      logger.error(`${EMOJI.ERROR} Failed to log auction result:`, err);
     }
 
     // 🧠 AUTO-UPDATE LEARNING SYSTEM (Bot learns from auction result)
@@ -1636,7 +1640,7 @@ async function itemEnd(client, config, channel) {
         );
 
         if (updated) {
-          console.log(`🧠 [LEARNING] Auto-updated prediction accuracy for "${item.item}" (actual: ${item.curBid}pts)`);
+          logger.info(`🧠 [LEARNING] Auto-updated prediction accuracy for "${item.item}" (actual: ${item.curBid}pts)`);
 
           // Optional: Send notification to admin logs
           try {
@@ -1651,15 +1655,15 @@ async function itemEnd(client, config, channel) {
             }
           } catch (notifyErr) {
             // Silent fail on notification (not critical)
-            console.log(`[LEARNING] Could not send admin notification: ${notifyErr.message}`);
+            logger.info(`[LEARNING] Could not send admin notification: ${notifyErr.message}`);
           }
         } else {
           // No matching prediction found (item wasn't predicted, or already updated)
-          console.log(`[LEARNING] No pending prediction found for "${item.item}" (may not have been predicted)`);
+          logger.info(`[LEARNING] No pending prediction found for "${item.item}" (may not have been predicted)`);
         }
       }
     } catch (learnErr) {
-      console.error(`${EMOJI.ERROR} Failed to update learning system:`, learnErr);
+      logger.error(`${EMOJI.ERROR} Failed to update learning system:`, learnErr);
       // Continue auction even if learning fails (non-critical)
     }
 
@@ -1699,7 +1703,7 @@ async function itemEnd(client, config, channel) {
       // Refetch thread to ensure it still exists
       const refreshedThread = await channel.fetch().catch(() => null);
       if (!refreshedThread) {
-        console.warn(
+        logger.warn(
           `⚠️ Thread ${channel.id} no longer exists, skipping lock/archive`
         );
       } else {
@@ -1708,12 +1712,12 @@ async function itemEnd(client, config, channel) {
           await refreshedThread
             .setLocked(true, "Auction ended")
             .catch((err) => {
-              console.warn(
+              logger.warn(
                 `⚠️ Failed to lock thread ${refreshedThread.id}:`,
                 err.message
               );
             });
-          console.log(`🔒 Locked thread for ${item.item}`);
+          logger.info(`🔒 Locked thread for ${item.item}`);
         }
 
         // Small delay to avoid race conditions with Discord API
@@ -1724,17 +1728,17 @@ async function itemEnd(client, config, channel) {
           await refreshedThread
             .setArchived(true, "Auction ended")
             .catch((err) => {
-              console.warn(
+              logger.warn(
                 `⚠️ Failed to archive thread ${refreshedThread.id}:`,
                 err.message
               );
             });
-          console.log(`📦 Archived thread for ${item.item}`);
+          logger.info(`📦 Archived thread for ${item.item}`);
         }
       }
     }
   } catch (err) {
-    console.warn(`⚠️ Error locking/archiving thread:`, err.message);
+    logger.warn(`⚠️ Error locking/archiving thread:`, err.message);
   }
 
   // ✅ Move to next item
@@ -1755,11 +1759,11 @@ async function itemEnd(client, config, channel) {
   // 🎯 SIMPLIFIED: Just check if there are more items
   if (auctionState.currentItemIndex < auctionState.sessionItems.length) {
     // ➡️ Next item
-    console.log(`⏭️ Moving to next item...`);
+    logger.info(`⏭️ Moving to next item...`);
     await auctionNextItem(client, config, biddingChannel);
   } else {
     // ✅ ALL DONE
-    console.log(`🎉 All items completed. Finalizing session.`);
+    logger.info(`🎉 All items completed. Finalizing session.`);
     await finalizeSession(client, config, biddingChannel);
   }
 }
@@ -1795,7 +1799,7 @@ async function itemEnd(client, config, channel) {
 async function finalizeSession(client, config, channel) {
   // Validate parameters
   if (!client || !config || !channel) {
-    console.error(`${EMOJI.ERROR} Invalid parameters to finalizeSession`);
+    logger.error(`${EMOJI.ERROR} Invalid parameters to finalizeSession`);
     return;
   }
 
@@ -1856,10 +1860,10 @@ async function finalizeSession(client, config, channel) {
 
   try {
     if (!postToSheetFunc) {
-      console.error(
+      logger.error(
         `${EMOJI.ERROR} postToSheet not initialized - cannot submit session results`
       );
-      console.log(
+      logger.info(
         `${EMOJI.WARNING} Session results (for manual recovery):`,
         JSON.stringify(submitPayload, null, 2)
       );
@@ -1870,7 +1874,7 @@ async function finalizeSession(client, config, channel) {
         throw new Error(result.message || "Unknown error from sheets");
       }
 
-      console.log(`${EMOJI.SUCCESS} Session results submitted successfully`);
+      logger.info(`${EMOJI.SUCCESS} Session results submitted successfully`);
 
       // Display tally summary in bidding channel
       const winnersWithSpending = combinedResults.filter(
@@ -1898,15 +1902,15 @@ async function finalizeSession(client, config, channel) {
       }
     }
   } catch (err) {
-    console.error(`${EMOJI.ERROR} Failed to submit bidding results:`, err);
-    console.log(
+    logger.error(`${EMOJI.ERROR} Failed to submit bidding results:`, err);
+    logger.info(
       `${EMOJI.WARNING} Session results (for manual recovery):`,
       JSON.stringify(submitPayload, null, 2)
     );
   }
 
   // STEP 3: Move all auctioned items to ForDistribution sheet
-  console.log(`📦 Moving completed auction items to ForDistribution...`);
+  logger.info(`📦 Moving completed auction items to ForDistribution...`);
 
   // Retry logic with exponential backoff
   const maxRetries = 3;
@@ -1916,13 +1920,13 @@ async function finalizeSession(client, config, channel) {
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`📦 Move attempt ${attempt}/${maxRetries}...`);
+      logger.info(`📦 Move attempt ${attempt}/${maxRetries}...`);
 
       moveData = await sheetAPI.call('moveAuctionedItemsToForDistribution');
 
       // Check if the call succeeded
       if (moveData && moveData.status === 'ok') {
-        console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution (skipped ${moveData.skipped || 0})`);
+        logger.info(`✅ Moved ${moveData.moved || 0} items to ForDistribution (skipped ${moveData.skipped || 0})`);
         moveSuccess = true;
 
         // Get admin logs channel
@@ -1942,22 +1946,22 @@ async function finalizeSession(client, config, channel) {
       } else {
         // API returned error status
         lastError = moveData?.message || 'Unknown error from sheets API';
-        console.error(`⚠️ Move attempt ${attempt} failed: ${lastError}`);
+        logger.error(`⚠️ Move attempt ${attempt} failed: ${lastError}`);
 
         if (attempt < maxRetries) {
           const delay = Math.pow(2, attempt) * 1000;
-          console.log(`⏳ Retrying in ${delay/1000}s...`);
+          logger.info(`⏳ Retrying in ${delay/1000}s...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
     } catch (err) {
       lastError = err.message;
-      console.error(`⚠️ Move attempt ${attempt} error:`, err);
+      logger.error(`⚠️ Move attempt ${attempt} error:`, err);
 
       // Retry with exponential backoff (2s, 4s, 8s)
       if (attempt < maxRetries) {
         const delay = Math.pow(2, attempt) * 1000;
-        console.log(`⏳ Retrying in ${delay/1000}s...`);
+        logger.info(`⏳ Retrying in ${delay/1000}s...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -1965,7 +1969,7 @@ async function finalizeSession(client, config, channel) {
 
   // If all retries failed, notify admin
   if (!moveSuccess) {
-    console.error(`❌ Failed to move items after ${maxRetries} attempts: ${lastError}`);
+    logger.error(`❌ Failed to move items after ${maxRetries} attempts: ${lastError}`);
 
     const mainGuild = await client.guilds.fetch(config.main_guild_id);
     const adminLogs = await mainGuild.channels
@@ -2028,7 +2032,7 @@ async function finalizeSession(client, config, channel) {
         }
       );
     } catch (err) {
-      console.error(`${EMOJI.ERROR} Error adding fields to embed:`, err);
+      logger.error(`${EMOJI.ERROR} Error adding fields to embed:`, err);
       // Fallback: try adding fields individually
       adminEmbed.addFields({
         name: `📊 Summary`,
@@ -2044,7 +2048,7 @@ async function finalizeSession(client, config, channel) {
     await adminLogs.send({ embeds: [adminEmbed] });
   }
 
-    console.log("🧹 Clearing session data...");
+    logger.info("🧹 Clearing session data...");
     auctionState.sessionItems = []; // Clear sold items history
 
     // Clear bidding module cache
@@ -2053,12 +2057,12 @@ async function finalizeSession(client, config, channel) {
     }
     biddingModule.clearPointsCache();
 
-    console.log("✅ Session data cleared");
+    logger.info("✅ Session data cleared");
 
     // Save state if config is available
     if (cfg && cfg.sheet_webhook_url) {
       await saveAuctionState(cfg.sheet_webhook_url).catch((err) => {
-        console.error(`${EMOJI.ERROR} Failed to save state:`, err);
+        logger.error(`${EMOJI.ERROR} Failed to save state:`, err);
       });
     }
   } finally {
@@ -2071,16 +2075,16 @@ async function finalizeSession(client, config, channel) {
       const biddingState = biddingModule.getBiddingState();
       biddingState.lp = {};
       biddingModule.saveBiddingState();
-      console.log("✅ Locked points released");
+      logger.info("✅ Locked points released");
     } catch (err) {
-      console.error(`${EMOJI.ERROR} Failed to clear locked points:`, err);
+      logger.error(`${EMOJI.ERROR} Failed to clear locked points:`, err);
       // Don't throw - this is cleanup, continue anyway
     }
 
     // CRITICAL: Mark session as fully finalized AFTER all sheet operations complete
     // This flag is used by the dual-session scheduler to know when Session 1 is truly done
     auctionState.sessionFinalized = true;
-    console.log(`${EMOJI.SUCCESS} Session finalization complete (tallies submitted, items moved)`);
+    logger.info(`${EMOJI.SUCCESS} Session finalization complete (tallies submitted, items moved)`);
   }
 }
 
@@ -2101,22 +2105,22 @@ async function finalizeSession(client, config, channel) {
  * @returns {Promise<Array<Object>>} Array of {member, totalSpent} objects
  */
 async function buildCombinedResults(config) {
-  console.log(`${EMOJI.CHART} Building combined results for ${auctionState.sessionItems?.length || 0} session items...`);
+  logger.info(`${EMOJI.CHART} Building combined results for ${auctionState.sessionItems?.length || 0} session items...`);
 
   // Fetch fresh points from sheet
   let allPoints = {};
   try {
     const data = await sheetAPI.call('getBiddingPoints');
     allPoints = data.points || {};
-    console.log(`${EMOJI.SUCCESS} Fetched points for ${Object.keys(allPoints).length} members`);
+    logger.info(`${EMOJI.SUCCESS} Fetched points for ${Object.keys(allPoints).length} members`);
   } catch (err) {
-    console.error(`${EMOJI.ERROR} Failed to fetch bidding points:`, err);
+    logger.error(`${EMOJI.ERROR} Failed to fetch bidding points:`, err);
     return [];
   }
 
   // Validate sessionItems exists
   if (!auctionState.sessionItems || !Array.isArray(auctionState.sessionItems)) {
-    console.error(`${EMOJI.ERROR} Invalid sessionItems array in auctionState`);
+    logger.error(`${EMOJI.ERROR} Invalid sessionItems array in auctionState`);
     return [];
   }
 
@@ -2133,7 +2137,7 @@ async function buildCombinedResults(config) {
     // Skip items without winners (unsold items)
     if (!item.winner || !item.amount) {
       skippedItems++;
-      console.log(`${EMOJI.WARNING} Skipping item ${index + 1} "${item.item}" - no winner or amount`);
+      logger.info(`${EMOJI.WARNING} Skipping item ${index + 1} "${item.item}" - no winner or amount`);
       return;
     }
 
@@ -2142,7 +2146,7 @@ async function buildCombinedResults(config) {
     processedItems++;
   });
 
-  console.log(`${EMOJI.SUCCESS} Processed ${processedItems} items with winners, skipped ${skippedItems} unsold items`);
+  logger.info(`${EMOJI.SUCCESS} Processed ${processedItems} items with winners, skipped ${skippedItems} unsold items`);
 
   // Build results for ALL members (including 0s for clean logs)
   const results = allMembers.map((m) => {
@@ -2153,7 +2157,7 @@ async function buildCombinedResults(config) {
     };
   });
 
-  console.log(
+  logger.info(
     `${EMOJI.CHART} Built results: ${
       results.filter((r) => r.totalSpent > 0).length
     } winners out of ${results.length} members`
@@ -2194,7 +2198,7 @@ function pauseSession() {
   }
 
   clearAllAuctionTimers();
-  console.log(`${EMOJI.PAUSE} Session paused`);
+  logger.info(`${EMOJI.PAUSE} Session paused`);
 
   // ADD THIS LINE:
   if (cfg && cfg.sheet_webhook_url) {
@@ -2236,7 +2240,7 @@ function resumeSession(client, config, channel) {
   }
 
   scheduleItemTimers(client, config, channel);
-  console.log(`${EMOJI.PLAY} Session resumed`);
+  logger.info(`${EMOJI.PLAY} Session resumed`);
   return true;
 }
 
@@ -2272,7 +2276,7 @@ function resumeSession(client, config, channel) {
  */
 async function stopCurrentItem(client, config, channel) {
   if (!auctionState.active || !auctionState.currentItem) {
-    console.warn("⚠️ No active item to stop.");
+    logger.warn("⚠️ No active item to stop.");
     return false;
   }
 
@@ -2282,11 +2286,11 @@ async function stopCurrentItem(client, config, channel) {
   const item = auctionState.currentItem;
 
   if (item.status === "ended") {
-    console.warn("⚠️ Item already ended — skipping force stop.");
+    logger.warn("⚠️ Item already ended — skipping force stop.");
     return false;
   }
 
-  console.log(`🛑 Forced stop for: ${item.item}`);
+  logger.info(`🛑 Forced stop for: ${item.item}`);
 
   // ✅ Announce forced stop in admin logs
   try {
@@ -2322,7 +2326,7 @@ async function stopCurrentItem(client, config, channel) {
       });
     }
   } catch (err) {
-    console.error("❌ Failed to announce force-stop:", err);
+    logger.error("❌ Failed to announce force-stop:", err);
   }
 
   // ✅ Mark as ended and finalize normally
@@ -2330,7 +2334,7 @@ async function stopCurrentItem(client, config, channel) {
     item.status = "ended";
     await itemEnd(client, config, channel);
   } catch (err) {
-    console.error("❌ Error finalizing forced stop:", err);
+    logger.error("❌ Error finalizing forced stop:", err);
   }
 
   return true;
@@ -2362,7 +2366,7 @@ function extendCurrentItem(minutes) {
   }
 
   auctionState.currentItem.endTime += minutes * 60000;
-  console.log(`${EMOJI.TIME} Extended by ${minutes}m`);
+  logger.info(`${EMOJI.TIME} Extended by ${minutes}m`);
   return true;
 }
 
@@ -2406,7 +2410,7 @@ function safelyClearItemTimers() {
     if (auctionState.timers[key]) {
       clearTimeout(auctionState.timers[key]);
       delete auctionState.timers[key];
-      console.log(`🛑 Cleared timer: ${key}`);
+      logger.info(`🛑 Cleared timer: ${key}`);
     }
   });
 }
@@ -2435,7 +2439,7 @@ function safelyClearItemTimers() {
  */
 function rescheduleItemTimers(client, config, channel) {
   if (!auctionState.active || !auctionState.currentItem) {
-    console.warn(`${EMOJI.WARNING} Cannot reschedule timers - no active item`);
+    logger.warn(`${EMOJI.WARNING} Cannot reschedule timers - no active item`);
     return false;
   }
 
@@ -2458,7 +2462,7 @@ function rescheduleItemTimers(client, config, channel) {
 
   // Reschedule based on new endTime
   scheduleItemTimers(client, config, channel);
-  console.log(`${EMOJI.SUCCESS} Item timers rescheduled for ${auctionState.currentItem.item}`);
+  logger.info(`${EMOJI.SUCCESS} Item timers rescheduled for ${auctionState.currentItem.item}`);
   return true;
 }
 
@@ -2844,7 +2848,7 @@ async function handleMyPoints(message, biddingModule, config) {
       userPts = null;
     }
   } catch (err) {
-    console.error(`❌ Failed to fetch points for !mypoints:`, err.message);
+    logger.error(`❌ Failed to fetch points for !mypoints:`, err.message);
     userPts = null;
   }
 
@@ -2874,7 +2878,7 @@ async function handleMyPoints(message, biddingModule, config) {
   try {
     await errorHandler.safeDelete(message, 'message deletion');
   } catch (e) {
-    console.warn(
+    logger.warn(
       `${EMOJI.WARNING} Could not delete user message: ${e.message}`
     );
   }
@@ -2884,7 +2888,7 @@ async function handleMyPoints(message, biddingModule, config) {
     try {
       await errorHandler.safeDelete(ptsMsg, 'message deletion');
     } catch (e) {
-      console.warn(`${EMOJI.WARNING} Could not delete points message: ${e.message}`);
+      logger.warn(`${EMOJI.WARNING} Could not delete points message: ${e.message}`);
     }
   }, 30000);
 }
@@ -3102,7 +3106,7 @@ async function handleCancelItem(message) {
           // Refetch thread to ensure it still exists
           const refreshedThread = await thread.fetch().catch(() => null);
           if (!refreshedThread) {
-            console.warn(
+            logger.warn(
               `⚠️ Thread ${thread.id} no longer exists, skipping lock/archive`
             );
           } else {
@@ -3110,12 +3114,12 @@ async function handleCancelItem(message) {
               await refreshedThread
                 .setLocked(true, "Item cancelled")
                 .catch((err) => {
-                  console.warn(
+                  logger.warn(
                     `⚠️ Failed to lock cancelled thread:`,
                     err.message
                   );
                 });
-              console.log(`🔒 Locked cancelled thread`);
+              logger.info(`🔒 Locked cancelled thread`);
             }
 
             // Small delay to avoid race conditions with Discord API
@@ -3125,16 +3129,16 @@ async function handleCancelItem(message) {
               await refreshedThread
                 .setArchived(true, "Item cancelled")
                 .catch((err) => {
-                  console.warn(
+                  logger.warn(
                     `⚠️ Failed to archive cancelled thread:`,
                     err.message
                   );
                 });
-              console.log(`📦 Archived cancelled thread`);
+              logger.info(`📦 Archived cancelled thread`);
             }
           }
         } catch (err) {
-          console.warn(`⚠️ Error closing cancelled thread:`, err.message);
+          logger.warn(`⚠️ Error closing cancelled thread:`, err.message);
         }
       }
 
@@ -3271,7 +3275,7 @@ async function handleSkipItem(message) {
           // Refetch thread to ensure it still exists
           const refreshedThread = await thread.fetch().catch(() => null);
           if (!refreshedThread) {
-            console.warn(
+            logger.warn(
               `⚠️ Thread ${thread.id} no longer exists, skipping lock/archive`
             );
           } else {
@@ -3279,12 +3283,12 @@ async function handleSkipItem(message) {
               await refreshedThread
                 .setLocked(true, "Item skipped")
                 .catch((err) => {
-                  console.warn(
+                  logger.warn(
                     `⚠️ Failed to lock skipped thread:`,
                     err.message
                   );
                 });
-              console.log(`🔒 Locked skipped thread`);
+              logger.info(`🔒 Locked skipped thread`);
             }
 
             // Small delay to avoid race conditions with Discord API
@@ -3294,16 +3298,16 @@ async function handleSkipItem(message) {
               await refreshedThread
                 .setArchived(true, "Item skipped")
                 .catch((err) => {
-                  console.warn(
+                  logger.warn(
                     `⚠️ Failed to archive skipped thread:`,
                     err.message
                   );
                 });
-              console.log(`📦 Archived skipped thread`);
+              logger.info(`📦 Archived skipped thread`);
             }
           }
         } catch (err) {
-          console.warn(`⚠️ Error closing skipped thread:`, err.message);
+          logger.warn(`⚠️ Error closing skipped thread:`, err.message);
         }
       }
 
@@ -3481,7 +3485,7 @@ function updateCurrentItemState(updates) {
   if (!auctionState.currentItem) return false;
 
   Object.assign(auctionState.currentItem, updates);
-  console.log(`${EMOJI.SUCCESS} Item state updated:`, Object.keys(updates));
+  logger.info(`${EMOJI.SUCCESS} Item state updated:`, Object.keys(updates));
   return true;
 }
 
@@ -3499,10 +3503,10 @@ function updateCurrentItemState(updates) {
  * @returns {Promise<void>}
  */
 async function endAuctionSession(client, config, channel) {
-  console.log(`🛑 Ending auction session (forced by admin)...`);
+  logger.info(`🛑 Ending auction session (forced by admin)...`);
 
   if (!auctionState.active) {
-    console.log(`${EMOJI.WARNING} No active auction to end`);
+    logger.info(`${EMOJI.WARNING} No active auction to end`);
     return;
   }
 
@@ -3537,14 +3541,14 @@ async function endAuctionSession(client, config, channel) {
         }
       }
     } catch (err) {
-      console.warn(`⚠️ Could not notify current item thread:`, err.message);
+      logger.warn(`⚠️ Could not notify current item thread:`, err.message);
     }
   }
 
   // Finalize the session (submit completed items, clear state)
   await finalizeSession(client, config, channel);
 
-  console.log(`✅ Auction session ended successfully`);
+  logger.info(`✅ Auction session ended successfully`);
 }
 
 /**
@@ -3573,7 +3577,7 @@ async function endAuctionSession(client, config, channel) {
  * @returns {Promise<void>}
  */
 async function handleMoveToDistribution(message, config, client) {
-  console.log(`📦 Admin triggered manual ForDistribution move...`);
+  logger.info(`📦 Admin triggered manual ForDistribution move...`);
 
   try {
     // Send processing message
@@ -3597,15 +3601,15 @@ async function handleMoveToDistribution(message, config, client) {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`📦 Move attempt ${attempt}/${maxRetries}...`);
+        logger.info(`📦 Move attempt ${attempt}/${maxRetries}...`);
 
         moveData = await sheetAPI.call('moveAuctionedItemsToForDistribution');
-        console.log(`✅ Moved ${moveData.moved || 0} items to ForDistribution`);
+        logger.info(`✅ Moved ${moveData.moved || 0} items to ForDistribution`);
         moveSuccess = true;
         break; // Success - exit retry loop
       } catch (err) {
         lastError = err.message;
-        console.error(`⚠️ Move attempt ${attempt} failed:`, err);
+        logger.error(`⚠️ Move attempt ${attempt} failed:`, err);
 
         // OPTIMIZATION v6.7: Exponential backoff with jitter
         if (attempt < maxRetries) {
@@ -3613,7 +3617,7 @@ async function handleMoveToDistribution(message, config, client) {
             Math.pow(2, attempt) * 1000 + Math.random() * 1000,
             30000 // Max 30s
           );
-          console.log(`⏳ Retrying in ${Math.round(delay/1000)}s...`);
+          logger.info(`⏳ Retrying in ${Math.round(delay/1000)}s...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
@@ -3695,7 +3699,7 @@ async function handleMoveToDistribution(message, config, client) {
       });
     }
   } catch (err) {
-    console.error(`❌ handleMoveToDistribution error:`, err);
+    logger.error(`❌ handleMoveToDistribution error:`, err);
     await message.reply({
       embeds: [
         new EmbedBuilder()
@@ -3752,19 +3756,19 @@ const DUAL_SESSION_CONFIG = {
  * @returns {Promise<void>}
  */
 async function startSession2(client, config) {
-  console.log(`${EMOJI.AUCTION} Starting Session 2 of scheduled auction...`);
+  logger.info(`${EMOJI.AUCTION} Starting Session 2 of scheduled auction...`);
 
   try {
     // Check if an auction is already running (shouldn't happen but safety check)
     if (auctionState.active) {
-      console.log(`${EMOJI.WARNING} Auction already running, skipping Session 2`);
+      logger.info(`${EMOJI.WARNING} Auction already running, skipping Session 2`);
       return;
     }
 
     // Fetch the bidding channel
     const biddingChannel = await discordCache.getChannel('bidding_channel_id');
     if (!biddingChannel) {
-      console.error(`${EMOJI.ERROR} Could not fetch bidding channel for Session 2`);
+      logger.error(`${EMOJI.ERROR} Could not fetch bidding channel for Session 2`);
       return;
     }
 
@@ -3787,7 +3791,7 @@ async function startSession2(client, config) {
 
     // CRITICAL: Refresh points cache before Session 2
     // This ensures members have updated points after Session 1 spending
-    console.log(`${EMOJI.INFO} Refreshing points cache for Session 2...`);
+    logger.info(`${EMOJI.INFO} Refreshing points cache for Session 2...`);
 
     try {
       const pointsData = await sheetAPI.call('getBiddingPoints');
@@ -3808,20 +3812,20 @@ async function startSession2(client, config) {
         biddingState.ct = Date.now();
         biddingModule.saveBiddingState();
 
-        console.log(`${EMOJI.SUCCESS} Refreshed ${biddingState.cp.size()} members' points for Session 2`);
+        logger.info(`${EMOJI.SUCCESS} Refreshed ${biddingState.cp.size()} members' points for Session 2`);
       }
     } catch (pointsErr) {
-      console.error(`${EMOJI.ERROR} Failed to refresh points for Session 2:`, pointsErr);
+      logger.error(`${EMOJI.ERROR} Failed to refresh points for Session 2:`, pointsErr);
       await biddingChannel.send(`${EMOJI.WARNING} Could not refresh points cache. Session 2 will use cached points.`);
     }
 
     // Start Session 2
     // startAuctioneering will fetch fresh items (only unsold ones without winners)
     await startAuctioneering(client, config, biddingChannel);
-    console.log(`${EMOJI.SUCCESS} Session 2 started successfully`);
+    logger.info(`${EMOJI.SUCCESS} Session 2 started successfully`);
 
   } catch (err) {
-    console.error(`${EMOJI.ERROR} Failed to start Session 2:`, err);
+    logger.error(`${EMOJI.ERROR} Failed to start Session 2:`, err);
 
     // Notify admin logs
     try {
@@ -3835,7 +3839,7 @@ async function startSession2(client, config) {
         );
       }
     } catch (notifyErr) {
-      console.error(`${EMOJI.ERROR} Could not notify admin logs:`, notifyErr);
+      logger.error(`${EMOJI.ERROR} Could not notify admin logs:`, notifyErr);
     }
   }
 }
@@ -3849,7 +3853,7 @@ async function startSession2(client, config) {
  */
 function scheduleSession2AfterCompletion(client, config) {
   if (!DUAL_SESSION_CONFIG.enabled) {
-    console.log(`${EMOJI.INFO} Dual-session auctions disabled, skipping Session 2 scheduling`);
+    logger.info(`${EMOJI.INFO} Dual-session auctions disabled, skipping Session 2 scheduling`);
     return;
   }
 
@@ -3860,14 +3864,14 @@ function scheduleSession2AfterCompletion(client, config) {
   }
 
   let pollAttempts = 0;
-  console.log(`${EMOJI.CLOCK} Monitoring Session 1 completion for Session 2 scheduling...`);
+  logger.info(`${EMOJI.CLOCK} Monitoring Session 1 completion for Session 2 scheduling...`);
 
   sessionPollInterval = setInterval(async () => {
     pollAttempts++;
 
     // Safety limit - stop polling after max attempts
     if (pollAttempts >= DUAL_SESSION_CONFIG.maxPollAttempts) {
-      console.log(`${EMOJI.WARNING} Max poll attempts reached, stopping Session 2 monitoring`);
+      logger.info(`${EMOJI.WARNING} Max poll attempts reached, stopping Session 2 monitoring`);
       clearInterval(sessionPollInterval);
       sessionPollInterval = null;
       return;
@@ -3876,7 +3880,7 @@ function scheduleSession2AfterCompletion(client, config) {
     // Check if Session 1 has ended AND finalization is complete
     // We check both flags to ensure tallies are submitted and items moved before announcing rest period
     if (!auctionState.active && auctionState.sessionFinalized) {
-      console.log(`${EMOJI.SUCCESS} Session 1 completed and finalized! Scheduling Session 2 after ${DUAL_SESSION_CONFIG.restPeriodMinutes} minute rest...`);
+      logger.info(`${EMOJI.SUCCESS} Session 1 completed and finalized! Scheduling Session 2 after ${DUAL_SESSION_CONFIG.restPeriodMinutes} minute rest...`);
 
       // Stop polling
       clearInterval(sessionPollInterval);
@@ -3914,7 +3918,7 @@ function scheduleSession2AfterCompletion(client, config) {
           });
         }
       } catch (announceErr) {
-        console.error(`${EMOJI.ERROR} Failed to announce rest period:`, announceErr);
+        logger.error(`${EMOJI.ERROR} Failed to announce rest period:`, announceErr);
       }
 
       // Schedule Session 2 after rest period
@@ -3944,7 +3948,7 @@ function scheduleSession2AfterCompletion(client, config) {
               });
             }
           } catch (warnErr) {
-            console.error(`${EMOJI.ERROR} Failed to send Session 2 warning:`, warnErr);
+            logger.error(`${EMOJI.ERROR} Failed to send Session 2 warning:`, warnErr);
           }
         }, warningDelayMs);
       }
@@ -3955,7 +3959,7 @@ function scheduleSession2AfterCompletion(client, config) {
         session2Timer = null;
       }, restDelayMs);
 
-      console.log(`${EMOJI.SUCCESS} Session 2 scheduled to start in ${DUAL_SESSION_CONFIG.restPeriodMinutes} minutes`);
+      logger.info(`${EMOJI.SUCCESS} Session 2 scheduled to start in ${DUAL_SESSION_CONFIG.restPeriodMinutes} minutes`);
     }
   }, DUAL_SESSION_CONFIG.pollIntervalMs);
 }
@@ -3986,11 +3990,11 @@ function scheduleSession2AfterCompletion(client, config) {
 function scheduleWeeklySundayAuction(client, config) {
   // Prevent duplicate schedulers
   if (weeklyAuctionTimer) {
-    console.log(`${EMOJI.WARNING} Weekly auction scheduler already running, skipping initialization`);
+    logger.info(`${EMOJI.WARNING} Weekly auction scheduler already running, skipping initialization`);
     return;
   }
 
-  console.log(`${EMOJI.CLOCK} Initializing weekly Sunday auction scheduler...`);
+  logger.info(`${EMOJI.CLOCK} Initializing weekly Sunday auction scheduler...`);
 
   const calculateNextSunday12PM = () => {
     const now = new Date();
@@ -4048,7 +4052,7 @@ function scheduleWeeklySundayAuction(client, config) {
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const dayName = dayNames[displayTime.getUTCDay()];
 
-    console.log(`${EMOJI.CLOCK} Next Sunday auction scheduled for: ${dayName}, ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${days}d ${hours}h ${minutes}m)`);
+    logger.info(`${EMOJI.CLOCK} Next Sunday auction scheduled for: ${dayName}, ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${days}d ${hours}h ${minutes}m)`);
 
     // Schedule announcement 15 minutes before auction
     const ANNOUNCEMENT_LEAD_TIME = 15 * 60 * 1000; // 15 minutes
@@ -4057,7 +4061,7 @@ function scheduleWeeklySundayAuction(client, config) {
     if (announcementDelay > 0) {
       setTimeout(async () => {
         try {
-          console.log(`${EMOJI.BELL} Sending 15-minute auction warning to announcement channel...`);
+          logger.info(`${EMOJI.BELL} Sending 15-minute auction warning to announcement channel...`);
           const announcementChannel = await discordCache.getChannel('guild_announcement_channel_id').catch(() => null);
 
           if (announcementChannel) {
@@ -4076,23 +4080,23 @@ function scheduleWeeklySundayAuction(client, config) {
                   .setTimestamp()
               ]
             });
-            console.log(`${EMOJI.SUCCESS} Auction announcement sent to announcement channel`);
+            logger.info(`${EMOJI.SUCCESS} Auction announcement sent to announcement channel`);
           } else {
-            console.warn(`${EMOJI.WARNING} Could not fetch announcement channel for pre-auction warning`);
+            logger.warn(`${EMOJI.WARNING} Could not fetch announcement channel for pre-auction warning`);
           }
         } catch (err) {
-          console.error(`${EMOJI.ERROR} Failed to send auction announcement:`, err);
+          logger.error(`${EMOJI.ERROR} Failed to send auction announcement:`, err);
         }
       }, announcementDelay);
     }
 
     weeklyAuctionTimer = setTimeout(async () => {
-      console.log(`${EMOJI.AUCTION} Sunday auction time! Starting auction...`);
+      logger.info(`${EMOJI.AUCTION} Sunday auction time! Starting auction...`);
 
       try {
         // Check if auction is already running
         if (auctionState.active) {
-          console.log(`${EMOJI.WARNING} Auction already running, skipping scheduled start`);
+          logger.info(`${EMOJI.WARNING} Auction already running, skipping scheduled start`);
           scheduleNext();
           return;
         }
@@ -4101,20 +4105,20 @@ function scheduleWeeklySundayAuction(client, config) {
         const biddingChannel = await discordCache.getChannel('bidding_channel_id');
 
         if (!biddingChannel) {
-          console.error(`${EMOJI.ERROR} Could not fetch bidding channel for scheduled auction`);
+          logger.error(`${EMOJI.ERROR} Could not fetch bidding channel for scheduled auction`);
           scheduleNext();
           return;
         }
 
         // Start Session 1 of the auction
         await startAuctioneering(client, config, biddingChannel);
-        console.log(`${EMOJI.SUCCESS} Scheduled Sunday auction Session 1 started successfully`);
+        logger.info(`${EMOJI.SUCCESS} Scheduled Sunday auction Session 1 started successfully`);
 
         // Schedule Session 2 to start after Session 1 completes
         // This monitors when Session 1 ends and schedules Session 2 after rest period
         scheduleSession2AfterCompletion(client, config);
       } catch (err) {
-        console.error(`${EMOJI.ERROR} Failed to start scheduled auction:`, err);
+        logger.error(`${EMOJI.ERROR} Failed to start scheduled auction:`, err);
 
         // Try to notify admin logs
         try {
@@ -4129,7 +4133,7 @@ function scheduleWeeklySundayAuction(client, config) {
             );
           }
         } catch (notifyErr) {
-          console.error(`${EMOJI.ERROR} Could not notify admin logs:`, notifyErr);
+          logger.error(`${EMOJI.ERROR} Could not notify admin logs:`, notifyErr);
         }
       }
 
@@ -4139,7 +4143,7 @@ function scheduleWeeklySundayAuction(client, config) {
   };
 
   scheduleNext();
-  console.log(`${EMOJI.SUCCESS} Weekly Sunday auction scheduler initialized (12:00 PM GMT+8)`);
+  logger.info(`${EMOJI.SUCCESS} Weekly Sunday auction scheduler initialized (12:00 PM GMT+8)`);
 }
 
 /**
@@ -4165,11 +4169,11 @@ let preAuctionSyncTimer = null;
 function schedulePreAuctionSync(sheetAPI, bossRotation) {
   // Prevent duplicate schedulers
   if (preAuctionSyncTimer) {
-    console.log(`${EMOJI.WARNING} Pre-auction sync scheduler already running`);
+    logger.info(`${EMOJI.WARNING} Pre-auction sync scheduler already running`);
     return;
   }
 
-  console.log(`${EMOJI.CLOCK} Initializing pre-auction sync scheduler (1 hour before auction)...`);
+  logger.info(`${EMOJI.CLOCK} Initializing pre-auction sync scheduler (1 hour before auction)...`);
 
   const calculateNextSunday11AM = () => {
     const now = new Date();
@@ -4208,11 +4212,11 @@ function schedulePreAuctionSync(sheetAPI, bossRotation) {
     const hours = Math.floor((delay / 1000 / 60 / 60) % 24);
     const minutes = Math.floor((delay / 1000 / 60) % 60);
 
-    console.log(`${EMOJI.CLOCK} Next pre-auction sync scheduled for: ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${days}d ${hours}h ${minutes}m)`);
+    logger.info(`${EMOJI.CLOCK} Next pre-auction sync scheduled for: ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${days}d ${hours}h ${minutes}m)`);
 
     preAuctionSyncTimer = setTimeout(async () => {
       try {
-        console.log(`${EMOJI.RESET} [PRE-AUCTION SYNC] Starting 1-hour pre-auction sync (Sheets → MongoDB)...`);
+        logger.info(`${EMOJI.RESET} [PRE-AUCTION SYNC] Starting 1-hour pre-auction sync (Sheets → MongoDB)...`);
         const startTime = Date.now();
 
         // Sync bidding points: Sheets → MongoDB
@@ -4224,7 +4228,7 @@ function schedulePreAuctionSync(sheetAPI, bossRotation) {
           const members = pointsData.members || pointsData.data?.members || [];
 
           if (members.length === 0) {
-            console.warn(`${EMOJI.WARNING} [PRE-AUCTION SYNC] No points data received from Sheets`);
+            logger.warn(`${EMOJI.WARNING} [PRE-AUCTION SYNC] No points data received from Sheets`);
           } else {
             const db = await dbAPI.connect();
             const membersCollection = db.collection('members');
@@ -4252,25 +4256,25 @@ function schedulePreAuctionSync(sheetAPI, bossRotation) {
               syncedCount++;
             }
 
-            console.log(`${EMOJI.SUCCESS} [PRE-AUCTION SYNC] Synced ${syncedCount} member points from Sheets → MongoDB`);
+            logger.info(`${EMOJI.SUCCESS} [PRE-AUCTION SYNC] Synced ${syncedCount} member points from Sheets → MongoDB`);
           }
         } catch (pointsError) {
-          console.error(`${EMOJI.ERROR} [PRE-AUCTION SYNC] Failed to sync points:`, pointsError.message);
+          logger.error(`${EMOJI.ERROR} [PRE-AUCTION SYNC] Failed to sync points:`, pointsError.message);
         }
 
         // Also sync boss rotation (good measure)
         try {
           await bossRotation.refreshRotationCache();
-          console.log(`${EMOJI.SUCCESS} [PRE-AUCTION SYNC] Boss rotation synced`);
+          logger.info(`${EMOJI.SUCCESS} [PRE-AUCTION SYNC] Boss rotation synced`);
         } catch (rotationError) {
-          console.error(`${EMOJI.ERROR} [PRE-AUCTION SYNC] Failed to sync rotation:`, rotationError.message);
+          logger.error(`${EMOJI.ERROR} [PRE-AUCTION SYNC] Failed to sync rotation:`, rotationError.message);
         }
 
         const duration = Date.now() - startTime;
-        console.log(`${EMOJI.SUCCESS} [PRE-AUCTION SYNC] Sync complete (${duration}ms) - Ready for auction in 1 hour!`);
+        logger.info(`${EMOJI.SUCCESS} [PRE-AUCTION SYNC] Sync complete (${duration}ms) - Ready for auction in 1 hour!`);
 
       } catch (error) {
-        console.error(`${EMOJI.ERROR} [PRE-AUCTION SYNC] Failed:`, error.message);
+        logger.error(`${EMOJI.ERROR} [PRE-AUCTION SYNC] Failed:`, error.message);
       }
 
       // Schedule next week's sync
@@ -4279,7 +4283,7 @@ function schedulePreAuctionSync(sheetAPI, bossRotation) {
   };
 
   scheduleNext();
-  console.log(`${EMOJI.SUCCESS} Pre-auction sync scheduler initialized (11:00 AM GMT+8 every Sunday)`);
+  logger.info(`${EMOJI.SUCCESS} Pre-auction sync scheduler initialized (11:00 AM GMT+8 every Sunday)`);
 }
 
 /**
@@ -4314,7 +4318,7 @@ function resetSessionState() {
     status.clearedSession2Timer = true;
   }
 
-  console.log(`${EMOJI.SUCCESS} Session state reset:`, status);
+  logger.info(`${EMOJI.SUCCESS} Session state reset:`, status);
   return status;
 }
 

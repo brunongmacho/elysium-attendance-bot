@@ -1219,13 +1219,14 @@ LOG_LEVEL=info                    # Optional: debug/info/warn/error
 ### Project Scripts
 
 ```bash
-npm start              # Run startup script (sync + bot)
-npm run start:direct   # Run bot directly with GC flags
-npm run sync          # Manual MongoDB sync
-npm run deploy        # Push to Google Apps Script
-npm test              # Run Jest tests
-npm run test:watch    # Watch mode
-npm run test:coverage # Coverage report
+npm start              # Fast startup (bot starts immediately, sync in background) - DEFAULT
+npm run start:sync     # Full sync startup (sync before bot starts, slower but thorough)
+npm run start:direct   # Direct bot start with GC flags (no sync)
+npm run sync           # Manual MongoDB sync
+npm run deploy         # Push to Google Apps Script
+npm test               # Run Jest tests
+npm run test:watch     # Watch mode
+npm run test:coverage  # Coverage report
 ```
 
 ---

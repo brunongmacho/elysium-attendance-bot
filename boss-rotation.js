@@ -37,8 +37,13 @@ const { addGuildFooter } = require('./utils/embed-branding');
 const dbAPI = require('./utils/database-api');
 const cron = require('node-cron');
 const mongoHelpers = require('./utils/mongodb-helpers');
+const shutdownManager = require('./utils/shutdown-manager');
+const { createLogger } = require('./utils/logger');
 const fs = require('fs');
 const path = require('path');
+
+// Create logger instance for this module
+const logger = createLogger('boss-rotation');
 
 // ============================================================================
 // MODULE STATE
@@ -136,17 +141,18 @@ async function initialize(cfg, discordClient, bossTimer = null) {
 
   // Start automatic rotation list refresh (every 6 hours)
   // High bosses respawn ~29-32 hours, so 6-hour checks are sufficient
-  setInterval(async () => {
+  const rotationRefreshTimer = setInterval(async () => {
     try {
-      console.log('⏰ [AUTO-REFRESH] Starting scheduled rotation cache refresh (6-hour interval)');
+      logger.info('⏰ [AUTO-REFRESH] Starting scheduled rotation cache refresh (6-hour interval)');
       await refreshRotationCache();
-      console.log('✅ [AUTO-REFRESH] Rotation cache refresh complete');
+      logger.info('✅ [AUTO-REFRESH] Rotation cache refresh complete');
     } catch (error) {
-      console.error('❌ [AUTO-REFRESH] Failed to refresh rotation cache:', error.message);
+      logger.error('❌ [AUTO-REFRESH] Failed to refresh rotation cache:', error.message);
     }
   }, 6 * 60 * 60 * 1000); // 6 hours
 
-  console.log('✅ Automatic rotation refresh scheduled (every 6 hours)');
+  shutdownManager.registerInterval('boss-rotation-refresh', rotationRefreshTimer, { frequency: '6 hours' });
+  logger.info('✅ Automatic rotation refresh scheduled (every 6 hours)');
 
   // Schedule daily rotation summary at 12:00 AM Manila time (UTC+8)
   // Cron expression: '0 0 * * *' means "at 00:00 (midnight) every day"
@@ -154,41 +160,45 @@ async function initialize(cfg, discordClient, bossTimer = null) {
   // But node-cron runs in server's timezone, so we'll use Manila time directly
   cron.schedule('0 0 * * *', async () => {
     try {
-      console.log('⏰ [DAILY-SCHEDULE] Running daily rotation schedule (12:00 AM Manila time)');
+      logger.info('⏰ [DAILY-SCHEDULE] Running daily rotation schedule (12:00 AM Manila time)');
       await postDailyRotationSchedule();
-      console.log('✅ [DAILY-SCHEDULE] Daily rotation schedule posted');
+      logger.info('✅ [DAILY-SCHEDULE] Daily rotation schedule posted');
     } catch (error) {
-      console.error('❌ [DAILY-SCHEDULE] Failed to post daily rotation schedule:', error.message);
+      logger.error('❌ [DAILY-SCHEDULE] Failed to post daily rotation schedule:', error.message);
     }
   }, {
     scheduled: true,
     timezone: "Asia/Manila"
   });
 
-  console.log('✅ Daily rotation schedule configured (posts at 12:00 AM Manila time)');
+  logger.info('✅ Daily rotation schedule configured (posts at 12:00 AM Manila time)');
 
   // Restore daily schedule tracking from MongoDB (in case of bot restart)
   // IMPORTANT: This must run AFTER rotation cache is loaded (which it is now, since we awaited above)
   await restoreDailyScheduleFromMongoDB();
 
   // Clean up old daily schedules from MongoDB (every 6 hours)
-  setInterval(async () => {
+  const scheduleCleanupTimer = setInterval(async () => {
     try {
       await cleanupOldSchedules();
     } catch (err) {
-      console.error('⚠️ Failed to clean up old schedules:', err.message);
+      logger.error('⚠️ Failed to clean up old schedules:', err.message);
     }
   }, 6 * 60 * 60 * 1000); // Run every 6 hours
 
+  shutdownManager.registerInterval('boss-rotation-schedule-cleanup', scheduleCleanupTimer, { frequency: '6 hours' });
+
   // Also run cleanup on startup (to catch any stale messages from crashes)
-  setTimeout(async () => {
+  const startupCleanupTimer = setTimeout(async () => {
     try {
-      console.log('🧹 Running startup cleanup for old daily schedules...');
+      logger.info('🧹 Running startup cleanup for old daily schedules...');
       await cleanupOldSchedules();
     } catch (err) {
-      console.error('⚠️ Failed startup cleanup:', err.message);
+      logger.error('⚠️ Failed startup cleanup:', err.message);
     }
   }, 10000); // Wait 10 seconds after startup to let Discord client fully initialize
+
+  shutdownManager.registerTimeout('boss-rotation-startup-cleanup', startupCleanupTimer, { delay: '10 seconds' });
 }
 
 // ============================================================================

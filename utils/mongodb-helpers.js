@@ -31,6 +31,51 @@ const mongoBreaker = new CircuitBreaker({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Calculate consecutive days streak from attendance records
+ * @param {Array} attendanceRecords - Array of attendance records sorted by timestamp desc
+ * @returns {number} - Current streak in days
+ */
+function calculateMemberStreak(attendanceRecords) {
+  if (attendanceRecords.length === 0) return 0;
+
+  // Get unique dates (normalized to day)
+  const attendanceDates = [];
+  const seenDates = new Set();
+
+  for (let i = 0; i < attendanceRecords.length; i++) {
+    const date = new Date(attendanceRecords[i].timestamp);
+    date.setHours(0, 0, 0, 0);
+    const dateStr = date.toDateString();
+
+    if (!seenDates.has(dateStr)) {
+      seenDates.add(dateStr);
+      attendanceDates.push(date);
+    }
+  }
+
+  // Sort dates descending (most recent first)
+  attendanceDates.sort((a, b) => b - a);
+
+  let streak = 1;
+  for (let i = 0; i < attendanceDates.length - 1; i++) {
+    const dayDiff = Math.floor((attendanceDates[i] - attendanceDates[i + 1]) / (1000 * 60 * 60 * 24));
+
+    if (dayDiff === 1) {
+      streak++;
+    } else if (dayDiff > 1) {
+      break; // Streak broken
+    }
+    // If dayDiff === 0, same day (already handled by seenDates)
+  }
+
+  return streak;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MEMBER OPERATIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -581,6 +626,15 @@ async function addAttendance(data) {
 }
 
 /**
+ * Helper function to escape special regex characters
+ * @param {string} str - String to escape
+ * @returns {string} - Escaped string safe for regex
+ */
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Get member stats (for !stats command)
  * Aggregates attendance, points, and ranking data from MongoDB
  * Returns data in same format as Google Sheets for compatibility
@@ -591,22 +645,22 @@ async function addAttendance(data) {
 async function getMemberStats(memberName) {
   const db = await dbAPI.connect();
 
-  // Step 1: Find member (case-insensitive fuzzy match)
-  const members = await db.collection('members').find({ isActive: true }).toArray();
-
+  // Step 1: Find member using database queries (more efficient than loading all members)
   let member = null;
   let actualMemberName = memberName;
 
-  // Try exact match first (case-insensitive)
-  member = members.find(m => m.username.toLowerCase() === memberName.toLowerCase());
+  // Try exact match first (case-insensitive) - uses username index
+  member = await db.collection('members').findOne({
+    username: { $regex: new RegExp(`^${escapeRegex(memberName)}$`, 'i') },
+    isActive: true
+  });
 
-  // If no exact match, try fuzzy match
+  // If no exact match, try fuzzy match (contains search)
   if (!member) {
-    const searchLower = memberName.toLowerCase();
-    member = members.find(m =>
-      m.username.toLowerCase().includes(searchLower) ||
-      searchLower.includes(m.username.toLowerCase())
-    );
+    member = await db.collection('members').findOne({
+      username: { $regex: new RegExp(escapeRegex(memberName), 'i') },
+      isActive: true
+    });
   }
 
   if (!member) {
@@ -656,60 +710,63 @@ async function getMemberStats(memberName) {
   }
 
   // Step 4: Calculate attendance rate based on unique spawns
-  // Get total unique spawns (unique bossName + timestamp combinations)
-  const uniqueSpawns = await db.collection('attendance').aggregate([
+  // OPTIMIZED: Use $facet to run both queries in parallel (single database call)
+  const [attendanceStats] = await db.collection('attendance').aggregate([
     {
-      $group: {
-        _id: {
-          bossName: '$bossName',
-          timestamp: '$timestamp'
-        }
+      $facet: {
+        // Pipeline 1: Count total unique spawns (all members)
+        totalSpawns: [
+          {
+            $group: {
+              _id: {
+                bossName: '$bossName',
+                timestamp: '$timestamp'
+              }
+            }
+          },
+          {
+            $count: 'total'
+          }
+        ],
+        // Pipeline 2: Count member's unique spawns (this member only)
+        memberSpawns: [
+          {
+            $match: { memberId: member._id }
+          },
+          {
+            $group: {
+              _id: {
+                bossName: '$bossName',
+                timestamp: '$timestamp'
+              }
+            }
+          },
+          {
+            $count: 'total'
+          }
+        ]
       }
-    },
-    {
-      $count: 'total'
     }
   ]).toArray();
 
-  const totalPossibleSpawns = uniqueSpawns.length > 0 ? uniqueSpawns[0].total : 0;
-
-  // Get member's unique spawn attendance (deduplicate by bossName + timestamp)
-  const memberUniqueSpawns = await db.collection('attendance').aggregate([
-    {
-      $match: { memberId: member._id }
-    },
-    {
-      $group: {
-        _id: {
-          bossName: '$bossName',
-          timestamp: '$timestamp'
-        }
-      }
-    },
-    {
-      $count: 'total'
-    }
-  ]).toArray();
-
-  const memberSpawnsAttended = memberUniqueSpawns.length > 0 ? memberUniqueSpawns[0].total : 0;
+  const totalPossibleSpawns = attendanceStats.totalSpawns[0]?.total || 0;
+  const memberSpawnsAttended = attendanceStats.memberSpawns[0]?.total || 0;
 
   // Rate = (spawns attended / total spawns) * 100, capped at 100%
   const attendanceRate = totalPossibleSpawns > 0
     ? Math.min(100, Math.round((memberSpawnsAttended / totalPossibleSpawns) * 100))
     : 0;
 
-  // Step 5: Calculate streak
-  // TODO: Implement streak calculation from attendance records
-  const currentStreak = member.attendance?.streak?.current || 0;
+  // Step 5: Calculate streak from attendance records
+  const currentStreak = calculateMemberStreak(attendanceRecords);
 
-  // Step 6: Get ranking
-  const allMembers = members.filter(m => m.isActive);
-  const sortedByAttendance = allMembers
-    .map(m => ({
-      username: m.username,
-      total: m.attendance?.total || 0
-    }))
-    .sort((a, b) => b.total - a.total);
+  // Step 6: Get ranking (optimized: only fetch needed fields, sort in database)
+  const sortedByAttendance = await db.collection('members').find(
+    { isActive: true },
+    { projection: { username: 1, 'attendance.total': 1 } }
+  )
+    .sort({ 'attendance.total': -1 })
+    .toArray();
 
   const rank = sortedByAttendance.findIndex(m => m.username === actualMemberName) + 1;
 
