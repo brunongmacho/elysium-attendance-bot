@@ -795,7 +795,7 @@ async function getMemberStats(memberName) {
       consumptionRate: consumptionRate
     },
     rank: rank,
-    totalMembers: allMembers.length
+    totalMembers: sortedByAttendance.length
   };
 }
 
