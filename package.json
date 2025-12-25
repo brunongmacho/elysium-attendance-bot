@@ -4,8 +4,8 @@
   "description": "Boss attendance + points bot for ELYSIUM guild",
   "main": "index2.js",
   "scripts": {
-    "start": "node scripts/startup.js",
-    "start:fast": "node scripts/startup-fast.js",
+    "start": "node scripts/startup-fast.js",
+    "start:sync": "node scripts/startup.js",
     "start:direct": "node --expose-gc --max-old-space-size=360 --max-semi-space-size=40 index2.js",
     "sync": "node scripts/sync-sheets-to-mongodb.js",
     "deploy": "clasp push",
