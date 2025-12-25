@@ -57,6 +57,7 @@
 const { EmbedBuilder } = require("discord.js");
 const { SheetAPI, clientCache } = require('./utils/sheet-api');
 const bossRotation = require('./boss-rotation.js');
+const bossTimer = require('./boss-timer.js');
 const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images');
 const { addGuildFooter } = require('./utils/embed-branding');
 const errorHandler = require('./utils/error-handler');
@@ -2049,6 +2050,10 @@ async function createThreadForBoss(discordClient, bossName, spawnTime, noAutoClo
   const guild = await discordClient.guilds.fetch(config.main_guild_id);
   const attChannel = await guild.channels.fetch(config.attendance_channel_id);
   const thread = await attChannel.threads.fetch(threadId);
+
+  // Clear boss timer entry if thread was created (makes boss available again)
+  // This handles both timer system spawns and external bot spawns
+  await bossTimer.clearBossTimerOnSpawn(bossName);
 
   return thread;
 }
