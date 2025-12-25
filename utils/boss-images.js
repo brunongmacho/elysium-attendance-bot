@@ -40,6 +40,51 @@ const BOSS_NAME_MAPPINGS = {
   'Guild Boss': 'guild-boss'
 };
 
+/**
+ * Boss image cache - initialized once at module load
+ * Maps normalized boss names to full image paths
+ * Eliminates repeated filesystem scans
+ */
+let BOSS_IMAGE_CACHE = null;
+
+/**
+ * Initialize boss image cache by scanning directory once
+ * @returns {Map<string, string>} Map of normalized names to file paths
+ */
+function initializeBossImageCache() {
+  if (BOSS_IMAGE_CACHE) return BOSS_IMAGE_CACHE;
+
+  const cache = new Map();
+
+  if (!fs.existsSync(BOSS_IMAGES_DIR)) {
+    console.warn('⚠️ Boss images directory not found:', BOSS_IMAGES_DIR);
+    BOSS_IMAGE_CACHE = cache;
+    return cache;
+  }
+
+  try {
+    const files = fs.readdirSync(BOSS_IMAGES_DIR);
+
+    files.forEach(file => {
+      const ext = path.extname(file);
+      if (IMAGE_EXTENSIONS.includes(ext.toLowerCase())) {
+        const baseName = path.basename(file, ext).toLowerCase();
+        cache.set(baseName, path.join(BOSS_IMAGES_DIR, file));
+      }
+    });
+
+    console.log(`✅ Boss image cache initialized (${cache.size} images loaded)`);
+  } catch (error) {
+    console.error('❌ Failed to initialize boss image cache:', error.message);
+  }
+
+  BOSS_IMAGE_CACHE = cache;
+  return cache;
+}
+
+// Initialize cache at module load (one-time cost)
+initializeBossImageCache();
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -64,34 +109,16 @@ function normalizeBossName(bossName) {
 
 /**
  * Find boss image file with any supported extension
- * Does case-insensitive matching to handle different filename capitalizations
+ * OPTIMIZED: Uses in-memory cache instead of filesystem scan
  * @param {string} normalizedName - Normalized boss name (without extension)
  * @returns {string|null} Full path to image file, or null if not found
  */
 function findBossImageFile(normalizedName) {
   if (!normalizedName) return null;
 
-  // Check if directory exists
-  if (!fs.existsSync(BOSS_IMAGES_DIR)) {
-    return null;
-  }
-
-  // Read all files in the directory
-  const files = fs.readdirSync(BOSS_IMAGES_DIR);
-
-  // Try each supported extension with case-insensitive matching
-  for (const ext of IMAGE_EXTENSIONS) {
-    const targetFilename = `${normalizedName}${ext}`.toLowerCase();
-
-    // Find a file that matches case-insensitively
-    const matchingFile = files.find(file => file.toLowerCase() === targetFilename);
-
-    if (matchingFile) {
-      return path.join(BOSS_IMAGES_DIR, matchingFile);
-    }
-  }
-
-  return null;
+  // Use cached image paths (O(1) lookup vs O(n) directory scan)
+  const cache = BOSS_IMAGE_CACHE || initializeBossImageCache();
+  return cache.get(normalizedName.toLowerCase()) || null;
 }
 
 // ============================================================================
@@ -165,17 +192,12 @@ function getBossImageAttachmentURL(bossName, guild = null) {
 
 /**
  * Get all available boss images
+ * OPTIMIZED: Returns cached boss names instead of re-scanning directory
  * @returns {Array<string>} Array of boss names that have images
  */
 function getAvailableBossImages() {
-  if (!fs.existsSync(BOSS_IMAGES_DIR)) {
-    return [];
-  }
-
-  const files = fs.readdirSync(BOSS_IMAGES_DIR);
-  return files
-    .filter(file => IMAGE_EXTENSIONS.some(ext => file.endsWith(ext)))
-    .map(file => path.basename(file, path.extname(file)));
+  const cache = BOSS_IMAGE_CACHE || initializeBossImageCache();
+  return Array.from(cache.keys());
 }
 
 // ============================================================================

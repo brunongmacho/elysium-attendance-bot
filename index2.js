@@ -5063,27 +5063,29 @@ client.on(Events.MessageCreate, async (message) => {
 
     // 🧹 BIDDING CHANNEL PROTECTION: Delete non-admin messages immediately
     // EXCEPT for member commands (!mypoints, !bidstatus, etc.)
+    // OPTIMIZED: Check command first, only fetch member if needed
     // Skip for bot messages (will be handled later)
     if (
       message.channel.id === config.bidding_channel_id &&
       !message.author.bot
     ) {
-      const member = await message.guild.members
-        .fetch(message.author.id)
-        .catch(() => null);
+      const content = message.content.trim().toLowerCase();
+      const memberCommands = [
+        '!mypoints', '!mp', '!pts', '!mypts',
+        '!bidstatus', '!bs', '!bstatus'
+      ];
 
-      // If not an admin, check if it's a valid member command
-      if (member && !isAdmin(member)) {
-        const content = message.content.trim().toLowerCase();
-        const memberCommands = [
-          '!mypoints', '!mp', '!pts', '!mypts',
-          '!bidstatus', '!bs', '!bstatus'
-        ];
+      // Check if it's a member command BEFORE fetching member (faster)
+      const isMemberCommand = memberCommands.some(cmd => content.startsWith(cmd));
 
-        // Allow member commands through, delete everything else
-        const isMemberCommand = memberCommands.some(cmd => content.startsWith(cmd));
+      // Only fetch member if it's NOT a member command (will be deleted)
+      if (!isMemberCommand) {
+        const member = await message.guild.members
+          .fetch(message.author.id)
+          .catch(() => null);
 
-        if (!isMemberCommand) {
+        // If not an admin, delete the message
+        if (member && !isAdmin(member)) {
           try {
             await errorHandler.safeDelete(message, 'message deletion');
             console.log(
@@ -5096,8 +5098,8 @@ client.on(Events.MessageCreate, async (message) => {
           }
           return; // Stop processing
         }
-        // If it IS a member command, continue processing below
       }
+      // If it IS a member command, continue processing below
     }
     // Debug for !bid detection
     if (

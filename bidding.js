@@ -182,6 +182,10 @@ const { normalizeUsername, formatDuration } = require("./modules/bidding/utiliti
 const errorHandler = require('./utils/error-handler');
 const { PointsCache } = require('./utils/points-cache');
 const { SheetAPI } = require('./utils/sheet-api');
+const { createLogger } = require('./utils/logger');
+
+// Create logger instance for this module
+const logger = createLogger('bidding');
 
 // MongoDB Integration (Phase 4)
 const mongoHelpers = require('./utils/mongodb-helpers');
@@ -673,7 +677,7 @@ async function save(forceSync = false) {
       fs.writeFileSync(SF, JSON.stringify(cleanState, null, 2));
     } catch (fileErr) {
       // On Koyeb, file system might be read-only or restricted
-      console.warn(
+      logger.warn(
         "⚠️ Local file save failed (expected on Koyeb):",
         fileErr.message
       );
@@ -688,36 +692,36 @@ async function save(forceSync = false) {
       lastSheetSyncTime = now;
       if (forceSync) {
         // When forceSync is true, await the sync with retry logic
-        console.log("📊 Forcing immediate state sync to Google Sheets...");
+        logger.info("📊 Forcing immediate state sync to Google Sheets...");
         const maxRetries = 3;
         let lastError;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
           try {
             await saveBiddingStateToSheet();
-            console.log("✅ State successfully synced to Google Sheets");
+            logger.info("✅ State successfully synced to Google Sheets");
             break; // Success
           } catch (err) {
             lastError = err;
             if (attempt < maxRetries) {
               const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s
-              console.warn(`⚠️ Sync attempt ${attempt} failed, retrying in ${delay}ms...`);
+              logger.warn(`⚠️ Sync attempt ${attempt} failed, retrying in ${delay}ms...`);
               await new Promise(r => setTimeout(r, delay));
             }
           }
         }
         if (lastError) {
-          console.error(`❌ All ${maxRetries} sync attempts failed:`, lastError.message);
+          logger.error(`❌ All ${maxRetries} sync attempts failed:`, lastError.message);
           throw new Error(`Failed to sync state after ${maxRetries} attempts`);
         }
       } else {
         // Background sync (fire-and-forget for periodic saves)
         saveBiddingStateToSheet().catch((err) => {
-          console.error("❌ Background sheet sync failed:", err.message);
+          logger.error("❌ Background sheet sync failed:", err.message);
         });
       }
     }
   } catch (e) {
-    console.error("❌ Save:", e);
+    logger.error("❌ Save:", e);
   }
 }
 
@@ -752,16 +756,16 @@ async function load() {
         auctionLock: false,
         cacheRefreshTimer: null,
       };
-      console.log("✅ Loaded state from local file");
+      logger.info("✅ Loaded state from local file");
       return true;
     }
   } catch (e) {
-    console.warn("⚠️ Local file load failed:", e.message);
+    logger.warn("⚠️ Local file load failed:", e.message);
   }
 
   // Fallback to Google Sheets (for Koyeb restarts)
   if (cfg && cfg.sheet_webhook_url) {
-    console.log("📊 Local file not found, loading from Google Sheets...");
+    logger.info("📊 Local file not found, loading from Google Sheets...");
     try {
       const sheetState = await loadBiddingStateFromSheet(cfg.sheet_webhook_url);
       if (sheetState) {
@@ -778,15 +782,15 @@ async function load() {
           auctionLock: false,
           cacheRefreshTimer: null,
         };
-        console.log("✅ Loaded state from Google Sheets");
+        logger.info("✅ Loaded state from Google Sheets");
         return true;
       }
     } catch (err) {
-      console.error("❌ Sheet load failed:", err.message);
+      logger.error("❌ Sheet load failed:", err.message);
     }
   }
 
-  console.log("ℹ️ Starting with fresh state");
+  logger.info("ℹ️ Starting with fresh state");
   return false;
 }
 
@@ -869,7 +873,7 @@ async function fetchPts(url) {
     const result = await sheetAPI.call('getBiddingPointsSummary');
     return result.points || {};
   } catch (e) {
-    console.error("❌ Fetch pts:", e);
+    logger.error("❌ Fetch pts:", e);
     return null;
   }
 }
@@ -908,7 +912,7 @@ async function submitRes(url, res, time) {
     return { ok: false, err: "Missing data" };
 
   // Submit to Google Sheets only (MongoDB removed per user request)
-  console.log(`💾 Submitting ${res.length} member results to Google Sheets...`);
+  logger.info(`💾 Submitting ${res.length} member results to Google Sheets...`);
   const startTime = Date.now();
 
   try {
@@ -920,14 +924,14 @@ async function submitRes(url, res, time) {
     const duration = Date.now() - startTime;
 
     if (d.status === "ok") {
-      console.log(`✅ [Sheets] Results submitted successfully (${duration}ms)`);
+      logger.info(`✅ [Sheets] Results submitted successfully (${duration}ms)`);
       return { ok: true, d: { status: "ok", source: 'Google Sheets' } };
     } else {
-      console.error(`❌ [Sheets] Failed to submit results: ${d.message || d.err}`);
+      logger.error(`❌ [Sheets] Failed to submit results: ${d.message || d.err}`);
       return { ok: false, err: d.message || d.err, res };
     }
   } catch (error) {
-    console.error(`❌ [Sheets] Failed to submit results:`, error.message);
+    logger.error(`❌ [Sheets] Failed to submit results:`, error.message);
     return { ok: false, err: error.message, res };
   }
 }
@@ -955,22 +959,22 @@ async function submitRes(url, res, time) {
 async function loadCache(url) {
   // Validate URL parameter
   if (!url || typeof url !== "string") {
-    console.error("❌ Invalid URL provided to loadCache");
+    logger.error("❌ Invalid URL provided to loadCache");
     return false;
   }
 
-  console.log("🔄 Loading cache...");
+  logger.info("🔄 Loading cache...");
   const t0 = Date.now();
   const p = await fetchPts(url);
   if (!p) {
-    console.error("❌ Cache fail");
+    logger.error("❌ Cache fail");
     return false;
   }
   // Wrap points data in PointsCache for O(1) lookups
   st.cp = new PointsCache(p);
   st.ct = Date.now();
   save();
-  console.log(
+  logger.info(
     `✅ Cache: ${Date.now() - t0}ms - ${Object.keys(p).length} members`
   );
 
@@ -1013,19 +1017,19 @@ function startCacheAutoRefresh(url) {
       }
 
       if (biddingActive || auctioneeringActive) {
-        console.log("🔄 Auto-refreshing cache...");
+        logger.info("🔄 Auto-refreshing cache...");
         await loadCache(url);
       } else {
         // Stop refreshing if no active auction
         stopCacheAutoRefresh();
       }
     } catch (error) {
-      console.error("❌ Error in cache auto-refresh:", error.message);
+      logger.error("❌ Error in cache auto-refresh:", error.message);
       // Continue interval, don't break it
     }
   }, CACHE_REFRESH_INTERVAL);
 
-  console.log("✅ Cache auto-refresh enabled (every 30 minutes)");
+  logger.info("✅ Cache auto-refresh enabled (every 30 minutes)");
 }
 
 /**
@@ -1040,7 +1044,7 @@ function stopCacheAutoRefresh() {
   if (st.cacheRefreshTimer) {
     clearInterval(st.cacheRefreshTimer);
     st.cacheRefreshTimer = null;
-    console.log("⏹️ Cache auto-refresh stopped");
+    logger.info("⏹️ Cache auto-refresh stopped");
   }
 }
 
@@ -1119,12 +1123,12 @@ async function logBidRejection(client, config, details) {
         await adminLogs.send({ embeds: [embed] });
       } catch (err) {
         // Silent fail - don't block bidding if admin logging fails
-        console.error('Failed to log bid rejection to admin channel:', err.message);
+        logger.error('Failed to log bid rejection to admin channel:', err.message);
       }
     }, 0);
   } catch (err) {
     // Silent fail
-    console.error('logBidRejection error:', err.message);
+    logger.error('logBidRejection error:', err.message);
   }
 }
 
@@ -1146,7 +1150,7 @@ async function logBidRejection(client, config, details) {
  * - Any pending bids will fail with "cache not loaded" error
  */
 function clearCache() {
-  console.log("🧹 Clear cache");
+  logger.info("🧹 Clear cache");
   stopCacheAutoRefresh();
   st.cp = null;
   st.ct = null;
@@ -1190,7 +1194,7 @@ function pauseAuction() {
     }
   });
 
-  console.log(`${EMOJI.PAUSE} PAUSED: ${st.a.remainingTime}ms remaining`);
+  logger.info(`${EMOJI.PAUSE} PAUSED: ${st.a.remainingTime}ms remaining`);
   save();
   return true;
 }
@@ -1231,14 +1235,14 @@ function resumeAuction(cli, cfg) {
     st.a.endTime = Date.now() + 60000;
     st.a.goingOnceAnnounced = false;
     st.a.goingTwiceAnnounced = false;
-    console.log(
+    logger.info(
       `${EMOJI.PLAY} RESUME: Extended to 60s (was ${Math.floor(
         st.a.remainingTime / 1000
       )}s)`
     );
   } else {
     st.a.endTime = Date.now() + st.a.remainingTime;
-    console.log(`${EMOJI.PLAY} RESUME: ${st.a.remainingTime}ms remaining`);
+    logger.info(`${EMOJI.PLAY} RESUME: ${st.a.remainingTime}ms remaining`);
   }
 
   delete st.a.pausedAt;
@@ -1401,7 +1405,7 @@ async function ann1(cli, cfg) {
   // Bug #26 fix: Check thread existence before sending
   const th = await cli.channels.fetch(a.threadId).catch(() => null);
   if (!th) {
-    console.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, skipping announcement`);
+    logger.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, skipping announcement`);
     return;
   }
 
@@ -1434,7 +1438,7 @@ async function ann2(cli, cfg) {
   // Bug #26 fix: Check thread existence before sending
   const th = await cli.channels.fetch(a.threadId).catch(() => null);
   if (!th) {
-    console.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, skipping announcement`);
+    logger.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, skipping announcement`);
     return;
   }
 
@@ -1467,7 +1471,7 @@ async function ann3(cli, cfg) {
   // Bug #26 fix: Check thread existence before sending
   const th = await cli.channels.fetch(a.threadId).catch(() => null);
   if (!th) {
-    console.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, skipping announcement`);
+    logger.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, skipping announcement`);
     return;
   }
 
@@ -1500,7 +1504,7 @@ async function endAuc(cli, cfg) {
   // Bug #26 fix: Check thread existence before sending
   const th = await cli.channels.fetch(a.threadId).catch(() => null);
   if (!th) {
-    console.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, cannot send auction results`);
+    logger.error(`${EMOJI.ERROR} Thread ${a.threadId} no longer exists, cannot send auction results`);
     // Still need to finalize to clear locked points and update state
     await finalize(cli, cfg);
     return;
@@ -1566,7 +1570,7 @@ async function endAuc(cli, cfg) {
     if (st.h.length > MAX_HISTORY_SIZE) {
       const removed = st.h.length - MAX_HISTORY_SIZE;
       st.h = st.h.slice(-MAX_HISTORY_SIZE);
-      console.log(`🧹 Trimmed auction history: removed ${removed} oldest entries, kept ${MAX_HISTORY_SIZE}`);
+      logger.info(`🧹 Trimmed auction history: removed ${removed} oldest entries, kept ${MAX_HISTORY_SIZE}`);
     }
   } else if (a.curWin) {
     // Single item auction
@@ -1605,7 +1609,7 @@ async function endAuc(cli, cfg) {
     if (st.h.length > MAX_HISTORY_SIZE) {
       const removed = st.h.length - MAX_HISTORY_SIZE;
       st.h = st.h.slice(-MAX_HISTORY_SIZE);
-      console.log(`🧹 Trimmed auction history: removed ${removed} oldest entries, kept ${MAX_HISTORY_SIZE}`);
+      logger.info(`🧹 Trimmed auction history: removed ${removed} oldest entries, kept ${MAX_HISTORY_SIZE}`);
     }
   } else {
     // No bids
@@ -1625,14 +1629,14 @@ async function endAuc(cli, cfg) {
     await th
       .setLocked(true, "Auction ended")
       .catch((err) =>
-        console.warn(`⚠️ Failed to lock thread ${th.id}:`, err.message)
+        logger.warn(`⚠️ Failed to lock thread ${th.id}:`, err.message)
       );
   }
 
   await th
     .setArchived(true, "Ended")
     .catch((err) =>
-      console.warn(`⚠️ Failed to archive thread ${th.id}:`, err.message)
+      logger.warn(`⚠️ Failed to archive thread ${th.id}:`, err.message)
     );
   st.q.shift();
   st.a = null;
@@ -1656,7 +1660,7 @@ async function endAuc(cli, cfg) {
 
 async function submitSessionTally(config, sessionItems) {
   if (!st.cp || sessionItems.length === 0) {
-    console.log(`⚠️ No items to tally`);
+    logger.info(`⚠️ No items to tally`);
     return;
   }
 
@@ -1681,13 +1685,13 @@ async function submitSessionTally(config, sessionItems) {
   const sub = await submitRes(config.sheet_webhook_url, res, st.sd);
 
   if (sub.ok) {
-    console.log(`✅ Session tally submitted`);
+    logger.info(`✅ Session tally submitted`);
     st.h = [];
     st.sd = null;
     st.lp = {};
     clearCache();
   } else {
-    console.error(`❌ Tally submission failed:`, sub.err);
+    logger.error(`❌ Tally submission failed:`, sub.err);
   }
 }
 
@@ -1704,7 +1708,7 @@ async function saveBiddingStateToSheet() {
     if (FEATURE_FLAGS.USE_MONGODB_BIDDING) {
       try {
         await mongoHelpers.saveBotState('bidding', stateToSave);
-        console.log(`✅ [MongoDB] Bot state saved`);
+        logger.info(`✅ [MongoDB] Bot state saved`);
 
         // Queue background sync to Sheets
         sheetSync.queueSync({
@@ -1714,7 +1718,7 @@ async function saveBiddingStateToSheet() {
 
         return;
       } catch (mongoError) {
-        console.error(`❌ [MongoDB] Save state error:`, mongoError);
+        logger.error(`❌ [MongoDB] Save state error:`, mongoError);
         // Fall through to Sheets as backup
       }
     }
@@ -1724,9 +1728,9 @@ async function saveBiddingStateToSheet() {
       state: stateToSave,
     });
 
-    console.log(`✅ Bot state saved to sheet`);
+    logger.info(`✅ Bot state saved to sheet`);
   } catch (e) {
-    console.error(`❌ Save state:`, e);
+    logger.error(`❌ Save state:`, e);
   }
 }
 
@@ -1736,13 +1740,13 @@ async function loadBiddingStateFromSheet(url) {
     try {
       const mongoState = await mongoHelpers.getBotState('bidding');
       if (mongoState) {
-        console.log(`✅ [MongoDB] Bot state loaded`);
+        logger.info(`✅ [MongoDB] Bot state loaded`);
         return mongoState;
       }
-      console.log(`ℹ️ [MongoDB] No saved state found, trying Sheets...`);
+      logger.info(`ℹ️ [MongoDB] No saved state found, trying Sheets...`);
     } catch (mongoError) {
-      console.error(`❌ [MongoDB] Load state error:`, mongoError);
-      console.log(`🔄 Falling back to Sheets...`);
+      logger.error(`❌ [MongoDB] Load state error:`, mongoError);
+      logger.info(`🔄 Falling back to Sheets...`);
     }
   }
 
@@ -1751,7 +1755,7 @@ async function loadBiddingStateFromSheet(url) {
     const data = await sheetAPI.call('getBotState');
     return data.state || null;
   } catch (e) {
-    console.error(`❌ Load state:`, e);
+    logger.error(`❌ Load state:`, e);
     return null;
   }
 }
@@ -1762,7 +1766,7 @@ let finalizationInProgress = false;
 async function finalize(cli, cfg) {
   // Prevent concurrent finalization or bids during finalization
   if (finalizationInProgress) {
-    console.warn("⚠️ Finalization already in progress, skipping duplicate call");
+    logger.warn("⚠️ Finalization already in progress, skipping duplicate call");
     return;
   }
 
@@ -1803,9 +1807,9 @@ async function finalize(cli, cfg) {
     };
   });
 
-  console.log(`${EMOJI.CHART} FINALIZE DEBUG:`);
-  console.log("Winners (normalized):", winners);
-  console.log(
+  logger.info(`${EMOJI.CHART} FINALIZE DEBUG:`);
+  logger.info("Winners (normalized):", winners);
+  logger.info(
     "Non-zero results:",
     res.filter((r) => r.totalSpent > 0)
   );
@@ -1940,7 +1944,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   const currentSession = currentItem.currentSession;
   if (!currentSession) {
     await msg.reply(ERROR_MESSAGES.SESSION_UNAVAILABLE);
-    console.error(`⚠️ Missing currentSession for item: ${currentItem.item}`);
+    logger.error(`⚠️ Missing currentSession for item: ${currentItem.item}`);
     return { ok: false, msg: "No session" };
   }
 
@@ -2057,7 +2061,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     try {
       unlock(currentItem.curWin, currentItem.curBid);
     } catch (err) {
-      console.error(`❌ CRITICAL: Failed to unlock points for ${currentItem.curWin}:`, err);
+      logger.error(`❌ CRITICAL: Failed to unlock points for ${currentItem.curWin}:`, err);
       // Log to admin but continue - don't block new bid
       // This should be investigated as it may indicate state corruption
     }
@@ -2067,13 +2071,13 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   try {
     lock(u, needed);
   } catch (err) {
-    console.error(`❌ CRITICAL: Failed to lock points for ${u}:`, err);
+    logger.error(`❌ CRITICAL: Failed to lock points for ${u}:`, err);
     // If we can't lock points, we MUST restore previous state
     if (currentItem.curWin && !isSelf) {
       try {
         lock(currentItem.curWin, currentItem.curBid); // Re-lock previous winner
       } catch (restoreErr) {
-        console.error(`❌ FATAL: Failed to restore previous state:`, restoreErr);
+        logger.error(`❌ FATAL: Failed to restore previous state:`, restoreErr);
       }
     }
     return {
@@ -2109,7 +2113,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     if (!auctRef ||
         typeof auctRef.safelyClearItemTimers !== "function" ||
         typeof auctRef.rescheduleItemTimers !== "function") {
-      console.error("❌ Cannot extend time - auctioneering module missing critical timer methods");
+      logger.error("❌ Cannot extend time - auctioneering module missing critical timer methods");
       return {
         status: "error",
         msg: "⚠️ Time extension failed - system error. Please contact admin.",
@@ -2118,7 +2122,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 
     // STEP 1: Clear ALL timers IMMEDIATELY to prevent old itemEnd from firing
     auctRef.safelyClearItemTimers();
-    console.log(`🛑 Cleared timers to prevent race condition`);
+    logger.info(`🛑 Cleared timers to prevent race condition`);
 
     // STEP 2: Update endTime (now safe since timers are cleared)
     const extensionTime = 60000; // 1 minute
@@ -2127,12 +2131,12 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     currentItem.extCnt++;
     timeExtended = true;
 
-    console.log(
+    logger.info(
       `⏰ Time extended for ${currentItem.item} by 1 minute (bid in final minute, ext #${currentItem.extCnt}/${ME})`
     );
-    console.log(`📊 Old end time: ${new Date(oldEndTime).toLocaleTimeString()}`);
-    console.log(`📊 New end time: ${new Date(currentItem.endTime).toLocaleTimeString()}`);
-    console.log(`📊 New time left: ${Math.ceil((currentItem.endTime - Date.now()) / 1000)}s`);
+    logger.info(`📊 Old end time: ${new Date(oldEndTime).toLocaleTimeString()}`);
+    logger.info(`📊 New end time: ${new Date(currentItem.endTime).toLocaleTimeString()}`);
+    logger.info(`📊 New time left: ${Math.ceil((currentItem.endTime - Date.now()) / 1000)}s`);
 
     // STEP 3: Reschedule timers with new endTime
     auctRef.rescheduleItemTimers(
@@ -2140,12 +2144,12 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
       config,
       msg.channel
     );
-    console.log(`✅ Timers rescheduled with new endTime`);
+    logger.info(`✅ Timers rescheduled with new endTime`);
   }
 
   // Update via auctioneering module - CRITICAL for state sync
   if (!auctRef || typeof auctRef.updateCurrentItemState !== "function") {
-    console.error("❌ CRITICAL: Cannot sync state with auctioneering module");
+    logger.error("❌ CRITICAL: Cannot sync state with auctioneering module");
     // This is critical - if state doesn't sync, timers will use stale data
     // Continue anyway but log the issue for investigation
   } else {
@@ -2425,7 +2429,7 @@ async function procBid(msg, amt, cfg) {
     }
   }
 
-  console.log(`[BID] ${u} bid ${bid}pts on ${a.item} (was: ${prevBid}pts, self: ${isSelf})`);
+  logger.info(`[BID] ${u} bid ${bid}pts on ${a.item} (was: ${prevBid}pts, self: ${isSelf})`);
 
   return { ok: true, msg: "Bid placed" };
 }
@@ -2852,7 +2856,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             await msg.channel
               .setLocked(true, "Item cancelled")
               .catch((err) =>
-                console.warn(`⚠️ Failed to lock thread ${msg.channel.id}:`, err.message)
+                logger.warn(`⚠️ Failed to lock thread ${msg.channel.id}:`, err.message)
               );
           }
 
@@ -2953,7 +2957,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             await msg.channel
               .setLocked(true, "Item skipped")
               .catch((err) =>
-                console.warn(`⚠️ Failed to lock thread ${msg.channel.id}:`, err.message)
+                logger.warn(`⚠️ Failed to lock thread ${msg.channel.id}:`, err.message)
               );
           }
 
@@ -3066,7 +3070,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
       try {
         await errorHandler.safeDelete(msg, 'message deletion');
       } catch (e) {
-        console.warn(
+        logger.warn(
           `${EMOJI.WARNING} Could not delete user message: ${e.message}`
         );
       }
@@ -3141,7 +3145,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         // CRITICAL: Defer the interaction immediately to prevent timeout
         // (save operation can take 3-4 seconds, Discord interactions expire after 3 seconds)
         await interaction.deferUpdate().catch(err => {
-          console.error(`⚠️ Failed to defer interaction: ${err.message}`);
+          logger.error(`⚠️ Failed to defer interaction: ${err.message}`);
         });
 
         const disabledFixRow = createDisabledRow(clearBtn, cancelBtn);
@@ -3167,7 +3171,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             .setTimestamp();
 
           await interaction.editReply({ embeds: [successEmbed], components: [disabledFixRow] }).catch(err => {
-            console.error(`⚠️ Failed to update interaction: ${err.message}`);
+            logger.error(`⚠️ Failed to update interaction: ${err.message}`);
           });
           fixCollector.stop();
         } else {
@@ -3179,7 +3183,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
             .setTimestamp();
 
           await interaction.editReply({ embeds: [cancelEmbed], components: [disabledFixRow] }).catch(err => {
-            console.error(`⚠️ Failed to update interaction: ${err.message}`);
+            logger.error(`⚠️ Failed to update interaction: ${err.message}`);
           });
           fixCollector.stop();
         }
@@ -3404,7 +3408,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
                 state: { auctionState: auctState, timestamp: new Date().toISOString() },
               });
             } catch (err) {
-              console.warn("⚠️ Failed to save auctioneering state:", err.message);
+              logger.warn("⚠️ Failed to save auctioneering state:", err.message);
             }
           }
 
@@ -3561,7 +3565,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         });
 
       } catch (err) {
-        console.error(`${EMOJI.ERROR} Error in !submittallyfromsheet:`, err);
+        logger.error(`${EMOJI.ERROR} Error in !submittallyfromsheet:`, err);
         await msg.reply(`${EMOJI.ERROR} Error: ${err.message}`);
       }
       break;
@@ -3717,7 +3721,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
               );
             }
           } catch (err) {
-            console.error("Recovery finalize error:", err);
+            logger.error("Recovery finalize error:", err);
             await msg.reply(
               `${EMOJI.ERROR} Failed to finalize: ${err.message}`
             );
@@ -3808,7 +3812,7 @@ function cleanupPendingConfirmations() {
   });
 
   if (cleaned > 0) {
-    console.log(`🧹 Cleaned up ${cleaned} stale pending confirmation(s)`);
+    logger.info(`🧹 Cleaned up ${cleaned} stale pending confirmation(s)`);
     save();
   }
 }
@@ -3855,7 +3859,7 @@ function checkLockedPoints() {
 
   // Report stuck points if no auction is running
   if (lockedCount > 0 && !anyActiveAuction) {
-    console.log(
+    logger.info(
       `⚠️ MEMORY WARNING: ${lockedCount} members have ${totalLocked}pts locked but no auction is active. ` +
       `Run !fixlockedpoints to clear.`
     );
@@ -3944,13 +3948,13 @@ function startCleanupSchedule() {
     // Memory stats: every 30 minutes
     cleanupIntervals.memoryStats = setInterval(() => {
       const stats = getMemoryStats();
-      console.log(`📊 Memory: ${stats.memory.heapUsed}MB / ${stats.memory.heapTotal}MB heap, ` +
+      logger.info(`📊 Memory: ${stats.memory.heapUsed}MB / ${stats.memory.heapTotal}MB heap, ` +
                   `${stats.state.pendingConfirmations} pending, ` +
                   `${stats.state.lockedPointsMembers} locked, ` +
                   `${stats.state.historySize} history`);
     }, 1800000); // 30 minutes
 
-    console.log("🧹 Started cleanup schedule (confirmations, locked points, memory monitoring)");
+    logger.info("🧹 Started cleanup schedule (confirmations, locked points, memory monitoring)");
   }
 }
 
@@ -3971,7 +3975,7 @@ function stopCleanupSchedule() {
     clearInterval(cleanupIntervals.memoryStats);
     cleanupIntervals.memoryStats = null;
   }
-  console.log("⏹️ Stopped all cleanup schedules");
+  logger.info("⏹️ Stopped all cleanup schedules");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -4063,7 +4067,7 @@ module.exports = {
    * @param {Object} config - Bot configuration object
    */
   confirmBid: async function (reaction, user, config) {
-    console.warn('[DEPRECATED] confirmBid called - this function is no longer used (instant bidding enabled)');
+    logger.warn('[DEPRECATED] confirmBid called - this function is no longer used (instant bidding enabled)');
     return;
     const p = st.pc[reaction.message.id];
     if (!p) return;
@@ -4079,7 +4083,7 @@ module.exports = {
 
     // CRITICAL: Check if this is an auctioneering bid
     if (p.isAuctioneering) {
-      console.log(`🎯 Processing auctioneering bid confirmation`);
+      logger.info(`🎯 Processing auctioneering bid confirmation`);
 
       const auctState = p.auctStateRef;
       const currentItem = auctState.currentItem;
@@ -4199,7 +4203,7 @@ module.exports = {
           ],
         });
 
-        console.log(
+        logger.info(
           `⏰ Time extended for ${currentItem.item} by 1 minute (bid in final minute, ext #${currentItem.extCnt})`
         );
 
@@ -4285,7 +4289,7 @@ module.exports = {
       delete st.pc[reaction.message.id];
       save();
 
-      console.log(
+      logger.info(
         `${EMOJI.SUCCESS} Auctioneering bid: ${p.username} - ${p.amount}pts${
           p.isSelf ? ` (self +${p.needed}pts)` : ""
         }`
@@ -4428,7 +4432,7 @@ module.exports = {
         ],
       });
 
-      console.log(
+      logger.info(
         `⏰ Time extended for ${a.item} by 1 minute (bid in final minute)`
       );
 
@@ -4516,7 +4520,7 @@ module.exports = {
       schedTimers(reaction.client, config);
     }
 
-    console.log(
+    logger.info(
       `${EMOJI.SUCCESS} Bid: ${p.username} - ${p.amount}pts${
         p.isSelf ? ` (self +${p.needed}pts)` : ""
       }`
@@ -4538,7 +4542,7 @@ module.exports = {
    * @param {Object} config - Bot configuration object
    */
   cancelBid: async function (reaction, user, config) {
-    console.warn('[DEPRECATED] cancelBid called - this function is no longer used (instant bidding enabled)');
+    logger.warn('[DEPRECATED] cancelBid called - this function is no longer used (instant bidding enabled)');
     return;
     const p = st.pc[reaction.message.id];
     if (!p) return;
@@ -4627,25 +4631,25 @@ module.exports = {
    */
   recoverBiddingState: async (client, config) => {
     if (await load()) {
-      console.log(`${EMOJI.SUCCESS} State recovered`);
+      logger.info(`${EMOJI.SUCCESS} State recovered`);
       if (st.cp) {
         const age = Math.floor((Date.now() - st.ct) / 60000);
-        console.log(
+        logger.info(
           `${EMOJI.CHART} Cache: ${
             st.cp.size()
           } members (${age}m old)`
         );
         if (age > 60) {
-          console.log(`${EMOJI.WARNING} Cache old, clearing...`);
+          logger.info(`${EMOJI.WARNING} Cache old, clearing...`);
           clearCache();
         }
-      } else console.log(`${EMOJI.WARNING} No cache`);
+      } else logger.info(`${EMOJI.WARNING} No cache`);
 
       if (st.a && st.a.status === "active") {
-        console.log(`${EMOJI.FIRE} Rescheduling timers...`);
+        logger.info(`${EMOJI.FIRE} Rescheduling timers...`);
         schedTimers(client, config);
         if (!st.cp)
-          console.warn(`${EMOJI.WARNING} Active auction but no cache!`);
+          logger.warn(`${EMOJI.WARNING} Active auction but no cache!`);
       }
       return true;
     }
@@ -4687,11 +4691,11 @@ module.exports = {
    */
   forceEndAuction: async (client, config) => {
     if (!st.a) {
-      console.log(`${EMOJI.WARNING} No active auction to end`);
+      logger.info(`${EMOJI.WARNING} No active auction to end`);
       return;
     }
 
-    console.log(`${EMOJI.EMERGENCY} Force ending auction: ${st.a.item}`);
+    logger.info(`${EMOJI.EMERGENCY} Force ending auction: ${st.a.item}`);
 
     // Clear all timers
     [
@@ -4711,7 +4715,7 @@ module.exports = {
     // Force finalize current session
     await finalize(client, config);
 
-    console.log(`${EMOJI.SUCCESS} Auction force-ended`);
+    logger.info(`${EMOJI.SUCCESS} Auction force-ended`);
   },
 
   /**
