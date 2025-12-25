@@ -565,9 +565,23 @@ async function triggerSpawnReminder(bossName, spawnTime) {
       if (bossType === 'schedule') {
         const bossConfig = bossSpawnConfig.scheduleBasedBosses[bossName];
         if (bossConfig && bossConfig.schedules) {
+          // Clear existing timer if present (prevents duplicates)
+          const existing = scheduledBossTimers.get(bossName.toLowerCase());
+          if (existing && existing.timerId) {
+            clearTimeout(existing.timerId);
+            console.log(`🔄 Cleared existing timer for ${bossName} before rescheduling (server down mode)`);
+          }
+
           const nextSpawn = findNextScheduledTime(bossConfig.schedules);
           if (nextSpawn) {
-            scheduleReminder(bossName, nextSpawn);
+            const timerId = scheduleReminder(bossName, nextSpawn);
+
+            // Track the timer to prevent duplicates
+            scheduledBossTimers.set(bossName.toLowerCase(), {
+              nextSpawn,
+              timerId
+            });
+
             console.log(`🔄 Rescheduled ${bossName} for next occurrence (server down mode)`);
           }
         }
@@ -593,9 +607,23 @@ async function triggerSpawnReminder(bossName, spawnTime) {
       if (bossType === 'schedule') {
         const bossConfig = bossSpawnConfig.scheduleBasedBosses[bossName];
         if (bossConfig && bossConfig.schedules) {
+          // Clear existing timer if present (prevents duplicates)
+          const existing = scheduledBossTimers.get(bossName.toLowerCase());
+          if (existing && existing.timerId) {
+            clearTimeout(existing.timerId);
+            console.log(`🔄 Cleared existing timer for ${bossName} before rescheduling (duplicate spawn detected)`);
+          }
+
           const nextSpawn = findNextScheduledTime(bossConfig.schedules);
           if (nextSpawn) {
-            scheduleReminder(bossName, nextSpawn);
+            const timerId = scheduleReminder(bossName, nextSpawn);
+
+            // Track the timer to prevent duplicates
+            scheduledBossTimers.set(bossName.toLowerCase(), {
+              nextSpawn,
+              timerId
+            });
+
             console.log(`🔄 Rescheduled ${bossName} for next occurrence`);
           }
         }
@@ -617,9 +645,22 @@ async function triggerSpawnReminder(bossName, spawnTime) {
         if (bossType === 'schedule') {
           const bossConfig = bossSpawnConfig.scheduleBasedBosses[bossName];
           if (bossConfig && bossConfig.schedules) {
+            // Clear existing timer if present (prevents duplicates)
+            const existing = scheduledBossTimers.get(bossName.toLowerCase());
+            if (existing && existing.timerId) {
+              clearTimeout(existing.timerId);
+              console.log(`🔄 Cleared existing timer for ${bossName} before rescheduling (duplicate error)`);
+            }
+
             const nextSpawn = findNextScheduledTime(bossConfig.schedules);
             if (nextSpawn) {
-              scheduleReminder(bossName, nextSpawn);
+              const timerId = scheduleReminder(bossName, nextSpawn);
+
+              // Track the timer to prevent duplicates
+              scheduledBossTimers.set(bossName.toLowerCase(), {
+                nextSpawn,
+                timerId
+              });
             }
           }
         }
@@ -674,6 +715,13 @@ async function triggerSpawnReminder(bossName, spawnTime) {
     if (bossType === 'schedule') {
       const bossConfig = bossSpawnConfig.scheduleBasedBosses[bossName];
       if (bossConfig && bossConfig.schedules) {
+        // Clear existing timer if present (prevents duplicates)
+        const existing = scheduledBossTimers.get(bossName.toLowerCase());
+        if (existing && existing.timerId) {
+          clearTimeout(existing.timerId);
+          console.log(`🔄 Cleared existing timer for ${bossName} before rescheduling`);
+        }
+
         const nextSpawn = findNextScheduledTime(bossConfig.schedules);
         if (nextSpawn) {
           const timerId = scheduleReminder(bossName, nextSpawn);
