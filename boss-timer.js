@@ -560,9 +560,48 @@ async function triggerSpawnReminder(bossName, spawnTime) {
       // Clear from kill times cache
       bossKillTimes.delete(bossName.toLowerCase());
 
-      // For scheduled bosses, reschedule for next occurrence
+      // Handle timer cleanup based on boss type
       const bossType = getBossType(bossName);
-      if (bossType === 'schedule') {
+      if (bossType === 'timer') {
+        // Timer-based boss: Delete recovery data (spawn skipped due to server down)
+        try {
+          // Parallel delete from MongoDB and Sheets
+          const mongoDeletePromise = (async () => {
+            try {
+              await mongoHelpers.deleteBossTimer(bossName);
+              return { success: true };
+            } catch (error) {
+              console.error(`❌ MongoDB delete failed for ${bossName}:`, error.message);
+              return { success: false };
+            }
+          })();
+
+          const sheetDeletePromise = (async () => {
+            try {
+              await sheetAPI.call('deleteBossTimerRecovery', { bossName });
+              return { success: true };
+            } catch (error) {
+              console.error(`❌ Sheets delete failed for ${bossName}:`, error.message);
+              return { success: false };
+            }
+          })();
+
+          const [mongoResult, sheetResult] = await Promise.all([
+            mongoDeletePromise,
+            sheetDeletePromise
+          ]);
+
+          const sources = [];
+          if (mongoResult.success) sources.push('MongoDB');
+          if (sheetResult.success) sources.push('Sheets');
+
+          if (sources.length > 0) {
+            console.log(`🗑️ Deleted recovery data for ${bossName} (${sources.join(' + ')}) - server down mode`);
+          }
+        } catch (error) {
+          console.error(`❌ Error deleting recovery data for ${bossName}:`, error.message);
+        }
+      } else if (bossType === 'schedule') {
         const bossConfig = bossSpawnConfig.scheduleBasedBosses[bossName];
         if (bossConfig && bossConfig.schedules) {
           // Clear existing timer if present (prevents duplicates)
@@ -602,9 +641,51 @@ async function triggerSpawnReminder(bossName, spawnTime) {
     if (activeSpawns[bossName]) {
       console.log(`⚠️ Spawn already exists for ${bossName}, skipping reminder to prevent duplicate`);
 
-      // Reschedule for next occurrence
+      // Clear from kill times cache
+      bossKillTimes.delete(bossName.toLowerCase());
+
+      // Handle timer cleanup based on boss type
       const bossType = getBossType(bossName);
-      if (bossType === 'schedule') {
+      if (bossType === 'timer') {
+        // Timer-based boss: Delete recovery data (duplicate spawn exists)
+        try {
+          // Parallel delete from MongoDB and Sheets
+          const mongoDeletePromise = (async () => {
+            try {
+              await mongoHelpers.deleteBossTimer(bossName);
+              return { success: true };
+            } catch (error) {
+              console.error(`❌ MongoDB delete failed for ${bossName}:`, error.message);
+              return { success: false };
+            }
+          })();
+
+          const sheetDeletePromise = (async () => {
+            try {
+              await sheetAPI.call('deleteBossTimerRecovery', { bossName });
+              return { success: true };
+            } catch (error) {
+              console.error(`❌ Sheets delete failed for ${bossName}:`, error.message);
+              return { success: false };
+            }
+          })();
+
+          const [mongoResult, sheetResult] = await Promise.all([
+            mongoDeletePromise,
+            sheetDeletePromise
+          ]);
+
+          const sources = [];
+          if (mongoResult.success) sources.push('MongoDB');
+          if (sheetResult.success) sources.push('Sheets');
+
+          if (sources.length > 0) {
+            console.log(`🗑️ Deleted recovery data for ${bossName} (${sources.join(' + ')}) - duplicate spawn`);
+          }
+        } catch (error) {
+          console.error(`❌ Error deleting recovery data for ${bossName}:`, error.message);
+        }
+      } else if (bossType === 'schedule') {
         const bossConfig = bossSpawnConfig.scheduleBasedBosses[bossName];
         if (bossConfig && bossConfig.schedules) {
           // Clear existing timer if present (prevents duplicates)
@@ -640,9 +721,51 @@ async function triggerSpawnReminder(bossName, spawnTime) {
       if (error.message.includes('duplicate spawn') || error.message.includes('Column already exists')) {
         console.log(`⚠️ Duplicate spawn detected for ${bossName} during thread creation - rescheduling for next spawn`);
 
-        // Reschedule for next occurrence
+        // Clear from kill times cache
+        bossKillTimes.delete(bossName.toLowerCase());
+
+        // Handle timer cleanup based on boss type
         const bossType = getBossType(bossName);
-        if (bossType === 'schedule') {
+        if (bossType === 'timer') {
+          // Timer-based boss: Delete recovery data (duplicate error)
+          try {
+            // Parallel delete from MongoDB and Sheets
+            const mongoDeletePromise = (async () => {
+              try {
+                await mongoHelpers.deleteBossTimer(bossName);
+                return { success: true };
+              } catch (error) {
+                console.error(`❌ MongoDB delete failed for ${bossName}:`, error.message);
+                return { success: false };
+              }
+            })();
+
+            const sheetDeletePromise = (async () => {
+              try {
+                await sheetAPI.call('deleteBossTimerRecovery', { bossName });
+                return { success: true };
+              } catch (error) {
+                console.error(`❌ Sheets delete failed for ${bossName}:`, error.message);
+                return { success: false };
+              }
+            })();
+
+            const [mongoResult, sheetResult] = await Promise.all([
+              mongoDeletePromise,
+              sheetDeletePromise
+            ]);
+
+            const sources = [];
+            if (mongoResult.success) sources.push('MongoDB');
+            if (sheetResult.success) sources.push('Sheets');
+
+            if (sources.length > 0) {
+              console.log(`🗑️ Deleted recovery data for ${bossName} (${sources.join(' + ')}) - duplicate error`);
+            }
+          } catch (error) {
+            console.error(`❌ Error deleting recovery data for ${bossName}:`, error.message);
+          }
+        } else if (bossType === 'schedule') {
           const bossConfig = bossSpawnConfig.scheduleBasedBosses[bossName];
           if (bossConfig && bossConfig.schedules) {
             // Clear existing timer if present (prevents duplicates)
@@ -710,9 +833,50 @@ async function triggerSpawnReminder(bossName, spawnTime) {
     addToRecentlyHandled(bossName, spawnTime, thread.id);
     console.log(`📌 Added ${bossName} to recently-handled cache (15min TTL) - Thread: ${thread.id}`);
 
-    // For scheduled bosses, reschedule for next occurrence
+    // Handle timer cleanup based on boss type
     const bossType = getBossType(bossName);
-    if (bossType === 'schedule') {
+    if (bossType === 'timer') {
+      // Timer-based boss: Delete recovery data (spawn completed, waiting for !killed to set next)
+      try {
+        // Parallel delete from MongoDB and Sheets
+        const mongoDeletePromise = (async () => {
+          try {
+            await mongoHelpers.deleteBossTimer(bossName);
+            return { success: true, source: 'MongoDB' };
+          } catch (error) {
+            console.error(`❌ MongoDB delete failed for ${bossName}:`, error.message);
+            return { success: false, source: 'MongoDB' };
+          }
+        })();
+
+        const sheetDeletePromise = (async () => {
+          try {
+            await sheetAPI.call('deleteBossTimerRecovery', { bossName });
+            return { success: true, source: 'Sheets' };
+          } catch (error) {
+            console.error(`❌ Sheets delete failed for ${bossName}:`, error.message);
+            return { success: false, source: 'Sheets' };
+          }
+        })();
+
+        const [mongoResult, sheetResult] = await Promise.all([
+          mongoDeletePromise,
+          sheetDeletePromise
+        ]);
+
+        const sources = [];
+        if (mongoResult.success) sources.push('MongoDB');
+        if (sheetResult.success) sources.push('Sheets');
+
+        if (sources.length > 0) {
+          console.log(`🗑️ Deleted recovery data for ${bossName} (${sources.join(' + ')}) - timer completed`);
+        } else {
+          console.warn(`⚠️ Failed to delete recovery data for ${bossName} from both sources`);
+        }
+      } catch (error) {
+        console.error(`❌ Error deleting recovery data for ${bossName}:`, error.message);
+      }
+    } else if (bossType === 'schedule') {
       const bossConfig = bossSpawnConfig.scheduleBasedBosses[bossName];
       if (bossConfig && bossConfig.schedules) {
         // Clear existing timer if present (prevents duplicates)
@@ -1307,10 +1471,48 @@ async function maintenance() {
     await saveServerDownState();
   }
 
-  // Clear all timer-based boss entries from Google Sheets (single API call)
+  // Clear all timer-based boss entries from MongoDB and Google Sheets
   try {
-    await sheetAPI.call('clearBossTimerRecovery', { type: 'timer-based' });
-    console.log('💾 Cleared timer-based boss recovery data from Google Sheets');
+    // Parallel delete from MongoDB and Sheets
+    const mongoDeletePromise = (async () => {
+      try {
+        // Delete all timer-based bosses from MongoDB
+        for (const bossName of Object.keys(bossSpawnConfig.timerBasedBosses)) {
+          if (!bossName.startsWith('_')) {
+            await mongoHelpers.deleteBossTimer(bossName);
+          }
+        }
+        return { success: true, source: 'MongoDB' };
+      } catch (error) {
+        console.error(`❌ MongoDB clear failed:`, error.message);
+        return { success: false, source: 'MongoDB' };
+      }
+    })();
+
+    const sheetDeletePromise = (async () => {
+      try {
+        await sheetAPI.call('clearBossTimerRecovery', { type: 'timer-based' });
+        return { success: true, source: 'Sheets' };
+      } catch (error) {
+        console.error(`❌ Sheets clear failed:`, error.message);
+        return { success: false, source: 'Sheets' };
+      }
+    })();
+
+    const [mongoResult, sheetResult] = await Promise.all([
+      mongoDeletePromise,
+      sheetDeletePromise
+    ]);
+
+    const sources = [];
+    if (mongoResult.success) sources.push('MongoDB');
+    if (sheetResult.success) sources.push('Sheets');
+
+    if (sources.length > 0) {
+      console.log(`💾 Cleared timer-based boss recovery data from ${sources.join(' + ')}`);
+    } else {
+      console.warn('⚠️ Failed to clear timer-based recovery data from both sources');
+    }
   } catch (error) {
     console.error('⚠️ Failed to clear timer-based recovery data:', error.message);
     // Continue anyway - local state will be correct
@@ -1617,6 +1819,66 @@ async function restoreServerDownState() {
 }
 
 // ============================================================================
+// EXTERNAL SPAWN HANDLING
+// ============================================================================
+
+/**
+ * Clear boss timer entry when thread is created (e.g., from external bot)
+ * Called by attendance module when creating threads
+ * @param {string} bossName - Boss name
+ * @returns {Promise<void>}
+ */
+async function clearBossTimerOnSpawn(bossName) {
+  const normalizedName = bossName.toLowerCase();
+  const bossType = getBossType(bossName);
+
+  // Only clear timer-based bosses (scheduled bosses auto-reschedule)
+  if (bossType === 'timer') {
+    // Clear from in-memory cache
+    bossKillTimes.delete(normalizedName);
+
+    // Delete recovery data from MongoDB and Sheets
+    try {
+      // Parallel delete from MongoDB and Sheets
+      const mongoDeletePromise = (async () => {
+        try {
+          await mongoHelpers.deleteBossTimer(bossName);
+          return { success: true };
+        } catch (error) {
+          console.error(`❌ MongoDB delete failed for ${bossName}:`, error.message);
+          return { success: false };
+        }
+      })();
+
+      const sheetDeletePromise = (async () => {
+        try {
+          await sheetAPI.call('deleteBossTimerRecovery', { bossName });
+          return { success: true };
+        } catch (error) {
+          console.error(`❌ Sheets delete failed for ${bossName}:`, error.message);
+          return { success: false };
+        }
+      })();
+
+      const [mongoResult, sheetResult] = await Promise.all([
+        mongoDeletePromise,
+        sheetDeletePromise
+      ]);
+
+      const sources = [];
+      if (mongoResult.success) sources.push('MongoDB');
+      if (sheetResult.success) sources.push('Sheets');
+
+      if (sources.length > 0) {
+        console.log(`🗑️ Cleared timer for ${bossName} (${sources.join(' + ')}) - thread created`);
+      }
+    } catch (error) {
+      console.error(`❌ Error clearing timer for ${bossName}:`, error.message);
+    }
+  }
+}
+
+// ============================================================================
 // MODULE EXPORTS
 // ============================================================================
 
@@ -1649,5 +1911,6 @@ module.exports = {
   getBossType,
   getNextScheduledSpawn,
   formatCountdown,
+  clearBossTimerOnSpawn, // Called by attendance module when creating threads
   bossKillTimes, // Export for monitoring/debugging
 };
