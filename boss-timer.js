@@ -1116,24 +1116,44 @@ function getNextSpawn(bossName) {
 
 /**
  * Get all upcoming spawns within specified hours
+ * Fetches fresh data from MongoDB for accurate real-time results
  * @param {number} hours - Hours to look ahead
- * @returns {Array} Array of {bossName, nextSpawn, type}
+ * @returns {Promise<Array>} Array of {bossName, nextSpawn, type}
  */
-function getUpcomingSpawns(hours = 24) {
+async function getUpcomingSpawns(hours = 24) {
   const now = new Date();
   const cutoff = new Date(now.getTime() + hours * 60 * 60 * 1000);
   const upcoming = [];
 
-  // Timer-based bosses (only if kill recorded)
-  for (const [bossName, data] of bossKillTimes) {
-    if (data.nextSpawn >= now && data.nextSpawn <= cutoff) {
-      // Find actual boss name (with proper casing)
-      const actualName = findBossName(bossName);
-      upcoming.push({
-        bossName: actualName,
-        nextSpawn: data.nextSpawn,
-        type: 'timer'
-      });
+  // Fetch fresh timer-based boss data from MongoDB (with fallback to cache)
+  try {
+    const mongoTimers = await mongoHelpers.getAllBossTimers();
+    if (mongoTimers && mongoTimers.length > 0) {
+      // Use MongoDB data (fresh from database)
+      for (const entry of mongoTimers) {
+        const nextSpawn = new Date(entry.nextSpawnTime);
+        if (!isNaN(nextSpawn.getTime()) && nextSpawn >= now && nextSpawn <= cutoff) {
+          upcoming.push({
+            bossName: entry.bossName,
+            nextSpawn: nextSpawn,
+            type: 'timer'
+          });
+        }
+      }
+      console.log(`📊 Fetched ${mongoTimers.length} timer-based bosses from MongoDB for !nextspawn`);
+    }
+  } catch (mongoError) {
+    console.warn(`⚠️ MongoDB unavailable for upcoming spawns, using cache: ${mongoError.message}`);
+    // Fallback to cache if MongoDB fails
+    for (const [bossName, data] of bossKillTimes) {
+      if (data.nextSpawn >= now && data.nextSpawn <= cutoff) {
+        const actualName = findBossName(bossName);
+        upcoming.push({
+          bossName: actualName,
+          nextSpawn: data.nextSpawn,
+          type: 'timer'
+        });
+      }
     }
   }
 
@@ -1178,9 +1198,42 @@ async function cancelTimer(bossName) {
     bossKillTimes.delete(normalizedName);
     cancelled = true;
 
-    // Remove from Sheets
+    // Remove from MongoDB and Sheets (parallel)
     try {
-      await sheetAPI.call('deleteBossTimerRecovery', { bossName });
+      const mongoDeletePromise = (async () => {
+        try {
+          await mongoHelpers.deleteBossTimer(bossName);
+          return { success: true };
+        } catch (error) {
+          console.error(`❌ MongoDB delete failed for ${bossName}:`, error.message);
+          return { success: false };
+        }
+      })();
+
+      const sheetDeletePromise = (async () => {
+        try {
+          await sheetAPI.call('deleteBossTimerRecovery', { bossName });
+          return { success: true };
+        } catch (error) {
+          console.error(`❌ Sheets delete failed for ${bossName}:`, error.message);
+          return { success: false };
+        }
+      })();
+
+      const [mongoResult, sheetResult] = await Promise.all([
+        mongoDeletePromise,
+        sheetDeletePromise
+      ]);
+
+      const sources = [];
+      if (mongoResult.success) sources.push('MongoDB');
+      if (sheetResult.success) sources.push('Sheets');
+
+      if (sources.length > 0) {
+        console.log(`🗑️ Deleted recovery data for ${bossName} (${sources.join(' + ')}) - cancelled via !unkill`);
+      } else {
+        console.warn(`⚠️ Failed to delete recovery data for ${bossName} from both sources`);
+      }
     } catch (error) {
       console.error(`⚠️ Failed to delete recovery data for ${bossName}:`, error.message);
     }
