@@ -194,7 +194,7 @@ async function handleKilled(message, args, config) {
  */
 async function handleNextSpawn(message) {
   try {
-    const upcoming = bossTimer.getUpcomingSpawns(24);
+    const upcoming = await bossTimer.getUpcomingSpawns(24);
 
     if (upcoming.length === 0) {
       return message.reply('📋 No bosses spawning in the next 24 hours.');
@@ -284,7 +284,7 @@ async function handleMaintenance(message) {
     const result = await bossTimer.maintenance();
 
     // Find first spawn
-    const upcoming = bossTimer.getUpcomingSpawns(48);
+    const upcoming = await bossTimer.getUpcomingSpawns(48);
     const firstSpawn = upcoming[0];
 
     const embed = new EmbedBuilder()
