@@ -1,0 +1,88 @@
+{
+  "_comment": "GUILD BOSS SCHEDULE CONFIGURATION - Edit this file to change when Guild Boss events run",
+
+  "timezone": {
+    "_description": "Timezone settings for Guild Boss schedule",
+    "name": "GMT+8 (Manila Time)",
+    "offsetHours": 8,
+    "_note": "offsetHours: Number of hours offset from UTC (8 for Manila/GMT+8)"
+  },
+
+  "guildBoss": {
+    "_description": "Guild Boss event schedule - when the weekly Guild Boss raid occurs",
+    "dayOfWeek": 1,
+    "dayName": "Monday",
+    "hour": 21,
+    "minute": 30,
+    "durationMinutes": 5,
+    "_instructions": {
+      "dayOfWeek": "Enter 0-6 where: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday",
+      "dayName": "Update this to match the day you selected (for logging/display purposes only)",
+      "hour": "Enter 0-23 for hour in 24-hour format (e.g., 21=9PM, 18=6PM)",
+      "minute": "Enter 0-59 for minutes",
+      "durationMinutes": "How long the Guild Boss event lasts (in minutes)"
+    }
+  },
+
+  "reminders": {
+    "_description": "Reminder settings - sends warning to Discord before Guild Boss starts",
+    "reminderOffsetMinutes": 20,
+    "attendanceAutoCloseMinutes": 30,
+    "_instructions": {
+      "reminderOffsetMinutes": "How many minutes before Guild Boss to send reminder (recommended: 20)",
+      "attendanceAutoCloseMinutes": "How long after event starts to auto-close attendance thread (recommended: 30)"
+    }
+  },
+
+  "rewards": {
+    "_description": "Bidding points awarded for Guild Boss attendance",
+    "biddingPoints": 15,
+    "_instructions": {
+      "biddingPoints": "Number of bidding points awarded for attending Guild Boss"
+    }
+  },
+
+  "display": {
+    "_description": "Display settings for Guild Boss event",
+    "name": "⚔️ Guild Boss",
+    "color": 14765116,
+    "description": "**Guild Boss** is starting soon! Attend for bidding points!",
+    "_instructions": {
+      "name": "Event name shown in Discord (can include emoji)",
+      "color": "Discord embed color in decimal format (14765116 = 0xe74c3c = red)",
+      "description": "Message shown in reminders and announcements"
+    }
+  },
+
+  "exampleSchedules": {
+    "_note": "Examples to help you set up different schedules",
+    "Monday_9PM": {
+      "dayOfWeek": 1,
+      "dayName": "Monday",
+      "hour": 21,
+      "minute": 0,
+      "description": "Original schedule (9:00 PM)"
+    },
+    "Monday_9_30PM": {
+      "dayOfWeek": 1,
+      "dayName": "Monday",
+      "hour": 21,
+      "minute": 30,
+      "description": "New schedule (9:30 PM)"
+    },
+    "Friday_8PM": {
+      "dayOfWeek": 5,
+      "dayName": "Friday",
+      "hour": 20,
+      "minute": 0,
+      "description": "Friday evening (8:00 PM)"
+    },
+    "Sunday_7_30PM": {
+      "dayOfWeek": 0,
+      "dayName": "Sunday",
+      "hour": 19,
+      "minute": 30,
+      "description": "Sunday evening (7:30 PM)"
+    }
+  }
+}

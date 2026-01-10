@@ -17,6 +17,7 @@
  * - Individual Arena: Mon, Wed, Fri at 20:30 - 21:30
  * - Coop Round Arena: Tue, Thu, Sat at 20:30 - 21:30
  * - Guild War: Fri, Sat, Sun at 20:25 - 20:28
+ * - Guild Boss: Configured in config/guild-boss-schedule.json (default: Mon at 21:30)
  * - World Boss Event: Daily at 11:00 AM and 20:00 PM (8:00 PM)
  * - Guild War Queue Reminder: Thu, Fri, Sat at 23:00 (auto-delete at 01:00)
  *
@@ -24,6 +25,9 @@
  */
 
 const { EmbedBuilder } = require('discord.js');
+
+// Guild Boss schedule configuration
+const guildBossScheduleConfig = require('./config/guild-boss-schedule.json');
 
 // ============================================================================
 // CONFIGURATION
@@ -69,15 +73,18 @@ const GAME_EVENTS = {
     attendanceAutoCloseMinutes: 20, // Auto-close thread 20 min after event starts (20:45)
   },
   guildBoss: {
-    name: '⚔️ Guild Boss',
-    days: [1], // Monday only
-    startTime: { hour: 21, minute: 0 }, // 21:00 (9:00 PM) GMT+8
-    durationMinutes: 5, // Guild Boss duration (21:00 - 21:05)
-    color: 0xe74c3c, // Red
-    description: '**Guild Boss** is starting soon! Attend for 15 bidding points!',
-    reminderOffsetMinutes: 20, // Remind 20 min before (20:40)
+    name: guildBossScheduleConfig.display.name,
+    days: [guildBossScheduleConfig.guildBoss.dayOfWeek], // From config
+    startTime: {
+      hour: guildBossScheduleConfig.guildBoss.hour,
+      minute: guildBossScheduleConfig.guildBoss.minute
+    }, // From config
+    durationMinutes: guildBossScheduleConfig.guildBoss.durationMinutes, // From config
+    color: guildBossScheduleConfig.display.color, // From config
+    description: guildBossScheduleConfig.display.description, // From config
+    reminderOffsetMinutes: guildBossScheduleConfig.reminders.reminderOffsetMinutes, // From config
     createAttendanceThread: false, // DISABLED: boss-timer.js handles Guild Boss thread creation with proper Google Sheets integration
-    attendanceAutoCloseMinutes: 30, // Auto-close thread 30 min after event starts (21:30)
+    attendanceAutoCloseMinutes: guildBossScheduleConfig.reminders.attendanceAutoCloseMinutes, // From config
   },
 };
 
