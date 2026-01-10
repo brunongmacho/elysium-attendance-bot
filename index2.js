@@ -4718,9 +4718,9 @@ client.once(Events.ClientReady, async () => {
   leaderboardSystem.scheduleMonthlyReport();
   auctioneering.scheduleWeeklySundayAuction(client, config);
 
-  // PRE-AUCTION SYNC (Sheets → MongoDB) - Runs 1 hour before Sunday auction
+  // PRE-AUCTION SYNC (Sheets → MongoDB) - Runs before weekly auction (configured in bidding-schedule.json)
   auctioneering.schedulePreAuctionSync(sheetAPI, bossRotation);
-  console.log('✅ Pre-auction sync scheduled (Sundays 11:00 AM GMT+8) - syncs manual Sheets edits to MongoDB');
+  console.log('✅ Pre-auction sync scheduled (see config/bidding-schedule.json) - syncs manual Sheets edits to MongoDB');
 
   // EVENT REMINDER SERVICE (Phase 10) - MongoDB-powered reminder system
   const mongoEventReminders = require('./services/event-reminders');

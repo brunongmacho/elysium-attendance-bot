@@ -1,0 +1,68 @@
+{
+  "_comment": "BIDDING SCHEDULE CONFIGURATION - Edit this file to change when the weekly auction runs",
+
+  "timezone": {
+    "_description": "Timezone settings for the auction schedule",
+    "name": "GMT+8 (Manila Time)",
+    "offsetHours": 8,
+    "_note": "offsetHours: Number of hours offset from UTC (8 for Manila/GMT+8)"
+  },
+
+  "auction": {
+    "_description": "Main auction schedule - when the weekly auction starts",
+    "dayOfWeek": 1,
+    "dayName": "Monday",
+    "hour": 12,
+    "minute": 0,
+    "_instructions": {
+      "dayOfWeek": "Enter 0-6 where: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday",
+      "dayName": "Update this to match the day you selected (for logging/display purposes only)",
+      "hour": "Enter 0-23 for hour in 24-hour format (e.g., 12=noon, 18=6PM)",
+      "minute": "Enter 0-59 for minutes (usually 0)"
+    }
+  },
+
+  "preAuctionSync": {
+    "_description": "Pre-auction sync settings - syncs bidding points from Google Sheets to MongoDB before auction",
+    "hoursBeforeAuction": 1,
+    "_instructions": {
+      "hoursBeforeAuction": "How many hours before the auction to sync data (recommended: 1)"
+    }
+  },
+
+  "announcement": {
+    "_description": "Announcement settings - sends warning to Discord before auction starts",
+    "leadTimeMinutes": 15,
+    "_instructions": {
+      "leadTimeMinutes": "How many minutes before auction to send announcement (recommended: 15)"
+    }
+  },
+
+  "exampleSchedules": {
+    "_note": "Examples to help you set up different schedules",
+    "Sunday_Noon": {
+      "dayOfWeek": 0,
+      "dayName": "Sunday",
+      "hour": 12,
+      "minute": 0
+    },
+    "Monday_Noon": {
+      "dayOfWeek": 1,
+      "dayName": "Monday",
+      "hour": 12,
+      "minute": 0
+    },
+    "Friday_Evening_6PM": {
+      "dayOfWeek": 5,
+      "dayName": "Friday",
+      "hour": 18,
+      "minute": 0
+    },
+    "Saturday_Morning_10AM": {
+      "dayOfWeek": 6,
+      "dayName": "Saturday",
+      "hour": 10,
+      "minute": 30
+    }
+  }
+}
