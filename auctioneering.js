@@ -52,7 +52,7 @@
  * ✓ Pause/resume functionality for admin control
  * ✓ Skip/cancel individual items
  * ✓ Force-submit results for error recovery
- * ✓ Scheduled weekly auctions (Every Sunday 12:00 PM GMT+8)
+ * ✓ Scheduled weekly auctions (Configurable via bidding-schedule.json)
  * ✓ Comprehensive error handling and logging
  *
  * ───────────────────────────────────────────────────────────────────────────
@@ -129,6 +129,9 @@ const logger = createLogger('auctioneering');
 // MongoDB integration (Phase 4)
 const mongoHelpers = require('./utils/mongodb-helpers');
 const sheetSync = require('./services/sheet-sync');
+
+// Bidding schedule configuration
+const biddingScheduleConfig = require('./config/bidding-schedule.json');
 
 // Feature flags: Enable MongoDB for operations
 const USE_MONGODB_AUCTIONEERING = process.env.USE_MONGODB_AUCTIONEERING === 'true';
@@ -3965,19 +3968,19 @@ function scheduleSession2AfterCompletion(client, config) {
 }
 
 /**
- * Schedules automatic weekly auctions every Sunday at 12:00 PM GMT+8 (Manila Time).
+ * Schedules automatic weekly auctions based on configuration in bidding-schedule.json.
  *
  * FEATURES:
- * - Calculates next Sunday at 12:00 PM in GMT+8 timezone
+ * - Calculates next scheduled auction time from config
  * - Automatically schedules next week's auction after completion
  * - Logs countdown until next auction
  * - Handles auction-already-running case
  *
  * PROCESS:
- * 1. Calculates time until next Sunday 12:00 PM GMT+8
+ * 1. Calculates time until next scheduled auction (from bidding-schedule.json)
  * 2. Sets timeout for that duration
  * 3. On trigger: starts auction if not already running
- * 4. Reschedules for next Sunday
+ * 4. Reschedules for next week
  *
  * ERROR HANDLING:
  * - Skips if auction already active
@@ -3994,42 +3997,50 @@ function scheduleWeeklySundayAuction(client, config) {
     return;
   }
 
-  logger.info(`${EMOJI.CLOCK} Initializing weekly Sunday auction scheduler...`);
+  // Load schedule config
+  const scheduleConfig = biddingScheduleConfig.auction;
+  const targetDay = scheduleConfig.dayOfWeek;
+  const targetDayName = scheduleConfig.dayName;
+  const targetHour = scheduleConfig.hour;
+  const targetMinute = scheduleConfig.minute;
 
-  const calculateNextSunday12PM = () => {
+  logger.info(`${EMOJI.CLOCK} Initializing weekly ${targetDayName} auction scheduler (${targetHour}:${String(targetMinute).padStart(2, '0')} GMT+8)...`);
+
+  const calculateNextScheduledTime = () => {
     const now = new Date();
 
     // GMT+8 offset in milliseconds
-    const GMT8_OFFSET = 8 * 60 * 60 * 1000;
+    const GMT8_OFFSET = biddingScheduleConfig.timezone.offsetHours * 60 * 60 * 1000;
 
     // Get current time in GMT+8
     const nowGMT8 = new Date(now.getTime() + GMT8_OFFSET);
 
-    // Set to 12:00 PM (noon) today in GMT+8
+    // Set to configured time today in GMT+8
     const targetGMT8 = new Date(nowGMT8);
-    targetGMT8.setUTCHours(12, 0, 0, 0);
+    targetGMT8.setUTCHours(targetHour, targetMinute, 0, 0);
 
     // Get current day of week (0 = Sunday, 6 = Saturday)
     const currentDay = targetGMT8.getUTCDay();
 
-    // Calculate days until next Sunday
-    let daysUntilSunday;
-    if (currentDay === 0) {
-      // Today is Sunday
+    // Calculate days until next target day
+    let daysUntilTarget;
+    if (currentDay === targetDay) {
+      // Today is the target day
       if (targetGMT8.getTime() > nowGMT8.getTime()) {
-        // Haven't reached 12:00 PM yet today
-        daysUntilSunday = 0;
+        // Haven't reached the target time yet today
+        daysUntilTarget = 0;
       } else {
-        // Already past 12:00 PM, schedule for next Sunday
-        daysUntilSunday = 7;
+        // Already past the target time, schedule for next week
+        daysUntilTarget = 7;
       }
     } else {
-      // Not Sunday, calculate days until next Sunday
-      daysUntilSunday = 7 - currentDay;
+      // Not the target day, calculate days until next occurrence
+      daysUntilTarget = (targetDay - currentDay + 7) % 7;
+      if (daysUntilTarget === 0) daysUntilTarget = 7; // If result is 0, it means next week
     }
 
     // Add days to target date
-    targetGMT8.setUTCDate(targetGMT8.getUTCDate() + daysUntilSunday);
+    targetGMT8.setUTCDate(targetGMT8.getUTCDate() + daysUntilTarget);
 
     // Convert back to UTC for the actual timer
     const targetUTC = new Date(targetGMT8.getTime() - GMT8_OFFSET);
@@ -4038,12 +4049,13 @@ function scheduleWeeklySundayAuction(client, config) {
   };
 
   const scheduleNext = () => {
-    const nextUTC = calculateNextSunday12PM();
+    const nextUTC = calculateNextScheduledTime();
     const now = new Date();
     const delay = nextUTC.getTime() - now.getTime();
 
     // Format for display in Manila time
-    const displayTime = new Date(nextUTC.getTime() + 8 * 60 * 60 * 1000);
+    const GMT8_OFFSET = biddingScheduleConfig.timezone.offsetHours * 60 * 60 * 1000;
+    const displayTime = new Date(nextUTC.getTime() + GMT8_OFFSET);
     const days = Math.floor(delay / 1000 / 60 / 60 / 24);
     const hours = Math.floor((delay / 1000 / 60 / 60) % 24);
     const minutes = Math.floor((delay / 1000 / 60) % 60);
@@ -4052,16 +4064,17 @@ function scheduleWeeklySundayAuction(client, config) {
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const dayName = dayNames[displayTime.getUTCDay()];
 
-    logger.info(`${EMOJI.CLOCK} Next Sunday auction scheduled for: ${dayName}, ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${days}d ${hours}h ${minutes}m)`);
+    logger.info(`${EMOJI.CLOCK} Next ${targetDayName} auction scheduled for: ${dayName}, ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${days}d ${hours}h ${minutes}m)`);
 
-    // Schedule announcement 15 minutes before auction
-    const ANNOUNCEMENT_LEAD_TIME = 15 * 60 * 1000; // 15 minutes
+    // Schedule announcement before auction
+    const ANNOUNCEMENT_LEAD_TIME = biddingScheduleConfig.announcement.leadTimeMinutes * 60 * 1000;
     const announcementDelay = delay - ANNOUNCEMENT_LEAD_TIME;
 
     if (announcementDelay > 0) {
       setTimeout(async () => {
         try {
-          logger.info(`${EMOJI.BELL} Sending 15-minute auction warning to announcement channel...`);
+          const leadMinutes = biddingScheduleConfig.announcement.leadTimeMinutes;
+          logger.info(`${EMOJI.BELL} Sending ${leadMinutes}-minute auction warning to announcement channel...`);
           const announcementChannel = await discordCache.getChannel('guild_announcement_channel_id').catch(() => null);
 
           if (announcementChannel) {
@@ -4071,7 +4084,7 @@ function scheduleWeeklySundayAuction(client, config) {
                 new EmbedBuilder()
                   .setColor(0xffa500) // Orange
                   .setTitle(`${EMOJI.AUCTION} Auction Starting Soon!`)
-                  .setDescription('The weekly auction will begin in **15 minutes**!')
+                  .setDescription(`The weekly auction will begin in **${leadMinutes} minutes**!`)
                   .addFields(
                     { name: '⏰ Start Time', value: '<t:' + Math.floor(nextUTC.getTime() / 1000) + ':R>', inline: true },
                     { name: '📍 Location', value: '<#' + config.bidding_channel_id + '>', inline: true }
@@ -4091,7 +4104,7 @@ function scheduleWeeklySundayAuction(client, config) {
     }
 
     weeklyAuctionTimer = setTimeout(async () => {
-      logger.info(`${EMOJI.AUCTION} Sunday auction time! Starting auction...`);
+      logger.info(`${EMOJI.AUCTION} ${targetDayName} auction time! Starting auction...`);
 
       try {
         // Check if auction is already running
@@ -4112,7 +4125,7 @@ function scheduleWeeklySundayAuction(client, config) {
 
         // Start Session 1 of the auction
         await startAuctioneering(client, config, biddingChannel);
-        logger.info(`${EMOJI.SUCCESS} Scheduled Sunday auction Session 1 started successfully`);
+        logger.info(`${EMOJI.SUCCESS} Scheduled ${targetDayName} auction Session 1 started successfully`);
 
         // Schedule Session 2 to start after Session 1 completes
         // This monitors when Session 1 ends and schedules Session 2 after rest period
@@ -4125,9 +4138,10 @@ function scheduleWeeklySundayAuction(client, config) {
           const adminLogs = await discordCache.getChannel('admin_logs_channel_id').catch(() => null);
 
           if (adminLogs) {
+            const timeStr = `${targetHour}:${String(targetMinute).padStart(2, '0')}`;
             await adminLogs.send(
               `${EMOJI.ERROR} **Scheduled Auction Failed**\n` +
-              `Failed to start Sunday auction at 12:00 PM GMT+8.\n` +
+              `Failed to start ${targetDayName} auction at ${timeStr} GMT+8.\n` +
               `**Error:** ${err.message}\n\n` +
               `Please check bot logs and try running \`!startauction\` manually.`
             );
@@ -4137,22 +4151,23 @@ function scheduleWeeklySundayAuction(client, config) {
         }
       }
 
-      // Schedule next Sunday's auction
+      // Schedule next week's auction
       scheduleNext();
     }, delay);
   };
 
   scheduleNext();
-  logger.info(`${EMOJI.SUCCESS} Weekly Sunday auction scheduler initialized (12:00 PM GMT+8)`);
+  const timeStr = `${targetHour}:${String(targetMinute).padStart(2, '0')}`;
+  logger.info(`${EMOJI.SUCCESS} Weekly ${targetDayName} auction scheduler initialized (${timeStr} GMT+8)`);
 }
 
 /**
- * Schedule pre-auction sync (Sheets → MongoDB) 1 hour before Sunday auction
+ * Schedule pre-auction sync (Sheets → MongoDB) before the weekly auction
  * Ensures all manual Google Sheets edits to bidding points are synced to MongoDB
  * before the auction starts and loads points from MongoDB.
  *
  * TIMING:
- * - Runs every Sunday at 11:00 AM GMT+8 (1 hour before 12:00 PM auction)
+ * - Runs based on configuration in bidding-schedule.json
  * - Syncs: BiddingPoints (Google Sheets → MongoDB)
  * - Also syncs: Boss Rotation (for good measure)
  *
@@ -4173,41 +4188,54 @@ function schedulePreAuctionSync(sheetAPI, bossRotation) {
     return;
   }
 
-  logger.info(`${EMOJI.CLOCK} Initializing pre-auction sync scheduler (1 hour before auction)...`);
+  // Load schedule config
+  const scheduleConfig = biddingScheduleConfig.auction;
+  const preAuctionConfig = biddingScheduleConfig.preAuctionSync;
+  const targetDay = scheduleConfig.dayOfWeek;
+  const targetDayName = scheduleConfig.dayName;
+  const auctionHour = scheduleConfig.hour;
+  const auctionMinute = scheduleConfig.minute;
+  const hoursBeforeAuction = preAuctionConfig.hoursBeforeAuction;
 
-  const calculateNextSunday11AM = () => {
+  logger.info(`${EMOJI.CLOCK} Initializing pre-auction sync scheduler (${hoursBeforeAuction} hour before auction)...`);
+
+  const calculateNextSyncTime = () => {
     const now = new Date();
-    const GMT8_OFFSET = 8 * 60 * 60 * 1000;
+    const GMT8_OFFSET = biddingScheduleConfig.timezone.offsetHours * 60 * 60 * 1000;
     const nowGMT8 = new Date(now.getTime() + GMT8_OFFSET);
 
-    // Set to 11:00 AM (1 hour before noon) in GMT+8
+    // Set to configured auction time minus hours before auction in GMT+8
     const targetGMT8 = new Date(nowGMT8);
-    targetGMT8.setUTCHours(11, 0, 0, 0);
+    const syncHour = auctionHour - hoursBeforeAuction;
+    targetGMT8.setUTCHours(syncHour, auctionMinute, 0, 0);
 
     const currentDay = targetGMT8.getUTCDay();
-    let daysUntilSunday;
+    let daysUntilTarget;
 
-    if (currentDay === 0) {
-      // Today is Sunday
+    if (currentDay === targetDay) {
+      // Today is the target day
       if (targetGMT8.getTime() > nowGMT8.getTime()) {
-        daysUntilSunday = 0;
+        daysUntilTarget = 0;
       } else {
-        daysUntilSunday = 7;
+        daysUntilTarget = 7;
       }
     } else {
-      daysUntilSunday = 7 - currentDay;
+      // Not the target day, calculate days until next occurrence
+      daysUntilTarget = (targetDay - currentDay + 7) % 7;
+      if (daysUntilTarget === 0) daysUntilTarget = 7; // If result is 0, it means next week
     }
 
-    targetGMT8.setUTCDate(targetGMT8.getUTCDate() + daysUntilSunday);
+    targetGMT8.setUTCDate(targetGMT8.getUTCDate() + daysUntilTarget);
     return new Date(targetGMT8.getTime() - GMT8_OFFSET);
   };
 
   const scheduleNext = () => {
-    const nextUTC = calculateNextSunday11AM();
+    const nextUTC = calculateNextSyncTime();
     const now = new Date();
     const delay = nextUTC.getTime() - now.getTime();
 
-    const displayTime = new Date(nextUTC.getTime() + 8 * 60 * 60 * 1000);
+    const GMT8_OFFSET = biddingScheduleConfig.timezone.offsetHours * 60 * 60 * 1000;
+    const displayTime = new Date(nextUTC.getTime() + GMT8_OFFSET);
     const days = Math.floor(delay / 1000 / 60 / 60 / 24);
     const hours = Math.floor((delay / 1000 / 60 / 60) % 24);
     const minutes = Math.floor((delay / 1000 / 60) % 60);
@@ -4283,7 +4311,9 @@ function schedulePreAuctionSync(sheetAPI, bossRotation) {
   };
 
   scheduleNext();
-  logger.info(`${EMOJI.SUCCESS} Pre-auction sync scheduler initialized (11:00 AM GMT+8 every Sunday)`);
+  const syncHour = auctionHour - hoursBeforeAuction;
+  const timeStr = `${syncHour}:${String(auctionMinute).padStart(2, '0')}`;
+  logger.info(`${EMOJI.SUCCESS} Pre-auction sync scheduler initialized (${timeStr} GMT+8 every ${targetDayName})`);
 }
 
 /**
@@ -4346,8 +4376,8 @@ module.exports = {
   handleSkipItem,
   handleForceSubmitResults,
   handleMoveToDistribution,
-  scheduleWeeklySundayAuction, // Weekly Sunday 12:00 PM GMT+8 auction scheduler
-  schedulePreAuctionSync, // Pre-auction sync (Sheets → MongoDB) 1 hour before auction
+  scheduleWeeklySundayAuction, // Weekly auction scheduler (config: bidding-schedule.json)
+  schedulePreAuctionSync, // Pre-auction sync (Sheets → MongoDB) before weekly auction
   resetSessionState, // Reset sessionFinalized flag and clear Session 2 timers
   // getCurrentSessionBoss: () => currentSessionBoss - REMOVED: Not used anywhere
 };
