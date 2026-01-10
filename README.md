@@ -815,7 +815,7 @@ Static 99% confidence predictions based on fixed schedules:
 | Auraq | Friday 22:00, Wednesday 21:00 |
 | Chaiflock | Saturday 22:00 |
 | Benji | Sunday 21:00 |
-| Guild Boss | Monday 21:00 |
+| Guild Boss | Monday 21:30 |
 | Icaruthia | Tuesday 21:00, Friday 21:00 |
 | Motti | Wednesday 19:00, Saturday 19:00 |
 | Nevaeh | Sunday 22:00 |

@@ -221,11 +221,11 @@
       "schedules": [
         {
           "day": "Monday",
-          "time": "21:00",
+          "time": "21:30",
           "dayOfWeek": 1
         }
       ],
-      "description": "Guild boss raid every Monday 21:00"
+      "description": "Guild boss raid every Monday 21:30"
     },
     "Icaruthia": {
       "schedules": [
