@@ -2,90 +2,83 @@
 
 ## Problem
 
-The bot was experiencing a race condition error:
+The bot was experiencing race condition errors in two scenarios:
+
+### Scenario 1: Thread Creation Level
 ```
 ❌ Failed to handle spawned for Venatus: Error: Failed to create thread for Venatus: Thread creation already in progress for Venatus
 ```
+When multiple sources (boss timer and external bot) simultaneously created threads.
 
-This occurred when multiple sources (boss timer and external bot) simultaneously attempted to create a thread for the same boss, causing a collision in the mutex lock.
+### Scenario 2: Command Handler Level  
+When 2 users used the `/spawned` command at the same time, both calls would pass through the cache check before either added the result, causing duplicate thread creation attempts.
 
-## Root Cause
+## Root Causes
 
-The original `createSpawnThreads` function had a mutex to prevent concurrent thread creation:
-- When a concurrent creation was detected, it would immediately **reject** the request with an error
-- If multiple requests came in simultaneously, the second request would fail instead of waiting for the first to complete
-- Both the timer system and external bot could trigger creation simultaneously, causing race conditions
+### Thread Creation Level
+The original mutex prevented concurrent thread creation but rejected the second request instead of waiting for the first.
+
+### Command Handler Level
+The `recentlyHandledBosses` cache only checked if a boss was already handled, but didn't prevent the race condition where two concurrent calls arrive before either adds the result to cache.
 
 ## Solution Implemented
 
-### 1. **Promise-Based Mutex with Waiting** (`attendance.js`)
+### 1. **Thread Creation Level** (`attendance.js`)
+- Added promise-based mutex that allows concurrent callers to wait
+- Tracks creation promises so waiters can await the original creation
+- First request creates, subsequent requests wait and receive same result
 
-Added a promise-based mechanism to allow concurrent callers to wait for the original creation:
-
-```javascript
-// Track creation promises so concurrent callers can wait
-let creationPromises = new Map();
-
-// In createSpawnThreads:
-if (pendingCreations.has(creationKey)) {
-  // ... existing creation is in progress
-  const existingResult = await creationPromises.get(creationKey);
-  if (existingResult && existingResult.success) {
-    console.log(`✅ Returning existing thread from concurrent creation`);
-    return existingResult; // Return the same result to concurrent caller
-  }
-}
-```
-
-### 2. **Wrapped Creation in IIFE**
-
-The entire thread creation logic is now wrapped in an async IIFE that:
-- Sets the mutex lock
-- Executes the creation
-- Stores the promise for concurrent callers to await
-- Always clears the mutex in a finally block
-
-### 3. **Graceful Concurrent Request Handling**
-
-Now when multiple requests come in for the same boss:
-1. **First request**: Sets mutex lock, begins creation
-2. **Concurrent requests**: Wait for first request's promise
-3. **All receive**: The same successfully created thread
-4. **On error**: Failed creation is also shared, preventing repeated failures
+### 2. **Command Handler Level** (`boss-timer.js`)
+- Added "pending" state to `recentlyHandledBosses` cache
+- Mark boss as pending BEFORE starting creation
+- Concurrent callers detect pending state and wait for handler promise
+- Only one handler actually executes; others receive its result
 
 ## Benefits
 
-✅ **No More Duplicate Errors**: Concurrent requests now cooperate instead of conflicting
-✅ **Single Thread Creation**: Only one thread is actually created, even with multiple requests
-✅ **Graceful Degradation**: If creation fails, all waiters get the same error
-✅ **Timeout Safety**: 60-second timeout clears stale mutexes if bot crashes during creation
-✅ **Better Logging**: Clear visibility into concurrent creations with source tracking
+✅ **No More Duplicate Errors**: Both command and thread creation now handle concurrency properly
+✅ **Single Thread Creation**: Only one thread is actually created, even with multiple concurrent requests
+✅ **Cooperative Concurrency**: Second caller waits for first, then both receive same result
+✅ **Clear Logging**: Visibility into pending states and handler waiting
+✅ **Timeout Safety**: 60-second timeout at thread creation level clears stale mutexes
 
 ## Log Examples
 
-### Before Fix
+### Before Fix (Command Level)
 ```
-⏳ BLOCKED CONCURRENT CREATION: Venatus - creation already in progress
-❌ Failed to handle spawned for Venatus: Error: Thread creation already in progress
-```
-
-### After Fix
-```
-🔒 MUTEX SET: Starting thread creation for Venatus at 01/21/26 12:34 (source: boss_timer)
-⏳ CONCURRENT CREATION DETECTED: Venatus - waiting for existing creation
-✅ Returning existing thread from concurrent creation: 123456789
-🔓 MUTEX CLEARED: Finished thread creation for Venatus
+User 1: /spawned Venatus
+User 2: /spawned Venatus
+❌ Thread creation already in progress
 ```
 
-## Testing Recommendations
+### After Fix (Command Level)
+```
+User 1: /spawned Venatus
+  🔒 Marked Venatus handler as pending
+User 2: /spawned Venatus (concurrent)
+  ⏳ Venatus handler already in progress - waiting for result
+  ✅ Returning result from concurrent handler for Venatus
+  🔓 Handler resolved for both users
+```
 
-1. Trigger `!spawned Venatus` from both timer and manual command simultaneously
-2. Verify only one thread is created
-3. Verify both callers receive successful results
-4. Check logs for waiting messages and proper cleanup
+### After Fix (Thread Creation Level)
+```
+🔒 MUTEX SET: Starting thread creation for Venatus
+⏳ CONCURRENT CREATION DETECTED: waiting for existing creation
+✅ Returning existing thread from concurrent creation
+🔓 MUTEX CLEARED
+```
 
 ## Files Modified
 
 - [attendance.js](attendance.js#L111) - Added `creationPromises` tracking
-- [attendance.js](attendance.js#L451-L485) - Updated mutex logic to wait for concurrent creations
+- [attendance.js](attendance.js#L451-L485) - Updated mutex logic for concurrent waiting
 - [attendance.js](attendance.js#L488-L723) - Wrapped creation in IIFE with promise tracking
+- [boss-timer.js](boss-timer.js#L1392-L1473) - Added handler-level concurrency control
+
+## Testing Recommendations
+
+1. **Thread Creation**: Trigger `!spawned Venatus` from both timer and manual command simultaneously
+2. **Command Handler**: Have 2 users use `/spawned Venatus` at the exact same time
+3. **Verify**: Only one thread should be created, all callers receive success
+4. **Check logs**: Should see "pending", "waiting", and "resolved" messages

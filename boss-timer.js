@@ -1394,9 +1394,23 @@ async function handleSpawned(bossName, userId) {
   const normalizedName = bossName.toLowerCase();
 
   try {
-    // Check if already handled recently (prevent duplicate !spawned calls)
+    // Check if already handled recently or currently being handled (prevent duplicate !spawned calls)
     const existing = recentlyHandledBosses.get(normalizedName);
     if (existing) {
+      // If pending, wait for the handler promise to complete
+      if (existing.handlerPromise) {
+        console.log(`⏳ ${bossName} handler already in progress - waiting for result`);
+        try {
+          const result = await existing.handlerPromise;
+          console.log(`✅ Returning result from concurrent handler for ${bossName}`);
+          return result;
+        } catch (err) {
+          console.error(`❌ Concurrent handler failed for ${bossName}:`, err.message);
+          throw err;
+        }
+      }
+
+      // Already handled (not pending)
       const timeSince = Math.round((Date.now() - existing.handledAt) / 1000 / 60);
       console.log(`⚠️ ${bossName} already handled ${timeSince}min ago - returning existing thread`);
 
@@ -1409,8 +1423,24 @@ async function handleSpawned(bossName, userId) {
       };
     }
 
-    // Create attendance thread for current spawn
-    const thread = await attendance.createThreadForBoss(client, bossName, now);
+    // Mark this handler as in-progress so concurrent calls wait for us
+    // Create a promise that will be resolved with the final result
+    let resolveHandler, rejectHandler;
+    const handlerPromise = new Promise((resolve, reject) => {
+      resolveHandler = resolve;
+      rejectHandler = reject;
+    });
+
+    recentlyHandledBosses.set(normalizedName, {
+      handledAt: new Date(),
+      handlerPromise, // Store the promise so waiters can await it
+      pending: true
+    });
+    console.log(`🔒 Marked ${bossName} handler as pending`);
+
+    try {
+      // Create attendance thread for current spawn
+      const thread = await attendance.createThreadForBoss(client, bossName, now);
 
     // Post confirmation in announcement channel with embed and thumbnail
     const announcementChannel = await client.channels.fetch(config.boss_spawn_announcement_channel_id);
@@ -1453,58 +1483,36 @@ async function handleSpawned(bossName, userId) {
       await announcementChannel.send(messagePayload);
     }
 
-    // Add to recently handled cache to prevent duplicate from external bot
-    // Uses shared function that also clears old timeouts
-    addToRecentlyHandled(bossName, now, thread.id);
-    console.log(`📌 Added ${bossName} to recently-handled cache (15min TTL) - Thread: ${thread.id}`);
+      // Add to recently handled cache to prevent duplicate from external bot
+      // Uses shared function that also clears old timeouts
+      addToRecentlyHandled(bossName, now, thread.id);
+      console.log(`📌 Added ${bossName} to recently-handled cache (15min TTL) - Thread: ${thread.id}`);
 
-    return {
-      success: true,
-      threadId: thread.id,
-      threadUrl: thread.url,
-      bossName
-    };
-  } catch (error) {
-    console.error(`❌ Failed to handle spawned for ${bossName}:`, error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
+      const result = {
+        success: true,
+        threadId: thread.id,
+        threadUrl: thread.url,
+        bossName
+      };
 
-/**
- * Enable server down mode - prevents attendance thread creation
- * Clears all boss timers making them available again
- * @returns {Promise<number>} Number of timers cleared
- */
-async function serverDown() {
-  console.log('🛑 Entering server down mode');
+      // Resolve the handler promise for any concurrent waiters
+      resolveHandler(result);
 
-  // Set server down flag
-  isServerDown = true;
+      return result;
+    } catch (error) {
+      console.error(`❌ Handler failed for ${bossName}:`, error.message);
+      
+      // Reject the handler promise for concurrent waiters
+      rejectHandler(error);
 
-  // Cancel and clear all boss timers
-  let count = 0;
-  for (const [bossName, data] of bossKillTimes) {
-    if (data.timerId) {
-      clearTimeout(data.timerId);
-      count++;
+      // Clean up pending marker
+      recentlyHandledBosses.delete(normalizedName);
+
+      return {
+        success: false,
+        error: error.message
+      };
     }
-  }
-  bossKillTimes.clear();
-
-  // Save state for crash recovery
-  await saveServerDownState();
-
-  console.log(`✅ Server down mode activated - cleared ${count} timers`);
-  return count;
-}
-
-/**
- * Create immediate attendance threads for all timer-based bosses (maintenance mode)
- * Automatically exits server down mode and resumes normal operations
- * Also reschedules all schedule-based bosses
  *
  * Timer-based bosses: Creates threads immediately with no auto-close
  * Schedule-based bosses: Schedules timers for next fixed spawn time
