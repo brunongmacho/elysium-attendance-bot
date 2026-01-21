@@ -1513,7 +1513,17 @@ async function handleSpawned(bossName, userId) {
         error: error.message
       };
     }
- *
+  } catch (error) {
+    console.error(`❌ Failed to handle spawned for ${bossName}:`, error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Maintenance spawn threads for all bosses
  * Timer-based bosses: Creates threads immediately with no auto-close
  * Schedule-based bosses: Schedules timers for next fixed spawn time
  *
