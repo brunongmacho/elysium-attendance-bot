@@ -1703,6 +1703,42 @@ async function clearKills() {
 }
 
 /**
+ * Enable server down mode - prevents attendance thread creation
+ * Clears all boss timers making them available again
+ * @returns {Promise<number>} Number of timers cleared
+ */
+async function serverDown() {
+  console.log('🛑 Entering server down mode');
+
+  // Set server down flag
+  isServerDown = true;
+
+  // Cancel and clear all boss timers
+  let count = 0;
+  for (const [bossName, data] of bossKillTimes) {
+    if (data.timerId) {
+      clearTimeout(data.timerId);
+      count++;
+    }
+  }
+  bossKillTimes.clear();
+
+  // Save state for crash recovery
+  await saveServerDownState();
+
+  console.log(`✅ Server down mode activated - cleared ${count} timers`);
+  return count;
+}
+
+/**
+ * Get server down status
+ * @returns {boolean} True if server is down
+ */
+function getServerDownStatus() {
+  return isServerDown;
+}
+
+/**
  * Get all active timers (for !timers command)
  * @returns {Object} {timerBased, scheduleBased}
  */
