@@ -29,11 +29,12 @@
   "Ordo": {"points":3, "aliases":["ordo"]},
   "Asta": {"points":3, "aliases":["asta"]},
   "Supore": {"points":3, "aliases":["supore"]},
-  "Chaiflock": {"points":3, "aliases":["chaiflock"]},
+  "Chaiflock": {"points":5, "aliases":["chaiflock"]},
   "Benji": {"points":3, "aliases":["benji"]},
-  "Icaruthia": {"points":4, "aliases":["icaruthia"]},
-  "Motti": {"points":4, "aliases":["motti"]},
-  "Nevaeh": {"points":4, "aliases":["nevaeh"]},
+  "Tumier": {"points":5, "aliases":["tumier"]},
+  "Icaruthia": {"points":10, "aliases":["icaruthia"]},
+  "Motti": {"points":10, "aliases":["motti"]},
+  "Nevaeh": {"points":10, "aliases":["nevaeh"]},
   "Guild Boss": {"points": 15, "aliases": ["guild boss", "guildboss", "gb"]},
   "GvG": {"points": 5, "aliases": ["gvg", "guild vs guild", "guild war pvp"]}
 }

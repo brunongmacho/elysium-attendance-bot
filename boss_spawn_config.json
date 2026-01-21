@@ -217,6 +217,16 @@
       ],
       "description": "Spawns Sunday 21:00"
     },
+        "Tumier": {
+      "schedules": [
+        {
+          "day": "Sunday",
+          "time": "19:00",
+          "dayOfWeek": 0
+        }
+      ],
+      "description": "Spawns Sunday 19:00"
+    },
     "Guild Boss": {
       "schedules": [
         {
