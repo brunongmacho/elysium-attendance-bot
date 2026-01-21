@@ -1590,6 +1590,24 @@ async function maintenance() {
       const thread = await attendance.createThreadForBoss(client, bossName, now, true, true);
       console.log(`✅ Created maintenance thread for ${bossName}: ${thread.id}`);
       timerCount++;
+
+      // Create attendance record in MongoDB so dashboard shows boss as spawned
+      // Set timestamp to past (spawn interval ago) so boss shows as "spawned" on dashboard
+      const spawnIntervalMs = (bossConfig.spawnIntervalHours || 24) * 60 * 60 * 1000;
+      const killTimestamp = new Date(now.getTime() - spawnIntervalMs);
+
+      await mongoHelpers.addAttendanceRecord({
+        memberId: 'system_maintenance',
+        memberName: 'System',
+        bossName: bossName,
+        bossPoints: 0,
+        timestamp: killTimestamp,
+        weekStartDate: now,
+        weekLabel: 'Maintenance',
+        verified: true,
+        threadId: thread.id
+      });
+      console.log(`📊 Created attendance record for ${bossName} in MongoDB`);
     } catch (error) {
       console.error(`❌ Failed to create thread for ${bossName}:`, error.message);
     }

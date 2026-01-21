@@ -108,6 +108,7 @@ let pendingClosures = {};       // Message IDs awaiting closure confirmation
 let confirmationMessages = {};  // Thread IDs to confirmation message IDs
 let lastSheetCall = 0;          // Timestamp of last Google Sheets API call
 let pendingCreations = new Map(); // Mutex: boss names currently being created (prevents race conditions)
+let creationPromises = new Map(); // Tracks creation promises so concurrent callers can wait
 
 /**
  * Timing constants for rate limiting and retry logic
@@ -457,9 +458,25 @@ async function createSpawnThreads(
     if (waitTime > MUTEX_TIMEOUT_MS) {
       console.log(`⚠️ STALE MUTEX: ${bossName} mutex held for ${waitTime}ms - clearing and proceeding`);
       pendingCreations.delete(creationKey);
+      creationPromises.delete(creationKey);
     } else {
-      console.log(`⏳ BLOCKED CONCURRENT CREATION: ${bossName} at ${fullTimestamp} - creation already in progress (${waitTime}ms ago) by ${existingCreation.source}`);
-      return { success: false, error: `Thread creation already in progress for ${bossName}` };
+      // Another creation is in progress - wait for it to complete and return its result
+      console.log(`⏳ CONCURRENT CREATION DETECTED: ${bossName} at ${fullTimestamp} - waiting for existing creation by ${existingCreation.source} (${waitTime}ms ago)`);
+      try {
+        const existingResult = await creationPromises.get(creationKey);
+        if (existingResult && existingResult.success) {
+          console.log(`✅ Returning existing thread from concurrent creation: ${existingResult.threadId}`);
+          return existingResult;
+        } else {
+          console.log(`⚠️ Existing creation failed, proceeding with new attempt`);
+          pendingCreations.delete(creationKey);
+          creationPromises.delete(creationKey);
+        }
+      } catch (waitErr) {
+        console.log(`⚠️ Error waiting for existing creation: ${waitErr.message}`);
+        pendingCreations.delete(creationKey);
+        creationPromises.delete(creationKey);
+      }
     }
   }
 
@@ -467,236 +484,248 @@ async function createSpawnThreads(
   pendingCreations.set(creationKey, { startedAt: Date.now(), source: triggerSource });
   console.log(`🔒 MUTEX SET: Starting thread creation for ${bossName} at ${fullTimestamp} (source: ${triggerSource})`);
 
-  try {
-  // Fetch required guild and channels
-  const mainGuild = await client.guilds
-    .fetch(config.main_guild_id)
-    .catch(() => null);
-  if (!mainGuild) return { success: false, error: 'Failed to fetch guild' };
+  // Create a promise for this creation so concurrent callers can wait
+  const creationPromise = (async () => {
+    try {
+      // Fetch required guild and channels
+      const mainGuild = await client.guilds
+        .fetch(config.main_guild_id)
+        .catch(() => null);
+      if (!mainGuild) return { success: false, error: 'Failed to fetch guild' };
 
-  // Batch fetch channels in parallel for faster execution
-  const [attChannel, adminLogs] = await Promise.all([
-    mainGuild.channels.fetch(config.attendance_channel_id).catch(() => null),
-    mainGuild.channels.fetch(config.admin_logs_channel_id).catch(() => null),
-  ]);
+      // Batch fetch channels in parallel for faster execution
+      const [attChannel, adminLogs] = await Promise.all([
+        mainGuild.channels.fetch(config.attendance_channel_id).catch(() => null),
+        mainGuild.channels.fetch(config.admin_logs_channel_id).catch(() => null),
+      ]);
 
-  if (!attChannel || !adminLogs) return { success: false, error: 'Failed to fetch channels' };
+      if (!attChannel || !adminLogs) return { success: false, error: 'Failed to fetch channels' };
 
-  // Prevent duplicate spawns by checking if column already exists (skip for maintenance - always new)
-  if (!skipColumnCheck) {
-    const columnExists = await checkColumnExists(bossName, fullTimestamp);
-    if (columnExists) {
-      await adminLogs.send(
-        `⚠️ **BLOCKED SPAWN:** ${bossName} at ${fullTimestamp}\nColumn already exists.`
-      );
-      return { success: false, error: 'Column already exists (duplicate spawn)' };
-    }
-  }
-
-  // NEW: Prevent duplicate threads for same boss if spawn times are close
-  // This allows legitimate new threads when timer was wrong but blocks true duplicates
-  // 30 min threshold allows new threads for maintenance-delayed spawns (>30 min delay)
-  const DUPLICATE_TIME_THRESHOLD_MINUTES = 30; // Block if spawn times within 30 min
-  for (const [threadId, spawn] of Object.entries(activeSpawns)) {
-    if (spawn.boss.toLowerCase() === bossName.toLowerCase() && !spawn.closed) {
-      // Compare spawn timestamps (not creation time)
-      // Parse existing thread's timestamp (format: "MM/DD/YY HH:MM")
-      const existingTimestamp = spawn.timestamp;
-      const newTimestamp = fullTimestamp;
-
-      // Simple comparison: if timestamps are identical or very close, block
-      if (existingTimestamp === newTimestamp) {
-        console.log(`⚠️ BLOCKED DUPLICATE: ${bossName} - identical timestamp ${newTimestamp}`);
-        await adminLogs.send(
-          `⚠️ **BLOCKED DUPLICATE:** ${bossName} at ${fullTimestamp}\n` +
-          `Thread already exists: <#${threadId}> (same timestamp)`
-        );
-        return { success: false, error: `Thread for ${bossName} at ${newTimestamp} already exists` };
-      }
-
-      // Parse timestamps to compare time difference
-      try {
-        const parseTimestamp = (ts) => {
-          // Format: "MM/DD/YY HH:MM"
-          const [datePart, timePart] = ts.split(' ');
-          const [month, day, year] = datePart.split('/').map(Number);
-          const [hours, minutes] = timePart.split(':').map(Number);
-          const fullYear = year < 100 ? 2000 + year : year;
-          return new Date(fullYear, month - 1, day, hours, minutes);
-        };
-
-        const existingTime = parseTimestamp(existingTimestamp);
-        const newTime = parseTimestamp(newTimestamp);
-        const timeDiffMinutes = Math.abs(newTime - existingTime) / (1000 * 60);
-
-        if (timeDiffMinutes < DUPLICATE_TIME_THRESHOLD_MINUTES) {
-          console.log(`⚠️ BLOCKED DUPLICATE: ${bossName} - times too close (${timeDiffMinutes.toFixed(0)} min apart)`);
+      // Prevent duplicate spawns by checking if column already exists (skip for maintenance - always new)
+      if (!skipColumnCheck) {
+        const columnExists = await checkColumnExists(bossName, fullTimestamp);
+        if (columnExists) {
           await adminLogs.send(
-            `⚠️ **BLOCKED DUPLICATE:** ${bossName} at ${fullTimestamp}\n` +
-            `Thread already exists: <#${threadId}> at ${existingTimestamp} (${timeDiffMinutes.toFixed(0)} min apart)`
+            `⚠️ **BLOCKED SPAWN:** ${bossName} at ${fullTimestamp}\nColumn already exists.`
           );
-          return { success: false, error: `Thread for ${bossName} already exists (${timeDiffMinutes.toFixed(0)} min apart)` };
-        } else {
-          // Times are far apart - this is a different spawn event, allow but log
-          console.log(`✅ Allowing new ${bossName} thread - existing at ${existingTimestamp}, new at ${newTimestamp} (${timeDiffMinutes.toFixed(0)} min apart)`);
-        }
-      } catch (parseError) {
-        // If parsing fails, fall back to blocking if created recently
-        const hoursSinceCreated = (Date.now() - spawn.createdAt) / (1000 * 60 * 60);
-        if (hoursSinceCreated < 1) {
-          console.log(`⚠️ BLOCKED DUPLICATE: ${bossName} - created ${hoursSinceCreated.toFixed(1)}h ago (timestamp parse failed)`);
-          return { success: false, error: `Thread for ${bossName} already exists` };
+          return { success: false, error: 'Column already exists (duplicate spawn)' };
         }
       }
-    }
-  }
 
-  const threadTitle = `[${dateStr} ${timeStr}] ${bossName}`;
+      // NEW: Prevent duplicate threads for same boss if spawn times are close
+      // This allows legitimate new threads when timer was wrong but blocks true duplicates
+      // 30 min threshold allows new threads for maintenance-delayed spawns (>30 min delay)
+      const DUPLICATE_TIME_THRESHOLD_MINUTES = 30; // Block if spawn times within 30 min
+      for (const [threadId, spawn] of Object.entries(activeSpawns)) {
+        if (spawn.boss.toLowerCase() === bossName.toLowerCase() && !spawn.closed) {
+          // Compare spawn timestamps (not creation time)
+          // Parse existing thread's timestamp (format: "MM/DD/YY HH:MM")
+          const existingTimestamp = spawn.timestamp;
+          const newTimestamp = fullTimestamp;
 
-  // Create both threads in parallel for efficiency
-  const [attThread, confirmThread] = await Promise.all([
-    attChannel.threads.create({
-      name: threadTitle,
-      autoArchiveDuration: config.auto_archive_minutes,
-      reason: `Boss spawn: ${bossName}`,
-    }),
-    adminLogs.threads.create({
-      name: `✅ ${threadTitle}`,
-      autoArchiveDuration: config.auto_archive_minutes,
-      reason: `Confirmation: ${bossName}`,
-    }),
-  ]);
+          // Simple comparison: if timestamps are identical or very close, block
+          if (existingTimestamp === newTimestamp) {
+            console.log(`⚠️ BLOCKED DUPLICATE: ${bossName} - identical timestamp ${newTimestamp}`);
+            await adminLogs.send(
+              `⚠️ **BLOCKED DUPLICATE:** ${bossName} at ${fullTimestamp}\n` +
+              `Thread already exists: <#${threadId}> (same timestamp)`
+            );
+            return { success: false, error: `Thread for ${bossName} at ${newTimestamp} already exists` };
+          }
 
-  if (!attThread) return { success: false, error: 'Failed to create attendance thread' };
+          // Parse timestamps to compare time difference
+          try {
+            const parseTimestamp = (ts) => {
+              // Format: "MM/DD/YY HH:MM"
+              const [datePart, timePart] = ts.split(' ');
+              const [month, day, year] = datePart.split('/').map(Number);
+              const [hours, minutes] = timePart.split(':').map(Number);
+              const fullYear = year < 100 ? 2000 + year : year;
+              return new Date(fullYear, month - 1, day, hours, minutes);
+            };
 
-  // Register spawn in state tracking
-  activeSpawns[attThread.id] = {
-    boss: bossName,
-    date: dateStr,
-    time: timeStr,
-    timestamp: fullTimestamp,
-    members: [],
-    memberIds: {}, // Map display names to Discord IDs for reliable identification
-    confirmThreadId: confirmThread ? confirmThread.id : null,
-    closed: false,
-    createdAt: Date.now(), // Track when thread was created for auto-close
-    noAutoClose: noAutoClose, // NEW: Flag to exempt from autoclose (for maintenance threads)
-  };
+            const existingTime = parseTimestamp(existingTimestamp);
+            const newTime = parseTimestamp(newTimestamp);
+            const timeDiffMinutes = Math.abs(newTime - existingTime) / (1000 * 60);
 
-  // Register in activeColumns for duplicate prevention (use normalized key for O(1) lookup)
-  const normalizedKey = `${bossName.toUpperCase()}|${normalizeTimestamp(fullTimestamp)}`;
-  activeColumns[normalizedKey] = attThread.id;
-
-  // Calculate auto-close timestamp using TIMING constant
-  const autoCloseTime = Date.now() + (TIMING.THREAD_AUTO_CLOSE_MINUTES * 60 * 1000);
-  const autoCloseTimestamp = Math.floor(autoCloseTime / 1000);
-
-  // Create description based on autoclose setting
-  const descriptionText = noAutoClose
-    ? `Boss detected! Please check in below.\n\n🔓 **No auto-close** (maintenance spawn - close manually when done)`
-    : `Boss detected! Please check in below.\n\n⏰ **Auto-closes <t:${autoCloseTimestamp}:R>** to prevent cheating.`;
-
-  // Create and send attendance instructions embed
-  const embed = new EmbedBuilder()
-    .setColor(noAutoClose ? 0x9b59b6 : 0xffd700) // Purple for maintenance, gold for normal
-    .setTitle(`🎯 ${bossName}`)
-    .setDescription(descriptionText)
-    .addFields(
-      {
-        name: "📸 How to Check In",
-        value:
-          "1. Post `present` or `here`\n2. Attach screenshot (admins exempt)\n3. Wait for admin ✅",
-      },
-      {
-        name: "📊 Points",
-        value: `${bossPoints[bossName].points} points`,
-        inline: true,
-      },
-      { name: "🕐 Time", value: timeStr, inline: true },
-      { name: "📅 Date", value: dateStr, inline: true },
-      {
-        name: "⏱️ Attendance Window",
-        value: noAutoClose ? "No limit (maintenance)" : `${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes (then auto-closes)`,
-        inline: false,
+            if (timeDiffMinutes < DUPLICATE_TIME_THRESHOLD_MINUTES) {
+              console.log(`⚠️ BLOCKED DUPLICATE: ${bossName} - times too close (${timeDiffMinutes.toFixed(0)} min apart)`);
+              await adminLogs.send(
+                `⚠️ **BLOCKED DUPLICATE:** ${bossName} at ${fullTimestamp}\n` +
+                `Thread already exists: <#${threadId}> at ${existingTimestamp} (${timeDiffMinutes.toFixed(0)} min apart)`
+              );
+              return { success: false, error: `Thread for ${bossName} already exists (${timeDiffMinutes.toFixed(0)} min apart)` };
+            } else {
+              // Times are far apart - this is a different spawn event, allow but log
+              console.log(`✅ Allowing new ${bossName} thread - existing at ${existingTimestamp}, new at ${newTimestamp} (${timeDiffMinutes.toFixed(0)} min apart)`);
+            }
+          } catch (parseError) {
+            // If parsing fails, fall back to blocking if created recently
+            const hoursSinceCreated = (Date.now() - spawn.createdAt) / (1000 * 60 * 60);
+            if (hoursSinceCreated < 1) {
+              console.log(`⚠️ BLOCKED DUPLICATE: ${bossName} - created ${hoursSinceCreated.toFixed(1)}h ago (timestamp parse failed)`);
+              return { success: false, error: `Thread for ${bossName} already exists` };
+            }
+          }
+        }
       }
-    )
-    .setFooter({ text: 'Admins: type "close" to finalize early' })
-    .setTimestamp();
 
-  // Add boss image if available
-  const bossImage = getBossImageAttachment(bossName);
-  const bossImageURL = getBossImageAttachmentURL(bossName, mainGuild);
-  if (bossImageURL) {
-    embed.setThumbnail(bossImageURL);
-  }
+      const threadTitle = `[${dateStr} ${timeStr}] ${bossName}`;
 
-  // Add guild branding to footer (preserving existing footer text)
-  addGuildFooter(embed, mainGuild, 'Admins: type "close" to finalize early');
+      // Create both threads in parallel for efficiency
+      const [attThread, confirmThread] = await Promise.all([
+        attChannel.threads.create({
+          name: threadTitle,
+          autoArchiveDuration: config.auto_archive_minutes,
+          reason: `Boss spawn: ${bossName}`,
+        }),
+        adminLogs.threads.create({
+          name: `✅ ${threadTitle}`,
+          autoArchiveDuration: config.auto_archive_minutes,
+          reason: `Confirmation: ${bossName}`,
+        }),
+      ]);
 
-  // Prepare message payload with boss image attachment
-  const messagePayload = { content: "@everyone", embeds: [embed] };
-  if (bossImage) {
-    messagePayload.files = [bossImage];
-  }
+      if (!attThread) return { success: false, error: 'Failed to create attendance thread' };
 
-  // Batch send notifications in parallel for faster execution
-  const notifications = [
-    attThread.send(messagePayload),
-  ];
+      // Register spawn in state tracking
+      activeSpawns[attThread.id] = {
+        boss: bossName,
+        date: dateStr,
+        time: timeStr,
+        timestamp: fullTimestamp,
+        members: [],
+        memberIds: {}, // Map display names to Discord IDs for reliable identification
+        confirmThreadId: confirmThread ? confirmThread.id : null,
+        closed: false,
+        createdAt: Date.now(), // Track when thread was created for auto-close
+        noAutoClose: noAutoClose, // NEW: Flag to exempt from autoclose (for maintenance threads)
+      };
 
-  if (confirmThread) {
-    // Create embed for confirmation thread with boss thumbnail
-    const confirmEmbed = new EmbedBuilder()
-      .setColor(0xf1c40f)
-      .setTitle('🟨 Boss Spawn Detected')
-      .setDescription(`**${bossName}**\n${fullTimestamp}`)
-      .setTimestamp();
+      // Register in activeColumns for duplicate prevention (use normalized key for O(1) lookup)
+      const normalizedKey = `${bossName.toUpperCase()}|${normalizeTimestamp(fullTimestamp)}`;
+      activeColumns[normalizedKey] = attThread.id;
 
-    // Add boss image if available
-    if (bossImageURL) {
-      confirmEmbed.setThumbnail(bossImageURL);
-    }
+      // Calculate auto-close timestamp using TIMING constant
+      const autoCloseTime = Date.now() + (TIMING.THREAD_AUTO_CLOSE_MINUTES * 60 * 1000);
+      const autoCloseTimestamp = Math.floor(autoCloseTime / 1000);
 
-    const confirmPayload = { embeds: [confirmEmbed] };
-    if (bossImage) {
-      confirmPayload.files = [bossImage];
-    }
+      // Create description based on autoclose setting
+      const descriptionText = noAutoClose
+        ? `Boss detected! Please check in below.\n\n🔓 **No auto-close** (maintenance spawn - close manually when done)`
+        : `Boss detected! Please check in below.\n\n⏰ **Auto-closes <t:${autoCloseTimestamp}:R>** to prevent cheating.`;
 
-    notifications.push(confirmThread.send(confirmPayload));
-  }
+      // Create and send attendance instructions embed
+      const embed = new EmbedBuilder()
+        .setColor(noAutoClose ? 0x9b59b6 : 0xffd700) // Purple for maintenance, gold for normal
+        .setTitle(`🎯 ${bossName}`)
+        .setDescription(descriptionText)
+        .addFields(
+          {
+            name: "📸 How to Check In",
+            value:
+              "1. Post `present` or `here`\n2. Attach screenshot (admins exempt)\n3. Wait for admin ✅",
+          },
+          {
+            name: "📊 Points",
+            value: `${bossPoints[bossName].points} points`,
+            inline: true,
+          },
+          { name: "🕐 Time", value: timeStr, inline: true },
+          { name: "📅 Date", value: dateStr, inline: true },
+          {
+            name: "⏱️ Attendance Window",
+            value: noAutoClose ? "No limit (maintenance)" : `${TIMING.THREAD_AUTO_CLOSE_MINUTES} minutes (then auto-closes)`,
+            inline: false,
+          }
+        )
+        .setFooter({ text: 'Admins: type "close" to finalize early' })
+        .setTimestamp();
 
-  await Promise.all(notifications);
-
-  // 🧠 AUTO-UPDATE LEARNING SYSTEM (Bot learns from actual spawn time)
-  try {
-    if (intelligenceEngine && intelligenceEngine.learningSystem) {
-      // Create ISO timestamp for the actual spawn time
-      const actualSpawnTime = new Date().toISOString();
-
-      const updated = await intelligenceEngine.learningSystem.updatePredictionAccuracy(
-        'spawn_prediction',
-        bossName,
-        actualSpawnTime
-      );
-
-      if (updated) {
-        console.log(`🧠 [LEARNING] Auto-updated spawn prediction accuracy for "${bossName}" (actual: ${actualSpawnTime})`);
-      } else {
-        console.log(`[LEARNING] No pending spawn prediction found for "${bossName}" (may not have been predicted)`);
+      // Add boss image if available
+      const bossImage = getBossImageAttachment(bossName);
+      const bossImageURL = getBossImageAttachmentURL(bossName, mainGuild);
+      if (bossImageURL) {
+        embed.setThumbnail(bossImageURL);
       }
-    }
-  } catch (learningErr) {
-    // Silent fail on learning updates (not critical to spawn creation)
-    console.log(`[LEARNING] Error updating spawn prediction: ${learningErr.message}`);
-  }
 
-  // Return success object for maintenance command
-  return { success: true, threadId: attThread.id };
-  } finally {
-    // MUTEX: Always clear the lock when done (success or failure)
-    pendingCreations.delete(creationKey);
-    console.log(`🔓 MUTEX CLEARED: Finished thread creation for ${bossName} at ${fullTimestamp}`);
-  }
+      // Add guild branding to footer (preserving existing footer text)
+      addGuildFooter(embed, mainGuild, 'Admins: type "close" to finalize early');
+
+      // Prepare message payload with boss image attachment
+      const messagePayload = { content: "@everyone", embeds: [embed] };
+      if (bossImage) {
+        messagePayload.files = [bossImage];
+      }
+
+      // Batch send notifications in parallel for faster execution
+      const notifications = [
+        attThread.send(messagePayload),
+      ];
+
+      if (confirmThread) {
+        // Create embed for confirmation thread with boss thumbnail
+        const confirmEmbed = new EmbedBuilder()
+          .setColor(0xf1c40f)
+          .setTitle('🟨 Boss Spawn Detected')
+          .setDescription(`**${bossName}**\n${fullTimestamp}`)
+          .setTimestamp();
+
+        // Add boss image if available
+        if (bossImageURL) {
+          confirmEmbed.setThumbnail(bossImageURL);
+        }
+
+        const confirmPayload = { embeds: [confirmEmbed] };
+        if (bossImage) {
+          confirmPayload.files = [bossImage];
+        }
+
+        notifications.push(confirmThread.send(confirmPayload));
+      }
+
+      await Promise.all(notifications);
+
+      // 🧠 AUTO-UPDATE LEARNING SYSTEM (Bot learns from actual spawn time)
+      try {
+        if (intelligenceEngine && intelligenceEngine.learningSystem) {
+          // Create ISO timestamp for the actual spawn time
+          const actualSpawnTime = new Date().toISOString();
+
+          const updated = await intelligenceEngine.learningSystem.updatePredictionAccuracy(
+            'spawn_prediction',
+            bossName,
+            actualSpawnTime
+          );
+
+          if (updated) {
+            console.log(`🧠 [LEARNING] Auto-updated spawn prediction accuracy for "${bossName}" (actual: ${actualSpawnTime})`);
+          } else {
+            console.log(`[LEARNING] No pending spawn prediction found for "${bossName}" (may not have been predicted)`);
+          }
+        }
+      } catch (learningErr) {
+        // Silent fail on learning updates (not critical to spawn creation)
+        console.log(`[LEARNING] Error updating spawn prediction: ${learningErr.message}`);
+      }
+
+      // Return success object for maintenance command
+      return { success: true, threadId: attThread.id };
+    } catch (error) {
+      console.error(`❌ Thread creation failed for ${bossName}:`, error.message);
+      return { success: false, error: error.message };
+    } finally {
+      // MUTEX: Always clear the lock when done (success or failure)
+      pendingCreations.delete(creationKey);
+      console.log(`🔓 MUTEX CLEARED: Finished thread creation for ${bossName} at ${fullTimestamp}`);
+    }
+  })();
+
+  // Store the promise so concurrent callers can wait for it
+  creationPromises.set(creationKey, creationPromise);
+
+  // Return the promise result
+  return await creationPromise;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
