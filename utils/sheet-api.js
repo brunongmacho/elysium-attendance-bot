@@ -153,16 +153,16 @@ const clientCache = {
    * Optimized to reduce API calls while maintaining data freshness
    */
   TTL: {
-    WEEKLY_ATTENDANCE: 30 * 60 * 1000,  // 30 min - historical data (rarely changes)
-    LEARNING_METRICS: 30 * 60 * 1000,   // 30 min - historical data (rarely changes)
+    WEEKLY_ATTENDANCE: 60 * 60 * 1000,  // 60 min - historical data (rarely changes, increased from 30)
+    LEARNING_METRICS: 60 * 60 * 1000,   // 60 min - historical data (rarely changes, increased from 30)
     BIDDING_POINTS: 5 * 60 * 1000,      // 5 min - frequently updated (keep aggressive)
-    FOR_DISTRIBUTION: 30 * 60 * 1000,   // 30 min - historical data (rarely changes)
-    MEMBER_STATS: 15 * 60 * 1000,       // 15 min - member lookups (was 5 min, stats change infrequently)
-    ROTATING_BOSSES: 30 * 60 * 1000,    // 30 min - boss rotation data (could be event-driven)
-    WEEKLY_MILESTONES: 30 * 60 * 1000,  // 30 min - milestone history (rarely changes)
-    STREAK_DATA: 24 * 60 * 60 * 1000,   // 24 hours - user streaks (daily calculation)
-    BIDDING_ITEMS: 2 * 60 * 1000,       // 2 min - auction setup (was 30 sec, items rarely change mid-auction)
-    DEFAULT: 5 * 60 * 1000              // 5 min - default fallback
+    FOR_DISTRIBUTION: 60 * 60 * 1000,   // 60 min - historical data (rarely changes, increased from 30)
+    MEMBER_STATS: 30 * 60 * 1000,       // 30 min - member lookups (increased from 15, stats change infrequently)
+    ROTATING_BOSSES: 60 * 60 * 1000,    // 60 min - boss rotation data (increased from 30, could be event-driven)
+    WEEKLY_MILESTONES: 60 * 60 * 1000,  // 60 min - milestone history (rarely changes, increased from 30)
+    STREAK_DATA: 24 * 60 * 60 * 1000,   // 24 hours - user streaks (daily calculation, keep same)
+    BIDDING_ITEMS: 5 * 60 * 1000,       // 5 min - auction setup (increased from 2, items rarely change mid-auction)
+    DEFAULT: 10 * 60 * 1000             // 10 min - default fallback (increased from 5)
   },
 
   /**
@@ -240,8 +240,16 @@ const clientCache = {
   }
 };
 
-// Run cache cleanup every 10 minutes
-setInterval(() => clientCache.cleanup(), 10 * 60 * 1000);
+// Run cache cleanup every 15 minutes (optimised from 10 minutes)
+setInterval(() => {
+  clientCache.cleanup();
+  
+  // Log cache size monitoring (helps detect memory issues)
+  const stats = clientCache.stats();
+  if (stats.size > 100) {
+    console.log(`📊 [CLIENT CACHE] Monitoring: ${stats.size} entries cached`);
+  }
+}, 15 * 60 * 1000);
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -514,8 +522,14 @@ class SheetAPI {
           "UND_ERR_SOCKET",
           "ECONNRESET",
           "ECONNREFUSED",
+          "ENOTFOUND",
+          "ETIMEDOUT",
+          "EHOSTUNREACH",
+          "ENETUNREACH",
           "FetchError",
-          "TimeoutError"
+          "TimeoutError",
+          "20", // Generic socket error
+          "ERR_SOCKET_HANG_UP"
         ];
 
         const errorCode = String(error.code || '');

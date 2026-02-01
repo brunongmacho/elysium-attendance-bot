@@ -375,8 +375,10 @@ async function syncAuctionItems(db, sheetAPI) {
     await itemsCollection.deleteMany({});
 
     log('💾', 'Inserting fresh auction items...');
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
     const itemDocs = itemsData.map((item, index) => ({
-      _id: `item_${Date.now()}_${index}`,
+      _id: `item_${timestamp}_${randomSuffix}_${index}`,
       itemName: item.item,
       startPrice: parseInt(item.startPrice) || 0,
       duration: parseInt(item.duration) || 60,
@@ -471,15 +473,30 @@ async function syncBossRotation(db, sheetAPI) {
       return { synced: rotationData.length, skipped: 0 };
     }
 
-    // Clear existing rotation and insert fresh data
+    // Upsert rotation data (update existing, insert new) - prevents duplicate key errors
     const rotationCollection = db.collection('bossRotation');
 
-    log('🗑️', 'Clearing old boss rotation data...');
-    await rotationCollection.deleteMany({});
+    log('💾', 'Upserting boss rotation data...');
+    const bulkOps = rotationData.map(rotation => ({
+      updateOne: {
+        filter: { _id: rotation._id },
+        update: {
+          $set: {
+            bossName: rotation.bossName,
+            currentIndex: rotation.currentIndex,
+            currentGuild: rotation.currentGuild,
+            isOurTurn: rotation.isOurTurn,
+            guilds: rotation.guilds,
+            nextGuild: rotation.nextGuild,
+            lastUpdated: rotation.lastUpdated
+          }
+        },
+        upsert: true
+      }
+    }));
 
-    log('💾', 'Inserting fresh boss rotation data...');
-    const result = await rotationCollection.insertMany(rotationData, { ordered: false });
-    const synced = result.insertedCount;
+    const result = await rotationCollection.bulkWrite(bulkOps, { ordered: false });
+    const synced = result.upsertedCount + result.modifiedCount;
 
     log('✅', `Boss rotation synced: ${synced} bosses`);
     return { synced, skipped: 0 };
