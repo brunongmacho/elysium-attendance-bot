@@ -10,8 +10,8 @@
 
   "auction": {
     "_description": "Main auction schedule - when the weekly auction starts",
-    "dayOfWeek": 6,
-    "dayName": "Saturday",
+    "dayOfWeek": 0,
+    "dayName": "Sunday",
     "hour": 12,
     "minute": 0,
     "_instructions": {
