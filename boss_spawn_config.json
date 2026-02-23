@@ -237,6 +237,36 @@
       ],
       "description": "Guild boss raid every Monday 21:30"
     },
+    "Libitina": {
+      "schedules": [
+        {
+          "day": "Monday",
+          "time": "21:00",
+          "dayOfWeek": 1
+        },
+        {
+          "day": "Saturday",
+          "time": "21:00",
+          "dayOfWeek": 6
+        }
+      ],
+      "description": "Spawns Monday 21:00, Saturday 21:00"
+    },
+    "Rakajeth": {
+      "schedules": [
+        {
+          "day": "Tuesday",
+          "time": "22:00",
+          "dayOfWeek": 2
+        },
+        {
+          "day": "Sunday",
+          "time": "19:00",
+          "dayOfWeek": 0
+        }
+      ],
+      "description": "Spawns Tuesday 22:00, Sunday 19:00"
+    },
     "Icaruthia": {
       "schedules": [
         {
