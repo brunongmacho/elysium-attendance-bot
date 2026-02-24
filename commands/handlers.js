@@ -1264,340 +1264,277 @@ async function handleSlashCommand(interaction, modules, config, client) {
     }
 
     // =========================================================================
-    // BOSS ROTATION COMMANDS
-    // =========================================================================
+// BOSS ROTATION COMMANDS
+// =========================================================================
 
-    if (commandName === 'rotation') {
-      const subcommand = interaction.options.getSubcommand();
+if (commandName === 'rotation') {
+  const subcommand = interaction.options.getSubcommand();
+  const MAX_FIELDS = 25;
 
-      if (subcommand === 'status') {
-        await interaction.deferReply();
+  // =========================================================
+  // STATUS
+  // =========================================================
+  if (subcommand === 'status') {
+    await interaction.deferReply();
+
+    try {
+      const allRotations = await bossRotation.getAllRotations();
+      const rotatingBosses = bossRotation.getRotatingBosses();
+
+      if (Object.keys(allRotations).length === 0) {
+        await interaction.editReply({
+          content: '⚠️ No rotation data available. BossRotation sheet may not be set up.'
+        });
+        return;
+      }
+
+      let bossSpawnConfig = null;
+      try {
+        const configPath = path.join(__dirname, '..', 'boss_spawn_config.json');
+        bossSpawnConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      } catch {}
+
+      const bossData = [];
+
+      for (const boss of rotatingBosses) {
+        const rotation = allRotations[boss];
+        if (!rotation) continue;
+
+        const emoji = rotation.isOurTurn ? '🟢' : '🔴';
+        const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
+
+        let spawnInfo = '';
+        let elysiumTurnInfo = '';
+        let nextSpawnDate = null;
 
         try {
-          const allRotations = await bossRotation.getAllRotations();
-          const rotatingBosses = bossRotation.getRotatingBosses();
-
-          if (Object.keys(allRotations).length === 0) {
-            await interaction.editReply({
-              content: '⚠️ No rotation data available. BossRotation sheet may not be set up.'
-            });
-            return;
+          const timerData = bossTimer.getNextSpawn(boss);
+          if (timerData?.nextSpawn) {
+            nextSpawnDate = timerData.nextSpawn;
           }
+        } catch {}
 
-          // Load boss spawn config for time calculations
-          let bossSpawnConfig = null;
-          try {
-            const configPath = path.join(__dirname, '..', 'boss_spawn_config.json');
-            const rawData = fs.readFileSync(configPath, 'utf8');
-            bossSpawnConfig = JSON.parse(rawData);
-          } catch (configError) {
-            console.error('Failed to load boss spawn config:', configError);
-          }
+        const hasGuilds = Array.isArray(rotation.guilds) && rotation.guilds.length > 0;
+        const guildCount = hasGuilds ? rotation.guilds.length : 5;
 
-          // Collect all boss data with spawn times for sorting
-          const bossData = [];
+        let nextGuild = rotation.currentGuild || 'Unknown';
+        if (hasGuilds) {
+          nextGuild = rotation.guilds[rotation.currentIndex % guildCount];
+        }
 
-          for (const boss of rotatingBosses) {
-            const rotation = allRotations[boss];
-            if (rotation) {
-              const emoji = rotation.isOurTurn ? '🟢' : '🔴';
-              const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
+        const dataWarning = !hasGuilds ? '\n⚠️ Guild list incomplete in sheet' : '';
 
-              // Get spawn time - try boss timer first, then attendance records
-              let spawnInfo = '';
-              let elysiumTurnInfo = '';
-              let nextSpawnDate = null;
-              try {
-                let spawnSource = '';
+        bossData.push({
+          boss,
+          emoji,
+          status,
+          rotation,
+          nextGuild,
+          guildCount,
+          spawnInfo,
+          elysiumTurnInfo,
+          dataWarning,
+          sortKey: nextSpawnDate ? nextSpawnDate.getTime() : Number.MAX_SAFE_INTEGER
+        });
+      }
 
-                // Try getting from boss timer first
-                const timerData = bossTimer.getNextSpawn(boss);
-                if (timerData && timerData.nextSpawn) {
-                  nextSpawnDate = timerData.nextSpawn;
-                  spawnSource = 'timer';
-                } else {
-                  // Fallback: Get last spawn from attendance records
-                  const lastSpawn = await mongoHelpers.getLastBossSpawn(boss);
-                  if (lastSpawn && lastSpawn.timestamp && bossSpawnConfig && bossSpawnConfig.timerBasedBosses[boss]) {
-                    const bossConfig = bossSpawnConfig.timerBasedBosses[boss];
-                    const intervalMs = bossConfig.spawnIntervalHours * 60 * 60 * 1000;
-                    const lastSpawnDate = new Date(lastSpawn.timestamp);
-                    const now = new Date();
+      bossData.sort((a, b) => a.sortKey - b.sortKey);
 
-                    // Calculate next spawn by adding intervals until we get a future time
-                    nextSpawnDate = new Date(lastSpawnDate.getTime() + intervalMs);
-                    while (nextSpawnDate < now) {
-                      nextSpawnDate = new Date(nextSpawnDate.getTime() + intervalMs);
-                    }
+      const embeds = [];
+      let embed = new EmbedBuilder()
+        .setColor(0x4a90e8)
+        .setTitle('🔄 Boss Rotation Status')
+        .setDescription('Track which guild\'s turn it is for rotating bosses')
+        .setTimestamp();
 
-                    spawnSource = 'attendance';
-                  }
-                }
+      let fieldCount = 0;
 
-                if (nextSpawnDate) {
-                  const spawnTimestamp = Math.floor(nextSpawnDate.getTime() / 1000);
-                  const sourceIndicator = spawnSource === 'attendance' ? '📋' : '⏱️';
-                  spawnInfo = `\n    📍 Next Spawn: <t:${spawnTimestamp}:R> ${sourceIndicator}`;
-
-                  // Calculate time until Elysium's turn if not currently our turn
-                  if (!rotation.isOurTurn && bossSpawnConfig && bossSpawnConfig.timerBasedBosses[boss]) {
-                    const bossConfig = bossSpawnConfig.timerBasedBosses[boss];
-                    const spawnIntervalHours = bossConfig.spawnIntervalHours;
-
-                    // Calculate spawns until Elysium's turn (index 1)
-                    const currentIndex = rotation.currentIndex;
-                    const totalGuilds = rotation.guilds && rotation.guilds.length > 0 ? rotation.guilds.length : 5;
-                    const elysiumIndex = 1;
-
-                    let spawnsUntilElysium;
-                    if (currentIndex >= elysiumIndex) {
-                      // Need to loop around: current -> end of cycle -> Elysium
-                      spawnsUntilElysium = (totalGuilds - currentIndex) + elysiumIndex;
-                    } else {
-                      // Direct path
-                      spawnsUntilElysium = elysiumIndex - currentIndex;
-                    }
-
-                    // Calculate predicted time for Elysium's turn
-                    // The next spawn is for the guild at currentIndex
-                    // spawnsUntilElysium represents moves needed in the rotation to reach Elysium
-                    // Each move = one spawn interval (kill -> respawn -> next guild's turn)
-                    const hoursUntilElysium = spawnsUntilElysium * spawnIntervalHours;
-
-                    const elysiumTurnDate = new Date(nextSpawnDate.getTime() + (hoursUntilElysium * 60 * 60 * 1000));
-                    const elysiumTimestamp = Math.floor(elysiumTurnDate.getTime() / 1000);
-
-                    const spawnsText = spawnsUntilElysium === 1 ? '1 spawn' : `${spawnsUntilElysium} spawns`;
-                    elysiumTurnInfo = `\n    🎯 Elysium's Turn: <t:${elysiumTimestamp}:R> (~${spawnsText}, ~${hoursUntilElysium}h)`;
-                  }
-                }
-              } catch (timerError) {
-                // Silently continue without spawn info
-              }
-
-              // Handle guilds array - check if it's empty or missing
-              const hasGuilds = rotation.guilds && Array.isArray(rotation.guilds) && rotation.guilds.length > 0;
-              const guildCount = hasGuilds ? rotation.guilds.length : 5;
-
-              let nextGuild = 'Unknown';
-              if (hasGuilds && rotation.guilds[rotation.currentIndex % guildCount]) {
-                nextGuild = rotation.guilds[rotation.currentIndex % guildCount];
-              } else if (rotation.nextGuild) {
-                nextGuild = rotation.nextGuild;
-              } else if (rotation.currentGuild) {
-                nextGuild = rotation.currentGuild;
-              }
-
-              // Show warning if guilds data is incomplete
-              const dataWarning = !hasGuilds ? '\n⚠️ Guild list incomplete in sheet' : '';
-
-              bossData.push({
-                boss,
-                emoji,
-                status,
-                rotation,
-                spawnInfo,
-                elysiumTurnInfo,
-                nextGuild,
-                guildCount,
-                dataWarning,
-                nextSpawnDate,
-                sortKey: nextSpawnDate ? nextSpawnDate.getTime() : Number.MAX_SAFE_INTEGER
-              });
-            }
-          }
-
-          // Sort by next predicted spawn time (earliest first, bosses without spawn times at the end)
-          bossData.sort((a, b) => a.sortKey - b.sortKey);
-
-          const embed = new EmbedBuilder()
+      for (const data of bossData) {
+        if (fieldCount === MAX_FIELDS) {
+          embeds.push(embed);
+          embed = new EmbedBuilder()
             .setColor(0x4a90e8)
-            .setTitle('🔄 Boss Rotation Status')
-            .setDescription('Track which guild\'s turn it is for rotating bosses\n*(Sorted by next predicted spawn)*')
+            .setTitle('🔄 Boss Rotation Status (cont.)')
             .setTimestamp();
-
-          // Add sorted boss fields to embed
-          for (const data of bossData) {
-            embed.addFields({
-              name: `${data.emoji} ${data.boss}`,
-              value: `Guild ${data.rotation.currentIndex}/${data.guildCount} - **${data.status}**\nNext: ${data.nextGuild}${data.spawnInfo}${data.elysiumTurnInfo}${data.dataWarning}`,
-              inline: false
-            });
-          }
-
-          await interaction.editReply({ embeds: [embed] });
-
-        } catch (error) {
-          console.error('Error in /rotation status:', error);
-          await interaction.editReply({
-            content: `❌ Failed to get rotation status: ${error.message}`
-          });
+          fieldCount = 0;
         }
 
-        return;
+        embed.addFields({
+          name: `${data.emoji} ${data.boss}`,
+          value: `Guild ${data.rotation.currentIndex}/${data.guildCount} - **${data.status}**\nNext: ${data.nextGuild}${data.spawnInfo}${data.elysiumTurnInfo}${data.dataWarning}`,
+          inline: false
+        });
+
+        fieldCount++;
       }
 
-      if (subcommand === 'set') {
-        const boss = interaction.options.getString('boss');
-        const position = interaction.options.getInteger('position');
+      embeds.push(embed);
+      await interaction.editReply({ embeds });
 
-        await interaction.deferReply();
-
-        try {
-          const result = await bossRotation.setRotation(boss, position);
-
-          if (result.success) {
-            const data = result.data;
-            const emoji = data.isOurTurn ? '🟢' : '🔴';
-            const status = data.isOurTurn ? 'ELYSIUM\'S TURN' : `${data.currentGuild}'s turn`;
-
-            const embed = new EmbedBuilder()
-              .setColor(data.isOurTurn ? 0x00ff00 : 0xff0000)
-              .setTitle(`${emoji} Rotation Updated`)
-              .setDescription(`**${boss}** rotation manually set`)
-              .addFields(
-                {
-                  name: 'Previous',
-                  value: `Index ${data.oldIndex} (${data.oldGuild})`,
-                  inline: true
-                },
-                {
-                  name: 'Current',
-                  value: `Index ${data.newIndex} (${data.newGuild})`,
-                  inline: true
-                },
-                {
-                  name: 'Status',
-                  value: `**${status}**`,
-                  inline: false
-                }
-              )
-              .setTimestamp();
-
-            await interaction.editReply({ embeds: [embed] });
-          } else {
-            await interaction.editReply({
-              content: `❌ Failed to set rotation: ${result.message}`
-            });
-          }
-
-        } catch (error) {
-          console.error('Error in /rotation set:', error);
-          await interaction.editReply({
-            content: `❌ Failed to set rotation: ${error.message}`
-          });
-        }
-
-        return;
-      }
-
-      if (subcommand === 'increment') {
-        const boss = interaction.options.getString('boss');
-
-        await interaction.deferReply();
-
-        try {
-          const result = await bossRotation.incrementRotation(boss);
-
-          if (result.updated !== false) {
-            const emoji = result.isNowOurTurn ? '🟢' : '🔴';
-            const status = result.isNowOurTurn ? 'ELYSIUM\'S TURN' : `${result.newGuild}'s turn`;
-
-            const embed = new EmbedBuilder()
-              .setColor(result.isNowOurTurn ? 0x00ff00 : 0xff0000)
-              .setTitle(`${emoji} Rotation Advanced`)
-              .setDescription(`**${boss}** rotation incremented`)
-              .addFields(
-                {
-                  name: 'Previous',
-                  value: `Index ${result.oldIndex} (${result.oldGuild})`,
-                  inline: true
-                },
-                {
-                  name: 'Current',
-                  value: `Index ${result.newIndex} (${result.newGuild})`,
-                  inline: true
-                },
-                {
-                  name: 'Status',
-                  value: `**${status}**`,
-                  inline: false
-                }
-              )
-              .setTimestamp();
-
-            await interaction.editReply({ embeds: [embed] });
-          } else {
-            await interaction.editReply({
-              content: `❌ Failed to increment rotation: ${result.error || 'Unknown error'}`
-            });
-          }
-
-        } catch (error) {
-          console.error('Error in /rotation increment:', error);
-          await interaction.editReply({
-            content: `❌ Failed to increment rotation: ${error.message}`
-          });
-        }
-
-        return;
-      }
-
-      if (subcommand === 'refresh') {
-        await interaction.deferReply();
-
-        try {
-          await bossRotation.refreshRotationCache();
-
-          const allRotations = await bossRotation.getAllRotations();
-          const rotatingBosses = bossRotation.getRotatingBosses();
-
-          if (Object.keys(allRotations).length === 0) {
-            await interaction.editReply({
-              content: '⚠️ No rotation data found after refresh. BossRotation sheet may not be set up.'
-            });
-            return;
-          }
-
-          const embed = new EmbedBuilder()
-            .setColor(0x00ff00)
-            .setTitle('✅ Rotation Data Refreshed')
-            .setDescription(`Loaded ${rotatingBosses.length} rotating bosses from Google Sheets`)
-            .setTimestamp();
-
-          for (const boss of rotatingBosses) {
-            const rotation = allRotations[boss];
-            if (rotation) {
-              const emoji = rotation.isOurTurn ? '🟢' : '🔴';
-              const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
-
-              // Handle guilds array - check if it's empty or missing
-              const hasGuilds = rotation.guilds && Array.isArray(rotation.guilds) && rotation.guilds.length > 0;
-              const guildCount = hasGuilds ? rotation.guilds.length : 5;
-
-              // Show warning if guilds data is incomplete
-              const dataWarning = !hasGuilds ? ' ⚠️ (incomplete)' : '';
-
-              embed.addFields({
-                name: `${emoji} ${boss}`,
-                value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**${dataWarning}`,
-                inline: false
-              });
-            }
-          }
-
-          await interaction.editReply({ embeds: [embed] });
-
-        } catch (error) {
-          console.error('Error in /rotation refresh:', error);
-          await interaction.editReply({
-            content: `❌ Failed to refresh rotation cache: ${error.message}`
-          });
-        }
-
-        return;
-      }
+    } catch (error) {
+      console.error('Error in /rotation status:', error);
+      await interaction.editReply({
+        content: `❌ Failed to get rotation status: ${error.message}`
+      });
     }
+
+    return;
+  }
+
+  // =========================================================
+  // SET
+  // =========================================================
+  if (subcommand === 'set') {
+    const boss = interaction.options.getString('boss');
+    const position = interaction.options.getInteger('position');
+
+    await interaction.deferReply();
+
+    try {
+      const result = await bossRotation.setRotation(boss, position);
+
+      if (!result.success) {
+        await interaction.editReply({ content: `❌ Failed to set rotation: ${result.message}` });
+        return;
+      }
+
+      const data = result.data;
+      const emoji = data.isOurTurn ? '🟢' : '🔴';
+      const status = data.isOurTurn ? 'ELYSIUM\'S TURN' : `${data.currentGuild}'s turn`;
+
+      const embed = new EmbedBuilder()
+        .setColor(data.isOurTurn ? 0x00ff00 : 0xff0000)
+        .setTitle(`${emoji} Rotation Updated`)
+        .setDescription(`**${boss}** rotation manually set`)
+        .addFields(
+          { name: 'Previous', value: `Index ${data.oldIndex} (${data.oldGuild})`, inline: true },
+          { name: 'Current', value: `Index ${data.newIndex} (${data.newGuild})`, inline: true },
+          { name: 'Status', value: `**${status}**`, inline: false }
+        )
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+
+    } catch (error) {
+      console.error('Error in /rotation set:', error);
+      await interaction.editReply({
+        content: `❌ Failed to set rotation: ${error.message}`
+      });
+    }
+
+    return;
+  }
+
+  // =========================================================
+  // INCREMENT
+  // =========================================================
+  if (subcommand === 'increment') {
+    const boss = interaction.options.getString('boss');
+    await interaction.deferReply();
+
+    try {
+      const result = await bossRotation.incrementRotation(boss);
+
+      if (result.updated === false) {
+        await interaction.editReply({ content: '❌ Failed to increment rotation.' });
+        return;
+      }
+
+      const emoji = result.isNowOurTurn ? '🟢' : '🔴';
+      const status = result.isNowOurTurn ? 'ELYSIUM\'S TURN' : `${result.newGuild}'s turn`;
+
+      const embed = new EmbedBuilder()
+        .setColor(result.isNowOurTurn ? 0x00ff00 : 0xff0000)
+        .setTitle(`${emoji} Rotation Advanced`)
+        .setDescription(`**${boss}** rotation incremented`)
+        .addFields(
+          { name: 'Previous', value: `Index ${result.oldIndex} (${result.oldGuild})`, inline: true },
+          { name: 'Current', value: `Index ${result.newIndex} (${result.newGuild})`, inline: true },
+          { name: 'Status', value: `**${status}**`, inline: false }
+        )
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+
+    } catch (error) {
+      console.error('Error in /rotation increment:', error);
+      await interaction.editReply({
+        content: `❌ Failed to increment rotation: ${error.message}`
+      });
+    }
+
+    return;
+  }
+
+  // =========================================================
+  // REFRESH
+  // =========================================================
+  if (subcommand === 'refresh') {
+    await interaction.deferReply();
+
+    try {
+      await bossRotation.refreshRotationCache();
+
+      const allRotations = await bossRotation.getAllRotations();
+      const rotatingBosses = bossRotation.getRotatingBosses();
+
+      if (Object.keys(allRotations).length === 0) {
+        await interaction.editReply({
+          content: '⚠️ No rotation data found after refresh.'
+        });
+        return;
+      }
+
+      const embeds = [];
+      let embed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle('✅ Rotation Data Refreshed')
+        .setDescription(`Loaded ${rotatingBosses.length} rotating bosses`)
+        .setTimestamp();
+
+      let fieldCount = 0;
+
+      for (const boss of rotatingBosses) {
+        const rotation = allRotations[boss];
+        if (!rotation) continue;
+
+        if (fieldCount === MAX_FIELDS) {
+          embeds.push(embed);
+          embed = new EmbedBuilder()
+            .setColor(0x00ff00)
+            .setTitle('✅ Rotation Data Refreshed (cont.)')
+            .setTimestamp();
+          fieldCount = 0;
+        }
+
+        const emoji = rotation.isOurTurn ? '🟢' : '🔴';
+        const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
+        const hasGuilds = Array.isArray(rotation.guilds) && rotation.guilds.length > 0;
+        const guildCount = hasGuilds ? rotation.guilds.length : 5;
+        const dataWarning = !hasGuilds ? ' ⚠️ (incomplete)' : '';
+
+        embed.addFields({
+          name: `${emoji} ${boss}`,
+          value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**${dataWarning}`,
+          inline: false
+        });
+
+        fieldCount++;
+      }
+
+      embeds.push(embed);
+      await interaction.editReply({ embeds });
+
+    } catch (error) {
+      console.error('Error in /rotation refresh:', error);
+      await interaction.editReply({
+        content: `❌ Failed to refresh rotation cache: ${error.message}`
+      });
+    }
+
+    return;
+  }
+}
 
     // =========================================================================
     // AUCTION/BIDDING COMMANDS
