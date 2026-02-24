@@ -4303,15 +4303,28 @@ const commandHandlers = {
           return;
         }
 
-        const embed = new EmbedBuilder()
+        const embeds = [];
+        let embed = new EmbedBuilder()
           .setColor(0x4a90e8)
           .setTitle('🔄 Boss Rotation Status')
           .setDescription('Current rotation for 5-guild system with ML-enhanced spawn predictions')
           .setTimestamp();
 
+        let fieldCount = 0;
+        const MAX_FIELDS = 25;
+
         for (const boss of rotatingBosses) {
           const rotation = rotations[boss];
           if (rotation) {
+            if (fieldCount === MAX_FIELDS) {
+              embeds.push(embed);
+              embed = new EmbedBuilder()
+                .setColor(0x4a90e8)
+                .setTitle('🔄 Boss Rotation Status (cont.)')
+                .setTimestamp();
+              fieldCount = 0;
+            }
+
             const emoji = rotation.isOurTurn ? '🟢' : '🔴';
             const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
 
@@ -4371,10 +4384,12 @@ const commandHandlers = {
               value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**\nNext: ${nextGuild}${spawnInfo}`,
               inline: false
             });
+            fieldCount++;
           }
         }
 
-        await message.reply({ embeds: [embed] });
+        embeds.push(embed);
+        await message.reply({ embeds });
       }
       // !rotation set <boss> <index> - Manually set rotation
       else if (subcommand === 'set') {
