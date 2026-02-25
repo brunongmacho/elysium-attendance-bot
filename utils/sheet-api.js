@@ -541,11 +541,13 @@ class SheetAPI {
           "does not exist",
           "invalid member",
           "already exists",
-          "duplicate"
+          "duplicate",
+          "column exists",
+          "lock timeout"
         ];
 
         const isNonRetryable = nonRetryableErrors.some(
-          phrase => errorMessage.toLowerCase().includes(phrase)
+          phrase => errorMessage.toLowerCase().includes(phrase.toLowerCase())
         );
 
         // If it's a logical error, fail immediately without retrying

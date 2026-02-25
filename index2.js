@@ -289,6 +289,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions, // Reaction events
     GatewayIntentBits.GuildMembers,        // Member events and data
     GatewayIntentBits.DirectMessages,      // DM support
+    GatewayIntentBits.GuildVoiceStates,     // Voice channel state events
   ],
 
   // Partials - handle uncached entities
@@ -7646,6 +7647,68 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 });
 
 // ==========================================
+// VOICE CHANNEL JOIN/LEAVE LOGGING
+// ==========================================
+
+client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+  try {
+    const member = newState.member;
+    
+    if (member.user.bot) return;
+    
+    const commandsChannel = await discordCache.getChannel('elysium_commands_channel_id');
+    
+    if (!commandsChannel) return;
+    
+    const guild = commandsChannel.guild;
+    
+    const memberName = member.user.username;
+    const loreKey = Object.keys(memberLore).find(
+      key => key.toLowerCase() === memberName.toLowerCase() && !key.startsWith('_')
+    );
+    const memberTitle = loreKey ? memberLore[loreKey].title : null;
+    
+    const joinedChannel = newState.channelId && !oldState.channelId;
+    const leftChannel = !newState.channelId && oldState.channelId;
+    
+    if (joinedChannel) {
+      const channel = newState.channel;
+      
+      const joinEmbed = new EmbedBuilder()
+        .setColor(0x3498DB)
+        .setTitle(memberTitle ? `✨ ${memberTitle}` : '🎤 Voice Channel Joined')
+        .setThumbnail(guild.iconURL())
+        .addFields(
+          { name: 'Member', value: member.user.username, inline: true },
+          { name: 'Channel', value: channel.name, inline: true }
+        )
+        .setFooter({ text: 'ELYSIUM Guild', iconURL: guild.iconURL() })
+        .setTimestamp();
+      
+      await commandsChannel.send({ embeds: [joinEmbed] });
+      
+    } else if (leftChannel) {
+      const channel = oldState.channel;
+      
+      const leaveEmbed = new EmbedBuilder()
+        .setColor(0xE74C3C)
+        .setTitle(memberTitle ? `✨ ${memberTitle}` : '🔌 Voice Channel Left')
+        .setThumbnail(guild.iconURL())
+        .addFields(
+          { name: 'Member', value: member.user.username, inline: true },
+          { name: 'Channel', value: channel.name, inline: true }
+        )
+        .setFooter({ text: 'ELYSIUM Guild', iconURL: guild.iconURL() })
+        .setTimestamp();
+      
+      await commandsChannel.send({ embeds: [leaveEmbed] });
+    }
+    
+  } catch (error) {
+    console.error('❌ Error handling voice state update:', error.message);
+  }
+});
+
 // THREAD UPDATE HANDLING (Manual Discord UI Archiving)
 // ==========================================
 
