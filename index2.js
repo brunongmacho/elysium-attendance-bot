@@ -1607,7 +1607,7 @@ async function cleanupStaleStatsMessages() {
   try {
     console.log('🧹 Cleaning up stale stats/mypoints messages...');
 
-    const commandsChannel = await discordCache.getChannel('elysium_commands_channel_id');
+const commandsChannel = await discordCache.getChannel('bot_manual_channel_id');
     if (!commandsChannel) {
       console.warn('⚠️ Could not find elysium-commands channel for cleanup');
       return;
