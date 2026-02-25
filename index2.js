@@ -7662,7 +7662,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
     
     const guild = commandsChannel.guild;
     
-    const memberName = member.user.username;
+    const memberName = member.displayName;
     const loreKey = Object.keys(memberLore).find(
       key => key.toLowerCase() === memberName.toLowerCase() && !key.startsWith('_')
     );
@@ -7679,7 +7679,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         .setTitle(memberTitle ? `✨ ${memberTitle}` : '🎤 Voice Channel Joined')
         .setThumbnail(guild.iconURL())
         .addFields(
-          { name: 'Member', value: member.user.username, inline: true },
+          { name: 'Member', value: member.displayName, inline: true },
           { name: 'Channel', value: channel.name, inline: true }
         )
         .setFooter({ text: 'ELYSIUM Guild', iconURL: guild.iconURL() })
@@ -7695,7 +7695,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         .setTitle(memberTitle ? `✨ ${memberTitle}` : '🔌 Voice Channel Left')
         .setThumbnail(guild.iconURL())
         .addFields(
-          { name: 'Member', value: member.user.username, inline: true },
+          { name: 'Member', value: member.displayName, inline: true },
           { name: 'Channel', value: channel.name, inline: true }
         )
         .setFooter({ text: 'ELYSIUM Guild', iconURL: guild.iconURL() })
