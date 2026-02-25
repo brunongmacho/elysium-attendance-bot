@@ -7656,7 +7656,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
     
     if (member.user.bot) return;
     
-    const commandsChannel = await discordCache.getChannel('elysium_commands_channel_id');
+    const commandsChannel = await discordCache.getChannel('bot_manual_channel_id');
     
     if (!commandsChannel) return;
     
