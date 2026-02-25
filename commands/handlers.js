@@ -1334,11 +1334,17 @@ if (commandName === 'rotation') {
           spawnInfo,
           elysiumTurnInfo,
           dataWarning,
+          isOurTurn: rotation.isOurTurn || false,
           sortKey: nextSpawnDate ? nextSpawnDate.getTime() : Number.MAX_SAFE_INTEGER
         });
       }
 
-      bossData.sort((a, b) => a.sortKey - b.sortKey);
+      bossData.sort((a, b) => {
+        if (a.isOurTurn !== b.isOurTurn) {
+          return b.isOurTurn ? 1 : -1;
+        }
+        return a.sortKey - b.sortKey;
+      });
 
       const embeds = [];
       let embed = new EmbedBuilder()

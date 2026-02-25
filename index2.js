@@ -4313,18 +4313,11 @@ const commandHandlers = {
         let fieldCount = 0;
         const MAX_FIELDS = 25;
 
+        const bossData = [];
+
         for (const boss of rotatingBosses) {
           const rotation = rotations[boss];
           if (rotation) {
-            if (fieldCount === MAX_FIELDS) {
-              embeds.push(embed);
-              embed = new EmbedBuilder()
-                .setColor(0x4a90e8)
-                .setTitle('🔄 Boss Rotation Status (cont.)')
-                .setTimestamp();
-              fieldCount = 0;
-            }
-
             const emoji = rotation.isOurTurn ? '🟢' : '🔴';
             const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
 
@@ -4379,13 +4372,43 @@ const commandHandlers = {
               ? rotation.guilds[rotation.currentIndex % guildCount]
               : (rotation.nextGuild || rotation.currentGuild || 'Unknown');
 
-            embed.addFields({
-              name: `${emoji} ${boss}`,
-              value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**\nNext: ${nextGuild}${spawnInfo}`,
-              inline: false
+            bossData.push({
+              boss,
+              emoji,
+              status,
+              rotation,
+              guildCount,
+              nextGuild,
+              spawnInfo,
+              isOurTurn: rotation.isOurTurn || false,
+              sortKey: spawnTimestamp ? spawnTimestamp * 1000 : Number.MAX_SAFE_INTEGER
             });
-            fieldCount++;
           }
+        }
+
+        bossData.sort((a, b) => {
+          if (a.isOurTurn !== b.isOurTurn) {
+            return b.isOurTurn ? 1 : -1;
+          }
+          return a.sortKey - b.sortKey;
+        });
+
+        for (const data of bossData) {
+          if (fieldCount === MAX_FIELDS) {
+            embeds.push(embed);
+            embed = new EmbedBuilder()
+              .setColor(0x4a90e8)
+              .setTitle('🔄 Boss Rotation Status (cont.)')
+              .setTimestamp();
+            fieldCount = 0;
+          }
+
+          embed.addFields({
+            name: `${data.emoji} ${data.boss}`,
+            value: `Guild ${data.rotation.currentIndex}/${data.guildCount} - **${data.status}**\nNext: ${data.nextGuild}${data.spawnInfo}`,
+            inline: false
+          });
+          fieldCount++;
         }
 
         embeds.push(embed);
