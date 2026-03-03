@@ -1414,14 +1414,15 @@ function buildStatsEmbed(stats, member) {
 
   // Footer with favorite boss and percentile
   const percentileText = percentile > 0 ? `Top ${percentile}%` : 'New Member';
+  const statsTip = '\n💡 Tip: !stats `IGN` shows anyone\'s story';
 
   if (attendance.favoriteBoss) {
     embed.setFooter({
-      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText}`
+      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText}${statsTip}`
     });
   } else {
     embed.setFooter({
-      text: `${percentileText}`
+      text: `${percentileText}${statsTip}`
     });
   }
 
@@ -5904,7 +5905,7 @@ client.on(Events.MessageCreate, async (message) => {
 
         const statusText = userIsAdmin
           ? `⏩ **${username}** (Admin) registered for **${spawnInfo.boss}**\n\nFast-track verification (no screenshot required)...`
-          : `⏳ **${username}** registered for **${spawnInfo.boss}**\n\nWaiting for admin verification...`;
+          : `⏳ **${username}** registered for **${spawnInfo.boss}**\n\nWaiting for admin verification...\n\nℹ️ !stats \`${username}\` in <#1431640753238442014>`;
 
         const embed = new EmbedBuilder()
           .setColor(userIsAdmin ? 0x00ff00 : 0xffa500)
