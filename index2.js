@@ -7800,8 +7800,11 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 
       // Check if the new joiner is AlterFrieren and HesuCrypto is already in the same channel
       if (member.id === ALTERFRIEREN_ID) {
+        // Fetch channel members to ensure we have the latest
+        await channel.members.fetch();
         const channelMembers = channel.members;
         if (channelMembers.has(HESUCRYPTO_ID)) {
+          console.log(`💌 Sending DM to AlterFrieren - She joined, Hesu is in channel`);
           // Combine general + whenSheJoins pools
           const pool = [...generalDMs, ...whenSheJoins];
           const randomDM = getRandomPlayfulDM(pool);
@@ -7811,13 +7814,19 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
             // Notify HesuCrypto
             const hesuUser = await client.users.fetch(HESUCRYPTO_ID);
             await hesuUser.send(`💌 Sent to AlterFrieren: "${randomDM}"`).catch(() => {});
-          } catch (e) {}
+            console.log(`💌 DM sent: "${randomDM}"`);
+          } catch (e) {
+            console.error(`💌 Error sending DM: ${e.message}`);
+          }
         }
       }
       // Check if the new joiner is HesuCrypto and AlterFrieren is already in the same channel
       else if (member.id === HESUCRYPTO_ID) {
+        // Fetch channel members to ensure we have the latest
+        await channel.members.fetch();
         const channelMembers = channel.members;
         if (channelMembers.has(ALTERFRIEREN_ID)) {
+          console.log(`💌 Sending DM to AlterFrieren - Hesu joined, She is in channel`);
           // Combine general + whenHeJoins pools
           const pool = [...generalDMs, ...whenHeJoins];
           const randomDM = getRandomPlayfulDM(pool);
@@ -7828,7 +7837,10 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
             // Notify HesuCrypto
             const hesuUser = await client.users.fetch(HESUCRYPTO_ID);
             await hesuUser.send(`💌 Sent to AlterFrieren: "${randomDM}"`).catch(() => {});
-          } catch (e) {}
+            console.log(`💌 DM sent: "${randomDM}"`);
+          } catch (e) {
+            console.error(`💌 Error sending DM: ${e.message}`);
+          }
         }
       }
       
