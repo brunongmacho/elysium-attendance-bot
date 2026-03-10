@@ -7800,8 +7800,6 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 
       // Check if the new joiner is AlterFrieren and HesuCrypto is already in the same channel
       if (member.id === ALTERFRIEREN_ID) {
-        // Fetch channel members to ensure we have the latest
-        await channel.members.fetch();
         const channelMembers = channel.members;
         if (channelMembers.has(HESUCRYPTO_ID)) {
           console.log(`💌 Sending DM to AlterFrieren - She joined, Hesu is in channel`);
@@ -7822,8 +7820,6 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
       }
       // Check if the new joiner is HesuCrypto and AlterFrieren is already in the same channel
       else if (member.id === HESUCRYPTO_ID) {
-        // Fetch channel members to ensure we have the latest
-        await channel.members.fetch();
         const channelMembers = channel.members;
         if (channelMembers.has(ALTERFRIEREN_ID)) {
           console.log(`💌 Sending DM to AlterFrieren - Hesu joined, She is in channel`);
