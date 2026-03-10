@@ -131,6 +131,7 @@ const discordMonitoring = require('./utils/discord-monitoring');
 const { registerCommands } = require('./commands/register-commands'); // Slash command registration
 const { handleSlashCommand } = require('./commands/handlers'); // Slash command handlers
 const { handleAutocomplete } = require('./commands/autocomplete'); // Autocomplete handlers
+const alterFrierenConfig = require('./AlterFrieren.json'); // AlterFrieren special messages
 
 // =====================================================================
 // SECTION 1B: COMMAND ALIASES (moved to config/command-aliases.js)
@@ -516,6 +517,12 @@ let isBidProcessing = false;
  * @type {NodeJS.Timeout|null}
  */
 let biddingChannelCleanupTimer = null;
+
+/**
+ * Track last 8 playful DMs sent to prevent repeats
+ * @type {string[]}
+ */
+let recentPlayfulDMs = [];
 
 /**
  * Cooldown period after auction ends before new auction can start (10 minutes)
@@ -5085,10 +5092,25 @@ client.once(Events.ClientReady, async () => {
  */
 client.on(Events.MessageCreate, async (message) => {
   try {
+    // 👑 SPECIAL DM FORWARDING: Forward Alter's replies to Hesu
+    const ALTERFRIEREN_ID = '517653312783253505';
+    const HESUCRYPTO_ID = '182081219062661120';
+
+    // Handle DMs to the bot
+    if (!message.guild) {
+      // If Alter replies to the bot's DM, forward to Hesu
+      if (message.author.id === ALTERFRIEREN_ID) {
+        try {
+          const hesuUser = await client.users.fetch(HESUCRYPTO_ID);
+          await hesuUser.send(`💬 AlterFrieren replied: ${message.content}`).catch(() => {});
+        } catch (e) {}
+      }
+      return; // Stop processing DMs
+    }
+
     // ⚡ PERFORMANCE: Early returns for irrelevant messages
     // NOTE: Bot message filtering happens AFTER timer server check (line ~3888)
     // This allows timer bot to create spawn threads before being blocked
-    if (!message.guild) return; // Skip DMs immediately
     if (message.guild.id !== config.main_guild_id && message.guild.id !== config.timer_server_id) return; // Skip wrong guild (allow timer server)
 
     // 📊 ACTIVITY TRACKING: Track message for activity heatmap
@@ -5098,6 +5120,53 @@ client.on(Events.MessageCreate, async (message) => {
         activityHeatmap.trackMessage(message);
       } catch (error) {
         console.error(`❌ Activity tracking error: ${error.message}`);
+      }
+    }
+
+    // 👑 SPECIAL REACTION: Random 💙 reaction for alterfrieren and hesucrypto
+    // 30% chance when talking to each other, 15% otherwise
+
+    if ([ALTERFRIEREN_ID, HESUCRYPTO_ID].includes(message.author.id) && !message.author.bot) {
+      let reactionChance = 0.15;
+
+      // Check if they're talking to each other
+      const isTalkingToEachOther = async () => {
+        // Check if message is a reply to the other person
+        if (message.reference) {
+          try {
+            const referencedMsg = await message.fetchReference();
+            if (referencedMsg && [ALTERFRIEREN_ID, HESUCRYPTO_ID].includes(referencedMsg.author.id) && referencedMsg.author.id !== message.author.id) {
+              return true;
+            }
+          } catch (e) {}
+        }
+
+        // Check recent messages in channel for conversation between the two
+        try {
+          const recentMessages = await message.channel.messages.fetch({ limit: 10 });
+          let otherPersonRepliedRecently = false;
+          let selfRepliedRecently = false;
+
+          for (const [_, msg] of recentMessages) {
+            if (msg.author.id === message.author.id) {
+              selfRepliedRecently = true;
+            } else if ([ALTERFRIEREN_ID, HESUCRYPTO_ID].includes(msg.author.id)) {
+              otherPersonRepliedRecently = true;
+            }
+          }
+
+          return otherPersonRepliedRecently && selfRepliedRecently;
+        } catch (e) {
+          return false;
+        }
+      };
+
+      if (await isTalkingToEachOther()) {
+        reactionChance = 0.30;
+      }
+
+      if (Math.random() < reactionChance) {
+        await message.react('💙').catch(() => {});
       }
     }
 
@@ -5904,7 +5973,7 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         const statusText = userIsAdmin
-          ? `⏩ **${username}** (Admin) registered for **${spawnInfo.boss}**\n\nFast-track verification (no screenshot required)...`
+          ? `⏩ **${username}** (Admin) registered for **${spawnInfo.boss}**\n\nFast-track verification (no screenshot required)...\n\nℹ️ !stats \`${username}\` in <#1431640753238442014>`
           : `⏳ **${username}** registered for **${spawnInfo.boss}**\n\nWaiting for admin verification...\n\nℹ️ !stats \`${username}\` in <#1431640753238442014>`;
 
         const embed = new EmbedBuilder()
@@ -7356,6 +7425,20 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     if (!reaction.message.guild) return; // Skip DM reactions
     if (reaction.message.guild.id !== config.main_guild_id) return; // Skip wrong guild
 
+    // 👑 SPECIAL REACTION: When hesucrypto or alterfrieren react to each other's messages
+    // 50% chance for the bot to also react with 💙
+    const ALTERFRIEREN_ID = '517653312783253505';
+    const HESUCRYPTO_ID = '182081219062661120';
+
+    if ((user.id === HESUCRYPTO_ID || user.id === ALTERFRIEREN_ID) && reaction.message.author) {
+      const otherPersonId = user.id === HESUCRYPTO_ID ? ALTERFRIEREN_ID : HESUCRYPTO_ID;
+      if (reaction.message.author.id === otherPersonId) {
+        if (Math.random() < 0.50) {
+          await reaction.message.react('💙').catch(() => {});
+        }
+      }
+    }
+
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();
 
@@ -7687,6 +7770,67 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         .setTimestamp();
       
       await commandsChannel.send({ embeds: [joinEmbed] });
+
+      // 👑 SPECIAL VOICE DM: Send playful DM when both are in same channel
+      const ALTERFRIEREN_ID = '517653312783253505';
+      const HESUCRYPTO_ID = '182081219062661120';
+
+      const generalDMs = alterFrierenConfig.general || [];
+      const whenSheJoins = alterFrierenConfig.whenSheJoins || [];
+      const whenHeJoins = alterFrierenConfig.whenHeJoins || [];
+
+      // Helper function to get a random DM that hasn't been sent recently
+      const getRandomPlayfulDM = (dmArray) => {
+        // Filter out recently sent messages
+        const availableDMs = dmArray.filter(dm => !recentPlayfulDMs.includes(dm));
+        
+        // If all messages used recently, reset the tracking
+        let pool = availableDMs.length > 0 ? availableDMs : dmArray;
+        
+        const selectedDM = pool[Math.floor(Math.random() * pool.length)];
+        
+        // Add to recent list, keep only last 8
+        recentPlayfulDMs.push(selectedDM);
+        if (recentPlayfulDMs.length > 8) {
+          recentPlayfulDMs.shift();
+        }
+        
+        return selectedDM;
+      };
+
+      // Check if the new joiner is AlterFrieren and HesuCrypto is already in the same channel
+      if (member.id === ALTERFRIEREN_ID) {
+        const channelMembers = channel.members;
+        if (channelMembers.has(HESUCRYPTO_ID)) {
+          // Combine general + whenSheJoins pools
+          const pool = [...generalDMs, ...whenSheJoins];
+          const randomDM = getRandomPlayfulDM(pool);
+          try {
+            // Send DM to AlterFrieren
+            await member.send(randomDM).catch(() => {});
+            // Notify HesuCrypto
+            const hesuUser = await client.users.fetch(HESUCRYPTO_ID);
+            await hesuUser.send(`💌 Sent to AlterFrieren: "${randomDM}"`).catch(() => {});
+          } catch (e) {}
+        }
+      }
+      // Check if the new joiner is HesuCrypto and AlterFrieren is already in the same channel
+      else if (member.id === HESUCRYPTO_ID) {
+        const channelMembers = channel.members;
+        if (channelMembers.has(ALTERFRIEREN_ID)) {
+          // Combine general + whenHeJoins pools
+          const pool = [...generalDMs, ...whenHeJoins];
+          const randomDM = getRandomPlayfulDM(pool);
+          try {
+            // Send DM to AlterFrieren
+            const alterUser = await client.users.fetch(ALTERFRIEREN_ID);
+            await alterUser.send(randomDM).catch(() => {});
+            // Notify HesuCrypto
+            const hesuUser = await client.users.fetch(HESUCRYPTO_ID);
+            await hesuUser.send(`💌 Sent to AlterFrieren: "${randomDM}"`).catch(() => {});
+          } catch (e) {}
+        }
+      }
       
     } else if (leftChannel) {
       const channel = oldState.channel;
