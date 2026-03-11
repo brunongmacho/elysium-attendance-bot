@@ -7805,8 +7805,15 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 
       // Check if the new joiner is AlterFrieren and HesuCrypto is already in the same channel
       if (member.id === ALTERFRIEREN_ID) {
+        console.log(`🎤 AlterFrieren joined. Waiting to check channel...`);
+        
+        // Wait a moment for the members cache to update
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         const channelMembers = channel.members;
-        console.log(`🎤 AlterFrieren joined. Checking if Hesu is in channel...`);
+        console.log(`🎤 Channel members: ${[...channelMembers.keys()].join(', ')}`);
+        console.log(`🎤 Has Hesu? ${channelMembers.has(HESUCRYPTO_ID)}`);
+        
         if (channelMembers.has(HESUCRYPTO_ID)) {
           console.log(`💌 Sending DM to AlterFrieren - She joined, Hesu is in channel`);
           // Combine general + whenSheJoins pools
@@ -7826,8 +7833,15 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
       }
       // Check if the new joiner is HesuCrypto and AlterFrieren is already in the same channel
       else if (member.id === HESUCRYPTO_ID) {
+        console.log(`🎤 HesuCrypto joined. Waiting to check channel...`);
+        
+        // Wait a moment for the members cache to update
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         const channelMembers = channel.members;
-        console.log(`🎤 HesuCrypto joined. Checking if Alter is in channel...`);
+        console.log(`🎤 Channel members: ${[...channelMembers.keys()].join(', ')}`);
+        console.log(`🎤 Has Alter? ${channelMembers.has(ALTERFRIEREN_ID)}`);
+        
         if (channelMembers.has(ALTERFRIEREN_ID)) {
           console.log(`💌 Sending DM to AlterFrieren - Hesu joined, She is in channel`);
           // Combine general + whenHeJoins pools
