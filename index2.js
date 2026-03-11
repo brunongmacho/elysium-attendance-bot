@@ -7813,11 +7813,13 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         const channelMembers = channel.members;
         console.log(`🎤 Channel members: ${[...channelMembers.values()].map(m => m.displayName).join(', ')}`);
         
-        // Check by ID or by nickname
+        // Check by ID or by nickname/username
         const hasHesuById = channelMembers.has(HESUCRYPTO_ID);
         const hasHesuByName = [...channelMembers.values()].some(m => 
           m.displayName.toLowerCase().includes('hesu') || 
-          m.displayName.toLowerCase().includes('.biogesic')
+          m.displayName.toLowerCase().includes('.biogesic') ||
+          m.user.username.toLowerCase().includes('hesu') ||
+          m.user.username.toLowerCase().includes('.biogesic')
         );
         
         console.log(`🎤 Has Hesu (by ID)? ${hasHesuById}, (by name)? ${hasHesuByName}`);
@@ -7849,11 +7851,13 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         const channelMembers = channel.members;
         console.log(`🎤 Channel members: ${[...channelMembers.values()].map(m => m.displayName).join(', ')}`);
         
-        // Check by ID or by nickname
+        // Check by ID or by nickname/username
         const hasAlterById = channelMembers.has(ALTERFRIEREN_ID);
         const hasAlterByName = [...channelMembers.values()].some(m => 
           m.displayName.toLowerCase().includes('alter') || 
-          m.displayName.toLowerCase().includes('zoe_bebe')
+          m.displayName.toLowerCase().includes('zoe_bebe') ||
+          m.user.username.toLowerCase().includes('alter') ||
+          m.user.username.toLowerCase().includes('zoe_bebe')
         );
         
         console.log(`🎤 Has Alter (by ID)? ${hasAlterById}, (by name)? ${hasAlterByName}`);
