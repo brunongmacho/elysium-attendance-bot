@@ -7897,8 +7897,6 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
             }
           }
         }
-          }
-        }
         
         console.log(`🎤 Alter in this channel? ${alterInThisChannel}`);
         
