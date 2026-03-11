@@ -7761,7 +7761,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
       const joinEmbed = new EmbedBuilder()
         .setColor(0x3498DB)
         .setTitle(memberTitle ? `✨ ${memberTitle} has joined` : '🎤 Voice Channel Joined')
-        .setThumbnail(guild.iconURL())
+        .setThumbnail(member.displayAvatarURL())
         .addFields(
           { name: 'Member', value: member.displayName, inline: true },
           { name: 'Channel', value: channel.name, inline: true }
@@ -7925,7 +7925,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
       const leaveEmbed = new EmbedBuilder()
         .setColor(0xE74C3C)
         .setTitle(memberTitle ? `✨ ${memberTitle} has left` : '🔌 Voice Channel Left')
-        .setThumbnail(guild.iconURL())
+        .setThumbnail(member.displayAvatarURL())
         .addFields(
           { name: 'Member', value: member.displayName, inline: true },
           { name: 'Channel', value: channel.name, inline: true }
