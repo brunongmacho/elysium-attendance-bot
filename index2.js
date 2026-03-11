@@ -7807,26 +7807,35 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
       if (member.id === ALTERFRIEREN_ID) {
         console.log(`🎤 AlterFrieren joined. Waiting to check channel...`);
         
-        // Wait a moment for the members cache to update
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait a moment for the voice state to settle
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
+        // Try both channel.members and guild.voiceStates
         const channelMembers = channel.members;
         console.log(`🎤 Channel members: ${[...channelMembers.values()].map(m => m.displayName).join(', ')}`);
         
-        // Check by ID or by nickname/username
-        const hasHesuById = channelMembers.has(HESUCRYPTO_ID);
-        const hasHesuByName = [...channelMembers.values()].some(m => 
-          m.displayName.toLowerCase().includes('hesu') || 
-          m.displayName.toLowerCase().includes('.biogesic') ||
-          m.displayName.toLowerCase().includes('hesucrypto') ||
-          m.user.username.toLowerCase().includes('hesu') ||
-          m.user.username.toLowerCase().includes('.biogesic') ||
-          m.user.username.toLowerCase().includes('hesucrypto')
-        );
+        // Check voice states from guild
+        const guild = commandsChannel.guild;
+        const voiceStates = guild.voiceStates.cache;
+        console.log(`🎤 Total voice states: ${voiceStates.size}`);
         
-        console.log(`🎤 Has Hesu (by ID)? ${hasHesuById}, (by name)? ${hasHesuByName}`);
+        // Find if HesuCrypto is in THIS channel via voice states
+        let hesuInThisChannel = false;
+        for (const [_, vs] of voiceStates) {
+          if (vs.channelId === channel.id) {
+            const name = vs.member?.displayName || vs.member?.user?.username || 'unknown';
+            console.log(`🎤 Voice state found: ${name}`);
+            if (name.toLowerCase().includes('hesu') || 
+                name.toLowerCase().includes('.biogesic') ||
+                name.toLowerCase().includes('hesucrypto')) {
+              hesuInThisChannel = true;
+            }
+          }
+        }
         
-        if (hasHesuById || hasHesuByName) {
+        console.log(`🎤 Hesu in this channel? ${hesuInThisChannel}`);
+        
+        if (hesuInThisChannel) {
           console.log(`💌 Sending DM to AlterFrieren - She joined, Hesu is in channel`);
           // Combine general + whenSheJoins pools
           const pool = [...generalDMs, ...whenSheJoins];
@@ -7847,26 +7856,35 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
       else if (member.id === HESUCRYPTO_ID) {
         console.log(`🎤 HesuCrypto joined. Waiting to check channel...`);
         
-        // Wait a moment for the members cache to update
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait a moment for the voice state to settle
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
+        // Try both channel.members and guild.voiceStates
         const channelMembers = channel.members;
         console.log(`🎤 Channel members: ${[...channelMembers.values()].map(m => m.displayName).join(', ')}`);
         
-        // Check by ID or by nickname/username
-        const hasAlterById = channelMembers.has(ALTERFRIEREN_ID);
-        const hasAlterByName = [...channelMembers.values()].some(m => 
-          m.displayName.toLowerCase().includes('alter') || 
-          m.displayName.toLowerCase().includes('zoe_bebe') ||
-          m.displayName.toLowerCase().includes('alterfrieren') ||
-          m.user.username.toLowerCase().includes('alter') ||
-          m.user.username.toLowerCase().includes('zoe_bebe') ||
-          m.user.username.toLowerCase().includes('alterfrieren')
-        );
+        // Check voice states from guild
+        const guild = commandsChannel.guild;
+        const voiceStates = guild.voiceStates.cache;
+        console.log(`🎤 Total voice states: ${voiceStates.size}`);
         
-        console.log(`🎤 Has Alter (by ID)? ${hasAlterById}, (by name)? ${hasAlterByName}`);
+        // Find if AlterFrieren is in THIS channel via voice states
+        let alterInThisChannel = false;
+        for (const [_, vs] of voiceStates) {
+          if (vs.channelId === channel.id) {
+            const name = vs.member?.displayName || vs.member?.user?.username || 'unknown';
+            console.log(`🎤 Voice state found: ${name}`);
+            if (name.toLowerCase().includes('alter') || 
+                name.toLowerCase().includes('zoe_bebe') ||
+                name.toLowerCase().includes('alterfrieren')) {
+              alterInThisChannel = true;
+            }
+          }
+        }
         
-        if (hasAlterById || hasAlterByName) {
+        console.log(`🎤 Alter in this channel? ${alterInThisChannel}`);
+        
+        if (alterInThisChannel) {
           console.log(`💌 Sending DM to AlterFrieren - Hesu joined, She is in channel`);
           // Combine general + whenHeJoins pools
           const pool = [...generalDMs, ...whenHeJoins];
