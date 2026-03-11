@@ -7811,10 +7811,18 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         const channelMembers = channel.members;
-        console.log(`🎤 Channel members: ${[...channelMembers.keys()].join(', ')}`);
-        console.log(`🎤 Has Hesu? ${channelMembers.has(HESUCRYPTO_ID)}`);
+        console.log(`🎤 Channel members: ${[...channelMembers.values()].map(m => m.displayName).join(', ')}`);
         
-        if (channelMembers.has(HESUCRYPTO_ID)) {
+        // Check by ID or by nickname
+        const hasHesuById = channelMembers.has(HESUCRYPTO_ID);
+        const hasHesuByName = [...channelMembers.values()].some(m => 
+          m.displayName.toLowerCase().includes('hesu') || 
+          m.displayName.toLowerCase().includes('hesucrypto')
+        );
+        
+        console.log(`🎤 Has Hesu (by ID)? ${hasHesuById}, (by name)? ${hasHesuByName}`);
+        
+        if (hasHesuById || hasHesuByName) {
           console.log(`💌 Sending DM to AlterFrieren - She joined, Hesu is in channel`);
           // Combine general + whenSheJoins pools
           const pool = [...generalDMs, ...whenSheJoins];
@@ -7839,10 +7847,18 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         const channelMembers = channel.members;
-        console.log(`🎤 Channel members: ${[...channelMembers.keys()].join(', ')}`);
-        console.log(`🎤 Has Alter? ${channelMembers.has(ALTERFRIEREN_ID)}`);
+        console.log(`🎤 Channel members: ${[...channelMembers.values()].map(m => m.displayName).join(', ')}`);
         
-        if (channelMembers.has(ALTERFRIEREN_ID)) {
+        // Check by ID or by nickname
+        const hasAlterById = channelMembers.has(ALTERFRIEREN_ID);
+        const hasAlterByName = [...channelMembers.values()].some(m => 
+          m.displayName.toLowerCase().includes('alter') || 
+          m.displayName.toLowerCase().includes('alterfrieren')
+        );
+        
+        console.log(`🎤 Has Alter (by ID)? ${hasAlterById}, (by name)? ${hasAlterByName}`);
+        
+        if (hasAlterById || hasAlterByName) {
           console.log(`💌 Sending DM to AlterFrieren - Hesu joined, She is in channel`);
           // Combine general + whenHeJoins pools
           const pool = [...generalDMs, ...whenHeJoins];
