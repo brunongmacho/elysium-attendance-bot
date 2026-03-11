@@ -7823,12 +7823,20 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         let hesuInThisChannel = false;
         for (const [_, vs] of voiceStates) {
           if (vs.channelId === channel.id) {
+            // Check by user ID first
+            if (vs.userId === HESUCRYPTO_ID) {
+              console.log(`🎤 Voice state found: HesuCrypto (by ID)`);
+              hesuInThisChannel = true;
+              break;
+            }
+            // Fallback to name check
             const name = vs.member?.displayName || vs.member?.user?.username || 'unknown';
-            console.log(`🎤 Voice state found: ${name}`);
+            console.log(`🎤 Voice state found: ${name} (ID: ${vs.userId})`);
             if (name.toLowerCase().includes('hesu') || 
                 name.toLowerCase().includes('.biogesic') ||
                 name.toLowerCase().includes('hesucrypto')) {
               hesuInThisChannel = true;
+              break;
             }
           }
         }
@@ -7872,13 +7880,23 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         let alterInThisChannel = false;
         for (const [_, vs] of voiceStates) {
           if (vs.channelId === channel.id) {
+            // Check by user ID first
+            if (vs.userId === ALTERFRIEREN_ID) {
+              console.log(`🎤 Voice state found: AlterFrieren (by ID)`);
+              alterInThisChannel = true;
+              break;
+            }
+            // Fallback to name check
             const name = vs.member?.displayName || vs.member?.user?.username || 'unknown';
-            console.log(`🎤 Voice state found: ${name}`);
+            console.log(`🎤 Voice state found: ${name} (ID: ${vs.userId})`);
             if (name.toLowerCase().includes('alter') || 
                 name.toLowerCase().includes('zoe_bebe') ||
                 name.toLowerCase().includes('alterfrieren')) {
               alterInThisChannel = true;
+              break;
             }
+          }
+        }
           }
         }
         
