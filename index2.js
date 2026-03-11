@@ -7818,8 +7818,10 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         const hasHesuByName = [...channelMembers.values()].some(m => 
           m.displayName.toLowerCase().includes('hesu') || 
           m.displayName.toLowerCase().includes('.biogesic') ||
+          m.displayName.toLowerCase().includes('hesucrypto') ||
           m.user.username.toLowerCase().includes('hesu') ||
-          m.user.username.toLowerCase().includes('.biogesic')
+          m.user.username.toLowerCase().includes('.biogesic') ||
+          m.user.username.toLowerCase().includes('hesucrypto')
         );
         
         console.log(`🎤 Has Hesu (by ID)? ${hasHesuById}, (by name)? ${hasHesuByName}`);
@@ -7856,8 +7858,10 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         const hasAlterByName = [...channelMembers.values()].some(m => 
           m.displayName.toLowerCase().includes('alter') || 
           m.displayName.toLowerCase().includes('zoe_bebe') ||
+          m.displayName.toLowerCase().includes('alterfrieren') ||
           m.user.username.toLowerCase().includes('alter') ||
-          m.user.username.toLowerCase().includes('zoe_bebe')
+          m.user.username.toLowerCase().includes('zoe_bebe') ||
+          m.user.username.toLowerCase().includes('alterfrieren')
         );
         
         console.log(`🎤 Has Alter (by ID)? ${hasAlterById}, (by name)? ${hasAlterByName}`);
