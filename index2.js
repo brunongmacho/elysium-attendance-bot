@@ -7817,7 +7817,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         const hasHesuById = channelMembers.has(HESUCRYPTO_ID);
         const hasHesuByName = [...channelMembers.values()].some(m => 
           m.displayName.toLowerCase().includes('hesu') || 
-          m.displayName.toLowerCase().includes('hesucrypto')
+          m.displayName.toLowerCase().includes('.biogesic')
         );
         
         console.log(`🎤 Has Hesu (by ID)? ${hasHesuById}, (by name)? ${hasHesuByName}`);
@@ -7853,7 +7853,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         const hasAlterById = channelMembers.has(ALTERFRIEREN_ID);
         const hasAlterByName = [...channelMembers.values()].some(m => 
           m.displayName.toLowerCase().includes('alter') || 
-          m.displayName.toLowerCase().includes('alterfrieren')
+          m.displayName.toLowerCase().includes('zoe_bebe')
         );
         
         console.log(`🎤 Has Alter (by ID)? ${hasAlterById}, (by name)? ${hasAlterByName}`);
