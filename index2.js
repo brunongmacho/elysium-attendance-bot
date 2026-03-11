@@ -7821,17 +7821,17 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         
         // Find if HesuCrypto is in THIS channel via voice states
         let hesuInThisChannel = false;
-        for (const [_, vs] of voiceStates) {
+        for (const [userId, vs] of voiceStates) {
           if (vs.channelId === channel.id) {
-            // Check by user ID first
-            if (vs.userId === HESUCRYPTO_ID) {
+            // Check by user ID first (use the key from the collection)
+            if (userId === HESUCRYPTO_ID) {
               console.log(`🎤 Voice state found: HesuCrypto (by ID)`);
               hesuInThisChannel = true;
               break;
             }
             // Fallback to name check
             const name = vs.member?.displayName || vs.member?.user?.username || 'unknown';
-            console.log(`🎤 Voice state found: ${name} (ID: ${vs.userId})`);
+            console.log(`🎤 Voice state found: ${name} (ID: ${userId})`);
             if (name.toLowerCase().includes('hesu') || 
                 name.toLowerCase().includes('.biogesic') ||
                 name.toLowerCase().includes('hesucrypto')) {
@@ -7878,17 +7878,17 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         
         // Find if AlterFrieren is in THIS channel via voice states
         let alterInThisChannel = false;
-        for (const [_, vs] of voiceStates) {
+        for (const [userId, vs] of voiceStates) {
           if (vs.channelId === channel.id) {
-            // Check by user ID first
-            if (vs.userId === ALTERFRIEREN_ID) {
+            // Check by user ID first (use the key from the collection)
+            if (userId === ALTERFRIEREN_ID) {
               console.log(`🎤 Voice state found: AlterFrieren (by ID)`);
               alterInThisChannel = true;
               break;
             }
             // Fallback to name check
             const name = vs.member?.displayName || vs.member?.user?.username || 'unknown';
-            console.log(`🎤 Voice state found: ${name} (ID: ${vs.userId})`);
+            console.log(`🎤 Voice state found: ${name} (ID: ${userId})`);
             if (name.toLowerCase().includes('alter') || 
                 name.toLowerCase().includes('zoe_bebe') ||
                 name.toLowerCase().includes('alterfrieren')) {
