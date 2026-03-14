@@ -3744,7 +3744,7 @@ let sessionPollInterval = null;
  * @constant {Object}
  */
 const DUAL_SESSION_CONFIG = {
-  enabled: true, // Enable 2-session auctions
+  enabled: false, // Disable 2-session auctions (single session only)
   restPeriodMinutes: 60, // 1 hour rest between sessions
   pollIntervalMs: 30000, // Check every 30 seconds if session ended
   maxPollAttempts: 720, // Max 6 hours of polling (720 * 30s = 6h)
