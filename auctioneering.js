@@ -138,6 +138,48 @@ const USE_MONGODB_AUCTIONEERING = process.env.USE_MONGODB_AUCTIONEERING === 'tru
 const USE_MONGODB_BIDDING = process.env.USE_MONGODB_BIDDING === 'true';
 
 // ═══════════════════════════════════════════════════════════════════════════
+// SECTION 0: UTILITY FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Splits a list of items into multiple Discord embeds to avoid 1024 char limit.
+ * Discord allows max 10 fields per embed and 6000 chars total per embed.
+ * 
+ * @param {string} title - Base title for embeds (will add page number)
+ * @param {Array<string>} items - Array of items to display (one per line)
+ * @param {number} itemsPerPage - Max items per embed (default 20)
+ * @param {Object} options - Additional options
+ * @param {number} options.color - Embed color (default gold)
+ * @param {string} options.footer - Footer text
+ * @returns {Array<EmbedBuilder>} Array of embed builders
+ */
+function createPaginatedEmbeds(title, items, itemsPerPage = 20, options = {}) {
+  const { color = COLORS.AUCTION, footer = '' } = options;
+  const embeds = [];
+  const totalPages = Math.ceil(items.length / itemsPerPage);
+  
+  for (let page = 0; page < totalPages; page++) {
+    const startIdx = page * itemsPerPage;
+    const endIdx = Math.min(startIdx + itemsPerPage, items.length);
+    const pageItems = items.slice(startIdx, endIdx);
+    
+    const embed = new EmbedBuilder()
+      .setColor(color)
+      .setTitle(totalPages > 1 ? `${title} (${page + 1}/${totalPages})` : title)
+      .setDescription(pageItems.join('\n'))
+      .setTimestamp();
+    
+    if (footer) {
+      embed.setFooter({ text: footer });
+    }
+    
+    embeds.push(embed);
+  }
+  
+  return embeds;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // SECTION 1: MODULE STATE & INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1827,30 +1869,25 @@ async function finalizeSession(client, config, channel) {
     .map((s, i) => `${i + 1}. **${s.item}** 📊: ${s.winner} - ${s.amount}pts`)
     .join("\n");
 
-  // Truncate summary if it exceeds Discord's 1024 character limit for embed fields
-  let truncatedSummary = summary || "No sales";
-  if (truncatedSummary.length > 1024) {
-    // Find a good truncation point (end of a line) within the limit
-    const maxLength = 1000; // Leave room for "... and X more"
-    const truncateAt = truncatedSummary.lastIndexOf('\n', maxLength);
-    const cutPoint = truncateAt > 0 ? truncateAt : maxLength;
-    const remainingItems = soldItems.length - truncatedSummary.substring(0, cutPoint).split('\n').length;
-    truncatedSummary = truncatedSummary.substring(0, cutPoint) + `\n\n*... and ${remainingItems} more items*`;
+  // Create multiple embeds instead of truncating (avoid 1024 char limit)
+  const soldItemStrings = soldItems.length > 0 
+    ? soldItems.map((s, i) => `${i + 1}. **${s.item}**: ${s.winner} - ${s.amount}pts`)
+    : ["No items sold"];
+
+  const summaryEmbeds = createPaginatedEmbeds(
+    `${EMOJI.SUCCESS} Auction Session Complete - ${soldItems.length} Items`,
+    soldItemStrings,
+    15, // items per embed
+    { color: COLORS.SUCCESS, footer: `Total: ${soldItems.length} items sold` }
+  );
+
+  // Add title and item count to first embed
+  summaryEmbeds[0].setDescription(`**${soldItems.length}** item(s) sold`);
+
+  // Send all embeds
+  for (const embed of summaryEmbeds) {
+    await channel.send({ embeds: [embed] });
   }
-
-  const mainEmbed = new EmbedBuilder()
-    .setColor(COLORS.SUCCESS)
-    .setTitle(`${EMOJI.SUCCESS} Auctioneering Session Complete!`)
-    .setDescription(`**${soldItems.length}** item(s) sold`)
-    .addFields({
-      name: `${EMOJI.LIST} Summary`,
-      value: truncatedSummary,
-      inline: false,
-    })
-    .setFooter({ text: "Processing results and submitting to sheets..." })
-    .setTimestamp();
-
-  await channel.send({ embeds: [mainEmbed] });
 
   // STEP 1: Build combined results for tally
   const combinedResults = await buildCombinedResults(config);
@@ -1884,24 +1921,24 @@ async function finalizeSession(client, config, channel) {
         (r) => r.totalSpent > 0
       );
       if (winnersWithSpending.length > 0) {
-        const tallyEmbed = new EmbedBuilder()
-          .setColor(COLORS.SUCCESS)
-          .setTitle(`${EMOJI.CHART} Bidding Points Tally`)
-          .setDescription(
-            `**Points spent this session:**\n\n${winnersWithSpending
-              .sort((a, b) => b.totalSpent - a.totalSpent)
-              .map((r, i) => `${i + 1}. **${r.member}** - ${r.totalSpent} pts`)
-              .join("\n")}`
-          )
-          .setFooter({
-            text: `Total: ${winnersWithSpending.reduce(
-              (sum, r) => sum + r.totalSpent,
-              0
-            )} pts spent`,
-          })
-          .setTimestamp();
+        // Create multiple embeds instead of truncating
+        const sortedWinners = winnersWithSpending.sort((a, b) => b.totalSpent - a.totalSpent);
+        const winnerStrings = sortedWinners.map((r, i) => `${i + 1}. **${r.member}** - ${r.totalSpent} pts`);
+        const totalSpent = winnersWithSpending.reduce((sum, r) => sum + r.totalSpent, 0);
 
-        await channel.send({ embeds: [tallyEmbed] });
+        const tallyEmbeds = createPaginatedEmbeds(
+          `${EMOJI.CHART} Bidding Points Tally`,
+          winnerStrings,
+          15,
+          { color: COLORS.SUCCESS, footer: `Total: ${totalSpent} pts spent` }
+        );
+
+        // Add header to first embed
+        tallyEmbeds[0].setDescription(`**Points spent this session:**`);
+
+        for (const embed of tallyEmbeds) {
+          await channel.send({ embeds: [embed] });
+        }
       }
     }
   } catch (err) {
@@ -3405,23 +3442,41 @@ async function handleForceSubmitResults(message, config, biddingModule) {
 
   const row = new ActionRowBuilder().addComponents(submitButton, cancelButton);
 
+  // Create multiple embeds for results preview instead of truncating
+  const resultsList = auctionState.sessionItems
+    .map((a, idx) => `${idx + 1}. **${a.item}**: ${a.winner || 'undefined'} - ${a.amount || 0}pts`);
+
+  const totalItems = auctionState.sessionItems.length;
+  const totalPoints = auctionState.sessionItems.reduce((sum, a) => sum + (a.amount || 0), 0);
+
+  // Show preview with just counts in confirmation (avoid huge embed)
+  const previewEmbed = new EmbedBuilder()
+    .setColor(0xffa500)
+    .setTitle(`${EMOJI.WARNING} Force Submit?`)
+    .setDescription(`**${totalItems} items** to submit\n**Total points:** ${totalPoints} pts`)
+    .addFields({
+      name: `${EMOJI.LIST} Preview (first 10)`,
+      value: resultsList.slice(0, 10).join('\n') + (totalItems > 10 ? `\n*... and ${totalItems - 10} more*` : ''),
+      inline: false,
+    })
+    .setFooter({ text: 'Click a button below to confirm' });
+
   const fsMsg = await message.reply({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(0xffa500)
-        .setTitle(`${EMOJI.WARNING} Force Submit?`)
-        .setDescription(`**Items:** ${auctionState.sessionItems.length}`)
-        .addFields({
-          name: `${EMOJI.LIST} Results`,
-          value: auctionState.sessionItems
-            .map((a) => `• **${a.item}**: ${a.winner} - ${a.amount}pts`)
-            .join("\n"),
-          inline: false,
-        })
-        .setFooter({ text: 'Click a button below to confirm' }),
-    ],
+    embeds: [previewEmbed],
     components: [row],
   });
+
+  // Send full results as followup (after confirmation)
+  const fullResultsEmbeds = createPaginatedEmbeds(
+    `${EMOJI.LIST} All Results - Force Submit`,
+    resultsList,
+    15,
+    { color: 0xffa500, footer: `Total: ${totalItems} items, ${totalPoints} pts` }
+  );
+
+  // Store full embeds for use after confirmation
+  auctionState._pendingForceSubmitEmbeds = fullResultsEmbeds;
+  auctionState._pendingForceSubmitTotalPoints = totalPoints;
 
   const collector = fsMsg.createMessageComponentCollector({
     componentType: ComponentType.Button,
@@ -3436,12 +3491,33 @@ async function handleForceSubmitResults(message, config, biddingModule) {
 
     if (isConfirm) {
       await biddingModule.submitSessionTally(config, auctionState.sessionItems);
+      
+      // Send full results as multiple embeds
+      const fullEmbeds = auctionState._pendingForceSubmitEmbeds || [];
+      const totalPoints = auctionState._pendingForceSubmitTotalPoints || 0;
+      
+      // Update first embed with success status
+      if (fullEmbeds.length > 0) {
+        fullEmbeds[0]
+          .setColor(0x00ff00)
+          .setTitle(`${EMOJI.SUCCESS} Results Submitted`)
+          .setDescription(`**${auctionState.sessionItems.length} items** submitted\n**Total points:** ${totalPoints} pts`);
+      }
+      
+      // Send all result embeds to channel
+      const channel = interaction.channel;
+      for (const embed of fullEmbeds) {
+        await channel.send({ embeds: [embed] });
+      }
+      
       auctionState.sessionItems = [];
+      delete auctionState._pendingForceSubmitEmbeds;
+      delete auctionState._pendingForceSubmitTotalPoints;
 
       const successEmbed = new EmbedBuilder()
         .setColor(0x00ff00)
         .setTitle(`${EMOJI.SUCCESS} Results Submitted`)
-        .setDescription('Results submitted successfully!')
+        .setDescription(`Results submitted successfully!\nSent ${fullEmbeds.length} embed(s) with all results.`)
         .setTimestamp();
 
       await interaction.update({ embeds: [successEmbed], components: [disabledRow] });

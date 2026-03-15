@@ -352,6 +352,44 @@ const mongoBiddingCircuit = new CircuitBreaker({
 });
 
 /**
+ * Splits a list of items into multiple Discord embeds to avoid 1024 char limit.
+ * Discord allows max 10 fields per embed and 6000 chars total per embed.
+ * 
+ * @param {string} title - Base title for embeds (will add page number)
+ * @param {Array<string>} items - Array of items to display (one per line)
+ * @param {number} itemsPerPage - Max items per embed (default 20)
+ * @param {Object} options - Additional options
+ * @param {number} options.color - Embed color (default gold)
+ * @param {string} options.footer - Footer text
+ * @returns {Array<EmbedBuilder>} Array of embed builders
+ */
+function createPaginatedEmbeds(title, items, itemsPerPage = 20, options = {}) {
+  const { color = COLORS.AUCTION, footer = '' } = options;
+  const embeds = [];
+  const totalPages = Math.ceil(items.length / itemsPerPage);
+  
+  for (let page = 0; page < totalPages; page++) {
+    const startIdx = page * itemsPerPage;
+    const endIdx = Math.min(startIdx + itemsPerPage, items.length);
+    const pageItems = items.slice(startIdx, endIdx);
+    
+    const embed = new EmbedBuilder()
+      .setColor(color)
+      .setTitle(totalPages > 1 ? `${title} (${page + 1}/${totalPages})` : title)
+      .setDescription(pageItems.join('\n'))
+      .setTimestamp();
+    
+    if (footer) {
+      embed.setFooter({ text: footer });
+    }
+    
+    embeds.push(embed);
+  }
+  
+  return embeds;
+}
+
+/**
  * Standardized error messages for consistent user experience
  * @constant {Object}
  */
@@ -1817,32 +1855,36 @@ async function finalize(cli, cfg) {
   const sub = await submitRes(cfg.sheet_webhook_url, res, st.sd);
 
   if (sub.ok) {
-    const wList = st.h
-      .map((a) => `• **${a.item}**: ${a.winner} - ${a.amount}pts`)
-      .join("\n");
-    const e = new EmbedBuilder()
-      .setColor(getColor(COLORS.SUCCESS))
-      .setTitle(`${EMOJI.SUCCESS} Session Complete!`)
-      .setDescription("Results submitted")
+    // Create multiple embeds instead of truncating
+    const wListStrings = st.h.length > 0 
+      ? st.h.map((a, i) => `${i + 1}. **${a.item}**: ${a.winner} - ${a.amount}pts`)
+      : ["No items"];
+    
+    const totalSpent = res.reduce((s, r) => s + r.totalSpent, 0);
+    
+    const sessionEmbeds = createPaginatedEmbeds(
+      `${EMOJI.SUCCESS} Session Complete`,
+      wListStrings,
+      15,
+      { color: COLORS.SUCCESS, footer: `Total: ${totalSpent} pts` }
+    );
+
+    // Update first embed with summary
+    sessionEmbeds[0]
+      .setDescription(`**Results submitted**\n**${st.h.length}** items sold\n**${totalSpent}** pts total`)
       .addFields(
         { name: `${EMOJI.CLOCK} Time`, value: st.sd, inline: true },
         { name: `${EMOJI.TROPHY} Sold`, value: `${st.h.length}`, inline: true },
-        {
-          name: `${EMOJI.BID} Total`,
-          value: `${res.reduce((s, r) => s + r.totalSpent, 0)}`,
-          inline: true,
-        },
-        { name: `${EMOJI.LIST} Winners`, value: wList || "None" },
-        {
-          name: "👥 Members Updated",
-          value: `${res.length} (auto-populated 0 for non-winners)`,
-          inline: false,
-        }
+        { name: `${EMOJI.BID} Total`, value: `${totalSpent}`, inline: true },
+        { name: "👥 Members Updated", value: `${res.length}`, inline: false }
       )
-      .setFooter({ text: "Points deducted" })
-      .setTimestamp();
-    await bch.send({ embeds: [e] });
-    await adm.send({ embeds: [e] });
+      .setFooter({ text: "Points deducted" });
+
+    // Send all embeds
+    for (const embed of sessionEmbeds) {
+      await bch.send({ embeds: [embed] });
+      await adm.send({ embeds: [embed] });
+    }
   } else {
     const d = res
       .filter((r) => r.totalSpent > 0)
@@ -2663,25 +2705,36 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
       const row = new ActionRowBuilder().addComponents(submitButton, cancelButton);
 
+      // Create preview list (first 10 items)
+      const resultsList = st.h
+        .map((a, i) => `${i + 1}. **${a.item}**: ${a.winner} - ${a.amount}pts`);
+      
+      const totalItems = st.h.length;
+      const totalPoints = st.h.reduce((sum, a) => sum + a.amount, 0);
+
+      const previewEmbed = new EmbedBuilder()
+        .setColor(getColor(COLORS.WARNING))
+        .setTitle(`${EMOJI.WARNING} Force Submit?`)
+        .setDescription(`**Time:** ${st.sd}\n**Items:** ${totalItems}\n**Total points:** ${totalPoints} pts`)
+        .addFields({
+          name: `${EMOJI.LIST} Preview (first 10)`,
+          value: resultsList.slice(0, 10).join('\n') + (totalItems > 10 ? `\n*... and ${totalItems - 10} more*` : ''),
+          inline: false,
+        })
+        .setFooter({ text: 'Click a button below to confirm' });
+
       const fsMsg = await msg.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(getColor(COLORS.WARNING))
-            .setTitle(`${EMOJI.WARNING} Force Submit?`)
-            .setDescription(`**Time:** ${st.sd}\n**Items:** ${st.h.length}`)
-            .addFields({
-              name: `${EMOJI.LIST} Results`,
-              value: st.h
-                .map((a) => `• **${a.item}**: ${a.winner} - ${a.amount}pts`)
-                .join("\n"),
-              inline: false,
-            })
-            .setFooter({
-              text: 'Click a button below to confirm',
-            }),
-        ],
+        embeds: [previewEmbed],
         components: [row],
       });
+
+      // Store full results for after confirmation
+      const fullResultsEmbeds = createPaginatedEmbeds(
+        `${EMOJI.LIST} All Results - Force Submit`,
+        resultsList,
+        15,
+        { color: COLORS.WARNING, footer: `Total: ${totalItems} items, ${totalPoints} pts` }
+      );
 
       const collector = fsMsg.createMessageComponentCollector({
         componentType: ComponentType.Button,
@@ -2714,38 +2767,22 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
           });
           const sub = await submitRes(cfg.sheet_webhook_url, res, st.sd);
           if (sub.ok) {
-            const wList = st.h
-              .map((a) => `• **${a.item}**: ${a.winner} - ${a.amount}pts`)
-              .join("\n");
-            await msg.channel.send({
-              embeds: [
-                new EmbedBuilder()
-                  .setColor(getColor(COLORS.SUCCESS))
-                  .setTitle(`${EMOJI.SUCCESS} Force Submit OK!`)
-                  .setDescription("Submitted")
-                  .addFields(
-                    { name: `${EMOJI.CLOCK} Time`, value: st.sd, inline: true },
-                    {
-                      name: `${EMOJI.TROPHY} Items`,
-                      value: `${st.h.length}`,
-                      inline: true,
-                    },
-                    {
-                      name: `${EMOJI.BID} Total`,
-                      value: `${res.reduce((s, r) => s + r.totalSpent, 0)}`,
-                      inline: true,
-                    },
-                    { name: `${EMOJI.LIST} Winners`, value: wList },
-                    {
-                      name: "👥 Updated",
-                      value: `${res.length} (0 auto-populated)`,
-                      inline: false,
-                    }
-                  )
-                  .setFooter({ text: "Deducted after session" })
-                  .setTimestamp(),
-              ],
-            });
+            // Send full results as multiple embeds
+            const totalSpent = res.reduce((s, r) => s + r.totalSpent, 0);
+            
+            // Update first embed with success status
+            if (fullResultsEmbeds.length > 0) {
+              fullResultsEmbeds[0]
+                .setColor(getColor(COLORS.SUCCESS))
+                .setTitle(`${EMOJI.SUCCESS} Force Submit OK!`)
+                .setDescription(`**${st.h.length}** items submitted\n**${totalSpent}** pts total`);
+            }
+            
+            // Send all result embeds
+            for (const embed of fullResultsEmbeds) {
+              await msg.channel.send({ embeds: [embed] });
+            }
+            
             st.h = [];
             st.sd = null;
             st.lp = {};
@@ -2757,16 +2794,25 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
                 new EmbedBuilder()
                   .setColor(getColor(COLORS.ERROR))
                   .setTitle(`${EMOJI.ERROR} Failed`)
-                  .setDescription(`**Error:** ${sub.err}`)
-                  .addFields({
-                    name: `${EMOJI.LIST} Data`,
-                    value: `\`\`\`\n${res
-                      .filter((r) => r.totalSpent > 0)
-                      .map((r) => `${r.member}: ${r.totalSpent}pts`)
-                      .join("\n")}\n\`\`\``,
-                  }),
+                  .setDescription(`**Error:** ${sub.err}`),
               ],
             });
+            
+            // Also send the data as paginated embeds for manual entry
+            const errorData = res
+              .filter((r) => r.totalSpent > 0)
+              .map((r) => `${r.member}: ${r.totalSpent}pts`);
+            
+            const errorEmbeds = createPaginatedEmbeds(
+              `${EMOJI.LIST} Data for Manual Entry`,
+              errorData,
+              15,
+              { color: COLORS.ERROR }
+            );
+            
+            for (const embed of errorEmbeds) {
+              await msg.channel.send({ embeds: [embed] });
+            }
           }
           await interaction.update({ components: [disabledRow] });
           collector.stop();
@@ -3099,10 +3145,9 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         });
       }
 
-      // Build audit report
-      const auditReport = lockedMembers
-        .map((member) => `• **${member}**: ${st.lp[member]}pts locked`)
-        .join("\n");
+      // Build audit report - use paginated embeds
+      const auditReportStrings = lockedMembers
+        .map((member) => `• **${member}**: ${st.lp[member]}pts locked`);
 
       const clearBtn = new ButtonBuilder()
         .setCustomId(`fixlocked_confirm_${msg.author.id}_${Date.now()}`)
@@ -3116,13 +3161,17 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
       const fixRow = new ActionRowBuilder().addComponents(clearBtn, cancelBtn);
 
+      // Create preview embed (first 10)
+      const previewReport = auditReportStrings.slice(0, 10).join('\n') + 
+        (auditReportStrings.length > 10 ? `\n*... and ${auditReportStrings.length - 10} more*` : '');
+
       const fixMsg = await msg.reply({
         embeds: [
           new EmbedBuilder()
             .setColor(getColor(COLORS.WARNING))
             .setTitle(`${EMOJI.WARNING} Locked Points Found`)
             .setDescription(
-              `Found **${lockedMembers.length} members** with locked points:\n\n${auditReport}\n\n` +
+              `Found **${lockedMembers.length} members** with locked points:\n\n${previewReport}\n\n` +
                 `**Action:** Clear all locked points?\n` +
                 `⚠️ Only do this if no auction is running or if points are stuck.`
             )
@@ -3472,16 +3521,9 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         // Items already filtered by the API - all have winners
         const itemsWithWinners = sheetData.items;
 
-        // Build summary
-        const summary = itemsWithWinners
-          .map((item, i) => `${i + 1}. **${item.item}**: ${item.winner} - ${item.winningBid || item.startPrice}pts`)
-          .join('\n');
-
-        // Truncate if too long
-        let displaySummary = summary;
-        if (displaySummary.length > 1000) {
-          displaySummary = displaySummary.substring(0, 1000) + `\n\n*... and more items*`;
-        }
+        // Build summary - use paginated embeds instead of truncating
+        const summaryStrings = itemsWithWinners
+          .map((item, i) => `${i + 1}. **${item.item}**: ${item.winner} - ${item.winningBid || item.startPrice}pts`);
 
         const confirmButton = new ButtonBuilder()
           .setCustomId(`sheettally_confirm_${msg.author.id}_${Date.now()}`)
@@ -3495,16 +3537,28 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
         const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 
+        // Preview (first 10)
+        const previewSummary = summaryStrings.slice(0, 10).join('\n') + 
+          (summaryStrings.length > 10 ? `\n*... and ${summaryStrings.length - 10} more*` : '');
+
         const confirmEmbed = new EmbedBuilder()
           .setColor(COLORS.WARNING)
           .setTitle(`${EMOJI.WARNING} Submit Tally from Sheet?`)
           .setDescription(
             `Found **${itemsWithWinners.length}** items with winners in BiddingItems sheet.\n\n` +
-            `This will deduct points from the following winners:\n\n${displaySummary}`
+            `This will deduct points from the following winners:\n\n${previewSummary}`
           )
           .setFooter({ text: 'Click to confirm or cancel (30s timeout)' });
 
         const confirmMsg = await msg.reply({ embeds: [confirmEmbed], components: [row] });
+
+        // Store full embeds for after confirmation
+        const fullSummaryEmbeds = createPaginatedEmbeds(
+          `${EMOJI.LIST} All Items - Sheet Tally`,
+          summaryStrings,
+          15,
+          { color: COLORS.WARNING }
+        );
 
         const collector = confirmMsg.createMessageComponentCollector({
           componentType: ComponentType.Button,
@@ -3536,6 +3590,11 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
             // Submit the tally
             await submitSessionTally(cfg, sessionItems);
+
+            // Send full results as multiple embeds
+            for (const embed of fullSummaryEmbeds) {
+              await msg.channel.send({ embeds: [embed] });
+            }
 
             const successEmbed = new EmbedBuilder()
               .setColor(COLORS.SUCCESS)
