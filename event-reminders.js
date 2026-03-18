@@ -110,6 +110,54 @@ const DAILY_EVENTS = {
   },
 };
 
+// ============================================================================
+// ANCIENT CITADEL BOSS SCHEDULE
+// ============================================================================
+
+const ANCIENT_CITADEL_BOSSES = {
+  0: { morning: 'Chaiflock', evening: 'Benji' },     // Sunday
+  1: { morning: 'Duplican', evening: 'Wannitas' },  // Monday
+  2: { morning: 'Metus', evening: 'Saphirus' },     // Tuesday
+  3: { morning: 'Clemantis', evening: 'Secreta' },  // Wednesday
+  4: { morning: 'Neutro', evening: 'Roderick' },    // Thursday
+  5: { morning: 'Auraq', evening: 'Thymele' },       // Friday
+  6: { morning: 'Titore', evening: 'Ringor' },       // Saturday
+};
+
+function getAncientCitadelEvents() {
+  const events = {};
+  const baseColor = 0x3498db; // Blue for Ancient Citadel
+
+  for (const [dayNum, bosses] of Object.entries(ANCIENT_CITADEL_BOSSES)) {
+    const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayNum];
+    const day = parseInt(dayNum);
+
+    events[`ancientCitadel_${dayNum}_morning`] = {
+      name: `🏰 Ancient Citadel - ${bosses.morning}`,
+      days: [day], // Only fires on this specific day
+      startTime: { hour: 12, minute: 0 }, // 12:00 PM GMT+8
+      durationMinutes: 60,
+      color: baseColor,
+      description: `**${bosses.morning}** is appearing at the Ancient Citadel! Prepare for battle!`,
+      reminderOffsetMinutes: 10,
+      isAncientCitadel: true,
+    };
+
+    events[`ancientCitadel_${dayNum}_evening`] = {
+      name: `🏰 Ancient Citadel - ${bosses.evening}`,
+      days: [day], // Only fires on this specific day
+      startTime: { hour: 21, minute: 0 }, // 9:00 PM GMT+8
+      durationMinutes: 60,
+      color: baseColor,
+      description: `**${bosses.evening}** is appearing at the Ancient Citadel! Prepare for battle!`,
+      reminderOffsetMinutes: 10,
+      isAncientCitadel: true,
+    };
+  }
+
+  return events;
+}
+
 /**
  * Guild War queue reminder (for guild leader)
  */
@@ -906,6 +954,14 @@ function scheduleAllEvents() {
   // Schedule Guild War queue reminders (Thu, Fri, Sat)
   GUILD_WAR_QUEUE_REMINDER.days.forEach(day => {
     scheduleQueueReminder(day);
+  });
+
+  // Schedule Ancient Citadel events (each boss only on its specific day)
+  const ancientCitadelEvents = getAncientCitadelEvents();
+  Object.entries(ancientCitadelEvents).forEach(([key, event]) => {
+    event.days.forEach(day => {
+      scheduleEventReminder(`${key}_${day}`, event, day);
+    });
   });
 
   console.log(`✅ [EVENT REMINDER] Scheduled ${Object.keys(eventTimers).length} event reminders`);
