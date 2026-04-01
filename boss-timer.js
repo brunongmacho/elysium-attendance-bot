@@ -1692,6 +1692,18 @@ async function clearKills() {
     bossKillTimes.delete(bossName.toLowerCase());
   }
 
+  // Clear from MongoDB
+  try {
+    for (const bossName of Object.keys(bossSpawnConfig.timerBasedBosses)) {
+      if (!bossName.startsWith('_')) {
+        await mongoHelpers.deleteBossTimer(bossName);
+      }
+    }
+    console.log('✅ Cleared timer-based bosses from MongoDB');
+  } catch (error) {
+    console.error(`⚠️ Failed to clear MongoDB:`, error.message);
+  }
+
   // Clear from Sheets
   try {
     await sheetAPI.call('clearBossTimerRecovery', { type: 'timer-based' });
