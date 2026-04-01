@@ -5143,55 +5143,6 @@ client.on(Events.MessageCreate, async (message) => {
       }
     }
 
-    // 👑 SPECIAL REACTION: Random 💙 reaction for alterfrieren and hesucrypto
-    // 30% chance when talking to each other, 15% otherwise
-
-    if ([ALTERFRIEREN_ID, HESUCRYPTO_ID].includes(message.author.id) && !message.author.bot) {
-      let reactionChance = 0.15;
-
-      // Check if they're talking to each other
-      const isTalkingToEachOther = async () => {
-        // Check if message is a reply to the other person
-        if (message.reference) {
-          try {
-            const referencedMsg = await message.fetchReference();
-            if (referencedMsg && [ALTERFRIEREN_ID, HESUCRYPTO_ID].includes(referencedMsg.author.id) && referencedMsg.author.id !== message.author.id) {
-              return true;
-            }
-          } catch (e) {
-            console.error(`Error checking message reference: ${e.message}`);
-          }
-        }
-
-        // Check recent messages in channel for conversation between the two
-        try {
-          const recentMessages = await message.channel.messages.fetch({ limit: 10 });
-          let otherPersonRepliedRecently = false;
-          let selfRepliedRecently = false;
-
-          for (const [_, msg] of recentMessages) {
-            if (msg.author.id === message.author.id) {
-              selfRepliedRecently = true;
-            } else if ([ALTERFRIEREN_ID, HESUCRYPTO_ID].includes(msg.author.id)) {
-              otherPersonRepliedRecently = true;
-            }
-          }
-
-          return otherPersonRepliedRecently && selfRepliedRecently;
-        } catch (e) {
-          return false;
-        }
-      };
-
-      if (await isTalkingToEachOther()) {
-        reactionChance = 0.30;
-      }
-
-      if (Math.random() < reactionChance) {
-        await message.react('💙').catch(err => console.error(`Failed to react with 💙: ${err.message}`));
-      }
-    }
-
     // 🧹 BIDDING CHANNEL PROTECTION: Delete non-admin messages immediately
     // EXCEPT for member commands (!mypoints, !bidstatus, etc.)
     // OPTIMIZED: Check command first, only fetch member if needed

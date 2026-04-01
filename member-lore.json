@@ -118,23 +118,23 @@
   },
   "Maria": {
     "title": "The Decibel Tyrant",
-    "lore": "Marsha11s twin who wins every argument by being louder, not righter. Has never been correct about anything. Wins anyway. Once convinced an enemy guild their own banner was an insult — they retreated to consult their flags. Her facts are weapons of mass confidence. Marsha11 has spreadsheets proving her wrong; Maria just yells over them.",
-    "recent_developments": "Marias loudness has transcended debate — she now wins arguments through sheer acoustic force. Her voice has been measured at 189 decibels (jet engine: 140). Once shouted an enemy fortresss walls into structural failure. The twin rivalry with Marsha11 escalated. Recently won a battle by screaming NO so loud the enemy formation collapsed. Victory rate: 100%.",
+    "lore": "Marzhalls twin who wins every argument by being louder, not righter. Has never been correct about anything. Wins anyway. Once convinced an enemy guild their own banner was an insult — they retreated to consult their flags. Her facts are weapons of mass confidence. Marzhall has spreadsheets proving her wrong; Maria just yells over them.",
+    "recent_developments": "Marias loudness has transcended debate — she now wins arguments through sheer acoustic force. Her voice has been measured at 189 decibels (jet engine: 140). Once shouted an enemy fortresss walls into structural failure. The twin rivalry with Marzhall escalated. Recently won a battle by screaming NO so loud the enemy formation collapsed. Victory rate: 100%.",
     "specialty": "Sonic warfare through confident wrongness",
     "reputation": "The twin who weaponized volume into a siege tactic with relentless presence",
     "stats": "Decibel Level 189 | Fortress Walls Destroyed 3 | Earplugs Purchased 9999 | Correctness Still 0%",
     "skills": ["Sonic Siege", "NO Shockwave", "Volume Fortress Break", "Acoustic Dominance"]
   },
-  "Marsha11": {
+  "Marzhall": {
     "title": "The Archival Martyr",
     "lore": "Marias twin who loses every argument despite being objectively right. Has spreadsheets. Has evidence. Has witnesses. Maria just says no louder. Has documented proof of being right 9,999 times. Has won 2 arguments total. Both were when Maria was asleep. The guild uses her archives as actual historical records.",
-    "recent_developments": "Marsha11s documentation has achieved historical significance. Her evidence folders expanded to 47 filing cabinets, 12 backup drives, and 1 blockchain. Kingdoms use her archives as official historical records. Now teaches a course called Being Right in a World That Rewards Wrong. Has 500 students. Maria crashed the first lecture. Marsha11 had spreadsheets proving otherwise.",
+    "recent_developments": "Marzhalls documentation has achieved historical significance. Her evidence folders expanded to 47 filing cabinets, 12 backup drives, and 1 blockchain. Kingdoms use her archives as official historical records. Now teaches a course called Being Right in a World That Rewards Wrong. Has 500 students. Maria crashed the first lecture. Marzhall had spreadsheets proving otherwise.",
     "specialty": "Historical accuracy in a world of confident lies",
     "reputation": "The archivist whose correctness cannot overcome volume but documents everything",
     "stats": "Filing Cabinets 47 | Backup Drives 12 | Course Students 500 | Arguments Won (Total) 3",
     "skills": ["Archive Fortress", "Blockchain Evidence", "Philosophical Acceptance", "Frustrated Lecture"]
   },
-  "Munchyy": {
+  "MochiP": {
     "title": "The Assassination Artist",
     "lore": "An assassin who sends handwritten apology notes with every kill. The handwriting is illegible — enemies die confused but appreciated. Studied calligraphy under a master who was also illiterate. Her Sorry Notes are collectors items worth more than the bounties. Has accidentally created an assassination art movement.",
     "recent_developments": "Munchyys Sorry Notes have become collectible artifacts. Current market value: 5000 gold per note. She opened a gallery: The Art of Apologetic Murder. Art critics call it post-modern violence with emotional depth. Three museums have exhibits. Enemies now REQUEST assassination just for the note. Spends extravagantly on gallery openings and art supplies.",
@@ -368,6 +368,24 @@
     "stats": "Confusion Deployments 89 | Successful Summons 3 | Name Laughs Caused Infinity | Effectiveness 47%",
     "skills": ["Signal Mixup", "Deliberate Confusion", "Horn Misdirection", "Accidental Heroics"]
   },
+  "nyawtz": {
+    "title": "The Nine-Tailed Phantom",
+    "lore": "Name sounds like nyaw-tz — the sound cats make when judging you. Has nine imaginary tails that appear during battle. Each tail represents a different personality — they argue with each other mid-combat. Once defeated an army because seven of the tails refused to cooperate while two wanted ice cream. The confusion was tactical. Probably.",
+    "recent_developments": "nyawtz has become Elysiums emotional support cat. When morale is low, they appear with judgmental stares and occasional purrs. Has started a side business: Professional Judging. Customers pay gold to be stared at judgmentally. The nine tails now have their own Discord account. They are collectively the most passive-aggressive member of the guild.",
+    "specialty": "Cat-based combat with multiple personality tails",
+    "reputation": "The feline who judges silently and purrs threateningly",
+    "stats": "Tails Nine | Judgmental Stares 9999 | Purrs 47 | Ice Cream Demands INFINITY",
+    "skills": ["Tail Argument", "Judgmental Stare", "Phantom Purr", "Ice Cream Negotiation"]
+  },
+  "Wren空": {
+    "title": "The Empty Sky Walker",
+    "lore": "Name combines Wren with the void symbol — literally walks between empty spaces. Moves through battlefields like passing through empty sky. Enemies struggle to find something that is not there. The space between moments is their battlefield.",
+    "recent_developments": "Wren空 has mastered the art of existing between realms. Has walked through 47 dimensional barriers. Recently appeared behind enemy lines by walking through the space between thoughts. Still has not been photographed — cameras cannot capture empty sky.",
+    "specialty": "Void walking with existential presence",
+    "reputation": "The walker who exists in the space enemies cannot target",
+    "stats": "Sky Mastery INFINITY | Void Steps 47 | Realm Crossings 47 | Photographs 0",
+    "skills": ["Empty Step", "Void Walk", "Dimensional Slip", "Untargetable"]
+  },
   "HASol3006": {
     "title": "The Solar Cipher",
     "lore": "Name is a code that has not been cracked — by design. Claims it stands for Highly Advanced Solar Operation 3006. The year is wrong, the technology is made up, and nobody believes them. Carries a glowing orb that might be a weapon or a night light.",
@@ -457,6 +475,15 @@
     "reputation": "The scholar who knows everything except how to get there",
     "stats": "Philosophical Debates Won 89 | Time Lost 7 Years | Correct Answers 9999 | Arrival Success 3",
     "skills": ["Infinite Knowledge", "Scenic Pathfinding", "Philosophical Compass", "Eternal Arrival"]
+  },
+  "YumekoJabami": {
+    "title": "The Risk Sovereign",
+    "lore": "Name carries the weight of high-stakes gambling. Bets on everything — raid drops, boss respawn times, even how many times Goblok will say stupid. Has won more bets than anyone in Elysium history. Lost more. Doesnt care. The thrill is the point. Once bet on a coin flip and bet on both outcomes simultaneously. Somehow won both. Nobody understands how. Not even the coin.",
+    "recent_developments": "YumekoJabami has opened Elysiums first casino — the House Always Wins. Guests disagree. Has bet on 47 raids and lost 46. The one win was legendary — predicted a boss would sneeze mid-attack. It did. House earnings fund the guild treasury. Her gambling addiction has become the guilds primary income source.",
+    "specialty": "High-stakes gambling with impossible odds",
+    "reputation": "The gambler who risks everything and wins through impossible probability",
+    "stats": "Bets Won 47 | Bets Lost 89 | Impossible Wins 12 | Coin Confusion INFINITY",
+    "skills": ["Impossible Bet", "Double Outcome Wager", "Coin Confounder", "House Edge"]
   },
   "_FUTURE_MEMBER_TEMPLATE": {
     "title": "Awaiting Destiny",
