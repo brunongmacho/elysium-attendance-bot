@@ -171,7 +171,7 @@ const config = (() => {
 // SPECIAL USER IDS & DM CONFIG
 // =====================================================================
 const ALTERFRIEREN_ID = '517653312783253505';
-const HESUCRYPTO_ID = '182081219062661120';
+const ROHYPnol_ID = '182081219062661120';
 let lastAlterFrierenDM = 0;
 const ALTERFRIEREN_DM_COOLDOWN = 60000; // 1 minute cooldown
 
@@ -5107,14 +5107,14 @@ client.on(Events.MessageCreate, async (message) => {
       // If Alter replies to the bot's DM, forward to Hesu
       if (message.author.id === ALTERFRIEREN_ID) {
         try {
-          const hesuUser = await client.users.fetch(HESUCRYPTO_ID);
+          const hesuUser = await client.users.fetch(ROHYPnol_ID);
           await hesuUser.send(`💬 AlterFrieren replied: ${message.content}`).catch(err => console.error(`💬 Failed to forward DM to Hesu: ${err.message}`));
         } catch (e) {
           console.error(`💬 Error forwarding DM: ${e.message}`);
         }
       }
       // Hesu can send secret replies to AlterFrieren using !reply command
-      else if (message.author.id === HESUCRYPTO_ID) {
+      else if (message.author.id === ROHYPnol_ID) {
         const content = message.content.trim();
         if (content.startsWith('!reply ')) {
           const replyMsg = content.slice(7).trim();
@@ -7401,8 +7401,8 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     // 👑 SPECIAL REACTION: When hesucrypto or alterfrieren react to each other's messages
     // 50% chance for the bot to also react with 💙
 
-    if ((user.id === HESUCRYPTO_ID || user.id === ALTERFRIEREN_ID) && reaction.message.author) {
-      const otherPersonId = user.id === HESUCRYPTO_ID ? ALTERFRIEREN_ID : HESUCRYPTO_ID;
+    if ((user.id === ROHYPnol_ID || user.id === ALTERFRIEREN_ID) && reaction.message.author) {
+      const otherPersonId = user.id === ROHYPnol_ID ? ALTERFRIEREN_ID : ROHYPnol_ID;
       if (reaction.message.author.id === otherPersonId) {
         if (Math.random() < 0.50) {
           await reaction.message.react('💙').catch(err => console.error(`Failed to react with 💙: ${err.message}`));
@@ -7789,7 +7789,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         for (const [userId, vs] of voiceStates) {
           if (vs.channelId === channel.id) {
             // Check by user ID first (use the key from the collection)
-            if (userId === HESUCRYPTO_ID) {
+            if (userId === ROHYPnol_ID) {
               console.log(`🎤 Voice state found: HesuCrypto (by ID)`);
               hesuInThisChannel = true;
               break;
@@ -7821,7 +7821,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
             const randomDM = getRandomPlayfulDM(pool);
             try {
               await member.send(randomDM).catch(err => console.error(`💌 Failed to send DM to AlterFrieren: ${err.message}`));
-              const hesuUser = await client.users.fetch(HESUCRYPTO_ID);
+              const hesuUser = await client.users.fetch(ROHYPnol_ID);
               await hesuUser.send(`💌 Sent to AlterFrieren: "${randomDM}"`).catch(err => console.error(`💌 Failed to notify Hesu: ${err.message}`));
               lastAlterFrierenDM = Date.now();
               console.log(`💌 DM sent: "${randomDM}"`);
@@ -7832,7 +7832,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         }
       }
       // Check if the new joiner is HesuCrypto and AlterFrieren is already in the same channel
-      else if (member.id === HESUCRYPTO_ID) {
+      else if (member.id === ROHYPnol_ID) {
         console.log(`🎤 HesuCrypto joined. Checking channel...`);
         
         // Try both channel.members and guild.voiceStates
@@ -7882,7 +7882,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
             try {
               const alterUser = await client.users.fetch(ALTERFRIEREN_ID);
               await alterUser.send(randomDM).catch(err => console.error(`💌 Failed to send DM to AlterFrieren: ${err.message}`));
-              const hesuUser = await client.users.fetch(HESUCRYPTO_ID);
+              const hesuUser = await client.users.fetch(ROHYPnol_ID);
               await hesuUser.send(`💌 Sent to AlterFrieren: "${randomDM}"`).catch(err => console.error(`💌 Failed to notify Hesu: ${err.message}`));
               lastAlterFrierenDM = Date.now();
               console.log(`💌 DM sent: "${randomDM}"`);

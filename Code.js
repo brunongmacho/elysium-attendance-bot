@@ -2163,9 +2163,13 @@ function updateBiddingPoints() {
 
   // --- Step 1: Map existing members and calculate consumed from session columns ---
   let hasBlankTallies = false;
+  let duplicatesFound = [];
   allData.forEach((r, i) => {
     const m = (r[0] || '').toString().trim();
     if (!m) return;
+
+    // Normalize name for consistent matching (lowercase)
+    const normalizedName = m.toLowerCase();
 
     // Sum all session columns (columns 4+ = indices 3+) and check for blank entries
     let totalConsumed = 0;
@@ -2179,8 +2183,20 @@ function updateBiddingPoints() {
       totalConsumed += val;
     }
 
-    memberMap[m] = { row: i + 2, consumed: totalConsumed };
+    // If duplicate found, add consumed points to existing entry instead of creating new
+    if (memberMap[normalizedName]) {
+      memberMap[normalizedName].consumed += totalConsumed;
+      duplicatesFound.push({ name: m, row: i + 2, consumed: totalConsumed });
+      Logger.log(`⚠️ Merging duplicate ${m} (row ${i+2}, ${totalConsumed} consumed) into first entry`);
+      return;
+    }
+
+    memberMap[normalizedName] = { row: i + 2, consumed: totalConsumed };
   });
+
+  // Store duplicate info for later deletion (after points update to avoid row index issues)
+  const duplicatesToDelete = duplicatesFound.length > 0 ? 
+    duplicatesFound.sort((a, b) => b.row - a.row).map(d => d.row) : [];
 
   // Write back normalized data if any blank tallies were found
   if (hasBlankTallies && allData.length > 0) {
@@ -2193,18 +2209,45 @@ function updateBiddingPoints() {
   const attendancePoints = {};
 
   sheets.forEach(s => {
-    const data = s.getRange('A2:D').getValues();
+    const lastRow = s.getLastRow();
+    if (lastRow < 3) return; // No member data
+    
+    // Read from row 3 (first member row): Column A (name) and Column D (attendance points)
+    const dataRange = s.getRange(3, 1, lastRow - 2, 4);
+    const data = dataRange.getValues();
+    
     data.forEach(r => {
       const m = (r[0] || '').toString().trim();
-      if (m) attendancePoints[m] = (attendancePoints[m] || 0) + Number(r[3] || 0);
+      if (m) {
+        // Normalize name for matching (lowercase)
+        const normalizedName = m.toLowerCase();
+        // Column D is index 3 in 0-based array
+        let points = Number(r[3] || 0);
+        // Handle NaN (uncached formulas) or invalid values
+        if (isNaN(points)) points = 0;
+        attendancePoints[normalizedName] = (attendancePoints[normalizedName] || 0) + points;
+      }
     });
   });
+  
+  Logger.log(`📊 Read attendance from ${sheets.length} weekly sheets`);
 
   // --- Step 3: Check for new members and auto-add to BiddingPoints ---
-  const newMembers = Object.keys(attendancePoints).filter(m => !memberMap[m]);
+  // Get original names from weekly sheets (not normalized)
+  const existingMemberNames = Object.keys(memberMap);
+  const newMembers = [];
+  
+  Object.keys(attendancePoints).forEach(normalizedName => {
+    if (!memberMap[normalizedName]) {
+      // Find the original name from one of the sheets
+      // For now, just use the normalized name (capitalized) - could be improved
+      newMembers.push({ normalized: normalizedName, original: normalizedName });
+    }
+  });
+  
   if (newMembers.length > 0) {
     Logger.log(`ℹ️ Found ${newMembers.length} new members in weekly sheets, adding to BiddingPoints:`);
-    Logger.log(`ℹ️ Members: ${newMembers.join(', ')}`);
+    Logger.log(`ℹ️ Members: ${newMembers.map(m => m.original).join(', ')}`);
 
     // Auto-add new members to BiddingPoints sheet
     const insertStart = bpSheet.getLastRow() + 1;
@@ -2214,14 +2257,14 @@ function updateBiddingPoints() {
 
     // Create rows with 0s for all existing tally columns for uniformity
     const tallyZeros = new Array(numTallyColumns).fill(0);
-    const newRows = newMembers.map(m => [m, attendancePoints[m], 0, ...tallyZeros]);
+    const newRows = newMembers.map(m => [m.original, attendancePoints[m.normalized], 0, ...tallyZeros]);
 
     // Insert new member rows with all columns
     const numColumns = 3 + numTallyColumns;
     bpSheet.getRange(insertStart, 1, newRows.length, numColumns).setValues(newRows);
 
     newMembers.forEach((m, i) => {
-      memberMap[m] = { row: insertStart + i, consumed: 0 };
+      memberMap[m.normalized] = { row: insertStart + i, consumed: 0 };
     });
 
     Logger.log(`✅ Successfully added ${newMembers.length} new members to BiddingPoints with ${numTallyColumns} previous tallies set to 0`);
@@ -2230,7 +2273,9 @@ function updateBiddingPoints() {
     // --- Step 4: Update Column 3 (Points Consumed) and Column 2 (Points Left) for all members ---
     Object.keys(memberMap).forEach(m => {
       const consumed = memberMap[m].consumed;
-      const left = (attendancePoints[m] || 0) - consumed;
+      // Normalize name for lookup (lowercase) to match how attendancePoints was collected
+      const normalizedName = m.toLowerCase();
+      const left = (attendancePoints[normalizedName] || 0) - consumed;
 
       // Update both columns
       bpSheet.getRange(memberMap[m].row, 2).setValue(left);      // Column 2 = Points Left
@@ -2238,6 +2283,15 @@ function updateBiddingPoints() {
     });
 
     Logger.log(`✅ Updated bidding points for ${Object.keys(memberMap).length} members`);
+
+    // Delete duplicate rows AFTER updating points (to avoid row index issues)
+    if (duplicatesToDelete.length > 0) {
+      Logger.log(`🗑️ Deleting duplicate rows: ${duplicatesToDelete.join(', ')}`);
+      duplicatesToDelete.forEach(row => {
+        bpSheet.deleteRow(row);
+      });
+      Logger.log(`✅ Deleted ${duplicatesToDelete.length} duplicate rows from BiddingPoints`);
+    }
 
     // v6.2: Invalidate cache after updating points
     invalidateBiddingPointsCache();

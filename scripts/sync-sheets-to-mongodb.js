@@ -25,10 +25,21 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-const dbAPI = require('../utils/database-api');
-const { SheetAPI } = require('../utils/sheet-api');
 const fs = require('fs');
 const path = require('path');
+
+// Load .env file FIRST to ensure MONGODB_URI is set
+const envPath = path.join(__dirname, '..', '.env');
+const envContent = fs.readFileSync(envPath, 'utf8');
+envContent.split('\n').forEach(line => {
+  const match = line.match(/^([^=]+)=(.*)$/);
+  if (match) {
+    process.env[match[1].trim()] = match[2].trim();
+  }
+});
+
+const dbAPI = require('../utils/database-api');
+const { SheetAPI } = require('../utils/sheet-api');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -51,6 +62,16 @@ try {
 } catch (error) {
   console.error('❌ Failed to load config.json:', error.message);
   process.exit(1);
+}
+
+// Load Discord ID mapping (nickname -> Discord ID)
+let discordIdMap = {};
+try {
+  const mappingPath = path.join(__dirname, '..', 'config', 'discord-id-mapping.json');
+  discordIdMap = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
+  console.log(`📋 Loaded ${Object.keys(discordIdMap).length} Discord ID mappings`);
+} catch (error) {
+  console.log('ℹ️  No discord-id-mapping.json found, will use temp IDs');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -263,6 +284,9 @@ async function syncMembers(db, sheetAPI) {
         });
 
         if (existingMember) {
+          // Check if we have a Discord ID for this member
+          const discordId = discordIdMap[username];
+          
           // Update existing member's points and mark as active
           await membersCollection.updateOne(
             { _id: existingMember._id },
@@ -273,17 +297,49 @@ async function syncMembers(db, sheetAPI) {
                 pointsSpent: pointsSpent,
                 username: username, // Update to current casing
                 isActive: true,  // Re-activate member
+                discordId: discordId || existingMember.discordId, // Add Discord ID if available
                 lastUpdated: new Date()
               }
             }
           );
+          
+          // If member has temp ID but we have Discord ID, migrate them properly
+          if (existingMember._id.startsWith('temp_') && discordId) {
+            // Delete old temp member and create new with Discord ID
+            const memberData = {
+              _id: discordId,
+              username: username,
+              discordId: discordId,
+              pointsAvailable: pointsAvailable,
+              pointsEarned: pointsEarned,
+              pointsSpent: pointsSpent,
+              isActive: true,
+              attendance: existingMember.attendance || { total: 0, thisWeek: 0, thisMonth: 0, byBoss: {}, streak: { current: 0, longest: 0 } },
+              joinedAt: existingMember.joinedAt || new Date(),
+              lastUpdated: new Date()
+            };
+            
+            // Update attendance records first
+            await db.collection('attendance').updateMany(
+              { memberId: existingMember._id },
+              { $set: { memberId: discordId } }
+            );
+            
+            // Delete old and insert new
+            await membersCollection.deleteOne({ _id: existingMember._id });
+            await membersCollection.insertOne(memberData);
+            log('🎯', `Migrated ${username} from temp ID to Discord ID: ${discordId}`);
+          }
           synced++;
         } else {
-          // Create new member with temp ID (will be migrated to Discord ID when they first interact)
-          const tempId = `temp_${username.toLowerCase().replace(/\s+/g, '_')}`;
+          // Create new member - check if we have Discord ID
+          const discordId = discordIdMap[username];
+          const memberId = discordId || `temp_${username.toLowerCase().replace(/\s+/g, '_')}`;
+          
           await membersCollection.insertOne({
-            _id: tempId,
+            _id: memberId,
             username: username,
+            discordId: discordId || null,
             pointsAvailable: pointsAvailable,
             pointsEarned: pointsEarned,
             pointsSpent: pointsSpent,
@@ -300,7 +356,12 @@ async function syncMembers(db, sheetAPI) {
           });
           created++;
           synced++;
-          log('➕', `Created new member: ${username} with temp ID (will migrate to Discord ID on first interaction)`);
+          
+          if (discordId) {
+            log('🎯', `Created member ${username} with Discord ID: ${discordId}`);
+          } else {
+            log('➕', `Created new member: ${username} with temp ID (will migrate to Discord ID on first interaction)`);
+          }
         }
       } catch (error) {
         const username = memberData?.username || 'unknown';
@@ -604,23 +665,38 @@ async function syncAttendance(db, sheetAPI) {
 
     if (missingMembers.size > 0) {
       log('➕', `Creating ${missingMembers.size} missing members...`);
-      const newMemberDocs = Array.from(missingMembers).map(username => ({
-        _id: `temp_${username.toLowerCase().replace(/\s+/g, '_')}`,
-        username: username,
-        pointsAvailable: 0,
-        pointsEarned: 0,
-        pointsSpent: 0,
-        isActive: true,
-        attendance: {
-          total: 0,
-          thisWeek: 0,
-          thisMonth: 0,
-          byBoss: {},
-          streak: { current: 0, longest: 0 }
-        },
-        joinedAt: new Date(),
-        lastUpdated: new Date()
-      }));
+      const newMemberDocs = Array.from(missingMembers).map(username => {
+        // Check if we have a Discord ID for this nickname
+        const discordId = discordIdMap[username];
+        
+        return {
+          _id: discordId || `temp_${username.toLowerCase().replace(/\s+/g, '_')}`,
+          username: username,
+          discordId: discordId || null,
+          pointsAvailable: 0,
+          pointsEarned: 0,
+          pointsSpent: 0,
+          isActive: true,
+          attendance: {
+            total: 0,
+            thisWeek: 0,
+            thisMonth: 0,
+            byBoss: {},
+            streak: { current: 0, longest: 0 }
+          },
+          joinedAt: new Date(),
+          lastUpdated: new Date()
+        };
+      });
+
+      // Log which members will get Discord IDs
+      const withDiscordId = newMemberDocs.filter(m => m.discordId);
+      if (withDiscordId.length > 0) {
+        log('🎯', `${withDiscordId.length} members will use Discord IDs:`);
+        withDiscordId.forEach(m => {
+          console.log(`   - ${m.username}: ${m.discordId}`);
+        });
+      }
 
       try {
         await membersCollection.insertMany(newMemberDocs, { ordered: false });
