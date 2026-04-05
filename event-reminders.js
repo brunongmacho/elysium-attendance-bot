@@ -956,13 +956,13 @@ function scheduleAllEvents() {
     scheduleQueueReminder(day);
   });
 
-  // Schedule Ancient Citadel events (each boss only on its specific day)
-  const ancientCitadelEvents = getAncientCitadelEvents();
-  Object.entries(ancientCitadelEvents).forEach(([key, event]) => {
-    event.days.forEach(day => {
-      scheduleEventReminder(`${key}_${day}`, event, day);
-    });
-  });
+  // TODO: Re-enable Ancient Citadel events when needed
+  // const ancientCitadelEvents = getAncientCitadelEvents();
+  // Object.entries(ancientCitadelEvents).forEach(([key, event]) => {
+  //   event.days.forEach(day => {
+  //     scheduleEventReminder(`${key}_${day}`, event, day);
+  //   });
+  // });
 
   console.log(`✅ [EVENT REMINDER] Scheduled ${Object.keys(eventTimers).length} event reminders`);
   console.log(`✅ [QUEUE REMINDER] Scheduled ${Object.keys(queueReminderTimers).length} queue reminders`);
