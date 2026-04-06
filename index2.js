@@ -7782,19 +7782,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
           await rohypnolUser.send(`💌 Sent to AlterFrieren: "${randomDM}"`).catch(err => console.error(`💌 Failed to notify Rohypnol: ${err.message}`));
         }
       }
-      // Check if the new joiner is Rohypnol and AlterFrieren is already in the same channel
-      else if (member.id === ROHYPnol_ID) {
-        console.log(`🎤 Rohypnol joined. Checking channel...`);
-        const rohypnolUser = await client.users.fetch(ROHYPnol_ID);
-        await rohypnolUser.send(`💌 Sent to AlterFrieren: "${randomDM}"`).catch(err => console.error(`💌 Failed to notify Rohypnol: ${err.message}`));
-              lastAlterFrierenDM = Date.now();
-              console.log(`💌 DM sent: "${randomDM}"`);
-            } catch (e) {
-              console.error(`💌 Error sending DM: ${e.message}`);
-            }
-          }
-        }
-      }
+
       // Check if the new joiner is Rohypnol and AlterFrieren is already in the same channel
       else if (member.id === ROHYPnol_ID) {
         console.log(`🎤 Rohypnol joined. Checking channel...`);
