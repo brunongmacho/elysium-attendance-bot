@@ -231,7 +231,7 @@ if (!searchTerm) {
   console.log('Usage: node scripts/debug-discord-match.js <discord-user-id-or-username>');
   console.log('');
   console.log('Examples:');
-  console.log('  node scripts/debug-discord-match.js HesuCrypto');
+  console.log('  node scripts/debug-discord-match.js Rohypnol');
   console.log('  node scripts/debug-discord-match.js 1234567890');
   console.log('');
   console.log('💡 To get your Discord User ID:');

@@ -5107,8 +5107,8 @@ client.on(Events.MessageCreate, async (message) => {
       // If Alter replies to the bot's DM, forward to Hesu
       if (message.author.id === ALTERFRIEREN_ID) {
         try {
-          const hesuUser = await client.users.fetch(ROHYPnol_ID);
-          await hesuUser.send(`💬 AlterFrieren replied: ${message.content}`).catch(err => console.error(`💬 Failed to forward DM to Hesu: ${err.message}`));
+          const rohypnolUser = await client.users.fetch(ROHYPnol_ID);
+          await rohypnolUser.send(`💬 AlterFrieren replied: ${message.content}`).catch(err => console.error(`💬 Failed to forward DM to Rohypnol: ${err.message}`));
         } catch (e) {
           console.error(`💬 Error forwarding DM: ${e.message}`);
         }
@@ -7398,7 +7398,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     if (!reaction.message.guild) return; // Skip DM reactions
     if (reaction.message.guild.id !== config.main_guild_id) return; // Skip wrong guild
 
-    // 👑 SPECIAL REACTION: When hesucrypto or alterfrieren react to each other's messages
+    // 👑 SPECIAL REACTION: When rohypnol or alterfrieren react to each other's messages
     // 50% chance for the bot to also react with 💙
 
     if ((user.id === ROHYPnol_ID || user.id === ALTERFRIEREN_ID) && reaction.message.author) {
@@ -7771,58 +7771,22 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         return selectedDM;
       };
 
-      // Check if the new joiner is AlterFrieren and HesuCrypto is already in the same channel
-      if (member.id === ALTERFRIEREN_ID) {
-        console.log(`🎤 AlterFrieren joined. Checking channel...`);
-        
-        // Try both channel.members and guild.voiceStates
-        const channelMembers = channel.members;
-        console.log(`🎤 Channel members: ${[...channelMembers.values()].map(m => m.displayName).join(', ')}`);
-        
-        // Check voice states from guild
-        const guild = commandsChannel.guild;
-        const voiceStates = guild.voiceStates.cache;
-        console.log(`🎤 Total voice states: ${voiceStates.size}`);
-        
-        // Find if HesuCrypto is in THIS channel via voice states
-        let hesuInThisChannel = false;
-        for (const [userId, vs] of voiceStates) {
-          if (vs.channelId === channel.id) {
-            // Check by user ID first (use the key from the collection)
-            if (userId === ROHYPnol_ID) {
-              console.log(`🎤 Voice state found: HesuCrypto (by ID)`);
-              hesuInThisChannel = true;
-              break;
-            }
-            // Fallback to name check
-            const name = vs.member?.displayName || vs.member?.user?.username || 'unknown';
-            console.log(`🎤 Voice state found: ${name} (ID: ${userId})`);
-            if (name.toLowerCase().includes('hesu') || 
-                name.toLowerCase().includes('.biogesic') ||
-                name.toLowerCase().includes('hesucrypto')) {
-              hesuInThisChannel = true;
-              break;
-            }
-          }
+      // Check if the new joiner is AlterFrieren and Rohypnol is already in the same channel
+      if (userId === ALTERFRIEREN_ID) {
+        // Find if Rohypnol is in THIS channel via voice states
+        let rohypnolInThisChannel = false;
+        console.log(`🎤 Rohypnol in this channel? ${rohypnolInThisChannel}`);
+        if (rohypnolInThisChannel) {
+          console.log(`💌 Sending DM to AlterFrieren - She joined, Rohypnol is in channel`);
+          const rohypnolUser = await client.users.fetch(ROHYPnol_ID);
+          await rohypnolUser.send(`💌 Sent to AlterFrieren: "${randomDM}"`).catch(err => console.error(`💌 Failed to notify Rohypnol: ${err.message}`));
         }
-        
-        console.log(`🎤 Hesu in this channel? ${hesuInThisChannel}`);
-        
-        if (hesuInThisChannel) {
-          console.log(`💌 Sending DM to AlterFrieren - She joined, Hesu is in channel`);
-          
-          // Check cooldown
-          const now = Date.now();
-          if (now - lastAlterFrierenDM < ALTERFRIEREN_DM_COOLDOWN) {
-            console.log(`💌 DM skipped - cooldown active (${Math.round((ALTERFRIEREN_DM_COOLDOWN - (now - lastAlterFrierenDM))/1000)}s remaining)`);
-          } else {
-            // Combine general + whenSheJoins pools
-            const pool = [...generalDMs, ...whenSheJoins];
-            const randomDM = getRandomPlayfulDM(pool);
-            try {
-              await member.send(randomDM).catch(err => console.error(`💌 Failed to send DM to AlterFrieren: ${err.message}`));
-              const hesuUser = await client.users.fetch(ROHYPnol_ID);
-              await hesuUser.send(`💌 Sent to AlterFrieren: "${randomDM}"`).catch(err => console.error(`💌 Failed to notify Hesu: ${err.message}`));
+      }
+      // Check if the new joiner is Rohypnol and AlterFrieren is already in the same channel
+      else if (member.id === ROHYPnol_ID) {
+        console.log(`🎤 Rohypnol joined. Checking channel...`);
+        const rohypnolUser = await client.users.fetch(ROHYPnol_ID);
+        await rohypnolUser.send(`💌 Sent to AlterFrieren: "${randomDM}"`).catch(err => console.error(`💌 Failed to notify Rohypnol: ${err.message}`));
               lastAlterFrierenDM = Date.now();
               console.log(`💌 DM sent: "${randomDM}"`);
             } catch (e) {
@@ -7831,9 +7795,9 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
           }
         }
       }
-      // Check if the new joiner is HesuCrypto and AlterFrieren is already in the same channel
+      // Check if the new joiner is Rohypnol and AlterFrieren is already in the same channel
       else if (member.id === ROHYPnol_ID) {
-        console.log(`🎤 HesuCrypto joined. Checking channel...`);
+        console.log(`🎤 Rohypnol joined. Checking channel...`);
         
         // Try both channel.members and guild.voiceStates
         const channelMembers = channel.members;
@@ -7882,8 +7846,8 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
             try {
               const alterUser = await client.users.fetch(ALTERFRIEREN_ID);
               await alterUser.send(randomDM).catch(err => console.error(`💌 Failed to send DM to AlterFrieren: ${err.message}`));
-              const hesuUser = await client.users.fetch(ROHYPnol_ID);
-              await hesuUser.send(`💌 Sent to AlterFrieren: "${randomDM}"`).catch(err => console.error(`💌 Failed to notify Hesu: ${err.message}`));
+              const rohypnolUser = await client.users.fetch(ROHYPnol_ID);
+              await rohypnolUser.send(`💌 Sent to AlterFrieren: "${randomDM}"`).catch(err => console.error(`💌 Failed to notify Rohypnol: ${err.message}`));
               lastAlterFrierenDM = Date.now();
               console.log(`💌 DM sent: "${randomDM}"`);
             } catch (e) {
