@@ -187,7 +187,7 @@ function evaluateAllMembers() {
   const ss = getEvaluationSheet();
   if (!ss) {
     Logger.log('❌ Evaluation sheet not found');
-    return createResponse('error', 'Evaluation sheet not found');
+    return;
   }
   
   const sheet = ss.getSheetByName(EVAL_CONFIG.SHEET_NAME) || ss.insertSheet(EVAL_CONFIG.SHEET_NAME);
