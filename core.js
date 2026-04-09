@@ -257,10 +257,17 @@ function evaluateAllMembersSheet(sheet, sheetName) {
   const allData = sheet.getRange(dataStartRow, 1, lastRow - dataStartRow + 1, lastCol).getValues();
   const members = [];
   
+  Logger.log(`📊 Processing ${allData.length} rows from row ${dataStartRow}`);
+  
   for (let i = 0; i < allData.length; i++) {
     const row = allData[i];
     const memberName = (row[0] || '').toString().trim();
-    if (!memberName) continue;
+    if (!memberName) {
+      Logger.log(`⚠️ Row ${dataStartRow + i}: No member name, skipping`);
+      continue;
+    }
+    
+    Logger.log(`📝 Row ${dataStartRow + i}: ${memberName} - Starting: ${row[1]}, Ending: ${row[2]}, Attendance: ${row[3]}`);
     
     const startingCP = parseFloat(String(row[1]).replace(/,/g, '')) || 0;
     const endingCPInput = row[2];
