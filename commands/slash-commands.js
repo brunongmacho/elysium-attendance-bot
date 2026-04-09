@@ -414,6 +414,23 @@ function generateStatsCommands() {
       name: 'monthly',
       description: 'Generate monthly activity report',
       dm_permission: false
+    },
+
+    // /cp command - Core Evaluation CP submission
+    {
+      name: 'cp',
+      description: 'Submit your CP for Core Evaluation (attach screenshot)',
+      dm_permission: false,
+      options: [
+        {
+          name: 'cp',
+          type: ApplicationCommandOptionType.Integer,
+          description: 'Your CP number (e.g., 90492)',
+          required: true,
+          min_value: 0,
+          max_value: 999999999
+        }
+      ]
     }
   ];
 }

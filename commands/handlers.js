@@ -1752,7 +1752,6 @@ if (commandName === 'rotation') {
       try {
         const { commandHandlers } = require('../index2.js');
         await commandHandlers.monthly(syntheticMessage, interaction.member);
-        // Handler uses channel.send(), so manually resolve the deferred interaction
         if (!interaction.replied) {
           await interaction.editReply({ content: '✅ Monthly report generated' });
         }
@@ -1760,6 +1759,16 @@ if (commandName === 'rotation') {
         console.error('Error in /monthly command:', error);
         await interaction.editReply({ content: `❌ Error: ${error.message}` });
       }
+      return;
+    }
+
+    // /cp command - Core Evaluation CP submission
+    if (commandName === 'cp') {
+      await interaction.deferReply({ ephemeral: true });
+      
+      await interaction.editReply({ 
+        content: `❌ Please post your CP in the Core Evaluation thread.\n\nUse \`!CP <number>\` with a screenshot attached.\n\nExample: \`!CP 90,492\`` 
+      });
       return;
     }
 

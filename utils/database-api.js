@@ -146,7 +146,9 @@ class DatabaseAPI {
       const criticalChecks = [
         { collection: 'attendance', index: 'member_history' },
         { collection: 'members', index: 'username_unique' },
-        { collection: 'eventReminders', index: 'due_reminders' }
+        { collection: 'eventReminders', index: 'due_reminders' },
+        { collection: 'coreEvaluation', index: 'evaluation_lookup' },
+        { collection: 'coreEvaluationState', index: 'state_type_lookup' }
       ];
 
       for (const check of criticalChecks) {
@@ -235,6 +237,11 @@ class DatabaseAPI {
       // Boss timers indexes
       { collection: 'bossTimers', spec: { bossName: 1 }, options: { unique: true }, name: 'boss_timer_unique', critical: false },
       { collection: 'bossTimers', spec: { nextSpawnTime: 1 }, name: 'spawn_time_lookup', critical: false },
+
+      // Core Evaluation indexes
+      { collection: 'coreEvaluation', spec: { discordId: 1, phase: 1, cycleNumber: -1 }, name: 'evaluation_lookup', critical: false },
+      { collection: 'coreEvaluation', spec: { phase: 1, cycleNumber: 1 }, name: 'phase_cycle_lookup', critical: false },
+      { collection: 'coreEvaluationState', spec: { type: 1 }, name: 'state_type_lookup', critical: false },
     ];
 
     // Create indexes with individual error handling

@@ -105,6 +105,7 @@ const timerRegistry = require('./utils/timer-registry'); // Centralized timer tr
 // ❌ REMOVED: Abolished systems (intelligence-engine, proactive-intelligence, nlp-*, ml-integration, loot-system)
 const eventReminders = require('./event-reminders.js'); // Game Event Reminder System
 const bossRotation = require('./boss-rotation.js'); // Boss Rotation System (5-guild tracking)
+const coreEvaluation = require('./core-evaluation.js'); // Core Member Evaluation System
 const activityHeatmap = require('./activity-heatmap.js'); // Activity Heatmap System
 const crashRecovery = require('./utils/crash-recovery.js'); // Crash Recovery System (state persistence)
 const dbAPI = require('./utils/database-api'); // MongoDB Database API
@@ -4981,6 +4982,9 @@ client.once(Events.ClientReady, async () => {
   scheduler.startScheduler();
 
   await eventReminders.initializeEventReminders(client, config, sheetAPI, attendance);
+  await coreEvaluation.initialize(config);
+  await coreEvaluation.scheduleEvaluationCheck(client);
+  await coreEvaluation.scheduleEvaluationReminder(client);
   await crashRecovery.initialize(client, config);
 
   leaderboardSystem.init(client, config, discordCache, crashRecovery);
@@ -6554,6 +6558,29 @@ client.on(Events.MessageCreate, async (message) => {
         if (memberCmd === "!stats") {
           console.log(`📊 Stats command detected by ${member.user.username}`);
           await commandHandlers.stats(message, member, args);
+          return;
+        }
+
+        // !CP command - Core Evaluation CP submission
+        if (memberCmd === "!cp" || rawCmd.startsWith("!cp ") || rawCmd.startsWith("!CP ")) {
+          const content = message.content.trim();
+          const cpMatch = content.match(/^!CP\s+([\d,]+)$/i) || content.match(/^!cp\s+([\d,]+)$/i);
+          
+          if (!cpMatch) {
+            await message.reply(
+              `❌ Invalid format. Use: \`!CP <number>\`\n` +
+              `Example: \`!CP 90,492\` or \`!CP 90492\`\n` +
+              `Attach a screenshot showing your CP.`
+            );
+            return;
+          }
+          
+          const cpNumber = parseInt(cpMatch[1].replace(/,/g, ''));
+          const discordNickname = member.nickname || message.author.username;
+          
+          console.log(`📊 CP submission: ${discordNickname} - ${cpNumber}`);
+          
+          const result = await coreEvaluation.handleCPCommand(message, cpNumber, discordNickname);
           return;
         }
       }

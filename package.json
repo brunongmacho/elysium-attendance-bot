@@ -10,6 +10,8 @@
     "sync": "node scripts/sync-sheets-to-mongodb.js",
     "deploy": "clasp push",
     "deploy:new": "clasp deploy --description \"Deployment $(date +'%Y-%m-%d %H:%M:%S')\"",
+    "deploy:core": "clasp --config .clasp.core.json push",
+    "deploy:core:new": "clasp --config .clasp.core.json deploy --description \"Core Evaluation Deployment $(date +'%Y-%m-%d %H:%M:%S')\"",
     "test": "jest --verbose",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
