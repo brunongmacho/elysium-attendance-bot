@@ -382,12 +382,6 @@ function evaluateAllMembersSheet(sheet, sheetName) {
   highlightSelectedCore(sheet, members, dataStartRow);
   
   Logger.log(`✅ Evaluation complete: ${members.length} members evaluated, ${coreCount} selected for Core`);
-  
-  return createResponse('ok', `Evaluated ${members.length} members`, {
-    totalMembers: members.length,
-    coreSelected: coreCount,
-    bracketAverages: bracketAverages,
-  });
 }
 
 /**
