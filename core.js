@@ -30,7 +30,7 @@
  */
 
 const EVAL_CONFIG = {
-  SHEET_NAME: 'CoreEvaluation',
+  SHEET_NAME: 'CYCLE 1',
   SPREADSHEET_ID: '', // Set your spreadsheet ID here if different from active
   
   // CP Brackets
@@ -209,9 +209,11 @@ function evaluateAllCycles() {
   
   sheets.forEach(sheet => {
     const sheetName = sheet.getName();
-    // Process any sheet that has data in columns A-D (Member Name, Starting CP, Ending CP, Attendance)
+    // Match "CYCLE 1", "Cycle 1", "cycle 1", etc.
+    const isCycleSheet = sheetName.match(/^CYCLE\s+\d+$/i);
     const dataCheck = sheet.getRange('A2:D2').getValues();
-    if (dataCheck[0][0]) { // Has data in row 2
+    
+    if (isCycleSheet && dataCheck[0][0]) {
       Logger.log(`📊 Processing sheet: ${sheetName}`);
       try {
         evaluateAllMembersSheet(sheet, sheetName);
@@ -422,8 +424,8 @@ function onEdit(e) {
   const sheet = e.source.getActiveSheet();
   const sheetName = sheet.getName();
   
-  // Accept both "Cycle X" sheets AND main CoreEvaluation sheet
-  const isCycleSheet = sheetName.match(/^Cycle \d+$/);
+  // Accept "CYCLE 1", "Cycle 1", "cycle 1", etc.
+  const isCycleSheet = sheetName.match(/^CYCLE\s+\d+$/i);
   const isMainSheet = sheetName === EVAL_CONFIG.SHEET_NAME;
   
   if (!isCycleSheet && !isMainSheet) return;
@@ -618,7 +620,7 @@ function syncEvaluationData(data) {
     // Process each cycle
     const results = [];
     for (const [cycleNum, cycleData] of Object.entries(dataByCycle)) {
-      const sheetName = `Cycle ${cycleNum}`;
+      const sheetName = `CYCLE ${cycleNum}`;
       let sheet = ss.getSheetByName(sheetName);
       
       if (!sheet) {
