@@ -195,6 +195,38 @@ function evaluateAllMembers() {
 }
 
 /**
+ * Evaluate ALL cycle sheets - call this to process all cycles
+ */
+function evaluateAllCycles() {
+  const ss = getEvaluationSheet();
+  if (!ss) {
+    Logger.log('❌ Evaluation sheet not found');
+    return;
+  }
+  
+  const sheets = ss.getSheets();
+  let processed = 0;
+  
+  sheets.forEach(sheet => {
+    const sheetName = sheet.getName();
+    // Process any sheet that has data in columns A-D (Member Name, Starting CP, Ending CP, Attendance)
+    const dataCheck = sheet.getRange('A2:D2').getValues();
+    if (dataCheck[0][0]) { // Has data in row 2
+      Logger.log(`📊 Processing sheet: ${sheetName}`);
+      try {
+        evaluateAllMembersSheet(sheet, sheetName);
+        processed++;
+      } catch (e) {
+        Logger.log(`⚠️ Error processing ${sheetName}: ${e.message}`);
+      }
+    }
+  });
+  
+  Logger.log(`✅ Processed ${processed} cycle sheets`);
+  return `Processed ${processed} cycle sheets`;
+}
+
+/**
  * Evaluate members for a specific sheet
  * @param {Sheet} sheet - The sheet to evaluate
  * @param {string} sheetName - Name of the sheet for headers
@@ -390,10 +422,11 @@ function onEdit(e) {
   const sheet = e.source.getActiveSheet();
   const sheetName = sheet.getName();
   
-  // Only process evaluation sheets (Cycle 1, Cycle 2, etc.)
+  // Accept both "Cycle X" sheets AND main CoreEvaluation sheet
   const isCycleSheet = sheetName.match(/^Cycle \d+$/);
+  const isMainSheet = sheetName === EVAL_CONFIG.SHEET_NAME;
   
-  if (!isCycleSheet) return;
+  if (!isCycleSheet && !isMainSheet) return;
   
   const range = e.range;
   const row = range.getRow();
