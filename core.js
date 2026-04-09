@@ -73,6 +73,7 @@ const EVAL_COLUMNS = {
   FINAL_SCORE: 11,
   CORE_ELIGIBLE: 12,
   SELECTED_CORE: 13,
+  SCREENSHOT: 14,
 };
 
 /**
@@ -407,6 +408,7 @@ function setHeaders(sheet) {
     'Final Score',
     'Core Eligible',
     'Selected Core',
+    'Screenshot',
   ];
   
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
@@ -429,6 +431,7 @@ function setHeaders(sheet) {
   sheet.setColumnWidth(EVAL_COLUMNS.FINAL_SCORE, 100);
   sheet.setColumnWidth(EVAL_COLUMNS.CORE_ELIGIBLE, 110);
   sheet.setColumnWidth(EVAL_COLUMNS.SELECTED_CORE, 110);
+  sheet.setColumnWidth(EVAL_COLUMNS.SCREENSHOT, 200);
   
   Logger.log('✅ Headers set');
 }
@@ -478,8 +481,10 @@ function onEdit(e) {
   const sheet = e.source.getActiveSheet();
   const sheetName = sheet.getName();
   
-  // Only process the evaluation sheet
-  if (sheetName !== EVAL_CONFIG.SHEET_NAME) return;
+  // Only process evaluation sheets (Cycle 1, Cycle 2, etc.)
+  const isCycleSheet = sheetName.match(/^Cycle \d+$/);
+  
+  if (!isCycleSheet) return;
   
   const range = e.range;
   const row = range.getRow();
@@ -503,7 +508,7 @@ function onEdit(e) {
   Utilities.sleep(500);
   
   try {
-    evaluateAllMembers();
+    evaluateAllMembersSheet(sheet, sheetName);
     Logger.log('✅ Recalculation complete');
   } catch (err) {
     Logger.log('❌ Error in onEdit: ' + err.toString());
@@ -688,6 +693,7 @@ function syncEvaluationData(data) {
         if (!memberName) return;
         
         const memberCP = item.cp || 0;
+        const screenshotUrl = item.screenshotUrl || '';
         const currentCycle = parseInt(cycleNum);
         
         // Find existing row
@@ -707,16 +713,16 @@ function syncEvaluationData(data) {
           
           if (existingStartingCP === 0) {
             // No data yet - first submission in this cycle
-            rowData = [memberName, memberCP, 0, 0, 0, '', 0, 0, 0, 0, 0, '', ''];
+            rowData = [memberName, memberCP, 0, 0, 0, '', 0, 0, 0, 0, 0, '', '', screenshotUrl];
           } else if (existingEndingCP === 0) {
             // Has Starting CP, no Ending CP - this is second submission
-            rowData = [memberName, existingStartingCP, memberCP, 0, 0, '', 0, 0, 0, 0, 0, '', ''];
+            rowData = [memberName, existingStartingCP, memberCP, 0, 0, '', 0, 0, 0, 0, 0, '', '', screenshotUrl];
           } else {
             // Has both - just update Ending CP (same cycle, updating)
-            rowData = [memberName, existingStartingCP, memberCP, 0, 0, '', 0, 0, 0, 0, 0, '', ''];
+            rowData = [memberName, existingStartingCP, memberCP, 0, 0, '', 0, 0, 0, 0, 0, '', '', screenshotUrl];
           }
           
-          sheet.getRange(existingRow, 1, 1, 13).setValues([rowData]);
+          sheet.getRange(existingRow, 1, 1, 14).setValues([rowData]);
         } else {
           // New member in this cycle - check if they exist in previous cycles
           let previousEndingCP = 0;
@@ -747,17 +753,17 @@ function syncEvaluationData(data) {
           
           if (previousEndingCP > 0 && cyclesMissed === 0) {
             // Member participated in immediately previous cycle - continue from there
-            rowData = [memberName, previousEndingCP, memberCP, 0, 0, '', 0, 0, 0, 0, 0, '', ''];
+            rowData = [memberName, previousEndingCP, memberCP, 0, 0, '', 0, 0, 0, 0, 0, '', '', screenshotUrl];
             Logger.log(`📝 ${memberName}: Returning (consecutive) → Starting CP = ${previousEndingCP}, Ending CP = ${memberCP}`);
           } else if (previousEndingCP > 0 && cyclesMissed > 0) {
             // Member MISSED cycles - reset! They start fresh
             // Their new submission becomes their Starting CP only
-            rowData = [memberName, memberCP, 0, 0, 0, '', 0, 0, 0, 0, 0, '', ''];
+            rowData = [memberName, memberCP, 0, 0, 0, '', 0, 0, 0, 0, 0, '', '', screenshotUrl];
             Logger.log(`📝 ${memberName}: RESET (missed ${cyclesMissed} cycle(s)) → Starting CP = ${memberCP} fresh`);
           } else {
             // Completely new member - this is their Starting CP
             // Will need Ending CP in next cycle to be eligible
-            rowData = [memberName, memberCP, 0, 0, 0, '', 0, 0, 0, 0, 0, '', ''];
+            rowData = [memberName, memberCP, 0, 0, 0, '', 0, 0, 0, 0, 0, '', '', screenshotUrl];
             Logger.log(`📝 ${memberName}: NEW member → Starting CP = ${memberCP} (eligible in next cycle)`);
           }
           
