@@ -262,9 +262,10 @@ function evaluateAllMembersSheet(sheet, sheetName) {
     const memberName = (row[0] || '').toString().trim();
     if (!memberName) continue;
     
-    const startingCP = Number(row[1]) || 0;
-    const endingCP = Number(row[2]) || startingCP;
-    const attendance = Number(row[3]) || 0;
+    const startingCP = parseFloat(String(row[1]).replace(/,/g, '')) || 0;
+    const endingCPInput = row[2];
+    const endingCP = endingCPInput ? parseFloat(String(endingCPInput).replace(/,/g, '')) : startingCP;
+    const attendance = parseInt(String(row[3])) || 0;
     
     members.push({
       row: dataStartRow + i,
