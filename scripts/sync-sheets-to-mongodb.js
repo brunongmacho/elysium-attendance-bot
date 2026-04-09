@@ -28,15 +28,19 @@
 const fs = require('fs');
 const path = require('path');
 
-// Load .env file FIRST to ensure MONGODB_URI is set
+// Load .env file FIRST to ensure MONGODB_URI is set (skip if not found in production)
 const envPath = path.join(__dirname, '..', '.env');
-const envContent = fs.readFileSync(envPath, 'utf8');
-envContent.split('\n').forEach(line => {
-  const match = line.match(/^([^=]+)=(.*)$/);
-  if (match) {
-    process.env[match[1].trim()] = match[2].trim();
-  }
-});
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  envContent.split('\n').forEach(line => {
+    const match = line.match(/^([^=]+)=(.*)$/);
+    if (match) {
+      process.env[match[1].trim()] = match[2].trim();
+    }
+  });
+} else {
+  console.log('📝 .env file not found - using environment variables from deployment');
+}
 
 const dbAPI = require('../utils/database-api');
 const { SheetAPI } = require('../utils/sheet-api');
