@@ -207,13 +207,13 @@ function evaluateAllMembersSheet(sheet, sheetName) {
     return;
   }
   
-  const headers = sheet.getRange(1, 1, 1, 13).getValues()[0];
+  const headers = sheet.getRange(1, 1, 1, 14).getValues()[0];
   if (!headers[0]) {
     setHeaders(sheet);
   }
   
   const dataStartRow = 2;
-  const lastCol = 13;
+  const lastCol = 14;
   
   if (lastRow < dataStartRow) {
     Logger.log('ℹ️ No member data to evaluate');
@@ -297,91 +297,6 @@ function evaluateAllMembersSheet(sheet, sheetName) {
   highlightSelectedCore(sheet, members, dataStartRow);
   
   Logger.log(`✅ Evaluation complete: ${members.length} members, ${coreCount} selected for Core`);
-}
-  
-  // Parse member data
-  for (let i = 0; i < allData.length; i++) {
-    const row = allData[i];
-    const memberName = (row[EVAL_COLUMNS.MEMBER_NAME - 1] || '').toString().trim();
-    if (!memberName) continue;
-    
-    const startingCP = Number(row[EVAL_COLUMNS.STARTING_CP - 1]) || 0;
-    const endingCP = Number(row[EVAL_COLUMNS.ENDING_CP - 1]) || startingCP;
-    const attendance = Number(row[EVAL_COLUMNS.ATTENDANCE - 1]) || 0;
-    
-    members.push({
-      row: dataStartRow + i,
-      memberName,
-      startingCP,
-      endingCP,
-      attendance,
-      cpGrowth: 0,
-      bracket: '',
-      bracketAvgGrowth: 0,
-      relativeGrowth: 0,
-      cpPoints: 0,
-      attendancePoints: 0,
-      finalScore: 0,
-      coreEligible: 'No',
-      selectedCore: 'No',
-    });
-  }
-  
-  Logger.log(`📊 Processing ${members.length} members`);
-  
-  // Calculate CP Growth and Bracket for each member
-  members.forEach(member => {
-    member.bracket = getBracket(member.startingCP);
-    member.cpGrowth = calculateCPGrowth(member.startingCP, member.endingCP);
-    member.attendancePoints = getAttendancePoints(member.attendance);
-    member.coreEligible = isCoreEligible(member.attendance);
-  });
-  
-  // Calculate bracket averages
-  const bracketAverages = calculateBracketAverages(members);
-  Logger.log(`📊 Bracket Averages: A=${bracketAverages.A}%, B=${bracketAverages.B}%, C=${bracketAverages.C}%`);
-  
-  // Calculate Relative Growth and CP Points for each member
-  members.forEach(member => {
-    member.bracketAvgGrowth = bracketAverages[member.bracket] || 0;
-    member.relativeGrowth = calculateRelativeGrowth(member.cpGrowth, member.bracketAvgGrowth);
-    member.cpPoints = getCPPoints(member.relativeGrowth);
-    member.finalScore = member.attendancePoints + member.cpPoints;
-  });
-  
-  // Sort by Final Score (descending) for Core selection
-  const sortedMembers = [...members].sort((a, b) => b.finalScore - a.finalScore);
-  
-  // Select Top 5 Core members (only those eligible)
-  let coreCount = 0;
-  sortedMembers.forEach(member => {
-    if (member.coreEligible === 'Yes' && coreCount < EVAL_CONFIG.CORE_SIZE) {
-      member.selectedCore = 'Yes';
-      coreCount++;
-    } else {
-      member.selectedCore = 'No';
-    }
-  });
-  
-  // Write all calculated values back to sheet
-  const updates = members.map(member => [
-    member.cpGrowth,                         // E: CP Growth %
-    member.bracket,                          // F: Bracket
-    member.bracketAvgGrowth,                 // G: Bracket Avg Growth %
-    member.relativeGrowth,                   // H: Relative Growth %
-    member.cpPoints,                         // I: CP Points
-    member.attendancePoints,                 // J: Attendance Points
-    member.finalScore,                       // K: Final Score
-    member.coreEligible,                     // L: Core Eligible
-    member.selectedCore,                     // M: Selected Core
-  ]);
-  
-  sheet.getRange(dataStartRow, EVAL_COLUMNS.CP_GROWTH_PCT, members.length, 9).setValues(updates);
-  
-  // Apply highlighting for Selected Core
-  highlightSelectedCore(sheet, members, dataStartRow);
-  
-  Logger.log(`✅ Evaluation complete: ${members.length} members evaluated, ${coreCount} selected for Core`);
 }
 
 /**
