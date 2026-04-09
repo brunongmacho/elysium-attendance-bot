@@ -430,20 +430,6 @@ function highlightSelectedCore(sheet, members, startRow) {
     }
   });
 }
-        .setBackground('#FFD700') // Gold
-        .setFontWeight('bold');
-    } else if (member.coreEligible === 'Yes') {
-      // Eligible but not selected - light gold
-      sheet.getRange(rowNum, 1, 1, EVAL_COLUMNS.SELECTED_CORE)
-        .setBackground('#FFF8DC'); // Cornsilk
-    } else {
-      // Not eligible - white/default
-      sheet.getRange(rowNum, 1, 1, EVAL_COLUMNS.SELECTED_CORE)
-        .setBackground('#FFFFFF')
-        .setFontWeight('normal');
-    }
-  });
-}
 
 /**
  * Get the evaluation sheet (by ID if set, otherwise active)
