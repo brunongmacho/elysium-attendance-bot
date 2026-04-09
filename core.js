@@ -63,17 +63,18 @@ const EVAL_COLUMNS = {
   MEMBER_NAME: 1,
   STARTING_CP: 2,
   ENDING_CP: 3,
-  ATTENDANCE: 4,
-  CP_GROWTH_PCT: 5,
-  BRACKET: 6,
-  BRACKET_AVG_GROWTH: 7,
-  RELATIVE_GROWTH: 8,
-  CP_POINTS: 9,
-  ATTENDANCE_POINTS: 10,
-  FINAL_SCORE: 11,
-  CORE_ELIGIBLE: 12,
-  SELECTED_CORE: 13,
-  SCREENSHOT: 14,
+  CP_GROWTH_RAW: 4,
+  ATTENDANCE: 5,
+  CP_GROWTH_PCT: 6,
+  BRACKET: 7,
+  BRACKET_AVG_GROWTH: 8,
+  RELATIVE_GROWTH: 9,
+  CP_POINTS: 10,
+  ATTENDANCE_POINTS: 11,
+  FINAL_SCORE: 12,
+  CORE_ELIGIBLE: 13,
+  SELECTED_CORE: 14,
+  SCREENSHOT: 15,
 };
 
 /**
@@ -247,7 +248,7 @@ function evaluateAllMembersSheet(sheet, sheetName) {
   }
   
   const dataStartRow = 2;
-  const lastCol = 14;
+  const lastCol = 15;
   
   if (lastRow < dataStartRow) {
     Logger.log('ℹ️ No member data to evaluate');
@@ -267,12 +268,12 @@ function evaluateAllMembersSheet(sheet, sheetName) {
       continue;
     }
     
-    Logger.log(`📝 Row ${dataStartRow + i}: ${memberName} - Starting: ${row[1]}, Ending: ${row[2]}, Attendance: ${row[3]}`);
+    Logger.log(`📝 Row ${dataStartRow + i}: ${memberName} - Starting: ${row[1]}, Ending: ${row[2]}, Attendance: ${row[4]}`);
     
     const startingCP = parseFloat(String(row[1]).replace(/,/g, '')) || 0;
     const endingCPInput = row[2];
     const endingCP = endingCPInput ? parseFloat(String(endingCPInput).replace(/,/g, '')) : startingCP;
-    const attendance = parseInt(String(row[3])) || 0;
+    const attendance = parseInt(String(row[4])) || 0;
     
     members.push({
       row: dataStartRow + i,
@@ -322,19 +323,23 @@ function evaluateAllMembersSheet(sheet, sheetName) {
     }
   });
   
+  // Calculate CP Growth (raw - difference)
   const updates = members.map(member => [
-    member.cpGrowth,
-    member.bracket,
-    member.bracketAvgGrowth,
-    member.relativeGrowth,
-    member.cpPoints,
-    member.attendancePoints,
-    member.finalScore,
-    member.coreEligible,
-    member.selectedCore,
+    member.endingCP - member.startingCP,    // D: CP Growth (raw)
+    member.cpGrowth,                         // F: CP Growth %
+    member.bracket,                          // G: Bracket
+    member.bracketAvgGrowth,                 // H: Bracket Avg Growth %
+    member.relativeGrowth,                   // I: Relative Growth %
+    member.cpPoints,                         // J: CP Points
+    member.attendancePoints,                // K: Attendance Points
+    member.finalScore,                       // L: Final Score
+    member.coreEligible,                     // M: Core Eligible
+    member.selectedCore,                     // N: Selected Core
   ]);
   
-  sheet.getRange(dataStartRow, 5, members.length, 9).setValues(updates);
+  // Write calculated values - columns D (CP Growth raw) through N (Selected Core)
+  // Starting at column 4, write 11 columns
+  sheet.getRange(dataStartRow, 4, members.length, 11).setValues(updates);
   
   highlightSelectedCore(sheet, members, dataStartRow);
   
@@ -349,6 +354,7 @@ function setHeaders(sheet) {
     'Member Name (Discord Nickname)',
     'Starting CP',
     'Ending CP',
+    'CP Growth',
     'Attendance',
     'CP Growth %',
     'Bracket',
@@ -372,6 +378,7 @@ function setHeaders(sheet) {
   sheet.setColumnWidth(EVAL_COLUMNS.MEMBER_NAME, 150);
   sheet.setColumnWidth(EVAL_COLUMNS.STARTING_CP, 100);
   sheet.setColumnWidth(EVAL_COLUMNS.ENDING_CP, 100);
+  sheet.setColumnWidth(EVAL_COLUMNS.CP_GROWTH_RAW, 100);
   sheet.setColumnWidth(EVAL_COLUMNS.ATTENDANCE, 100);
   sheet.setColumnWidth(EVAL_COLUMNS.CP_GROWTH_PCT, 100);
   sheet.setColumnWidth(EVAL_COLUMNS.BRACKET, 80);
@@ -389,14 +396,40 @@ function setHeaders(sheet) {
 
 /**
  * Highlight Selected Core members with conditional formatting
+ * Different colors for Top 5 rankings
  */
 function highlightSelectedCore(sheet, members, startRow) {
+  const goldColors = {
+    '1': '#FFD700', // Gold
+    '2': '#C0C0C0', // Silver
+    '3': '#CD7F32', // Bronze
+    '4': '#E8E8E8', // Light gray
+    '5': '#E8E8E8', // Light gray
+  };
+  
   members.forEach((member, index) => {
     const rowNum = startRow + index;
+    const ranking = member.selectedCore;
     
-    if (member.selectedCore === 'Yes') {
-      // Highlight entire row in gold
-      sheet.getRange(rowNum, 1, 1, EVAL_COLUMNS.SELECTED_CORE)
+    if (ranking && ranking.match(/^[1-5]$/)) {
+      // Top 5 - different color based on ranking
+      const color = goldColors[ranking] || '#FFD700';
+      sheet.getRange(rowNum, 1, 1, 15)
+        .setBackground(color)
+        .setFontWeight('bold');
+    } else if (member.coreEligible === 'Yes') {
+      // Eligible but not selected - light gold
+      sheet.getRange(rowNum, 1, 1, 15)
+        .setBackground('#FFF8DC')
+        .setFontWeight('normal');
+    } else {
+      // Not eligible - white/default
+      sheet.getRange(rowNum, 1, 1, 15)
+        .setBackground('#FFFFFF')
+        .setFontWeight('normal');
+    }
+  });
+}
         .setBackground('#FFD700') // Gold
         .setFontWeight('bold');
     } else if (member.coreEligible === 'Yes') {
@@ -446,7 +479,7 @@ function onEdit(e) {
   if (row === 1) return;
   
   // Only recalculate if relevant columns were edited
-  // B: Starting CP, C: Ending CP, D: Attendance
+  // B: Starting CP, C: Ending CP, E: Attendance
   const relevantColumns = [EVAL_COLUMNS.STARTING_CP, EVAL_COLUMNS.ENDING_CP, EVAL_COLUMNS.ATTENDANCE];
   
   if (!relevantColumns.includes(col)) {
