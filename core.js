@@ -311,21 +311,39 @@ function evaluateAllMembersSheet(sheet, sheetName) {
     member.finalScore = member.attendancePoints + member.cpPoints;
   });
   
-  const sortedMembers = [...members].sort((a, b) => b.finalScore - a.finalScore);
+  // Calculate rankings without sorting the data rows
+  // Sort by: Final Score → Attendance Points → CP Points → CP Growth %
+  const rankedMembers = [...members].sort((a, b) => {
+    if (b.finalScore !== a.finalScore) return b.finalScore - a.finalScore;
+    if (b.attendancePoints !== a.attendancePoints) return b.attendancePoints - a.attendancePoints;
+    if (b.cpPoints !== a.cpPoints) return b.cpPoints - a.cpPoints;
+    return b.cpGrowth - a.cpGrowth;
+  });
   
   let coreCount = 0;
-  sortedMembers.forEach((member, index) => {
+  rankedMembers.forEach((member, index) => {
     if (member.coreEligible === 'Yes' && coreCount < EVAL_CONFIG.CORE_SIZE) {
-      member.selectedCore = `${index + 1}`; // Ranking: 1, 2, 3, 4, 5
+      member.selectedCore = `${index + 1}`;
       coreCount++;
     } else {
       member.selectedCore = '';
     }
   });
-  
-  // Calculate CP Growth (raw - difference)
+
+  // Map selectedCore back to original members array
+  const memberRankMap = {};
+  rankedMembers.forEach((member, index) => {
+    if (member.selectedCore) {
+      memberRankMap[member.memberName] = member.selectedCore;
+    }
+  });
+
   const updates = members.map(member => [
+    member.memberName,                       // A: Member Name
+    member.startingCP,                       // B: Starting CP
+    member.endingCP,                         // C: Ending CP
     member.endingCP - member.startingCP,    // D: CP Growth (raw)
+    member.attendance,                       // E: Attendance
     member.cpGrowth,                         // F: CP Growth %
     member.bracket,                          // G: Bracket
     member.bracketAvgGrowth,                 // H: Bracket Avg Growth %
@@ -334,15 +352,20 @@ function evaluateAllMembersSheet(sheet, sheetName) {
     member.attendancePoints,                // K: Attendance Points
     member.finalScore,                       // L: Final Score
     member.coreEligible,                     // M: Core Eligible
-    member.selectedCore,                     // N: Selected Core
+    memberRankMap[member.memberName] || '', // N: Selected Core
+    member.screenshot,                       // O: Screenshot
   ]);
-  
-  // Write calculated values - columns D (CP Growth raw) through N (Selected Core)
-  // Starting at column 4, write 11 columns
-  sheet.getRange(dataStartRow, 4, members.length, 11).setValues(updates);
-  
-  highlightSelectedCore(sheet, members, dataStartRow);
-  
+
+  // Write all columns A through O (keep original row order)
+  sheet.getRange(dataStartRow, 1, members.length, 15).setValues(updates);
+
+  // Highlight based on ranking
+  const rankedForHighlight = members.map(m => ({
+    ...m,
+    selectedCore: memberRankMap[m.memberName] || ''
+  }));
+  highlightSelectedCore(sheet, rankedForHighlight, dataStartRow);
+
   Logger.log(`✅ Evaluation complete: ${members.length} members, ${coreCount} selected for Core`);
 }
 

@@ -215,12 +215,19 @@ async function checkAndCreateWeeklyThread(client) {
       `3. Screenshot must show the CP matching your command\n` +
       `   (from Guild Member List in-game)\n` +
       `4. You may use ANY class/ability - post your highest attained CP\n\n` +
+      `**How it works:**\n` +
+      `• 2-week evaluation cycles\n` +
+      `• Current CP → Ending CP (after 2 weeks)\n` +
+      `• Top 5 Core members selected by Final Score\n` +
+      `• Final Score = CP Points + Attendance Points\n\n` +
       `**Note:** If you submitted before, your latest entry will replace the old one.`
     )
     .addFields(
       { name: '⏰ Thread closes', value: 'Monday 11:59 PM', inline: true },
       { name: '📅 Next evaluation', value: 'In 2 weeks', inline: true },
-      { name: '📸 Required Screenshot', value: 'See attachment below', inline: false }
+      { name: '📸 Required Screenshot', value: 'Must show CP from Guild Member List', inline: false },
+      { name: '💰 CP Points', value: 'Based on Relative Growth % vs bracket average', inline: true },
+      { name: '⭐ Attendance Points', value: '8/8 = 70pts, 7/8 = 60pts, etc.', inline: true }
     )
     .setTimestamp();
 
@@ -228,17 +235,17 @@ async function checkAndCreateWeeklyThread(client) {
     if (SAMPLE_SCREENSHOT_EXISTS) {
       embed.setThumbnail('attachment://samplecp.png');
       await thread.send({ 
-        content: '@everyone',
+        content: `<@&${config.elysium_role_id}>`,
         embeds: [embed], 
         files: [{ attachment: SAMPLE_SCREENSHOT_PATH, name: 'samplecp.png' }] 
       });
     } else {
       console.warn('⚠️ Sample screenshot not found at:', SAMPLE_SCREENSHOT_PATH);
-      await thread.send({ content: '@everyone', embeds: [embed] });
+      await thread.send({ content: `<@&${config.elysium_role_id}>`, embeds: [embed] });
     }
   } catch (err) {
     console.error('❌ Failed to send evaluation thread message:', err.message);
-    await thread.send({ content: '@everyone', embeds: [embed] });
+    await thread.send({ content: `<@&${config.elysium_role_id}>`, embeds: [embed] });
   }
   
   console.log(`✅ Created Core Evaluation thread: ${threadName} (ID: ${thread.id})`);
@@ -445,13 +452,11 @@ function scheduleEvaluationReminder(client) {
     const hour = now.getHours();
     const minutes = now.getMinutes();
     
-    // Monday 12:00 AM - Create new thread
-    if (dayOfWeek === 1 && hour === 0 && minutes < 5) {
-      await checkAndCreateWeeklyThread(client);
-    }
-    
-    // Sunday 11:50 PM - Reminder 10 minutes before thread creation
+    // Sunday 11:50 PM - Create thread AND send reminder
     if (dayOfWeek === 0 && hour === 23 && minutes >= 50 && minutes <= 59) {
+      // Create thread first so it's ready for the reminder
+      await checkAndCreateWeeklyThread(client);
+      
       const channelId = config.bot_manual_channel_id;
       const channel = await client.channels.fetch(channelId);
       
@@ -464,8 +469,8 @@ function scheduleEvaluationReminder(client) {
           } catch (e) {}
         }
         
-        // Get existing thread from current cycle
-        let threadLink = 'Thread will be created in 10 minutes';
+        // Get thread link (now it exists!)
+        let threadLink = 'Thread is now open!';
         if (currentCycle && currentCycle.threadId) {
           const threadUrl = `https://discord.com/channels/${config.main_guild_id}/${channelId}/${currentCycle.threadId}`;
           threadLink = `[Click here to go to the thread](${threadUrl})`;
@@ -473,18 +478,23 @@ function scheduleEvaluationReminder(client) {
         
         const embed = new EmbedBuilder()
           .setColor(0x4A90E2)
-          .setTitle('🔔 Core Evaluation Starting Soon!')
+          .setTitle('🔔 Core Evaluation Thread Open!')
           .setDescription(
-            `**Core Evaluation thread will open in 10 minutes!**\n\n` +
+            `**Core Evaluation thread is now open!**\n\n` +
             `**Thread:** ${threadLink}\n\n` +
-            `Prepare your screenshot showing your CP from Guild Member List.\n` +
-            `Use \`!CP <number>\` with your screenshot when the thread opens.`
+            `Post your screenshot showing your CP from Guild Member List.\n` +
+            `Use \`!CP <number>\` with your screenshot.`
           )
           .setTimestamp();
         
-        const sentMsg = await channel.send({ content: '@everyone', embeds: [embed] });
+        const sentMsg = await channel.send({ content: `<@&${config.elysium_role_id}>`, embeds: [embed] });
         reminderMessageId = sentMsg.id;
       }
+    }
+    
+    // Monday 12:00 AM - Fallback: create thread if somehow it wasn't created
+    if (dayOfWeek === 1 && hour === 0 && minutes < 5) {
+      await checkAndCreateWeeklyThread(client);
     }
     
     // Tuesday 12:00 AM - Send evaluation report (after Monday thread closes)
@@ -592,7 +602,7 @@ async function sendEvaluationReport(client) {
       )
       .setTimestamp();
     
-    await channel.send({ content: '@everyone', embeds: [embed] });
+    await channel.send({ content: '<@&${config.elysium_role_id}>', embeds: [embed] });
     console.log(`📊 Evaluation report sent: ${submissions.length} submissions`);
     
   } catch (error) {
