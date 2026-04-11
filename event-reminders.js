@@ -585,7 +585,7 @@ async function sendGuildWarQueueReminder() {
     }
 
     const guild = await client.guilds.fetch(config.main_guild_id);
-    const guildLeaderRole = guild.roles.cache.find(role => role.name === 'GUILD LEADER');
+    const guildLeaderRole = guild.roles.cache.get(config.guild_leader_role_id);
 
     if (!guildLeaderRole) {
       console.error(`❌ [QUEUE REMINDER] Guild Leader role not found`);
