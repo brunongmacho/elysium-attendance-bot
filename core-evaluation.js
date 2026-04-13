@@ -358,6 +358,7 @@ async function handleCPCommand(message, cpNumber, discordNickname) {
   }
   
   const hasAttachment = message.attachments.size > 0;
+  console.log(`📸 Attachment check: ${hasAttachment}, count: ${message.attachments.size}`);
   if (!hasAttachment) {
     await message.reply('❌ Please attach a screenshot showing your CP and character name.');
     return { success: false, error: 'No screenshot' };
