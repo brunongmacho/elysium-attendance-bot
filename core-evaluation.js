@@ -111,7 +111,7 @@ async function loadStateFromMongoDB() {
 }
 
 async function saveStateToMongoDB() {
-  if (!dbAPI.isConnected()) return;
+  if (!dbAPI.connected) return;
   
   try {
     await dbAPI.collection(STATE_COLLECTION).updateOne(
@@ -366,7 +366,7 @@ async function handleCPCommand(message, cpNumber, discordNickname) {
   const { phase, cycleNumber } = determinePhase();
   
   try {
-    if (dbAPI.isConnected()) {
+    if (dbAPI.connected) {
       const previousCycle = await dbAPI.collection(EVAL_COLLECTION)
         .find({ discordId: message.author.id })
         .sort({ cycleNumber: -1 })
@@ -398,7 +398,7 @@ async function handleCPCommand(message, cpNumber, discordNickname) {
   };
   
   try {
-    if (dbAPI.isConnected()) {
+    if (dbAPI.connected) {
       await dbAPI.collection(EVAL_COLLECTION).deleteMany({
         discordId: message.author.id,
         phase,
