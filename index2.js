@@ -6569,10 +6569,32 @@ client.on(Events.MessageCreate, async (message) => {
       const memberCmd = resolveCommandAlias(rawCmd);
       const args = message.content.trim().split(/\s+/).slice(1);
 
-      // Check if this is a member command
-      const isMemberCommand = ["!eightball", "!slap", "!stats"].includes(memberCmd);
-
-      if (isMemberCommand) {
+      // !CP command - Core Evaluation CP submission (outside isMemberCommand check)
+        if (memberCmd === "!cp" || rawCmd.startsWith("!cp ") || rawCmd.startsWith("!cp") || rawCmd.startsWith("!CP")) {
+          const content = message.content.trim();
+          const cpMatch = content.match(/^!CP\s+([\d,]+)$/i) || content.match(/^!cp\s+([\d,]+)$/i);
+          
+          if (!cpMatch) {
+            await message.reply(
+              `❌ Invalid format. Use: \`!CP <number>\`\n` +
+              `Example: \`!CP 90,492\` or \`!CP 90492\`\n` +
+              `Attach a screenshot showing your CP.`
+            );
+            return;
+          }
+          
+          const cpNumber = parseInt(cpMatch[1].replace(/,/g, ''));
+          const discordNickname = member.nickname || message.author.username;
+          
+          console.log(`📊 CP submission: ${discordNickname} - ${cpNumber}`);
+          
+          const result = await coreEvaluation.handleCPCommand(message, cpNumber, discordNickname);
+          return;
+        }
+      }
+    }
+    
+    // Admin-only commands in admin logs
         // If invoked in guild chat, redirect to BOT-COMMANDS (for both admins and members)
         if (inElysiumCommandsChannel && !inBotCommandsChannel) {
           // Send redirect message in guild chat that auto-deletes after 30 seconds
