@@ -4296,6 +4296,21 @@ const commandHandlers = {
     await emergencyCommands.handleEmergencyCommand(message, ['sync']);
   },
 
+  /**
+   * Force run Core Evaluation immediately
+   * Usage: !forcecore | !fcore
+   */
+  forcecore: async (message, member) => {
+    if (!isAdmin(member)) {
+      await message.reply('❌ Admin-only command.');
+      return;
+    }
+    
+    await message.reply('🔧 Running Core Evaluation now...');
+    await coreEvaluation.forceEvaluationNow(client);
+    await message.reply('✅ Core Evaluation complete!');
+  },
+
 
   /**
    * Boss rotation management commands
@@ -6611,6 +6626,8 @@ client.on(Events.MessageCreate, async (message) => {
           "!submittallyfromsheet", // Submit tallies from BiddingItems sheet (crash recovery)
           "!resetsession", // Reset stuck sessionFinalized flag
           "!forcesync",
+          "!forcecore",
+          "!fcore",
           "!testmilestones",
         ].includes(adminCmd)
       ) {
@@ -6657,6 +6674,8 @@ client.on(Events.MessageCreate, async (message) => {
           await commandHandlers.diagnostics(message, member);
         else if (adminCmd === "!forcesync")
           await commandHandlers.forcesync(message, member);
+        else if (adminCmd === "!forcecore" || adminCmd === "!fcore")
+          await commandHandlers.forcecore(message, member);
         else if (adminCmd === "!testmilestones")
           await commandHandlers.testmilestones(message, member);
         else if (adminCmd === "!submittallyfromsheet" || adminCmd === "!resetsession")
@@ -7799,7 +7818,8 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
       };
 
       // Check if the new joiner is AlterFrieren and Rohypnol is already in the same channel
-      if (userId === ALTERFRIEREN_ID) {
+      const joiningUserId = member.id;
+      if (joiningUserId === ALTERFRIEREN_ID) {
         // Find if Rohypnol is in THIS channel via voice states
         let rohypnolInThisChannel = false;
         console.log(`🎤 Rohypnol in this channel? ${rohypnolInThisChannel}`);

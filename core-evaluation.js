@@ -47,6 +47,7 @@ let activeThread = null;
 let currentCycle = null;
 let lastStateSync = 0;
 let reminderMessageId = null;
+let lastReminderSentDate = null; // Prevent multiple reminders in same window
 let lastCPSubmissionTime = 0;
 let syncTimeout = null;
 
@@ -64,7 +65,7 @@ async function initialize(cfg) {
 
 async function loadStateFromMongoDB() {
   try {
-    if (!dbAPI.isConnected()) {
+    if (!dbAPI.connected) {
       console.log('⚠️ MongoDB not connected, skipping state load');
       return;
     }
@@ -149,6 +150,97 @@ function determinePhase() {
   const phase = twoWeekPeriods % 2 === 0 ? EVAL_PHASE.STARTING_CP : EVAL_PHASE.ENDING_CP;
   
   return { phase, cycleNumber: newCycleNumber };
+}
+
+async function createEvaluationThreadNow(client) {
+  const now = new Date();
+  const { phase, cycleNumber } = determinePhase();
+  
+  if (currentCycle && 
+      currentCycle.phase === phase && 
+      currentCycle.cycleNumber === cycleNumber && 
+      currentCycle.threadId) {
+    console.log('📋 Core Evaluation thread already exists for this phase');
+    return currentCycle.threadId;
+  }
+  
+  const channelId = config.bot_manual_channel_id;
+  const channel = await client.channels.fetch(channelId);
+  
+  if (!channel) {
+    console.error('❌ Core Evaluation channel not found');
+    return null;
+  }
+  
+  const dateStr = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+  const threadName = `CORE EVALUATION (CURRENT CP) - ${dateStr}`;
+  
+  const thread = await channel.threads.create({
+    name: threadName,
+    autoArchiveDuration: 60 * 24 * 7,
+    reason: `Core Evaluation ${phase} thread`,
+  });
+  
+  currentCycle = {
+    phase,
+    cycleNumber,
+    threadId: thread.id,
+    startDate: currentCycle?.startDate || now.toISOString(),
+    lastUpdated: now.toISOString(),
+  };
+  
+  await saveStateToMongoDB();
+  
+  const phaseText = '📊 **CURRENT CP Phase** - Submit your current CP';
+  
+  const embed = new EmbedBuilder()
+    .setColor(0x4A90E2)
+    .setTitle(`🎯 Core Evaluation Thread Created`)
+    .setDescription(
+      `${phaseText}\n\n` +
+      `**Cycle:** ${cycleNumber}\n\n` +
+      `**Instructions:**\n` +
+      `1. Post \`!CP <NUMBER>\` with your screenshot\n` +
+      `2. Example: \`!CP 90,492\` or \`!CP 90492\`\n` +
+      `3. Screenshot must show the CP matching your command\n` +
+      `   (from Guild Member List in-game)\n` +
+      `4. You may use ANY class/ability - post your highest attained CP\n\n` +
+      `**How it works:**\n` +
+      `• 2-week evaluation cycles\n` +
+      `• Current CP → Ending CP (after 2 weeks)\n` +
+      `• Top 5 Core members selected by Final Score\n` +
+      `• Final Score = CP Points + Attendance Points\n\n` +
+      `**Note:** If you submitted before, your latest entry will replace the old one.`
+    )
+    .addFields(
+      { name: '⏰ Thread closes', value: 'Monday 11:59 PM', inline: true },
+      { name: '📅 Next evaluation', value: 'In 2 weeks', inline: true },
+      { name: '📸 Required Screenshot', value: 'Must show CP from Guild Member List', inline: false },
+      { name: '💰 CP Points', value: 'Based on Relative Growth % vs bracket average', inline: true },
+      { name: '⭐ Attendance Points', value: '8/8 = 70pts, 7/8 = 60pts, etc.', inline: true }
+    )
+    .setTimestamp();
+
+  try {
+    if (SAMPLE_SCREENSHOT_EXISTS) {
+      embed.setThumbnail('attachment://samplecp.png');
+      await thread.send({ 
+        content: `<@&${config.elysium_role_id}>`,
+        embeds: [embed], 
+        files: [{ attachment: SAMPLE_SCREENSHOT_PATH, name: 'samplecp.png' }] 
+      });
+    } else {
+      console.warn('⚠️ Sample screenshot not found at:', SAMPLE_SCREENSHOT_PATH);
+      await thread.send({ content: `<@&${config.elysium_role_id}>`, embeds: [embed] });
+    }
+  } catch (err) {
+    console.error('❌ Failed to send evaluation thread message:', err.message);
+    await thread.send({ content: `<@&${config.elysium_role_id}>`, embeds: [embed] });
+  }
+  
+  console.log(`✅ Created Core Evaluation thread: ${threadName} (ID: ${thread.id})`);
+  
+  return thread.id;
 }
 
 async function checkAndCreateWeeklyThread(client) {
@@ -360,7 +452,7 @@ function scheduleIdleSync() {
 }
 
 async function getAllSubmissions(phase, cycleNumber) {
-  if (!dbAPI.isConnected()) {
+  if (!dbAPI.connected) {
     return [];
   }
   
@@ -454,11 +546,19 @@ function scheduleEvaluationReminder(client) {
     
     // Sunday 11:50 PM - Create thread AND send reminder
     if (dayOfWeek === 0 && hour === 23 && minutes >= 50 && minutes <= 59) {
-      // Create thread first so it's ready for the reminder
-      await checkAndCreateWeeklyThread(client);
+      // Only send once per Sunday (check date to avoid repeats)
+      const todayStr = now.toDateString();
+      if (lastReminderSentDate === todayStr) {
+        return; // Already sent reminder today
+      }
+      lastReminderSentDate = todayStr;
       
-      const channelId = config.bot_manual_channel_id;
-      const channel = await client.channels.fetch(channelId);
+      // Create thread first so it's ready for the reminder
+      await createEvaluationThreadNow(client);
+      
+      // Send reminder to separate channel
+      const reminderChannelId = config.elysium_commands_channel_id;
+      const channel = await client.channels.fetch(reminderChannelId);
       
       if (channel) {
         // Delete old reminder first
@@ -472,7 +572,7 @@ function scheduleEvaluationReminder(client) {
         // Get thread link (now it exists!)
         let threadLink = 'Thread is now open!';
         if (currentCycle && currentCycle.threadId) {
-          const threadUrl = `https://discord.com/channels/${config.main_guild_id}/${channelId}/${currentCycle.threadId}`;
+          const threadUrl = `https://discord.com/channels/${config.main_guild_id}/${config.bot_manual_channel_id}/${currentCycle.threadId}`;
           threadLink = `[Click here to go to the thread](${threadUrl})`;
         }
         
@@ -610,6 +710,39 @@ async function sendEvaluationReport(client) {
   }
 }
 
+async function forceEvaluationNow(client) {
+  console.log('🔧 Force running Core Evaluation...');
+  
+  // Create thread
+  await createEvaluationThreadNow(client);
+  
+  // Send reminder
+  const reminderChannelId = config.elysium_commands_channel_id;
+  const channel = await client.channels.fetch(reminderChannelId);
+  
+  if (channel) {
+    let threadLink = 'Thread is now open!';
+    if (currentCycle && currentCycle.threadId) {
+      const threadUrl = `https://discord.com/channels/${config.main_guild_id}/${config.bot_manual_channel_id}/${currentCycle.threadId}`;
+      threadLink = `[Click here to go to the thread](${threadUrl})`;
+    }
+    
+    const embed = new EmbedBuilder()
+      .setColor(0x4A90E2)
+      .setTitle('🔔 Core Evaluation Thread Open!')
+      .setDescription(
+        `**Core Evaluation thread is now open!**\n\n` +
+        `**Thread:** ${threadLink}\n\n` +
+        `Post your screenshot showing your CP from Guild Member List.\n` +
+        `Use \`!CP <number>\` with your screenshot.`
+      )
+      .setTimestamp();
+    
+    await channel.send({ content: `<@&${config.elysium_role_id}>`, embeds: [embed] });
+    console.log('✅ Force evaluation complete');
+  }
+}
+
 module.exports = {
   initialize,
   handleCPCommand,
@@ -623,6 +756,7 @@ module.exports = {
   getCurrentPhase,
   getCurrentCycleNumber,
   getCurrentThreadId,
+  forceEvaluationNow,
   EVAL_PHASE,
   EVAL_COLLECTION,
 };
