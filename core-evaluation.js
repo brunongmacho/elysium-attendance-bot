@@ -369,16 +369,20 @@ async function handleCPCommand(message, cpNumber, discordNickname) {
   try {
     if (dbAPI.connected) {
       const previousCycle = await dbAPI.collection(EVAL_COLLECTION)
-        .find({ discordId: message.author.id })
-        .sort({ cycleNumber: -1 })
+        .find({ 
+          discordId: message.author.id,
+          phase: phase,
+          cycleNumber: cycleNumber
+        })
+        .sort({ submittedAt: -1 })
         .limit(1)
         .toArray();
       
       if (previousCycle.length > 0) {
         const prevCP = previousCycle[0].cp;
         if (cpNumber < prevCP) {
-          await message.reply(`❌ Your CP cannot be lower than your previous submission.\n\nPrevious CP: ${prevCP.toLocaleString()}\nNew CP: ${cpNumber.toLocaleString()}`);
-          return { success: false, error: 'CP lower than previous' };
+          await message.reply(`❌ Your CP cannot be lower than your current cycle submission.\n\nCurrent Cycle CP: ${prevCP.toLocaleString()}\nNew CP: ${cpNumber.toLocaleString()}`);
+          return { success: false, error: 'CP lower than current cycle' };
         }
       }
     }
