@@ -6553,6 +6553,9 @@ client.on(Events.MessageCreate, async (message) => {
     // MEMBER COMMANDS IN BOT-COMMANDS CHANNEL
     // =========================================================================
     // Define bot commands channel
+    console.log(`📊 Channel check - msg.channel.id: ${message.channel.id}, isThread: ${message.channel.isThread()}, parentId: ${message.channel.isThread() ? message.channel.parentId : 'N/A'}`);
+    console.log(`📊 Config - bot_manual: ${config.bot_manual_channel_id}, core_eval: ${config.core_evaluation_commands_channel}`);
+    
     const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
       (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id) ||
       // Also allow Core Evaluation commands in its thread or parent channel
