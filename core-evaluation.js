@@ -408,12 +408,6 @@ async function handleCPCommand(message, cpNumber, discordNickname) {
       await dbAPI.collection(EVAL_COLLECTION).insertOne(memberData);
     }
     
-    await message.reply(`✅ **CP Recorded!**\n\n` +
-      `**Member:** ${discordNickname}\n` +
-      `**CP:** ${cpNumber.toLocaleString()}\n` +
-      `**Cycle:** ${cycleNumber}`
-    );
-    
     console.log(`📊 CP submitted: ${discordNickname} - ${cpNumber} (${phase})`);
     
     // Schedule sync after 5 minutes of idle (collect submissions in bulk)
