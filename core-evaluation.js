@@ -164,7 +164,7 @@ async function createEvaluationThreadNow(client) {
     return currentCycle.threadId;
   }
   
-  const channelId = config.bot_manual_channel_id;
+  const channelId = config.timer_channel_id || config.bot_manual_channel_id;
   const channel = await client.channels.fetch(channelId);
   
   if (!channel) {
@@ -266,7 +266,7 @@ async function checkAndCreateWeeklyThread(client) {
     return currentCycle.threadId;
   }
   
-  const channelId = config.bot_manual_channel_id;
+  const channelId = config.timer_channel_id || config.bot_manual_channel_id;
   const channel = await client.channels.fetch(channelId);
   
   if (!channel) {
@@ -350,7 +350,7 @@ async function handleCPCommand(message, cpNumber, discordNickname) {
     return { success: false, error: 'Not in thread' };
   }
   
-  const channelId = config.bot_manual_channel_id;
+  const channelId = config.timer_channel_id || config.bot_manual_channel_id;
   if (message.channel.parentId !== channelId) {
     await message.reply('❌ This command only works in the Core Evaluation thread.');
     return { success: false, error: 'Wrong channel' };
@@ -463,7 +463,7 @@ async function getAllSubmissions(phase, cycleNumber) {
 }
 
 async function sendEvaluationSummary(client) {
-  const channelId = config.bot_manual_channel_id;
+  const channelId = config.timer_channel_id || config.bot_manual_channel_id;
   const channel = await client.channels.fetch(channelId);
   
   if (!channel) return;
@@ -612,7 +612,7 @@ async function sendEvaluationReport(client) {
     // First, close and lock the current thread
     if (currentCycle && currentCycle.threadId) {
       try {
-        const channelId = config.bot_manual_channel_id;
+        const channelId = config.timer_channel_id || config.bot_manual_channel_id;
         const channel = await client.channels.fetch(channelId);
         if (channel) {
           const thread = await channel.threads.fetch(currentCycle.threadId);
@@ -630,7 +630,7 @@ async function sendEvaluationReport(client) {
     // Delete previous reminder if exists
     if (reminderMessageId) {
       try {
-        const channelId = config.bot_manual_channel_id;
+        const channelId = config.timer_channel_id || config.bot_manual_channel_id;
         const channel = await client.channels.fetch(channelId);
         if (channel) {
           const message = await channel.messages.fetch(reminderMessageId).catch(() => null);
@@ -645,7 +645,7 @@ async function sendEvaluationReport(client) {
       reminderMessageId = null;
     }
     
-    const channelId = config.bot_manual_channel_id;
+    const channelId = config.timer_channel_id || config.bot_manual_channel_id;
     const channel = await client.channels.fetch(channelId);
     if (!channel) return;
     
@@ -756,7 +756,7 @@ async function forceCloseCycle(client) {
   console.log('🔒 Force closing Core Evaluation cycle...');
   
   if (currentCycle && currentCycle.threadId) {
-    const channelId = config.bot_manual_channel_id;
+    const channelId = config.timer_channel_id || config.bot_manual_channel_id;
     const channel = await client.channels.fetch(channelId);
     
     if (channel) {

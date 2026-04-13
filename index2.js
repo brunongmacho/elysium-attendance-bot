@@ -6558,11 +6558,14 @@ client.on(Events.MessageCreate, async (message) => {
     
     const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
       (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id) ||
-      // Also allow Core Evaluation commands in its thread or parent channel
+      // Also allow Core Evaluation commands - check thread ID or parent channel
       message.channel.id === config.core_evaluation_commands_channel ||
       (message.channel.isThread() && 
         (message.channel.id === config.core_evaluation_commands_channel || 
-         message.channel.parentId === config.core_evaluation_commands_channel));
+         message.channel.parentId === config.core_evaluation_commands_channel ||
+         // Also allow from timer channel threads (where core eval thread is created)
+         message.channel.parentId === config.timer_channel_id ||
+         message.channel.parentId === config.admin_logs_channel_id));
 
     // Fun commands available to all members in BOT-COMMANDS channel
     if (inBotCommandsChannel || inElysiumCommandsChannel) {
