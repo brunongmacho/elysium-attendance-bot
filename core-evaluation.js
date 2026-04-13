@@ -453,7 +453,7 @@ function scheduleIdleSync() {
     }
   }, IDLE_SYNC_DELAY_MS);
   
-  console.log(`⏳ Sync scheduled in ${IDLE_SYNC_DELAY_MS / 1000} minutes`);
+  console.log(`⏳ Sync scheduled in ${IDLE_SYNC_DELAY_MS / 1000} seconds`);
 }
 
 async function getAllSubmissions(phase, cycleNumber) {
