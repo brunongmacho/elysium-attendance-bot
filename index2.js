@@ -6555,9 +6555,11 @@ client.on(Events.MessageCreate, async (message) => {
     // Define bot commands channel
     const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
       (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id) ||
-      // Also allow Core Evaluation commands in its channel
+      // Also allow Core Evaluation commands in its thread or parent channel
       message.channel.id === config.core_evaluation_commands_channel ||
-      (message.channel.isThread() && message.channel.parentId === config.core_evaluation_commands_channel);
+      (message.channel.isThread() && 
+        (message.channel.id === config.core_evaluation_commands_channel || 
+         message.channel.parentId === config.core_evaluation_commands_channel));
 
     // Fun commands available to all members in BOT-COMMANDS channel
     if (inBotCommandsChannel || inElysiumCommandsChannel) {
@@ -6610,9 +6612,12 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         // !CP command - Core Evaluation CP submission
-        if (memberCmd === "!cp" || rawCmd.startsWith("!cp ") || rawCmd.startsWith("!CP ")) {
+        console.log(`📊 Checking !CP command - memberCmd: ${memberCmd}, rawCmd: ${rawCmd}, inBotCommandsChannel: ${inBotCommandsChannel}, inElysiumCommandsChannel: ${inElysiumCommandsChannel}`);
+        if (memberCmd === "!cp" || rawCmd.startsWith("!cp ") || rawCmd.startsWith("!cp") || rawCmd.startsWith("!CP")) {
           const content = message.content.trim();
+          console.log(`📊 Content: ${content}`);
           const cpMatch = content.match(/^!CP\s+([\d,]+)$/i) || content.match(/^!cp\s+([\d,]+)$/i);
+          console.log(`📊 cpMatch: ${cpMatch}`);
           
           if (!cpMatch) {
             await message.reply(
@@ -6629,6 +6634,9 @@ client.on(Events.MessageCreate, async (message) => {
           console.log(`📊 CP submission: ${discordNickname} - ${cpNumber}`);
           
           const result = await coreEvaluation.handleCPCommand(message, cpNumber, discordNickname);
+          
+          // Reply confirmation
+          await message.reply(`✅ CP recorded: **${cpNumber.toLocaleString()}** - Good luck!`);
           return;
         }
       }
