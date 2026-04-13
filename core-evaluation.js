@@ -351,7 +351,8 @@ async function handleCPCommand(message, cpNumber, discordNickname) {
   }
   
   const channelId = config.bot_manual_channel_id;
-  if (message.channel.parentId !== channelId) {
+  const validParentChannels = [config.bot_manual_channel_id, config.timer_channel_id];
+  if (!validParentChannels.includes(message.channel.parentId)) {
     await message.reply('❌ This command only works in the Core Evaluation thread.');
     return { success: false, error: 'Wrong channel' };
   }
@@ -502,7 +503,7 @@ async function syncToGoogleSheet() {
       return { success: true, synced: 0 };
     }
     
-    const webAppUrl = 'https://script.google.com/macros/s/AKfycbx4SWRJBQVz2vRndf7Wn7Cb-abqY02_Llwz8M5b2X_oHFavKdxsaoYC4PPUdjkmZfkldQ/exec';
+    const webAppUrl = config.sheet_webhook_url;
     
     const response = await fetch(webAppUrl, {
       method: 'POST',
