@@ -711,6 +711,11 @@ async function sendEvaluationReport(client) {
 }
 
 async function forceEvaluationNow(client) {
+  if (!config) {
+    console.error('❌ Core Evaluation not initialized - config is null');
+    return;
+  }
+  
   console.log('🔧 Force running Core Evaluation...');
   
   // Create thread
