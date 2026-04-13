@@ -6569,41 +6569,17 @@ client.on(Events.MessageCreate, async (message) => {
       const memberCmd = resolveCommandAlias(rawCmd);
       const args = message.content.trim().split(/\s+/).slice(1);
 
-      // !CP command - Core Evaluation CP submission (outside isMemberCommand check)
-        if (memberCmd === "!cp" || rawCmd.startsWith("!cp ") || rawCmd.startsWith("!cp") || rawCmd.startsWith("!CP")) {
-          const content = message.content.trim();
-          const cpMatch = content.match(/^!CP\s+([\d,]+)$/i) || content.match(/^!cp\s+([\d,]+)$/i);
-          
-          if (!cpMatch) {
-            await message.reply(
-              `❌ Invalid format. Use: \`!CP <number>\`\n` +
-              `Example: \`!CP 90,492\` or \`!CP 90492\`\n` +
-              `Attach a screenshot showing your CP.`
-            );
-            return;
-          }
-          
-          const cpNumber = parseInt(cpMatch[1].replace(/,/g, ''));
-          const discordNickname = member.nickname || message.author.username;
-          
-          console.log(`📊 CP submission: ${discordNickname} - ${cpNumber}`);
-          
-          const result = await coreEvaluation.handleCPCommand(message, cpNumber, discordNickname);
-          return;
-        }
-      }
-    }
-    
-    // Admin-only commands in admin logs
+      // Check if this is a member command
+      const isMemberCommand = ["!eightball", "!slap", "!stats"].includes(memberCmd);
+
+      if (isMemberCommand) {
         // If invoked in guild chat, redirect to BOT-COMMANDS (for both admins and members)
         if (inElysiumCommandsChannel && !inBotCommandsChannel) {
-          // Send redirect message in guild chat that auto-deletes after 30 seconds
           const redirectMsg = await message.reply(
             `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
             `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
           ).catch(() => null);
 
-          // Delete both messages after 30 seconds
           setTimeout(async () => {
             if (redirectMsg) {
               await errorHandler.safeDelete(redirectMsg, 'member command redirect cleanup');
@@ -6614,50 +6590,42 @@ client.on(Events.MessageCreate, async (message) => {
           return;
         }
 
-        // Execute command (in BOT-COMMANDS or if admin)
-        // !8ball command - Magic 8-Ball predictions
+        // Execute command
         if (memberCmd === "!eightball") {
-          console.log(`🎱 8ball command detected by ${member.user.username}`);
           await commandHandlers.eightball(message, member, args);
           return;
         }
-
-        // !slap command - Slap someone with a random object
         if (memberCmd === "!slap") {
-          console.log(`👊 Slap command detected by ${member.user.username}`);
           await commandHandlers.slap(message, member, args);
           return;
         }
-
-        // !stats command - Show member statistics
         if (memberCmd === "!stats") {
-          console.log(`📊 Stats command detected by ${member.user.username}`);
           await commandHandlers.stats(message, member, args);
           return;
         }
+      }
 
-        // !CP command - Core Evaluation CP submission
-        if (memberCmd === "!cp" || rawCmd.startsWith("!cp ") || rawCmd.startsWith("!cp") || rawCmd.startsWith("!CP")) {
-          const content = message.content.trim();
-          const cpMatch = content.match(/^!CP\s+([\d,]+)$/i) || content.match(/^!cp\s+([\d,]+)$/i);
-          
-          if (!cpMatch) {
-            await message.reply(
-              `❌ Invalid format. Use: \`!CP <number>\`\n` +
-              `Example: \`!CP 90,492\` or \`!CP 90492\`\n` +
-              `Attach a screenshot showing your CP.`
-            );
-            return;
-          }
-          
-          const cpNumber = parseInt(cpMatch[1].replace(/,/g, ''));
-          const discordNickname = member.nickname || message.author.username;
-          
-          console.log(`📊 CP submission: ${discordNickname} - ${cpNumber}`);
-          
-          const result = await coreEvaluation.handleCPCommand(message, cpNumber, discordNickname);
+      // !CP command - Core Evaluation CP submission (always allowed in bot commands channel)
+      if (memberCmd === "!cp" || rawCmd.startsWith("!cp ") || rawCmd.startsWith("!cp") || rawCmd.startsWith("!CP")) {
+        const content = message.content.trim();
+        const cpMatch = content.match(/^!CP\s+([\d,]+)$/i) || content.match(/^!cp\s+([\d,]+)$/i);
+        
+        if (!cpMatch) {
+          await message.reply(
+            `❌ Invalid format. Use: \`!CP <number>\`\n` +
+            `Example: \`!CP 90,492\` or \`!CP 90492\`\n` +
+            `Attach a screenshot showing your CP.`
+          );
           return;
         }
+        
+        const cpNumber = parseInt(cpMatch[1].replace(/,/g, ''));
+        const discordNickname = member.nickname || message.author.username;
+        
+        console.log(`📊 CP submission: ${discordNickname} - ${cpNumber}`);
+        
+        const result = await coreEvaluation.handleCPCommand(message, cpNumber, discordNickname);
+        return;
       }
     }
 
