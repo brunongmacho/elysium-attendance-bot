@@ -503,7 +503,7 @@ async function syncToGoogleSheet() {
       return { success: true, synced: 0 };
     }
     
-    const webAppUrl = config.sheet_webhook_url;
+    const webAppUrl = 'https://script.google.com/macros/s/AKfycbx4SWRJBQVz2vRndf7Wn7Cb-abqY02_Llwz8M5b2X_oHFavKdxsaoYC4PPUdjkmZfkldQ/exec';
     
     const response = await fetch(webAppUrl, {
       method: 'POST',
