@@ -223,12 +223,12 @@ async function createEvaluationThreadNow(client) {
 
   try {
     if (SAMPLE_SCREENSHOT_EXISTS) {
-      embed.setThumbnail('attachment://samplecp.png');
+      // Send embed first, then screenshot as separate message (bigger image)
       await thread.send({ 
         content: `<@&${config.elysium_role_id}>`,
-        embeds: [embed], 
-        files: [{ attachment: SAMPLE_SCREENSHOT_PATH, name: 'samplecp.png' }] 
+        embeds: [embed]
       });
+      await thread.send({ files: [{ attachment: SAMPLE_SCREENSHOT_PATH, name: 'sample-cp-example.png' }] });
     } else {
       console.warn('⚠️ Sample screenshot not found at:', SAMPLE_SCREENSHOT_PATH);
       await thread.send({ content: `<@&${config.elysium_role_id}>`, embeds: [embed] });
@@ -325,12 +325,11 @@ async function checkAndCreateWeeklyThread(client) {
 
   try {
     if (SAMPLE_SCREENSHOT_EXISTS) {
-      embed.setThumbnail('attachment://samplecp.png');
       await thread.send({ 
         content: `<@&${config.elysium_role_id}>`,
-        embeds: [embed], 
-        files: [{ attachment: SAMPLE_SCREENSHOT_PATH, name: 'samplecp.png' }] 
+        embeds: [embed]
       });
+      await thread.send({ files: [{ attachment: SAMPLE_SCREENSHOT_PATH, name: 'sample-cp-example.png' }] });
     } else {
       console.warn('⚠️ Sample screenshot not found at:', SAMPLE_SCREENSHOT_PATH);
       await thread.send({ content: `<@&${config.elysium_role_id}>`, embeds: [embed] });
@@ -557,7 +556,7 @@ function scheduleEvaluationReminder(client) {
       await createEvaluationThreadNow(client);
       
       // Send reminder to separate channel
-      const reminderChannelId = config.core_evaluation_commands_channel;
+      const reminderChannelId = config.core_evaluation_reminder_channel || config.elysium_commands_channel_id;
       const channel = await client.channels.fetch(reminderChannelId);
       
       if (channel) {
@@ -722,7 +721,7 @@ async function forceEvaluationNow(client) {
   await createEvaluationThreadNow(client);
   
   // Send reminder
-  const reminderChannelId = config.core_evaluation_commands_channel;
+  const reminderChannelId = config.core_evaluation_reminder_channel || config.elysium_commands_channel_id;
   const channel = await client.channels.fetch(reminderChannelId);
   
   if (channel) {
@@ -748,6 +747,55 @@ async function forceEvaluationNow(client) {
   }
 }
 
+async function forceCloseCycle(client) {
+  if (!config) {
+    console.error('❌ Core Evaluation not initialized - config is null');
+    return;
+  }
+  
+  console.log('🔒 Force closing Core Evaluation cycle...');
+  
+  if (currentCycle && currentCycle.threadId) {
+    const channelId = config.bot_manual_channel_id;
+    const channel = await client.channels.fetch(channelId);
+    
+    if (channel) {
+      try {
+        const thread = await channel.threads.fetch(currentCycle.threadId);
+        if (thread && !thread.locked) {
+          await thread.setLocked(true, 'Core Evaluation closed manually');
+          await thread.setArchived(true, 'Core Evaluation cycle ended');
+          console.log('🔒 Thread locked and archived');
+        }
+      } catch (err) {
+        console.error('❌ Failed to close thread:', err.message);
+      }
+    }
+  }
+  
+  console.log('✅ Force close complete');
+}
+
+async function forceResetCycle() {
+  if (!config) {
+    console.error('❌ Core Evaluation not initialized - config is null');
+    return;
+  }
+  
+  console.log('🔄 Force resetting Core Evaluation cycle...');
+  
+  currentCycle = null;
+  
+  try {
+    await dbAPI.collection(STATE_COLLECTION).deleteMany({ type: 'evaluation_state' });
+    console.log('✅ State cleared from MongoDB');
+  } catch (err) {
+    console.warn('⚠️ Could not clear MongoDB state:', err.message);
+  }
+  
+  console.log('✅ Force reset complete - ready for new cycle');
+}
+
 module.exports = {
   initialize,
   handleCPCommand,
@@ -762,6 +810,8 @@ module.exports = {
   getCurrentCycleNumber,
   getCurrentThreadId,
   forceEvaluationNow,
+  forceCloseCycle,
+  forceResetCycle,
   EVAL_PHASE,
   EVAL_COLLECTION,
 };

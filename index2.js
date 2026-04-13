@@ -4311,6 +4311,36 @@ const commandHandlers = {
     await message.reply('✅ Core Evaluation complete!');
   },
 
+  /**
+   * Force close Core Evaluation thread
+   * Usage: !fclose
+   */
+  fclose: async (message, member) => {
+    if (!isAdmin(member)) {
+      await message.reply('❌ Admin-only command.');
+      return;
+    }
+    
+    await message.reply('🔒 Closing Core Evaluation thread...');
+    await coreEvaluation.forceCloseCycle(client);
+    await message.reply('✅ Thread closed!');
+  },
+
+  /**
+   * Force reset Core Evaluation cycle
+   * Usage: !freset
+   */
+  freset: async (message, member) => {
+    if (!isAdmin(member)) {
+      await message.reply('❌ Admin-only command.');
+      return;
+    }
+    
+    await message.reply('🔄 Resetting Core Evaluation cycle...');
+    await coreEvaluation.forceResetCycle();
+    await message.reply('✅ Cycle reset! Use !forcecore to start fresh.');
+  },
+
 
   /**
    * Boss rotation management commands
@@ -6628,6 +6658,8 @@ client.on(Events.MessageCreate, async (message) => {
           "!forcesync",
           "!forcecore",
           "!fcore",
+          "!fclose",
+          "!freset",
           "!testmilestones",
         ].includes(adminCmd)
       ) {
@@ -6676,6 +6708,10 @@ client.on(Events.MessageCreate, async (message) => {
           await commandHandlers.forcesync(message, member);
         else if (adminCmd === "!forcecore" || adminCmd === "!fcore")
           await commandHandlers.forcecore(message, member);
+        else if (adminCmd === "!fclose")
+          await commandHandlers.fclose(message, member);
+        else if (adminCmd === "!freset")
+          await commandHandlers.freset(message, member);
         else if (adminCmd === "!testmilestones")
           await commandHandlers.testmilestones(message, member);
         else if (adminCmd === "!submittallyfromsheet" || adminCmd === "!resetsession")
