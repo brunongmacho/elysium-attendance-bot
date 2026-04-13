@@ -6554,7 +6554,10 @@ client.on(Events.MessageCreate, async (message) => {
     // =========================================================================
     // Define bot commands channel
     const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
-      (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
+      (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id) ||
+      // Also allow Core Evaluation commands in its channel
+      message.channel.id === config.core_evaluation_commands_channel ||
+      (message.channel.isThread() && message.channel.parentId === config.core_evaluation_commands_channel);
 
     // Fun commands available to all members in BOT-COMMANDS channel
     if (inBotCommandsChannel || inElysiumCommandsChannel) {
