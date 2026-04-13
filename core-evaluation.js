@@ -557,7 +557,7 @@ function scheduleEvaluationReminder(client) {
       await createEvaluationThreadNow(client);
       
       // Send reminder to separate channel
-      const reminderChannelId = config.elysium_commands_channel_id;
+      const reminderChannelId = config.core_evaluation_commands_channel;
       const channel = await client.channels.fetch(reminderChannelId);
       
       if (channel) {
@@ -717,7 +717,7 @@ async function forceEvaluationNow(client) {
   await createEvaluationThreadNow(client);
   
   // Send reminder
-  const reminderChannelId = config.elysium_commands_channel_id;
+  const reminderChannelId = config.core_evaluation_commands_channel;
   const channel = await client.channels.fetch(reminderChannelId);
   
   if (channel) {
