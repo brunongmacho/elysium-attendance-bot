@@ -28,10 +28,19 @@ const dbAPI = require('./utils/database-api');
 const path = require('path');
 const fs = require('fs');
 
-const TIMEZONE = 'Asia/Manila';
+const TIMEZONE_OFFSET = 8 * 60 * 60 * 1000; // GMT+8 in milliseconds
 
 const SAMPLE_SCREENSHOT_PATH = path.join(__dirname, 'assets', 'sample', 'samplecp.png');
 const SAMPLE_SCREENSHOT_EXISTS = fs.existsSync(SAMPLE_SCREENSHOT_PATH);
+
+/**
+ * Get current time in GMT+8 (Asia/Manila)
+ */
+function getCurrentGMT8() {
+  const now = new Date();
+  const utc = now.getTime();
+  return new Date(utc + TIMEZONE_OFFSET);
+}
 
 const EVAL_PHASE = {
   STARTING_CP: 'starting_cp',
@@ -48,6 +57,7 @@ let currentCycle = null;
 let lastStateSync = 0;
 let reminderMessageId = null;
 let lastReminderSentDate = null; // Prevent multiple reminders in same window
+let lastSyncDate = null; // Prevent multiple syncs in same window
 let lastCPSubmissionTime = 0;
 let syncTimeout = null;
 
@@ -142,7 +152,7 @@ function determinePhase() {
   }
   
   const startDate = new Date(currentCycle.startDate);
-  const now = new Date();
+  const now = getCurrentGMT8();
   const daysSinceStart = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
   
   const twoWeekPeriods = Math.floor(daysSinceStart / 14);
@@ -153,7 +163,7 @@ function determinePhase() {
 }
 
 async function createEvaluationThreadNow(client) {
-  const now = new Date();
+  const now = getCurrentGMT8();
   const { phase, cycleNumber } = determinePhase();
   
   if (currentCycle && 
@@ -244,7 +254,7 @@ async function createEvaluationThreadNow(client) {
 }
 
 async function checkAndCreateWeeklyThread(client) {
-  const now = new Date();
+  const now = getCurrentGMT8();
   const dayOfWeek = now.getDay();
   const hours = now.getHours();
   const minutes = now.getMinutes();
@@ -436,13 +446,17 @@ async function handleCPCommand(message, cpNumber, discordNickname) {
 /**
  * Schedule Google Sheets sync after 5 minutes of idle
  * Clears any existing timeout and sets new one
+ * Only schedules if no pending sync
  */
 function scheduleIdleSync() {
-  lastCPSubmissionTime = Date.now();
-  
+  // Only schedule if no pending sync
   if (syncTimeout) {
-    clearTimeout(syncTimeout);
+    // Update last submission time but keep existing sync
+    lastCPSubmissionTime = Date.now();
+    return;
   }
+  
+  lastCPSubmissionTime = Date.now();
   
   syncTimeout = setTimeout(async () => {
     const timeSinceLastSubmit = Date.now() - lastCPSubmissionTime;
@@ -451,6 +465,7 @@ function scheduleIdleSync() {
       console.log('⏰ 5 minutes idle - syncing to Google Sheets...');
       await syncToGoogleSheet();
     }
+    syncTimeout = null; // Clear timeout after sync
   }, IDLE_SYNC_DELAY_MS);
   
   console.log(`⏳ Sync scheduled in ${IDLE_SYNC_DELAY_MS / 1000} seconds`);
@@ -544,7 +559,7 @@ function scheduleEvaluationCheck(client) {
 
 function scheduleEvaluationReminder(client) {
   const sendReminder = async () => {
-    const now = new Date();
+    const now = getCurrentGMT8();
     const dayOfWeek = now.getDay();
     const hour = now.getHours();
     const minutes = now.getMinutes();
@@ -604,6 +619,13 @@ function scheduleEvaluationReminder(client) {
     
     // Tuesday 12:00 AM - Send evaluation report (after Monday thread closes)
     if (dayOfWeek === 2 && hour === 0 && minutes < 5) {
+      // Only sync once per Tuesday (check date to avoid repeats)
+      const todayStr = now.toDateString();
+      if (lastSyncDate === todayStr) {
+        return; // Already synced today
+      }
+      lastSyncDate = todayStr;
+      
       await syncToGoogleSheet();
       await sendEvaluationReport(client);
     }
@@ -651,7 +673,8 @@ async function sendEvaluationReport(client) {
       reminderMessageId = null;
     }
     
-    const channelId = config.bot_manual_channel_id;
+    // Send to reminder channel (same as Sunday reminder)
+    const channelId = config.core_evaluation_reminder_channel || config.elysium_commands_channel_id;
     const channel = await client.channels.fetch(channelId);
     if (!channel) return;
     
@@ -678,8 +701,9 @@ async function sendEvaluationReport(client) {
       console.warn('⚠️ Could not fetch from Google Sheet:', err.message);
     }
     
-    let top5List, allList;
+    let top5List;
     
+    // Try to use sheet data with Final Score (if available)
     if (sheetData && sheetData.members && sheetData.members.length > 0) {
       const sortedByScore = [...sheetData.members].sort((a, b) => b.finalScore - a.finalScore);
       const eligible = sortedByScore.filter(m => m.coreEligible === 'Yes');
@@ -689,6 +713,7 @@ async function sendEvaluationReport(client) {
         `🥇 ${i + 1}. **${m.name}** - ${m.finalScore} pts`
       ).join('\n');
     } else {
+      // Fallback: Show CP rankings from MongoDB (no Final Score available yet)
       const sorted = [...submissions].sort((a, b) => b.cp - a.cp);
       const top5 = sorted.slice(0, 5);
       top5List = top5.map((m, i) => 
@@ -701,8 +726,8 @@ async function sendEvaluationReport(client) {
       .setTitle(`🎉 CONGRATULATIONS! 🎉`)
       .setDescription(
         `**Congratulations to our new Core Members for Cycle ${cycleNumber}!**\n\n` +
-        `You are the Top 5 based on Final Score (CP + Attendance).\n` +
-        `You will be the Core for the next 2 weeks!\n\n` +
+        `You are the Top 5 based on Final Score.\n` +
+        `(Final Score = CP Points + Attendance Points)\n\n` +
         `📋 **CORE MEMBERS:**\n${top5List}`
       )
       .setTimestamp();

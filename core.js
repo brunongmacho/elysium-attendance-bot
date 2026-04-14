@@ -38,14 +38,10 @@ const EVAL_CONFIG = {
   BRACKET_B_MIN: 85000,
   BRACKET_B_MAX: 99999,
   BRACKET_A_MIN: 100000,
-  
-  // CP Points thresholds
-  CP_POINTS_30_MIN: 120,
-  CP_POINTS_25_MIN: 110,
-  CP_POINTS_20_MIN: 100,
-  CP_POINTS_15_MIN: 90,
-  CP_POINTS_10_MIN: 80,
-  
+
+  // Members who are never eligible (like Jack in deck - counted but not eligible)
+  ALWAYS_INELIGIBLE: ['Rohypnol', 'Iguro', 'Carrera', 'Marzhall', 'Inihaw', 'xAustinx'],
+
   // Attendance thresholds
   ATTENDANCE_70: 8,
   ATTENDANCE_60: 7,
@@ -100,21 +96,28 @@ function calculateCPGrowth(startingCP, endingCP) {
 }
 
 /**
- * Calculate CP Points based on Relative Growth %
- * ≥120 → 30 pts
- * 110–119 → 25 pts
- * 100–109 → 20 pts
- * 90–99 → 15 pts
- * 80–89 → 10 pts
- * <80 → 0 pts
+ * Calculate CP Points - New Logic
+ * 1. Calculate Growth % for each member
+ * 2. Calculate Bracket Avg Growth %
+ * 3. Calculate Relative % within bracket
+ * 4. Scale all relative % (normalize to max relative)
+ * 5. CP Points = scaled % × 0.3 (max 30)
  */
-function getCPPoints(relativeGrowth) {
-  if (relativeGrowth >= EVAL_CONFIG.CP_POINTS_30_MIN) return 30;
-  if (relativeGrowth >= EVAL_CONFIG.CP_POINTS_25_MIN) return 25;
-  if (relativeGrowth >= EVAL_CONFIG.CP_POINTS_20_MIN) return 20;
-  if (relativeGrowth >= EVAL_CONFIG.CP_POINTS_15_MIN) return 15;
-  if (relativeGrowth >= EVAL_CONFIG.CP_POINTS_10_MIN) return 10;
-  return 0;
+function getCPPoints(member, allMembers) {
+  if (member.relativeGrowth <= 0) return 0;
+  
+  // Find max relative % across all members
+  const maxRelative = Math.max(...allMembers.map(m => m.relativeGrowth || 0));
+  
+  if (maxRelative <= 0) return 0;
+  
+  // Scale relative % (normalize to max)
+  const scaledPercent = (member.relativeGrowth / maxRelative) * 100;
+  
+  // CP Points = scaled % × 0.3, capped at 30
+  const points = scaledPercent * 0.3;
+  
+  return Math.min(points, 30);
 }
 
 /**
@@ -135,9 +138,13 @@ function getAttendancePoints(attendance) {
 
 /**
  * Determine if member is Core Eligible
- * Core Eligible: Attendance ≥ 5
+ * - Attendance ≥ 5
+ * - NOT in ALWAYS_INELIGIBLE list (like Jack in deck - counted but not eligible)
  */
-function isCoreEligible(attendance) {
+function isCoreEligible(attendance, memberName) {
+  if (EVAL_CONFIG.ALWAYS_INELIGIBLE.includes(memberName)) {
+    return 'No';
+  }
   return attendance >= EVAL_CONFIG.MIN_ATTENDANCE_FOR_CORE ? 'Yes' : 'No';
 }
 
@@ -299,7 +306,7 @@ function evaluateAllMembersSheet(sheet, sheetName) {
     member.bracket = getBracket(member.startingCP);
     member.cpGrowth = calculateCPGrowth(member.startingCP, member.endingCP);
     member.attendancePoints = getAttendancePoints(member.attendance);
-    member.coreEligible = isCoreEligible(member.attendance);
+    member.coreEligible = isCoreEligible(member.attendance, member.memberName);
   });
   
   const bracketAverages = calculateBracketAverages(members);
@@ -307,7 +314,7 @@ function evaluateAllMembersSheet(sheet, sheetName) {
   members.forEach(member => {
     member.bracketAvgGrowth = bracketAverages[member.bracket] || 0;
     member.relativeGrowth = calculateRelativeGrowth(member.cpGrowth, member.bracketAvgGrowth);
-    member.cpPoints = getCPPoints(member.relativeGrowth);
+    member.cpPoints = getCPPoints(member, members);
     member.finalScore = member.attendancePoints + member.cpPoints;
   });
   
