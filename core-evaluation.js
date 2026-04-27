@@ -27,6 +27,7 @@ const { getCurrentTimestamp } = require('./utils/common');
 const dbAPI = require('./utils/database-api');
 const path = require('path');
 const fs = require('fs');
+const config = require('./config.json');
 
 const TIMEZONE_OFFSET = 8 * 60 * 60 * 1000; // GMT+8 in milliseconds
 
@@ -523,7 +524,7 @@ async function syncToGoogleSheet() {
       return { success: true, synced: 0 };
     }
     
-    const webAppUrl = 'https://script.google.com/macros/s/AKfycbx4SWRJBQVz2vRndf7Wn7Cb-abqY02_Llwz8M5b2X_oHFavKdxsaoYC4PPUdjkmZfkldQ/exec';
+    const webAppUrl = config.sheet_webhook_url;
     
     const response = await fetch(webAppUrl, {
       method: 'POST',
@@ -691,7 +692,7 @@ async function sendEvaluationReport(client) {
     // Fetch full evaluation data from Google Sheet (includes Final Score after you add Attendance)
     let sheetData = null;
     try {
-      const webAppUrl = 'https://script.google.com/macros/s/AKfycbx4SWRJBQVz2vRndf7Wn7Cb-abqY02_Llwz8M5b2X_oHFavKdxsaoYC4PPUdjkmZfkldQ/exec';
+      const webAppUrl = config.sheet_webhook_url;
       const response = await fetch(`${webAppUrl}?action=getSummary`, { method: 'GET' });
       const result = await response.json();
       if (result && result.members) {

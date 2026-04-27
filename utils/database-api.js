@@ -19,8 +19,9 @@ const { MongoClient } = require('mongodb');
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
-// Load config for database name
+// Load config for database name and guild name
 let DB_NAME = 'elysium-bot-tpb'; // Default for TrailerParkB
+let GUILD_NAME = 'TrailerParkB';
 try {
   const fs = require('fs');
   const path = require('path');
@@ -29,8 +30,22 @@ try {
   if (config.mongodb_database) {
     DB_NAME = config.mongodb_database;
   }
+  if (config.guild_name) {
+    GUILD_NAME = config.guild_name;
+  }
 } catch (e) {
   // Use default
+}
+
+/**
+ * Helper function to get guild-specific collection name
+ * All collections use suffix (e.g., attendance-TPB, members-TPB)
+ * @param {string} baseName - Base collection name
+ * @returns {string} - Guild-specific collection name
+ */
+function getCollectionName(baseName) {
+  const suffix = GUILD_NAME.replace(/\s+/g, '_').toUpperCase();
+  return `${baseName}-${suffix}`;
 }
 
 class DatabaseAPI {
@@ -157,11 +172,11 @@ class DatabaseAPI {
     try {
       // Check a few critical indexes to determine if indexes are already created
       const criticalChecks = [
-        { collection: 'attendance', index: 'member_history' },
-        { collection: 'members', index: 'username_unique' },
-        { collection: 'eventReminders', index: 'due_reminders' },
-        { collection: 'coreEvaluation', index: 'evaluation_lookup' },
-        { collection: 'coreEvaluationState', index: 'state_type_lookup' }
+        { collection: getCollectionName('attendance'), index: 'member_history' },
+        { collection: getCollectionName('members'), index: 'username_unique' },
+        { collection: getCollectionName('eventReminders'), index: 'due_reminders' },
+        { collection: getCollectionName('coreEvaluation'), index: 'evaluation_lookup' },
+        { collection: getCollectionName('coreEvaluationState'), index: 'state_type_lookup' }
       ];
 
       for (const check of criticalChecks) {
@@ -211,50 +226,50 @@ class DatabaseAPI {
     // Define all indexes with metadata
     const indexDefinitions = [
       // Attendance indexes
-      { collection: 'attendance', spec: { memberId: 1, timestamp: -1 }, name: 'member_history', critical: true },
-      { collection: 'attendance', spec: { weekStartDate: 1 }, name: 'week_lookup', critical: false },
-      { collection: 'attendance', spec: { bossName: 1 }, name: 'boss_lookup', critical: false },
-      { collection: 'attendance', spec: { weekLabel: 1 }, name: 'sheet_sync', critical: false },
+      { collection: getCollectionName('attendance'), spec: { memberId: 1, timestamp: -1 }, name: 'member_history', critical: true },
+      { collection: getCollectionName('attendance'), spec: { weekStartDate: 1 }, name: 'week_lookup', critical: false },
+      { collection: getCollectionName('attendance'), spec: { bossName: 1 }, name: 'boss_lookup', critical: false },
+      { collection: getCollectionName('attendance'), spec: { weekLabel: 1 }, name: 'sheet_sync', critical: false },
 
       // PHASE 3.2: Compound indexes for report optimization
-      { collection: 'attendance', spec: { timestamp: -1, bossName: 1 }, name: 'report_spawns', critical: false },
-      { collection: 'attendance', spec: { timestamp: -1, memberName: 1, bossName: 1 }, name: 'report_members', critical: false },
-      { collection: 'attendance', spec: { timestamp: -1, memberId: 1 }, name: 'member_timeline', critical: false },
+      { collection: getCollectionName('attendance'), spec: { timestamp: -1, bossName: 1 }, name: 'report_spawns', critical: false },
+      { collection: getCollectionName('attendance'), spec: { timestamp: -1, memberName: 1, bossName: 1 }, name: 'report_members', critical: false },
+      { collection: getCollectionName('attendance'), spec: { timestamp: -1, memberId: 1 }, name: 'member_timeline', critical: false },
 
       // Members indexes
-      { collection: 'members', spec: { username: 1 }, options: { unique: true }, name: 'username_unique', critical: true },
-      { collection: 'members', spec: { pointsAvailable: -1 }, name: 'points_leaderboard', critical: false },
-      { collection: 'members', spec: { 'attendance.total': -1 }, name: 'attendance_leaderboard', critical: false },
+      { collection: getCollectionName('members'), spec: { username: 1 }, options: { unique: true }, name: 'username_unique', critical: true },
+      { collection: getCollectionName('members'), spec: { pointsAvailable: -1 }, name: 'points_leaderboard', critical: false },
+      { collection: getCollectionName('members'), spec: { 'attendance.total': -1 }, name: 'attendance_leaderboard', critical: false },
 
       // PHASE 3.2: Compound indexes for bidding stats in reports
-      { collection: 'members', spec: { isActive: 1, pointsEarned: -1 }, name: 'active_top_earners', critical: false },
-      { collection: 'members', spec: { isActive: 1, pointsSpent: -1 }, name: 'active_top_spenders', critical: false },
+      { collection: getCollectionName('members'), spec: { isActive: 1, pointsEarned: -1 }, name: 'active_top_earners', critical: false },
+      { collection: getCollectionName('members'), spec: { isActive: 1, pointsSpent: -1 }, name: 'active_top_spenders', critical: false },
 
       // Auction items indexes
-      { collection: 'auctionItems', spec: { status: 1 }, name: 'status_lookup', critical: false },
-      { collection: 'auctionItems', spec: { addedAt: -1 }, name: 'recent_items', critical: false },
-      { collection: 'auctionItems', spec: { winnerId: 1, status: 1 }, name: 'winner_items', critical: false },
+      { collection: getCollectionName('auctionItems'), spec: { status: 1 }, name: 'status_lookup', critical: false },
+      { collection: getCollectionName('auctionItems'), spec: { addedAt: -1 }, name: 'recent_items', critical: false },
+      { collection: getCollectionName('auctionItems'), spec: { winnerId: 1, status: 1 }, name: 'winner_items', critical: false },
 
       // Auction sessions indexes
-      { collection: 'auctionSessions', spec: { sessionDate: -1 }, name: 'recent_sessions', critical: false },
-      { collection: 'auctionSessions', spec: { sessionNumber: 1 }, options: { unique: true }, name: 'session_number_unique', critical: false },
+      { collection: getCollectionName('auctionSessions'), spec: { sessionDate: -1 }, name: 'recent_sessions', critical: false },
+      { collection: getCollectionName('auctionSessions'), spec: { sessionNumber: 1 }, options: { unique: true }, name: 'session_number_unique', critical: false },
 
       // Boss rotation indexes
-      { collection: 'bossRotation', spec: { bossName: 1 }, options: { unique: true }, name: 'boss_unique', critical: false },
-      { collection: 'bossRotation', spec: { currentGuild: 1 }, name: 'current_turn', critical: false },
+      { collection: getCollectionName('bossRotation'), spec: { bossName: 1 }, options: { unique: true }, name: 'boss_unique', critical: false },
+      { collection: getCollectionName('bossRotation'), spec: { currentGuild: 1 }, name: 'current_turn', critical: false },
 
       // Event reminders indexes
-      { collection: 'eventReminders', spec: { nextTrigger: 1, active: 1 }, name: 'due_reminders', critical: true },
-      { collection: 'eventReminders', spec: { eventType: 1 }, name: 'event_type_lookup', critical: false },
+      { collection: getCollectionName('eventReminders'), spec: { nextTrigger: 1, active: 1 }, name: 'due_reminders', critical: true },
+      { collection: getCollectionName('eventReminders'), spec: { eventType: 1 }, name: 'event_type_lookup', critical: false },
 
       // Boss timers indexes
-      { collection: 'bossTimers', spec: { bossName: 1 }, options: { unique: true }, name: 'boss_timer_unique', critical: false },
-      { collection: 'bossTimers', spec: { nextSpawnTime: 1 }, name: 'spawn_time_lookup', critical: false },
+      { collection: getCollectionName('bossTimers'), spec: { bossName: 1 }, options: { unique: true }, name: 'boss_timer_unique', critical: false },
+      { collection: getCollectionName('bossTimers'), spec: { nextSpawnTime: 1 }, name: 'spawn_time_lookup', critical: false },
 
       // Core Evaluation indexes
-      { collection: 'coreEvaluation', spec: { discordId: 1, phase: 1, cycleNumber: -1 }, name: 'evaluation_lookup', critical: false },
-      { collection: 'coreEvaluation', spec: { phase: 1, cycleNumber: 1 }, name: 'phase_cycle_lookup', critical: false },
-      { collection: 'coreEvaluationState', spec: { type: 1 }, name: 'state_type_lookup', critical: false },
+      { collection: getCollectionName('coreEvaluation'), spec: { discordId: 1, phase: 1, cycleNumber: -1 }, name: 'evaluation_lookup', critical: false },
+      { collection: getCollectionName('coreEvaluation'), spec: { phase: 1, cycleNumber: 1 }, name: 'phase_cycle_lookup', critical: false },
+      { collection: getCollectionName('coreEvaluationState'), spec: { type: 1 }, name: 'state_type_lookup', critical: false },
     ];
 
     // Create indexes with individual error handling

@@ -32,7 +32,7 @@
   "elysium_role_id": "1497105628185890817",
   "guild_leader_role_id": "1497105083253395516",
   "week_start": "Monday",
-  "sheet_webhook_url": "https://script.google.com/macros/s/AKfycbzY2sJA742QWLUZnqH06oIFosTD-X01dPd2q-uNdt8Fus-WcYo5YG3Y5ZfYfE7uFvTO/exec",
+  "sheet_webhook_url": "https://script.google.com/macros/s/AKfycbzw9X5Ked8QxtJCLa2s8VdUH3mva5bXACcbCVpBGHBOZB74gZn8NuUM6hCWkRN96Uxq/exec",
   "timezone": "Asia/Manila",
   "auto_archive_minutes": 60,
   "ml_service_url": "",

@@ -870,6 +870,95 @@ function hasElysiumRole(member) {
   );
 }
 
+/**
+ * Collect all unique channel IDs from the test-send collections.
+ * @returns {Promise<Set<string>>}
+ */
+async function collectTestSendChannelIds() {
+  const db = await dbAPI.connect();
+  const channelIds = new Set();
+  const collectionNames = ['attendance-TPB', 'members-TPB', 'auctionItems-TPB'];
+
+  for (const collectionName of collectionNames) {
+    try {
+      const docs = await db.collection(collectionName)
+        .find({}, { projection: { channelId: 1, channel_id: 1 } })
+        .toArray();
+
+      docs.forEach((doc) => {
+        if (doc?.channelId) channelIds.add(String(doc.channelId));
+        if (doc?.channel_id) channelIds.add(String(doc.channel_id));
+      });
+    } catch (error) {
+      console.warn(`⚠️ Could not read collection ${collectionName}: ${error.message}`);
+    }
+  }
+
+  return channelIds;
+}
+
+/**
+ * Send the test embed message to all recorded channels and schedule cleanup.
+ * @param {Guild} guild
+ * @param {Client} client
+ * @returns {Promise<Object>}
+ */
+async function performTestSend(guild, client) {
+  if (!guild) {
+    return { error: 'Guild context is required.' };
+  }
+
+  const channelIds = await collectTestSendChannelIds();
+  if (channelIds.size === 0) {
+    return { warning: '⚠️ No channels have been recorded yet.' };
+  }
+
+  const testEmbed = new EmbedBuilder()
+    .setColor(0xFFA500)
+    .setTitle('🔧 THIS IS A TEST')
+    .setDescription('This is a test message to verify the bot is working correctly.')
+    .addFields(
+      { name: 'Status', value: '✅ Working', inline: true },
+      { name: 'Channels Tested', value: `${channelIds.size}`, inline: true },
+      { name: 'Timestamp', value: new Date().toLocaleString(), inline: false }
+    )
+    .setFooter({ text: 'Test message - will auto-delete in 2 minutes' })
+    .setTimestamp();
+
+  const results = [];
+  for (const channelId of channelIds) {
+    try {
+      const channel = await client.channels.fetch(channelId).catch(() => null);
+      if (!channel || !channel.isTextBased()) {
+        results.push({ channelId, status: 'failed', error: 'Channel not found or not text-based.' });
+        continue;
+      }
+
+      const msg = await channel.send({ embeds: [testEmbed] });
+      results.push({ channelId, status: 'sent', messageId: msg.id });
+
+      setTimeout(async () => {
+        try {
+          await msg.delete();
+          console.log(`✅ Test message deleted from channel ${channelId}`);
+        } catch (deleteError) {
+          console.warn(`⚠️ Could not delete test message from ${channelId}: ${deleteError.message}`);
+        }
+      }, 120000);
+    } catch (error) {
+      results.push({ channelId, status: 'failed', error: error.message });
+    }
+  }
+
+  const successCount = results.filter((item) => item.status === 'sent').length;
+  return {
+    success: true,
+    successCount,
+    failedCount: results.length - successCount,
+    channels: results
+  };
+}
+
 // =====================================================================
 // SECTION 6: BIDDING CHANNEL CLEANUP
 // =====================================================================
@@ -2138,6 +2227,14 @@ const commandHandlers = {
     await message.reply({
       embeds: [overviewEmbed, attendanceEmbed, auctionEmbed, tipsEmbed]
     });
+  },
+
+  // =========================================================================
+  // TEST SEND COMMAND - Send a test embed to all recorded bot channels
+  // =========================================================================
+  testsend: async (context, member) => {
+    const guild = context?.guild || context?.message?.guild || context?.channel?.guild;
+    return await performTestSend(guild, client);
   },
 
   // =========================================================================
@@ -5828,6 +5925,50 @@ client.on(Events.MessageCreate, async (message) => {
       }
 
       await commandHandlers.newmember(message, member);
+      return;
+    }
+
+    if (resolvedCmd === "!testsend") {
+      if (!userIsAdmin) {
+        await message.reply('❌ Admin only command');
+        return;
+      }
+
+      if (message.channel.id !== config.admin_logs_channel_id) {
+        await message.reply(`❌ This command can only be used in <#${config.admin_logs_channel_id}>`);
+        return;
+      }
+
+      const result = await commandHandlers.testsend(message, member);
+      if (result.error) {
+        await message.reply(`❌ Test send failed: ${result.error}`);
+        return;
+      }
+
+      if (result.warning) {
+        await message.reply(result.warning);
+        return;
+      }
+
+      const failedChannels = result.channels.filter((c) => c.status === 'failed');
+      const failedCount = failedChannels.length;
+      const summaryEmbed = new EmbedBuilder()
+        .setColor(failedCount > 0 ? 0xFFA500 : 0x00FF00)
+        .setTitle('✅ Test Send Complete')
+        .setDescription(`Sent to ${result.successCount} channel(s)` + (failedCount > 0 ? `, ${failedCount} failed` : ''))
+        .setTimestamp()
+        .setFooter({ text: 'Guild: ' + config.guild_name });
+
+      if (failedCount > 0) {
+        const detailLines = failedChannels.slice(0, 8).map((c) => `• ${c.channelId}: ${c.error || 'Unknown error'}`);
+        summaryEmbed.addFields({
+          name: 'Failed Channels',
+          value: detailLines.join('\n'),
+          inline: false
+        });
+      }
+
+      await message.reply({ embeds: [summaryEmbed] });
       return;
     }
 

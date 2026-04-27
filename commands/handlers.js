@@ -1800,21 +1800,37 @@ if (commandName === 'testsend') {
   try {
     // Call test send function from index2
     const { commandHandlers } = require('../index2.js');
-    const result = await commandHandlers.testSend({ guild: interaction.guild }, config, client);
+    const result = await commandHandlers.testsend(interaction, interaction.member);
 
     if (result.error) {
       await interaction.editReply({ content: '❌ Test send failed: ' + result.error });
+    } else if (result.warning) {
+      await interaction.editReply({ content: result.warning });
     } else {
-      await interaction.editReply({ 
-        embeds: [{
-          color: 0x00FF00,
-          title: '✅ Test Send Complete',
-          description: 'Sent to ' + result.successCount + ' channels' +
-                       (result.channels.filter(c => c.status === 'failed').length > 0 ? ', ' + result.channels.filter(c => c.status === 'failed').length + ' failed' : ''),
-          timestamp: new Date(),
-          footer: { text: 'Guild: ' + config.guild_name }
-        }]
-      });
+      const failedChannels = result.channels.filter((c) => c.status === 'failed');
+      const failedCount = failedChannels.length;
+      const detailLines = failedChannels.slice(0, 8).map((c) => `• ${c.channelId}: ${c.error || 'Unknown error'}`);
+
+      const embed = {
+        color: failedCount > 0 ? 0xFFA500 : 0x00FF00,
+        title: '✅ Test Send Complete',
+        description: 'Sent to ' + result.successCount + ' channels' +
+                     (failedCount > 0 ? ', ' + failedCount + ' failed' : ''),
+        timestamp: new Date(),
+        footer: { text: 'Guild: ' + config.guild_name }
+      };
+
+      if (failedCount > 0) {
+        embed.fields = [
+          {
+            name: 'Failed Channels',
+            value: detailLines.join('\n'),
+            inline: false
+          }
+        ];
+      }
+
+      await interaction.editReply({ embeds: [embed] });
     }
   } catch (err) {
     console.error('Error in /testsend command:', err);
