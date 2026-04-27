@@ -444,6 +444,23 @@ function generateStatsCommands() {
  * @param {string} channelNames.bidding - Bidding channel name
  * @returns {Object} Object containing command arrays
  */
+/**
+ * Generate test send command (admin-only, channel-specific)
+ * Sends a test embed to all recorded channels and auto-deletes after 2 minutes
+ *
+ * @param {string} adminLogsChannelName - Name of admin logs channel
+ * @returns {Array} Test send command definition
+ */
+function generateTestSendCommand(adminLogsChannelName = "") {
+  return [{
+    name: "testsend",
+    description: `Send a test embed to all recorded channels (admin-logs only)${adminLogsChannelName ? " (use in #" + adminLogsChannelName + ")" : ""}`,
+    default_member_permissions: PermissionFlagsBits.Administrator.toString(),
+    dm_permission: false,
+    options: []
+  }];
+}
+
 function generateAllCommands(channelNames = {}) {
   const { attendance = 'attendance', bossTimer = 'boss-timer', bidding = 'bidding' } = channelNames;
 
@@ -473,11 +490,20 @@ function generateAllCommands(channelNames = {}) {
 }
 
 module.exports = {
-  generateAllCommands,
-  generateAttendanceCommands,
-  generateAttendanceOverrideCommands,
-  generateBossTimerCommands,
-  generateRotationCommands,
-  generateAuctionCommands,
-  generateStatsCommands
+   generateAllCommands,
+   generateAttendanceCommands,
+   generateAttendanceOverrideCommands,
+   generateBossTimerCommands,
+   generateRotationCommands,
+   generateAuctionCommands,
+   generateStatsCommands,
+   generateTestSendCommand
+};
+
+// Update generateAllCommands to include testSend
+const originalGenerateAllCommands = generateAllCommands;
+generateAllCommands = function(channelNames = {}) {
+  const result = originalGenerateAllCommands(channelNames);
+  result.allCommands = [...result.allCommands, ...result.testSendCommand];
+  return result;
 };

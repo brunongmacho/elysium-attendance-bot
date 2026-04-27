@@ -1,6 +1,6 @@
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║                    ELYSIUM GUILD BIDDING ENGINE                           ║
+ * ║                    GUILD BIDDING ENGINE                           ║
  * ║                         Version 6.0 - Enhanced                            ║
  * ╚═══════════════════════════════════════════════════════════════════════════╝
  *
@@ -128,7 +128,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * STANDALONE MODE (!bid command):
- *   1. Validate user has ELYSIUM role
+ *   1. Validate user has guild role
  *   2. Check rate limit (3s cooldown)
  *   3. Validate bid amount (integer, positive, not too large)
  *   4. Calculate available points (total - locked)
@@ -144,7 +144,7 @@
  *   9. Auto-timeout after 10 seconds if no reaction
  *
  * AUCTIONEERING MODE (procBidAuctioneering):
- *   1. Validate user has ELYSIUM role
+ *   1. Validate user has guild role
  *   2. Check rate limit (3s cooldown)
  *   3. Validate bid amount (integer, positive, not too large)
  *   4. Calculate available points (total - locked)
@@ -167,7 +167,7 @@
  *     5. Announce time extension to channel
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * @author ELYSIUM Development Team
+ * @author Guild Development Team
  * @version 6.0.0
  * @since 2024
  */
@@ -186,6 +186,9 @@ const { createLogger } = require('./utils/logger');
 
 // Create logger instance for this module
 const logger = createLogger('bidding');
+
+// Member Registry for nickname-agnostic lookups
+const memberRegistry = require('./member-registry');
 
 // MongoDB Integration (Phase 4)
 const mongoHelpers = require('./utils/mongodb-helpers');
@@ -394,7 +397,7 @@ function createPaginatedEmbeds(title, items, itemsPerPage = 20, options = {}) {
  * @constant {Object}
  */
 const ERROR_MESSAGES = {
-  NO_ROLE: `${EMOJI.ERROR} You need the ELYSIUM role to participate in auctions`,
+  NO_ROLE: `${EMOJI.ERROR} You need the guild role to participate in auctions`,
   NO_POINTS: `${EMOJI.ERROR} You have no bidding points available`,
   CACHE_NOT_LOADED: `${EMOJI.ERROR} Points cache not loaded. Please try again shortly.`,
   CACHE_LOAD_FAILED: `${EMOJI.ERROR} Failed to load bidding points from server`,
@@ -447,8 +450,9 @@ let st = {
 
   /**
    * @type {Object.<string, number>} Locked points per user
-   * Key: normalized username, Value: points locked
+   * Key: normalized username OR Discord ID, Value: points locked
    * SHARED across bidding.js and auctioneering.js modules
+   * Uses Discord ID when available for nickname-agnostic tracking
    */
   lp: {},
 
@@ -506,12 +510,16 @@ let isAdmFunc = null;
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Checks if member has ELYSIUM role required for bidding
+ * Checks if member has guild role required for bidding
  *
  * @param {GuildMember} m - Discord guild member object
- * @returns {boolean} True if member has ELYSIUM role
+ * @returns {boolean} True if member has guild role
  */
-const hasRole = (m) => m.roles.cache.some((r) => r.name === "ELYSIUM");
+const hasRole = (m) => m.roles.cache.some((r) => {
+  const roleName = cfg?.elysium_role || 'Certified TPB';
+  const roleId = cfg?.elysium_role_id || cfg?.role_ids?.member;
+  return r.name === roleName || r.id === roleId;
+});
 
 /**
  * Checks if member has admin privileges based on configured admin roles
@@ -600,19 +608,27 @@ function createDisabledRow(btn1, btn2) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Calculates available (unlocked) points for a user
+ * Calculates available points for a user
+ * 
+ * Uses Discord ID if available for nickname-agnostic calculation.
+ * Falls back to normalized username for backwards compatibility.
  *
- * CRITICAL: This function prevents users from bidding more points than they have
- * across multiple simultaneous auctions by subtracting locked points from total.
- *
- * @param {string} u - Username (will be normalized)
- * @param {number} tot - Total points the user has
+ * @param {string} u - Username (used as fallback key)
+ * @param {number} tot - Total points
+ * @param {string} userId - Discord user ID (preferred key)
  * @returns {number} Available points (never negative)
  * @example
  * // User has 1000 total points, 300 locked in another auction
  * avail("Username", 1000) // Returns 700
  */
-const avail = (u, tot) => Math.max(0, tot - (st.lp[normalizeUsername(u)] || 0));
+const avail = (u, tot, userId = null) => {
+  // Try Discord ID first (nickname-agnostic), then fall back to name
+  const nameKey = normalizeUsername(u);
+  const locked = userId 
+    ? (st.lp[userId] || st.lp[nameKey] || 0)
+    : (st.lp[nameKey] || 0);
+  return Math.max(0, tot - locked);
+};
 
 /**
  * Locks points for a user (atomic operation with persistence)
@@ -626,11 +642,13 @@ const avail = (u, tot) => Math.max(0, tot - (st.lp[normalizeUsername(u)] || 0));
  * - Called when user places a bid
  * - Called when user increases their existing bid (only lock difference)
  *
- * @param {string} u - Username (will be normalized)
+ * @param {string} u - Username (will be normalized as fallback)
  * @param {number} amt - Amount of points to lock
+ * @param {string} userId - Discord user ID (preferred key for nickname-agnostic tracking)
  */
-const lock = (u, amt) => {
-  const key = normalizeUsername(u);
+const lock = (u, amt, userId = null) => {
+  // Use Discord ID as key if available (nickname-agnostic)
+  const key = userId || normalizeUsername(u);
   st.lp[key] = (st.lp[key] || 0) + amt;
   save();
 };
@@ -648,11 +666,13 @@ const lock = (u, amt) => {
  * - Called when auction is cancelled or skipped
  * - Called after session finalization
  *
- * @param {string} u - Username (will be normalized)
+ * @param {string} u - Username (will be normalized as fallback)
  * @param {number} amt - Amount of points to unlock
+ * @param {string} userId - Discord user ID (preferred key for nickname-agnostic tracking)
  */
-const unlock = (u, amt) => {
-  const key = normalizeUsername(u);
+const unlock = (u, amt, userId = null) => {
+  // Use Discord ID as key if available (nickname-agnostic)
+  const key = userId || normalizeUsername(u);
   st.lp[key] = Math.max(0, (st.lp[key] || 0) - amt);
   if (st.lp[key] === 0) delete st.lp[key];
   save();
@@ -1856,25 +1876,29 @@ async function finalize(cli, cfg) {
 
   if (sub.ok) {
     // Create multiple embeds instead of truncating
-    const wListStrings = st.h.length > 0 
-      ? st.h.map((a, i) => `${i + 1}. **${a.item}**: ${a.winner} - ${a.amount}pts`)
+    // Track session items separately - history may contain old items from bot restart
+    // Use timestamp comparison to only include this session's items
+    const sessionStartTime = typeof st.sd === 'string' ? Date.parse(st.sd) : st.sd.getTime();
+    const sessionItems = st.h.filter(a => a.timestamp >= sessionStartTime);
+    const itemList = sessionItems.length > 0 
+      ? sessionItems.map((a, i) => `${i + 1}. **${a.item}**: ${a.winner} - ${a.amount}pts`)
       : ["No items"];
     
     const totalSpent = res.reduce((s, r) => s + r.totalSpent, 0);
     
     const sessionEmbeds = createPaginatedEmbeds(
       `${EMOJI.SUCCESS} Session Complete`,
-      wListStrings,
+      itemList,
       15,
       { color: COLORS.SUCCESS, footer: `Total: ${totalSpent} pts` }
     );
 
     // Update first embed with summary
     sessionEmbeds[0]
-      .setDescription(`**Results submitted**\n**${st.h.length}** items sold\n**${totalSpent}** pts total`)
+      .setDescription(`**Results submitted**\n**${sessionItems.length}** items sold\n**${totalSpent}** pts total`)
       .addFields(
         { name: `${EMOJI.CLOCK} Time`, value: st.sd, inline: true },
-        { name: `${EMOJI.TROPHY} Sold`, value: `${st.h.length}`, inline: true },
+        { name: `${EMOJI.TROPHY} Sold`, value: `${sessionItems.length}`, inline: true },
         { name: `${EMOJI.BID} Total`, value: `${totalSpent}`, inline: true },
         { name: "👥 Members Updated", value: `${res.length}`, inline: false }
       )
@@ -1948,7 +1972,7 @@ function isFinalizingSession() {
  *    - Timers are RESCHEDULED after endTime update
  *
  * 4. VALIDATION CHECKS:
- *    - ELYSIUM role requirement
+ *    - Guild role requirement
  *    - Rate limit enforcement
  *    - Bid amount validation (integer, positive, not too large)
  *    - Points availability check (total - locked >= needed)
@@ -2011,7 +2035,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     return { ok: false, msg: "Finalizing" };
   }
 
-  // Attendance check removed - all ELYSIUM members can now bid freely
+  // Attendance check removed - all guild members can now bid freely
   const now = Date.now();
   if (st.lb[uid] && now - st.lb[uid] < 3000) {
     const wait = Math.ceil((3000 - (now - st.lb[uid])) / 1000);
@@ -2064,11 +2088,14 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   }
 
   // Calculate locked points ACROSS ALL SYSTEMS (auctioneering uses st.lp from bidding.js)
-  const curLocked = st.lp[normalizeUsername(u)] || 0;
+  // Use Discord ID for nickname-agnostic lookup
+  const lockedKey = uid || normalizeUsername(u);
+  const curLocked = st.lp[lockedKey] || 0;
   const av = tot - curLocked;
 
-  const isSelf =
-    currentItem.curWin && normalizeUsername(currentItem.curWin) === normalizeUsername(u);
+  // Check if self-outbid - use ID for comparison when available
+  const selfKey = currentItem.curWinId || (currentItem.curWin ? normalizeUsername(currentItem.curWin) : null);
+  const isSelf = selfKey && (uid === selfKey || (currentItem.curWin && normalizeUsername(currentItem.curWin) === normalizeUsername(u)));
   const needed = isSelf ? Math.max(0, bid - currentItem.curBid) : bid;
 
   if (needed > av) {
@@ -2101,23 +2128,24 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   // Handle previous winner (unlock their points)
   if (currentItem.curWin && !isSelf) {
     try {
-      unlock(currentItem.curWin, currentItem.curBid);
+      // Use curWinId for nickname-agnostic unlock
+      unlock(currentItem.curWin, currentItem.curBid, currentItem.curWinId);
     } catch (err) {
       logger.error(`❌ CRITICAL: Failed to unlock points for ${currentItem.curWin}:`, err);
-      // Log to admin but continue - don't block new bid
-      // This should be investigated as it may indicate state corruption
     }
   }
 
   // Lock the new bid
   try {
-    lock(u, needed);
+    // Use uid for nickname-agnostic lock
+    lock(u, needed, uid);
   } catch (err) {
     logger.error(`❌ CRITICAL: Failed to lock points for ${u}:`, err);
     // If we can't lock points, we MUST restore previous state
     if (currentItem.curWin && !isSelf) {
       try {
-        lock(currentItem.curWin, currentItem.curBid); // Re-lock previous winner
+        // Use curWinId for restore
+        lock(currentItem.curWin, currentItem.curBid, currentItem.curWinId);
       } catch (restoreErr) {
         logger.error(`❌ FATAL: Failed to restore previous state:`, restoreErr);
       }
@@ -2344,7 +2372,7 @@ async function procBid(msg, amt, cfg) {
     u = m.nickname || msg.author.username,
     uid = msg.author.id;
   if (!hasRole(m) && !isAdm(m, cfg)) {
-    await msg.reply(`${EMOJI.ERROR} Need ELYSIUM role`);
+    await msg.reply(`${EMOJI.ERROR} Need guild role`);
     return { ok: false, msg: "No role" };
   }
 
@@ -2385,9 +2413,13 @@ async function procBid(msg, amt, cfg) {
     return { ok: false, msg: "No pts" };
   }
 
-  // Check if self-overbidding
-  const isSelf = a.curWin && normalizeUsername(a.curWin) === normalizeUsername(u);
-  const curLocked = st.lp[normalizeUsername(u)] || 0;
+  // Check if self-overbidding - use ID for comparison
+  const selfKey = a.curWinId || (a.curWin ? normalizeUsername(a.curWin) : null);
+  const isSelf = selfKey && (uid === selfKey || (a.curWin && normalizeUsername(a.curWin) === normalizeUsername(u)));
+  
+  // Use Discord ID for nickname-agnostic lookup
+  const lockedKey = uid || normalizeUsername(u);
+  const curLocked = st.lp[lockedKey] || 0;
   const needed = isSelf ? Math.max(0, bid - a.curBid) : bid;
 
   if (needed > av) {
@@ -2407,11 +2439,12 @@ async function procBid(msg, amt, cfg) {
 
   // Handle previous winner (unlock their points)
   if (a.curWin && !isSelf) {
-    unlock(a.curWin, a.curBid);
+    // Use curWinId for nickname-agnostic unlock
+    unlock(a.curWin, a.curBid, a.curWinId);
   }
 
-  // Lock the new bid
-  lock(u, needed);
+  // Lock the new bid - use uid for nickname-agnostic lock
+  lock(u, needed, uid);
 
   // Store previous bid for display
   const prevBid = a.curBid;
@@ -2648,249 +2681,10 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
         const isConfirm = interaction.customId.startsWith('reset_confirm_');
         const disabledRow = createDisabledRow(rstConfirmBtn, rstCancelBtn);
 
-        if (isConfirm) {
+if (isConfirm) {
           clearAllTimers();
-          stopCacheAutoRefresh();
-          st = {
-            a: null,
-            lp: {},
-            q: [],
-            h: [],
-            th: {},
-            pc: {},
-            sd: null,
-            cp: null,
-            ct: null,
-            lb: {},
-            pause: false,
-            pauseTimer: null,
-            auctionLock: false,
-            cacheRefreshTimer: null,
-          };
-          await save(true);
-
-          const successEmbed = EmbedBuilder.from(rstEmbed).setColor(COLORS.SUCCESS).setTitle(`${EMOJI.SUCCESS} Reset Complete`);
-          await interaction.update({ embeds: [successEmbed], components: [disabledRow] });
-          await msg.reply(`${EMOJI.SUCCESS} Reset (cache cleared)`);
-        } else {
-          const cancelEmbed = EmbedBuilder.from(rstEmbed).setColor(COLORS.INFO).setTitle(`${EMOJI.ERROR} Reset Cancelled`);
-          await interaction.update({ embeds: [cancelEmbed], components: [disabledRow] });
-        }
-        rstCollector.stop();
-      });
-
-      rstCollector.on('end', async (collected, reason) => {
-        if (reason === 'time') {
-          const disabledRow = createDisabledRow(rstConfirmBtn, rstCancelBtn);
-          const timeoutEmbed = EmbedBuilder.from(rstEmbed).setColor(COLORS.INFO).setTitle(`${EMOJI.CLOCK} Timed Out`);
-          await errorHandler.safeEdit(rstMsg, { embeds: [timeoutEmbed], components: [disabledRow] }, 'message edit');
-        }
-      });
-      break;
-
-    case "!forcesubmitresults": {
-      if (!st.sd || st.h.length === 0)
-        return await msg.reply(`${EMOJI.ERROR} No history`);
-      const submitButton = new ButtonBuilder()
-        .setCustomId(`forcesubmit_confirm_${msg.author.id}_${Date.now()}`)
-        .setLabel('✅ Submit Results')
-        .setStyle(ButtonStyle.Success)
-        .setDisabled(false);
-
-      const cancelButton = new ButtonBuilder()
-        .setCustomId(`forcesubmit_cancel_${msg.author.id}_${Date.now()}`)
-        .setLabel('❌ Cancel')
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(false);
-
-      const row = new ActionRowBuilder().addComponents(submitButton, cancelButton);
-
-      // Create preview list (first 10 items)
-      const resultsList = st.h
-        .map((a, i) => `${i + 1}. **${a.item}**: ${a.winner} - ${a.amount}pts`);
-      
-      const totalItems = st.h.length;
-      const totalPoints = st.h.reduce((sum, a) => sum + a.amount, 0);
-
-      const previewEmbed = new EmbedBuilder()
-        .setColor(getColor(COLORS.WARNING))
-        .setTitle(`${EMOJI.WARNING} Force Submit?`)
-        .setDescription(`**Time:** ${st.sd}\n**Items:** ${totalItems}\n**Total points:** ${totalPoints} pts`)
-        .addFields({
-          name: `${EMOJI.LIST} Preview (first 10)`,
-          value: resultsList.slice(0, 10).join('\n') + (totalItems > 10 ? `\n*... and ${totalItems - 10} more*` : ''),
-          inline: false,
-        })
-        .setFooter({ text: 'Click a button below to confirm' });
-
-      const fsMsg = await msg.reply({
-        embeds: [previewEmbed],
-        components: [row],
-      });
-
-      // Store full results for after confirmation
-      const fullResultsEmbeds = createPaginatedEmbeds(
-        `${EMOJI.LIST} All Results - Force Submit`,
-        resultsList,
-        15,
-        { color: COLORS.WARNING, footer: `Total: ${totalItems} items, ${totalPoints} pts` }
-      );
-
-      const collector = fsMsg.createMessageComponentCollector({
-        componentType: ComponentType.Button,
-        time: TIMEOUTS.CONFIRMATION,
-        filter: i => i.user.id === msg.author.id
-      });
-
-      collector.on('collect', async (interaction) => {
-        const isConfirm = interaction.customId.startsWith('forcesubmit_confirm_');
-
-        const disabledRow = createDisabledRow(submitButton, cancelButton);
-
-        if (isConfirm) {
-          if (!st.sd) st.sd = ts();
-
-          const winners = {};
-          st.h.forEach((a) => {
-            const normalizedWinner = normalizeUsername(a.winner);
-            winners[normalizedWinner] =
-              (winners[normalizedWinner] || 0) + a.amount;
-          });
-
-          const allMembers = st.cp ? st.cp.getAllUsernames() : [];
-          const res = allMembers.map((m) => {
-            const normalizedMember = normalizeUsername(m);
-            return {
-              member: m,
-              totalSpent: winners[normalizedMember] || 0,
-            };
-          });
-          const sub = await submitRes(cfg.sheet_webhook_url, res, st.sd);
-          if (sub.ok) {
-            // Send full results as multiple embeds
-            const totalSpent = res.reduce((s, r) => s + r.totalSpent, 0);
-            
-            // Update first embed with success status
-            if (fullResultsEmbeds.length > 0) {
-              fullResultsEmbeds[0]
-                .setColor(getColor(COLORS.SUCCESS))
-                .setTitle(`${EMOJI.SUCCESS} Force Submit OK!`)
-                .setDescription(`**${st.h.length}** items submitted\n**${totalSpent}** pts total`);
-            }
-            
-            // Send all result embeds
-            for (const embed of fullResultsEmbeds) {
-              await msg.channel.send({ embeds: [embed] });
-            }
-            
-            st.h = [];
-            st.sd = null;
-            st.lp = {};
-            clearCache();
-            save();
-          } else {
-            await msg.channel.send({
-              embeds: [
-                new EmbedBuilder()
-                  .setColor(getColor(COLORS.ERROR))
-                  .setTitle(`${EMOJI.ERROR} Failed`)
-                  .setDescription(`**Error:** ${sub.err}`),
-              ],
-            });
-            
-            // Also send the data as paginated embeds for manual entry
-            const errorData = res
-              .filter((r) => r.totalSpent > 0)
-              .map((r) => `${r.member}: ${r.totalSpent}pts`);
-            
-            const errorEmbeds = createPaginatedEmbeds(
-              `${EMOJI.LIST} Data for Manual Entry`,
-              errorData,
-              15,
-              { color: COLORS.ERROR }
-            );
-            
-            for (const embed of errorEmbeds) {
-              await msg.channel.send({ embeds: [embed] });
-            }
-          }
-          await interaction.update({ components: [disabledRow] });
-          collector.stop();
-        } else {
-          // User cancelled
-          const cancelEmbed = new EmbedBuilder()
-            .setColor(getColor(COLORS.ERROR))
-            .setTitle(`${EMOJI.ERROR} Cancelled`)
-            .setDescription('Force submit cancelled')
-            .setTimestamp();
-
-          await interaction.update({ embeds: [cancelEmbed], components: [disabledRow] });
-          collector.stop();
-        }
-      });
-
-      collector.on('end', async (collected, reason) => {
-        if (reason === 'time' && collected.size === 0) {
-          const disabledRow = createDisabledRow(submitButton, cancelButton);
-
-          const timeoutEmbed = new EmbedBuilder()
-            .setColor(getColor(COLORS.ERROR))
-            .setTitle(`${EMOJI.ERROR} Timed Out`)
-            .setDescription('Confirmation expired')
-            .setTimestamp();
-
-          await errorHandler.safeEdit(fsMsg, { embeds: [timeoutEmbed], components: [disabledRow] }, 'force sell confirmation timeout');
-        }
-      });
-      break;
-    }
-
-    case "!cancelitem":
-      if (!st.a) return await msg.reply(`${EMOJI.ERROR} No active auction`);
-      if (msg.channel.id !== st.a.threadId)
-        return await msg.reply(`${EMOJI.ERROR} Use in auction thread`);
-
-      const cancelConfirmBtn = new ButtonBuilder()
-        .setCustomId(`cancelitem_confirm_${msg.author.id}_${Date.now()}`)
-        .setLabel('✅ Yes, Cancel Item')
-        .setStyle(ButtonStyle.Danger);
-
-      const cancelCancelBtn = new ButtonBuilder()
-        .setCustomId(`cancelitem_cancel_${msg.author.id}_${Date.now()}`)
-        .setLabel('❌ No, Keep Item')
-        .setStyle(ButtonStyle.Secondary);
-
-      const cancelRow = new ActionRowBuilder().addComponents(cancelConfirmBtn, cancelCancelBtn);
-
-      const canMsg = await msg.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(getColor(COLORS.WARNING))
-            .setTitle(`${EMOJI.WARNING} Cancel Item?`)
-            .setDescription(
-              `**${st.a.item}**${
-                st.a.quantity > 1 ? ` x${st.a.quantity}` : ""
-              }\n\nRefund all locked points?`
-            )
-            .setFooter({ text: 'Click a button below to confirm' }),
-        ],
-        components: [cancelRow],
-      });
-
-      const cancelCollector = canMsg.createMessageComponentCollector({
-        componentType: ComponentType.Button,
-        time: TIMEOUTS.CONFIRMATION,
-        filter: i => i.user.id === msg.author.id
-      });
-
-      cancelCollector.on('collect', async (interaction) => {
-        const isConfirm = interaction.customId.startsWith('cancelitem_confirm_');
-
-        const disabledCancelRow = createDisabledRow(cancelConfirmBtn, cancelCancelBtn);
-
-        if (isConfirm) {
-          clearAllTimers();
-          if (st.a.curWin) unlock(st.a.curWin, st.a.curBid);
+          // Use curWinId for nickname-agnostic unlock
+          if (st.a.curWin) unlock(st.a.curWin, st.a.curBid, st.a.curWinId);
 
           // Send messages before locking/archiving
           await msg.channel.send(
@@ -2991,7 +2785,8 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
 
         if (isConfirm) {
           clearAllTimers();
-          if (st.a.curWin) unlock(st.a.curWin, st.a.curBid);
+          // Use curWinId for nickname-agnostic unlock
+          if (st.a.curWin) unlock(st.a.curWin, st.a.curBid, st.a.curWinId);
 
           // Send messages before locking/archiving
           await msg.channel.send(
@@ -3088,7 +2883,7 @@ async function handleCmd(cmd, msg, args, cli, cfg) {
               .setColor(getColor(COLORS.ERROR))
               .setTitle(`${EMOJI.ERROR} Not Found`)
               .setDescription(
-                `**${u}**\n\nYou are not in the bidding system or not a current ELYSIUM member.`
+                `**${u}**\n\nYou are not in the bidding system or not a current guild member.`
               )
               .setFooter({ text: "Contact admin if this is wrong" })
               .setTimestamp(),
@@ -4220,8 +4015,8 @@ module.exports = {
         });
       }
 
-      // Lock the new bid
-      lock(p.username, p.needed);
+      // Lock the new bid - use userId for nickname-agnostic lock
+      lock(p.username, p.needed, p.userId);
 
       // Update current item
       const prevBid = currentItem.curBid;
@@ -4436,9 +4231,9 @@ module.exports = {
       return;
     }
 
-    // Handle previous winner
+    // Handle previous winner - use curWinId for nickname-agnostic unlock
     if (a.curWin && !p.isSelf) {
-      unlock(a.curWin, a.curBid);
+      unlock(a.curWin, a.curBid, a.curWinId);
       await reaction.message.channel.send({
         content: `<@${a.curWinId}>`,
         embeds: [
@@ -4450,7 +4245,8 @@ module.exports = {
       });
     }
 
-    lock(p.username, p.needed);
+    // Use userId for nickname-agnostic lock
+    lock(p.username, p.needed, p.userId);
 
     const prevBid = a.curBid;
     a.curBid = p.amount;

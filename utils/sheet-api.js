@@ -643,16 +643,16 @@ class SheetAPI {
    * Export learning data to Google Drive
    * @param {Object} filters - Optional filters { type, startDate, endDate }
    */
-  async exportLearningData(filters = {}) {
-    return await this.call('exportLearningData', { filters });
-  }
+  // DISABLED: async exportLearningData(filters = {}) {
+  // DISABLED:   return await this.call('exportLearningData', { filters });
+  // DISABLED: }
 
-  /**
-   * Export prediction features for ML training
-   */
-  async exportPredictionFeatures() {
-    return await this.call('exportPredictionFeatures', {});
-  }
+  // DISABLED: /**
+  // DISABLED:  * Export prediction features for ML training
+  // DISABLED:  */
+  // DISABLED: async exportPredictionFeatures() {
+  // DISABLED:   return await this.call('exportPredictionFeatures', {});
+  // DISABLED: }
 
   /**
    * Create daily backup of all sheets
@@ -669,20 +669,20 @@ class SheetAPI {
     return await this.call('logAuditTrail', data);
   }
 
-  /**
-   * Bootstrap learning system from historical data
-   * Analyzes all ForDistribution data and creates completed predictions
-   */
-  async bootstrapLearning() {
-    return await this.call('bootstrapLearning', {});
-  }
+  // DISABLED: /**
+  // DISABLED:  * Bootstrap learning system from historical data
+  // DISABLED:  * Analyzes all ForDistribution data and creates completed predictions
+  // DISABLED:  */
+  // DISABLED: async bootstrapLearning() {
+  // DISABLED:   return await this.call('bootstrapLearning', {});
+  // DISABLED: }
 
-  /**
-   * Check if bootstrap is needed
-   */
-  async needsBootstrap() {
-    return await this.call('needsBootstrap', {});
-  }
+  // DISABLED: /**
+  // DISABLED:  * Check if bootstrap is needed
+  // DISABLED:  */
+  // DISABLED: async needsBootstrap() {
+  // DISABLED:   return await this.call('needsBootstrap', {});
+  // DISABLED: }
 
   /**
    * Get all weekly attendance data for spawn prediction

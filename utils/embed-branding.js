@@ -16,8 +16,7 @@
  *
  * @param {EmbedBuilder} embed - The embed to add branding to
  * @param {Guild} guild - Discord guild object
- * @param {string} footerText - Optional custom footer text (defaults to existing or 'ELYSIUM Guild')
- * @returns {EmbedBuilder} The embed with branding added
+* @param {string} footerText - Optional custom footer text (defaults to guild name from config)
  */
 function addGuildFooter(embed, guild, footerText = null) {
   if (!guild) return embed;
@@ -25,8 +24,17 @@ function addGuildFooter(embed, guild, footerText = null) {
   const iconURL = guild.iconURL();
   if (!iconURL) return embed;
 
-  // Get existing footer text or use default
-  const text = footerText || embed.data.footer?.text || 'ELYSIUM Guild';
+  // Get guild name from config or use default
+  let guildName = 'TrailerParkB';
+  try {
+    const config = require('../config.json');
+    guildName = config.guild_name || 'TrailerParkB';
+  } catch (e) {
+    // Use default
+  }
+
+  // Get existing footer text or use config guild name
+  const text = footerText || embed.data.footer?.text || `${guildName} Guild`;
 
   embed.setFooter({
     text: text,
@@ -69,7 +77,7 @@ function addGuildAuthor(embed, guild, authorName = null) {
   const iconURL = guild.iconURL();
   if (!iconURL) return embed;
 
-  const name = authorName || guild.name || 'ELYSIUM Guild';
+  const name = authorName || guild.name || guildName;
 
   embed.setAuthor({
     name: name,

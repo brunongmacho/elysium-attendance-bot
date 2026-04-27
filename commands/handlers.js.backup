@@ -1772,56 +1772,6 @@ if (commandName === 'rotation') {
       return;
     }
 
-// =========================================================================
-// TEST SEND COMMAND
-// =========================================================================
-if (commandName === 'testsend') {
-  // Check admin permission
-  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-  if (!member || !isAdmin(member, config)) {
-    await interaction.reply({
-      content: '❌ Admin only command',
-      ephemeral: true
-    });
-    return;
-  }
-
-  // Check if used in admin-logs channel
-  if (interaction.channel.id !== config.admin_logs_channel_id) {
-    await interaction.reply({
-      content: `❌ This command can only be used in <#${config.admin_logs_channel_id}>`,
-      ephemeral: true
-    });
-    return;
-  }
-
-  await interaction.deferReply();
-
-  try {
-    // Call test send function from index2
-    const { commandHandlers } = require('../index2.js');
-    const result = await commandHandlers.testSend({ guild: interaction.guild }, config, client);
-
-    if (result.error) {
-      await interaction.editReply({ content: '❌ Test send failed: ' + result.error });
-    } else {
-      await interaction.editReply({ 
-        embeds: [{
-          color: 0x00FF00,
-          title: '✅ Test Send Complete',
-          description: 'Sent to ' + result.successCount + ' channels' +
-                       (result.channels.filter(c => c.status === 'failed').length > 0 ? ', ' + result.channels.filter(c => c.status === 'failed').length + ' failed' : ''),
-          timestamp: new Date(),
-          footer: { text: 'Guild: ' + config.guild_name }
-        }]
-      });
-    }
-  } catch (err) {
-    console.error('Error in /testsend command:', err);
-    await interaction.editReply({ content: '❌ Failed to execute test send: ' + err.message });
-  }
-  return;
-}
     // Unknown command
     await interaction.reply({
       content: '❌ Unknown command',

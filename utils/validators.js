@@ -32,9 +32,13 @@ const config = require('../config.json');
 function isAdmin(member) {
   if (!member) return false;
 
-  // Check if user has any admin role
-  return config.admin_roles.some(roleName =>
-    member.roles.cache.some(role => role.name === roleName)
+  // Get role IDs from config.role_ids and role names from config.admin_roles
+  const roleIds = Object.values(config.role_ids || {});
+  const roleNames = config.admin_roles || [];
+
+  return member.roles.cache.some((r) => 
+    roleNames.includes(r.name) || 
+    roleIds.includes(r.id)
   );
 }
 

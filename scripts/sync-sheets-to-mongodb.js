@@ -1,15 +1,17 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * ELYSIUM GUILD BOT - Sync Google Sheets → MongoDB
+ * TRAILERPARKB GUILD BOT - Sync Google Sheets → MongoDB
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Syncs latest data from Google Sheets to MongoDB for all MongoDB-enabled modules.
+ * Uses guild-specific database for data isolation.
  *
- * As Phase 4 progresses, this script is updated to include new modules:
- * - ✅ Phase 4.1: Members (bidding points) - USE_MONGODB_BIDDING
- * - ✅ Phase 4.2: Auction Items - USE_MONGODB_AUCTIONEERING
- * - ✅ Phase 4.3: Boss Rotation - Boss rotation tracking
- * - ✅ Phase 4.4: Attendance records - USE_MONGODB_ATTENDANCE (historical import)
+ * Modules synced:
+ * - Members (bidding points) - USE_MONGODB_BIDDING
+ * - Auction Items - USE_MONGODB_AUCTIONEERING
+ * - Boss Rotation - Boss rotation tracking
+ * - Attendance records - USE_MONGODB_ATTENDANCE (historical import)
+ * - Member Registry - Nickname tracking and updates
  *
  * Usage:
  *   node scripts/sync-sheets-to-mongodb.js                # Sync all modules
@@ -17,6 +19,7 @@
  *   node scripts/sync-sheets-to-mongodb.js --items        # Sync auction items only
  *   node scripts/sync-sheets-to-mongodb.js --rotation     # Sync boss rotation only
  *   node scripts/sync-sheets-to-mongodb.js --attendance   # Sync attendance only
+ *   node scripts/sync-sheets-to-mongodb.js --registry    # Sync member registry
  *   node scripts/sync-sheets-to-mongodb.js --dry-run      # Test without writing
  *
  * Note: Output is Discord-safe (stays under 2000 char limit) by limiting
@@ -58,15 +61,25 @@ const SYNC_ROTATION = process.argv.includes('--rotation') || !hasModuleFlag();
 const SKIP_ATTENDANCE = process.env.SKIP_ATTENDANCE_SYNC === 'true';
 const SYNC_ATTENDANCE = (process.argv.includes('--attendance') || !hasModuleFlag()) && !SKIP_ATTENDANCE;
 
+// Member Registry sync (always included in full sync)
+const SYNC_REGISTRY = process.argv.includes('--registry') || (!hasModuleFlag() && !DRY_RUN);
+
 // Load bot configuration
 let config;
+let guildName = 'TrailerParkB';
 try {
   const configPath = path.join(__dirname, '..', 'config.json');
   config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  if (config.guild_name) {
+    guildName = config.guild_name;
+  }
 } catch (error) {
   console.error('❌ Failed to load config.json:', error.message);
   process.exit(1);
 }
+
+// Get MongoDB database name from config
+const DB_NAME = config.mongodb_database || `elysium-bot-${guildName.toLowerCase().replace(/\s+/g, '-')}`;
 
 // Load Discord ID mapping (nickname -> Discord ID)
 let discordIdMap = {};
@@ -255,7 +268,8 @@ async function syncMembers(db, sheetAPI) {
     }
 
     // Update MongoDB
-    const membersCollection = db.collection('members');
+    const collectionName = `members-${guildName.toLowerCase().replace(/\s+/g, '-')}`;
+    const membersCollection = db.collection(collectionName);
     let synced = 0;
     let skipped = 0;
     let created = 0;
@@ -434,7 +448,8 @@ async function syncAuctionItems(db, sheetAPI) {
     }
 
     // Clear existing items and insert fresh data
-    const itemsCollection = db.collection('auctionItems');
+    const collectionName = `auctionItems-${guildName.toLowerCase().replace(/\s+/g, '-')}`;
+    const itemsCollection = db.collection(collectionName);
 
     log('🗑️', 'Clearing old auction items...');
     await itemsCollection.deleteMany({});
@@ -538,8 +553,9 @@ async function syncBossRotation(db, sheetAPI) {
       return { synced: rotationData.length, skipped: 0 };
     }
 
-    // Upsert rotation data (update existing, insert new) - prevents duplicate key errors
-    const rotationCollection = db.collection('bossRotation');
+// Upsert rotation data (update existing, insert new) - prevents duplicate key errors
+    const collectionName = `bossRotation-${guildName.toLowerCase().replace(/\s+/g, '-')}`;
+    const rotationCollection = db.collection(collectionName);
 
     log('💾', 'Upserting boss rotation data...');
     const bulkOps = rotationData.map(rotation => ({
@@ -582,10 +598,10 @@ async function syncBossRotation(db, sheetAPI) {
 async function syncAttendance(db, sheetAPI) {
   log('🔄', 'Syncing attendance records...');
 
-  try {
+try {
     // PERF FIX: Smart check - compare counts and timestamps
-    // Instead of blindly skipping, check if there are new records to sync
-    const attendanceCollection = db.collection('attendance');
+    const collectionName = `attendance-${guildName.toLowerCase().replace(/\s+/g, '-')}`;
+    const attendanceCollection = db.collection(collectionName);
     const existingCount = await attendanceCollection.countDocuments();
 
     // If we have a lot of records, check if there are NEW ones before doing expensive fetch
@@ -643,8 +659,9 @@ async function syncAttendance(db, sheetAPI) {
       return { synced: attendanceRecords.length, skipped: 0 };
     }
 
-    // Reuse attendanceCollection from above (already declared at line 463)
-    const membersCollection = db.collection('members');
+    // Reuse attendanceCollection from above (already declared with guild suffix)
+    const membersCollectionName = `members-${guildName.toLowerCase().replace(/\s+/g, '-')}`;
+    const membersCollection = db.collection(membersCollectionName);
 
     // ═══════════════════════════════════════════════════════════════════════════
     // STEP 1: Pre-fetch all members and build username → member map (1 query)

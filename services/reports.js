@@ -23,7 +23,7 @@
  */
 
 // ============================================================================
-// DEPENDENCIES
+// DEPENDENCY UTILITIES
 // ============================================================================
 
 const { EmbedBuilder } = require('discord.js');
@@ -31,6 +31,56 @@ const dbAPI = require('../utils/database-api');
 const mongoHelpers = require('../utils/mongodb-helpers');
 const errorHandler = require('../utils/error-handler');
 const LRUCache = require('../utils/lru-cache');
+
+// Discord embed limits
+const DISCORD_LIMITS = {
+  FIELD_NAME: 256,
+  FIELD_VALUE: 1024,
+  EMBED_TITLE: 256,
+  EMBED_DESCRIPTION: 4096,
+  FOOTER_TEXT: 2048,
+  AUTHOR_NAME: 256,
+  TOTAL_EMBED: 6000
+};
+
+// Truncate text to stay within Discord limits
+function truncate(text, maxLength, suffix = '...') {
+  if (!text || text.length <= maxLength) return text;
+  return text.substring(0, maxLength - suffix.length) + suffix;
+}
+
+// Truncate field value array by limiting member count or truncating names
+function truncateFieldValue(lines, maxLength = DISCORD_LIMITS.FIELD_VALUE, maxItems = null) {
+  let result = [];
+  let totalLength = 0;
+  
+  for (let i = 0; i < lines.length; i++) {
+    if (maxItems && i >= maxItems) break;
+    
+    const line = lines[i];
+    if (totalLength + line.length + 1 > maxLength) {
+      const remaining = maxLength - totalLength - 1;
+      if (remaining > 10) {
+        result.push(truncate(line, remaining));
+      }
+      break;
+    }
+    
+    result.push(line);
+    totalLength += line.length + 1;
+  }
+  
+  return result.join('\n');
+}
+
+// Get guild name from config
+let guildName = 'TrailerParkB';
+try {
+  const config = require('../config.json');
+  guildName = config.guild_name || 'TrailerParkB';
+} catch (e) {
+  console.warn('⚠️ Could not load config for guild name, using default');
+}
 
 // ============================================================================
 // QUERY RESULT CACHING (PHASE 3.2)
@@ -413,7 +463,7 @@ function buildWeeklyReportEmbed(reportData) {
 
   const embed = new EmbedBuilder()
     .setColor(0x3498DB)
-    .setTitle('📊 ELYSIUM WEEKLY REPORT')
+    .setTitle(`📊 ${guildName} WEEKLY REPORT`)
     .setDescription(`**Week of ${dateRange}**`)
     .setTimestamp();
 
@@ -455,7 +505,7 @@ function buildWeeklyReportEmbed(reportData) {
 
     embed.addFields({
       name: '👥 TOP 10 MOST ACTIVE MEMBERS',
-      value: memberLines.join('\n'),
+      value: truncateFieldValue(memberLines),
       inline: false
     });
   }
@@ -741,7 +791,7 @@ function buildMonthlyReportEmbed(reportData) {
 
   const embed = new EmbedBuilder()
     .setColor(0x9B59B6)
-    .setTitle(`📊 ELYSIUM MONTHLY REPORT - ${monthName.toUpperCase()}`)
+    .setTitle(`📊 ${guildName} MONTHLY REPORT - ${monthName.toUpperCase()}`)
     .setTimestamp();
 
   // Monthly overview

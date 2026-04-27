@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * ELYSIUM LEADERBOARD & WEEKLY REPORT SYSTEM
+ * LEADERBOARD & WEEKLY REPORT SYSTEM
  * ============================================================================
  *
  * PURPOSE:
@@ -10,7 +10,7 @@
  * FEATURES:
  * - Attendance Leaderboard: Ranks members by attendance points
  * - Bidding Points Leaderboard: Shows members' remaining bidding points
- * - Weekly Reports: Automated summary reports every Saturday
+ * Weekly Reports: Automated summary reports every Monday
  * - Visual Progress Bars: Graphical representation of rankings
  * - Top Performers Highlighting: Gold/silver/bronze medals
  * - Statistics: Total spawns, average attendance, points consumed, etc.
@@ -27,7 +27,7 @@
  *    - Shows total points distributed and consumed
  *
  * WEEKLY REPORTS:
- * - Auto-generated every Saturday at 11:59pm GMT+8
+ * - Auto-generated every Monday at 2:59am GMT+8
  * - Sent to admin-logs channel
  * - Includes attendance summary, bidding summary, top members
  * - Timezone-aware scheduling (GMT+8 / Asia/Manila)
@@ -45,9 +45,18 @@
 const { EmbedBuilder } = require('discord.js');
 const { SheetAPI } = require('./utils/sheet-api');
 const { addGuildThumbnail } = require('./utils/embed-branding');
-const mongoHelpers = require('./utils/mongodb-helpers'); // Phase 4: MongoDB integration
-const dbAPI = require('./utils/database-api'); // Phase 4.5: Direct MongoDB access
+const mongoHelpers = require('./utils/mongodb-helpers');
+const dbAPI = require('./utils/database-api');
 const shutdownManager = require('./utils/shutdown-manager');
+
+// Get guild name from config
+let guildName = 'TrailerParkB';
+try {
+  const config = require('./config.json');
+  guildName = config.guild_name || 'TrailerParkB';
+} catch (e) {
+  console.warn('⚠️ Could not load config for guild name, using default');
+}
 const { createLogger } = require('./utils/logger');
 
 // Create logger instance for this module
@@ -580,7 +589,7 @@ async function displayCombinedLeaderboards(message) {
     // Build combined embed
     const embed = new EmbedBuilder()
       .setColor('#9b59b6')
-      .setTitle('🏆 ELYSIUM Leaderboards')
+      .setTitle(`🏆 ${guildName} Leaderboards`)
       .setDescription('**Combined Attendance & Bidding Rankings**')
       .setTimestamp();
 
@@ -677,7 +686,7 @@ async function displayCombinedLeaderboards(message) {
  *    - Top 5 most active members
  *
  * SCHEDULING:
- * Called automatically every Saturday at 11:59pm GMT+8
+ * Called automatically every Monday at 2:59am GMT+8
  * Can also be manually triggered for testing
  *
  * ERROR HANDLING:
@@ -690,7 +699,7 @@ async function displayCombinedLeaderboards(message) {
  *
  * @example
  * // Automatic (via scheduler)
- * // Every Saturday 11:59pm GMT+8
+ * // Every Monday 2:59am GMT+8
  *
  * @example
  * // Manual trigger
@@ -764,7 +773,7 @@ async function sendWeeklyReport(targetChannel = null) {
     }
 
     // ==========================================
-    // NEW: WEEK-SPECIFIC STATISTICS (Sunday-Saturday)
+    // NEW: WEEK-SPECIFIC STATISTICS (Monday-Sunday)
     // ==========================================
     if (data.weekSpecific) {
       const weekAtt = data.weekSpecific.attendance;
@@ -791,7 +800,7 @@ async function sendWeeklyReport(targetChannel = null) {
         }
 
         embed.addFields({
-          name: '📅 This Week\'s Attendance (Sunday-Saturday)',
+          name: '📅 This Week\'s Attendance (Monday-Sunday)',
           value: weekAttText,
           inline: false
         });
@@ -816,7 +825,7 @@ async function sendWeeklyReport(targetChannel = null) {
         }
 
         embed.addFields({
-          name: '💸 This Week\'s Bidding Activity (Sunday-Saturday)',
+          name: '💸 This Week\'s Bidding Activity (Monday-Sunday)',
           value: weekBidText,
           inline: false
         });
@@ -984,7 +993,7 @@ async function sendWeeklyReport(targetChannel = null) {
       });
     }
 
-    embed.setFooter({ text: 'Generated automatically every Saturday at 11:59pm GMT+8' });
+    embed.setFooter({ text: 'Generated automatically every Monday at 2:59am GMT+8' });
 
     // Send to appropriate channel(s)
     if (targetChannel) {
@@ -1014,10 +1023,10 @@ async function sendWeeklyReport(targetChannel = null) {
       await adminLogsChannel.send({ embeds: [embed] });
       console.log('✅ Weekly report sent to admin logs channel');
 
-      // Also send to ELYSIUM commands channel if configured
+      // Also send to guild commands channel if configured
       if (elysiumCommandsChannel) {
         await elysiumCommandsChannel.send({ embeds: [embed] });
-        console.log('✅ Weekly report sent to ELYSIUM commands channel');
+        console.log(`✅ Weekly report sent to guild commands channel`);
       }
 
       // Mark weekly report as completed in crash recovery (only for scheduled reports)
@@ -1047,20 +1056,20 @@ let weeklyReportTimer = null;
 let monthlyReportTimer = null;
 
 /**
- * Schedules weekly reports for every Saturday at 11:59pm GMT+8
+ * Schedules weekly reports for every Monday at 2:59am GMT+8
  *
  * TIMEZONE HANDLING:
  * This function properly handles timezone conversions for GMT+8 (Asia/Manila).
  * The server may be running in any timezone, so we calculate the next
- * Saturday 11:59pm GMT+8 in terms of UTC time.
+ * Monday 2:59am GMT+8 in terms of UTC time.
  *
  * WEEK DEFINITION:
- * Weeks start on Sunday and end on Saturday. Reports are generated at
- * the end of the week (Saturday 11:59pm) to capture all week activity.
+* Weeks start on Monday 3:00am and end on Monday 2:59am. Reports are generated at
+   * 2:59am Monday (1 minute BEFORE weekly reset).
  *
- * SCHEDULING LOGIC:
- * 1. Calculate days until next Saturday
- * 2. Set target time to 11:59pm GMT+8 on that Saturday
+* SCHEDULING LOGIC:
+  * 1. Calculate days until next Monday
+  * 2. Set target time to 2:59am GMT+8 on that Monday
  * 3. Convert to UTC for setTimeout
  * 4. After report runs, automatically schedule next week
  *
@@ -1077,8 +1086,8 @@ let monthlyReportTimer = null;
  * @example
  * // Called once at bot startup
  * scheduleWeeklyReport();
- * // Logs: ✅ Weekly report scheduler initialized (Saturday 11:59pm GMT+8)
- * // Logs: 📅 Next weekly report scheduled for: 2025-11-09 23:59:00 GMT+8 (in 168 hours)
+ * // Logs: ✅ Weekly report scheduler initialized (Monday 2:59am GMT+8)
+ * // Logs: 📅 Next weekly report scheduled for: 2025-11-09 02:59:00 GMT+8 (in 168 hours)
  */
 function scheduleWeeklyReport() {
   // ========================================
@@ -1091,11 +1100,11 @@ function scheduleWeeklyReport() {
   }
 
   /**
-   * Calculates the next Saturday at 11:59pm GMT+8 in UTC time
+   * Calculates the next Monday at 2:59am GMT+8 in UTC time
    *
-   * @returns {Date} UTC date object representing next Saturday 11:59pm GMT+8
+   * @returns {Date} UTC date object representing next Monday 2:59am GMT+8
    */
-  const calculateNextSaturday1159PM = () => {
+  const calculateNextMonday259AM = () => {
     const now = new Date();
 
     // GMT+8 offset in milliseconds (Asia/Manila timezone)
@@ -1107,20 +1116,20 @@ function scheduleWeeklyReport() {
     // Get current day (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
     const currentDay = nowGMT8.getUTCDay();
 
-    // Calculate days until next Saturday
+    // Calculate days until next Monday
     // Formula: (target_day - current_day + 7) % 7
-    let daysUntilSaturday = (6 - currentDay + 7) % 7;
+    let daysUntilMonday = (1 - currentDay + 7) % 7;
 
-    // Special case: If today IS Saturday and it's already past 11:59pm,
-    // schedule for next Saturday (7 days from now)
-    if (daysUntilSaturday === 0 && (nowGMT8.getUTCHours() > 23 || (nowGMT8.getUTCHours() === 23 && nowGMT8.getUTCMinutes() >= 59))) {
-      daysUntilSaturday = 7;
+    // Special case: If today IS Monday and it's already past 2:59am,
+    // schedule for next Monday (7 days from now)
+    if (daysUntilMonday === 0 && (nowGMT8.getUTCHours() > 2 || (nowGMT8.getUTCHours() === 2 && nowGMT8.getUTCMinutes() >= 59))) {
+      daysUntilMonday = 7;
     }
 
     // Create target date in GMT+8 timezone
     const targetGMT8 = new Date(nowGMT8);
-    targetGMT8.setUTCDate(targetGMT8.getUTCDate() + daysUntilSaturday);
-    targetGMT8.setUTCHours(23, 59, 0, 0);  // 11:59:00pm
+    targetGMT8.setUTCDate(targetGMT8.getUTCDate() + daysUntilMonday);
+    targetGMT8.setUTCHours(2, 59, 0, 0);  // 2:59:00am
 
     // Convert back to UTC for setTimeout (which uses UTC)
     const targetUTC = new Date(targetGMT8.getTime() - GMT8_OFFSET);
@@ -1134,19 +1143,19 @@ function scheduleWeeklyReport() {
    */
   const scheduleNext = () => {
     // Calculate when next report should run (in UTC)
-    const nextSaturdayUTC = calculateNextSaturday1159PM();
+    const nextMondayUTC = calculateNextMonday259AM();
     const now = new Date();
-    const delay = nextSaturdayUTC.getTime() - now.getTime();
+    const delay = nextMondayUTC.getTime() - now.getTime();
 
     // Format for logging (convert back to GMT+8 for display)
-    const displayTime = new Date(nextSaturdayUTC.getTime() + 8 * 60 * 60 * 1000);
+    const displayTime = new Date(nextMondayUTC.getTime() + 8 * 60 * 60 * 1000);
     const hours = Math.floor(delay / 1000 / 60 / 60);
 
     logger.info(`📅 Next weekly report scheduled for: ${displayTime.toISOString().replace('T', ' ').substring(0, 19)} GMT+8 (in ${hours} hours)`);
 
     // Save schedule to crash recovery
     if (crashRecovery) {
-      crashRecovery.saveLeaderboardReportSchedule(nextSaturdayUTC).catch(err => {
+      crashRecovery.saveLeaderboardReportSchedule(nextMondayUTC).catch(err => {
         logger.error('⚠️ Failed to save report schedule to crash recovery:', err.message);
       });
     }
@@ -1162,7 +1171,7 @@ function scheduleWeeklyReport() {
 
   // Start the scheduling cycle
   scheduleNext();
-  logger.info('✅ Weekly report scheduler initialized (Saturday 11:59pm GMT+8)');
+  logger.info('✅ Weekly report scheduler initialized (Monday 2:59am GMT+8)');
 }
 
 // ============================================================================

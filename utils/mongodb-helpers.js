@@ -19,9 +19,25 @@
 const dbAPI = require('./database-api');
 const CircuitBreaker = require('./circuit-breaker');
 
-// ═══════════════════════════════════════════════════════════════════════════
-// CONFIGURATION
-// ═══════════════════════════════════════════════════════════════════════════
+// Helper function to get guild-specific collection name
+// All collections are now guild-specific with suffix (e.g., members-TPB)
+let _guildName = 'TrailerParkB';
+try {
+  const fs = require('fs');
+  const path = require('path');
+  const configPath = path.join(__dirname, '..', 'config.json');
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  if (config.guild_name) {
+    _guildName = config.guild_name;
+  }
+} catch (e) {
+  console.log('⚠️ Could not load config for collection naming, using default');
+}
+
+function getCollectionName(baseName) {
+  const suffix = _guildName.replace(/\s+/g, '_').toUpperCase();
+  return `${baseName}-${suffix}`;
+}
 
 // Circuit breaker for MongoDB operations
 const mongoBreaker = new CircuitBreaker({
@@ -87,7 +103,7 @@ function calculateMemberStreak(attendanceRecords) {
 async function getMemberByUsername(username) {
   const db = await dbAPI.connect();
   // Case-insensitive search to prevent duplicates from case variations
-  return await db.collection('members').findOne({
+  return await db.collection(getCollectionName('members')).findOne({
     username: { $regex: new RegExp(`^${username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
   });
 }
@@ -99,7 +115,7 @@ async function getMemberByUsername(username) {
  */
 async function getMemberByDiscordId(userId) {
   const db = await dbAPI.connect();
-  return await db.collection('members').findOne({ _id: userId });
+  return await db.collection(getCollectionName('members')).findOne({ _id: userId });
 }
 
 /**
@@ -111,11 +127,11 @@ async function getMember(identifier) {
   const db = await dbAPI.connect();
 
   // Try by Discord ID first
-  let member = await db.collection('members').findOne({ _id: identifier });
+  let member = await db.collection(getCollectionName('members')).findOne({ _id: identifier });
 
   // If not found, try by username (case-insensitive)
   if (!member) {
-    member = await db.collection('members').findOne({
+    member = await db.collection(getCollectionName('members')).findOne({
       username: { $regex: new RegExp(`^${identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
     });
   }
@@ -130,7 +146,7 @@ async function getMember(identifier) {
  */
 async function getAllMembers(filter = {}) {
   const db = await dbAPI.connect();
-  return await db.collection('members').find(filter).toArray();
+  return await db.collection(getCollectionName('members')).find(filter).toArray();
 }
 
 /**
@@ -144,24 +160,23 @@ async function createMember(memberData) {
   const member = {
     _id: memberData.userId || `temp_${memberData.username.toLowerCase().replace(/\s+/g, '_')}`,
     username: memberData.username,
+    discordId: memberData.discordId || null,
     pointsAvailable: memberData.pointsAvailable || 0,
     pointsEarned: memberData.pointsEarned || 0,
     pointsSpent: memberData.pointsSpent || 0,
-    attendance: {
+    isActive: true,
+    attendance: memberData.attendance || {
       total: 0,
       thisWeek: 0,
       thisMonth: 0,
       byBoss: {},
-      streak: {
-        current: 0,
-        longest: 0
-      }
+      streak: { current: 0, longest: 0 }
     },
-    joinedAt: new Date(),
-    lastActive: new Date()
+    joinedAt: memberData.joinedAt || new Date(),
+    lastUpdated: new Date()
   };
 
-  await db.collection('members').insertOne(member);
+  await db.collection(getCollectionName('members')).insertOne(member);
   return member;
 }
 
@@ -179,12 +194,6 @@ async function updateMember(identifier, updates) {
   if (!member) {
     throw new Error(`Member not found: ${identifier}`);
   }
-
-  // Update member
-  const result = await db.collection('members').updateOne(
-    { _id: member._id },
-    { $set: { ...updates, lastActive: new Date() } }
-  );
 
   return result;
 }
@@ -204,7 +213,7 @@ async function removeMember(identifier) {
   }
 
   // Delete member
-  const result = await db.collection('members').deleteOne({ _id: member._id });
+  const result = await db.collection(getCollectionName('members')).deleteOne({ _id: member._id });
   return result;
 }
 
@@ -258,7 +267,7 @@ async function updateMemberPoints(identifier, pointsChange, reason = 'Unknown') 
     updateFields.$inc.pointsSpent = Math.abs(pointsChange);
   }
 
-  await db.collection('members').updateOne(
+  await db.collection(getCollectionName('members')).updateOne(
     { _id: member._id },
     updateFields
   );
@@ -303,7 +312,7 @@ async function getAllMemberPoints() {
  */
 async function getAuctionQueue() {
   const db = await dbAPI.connect();
-  return await db.collection('auctionItems')
+  return await db.collection(getCollectionName('auctionItems'))
     .find({ status: 'pending' })
     .sort({ addedAt: 1 })
     .toArray();
@@ -315,8 +324,37 @@ async function getAuctionQueue() {
  */
 async function getNextAuctionItem() {
   const db = await dbAPI.connect();
-  return await db.collection('auctionItems')
+  return await db.collection(getCollectionName('auctionItems'))
     .findOne({ status: 'pending' }, { sort: { addedAt: 1 } });
+}
+
+/**
+ * Add item to auction queue
+ * @param {Object} itemData - Item data
+ * @returns {Promise<Object>} - Created item
+ */
+async function addAuctionItem(itemData) {
+  const db = await dbAPI.connect();
+
+  const item = {
+    _id: itemData.itemId || `item_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+    itemName: itemData.itemName,
+    startPrice: itemData.startPrice || 0,
+    duration: itemData.duration || 30,
+    quantity: itemData.quantity || 1,
+    boss: itemData.boss || 'Unknown',
+    source: itemData.source || 'manual',
+    status: 'pending',
+    winner: null,
+    winnerId: null,
+    winningBid: null,
+    soldAt: null,
+    addedAt: new Date(),
+    sheetRow: itemData.sheetRow || null
+  };
+
+  await db.collection(getCollectionName('auctionItems')).insertOne(item);
+  return item;
 }
 
 /**
@@ -343,7 +381,7 @@ async function addAuctionItem(itemData) {
     sheetRow: itemData.sheetRow || null
   };
 
-  const result = await db.collection('auctionItems').insertOne(item);
+  const result = await db.collection(getCollectionName('auctionItems')).insertOne(item);
   return { ...item, _id: result.insertedId };
 }
 
@@ -357,7 +395,7 @@ async function addAuctionItem(itemData) {
 async function markItemAsSold(itemId, winner, winningBid) {
   const db = await dbAPI.connect();
 
-  const result = await db.collection('auctionItems').updateOne(
+  const result = await db.collection(getCollectionName('auctionItems')).updateOne(
     { _id: itemId },
     {
       $set: {
@@ -374,7 +412,7 @@ async function markItemAsSold(itemId, winner, winningBid) {
     throw new Error(`Auction item not found: ${itemId}`);
   }
 
-  return await db.collection('auctionItems').findOne({ _id: itemId });
+  return await db.collection(getCollectionName('auctionItems')).findOne({ _id: itemId });
 }
 
 /**
@@ -384,7 +422,7 @@ async function markItemAsSold(itemId, winner, winningBid) {
  */
 async function getSoldItems(limit = 50) {
   const db = await dbAPI.connect();
-  return await db.collection('auctionItems')
+  return await db.collection(getCollectionName('auctionItems'))
     .find({ status: 'sold' })
     .sort({ soldAt: -1 })
     .limit(limit)
@@ -416,7 +454,7 @@ async function addAttendanceRecord(attendanceData) {
     createdAt: new Date()
   };
 
-  const result = await db.collection('attendance').insertOne(attendance);
+  const result = await db.collection(getCollectionName('attendance')).insertOne(attendance);
   return { ...attendance, _id: result.insertedId };
 }
 
@@ -441,7 +479,7 @@ async function getMemberAttendance(identifier, filter = {}) {
     ...filter
   };
 
-  return await db.collection('attendance')
+  return await db.collection(getCollectionName('attendance'))
     .find(query)
     .sort({ timestamp: -1 })
     .toArray();
@@ -457,7 +495,7 @@ async function getLastBossSpawn(bossName) {
     const db = await dbAPI.connect();
 
     // Find the most recent attendance record for this boss (case-insensitive)
-    const lastRecord = await db.collection('attendance')
+    const lastRecord = await db.collection(getCollectionName('attendance'))
       .find({ bossName: { $regex: new RegExp(`^${bossName}$`, 'i') } })
       .sort({ timestamp: -1 })
       .limit(1)
@@ -514,7 +552,7 @@ async function updateAttendanceStats(identifier, attendanceData) {
     updateFields.$inc.pointsEarned = bossPoints;
   }
 
-  await db.collection('members').updateOne(
+  await db.collection(getCollectionName('members')).updateOne(
     { _id: member._id },
     updateFields
   );
@@ -558,7 +596,7 @@ async function addAttendance(data) {
     const memberId = data.discordId || `temp_${data.username.toLowerCase().replace(/\s+/g, '_')}`;
     console.log(`➕ [MongoDB] Creating new member: ${data.username} (ID: ${memberId})`);
 
-    await db.collection('members').insertOne({
+    await db.collection(getCollectionName('members')).insertOne({
       _id: memberId,
       username: data.username,
       pointsAvailable: 0,
@@ -650,14 +688,14 @@ async function getMemberStats(memberName) {
   let actualMemberName = memberName;
 
   // Try exact match first (case-insensitive) - uses username index
-  member = await db.collection('members').findOne({
+  member = await db.collection(getCollectionName('members')).findOne({
     username: { $regex: new RegExp(`^${escapeRegex(memberName)}$`, 'i') },
     isActive: true
   });
 
   // If no exact match, try fuzzy match (contains search)
   if (!member) {
-    member = await db.collection('members').findOne({
+    member = await db.collection(getCollectionName('members')).findOne({
       username: { $regex: new RegExp(escapeRegex(memberName), 'i') },
       isActive: true
     });
@@ -673,7 +711,7 @@ async function getMemberStats(memberName) {
   actualMemberName = member.username;
 
   // Step 2: Get attendance records
-  const attendanceRecords = await db.collection('attendance')
+  const attendanceRecords = await db.collection(getCollectionName('attendance'))
     .find({ memberId: member._id })
     .sort({ timestamp: -1 })
     .toArray();
@@ -711,7 +749,7 @@ async function getMemberStats(memberName) {
 
   // Step 4: Calculate attendance rate based on unique spawns
   // OPTIMIZED: Use $facet to run both queries in parallel (single database call)
-  const [attendanceStats] = await db.collection('attendance').aggregate([
+  const [attendanceStats] = await db.collection(getCollectionName('attendance')).aggregate([
     {
       $facet: {
         // Pipeline 1: Count total unique spawns (all members)
@@ -761,7 +799,7 @@ async function getMemberStats(memberName) {
   const currentStreak = calculateMemberStreak(attendanceRecords);
 
   // Step 6: Get ranking (optimized: only fetch needed fields, sort in database)
-  const sortedByAttendance = await db.collection('members').find(
+  const sortedByAttendance = await db.collection(getCollectionName('members')).find(
     { isActive: true },
     { projection: { username: 1, 'attendance.total': 1 } }
   )
@@ -818,7 +856,7 @@ async function saveBotState(module, state) {
     savedAt: new Date()
   };
 
-  await db.collection('botState').updateOne(
+  await db.collection(getCollectionName('botState')).updateOne(
     { module },
     { $set: stateDoc },
     { upsert: true }
@@ -834,7 +872,7 @@ async function saveBotState(module, state) {
  */
 async function getBotState(module) {
   const db = await dbAPI.connect();
-  const stateDoc = await db.collection('botState').findOne({ module });
+  const stateDoc = await db.collection(getCollectionName('botState')).findOne({ module });
   return stateDoc ? stateDoc.state : null;
 }
 
@@ -845,7 +883,7 @@ async function getBotState(module) {
  */
 async function clearBotState(module) {
   const db = await dbAPI.connect();
-  return await db.collection('botState').deleteOne({ module });
+  return await db.collection(getCollectionName('botState')).deleteOne({ module });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -874,7 +912,7 @@ async function saveBossTimerData(bossName, killTime, nextSpawn, killedBy, server
   };
 
   // Update or insert the timer data for this boss
-  await db.collection('bossTimers').updateOne(
+  await db.collection(getCollectionName('bossTimers')).updateOne(
     { bossName },
     { $set: timerData },
     { upsert: true }
@@ -889,7 +927,7 @@ async function saveBossTimerData(bossName, killTime, nextSpawn, killedBy, server
  */
 async function getAllBossTimers() {
   const db = await dbAPI.connect();
-  return await db.collection('bossTimers').find({}).toArray();
+  return await db.collection(getCollectionName('bossTimers')).find({}).toArray();
 }
 
 /**
@@ -899,7 +937,7 @@ async function getAllBossTimers() {
  */
 async function getBossTimer(bossName) {
   const db = await dbAPI.connect();
-  return await db.collection('bossTimers').findOne({ bossName });
+  return await db.collection(getCollectionName('bossTimers')).findOne({ bossName });
 }
 
 /**
@@ -909,7 +947,7 @@ async function getBossTimer(bossName) {
  */
 async function deleteBossTimer(bossName) {
   const db = await dbAPI.connect();
-  return await db.collection('bossTimers').deleteOne({ bossName });
+  return await db.collection(getCollectionName('bossTimers')).deleteOne({ bossName });
 }
 
 /**
@@ -920,7 +958,7 @@ async function deleteBossTimer(bossName) {
 async function saveServerDownState(isDown) {
   const db = await dbAPI.connect();
 
-  await db.collection('botState').updateOne(
+  await db.collection(getCollectionName('botState')).updateOne(
     { _id: 'server_state' },
     {
       $set: {
@@ -940,7 +978,7 @@ async function saveServerDownState(isDown) {
  */
 async function getServerDownState() {
   const db = await dbAPI.connect();
-  const state = await db.collection('botState').findOne({ _id: 'server_state' });
+  const state = await db.collection(getCollectionName('botState')).findOne({ _id: 'server_state' });
   return state ? state.serverDown : false;
 }
 
@@ -974,7 +1012,7 @@ async function createReminder(reminderData) {
     active: true
   };
 
-  const result = await db.collection('eventReminders').insertOne(reminder);
+  const result = await db.collection(getCollectionName('eventReminders')).insertOne(reminder);
   reminder._id = result.insertedId;
 
   return reminder;
@@ -986,7 +1024,7 @@ async function createReminder(reminderData) {
  */
 async function getActiveReminders() {
   const db = await dbAPI.connect();
-  return await db.collection('eventReminders').find({ active: true }).toArray();
+  return await db.collection(getCollectionName('eventReminders')).find({ active: true }).toArray();
 }
 
 /**
@@ -995,7 +1033,7 @@ async function getActiveReminders() {
  */
 async function getDueReminders() {
   const db = await dbAPI.connect();
-  return await db.collection('eventReminders').find({
+  return await db.collection(getCollectionName('eventReminders')).find({
     active: true,
     nextTrigger: { $lte: new Date() }
   }).toArray();
@@ -1009,7 +1047,7 @@ async function getDueReminders() {
 async function getReminder(reminderId) {
   const db = await dbAPI.connect();
   const { ObjectId } = require('mongodb');
-  return await db.collection('eventReminders').findOne({ _id: new ObjectId(reminderId) });
+  return await db.collection(getCollectionName('eventReminders')).findOne({ _id: new ObjectId(reminderId) });
 }
 
 /**
@@ -1034,7 +1072,7 @@ async function updateReminderAfterTrigger(reminderId, nextTrigger) {
     update.active = false; // Deactivate if not recurring
   }
 
-  return await db.collection('eventReminders').updateOne(
+  return await db.collection(getCollectionName('eventReminders')).updateOne(
     { _id: new ObjectId(reminderId) },
     { $set: update }
   );
@@ -1048,7 +1086,7 @@ async function updateReminderAfterTrigger(reminderId, nextTrigger) {
 async function deleteReminder(reminderId) {
   const db = await dbAPI.connect();
   const { ObjectId } = require('mongodb');
-  return await db.collection('eventReminders').deleteOne({ _id: new ObjectId(reminderId) });
+  return await db.collection(getCollectionName('eventReminders')).deleteOne({ _id: new ObjectId(reminderId) });
 }
 
 /**
@@ -1059,7 +1097,7 @@ async function deleteReminder(reminderId) {
 async function deactivateReminder(reminderId) {
   const db = await dbAPI.connect();
   const { ObjectId } = require('mongodb');
-  return await db.collection('eventReminders').updateOne(
+  return await db.collection(getCollectionName('eventReminders')).updateOne(
     { _id: new ObjectId(reminderId) },
     { $set: { active: false, updatedAt: new Date() } }
   );
@@ -1072,7 +1110,7 @@ async function deactivateReminder(reminderId) {
  */
 async function getRemindersByType(eventType) {
   const db = await dbAPI.connect();
-  return await db.collection('eventReminders').find({ eventType, active: true }).toArray();
+  return await db.collection(getCollectionName('eventReminders')).find({ eventType, active: true }).toArray();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1096,7 +1134,7 @@ function getWeekLabel() {
   const now = new Date();
   const year = now.getFullYear();
   const weekNum = getWeekNumber(now);
-  return `ELYSIUM_WEEK_${year}_${weekNum}`;
+  return `WEEK_${year}_${weekNum}`;
 }
 
 /**
@@ -1141,7 +1179,7 @@ async function syncDiscordIds(guild) {
   console.log('🔄 [MongoDB] Syncing Discord IDs for members with temp IDs...');
 
   // Step 1: Find all members with temp IDs
-  const tempMembers = await db.collection('members')
+  const tempMembers = await db.collection(getCollectionName('members'))
     .find({ _id: /^temp_/ })
     .toArray();
 
@@ -1271,7 +1309,7 @@ async function syncDiscordIds(guild) {
       const tempId = tempMember._id;
 
       // Check if real Discord ID already exists (prevent duplicates)
-      const existing = await db.collection('members').findOne({ _id: realDiscordId });
+      const existing = await db.collection(getCollectionName('members')).findOne({ _id: realDiscordId });
       if (existing) {
         console.log(`   ⚠️ Discord ID ${realDiscordId} already exists, merging data for ${tempMember.username}...`);
 
@@ -1280,7 +1318,7 @@ async function syncDiscordIds(guild) {
         const existingAttendance = existing.attendance || { total: 0, byBoss: {} };
 
         // Update existing member with merged data
-        await db.collection('members').updateOne(
+        await db.collection(getCollectionName('members')).updateOne(
           { _id: realDiscordId },
           {
             $set: {
@@ -1294,34 +1332,34 @@ async function syncDiscordIds(guild) {
         );
 
         // Update attendance records to use real Discord ID
-        await db.collection('attendance').updateMany(
+        await db.collection(getCollectionName('attendance')).updateMany(
           { memberId: tempId },
           { $set: { memberId: realDiscordId } }
         );
 
         // Delete temp member
-        await db.collection('members').deleteOne({ _id: tempId });
+        await db.collection(getCollectionName('members')).deleteOne({ _id: tempId });
 
         console.log(`   ✅ Merged: ${tempMember.username} (${tempId} → ${realDiscordId})`);
       } else {
         // Simple case: just rename the member ID
 
         // Step 3a: Update all attendance records to use real Discord ID FIRST
-        const attendanceUpdateResult = await db.collection('attendance').updateMany(
+        const attendanceUpdateResult = await db.collection(getCollectionName('attendance')).updateMany(
           { memberId: tempId },
           { $set: { memberId: realDiscordId } }
         );
 
         // Check if attendance records already have real Discord ID
         if (attendanceUpdateResult.modifiedCount === 0) {
-          const existingRecordsCount = await db.collection('attendance').countDocuments({ memberId: realDiscordId });
+          const existingRecordsCount = await db.collection(getCollectionName('attendance')).countDocuments({ memberId: realDiscordId });
           if (existingRecordsCount > 0) {
             console.log(`      ℹ️  Attendance records already use Discord ID (${existingRecordsCount} records with ID ${realDiscordId})`);
           }
         }
 
         // Step 3b: Delete temp member BEFORE inserting new one (avoids unique constraint violation on username)
-        await db.collection('members').deleteOne({ _id: tempId });
+        await db.collection(getCollectionName('members')).deleteOne({ _id: tempId });
 
         // Step 3c: Insert new member with real Discord ID
         const newMemberDoc = {
@@ -1330,7 +1368,7 @@ async function syncDiscordIds(guild) {
           lastUpdated: new Date()
         };
 
-        await db.collection('members').insertOne(newMemberDoc);
+        await db.collection(getCollectionName('members')).insertOne(newMemberDoc);
 
         // Log which name matched
         const matchedAs = discordMember.user.username !== tempMember.username

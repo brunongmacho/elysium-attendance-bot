@@ -165,7 +165,7 @@ const GUILD_WAR_QUEUE_REMINDER = {
   name: '🎯 Guild War Queue Reminder',
   days: [4, 5, 6], // Thursday, Friday, Saturday
   startTime: { hour: 23, minute: 0 }, // 11pm
-  deleteAfterMinutes: 120, // Delete at 1am (2 hours later)
+  deleteAfterMinutes: 999999999, // DISABLED: No auto-delete (reminders channel is dedicated)
   color: 0xffa502, // Orange
   description: '⏰ **REMINDER:** Please queue for Guild War before reset!',
 };

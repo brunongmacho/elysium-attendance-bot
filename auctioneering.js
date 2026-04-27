@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * ELYSIUM AUCTIONEERING SYSTEM v2.1
+ * AUCTIONEERING SYSTEM v2.1
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Comprehensive auction session management system for Discord-based item
@@ -122,6 +122,7 @@ const {
 } = require("./utils/common");
 const auctionCache = require('./utils/auction-cache');
 const attendance = require("./attendance");
+const memberRegistry = require('./member-registry');
 
 // Create logger instance for this module
 const logger = createLogger('auctioneering');
@@ -904,7 +905,7 @@ async function startAuctioneering(client, config, channel) {
     .setTitle(`${EMOJI.FIRE} Auctioneering Started!`)
     .setDescription(
       `**${allItems.length} item(s)** queued for auction\n\n${previewList}${moreItems}\n\n` +
-        `✅ **No attendance required** - All ELYSIUM members can bid!`
+        `✅ **No attendance required** - All guild members can bid!`
     )
     .setFooter({ text: "Starting first item in 30s..." })
     .setTimestamp();
@@ -1280,7 +1281,7 @@ async function auctionNextItem(client, config, channel) {
                 item.startPrice || 0
               } pts\n**Duration:** ${
                 item.duration || 2
-              } min\n\n✅ **All ELYSIUM members can bid!**`
+              } min\n\n✅ **All guild members can bid!**`
             )
             .setFooter({
               text: `Thread created per item • ${getTimestamp()}`,
@@ -1373,7 +1374,7 @@ async function auctionNextItem(client, config, channel) {
               `**Starting Price:** ${item.startPrice || 0} pts\n` +
               `**Duration:** ${item.duration || 2} min\n\n` +
               `Use \`!bid <amount>\` to place your bids.\n` +
-              `✅ **All ELYSIUM members can bid!**`
+              `✅ **All guild members can bid!**`
           )
           .setFooter({ text: "Auction open — place your bids now!" })
           .setTimestamp(),
@@ -2604,7 +2605,7 @@ function buildQueuePage(sheetItems, bossGroups, noBossItems, currentPage, itemsP
   const totalSessions = Object.keys(bossGroups).length + (noBossItems.length > 0 ? 1 : 0);
   const totalItems = sheetItems.length;
 
-  const footerNote = `\n**ℹ️ Note:** Order shown is how items will auction when you run \`!startauction\`\n✅ **All ELYSIUM members can bid!**`;
+  const footerNote = `\n**ℹ️ Note:** Order shown is how items will auction when you run \`!startauction\`\n✅ **All guild members can bid!**`;
   queueText += footerNote;
 
   const embed = new EmbedBuilder()
@@ -2900,7 +2901,7 @@ async function handleMyPoints(message, biddingModule, config) {
           .setColor(0xff0000)
           .setTitle(`${EMOJI.ERROR} Not Found`)
           .setDescription(
-            `**${u}**\n\nYou are not in the bidding system or not a current ELYSIUM member.`
+            `**${u}**\n\nYou are not in the bidding system or not a current guild member.`
           )
           .setFooter({ text: "Contact admin if this is wrong" })
           .setTimestamp(),

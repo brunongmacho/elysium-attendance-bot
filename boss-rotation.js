@@ -10,18 +10,18 @@
  * FEATURES:
  * - Track rotation index (1-5) for each rotating boss
  * - Auto-increment rotation after boss kill (attendance submission)
- * - Check if it's ELYSIUM's turn (index = 1)
+ * - Check if it's our guild's turn (index = 1)
  * - Send 15-min warnings when it's our rotation
  * - Crash recovery (rotation state stored in Google Sheets)
  * - Admin commands for manual rotation control
  *
  * ROTATION FLOW:
- * Kill 1: ELYSIUM (index 1)
+ * Kill 1: Guild 1 (index 1)
  * Kill 2: Guild 2 (index 2)
  * Kill 3: Guild 3 (index 3)
  * Kill 4: Guild 4 (index 4)
  * Kill 5: Guild 5 (index 5)
- * Kill 6: ELYSIUM (loops back to index 1)
+ * Kill 6: Guild 1 (loops back to index 1)
  *
  * @module boss-rotation
  */
@@ -44,6 +44,15 @@ const path = require('path');
 
 // Create logger instance for this module
 const logger = createLogger('boss-rotation');
+
+// Get guild name from config
+let guildName = 'TrailerParkB';
+try {
+  const configModule = require('./config.json');
+  guildName = configModule.guild_name || 'TrailerParkB';
+} catch (e) {
+  console.warn('⚠️ Could not load config for guild name, using default');
+}
 
 // ============================================================================
 // MODULE STATE
@@ -69,12 +78,13 @@ try {
 /**
  * Rotating bosses list (dynamically loaded from Google Sheets)
  * Updated on initialization and cache refresh
+ * Empty array means rotation system is disabled - no reminders sent
  */
-let ROTATING_BOSSES = ['Amentis', 'General Aquleus', 'Baron Braudmore']; // Default fallback
+let ROTATING_BOSSES = [];
 
 /**
  * In-memory cache of rotation status (refreshed from sheets periodically)
- * Format: { "Amentis": { currentIndex: 1, currentGuild: "ELYSIUM", isOurTurn: true }, ... }
+ * Format: { "Amentis": { currentIndex: 1, currentGuild: "Guild 1", isOurTurn: true }, ... }
  */
 let rotationCache = {};
 let lastCacheRefresh = 0;
@@ -677,7 +687,7 @@ async function sendRotationUpdateNotification(rotationData) {
     if (!channel) return;
 
     const emoji = rotationData.isNowOurTurn ? '🟢' : '🔴';
-    const status = rotationData.isNowOurTurn ? 'ELYSIUM\'S TURN' : `${rotationData.newGuild}'s turn`;
+    const status = rotationData.isNowOurTurn ? `${guildName}'S TURN` : `${rotationData.newGuild}'s turn`;
 
     const embed = new EmbedBuilder()
       .setColor(rotationData.isNowOurTurn ? 0x00ff00 : 0xff0000)
@@ -710,7 +720,7 @@ async function sendRotationUpdateNotification(rotationData) {
 }
 
 /**
- * Send 15-minute warning when it's ELYSIUM's rotation
+ * Send 15-minute warning when it's our guild's rotation
  * Called by spawn prediction system
  * @param {string} bossName - Name of the boss
  * @param {Date} predictedSpawnTime - Predicted spawn time
@@ -734,7 +744,7 @@ async function sendRotationWarning(bossName, predictedSpawnTime) {
     const embed = new EmbedBuilder()
       .setColor(0x00ff00)
       .setTitle(`🟢 OUR ROTATION - ${bossName} Spawning Soon!`)
-      .setDescription(`**${bossName}** is **ELYSIUM's rotation**! Get ready!`)
+      .setDescription(`**${bossName}** is **${guildName}'s rotation**! Get ready!`)
       .addFields(
         {
           name: '⏰ Predicted Spawn Time',
@@ -748,7 +758,7 @@ async function sendRotationWarning(bossName, predictedSpawnTime) {
         },
         {
           name: '🎯 Rotation Status',
-          value: `Guild ${rotation.currentIndex}/5 - **ELYSIUM**`,
+          value: `Guild ${rotation.currentIndex}/5 - **${guildName}**`,
           inline: false
         }
       )
@@ -762,7 +772,7 @@ async function sendRotationWarning(bossName, predictedSpawnTime) {
     }
 
     // Add guild branding to footer
-    addGuildFooter(embed, channel.guild, 'ELYSIUM Rotation System');
+    addGuildFooter(embed, channel.guild, `${guildName} Rotation System`);
 
     const messagePayload = { content: '@everyone', embeds: [embed] };
     if (bossImage) {
@@ -980,7 +990,7 @@ async function restoreDailyScheduleFromMongoDB() {
 
 /**
  * Post daily rotation schedule at 12:00 AM Manila time
- * Shows all ELYSIUM rotations for the next 24 hours (12am to 11:59pm)
+ * Shows all guild rotations for the next 24 hours (12am to 11:59pm)
  * Auto-deletes when last boss attendance closes (or after 1 hour if no spawns)
  */
 async function postDailyRotationSchedule() {
@@ -992,13 +1002,13 @@ async function postDailyRotationSchedule() {
 
     const elysiumCommandsChannelId = config.elysium_commands_channel_id;
     if (!elysiumCommandsChannelId) {
-      console.warn('⚠️ ELYSIUM commands channel not configured - cannot post daily schedule');
+      console.warn('⚠️ Guild commands channel not configured - cannot post daily schedule');
       return;
     }
 
     const channel = await client.channels.fetch(elysiumCommandsChannelId);
     if (!channel) {
-      console.warn('⚠️ ELYSIUM commands channel not found');
+      console.warn('⚠️ Guild commands channel not found');
       return;
     }
 
@@ -1042,8 +1052,13 @@ async function postDailyRotationSchedule() {
       return;
     }
 
-    // Collect all ELYSIUM rotations for the next 24 hours
-    const elysiumRotations = [];
+    // Collect all guild rotations for the next 24 hours
+    const guildRotations = [];
+
+    if (ROTATING_BOSSES.length === 0) {
+      console.log('📅 [DAILY-SCHEDULE] No rotating bosses configured - rotation reminders disabled');
+      return null;
+    }
 
     for (const bossName of ROTATING_BOSSES) {
       try {
@@ -1055,7 +1070,7 @@ async function postDailyRotationSchedule() {
           continue; // Not our turn, skip
         }
 
-        console.log(`📅 [DAILY-SCHEDULE] ${bossName}: ELYSIUM's turn - checking spawn time...`);
+        console.log(`📅 [DAILY-SCHEDULE] ${bossName}: ${guildName}'s turn - checking spawn time...`);
 
         // Get spawn time - try boss timer first, then attendance records
         let spawnTime = null;
@@ -1121,7 +1136,7 @@ async function postDailyRotationSchedule() {
 
           if (spawnDayStart.getTime() === startOfDay.getTime()) {
             console.log(`📅 [DAILY-SCHEDULE] ${bossName}: ✅ INCLUDED in daily schedule`);
-            elysiumRotations.push({
+            guildRotations.push({
               bossName,
               spawnTime,
               rotation,
@@ -1141,24 +1156,24 @@ async function postDailyRotationSchedule() {
     }
 
     // Sort by spawn time
-    elysiumRotations.sort((a, b) => a.spawnTime - b.spawnTime);
+    guildRotations.sort((a, b) => a.spawnTime - b.spawnTime);
 
-    console.log(`📊 Found ${elysiumRotations.length} ELYSIUM rotations today`);
+    console.log(`📊 Found ${guildRotations.length} ${guildName} rotations today`);
 
     // Delete previous daily schedule message if exists
     if (dailyScheduleMessage) {
       await deleteDailySchedule();
     }
 
-    // Case 1: No ELYSIUM rotations today
-    if (elysiumRotations.length === 0) {
+    // Case 1: No guild rotations today
+    if (guildRotations.length === 0) {
       const embed = new EmbedBuilder()
         .setColor(0x808080) // Gray
-        .setTitle('📅 Daily Boss Rotation - ELYSIUM')
-        .setDescription('**No ELYSIUM rotations scheduled for today.**\n\nEnjoy your day off! 🌴')
+        .setTitle(`📅 Daily Boss Rotation - ${guildName}`)
+        .setDescription(`**No ${guildName} rotations scheduled for today.**\n\nRotation reminders are disabled. 🌴`)
         .setTimestamp();
 
-      addGuildFooter(embed, channel.guild, 'ELYSIUM Daily Schedule');
+addGuildFooter(embed, channel.guild, `${guildName} Daily Schedule`);
 
       const sentMessage = await channel.send({ embeds: [embed] });
 
@@ -1203,7 +1218,7 @@ async function postDailyRotationSchedule() {
       return;
     }
 
-    // Case 2: ELYSIUM has rotations today - create enhanced visual
+    // Case 2: Guild has rotations today - create enhanced visual
     // Group bosses by time of day
     const timeGroups = {
       'Night (12am - 6am)': [],
@@ -1212,7 +1227,7 @@ async function postDailyRotationSchedule() {
       'Evening (6pm - 12am)': []
     };
 
-    for (const rotation of elysiumRotations) {
+    for (const rotation of guildRotations) {
       // Convert spawn time to Manila timezone before getting hour
       const spawnTimeManila = new Date(rotation.spawnTime.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
       const hour = spawnTimeManila.getHours();
@@ -1230,9 +1245,9 @@ async function postDailyRotationSchedule() {
 
     // Build embed with enhanced visual
     const embed = new EmbedBuilder()
-      .setColor(0x00ff00) // Green for ELYSIUM
-      .setTitle('🟢 Daily Boss Rotation - ELYSIUM')
-      .setDescription(`**${elysiumRotations.length} boss${elysiumRotations.length > 1 ? 'es' : ''} rotating today!** Get ready!\n\u200B`);
+      .setColor(0x00ff00) // Green for our guild
+      .setTitle(`🟢 Daily Boss Rotation - ${guildName}`)
+      .setDescription(`**${guildRotations.length} boss${guildRotations.length > 1 ? 'es' : ''} rotating today!** Get ready!\n\u200B`);
 
     // Add fields for each time group (only if has bosses)
     for (const [timeLabel, bosses] of Object.entries(timeGroups)) {
@@ -1247,7 +1262,7 @@ async function postDailyRotationSchedule() {
 
         fieldValue += `**${bossName}**${isPast ? ' 🔴' : ''}\n`;
         fieldValue += `├ 🕐 <t:${spawnTimestamp}:t> (<t:${spawnTimestamp}:R>) ${isPast ? '**[LIVE NOW]**' : ''}\n`;
-        fieldValue += `└ 🎯 Guild ${rotation.currentIndex}/${guildCount} - **ELYSIUM**\n\n`;
+        fieldValue += `└ 🎯 Guild ${rotation.currentIndex}/${guildCount} - **${guildName}**\n\n`;
       }
 
       embed.addFields({
@@ -1258,21 +1273,21 @@ async function postDailyRotationSchedule() {
     }
 
     // Add summary footer
-    const totalPoints = elysiumRotations.length; // Could calculate actual points if needed
+    const totalPoints = guildRotations.length; // Could calculate actual points if needed
     embed.addFields({
       name: '\u200B',
-      value: `**Total Rotations:** ${elysiumRotations.length}\n**Stay alert and check #elysium-commands for 15-min warnings!**`,
+      value: `**Total Rotations:** ${guildRotations.length}\n**Stay alert and check #elysium-commands for 15-min warnings!**`,
       inline: false
     });
 
-    // Add thumbnail (use ELYSIUM server icon)
+    // Add thumbnail (use guild server icon)
     const serverIcon = channel.guild.iconURL({ dynamic: true, size: 256 });
     if (serverIcon) {
       embed.setThumbnail(serverIcon);
     }
 
     // Add guild branding
-    addGuildFooter(embed, channel.guild, 'ELYSIUM Daily Schedule');
+    addGuildFooter(embed, channel.guild, `${guildName} Daily Schedule`);
     embed.setTimestamp();
 
     // Send message (no attachment needed - using server icon)
@@ -1285,7 +1300,7 @@ async function postDailyRotationSchedule() {
       messageId: sentMessage.id,
       channelId: channel.id,
       date: todayDate,
-      bosses: elysiumRotations.map(r => r.bossName),
+      bosses: guildRotations.map(r => r.bossName),
       autoDeleteTimer: null // No timer - deleted when last boss attendance closes
     };
 
@@ -1297,14 +1312,14 @@ async function postDailyRotationSchedule() {
           messageId: sentMessage.id,
           channelId: channel.id,
           date: todayDate,
-          bosses: elysiumRotations.map(r => r.bossName),
+          bosses: guildRotations.map(r => r.bossName),
           postedAt: new Date()
         }
       },
       { upsert: true }
     );
 
-    console.log(`✅ Posted daily rotation schedule: ${elysiumRotations.length} ELYSIUM rotations`);
+    console.log(`✅ Posted daily rotation schedule: ${guildRotations.length} ${guildName} rotations`);
 
   } catch (err) {
     console.error('❌ Error posting daily rotation schedule:', err.message);

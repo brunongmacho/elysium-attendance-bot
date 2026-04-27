@@ -198,7 +198,7 @@ class BackgroundSync {
     const date = new Date(timestamp);
     const year = date.getFullYear();
     const weekNum = this.getWeekNumber(date);
-    return `ELYSIUM_WEEK_${year}_${weekNum}`;
+    return `WEEK_${year}_${weekNum}`;
   }
 
   /**

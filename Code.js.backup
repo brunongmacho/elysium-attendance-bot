@@ -41,7 +41,7 @@
 
 const CONFIG = {
   SSHEET_ID: '1dGLGjmRhvG0io1Yta5ikfN-b_U-SSJJfWIHznK18qYQ',
-  SHEET_NAME_PREFIX: 'WEEK_',
+  SHEET_NAME_PREFIX: 'ELYSIUM_WEEK_',
   BOSS_POINTS_SHEET: 'BossPoints',
   BIDDING_SHEET: 'BiddingPoints',
   TIMEZONE: 'Asia/Manila',
@@ -150,7 +150,6 @@ function doPost(e) {
     if (action === 'saveBotState') return saveBotState(data);
     if (action === 'moveQueueItemsToSheet') return moveQueueItemsToSheet(data);
     if (action === 'moveAuctionedItemsToForDistribution') return moveAllItemsWithWinnersToForDistribution();
-    if (action === 'testSend') return handleTestSend(data); // NEW: Test send command
 
     // Loot logger actions
     if (action === 'submitLootEntries') return handleSubmitLootEntries(data);
@@ -191,13 +190,12 @@ function doPost(e) {
     if (action === 'getWeeklySummary') return getWeeklySummary(data);
     if (action === 'getMemberStats') return getMemberStats(data);
 
-    // Member Registry actions
-    if (action === 'updateMemberRegistry') return handleUpdateMemberRegistry(data);
-    if (action === 'getMemberRegistry') return handleGetMemberRegistry(data);
-    if (action === 'normalizeNamesFromRegistry') return createResponse('ok', 'Names normalized', { 
-      members: normalizeMemberNamesFromRegistry(data?.members || []) 
-    });
-    if (action === 'bulkUpdateNickname') return handleBulkUpdateNickname(data);
+    // Milestone Tracking actions
+    if (action === 'getMilestoneHistory') return getMilestoneHistory(data);
+    if (action === 'updateMilestoneHistory') return updateMilestoneHistory(data);
+    if (action === 'saveMilestoneQueue') return saveMilestoneQueue(data);
+    if (action === 'loadMilestoneQueue') return loadMilestoneQueue(data);
+    if (action === 'clearMilestoneQueue') return clearMilestoneQueue(data);
 
     // Enhanced Milestone Tracking actions (new milestone types)
     if (action === 'ensureMilestoneTabsExist') return ensureMilestoneTabsExist();
@@ -369,7 +367,7 @@ function getAllWeeklyAttendance(data) {
     const allSheets = ss.getSheets();
     const weeklySheets = [];
 
-    // Filter to only weekly attendance sheets (matching pattern WEEK_*)
+    // Filter to only weekly attendance sheets (matching pattern ELYSIUM_WEEK_*)
     for (const sheet of allSheets) {
       const sheetName = sheet.getName();
       if (sheetName.startsWith(CONFIG.SHEET_NAME_PREFIX)) {
@@ -460,7 +458,7 @@ function getAllWeeklyAttendance(data) {
               bossName: bossName,
               timestamp: timestamp,
               date: timestamp, // For backward compatibility
-              weekLabel: sheetName.replace('WEEK_', ''),
+              weekLabel: sheetName.replace('ELYSIUM_WEEK_', ''),
               weekSheet: sheetName,
               points: 1 // Default points (can be enhanced later)
             });
@@ -823,9 +821,7 @@ function handleSubmitLootEntries(data) {
 function handleSubmitAttendance(data) {
   const boss = (data.boss || '').toString().trim().toUpperCase();
   const timestamp = (data.timestamp || '').toString().trim();
-  // Normalize member names using MemberRegistry (gets current nicknames)
-  const rawMembers = (data.members || []).map(m => m.trim());
-  const members = normalizeMemberNamesFromRegistry(rawMembers);
+  const members = (data.members || []).map(m => m.trim());
   
   if (!boss || !timestamp || members.length === 0) {
     return createResponse('error', 'Missing boss, timestamp, or members');
@@ -1573,7 +1569,7 @@ function calculateSimilarity(str1, str2) {
  *
  * EXEMPTIONS:
  * - ForDistribution sheet is NOT touched (historical auction log)
- * - Only removes from BiddingPoints and WEEK_* attendance sheets
+ * - Only removes from BiddingPoints and ELYSIUM_WEEK_* attendance sheets
  *
  * @param {Object} data - Request data containing memberName
  * @param {string} data.memberName - Name of the member to remove
@@ -1645,13 +1641,13 @@ function handleRemoveMember(data) {
   }
 
   // ==========================================
-  // STEP 2: Remove from all attendance sheets (WEEK_*)
+  // STEP 2: Remove from all attendance sheets (ELYSIUM_WEEK_*)
   // NOTE: ForDistribution sheet is EXCLUDED as it's a historical auction log
   // ==========================================
   const allSheets = ss.getSheets();
   const attendanceSheets = allSheets.filter(s => {
     const sheetName = s.getName();
-    // Include only WEEK_ sheets, exclude ForDistribution
+    // Include only ELYSIUM_WEEK_ sheets, exclude ForDistribution
     return sheetName.startsWith(CONFIG.SHEET_NAME_PREFIX) && sheetName !== 'ForDistribution';
   });
 
@@ -1891,19 +1887,8 @@ function logAuctionResult(data) {
 }
 
 function handleSubmitBiddingResults(data) {
-  const rawResults = data.results || [];
-  const rawManualItems = data.manualItems || [];
-  
-  // Normalize all winner names using MemberRegistry (gets current nicknames)
-  const results = rawResults.map(r => ({
-    ...r,
-    winner: getCurrentNickname(r.winner || r.member || '')
-  }));
-  
-  const manualItems = rawManualItems.map(item => ({
-    ...item,
-    winner: getCurrentNickname(item.winner || '')
-  }));
+  const results = data.results || [];
+  const manualItems = data.manualItems || [];
   
   // Get session info
   const sessionTs = getSessionTimestamp();
@@ -3035,7 +3020,7 @@ function saveAttendanceState(data) {
 
 function updateTotalAttendanceAndMembers() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheets = ss.getSheets().filter(s => s.getName().startsWith("WEEK_"));
+  const sheets = ss.getSheets().filter(s => s.getName().startsWith("ELYSIUM_WEEK_"));
   const totalSheetName = "TOTAL ATTENDANCE";
   const totalSheet = ss.getSheetByName(totalSheetName);
   const memberTotals = {};
@@ -7089,453 +7074,5 @@ function clearBossTimerRecovery(data) {
 }
 
 // ===========================================================
-// MEMBER REGISTRY (Google Sheets)
-// ===========================================================
-
-const MEMBER_REGISTRY_SHEET = 'MemberRegistry';
-
-/**
- * Handle member registry updates from bot
- * @param {Object} data - { action: 'upsert'|'bulk', discordId, row, data }
- * @returns {Object} Response object
- */
-function handleUpdateMemberRegistry(data) {
-  try {
-    const { action, discordId, row, data: bulkData } = data;
-    
-    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
-    
-    // Get or create MemberRegistry sheet
-    let sheet = ss.getSheetByName(MEMBER_REGISTRY_SHEET);
-    if (!sheet) {
-      sheet = ss.insertSheet(MEMBER_REGISTRY_SHEET);
-      // Add header row
-      sheet.getRange(1, 1, 1, 8).setValues([[
-        'Discord ID', 'Username', 'Global Name', 'Nickname (IGN)', 'Display Name', 
-        'Joined At', 'Registered At', 'Last Updated'
-      ]]);
-      sheet.getRange(1, 1, 1, 8).setFontWeight('bold');
-      Logger.log(`✅ Created ${MEMBER_REGISTRY_SHEET} sheet`);
-    }
-    
-    if (action === 'upsert' && discordId && row) {
-      // Find existing row by Discord ID
-      const dataRange = sheet.getDataRange();
-      const values = dataRange.getValues();
-      
-      let found = false;
-      for (let i = 1; i < values.length; i++) {
-        if (values[i][0] === discordId) {
-          // Update existing row
-          sheet.getRange(i + 1, 1, 1, row.length).setValues([row]);
-          found = true;
-          Logger.log(`✅ Updated member registry: ${row[3]} (${discordId})`);
-          break;
-        }
-      }
-      
-      if (!found) {
-        // Append new row
-        sheet.appendRow(row);
-        Logger.log(`✅ Added member to registry: ${row[3]} (${discordId})`);
-      }
-      
-      return createResponse('ok', 'Member registry updated');
-      
-    } else if (action === 'bulk' && bulkData && Array.isArray(bulkData)) {
-      // Bulk insert/update
-      const dataRange = sheet.getDataRange();
-      const existingIds = dataRange.getValues().map(r => r[0]);
-      
-      const newRows = bulkData.filter(row => !existingIds.includes(row[0]));
-      if (newRows.length > 0) {
-        sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, newRows[0].length)
-          .setValues(newRows);
-        Logger.log(`✅ Bulk added ${newRows.length} members to registry`);
-      }
-      
-      return createResponse('ok', `Synced ${newRows.length} members`);
-    }
-    
-    return createResponse('ok', 'No changes needed');
-    
-  } catch (err) {
-    Logger.log('❌ Member registry update error: ' + err.toString());
-    return createResponse('error', err.toString());
-  }
-}
-
-/**
- * Get member registry data
- * @param {Object} data - Optional filter parameters
- * @returns {Object} Response with member data
- */
-function handleGetMemberRegistry(data) {
-  try {
-    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
-    const sheet = ss.getSheetByName(MEMBER_REGISTRY_SHEET);
-    
-    if (!sheet) {
-      return createResponse('ok', 'No registry', { members: [] });
-    }
-    
-    const dataRange = sheet.getDataRange();
-    const values = dataRange.getValues();
-    
-    if (values.length <= 1) {
-      return createResponse('ok', 'No members', { members: [] });
-    }
-    
-    // Skip header row
-    const members = values.slice(1).map(row => ({
-      discordId: row[0],
-      username: row[1],
-      globalName: row[2] || null,
-      nickname: row[3],
-      displayName: row[4],
-      joinedAt: row[5],
-      registeredAt: row[6],
-      lastUpdated: row[7]
-    }));
-    
-    return createResponse('ok', 'Members retrieved', { 
-      members: members,
-      count: members.length 
-    });
-    
-  } catch (err) {
-    Logger.log('❌ Get member registry error: ' + err.toString());
-    return createResponse('error', err.toString());
-  }
-}
-
-/**
- * Normalize member names using MemberRegistry
- * Returns current nicknames for display in sheets
- * @param {Array} members - Array of member names or Discord IDs
- * @returns {Array} Array of current nicknames
- */
-function normalizeMemberNamesFromRegistry(members) {
-  try {
-    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
-    const registrySheet = ss.getSheetByName(MEMBER_REGISTRY_SHEET);
-    
-    if (!registrySheet) {
-      // No registry - return original names
-      return members;
-    }
-    
-    const dataRange = registrySheet.getDataRange();
-    const values = dataRange.getValues();
-    
-    if (values.length <= 1) {
-      return members;
-    }
-    
-    // Build lookup map: discordId -> nickname, username -> nickname
-    const discordIdToNickname = {};
-    const usernameToNickname = {};
-    
-    for (let i = 1; i < values.length; i++) {
-      const row = values[i];
-      const discordId = row[0]?.toString().trim();
-      const username = (row[1] || '').toString().trim().toLowerCase();
-      const nickname = (row[3] || row[4] || row[1] || '').toString().trim();
-      
-      if (discordId) discordIdToNickname[discordId] = nickname;
-      if (username) usernameToNickname[username] = nickname;
-    }
-    
-    // Normalize each member name
-    return members.map(m => {
-      if (!m) return m;
-      const mStr = m.toString().trim();
-      
-      // Check if it's a Discord ID (numeric string)
-      if (/^\d+$/.test(mStr) && discordIdToNickname[mStr]) {
-        return discordIdToNickname[mStr];
-      }
-      
-      // Check if it's in username map
-      const normalized = mStr.toLowerCase();
-      if (usernameToNickname[normalized]) {
-        return usernameToNickname[normalized];
-      }
-      
-      // Return original if not found in registry
-      return mStr;
-    });
-    
-  } catch (err) {
-    Logger.log('⚠️ normalizeMemberNamesFromRegistry error:', err.toString());
-    return members;
-  }
-}
-
-/**
- * Get current nickname by Discord ID or username
- * @param {string} identifier - Discord ID or username
- * @returns {string} Current nickname or original identifier
- */
-function getCurrentNickname(identifier) {
-  if (!identifier) return identifier;
-  
-  try {
-    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
-    const registrySheet = ss.getSheetByName(MEMBER_REGISTRY_SHEET);
-    
-    if (!registrySheet) return identifier;
-    
-    const dataRange = registrySheet.getDataRange();
-    const values = dataRange.getValues();
-    
-    const idStr = identifier.toString().trim();
-    
-    // Check if it's a Discord ID
-    if (/^\d+$/.test(idStr)) {
-      for (let i = 1; i < values.length; i++) {
-        if (values[i][0]?.toString().trim() === idStr) {
-          return values[i][3] || values[i][4] || values[i][1] || identifier;
-        }
-      }
-    }
-    
-    // Check by username
-    const normalized = idStr.toLowerCase();
-    for (let i = 1; i < values.length; i++) {
-      if ((values[i][1] || '').toString().trim().toLowerCase() === normalized) {
-        return values[i][3] || values[i][4] || values[i][1] || identifier;
-      }
-    }
-    
-  } catch (err) {
-    Logger.log('⚠️ getCurrentNickname error:', err.toString());
-  }
-  
-  return identifier;
-}
-
-/**
- * Bulk update all member names across all sheets when nickname changes
- * This ensures historical records always show current nickname
- * 
- * @param {Object} data - { discordId, oldNickname, newNickname }
- * @returns {Object} Response with update count
- */
-function handleBulkUpdateNickname(data) {
-  const { discordId, oldNickname, newNickname } = data;
-  
-  if (!oldNickname || !newNickname) {
-    return createResponse('error', 'Missing oldNickname or newNickname');
-  }
-  
-  try {
-    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
-    const normalizedOld = oldNickname.toLowerCase().trim();
-    const normalizedNew = newNickname.toLowerCase().trim();
-    
-    let totalUpdated = 0;
-    const sheetsToUpdate = [];
-    
-    // Find all sheets that might contain member names
-    const allSheets = ss.getSheets();
-    
-    for (const sheet of allSheets) {
-      const sheetName = sheet.getName();
-      
-      // Skip non-data sheets
-      if (sheetName.startsWith('Template') || sheetName.startsWith('_')) continue;
-      
-      try {
-        const lastRow = sheet.getLastRow();
-        const lastCol = sheet.getLastColumn();
-        
-        if (lastRow < 2 || lastCol < 1) continue;
-        
-        // Search for the old nickname in all cells
-        const searchRange = sheet.getRange(1, 1, lastRow, lastCol);
-        const values = searchRange.getValues();
-        
-        let sheetUpdated = false;
-        
-        for (let row = 0; row < values.length; row++) {
-          for (let col = 0; col < values[row].length; col++) {
-            const cellValue = (values[row][col] || '').toString().trim();
-            if (cellValue.toLowerCase() === normalizedOld) {
-              // Found a match - update it
-              sheet.getRange(row + 1, col + 1).setValue(newNickname);
-              sheetUpdated = true;
-              totalUpdated++;
-            }
-          }
-        }
-        
-        if (sheetUpdated) {
-          sheetsToUpdate.push(sheetName);
-        }
-      } catch (e) {
-        // Skip sheets with access issues
-        Logger.log(`⚠️ Skipped sheet ${sheetName}: ${e.message}`);
-      }
-    }
-    
-    Logger.log(`✅ Bulk nickname update: "${oldNickname}" → "${newNickname}"`);
-    Logger.log(`   Updated ${totalUpdated} cells across ${sheetsToUpdate.length} sheets: ${sheetsToUpdate.join(', ')}`);
-    
-    return createResponse('ok', 'Bulk update complete', {
-      oldNickname,
-      newNickname,
-      totalUpdated,
-      sheetsUpdated: sheetsToUpdate
-    });
-    
-  } catch (err) {
-    Logger.log('❌ Bulk nickname update error:', err.toString());
-    return createResponse('error', err.toString());
-  }
-}
-
-// ===========================================================
 // OPTIMIZED SHEET CREATION WITH AUTO-LOGGING
 // ===========================================================
-// ========================================================================
-// TEST SEND COMMAND - FOR ADMIN LOGS CHANNEL ONLY
-// ========================================================================
-
-/**
- * Handle !testsend command - sends a test embed to all recorded channels
- * Auto-deletes after 2 minutes
- * Only works in admin-logs channel and only for users with admin role
- * 
- * @param {Object} data - Command data
- */
-async function handleTestSend(data) {
-  try {
-    // Verify channel is admin-logs channel
-    const channelId = data.channelId;
-    const expectedChannelId = config.admin_logs_channel_id;
-    
-    if (channelId !== expectedChannelId) {
-      await message.reply('❌ This command can only be used in the admin-logs channel.');
-      return;
-    }
-    
-    // Verify user has admin role
-    const member = message.member;
-    const userRoles = member.roles.cache.map(r => r.name);
-    const hasAdminRole = config.admin_roles.some(role => userRoles.includes(role));
-    
-    if (!hasAdminRole) {
-      await message.reply('❌ You do not have permission to use this command.');
-      return;
-    }
-    
-    // Get all recorded channel IDs from the database
-    const channels = await getRecordedChannels();
-    
-    if (channels.length === 0) {
-      await message.reply('⚠️ No channels have been recorded yet.');
-      return;
-    }
-    
-    // Create the test embed
-    const testEmbed = new EmbedBuilder()
-      .setColor(0xFFA500) // Orange
-      .setTitle('🔧 THIS IS A TEST')
-      .setDescription('This is a test message to verify the bot is working correctly.')
-      .addFields(
-        { name: 'Status', value: '✅ Working', inline: true },
-        { name: 'Channels Tested', value: channels.length.toString(), inline: true },
-        { name: 'Timestamp', value: new Date().toLocaleString(), inline: false }
-      )
-      .setFooter({ text: 'Test message - will auto-delete in 2 minutes' })
-      .setTimestamp()
-      .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() });
-    
-    // Send to all channels
-    const results = [];
-    for (const channelId of channels) {
-      try {
-        const channel = await client.channels.fetch(channelId);
-        if (channel && channel.isTextBased()) {
-          const msg = await channel.send({ embeds: [testEmbed] });
-          results.push({ channel: channelId, status: 'sent', messageId: msg.id });
-          
-          // Schedule deletion after 2 minutes
-          setTimeout(async () => {
-            try {
-              await msg.delete();
-              console.log(`✅ Test message deleted from channel ${channelId}`);
-            } catch (err) {
-              console.log(`⚠️ Could not delete test message from ${channelId}: ${err.message}`);
-            }
-          }, 120000); // 2 minutes
-        }
-      } catch (err) {
-        results.push({ channel: channelId, status: 'failed', error: err.message });
-      }
-    }
-    
-    // Send confirmation to the original channel
-    const successCount = results.filter(r => r.status === 'sent').length;
-    const failedCount = results.filter(r => r.status === 'failed').length;
-    
-    await message.reply({
-      embeds: [{
-        color: 0x00FF00,
-        title: '✅ Test Send Complete',
-        description: `Successfully sent test messages to **${successCount}** channels${
-          failedCount > 0 ? `, ${failedCount} failed` : ''
-        }`,
-        fields: results.map(r => ({
-          name: r.channel.substring(0, 10) + '...',
-          value: r.status === 'sent' ? '✅ Sent and will auto-delete in 2 min' : `❌ ${r.error}`,
-          inline: false
-        })),
-        footer: { text: 'Test completed - messages will self-destruct' }
-      }]
-    });
-    
-    console.log(`✅ !testsend executed by ${message.author.username} - ${successCount} channels tested`);
-    
-  } catch (err) {
-    console.error('❌ !testsend error:', err);
-    await message.reply(`❌ Test send failed: ${err.message}`);
-  }
-}
-
-/**
- * Get all recorded channel IDs from the database
- * 
- * @returns {Promise<Array>} Array of channel IDs
- */
-async function getRecordedChannels() {
-  try {
-    const db = await dbAPI.connect();
-    const collections = [
-      'attendance-TPB',
-      'members-TPB',
-      'auctionItems-TPB'
-    ];
-    
-    const channels = new Set();
-    
-    for (const collName of collections) {
-      try {
-        const collection = db.collection(collName);
-        // Get unique channel IDs from the collection
-        const docs = await collection.find({}, { projection: { channelId: 1 } }).toArray();
-        docs.forEach(doc => {
-          if (doc.channelId) channels.add(doc.channelId);
-        });
-      } catch (err) {
-        // Collection might not exist yet, skip
-      }
-    }
-    
-    return Array.from(channels);
-  } catch (err) {
-    console.error('⚠️ Could not fetch recorded channels:', err.message);
-    return [];
-  }
-}

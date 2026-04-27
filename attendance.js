@@ -1091,7 +1091,7 @@ async function validateStateConsistency(client) {
 
     // Get current week sheet
     const weekSheet = getSundayOfWeek();
-    const sheetName = `ELYSIUM_WEEK_${weekSheet}`;
+    const sheetName = `WEEK_${weekSheet}`;
 
     console.log(`📊 Checking consistency with sheet: ${sheetName}`);
 

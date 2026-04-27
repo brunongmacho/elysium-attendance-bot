@@ -18,7 +18,20 @@
 const { MongoClient } = require('mongodb');
 
 const MONGODB_URI = process.env.MONGODB_URI;
-const DB_NAME = 'elysium-bot';
+
+// Load config for database name
+let DB_NAME = 'elysium-bot-tpb'; // Default for TrailerParkB
+try {
+  const fs = require('fs');
+  const path = require('path');
+  const configPath = path.join(__dirname, '..', 'config.json');
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  if (config.mongodb_database) {
+    DB_NAME = config.mongodb_database;
+  }
+} catch (e) {
+  // Use default
+}
 
 class DatabaseAPI {
   constructor() {

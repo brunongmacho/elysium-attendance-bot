@@ -186,7 +186,7 @@ Automated rankings and comprehensive guild analytics.
 **Features:**
 - 🏆 **Attendance Leaderboard** - Top 10 by points earned
 - 🏆 **Bidding Leaderboard** - Top 10 by remaining points
-- 🏆 **Weekly Reports** - Auto-sent Saturday 11:59 PM GMT+8
+- 🏆 **Weekly Reports** - Auto-sent Monday 2:59 AM GMT+8
 - 🏆 **Monthly Reports** - Auto-sent last day of month 11:59 PM GMT+8
 - 🏆 **Visual progress bars** with percentage indicators
 - 🏆 **Real-time statistics** with live updates from MongoDB

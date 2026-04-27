@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * ELYSIUM GUILD BOT - ENHANCED HELP SYSTEM v10.0
+ * GUILD BOT - ENHANCED HELP SYSTEM v10.0
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Features:
@@ -263,7 +263,7 @@ const COMMANDS = {
       aliases: ["!startauction", "!start", "!auc-start", "!begin-auction", "!startauc"],
       adminOnly: true,
       details: [
-        "• All ELYSIUM members can bid",
+        "• All guild members can bid",
         "• 10-minute cooldown protection",
         "• Loads items from Google Sheets",
         "• Session preview before start",
@@ -459,14 +459,14 @@ const COMMANDS = {
     },
     weeklyreport: {
       usage: "!weeklyreport",
-      description: "Force send weekly leaderboard report (auto-sent Saturday 11:59 PM)",
+      description: "Force send weekly leaderboard report (auto-sent Monday 2:59 AM)",
       aliases: ["!weekly", "!week"],
       adminOnly: true,
       details: [
         "• Manual trigger",
         "• Same format as automatic report",
         "• Posts to designated channel",
-        "• **Scheduled**: Auto-runs Saturday 11:59 PM"
+        "• **Scheduled**: Auto-runs Monday 2:59 AM"
       ]
     },
     monthlyreport: {
@@ -710,7 +710,7 @@ const COMMANDS = {
 function buildMainHelp() {
   const embed = new EmbedBuilder()
     .setColor(COLORS.PRIMARY)
-    .setTitle(`${EMOJI.SHIELD} ELYSIUM Guild Bot - Command Help`)
+    .setTitle(`${EMOJI.SHIELD} Guild Bot - Command Help`)
     .setDescription(
       `**Version ${BOT_VERSION}**\n\n` +
       `${EMOJI.SPARKLES} **What's New:**\n` +

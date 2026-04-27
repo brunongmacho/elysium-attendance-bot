@@ -367,7 +367,7 @@ function getCurrentWeekLabel() {
   const now = new Date();
   const year = now.getFullYear();
   const weekNum = getWeekNumber(now);
-  return `ELYSIUM_WEEK_${year}_${weekNum}`;
+  return `WEEK_${year}_${weekNum}`;
 }
 
 /**

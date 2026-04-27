@@ -1,11 +1,11 @@
 /**
  * =====================================================================
- * ELYSIUM GUILD BOT - Main Application Entry Point
+ * GUILD BOT - Main Application Entry Point
  * =====================================================================
  *
  * @file index2.js
  * @version 9.0.0
- * @description Comprehensive Discord bot for ELYSIUM guild management,
+ * @description Comprehensive Discord bot for guild management,
  *              integrating attendance tracking and auction bidding systems
  *              with Google Sheets synchronization.
  *
@@ -20,7 +20,7 @@
  *
  * @architecture
  * ┌─────────────────────────────────────────────────────────────┐
- * │                    ELYSIUM Guild Bot                        │
+ * │                    GUILD BOT                        │
  * ├─────────────────────────────────────────────────────────────┤
  * │ Core Systems:                                               │
  * │  - Attendance Module (./attendance.js)                      │
@@ -45,7 +45,7 @@
  * 9. Event Handlers
  * 10. Bot Initialization
  *
- * @author ELYSIUM Development Team
+ * @author Guild Development Team
  * @license MIT
  */
 
@@ -105,7 +105,7 @@ const timerRegistry = require('./utils/timer-registry'); // Centralized timer tr
 // ❌ REMOVED: Abolished systems (intelligence-engine, proactive-intelligence, nlp-*, ml-integration, loot-system)
 const eventReminders = require('./event-reminders.js'); // Game Event Reminder System
 const bossRotation = require('./boss-rotation.js'); // Boss Rotation System (5-guild tracking)
-const coreEvaluation = require('./core-evaluation.js'); // Core Member Evaluation System
+const coreEvaluation = null; // DISABLED: require('./core-evaluation.js'); // Core Member Evaluation System
 const activityHeatmap = require('./activity-heatmap.js'); // Activity Heatmap System
 const crashRecovery = require('./utils/crash-recovery.js'); // Crash Recovery System (state persistence)
 const dbAPI = require('./utils/database-api'); // MongoDB Database API
@@ -167,6 +167,9 @@ const config = (() => {
     node_env: process.env.NODE_ENV || fileConfig.node_env || 'production'
   };
 })();
+
+// Guild name from config
+const guildName = config.guild_name || 'TrailerParkB';
 
 // =====================================================================
 // SPECIAL USER IDS & DM CONFIG
@@ -838,16 +841,33 @@ async function moveQueueItemsToSheet(config, queueItems) {
  * }
  */
 function isAdmin(member) {
-  return member.roles.cache.some((r) => config.admin_roles.includes(r.name));
+  if (!member) return false;
+  
+  // Get role IDs from config.role_ids and role names from config.admin_roles
+  const roleIds = Object.values(config.role_ids || {});
+  const roleNames = config.admin_roles || [];
+  
+  return member.roles.cache.some((r) => 
+    roleNames.includes(r.name) || 
+    roleIds.includes(r.id)
+  );
 }
 
 /**
- * Check if member has ELYSIUM role
+ * Check if member has guild role
  * @param {GuildMember} member - Discord guild member
- * @returns {boolean} - True if member has ELYSIUM role
+ * @returns {boolean} - True if member has guild role
  */
 function hasElysiumRole(member) {
-  return member.roles.cache.some((r) => r.name === config.elysium_role);
+  if (!member) return false;
+  
+  const roleName = config.elysium_role;
+  const roleId = config.elysium_role_id || config.role_ids?.member;
+  
+  return member.roles.cache.some((r) => 
+    r.name === roleName || 
+    r.id === roleId
+  );
 }
 
 // =====================================================================
@@ -1476,7 +1496,7 @@ function getRankTitle(rank, attendance) {
   }
 
   // RANK #1 - THE ABSOLUTE GOD
-  if (rank === 1) return "👑 GOD OF ELYSIUM 👑";
+  if (rank === 1) return `👑 GOD OF ${guildName} 👑`;
 
   // TOP 2-3 - LEGENDARY STATUS
   if (rank === 2) return "🥈 ATTENDANCE DEMON 🥈";
@@ -2123,9 +2143,10 @@ const commandHandlers = {
   // =========================================================================
   // STATUS COMMAND - Displays bot health and active operations
   // =========================================================================
-  status: async (message, member) => {
-    const guild = message.guild;
-    const uptime = attendance.formatUptime(Date.now() - BOT_START_TIME);
+   status: async (message, member) => {
+     if (!message.guild || message.guild.id !== config.main_guild_id) return;
+     const guild = message.guild;
+     const uptime = attendance.formatUptime(Date.now() - BOT_START_TIME);
     const timeSinceSheet =
       lastSheetCall > 0
         ? `${Math.floor((Date.now() - lastSheetCall) / 1000)} seconds ago`
@@ -2338,10 +2359,11 @@ const commandHandlers = {
       targetMember = message.mentions.members.first();
       targetDisplayName = targetMember.displayName;
       targetQueryName = targetMember.nickname || targetMember.user.username;
-    } else {
-      // User provided a name without @mention - use fuzzy matching
-      const searchName = args.join(" ");
-      const guild = message.guild;
+     } else {
+       if (!message.guild || message.guild.id !== config.main_guild_id) return;
+       // User provided a name without @mention - use fuzzy matching
+       const searchName = args.join(" ");
+       const guild = message.guild;
 
       if (guild) {
         matchInfo = findBestMemberMatch(searchName, guild);
@@ -2374,8 +2396,8 @@ const commandHandlers = {
   if (cached && (Date.now() - cached.timestamp < STATS_CACHE_DURATION)) {
     console.log(`📦 Using cached stats for ${targetDisplayName}`);
 
-    // CRITICAL FIX: Try to find member by the actual name returned from sheets
-    if (!targetMember && message.guild) {
+     // CRITICAL FIX: Try to find member by the actual name returned from sheets
+     if (!targetMember && message.guild?.id === config.main_guild_id) {
       const actualName = cached.data.memberName;
       const foundMember = message.guild.members.cache.find(
         m => m.displayName.toLowerCase() === actualName.toLowerCase() ||
@@ -2454,8 +2476,8 @@ const commandHandlers = {
     // CRITICAL FIX: Get the actual member name returned from sheets (for fuzzy match cases)
     const actualMemberName = result.memberName;
 
-    // CRITICAL FIX: Try to find the actual Discord member by the returned name
-    if (message.guild) {
+     // CRITICAL FIX: Try to find the actual Discord member by the returned name
+     if (message.guild?.id === config.main_guild_id) {
       const foundMember = message.guild.members.cache.find(
         m => m.displayName.toLowerCase() === actualMemberName.toLowerCase() ||
              m.user.username.toLowerCase() === actualMemberName.toLowerCase()
@@ -2549,8 +2571,9 @@ const commandHandlers = {
   // =========================================================================
   // CLOSEALLTHREAD COMMAND - Mass close all attendance threads
   // =========================================================================
-  closeallthread: async (message, member) => {
-    const guild = message.guild;
+   closeallthread: async (message, member) => {
+     if (!message.guild || message.guild.id !== config.main_guild_id) return;
+     const guild = message.guild;
     const attChannel = await guild.channels
       .fetch(config.attendance_channel_id)
       .catch(() => null);
@@ -3265,21 +3288,22 @@ const commandHandlers = {
         `• Allow new check-ins and re-queue all messages as pending verifications\n` +
         `• Use \`!overrideclose\` to close and submit (will overwrite existing column if any)\n\n` +
         `Click ✅ Confirm or ❌ Cancel button below.`,
-      async (confirmMsg) => {
-        const guild = message.guild;
+       async (confirmMsg) => {
+         if (!message.guild || message.guild.id !== config.main_guild_id) return;
+         const guild = message.guild;
 
-        // Unarchive and unlock the thread
-        try {
-          if (thread.archived) {
-            await thread.setArchived(false, `Reopened by ${member.user.username}`);
-          }
-          if (thread.locked) {
-            await thread.setLocked(false, `Unlocked by ${member.user.username}`);
-          }
-        } catch (err) {
-          await message.reply(`⚠️ Could not unlock/unarchive thread: ${err.message}`);
-          return;
-        }
+         // Unarchive and unlock the thread
+         try {
+           if (thread.archived) {
+             await thread.setArchived(false, `Reopened by ${member.user.username}`);
+           }
+           if (thread.locked) {
+             await thread.setLocked(false, `Unlocked by ${member.user.username}`);
+           }
+         } catch (err) {
+           await message.reply(`⚠️ Could not unlock/unarchive thread: ${err.message}`);
+           return;
+         }
 
         // Try to load existing members from MongoDB (fast) or Google Sheets (fallback)
         let existingMembers = [];
@@ -3454,8 +3478,9 @@ const commandHandlers = {
         overwriteWarning +
         `\n\n${pendingInThread.length > 0 ? `⚠️ **${pendingInThread.length} pending verification(s) will be AUTO-VERIFIED!**\n\n` : ''}` +
         `Click ✅ Confirm or ❌ Cancel button below.`,
-      async (confirmMsg) => {
-        const guild = message.guild;
+       async (confirmMsg) => {
+         if (!message.guild || message.guild.id !== config.main_guild_id) return;
+         const guild = message.guild;
 
         // Auto-verify all pending check-ins
         if (pendingInThread.length > 0) {
@@ -4307,7 +4332,7 @@ const commandHandlers = {
     }
     
     await message.reply('🔧 Running Core Evaluation now...');
-    await coreEvaluation.forceEvaluationNow(client);
+    // DISABLED: await coreEvaluation.forceEvaluationNow(client);
     await message.reply('✅ Core Evaluation complete!');
   },
 
@@ -4322,7 +4347,7 @@ const commandHandlers = {
     }
     
     await message.reply('🔒 Closing Core Evaluation thread...');
-    await coreEvaluation.forceCloseCycle(client);
+    // DISABLED: await coreEvaluation.forceCloseCycle(client);
     await message.reply('✅ Thread closed!');
   },
 
@@ -4337,7 +4362,7 @@ const commandHandlers = {
     }
     
     await message.reply('🔄 Resetting Core Evaluation cycle...');
-    await coreEvaluation.forceResetCycle();
+    // DISABLED: await coreEvaluation.forceResetCycle();
     await message.reply('✅ Cycle reset! Use !forcecore to start fresh.');
   },
 
@@ -4382,7 +4407,7 @@ const commandHandlers = {
           const rotation = rotations[boss];
           if (rotation) {
             const emoji = rotation.isOurTurn ? '🟢' : '🔴';
-            const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
+            const status = rotation.isOurTurn ? `${guildName}'S TURN` : `${rotation.currentGuild}'s turn`;
 
             // Get spawn time - check boss timer first, then fall back to attendance predictions
             let spawnInfo = '';
@@ -4523,7 +4548,7 @@ const commandHandlers = {
 
         if (result.success) {
           const emoji = result.data.isOurTurn ? '🟢' : '🔴';
-          const status = result.data.isOurTurn ? 'ELYSIUM\'S TURN' : `${result.data.currentGuild}'s turn`;
+          const status = result.data.isOurTurn ? `${guildName}'S TURN` : `${result.data.currentGuild}'s turn`;
           await message.reply(
             `✅ **${bossName}** rotation set to index **${newIndex}**\n\n` +
             `${emoji} Status: **${status}**\n` +
@@ -4557,7 +4582,7 @@ const commandHandlers = {
 
         if (result.updated !== false) {
           const emoji = result.isNowOurTurn ? '🟢' : '🔴';
-          const status = result.isNowOurTurn ? 'ELYSIUM\'S TURN' : `${result.newGuild}'s turn`;
+          const status = result.isNowOurTurn ? `${guildName}'S TURN` : `${result.newGuild}'s turn`;
           await message.reply(
             `✅ **${bossName}** rotation advanced\n\n` +
             `${result.oldIndex} (${result.oldGuild}) → ${result.newIndex} (${result.newGuild})\n\n` +
@@ -4591,7 +4616,7 @@ const commandHandlers = {
           const rotation = rotations[boss];
           if (rotation) {
             const emoji = rotation.isOurTurn ? '🟢' : '🔴';
-            const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
+            const status = rotation.isOurTurn ? `${guildName}'S TURN` : `${rotation.currentGuild}'s turn`;
             embed.addFields({
               name: `${emoji} ${boss}`,
               value: `Guild ${rotation.currentIndex}/${rotation.guilds ? rotation.guilds.length : 5} - **${status}**`,
@@ -4758,6 +4783,11 @@ client.once(Events.ClientReady, async () => {
   await auctionCache.init();
 
 
+  // INITIALIZE MEMBER REGISTRY
+  const memberRegistry = require('./member-registry');
+  await memberRegistry.initialize(config, mongoClient);
+  console.log('✅ Member registry initialized');
+
   // INITIALIZE ALL MODULES IN CORRECT ORDER
   attendance.initialize(config, bossPoints, isAdmin, discordCache);
   await bossTimer.initialize(client, config, sheetAPI, attendance); // Boss timer system
@@ -4822,6 +4852,37 @@ client.once(Events.ClientReady, async () => {
   // PRE-AUCTION SYNC (Sheets → MongoDB) - Runs before weekly auction (configured in bidding-schedule.json)
   auctioneering.schedulePreAuctionSync(sheetAPI, bossRotation);
   console.log('✅ Pre-auction sync scheduled (see config/bidding-schedule.json) - syncs manual Sheets edits to MongoDB');
+
+  // EVENT LISTENERS FOR MEMBER REGISTRY
+  // Track member joins and nickname changes
+  client.on(Events.GuildMemberAdd, async (member) => {
+    if (member.guild.id === config.main_guild_id) {
+      try {
+        await memberRegistry.onMemberJoin(member);
+      } catch (err) {
+        console.error('❌ GuildMemberAdd error:', err.message);
+      }
+    }
+  });
+
+  client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
+    if (newMember.guild.id === config.main_guild_id) {
+      try {
+        // Check for nickname change
+        if (oldMember.nickname !== newMember.nickname) {
+          await memberRegistry.onNicknameChange(newMember, oldMember.nickname);
+        }
+        // Check for username change
+        if (oldMember.user?.username !== newMember.user?.username) {
+          await memberRegistry.onUsernameChange(oldMember.user, newMember.user);
+        }
+      } catch (err) {
+        console.error('❌ GuildMemberUpdate error:', err.message);
+      }
+    }
+  });
+
+  console.log('✅ Member registry event listeners registered');
 
   // EVENT REMINDER SERVICE (Phase 10) - MongoDB-powered reminder system
   const mongoEventReminders = require('./services/event-reminders');
@@ -5027,9 +5088,9 @@ client.once(Events.ClientReady, async () => {
   scheduler.startScheduler();
 
   await eventReminders.initializeEventReminders(client, config, sheetAPI, attendance);
-  await coreEvaluation.initialize(config);
-  await coreEvaluation.scheduleEvaluationCheck(client);
-  await coreEvaluation.scheduleEvaluationReminder(client);
+  // DISABLED: await coreEvaluation.initialize(config);
+  // DISABLED: await coreEvaluation.scheduleEvaluationCheck(client);
+  // DISABLED: await coreEvaluation.scheduleEvaluationReminder(client);
   await crashRecovery.initialize(client, config);
 
   leaderboardSystem.init(client, config, discordCache, crashRecovery);
@@ -5206,11 +5267,11 @@ client.on(Events.MessageCreate, async (message) => {
         '!bidstatus', '!bs', '!bstatus'
       ];
 
-      // Check if it's a member command BEFORE fetching member (faster)
-      const isMemberCommand = memberCommands.some(cmd => content.startsWith(cmd));
+       // Check if it's a member command BEFORE fetching member (faster)
+       const isMemberCommand = memberCommands.some(cmd => content.startsWith(cmd));
 
-      // Only fetch member if it's NOT a member command (will be deleted)
-      if (!isMemberCommand) {
+       // Only fetch member if it's NOT a member command (will be deleted)
+       if (!isMemberCommand && message.guild?.id === config.main_guild_id) {
         const member = await message.guild.members
           .fetch(message.author.id)
           .catch(() => null);
@@ -5407,15 +5468,15 @@ client.on(Events.MessageCreate, async (message) => {
                   )
                   .setTimestamp();
 
-                // Add boss image if available
-                const bossImage = getBossImageAttachment(bossName);
-                const bossImageURL = getBossImageAttachmentURL(bossName, message.guild);
-                if (bossImageURL) {
+                 // Add boss image if available
+                 const bossImage = getBossImageAttachment(bossName);
+                 const bossImageURL = getBossImageAttachmentURL(bossName, message.guild?.id);
+                 if (bossImageURL) {
                   embed.setThumbnail(bossImageURL);
                 }
 
-                // Add guild branding
-                addGuildFooter(embed, message.guild);
+                 // Add guild branding
+                 addGuildFooter(embed, message.guild?.id);
 
                 const messagePayload = { content: '@everyone', embeds: [embed] };
                 if (bossImage) {
@@ -5770,7 +5831,7 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
-    // Leaderboard commands (admin only OR ELYSIUM role in BOT-COMMANDS channel, anywhere except spawn threads)
+    // Leaderboard commands (admin only OR guild role in BOT-COMMANDS channel, anywhere except spawn threads)
     if (
       resolvedCmd === "!leaderboardattendance" ||
       resolvedCmd === "!leaderboardbidding" ||
@@ -5785,11 +5846,11 @@ client.on(Events.MessageCreate, async (message) => {
       const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
         (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
 
-      // Check permissions: either admin OR ELYSIUM role in BOT-COMMANDS channel
+      // Check permissions: either admin OR guild role in BOT-COMMANDS channel
       const hasPermission = userIsAdmin || (hasElysiumRole(member) && (inBotCommandsChannel || inElysiumCommandsChannel));
 
       if (!hasPermission) {
-        await message.reply("❌ Only admins or ELYSIUM members can use leaderboard commands.");
+        await message.reply("❌ Only admins or guild members can use leaderboard commands.");
         return;
       }
 
@@ -5995,8 +6056,8 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         const statusText = userIsAdmin
-          ? `⏩ **${username}** (Admin) registered for **${spawnInfo.boss}**\n\nFast-track verification (no screenshot required)...\n\nℹ️ !stats \`${username}\` in <#1431640753238442014>`
-          : `⏳ **${username}** registered for **${spawnInfo.boss}**\n\nWaiting for admin verification...\n\nℹ️ !stats \`${username}\` in <#1431640753238442014>`;
+          ? `⏩ **${username}** (Admin) registered for **${spawnInfo.boss}**\n\nFast-track verification (no screenshot required)...\n\nℹ️ !stats \`${username}\` in <#${config.bot_manual_channel_id}>`
+          : `⏳ **${username}** registered for **${spawnInfo.boss}**\n\nWaiting for admin verification...\n\nℹ️ !stats \`${username}\` in <#${config.bot_manual_channel_id}>`;
 
         const embed = new EmbedBuilder()
           .setColor(userIsAdmin ? 0x00ff00 : 0xffa500)
@@ -6553,16 +6614,17 @@ client.on(Events.MessageCreate, async (message) => {
     // MEMBER COMMANDS IN BOT-COMMANDS CHANNEL
     // =========================================================================
     // Define bot commands channel
+    // DISABLED: Core Evaluation commands channel - no longer used
     const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
-      (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id) ||
+      (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
       // Also allow Core Evaluation commands - check thread ID or parent channel
-      message.channel.id === config.core_evaluation_commands_channel ||
-      (message.channel.isThread() && 
-        (message.channel.id === config.core_evaluation_commands_channel || 
-         message.channel.parentId === config.core_evaluation_commands_channel ||
-         // Also allow Core Evaluation threads from bot_manual OR timer channel
-         message.channel.parentId === config.bot_manual_channel_id ||
-         message.channel.parentId === config.timer_channel_id));
+      // DISABLED: message.channel.id === config.core_evaluation_commands_channel ||
+      // DISABLED: (message.channel.isThread() && 
+      // DISABLED:   (message.channel.id === config.core_evaluation_commands_channel || 
+      // DISABLED:    message.channel.parentId === config.core_evaluation_commands_channel ||
+      // DISABLED:    // Also allow Core Evaluation threads from bot_manual OR timer channel
+      // DISABLED:    message.channel.parentId === config.bot_manual_channel_id ||
+      // DISABLED:    message.channel.parentId === config.timer_channel_id));
 
     // Fun commands available to all members in BOT-COMMANDS channel
     if (inBotCommandsChannel || inElysiumCommandsChannel) {
@@ -6624,7 +6686,7 @@ client.on(Events.MessageCreate, async (message) => {
         
         console.log(`📊 CP submission: ${discordNickname} - ${cpNumber}`);
         
-        const result = await coreEvaluation.handleCPCommand(message, cpNumber, discordNickname);
+        // DISABLED: const result = await coreEvaluation.handleCPCommand(message, cpNumber, discordNickname);
         return;
       }
     }
@@ -7791,11 +7853,17 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
     
     if (member.user.bot) return;
     
+    // ONLY process voice updates from TrailerParkB guild
+    const guild = newState.guild;
+    if (!guild || guild.id !== config.main_guild_id) {
+      return; // Skip voice updates from other servers
+    }
+    
     const commandsChannel = await discordCache.getChannel('bot_manual_channel_id');
     
     if (!commandsChannel) return;
     
-    const guild = commandsChannel.guild;
+     const voiceGuild = commandsChannel.guild;
     
     const memberName = member.displayName;
     const loreKey = Object.keys(memberLore).find(
@@ -7817,7 +7885,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
           { name: 'Member', value: member.displayName, inline: true },
           { name: 'Channel', value: channel.name, inline: true }
         )
-        .setFooter({ text: 'ELYSIUM Guild', iconURL: guild.iconURL() })
+        .setFooter({ text: `${guildName} Guild`, iconURL: guild.iconURL() })
         .setTimestamp();
       
       await commandsChannel.send({ embeds: [joinEmbed] });
@@ -7937,7 +8005,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
           { name: 'Member', value: member.displayName, inline: true },
           { name: 'Channel', value: channel.name, inline: true }
         )
-        .setFooter({ text: 'ELYSIUM Guild', iconURL: guild.iconURL() })
+        .setFooter({ text: `${guildName} Guild`, iconURL: guild.iconURL() })
         .setTimestamp();
       
       await commandsChannel.send({ embeds: [leaveEmbed] });
