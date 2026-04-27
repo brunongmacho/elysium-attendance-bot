@@ -167,13 +167,14 @@ function doPost(e) {
     if (action === 'getLearningData') return getLearningData(data);
     if (action === 'getLearningMetrics') return getLearningMetrics(data);
 
-    // Google Drive actions (Learning & Data Storage)
-    if (action === 'initializeDriveFolders') return initializeDriveFolders();
-    if (action === 'uploadScreenshot') return uploadScreenshot(data);
-    if (action === 'exportLearningData') return exportLearningData(data);
-    if (action === 'exportPredictionFeatures') return exportPredictionFeatures(data);
-    if (action === 'createDailyBackup') return createDailyBackup();
-    if (action === 'logAuditTrail') return logAuditTrail(data);
+     // Google Drive actions (Learning & Data Storage)
+     if (action === 'initializeDriveFolders') return initializeDriveFolders();
+     if (action === 'initializeAllSheets') return initializeAllSheets();
+     if (action === 'uploadScreenshot') return uploadScreenshot(data);
+     if (action === 'exportLearningData') return exportLearningData(data);
+     if (action === 'exportPredictionFeatures') return exportPredictionFeatures(data);
+     if (action === 'createDailyBackup') return createDailyBackup();
+     if (action === 'logAuditTrail') return logAuditTrail(data);
 
     // Bootstrap learning system
     if (action === 'bootstrapLearning') return bootstrapLearningFromHistory();
@@ -5321,9 +5322,259 @@ function updateNLPAnalytics(data) {
 }
 
 function manualInitializeNLP() {
-  const result = initializeNLPTabs();
-  Logger.log('✅ Manual NLP initialization complete: ' + result.created.join(', '));
-  return result;
+   const result = initializeNLPTabs();
+   Logger.log('✅ Manual NLP initialization complete: ' + result.created.join(', '));
+   return result;
+}
+
+/**
+ * Initialize all required Google Sheets for the bot
+ * Creates missing sheets with proper headers and formatting
+ */
+function initializeAllSheets() {
+   try {
+     Logger.log('🚀 Initializing all Google Sheets...');
+     
+     const ss = SpreadsheetApp.getActiveSpreadsheet();
+     
+     // Initialize BiddingItems sheet
+     initializeBiddingItemsSheet(ss);
+     
+     // Initialize AttendanceLog sheet
+     initializeAttendanceLogSheet(ss);
+     
+     // Initialize AuctionLog sheet
+     initializeAuctionLogSheet(ss);
+     
+     // Initialize _BotState sheet
+     initializeBotStateSheet(ss);
+     
+     // Initialize _LootState sheet
+     initializeLootStateSheet(ss);
+     
+     // Initialize _AttendanceState sheet
+     initializeAttendanceStateSheet(ss);
+     
+     // Initialize ForDistribution sheet
+     initializeForDistributionSheet(ss);
+     
+     // Initialize TOTAL ATTENDANCE sheet
+     initializeTotalAttendanceSheet(ss);
+     
+     // Initialize BiddingPoints sheet
+     initializeBiddingPointsSheet(ss);
+     
+     Logger.log('✅ All sheets initialized successfully');
+     return createResponse('ok', 'All sheets initialized');
+   } catch (err) {
+     Logger.log('❌ Error initializing sheets: ' + err.toString());
+     return createResponse('error', err.toString());
+   }
+}
+
+/**
+ * Initialize or get BiddingItems sheet with proper headers
+ */
+function initializeBiddingItemsSheet(ss) {
+   let sheet = ss.getSheetByName('BiddingItems');
+   if (!sheet) {
+     Logger.log('📋 Creating BiddingItems sheet...');
+     sheet = ss.insertSheet('BiddingItems');
+     
+     // Set headers (12 columns total: A-L)
+     sheet.getRange(1, 1, 1, 12).setValues([[
+       'Item', 'Start Price', 'Duration', 'Winner', 'Winning Bid', 
+       'Auction Start', 'Auction End', 'Timestamp', 'Total Bids', 'Source', 'Quantity', 'Boss'
+     ]])
+     .setFontWeight('bold')
+     .setBackground('#4A90E2')
+     .setFontColor('#FFFFFF');
+     
+     // Set column widths
+     sheet.setColumnWidth(1, 200);  // Item
+     sheet.setColumnWidth(10, 100); // Source
+     sheet.setColumnWidth(11, 80);  // Quantity
+     sheet.setColumnWidth(12, 200); // Boss
+     
+     Logger.log('✅ BiddingItems sheet created');
+   }
+   return sheet;
+}
+
+/**
+ * Initialize or get AttendanceLog sheet with proper headers
+ */
+function initializeAttendanceLogSheet(ss) {
+   let sheet = ss.getSheetByName('AttendanceLog');
+   if (!sheet) {
+     Logger.log('📋 Creating AttendanceLog sheet...');
+     sheet = ss.insertSheet('AttendanceLog');
+     
+     // Set headers
+     sheet.getRange(1, 1, 1, 5).setValues([[
+       'Timestamp', 'Member Name', 'Boss', 'Spawn Type', 'Points Awarded'
+     ]])
+     .setFontWeight('bold')
+     .setBackground('#4A90E2')
+     .setFontColor('#FFFFFF');
+     
+     Logger.log('✅ AttendanceLog sheet created');
+   }
+   return sheet;
+}
+
+/**
+ * Initialize or get AuctionLog sheet with proper headers
+ */
+function initializeAuctionLogSheet(ss) {
+   let sheet = ss.getSheetByName('AuctionLog');
+   if (!sheet) {
+     Logger.log('📋 Creating AuctionLog sheet...');
+     sheet = ss.insertSheet('AuctionLog');
+     
+     // Set headers
+     sheet.getRange(1, 1, 1, 6).setValues([[
+       'Timestamp', 'Item', 'Winner', 'Winning Bid', 'Bidder Count', 'Duration (sec)'
+     ]])
+     .setFontWeight('bold')
+     .setBackground('#4A90E2')
+     .setFontColor('#FFFFFF');
+     
+     Logger.log('✅ AuctionLog sheet created');
+   }
+   return sheet;
+}
+
+/**
+ * Initialize or get _BotState sheet with proper headers
+ */
+function initializeBotStateSheet(ss) {
+   let sheet = ss.getSheetByName('_BotState');
+   if (!sheet) {
+     Logger.log('📋 Creating _BotState sheet...');
+     sheet = ss.insertSheet('_BotState');
+     
+     // Set headers
+     sheet.getRange(1, 1, 1, 2).setValues([[
+       'Key', 'Value'
+     ]])
+     .setFontWeight('bold')
+     .setBackground('#4A90E2')
+     .setFontColor('#FFFFFF');
+     
+     Logger.log('✅ _BotState sheet created');
+   }
+   return sheet;
+}
+
+/**
+ * Initialize or get _LootState sheet with proper headers
+ */
+function initializeLootStateSheet(ss) {
+   let sheet = ss.getSheetByName('_LootState');
+   if (!sheet) {
+     Logger.log('📋 Creating _LootState sheet...');
+     sheet = ss.insertSheet('_LootState');
+     
+     // Set headers
+     sheet.getRange(1, 1, 1, 2).setValues([[
+       'Key', 'Value'
+     ]])
+     .setFontWeight('bold')
+     .setBackground('#4A90E2')
+     .setFontColor('#FFFFFF');
+     
+     Logger.log('✅ _LootState sheet created');
+   }
+   return sheet;
+}
+
+/**
+ * Initialize or get _AttendanceState sheet with proper headers
+ */
+function initializeAttendanceStateSheet(ss) {
+   let sheet = ss.getSheetByName('_AttendanceState');
+   if (!sheet) {
+     Logger.log('📋 Creating _AttendanceState sheet...');
+     sheet = ss.insertSheet('_AttendanceState');
+     
+     // Set headers
+     sheet.getRange(1, 1, 1, 2).setValues([[
+       'Key', 'Value'
+     ]])
+     .setFontWeight('bold')
+     .setBackground('#4A90E2')
+     .setFontColor('#FFFFFF');
+     
+     Logger.log('✅ _AttendanceState sheet created');
+   }
+   return sheet;
+}
+
+/**
+ * Initialize or get ForDistribution sheet with proper headers
+ */
+function initializeForDistributionSheet(ss) {
+   let sheet = ss.getSheetByName('ForDistribution');
+   if (!sheet) {
+     Logger.log('📋 Creating ForDistribution sheet...');
+     sheet = ss.insertSheet('ForDistribution');
+     
+     // Set headers
+     sheet.getRange(1, 1, 1, 4).setValues([[
+       'Item', 'Winner', 'Winning Bid', 'Timestamp'
+     ]])
+     .setFontWeight('bold')
+     .setBackground('#4A90E2')
+     .setFontColor('#FFFFFF');
+     
+     Logger.log('✅ ForDistribution sheet created');
+   }
+   return sheet;
+}
+
+/**
+ * Initialize or get TOTAL ATTENDANCE sheet with proper headers
+ */
+function initializeTotalAttendanceSheet(ss) {
+   let sheet = ss.getSheetByName('TOTAL ATTENDANCE');
+   if (!sheet) {
+     Logger.log('📋 Creating TOTAL ATTENDANCE sheet...');
+     sheet = ss.insertSheet('TOTAL ATTENDANCE');
+     
+     // Set headers
+     sheet.getRange(1, 1, 1, 4).setValues([[
+       'Member Name', 'Total Points', 'Events Attended', 'Last Attendance'
+     ]])
+     .setFontWeight('bold')
+     .setBackground('#4A90E2')
+     .setFontColor('#FFFFFF');
+     
+     Logger.log('✅ TOTAL ATTENDANCE sheet created');
+   }
+   return sheet;
+}
+
+/**
+ * Initialize or get BiddingPoints sheet with proper headers
+ */
+function initializeBiddingPointsSheet(ss) {
+   let sheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
+   if (!sheet) {
+     Logger.log('📋 Creating BiddingPoints sheet...');
+     sheet = ss.insertSheet(CONFIG.BIDDING_SHEET);
+     
+     // Set headers
+     sheet.getRange(1, 1, 1, 4).setValues([[
+       'Member Name', 'Points Consumed', 'Points Left', 'Attendance Points'
+     ]])
+     .setFontWeight('bold')
+     .setBackground('#4A90E2')
+     .setFontColor('#FFFFFF');
+     
+     Logger.log('✅ BiddingPoints sheet created');
+   }
+   return sheet;
 }
 
 // ===========================================================

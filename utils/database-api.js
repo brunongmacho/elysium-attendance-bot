@@ -163,36 +163,46 @@ class DatabaseAPI {
     console.log('✅ [MongoDB] Admin channel configured for alerts');
   }
 
-  /**
-   * Check if critical indexes already exist (PERF FIX)
-   * Prevents redundant index creation during startup
-   * @returns {Promise<boolean>} True if all critical indexes exist
-   */
-  async checkIndexesExist() {
-    try {
-      // Check a few critical indexes to determine if indexes are already created
-      const criticalChecks = [
-        { collection: getCollectionName('attendance'), index: 'member_history' },
-        { collection: getCollectionName('members'), index: 'username_unique' },
-        { collection: getCollectionName('eventReminders'), index: 'due_reminders' },
-        { collection: getCollectionName('coreEvaluation'), index: 'evaluation_lookup' },
-        { collection: getCollectionName('coreEvaluationState'), index: 'state_type_lookup' }
-      ];
+   /**
+    * Check if critical indexes already exist (PERF FIX)
+    * Prevents redundant index creation during startup
+    * @returns {Promise<boolean>} True if all critical indexes exist
+    */
+   async checkIndexesExist() {
+     try {
+       // Check a few critical indexes to determine if indexes are already created
+       const criticalChecks = [
+         { collection: getCollectionName('attendance'), index: 'member_history' },
+         { collection: getCollectionName('members'), index: 'username_unique' },
+         { collection: getCollectionName('eventReminders'), index: 'due_reminders' },
+         { collection: getCollectionName('coreEvaluation'), index: 'evaluation_lookup' },
+         { collection: getCollectionName('coreEvaluationState'), index: 'state_type_lookup' }
+       ];
 
-      for (const check of criticalChecks) {
-        const indexes = await this.db.collection(check.collection).indexes();
-        const exists = indexes.some(idx => idx.name === check.index);
-        if (!exists) {
-          return false; // At least one critical index missing
-        }
-      }
+       for (const check of criticalChecks) {
+         try {
+           const indexes = await this.db.collection(check.collection).indexes();
+           const exists = indexes.some(idx => idx.name === check.index);
+           if (!exists) {
+             return false; // At least one critical index missing
+           }
+         } catch (collectionError) {
+           // If collection doesn't exist yet, indexes definitely don't exist
+           if (collectionError.message && collectionError.message.includes('ns does not exist')) {
+             return false; // Collection doesn't exist, so indexes don't exist
+           }
+           // For other errors, log and treat as missing indexes
+           console.error(`⚠️ Error checking indexes for ${check.collection}:`, collectionError.message);
+           return false;
+         }
+       }
 
-      return true; // All critical indexes exist
-    } catch (error) {
-      console.error('⚠️ Error checking indexes:', error.message);
-      return false; // On error, proceed with creation to be safe
-    }
-  }
+       return true; // All critical indexes exist
+     } catch (error) {
+       console.error('⚠️ Error checking indexes:', error.message);
+       return false; // On error, proceed with creation to be safe
+     }
+   }
 
   /**
    * Create database indexes for performance (PHASE 1: CRIT-005 Enhanced)

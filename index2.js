@@ -4880,9 +4880,9 @@ client.once(Events.ClientReady, async () => {
   await auctionCache.init();
 
 
-  // INITIALIZE MEMBER REGISTRY
-  const memberRegistry = require('./member-registry');
-  await memberRegistry.initialize(config, mongoClient);
+   // INITIALIZE MEMBER REGISTRY
+   const memberRegistry = require('./member-registry');
+   await memberRegistry.initialize(config, dbAPI.client);
   console.log('✅ Member registry initialized');
 
   // INITIALIZE ALL MODULES IN CORRECT ORDER
