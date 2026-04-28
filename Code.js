@@ -7660,133 +7660,26 @@ function handleBulkUpdateNickname(data) {
  * 
  * @param {Object} data - Command data
  */
-async function handleTestSend(data) {
+function handleTestSend(data) {
   try {
-    // Verify channel is admin-logs channel
-    const channelId = data.channelId;
-    const expectedChannelId = config.admin_logs_channel_id;
-    
-    if (channelId !== expectedChannelId) {
-      await message.reply('❌ This command can only be used in the admin-logs channel.');
-      return;
-    }
-    
-    // Verify user has admin role
-    const member = message.member;
-    const userRoles = member.roles.cache.map(r => r.name);
-    const hasAdminRole = config.admin_roles.some(role => userRoles.includes(role));
-    
-    if (!hasAdminRole) {
-      await message.reply('❌ You do not have permission to use this command.');
-      return;
-    }
-    
-    // Get all recorded channel IDs from the database
-    const channels = await getRecordedChannels();
-    
-    if (channels.length === 0) {
-      await message.reply('⚠️ No channels have been recorded yet.');
-      return;
-    }
-    
-    // Create the test embed
-    const testEmbed = new EmbedBuilder()
-      .setColor(0xFFA500) // Orange
-      .setTitle('🔧 THIS IS A TEST')
-      .setDescription('This is a test message to verify the bot is working correctly.')
-      .addFields(
-        { name: 'Status', value: '✅ Working', inline: true },
-        { name: 'Channels Tested', value: channels.length.toString(), inline: true },
-        { name: 'Timestamp', value: new Date().toLocaleString(), inline: false }
-      )
-      .setFooter({ text: 'Test message - will auto-delete in 2 minutes' })
-      .setTimestamp()
-      .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() });
-    
-    // Send to all channels
-    const results = [];
-    for (const channelId of channels) {
-      try {
-        const channel = await client.channels.fetch(channelId);
-        if (channel && channel.isTextBased()) {
-          const msg = await channel.send({ embeds: [testEmbed] });
-          results.push({ channel: channelId, status: 'sent', messageId: msg.id });
-          
-          // Schedule deletion after 2 minutes
-          setTimeout(async () => {
-            try {
-              await msg.delete();
-              console.log(`✅ Test message deleted from channel ${channelId}`);
-            } catch (err) {
-              console.log(`⚠️ Could not delete test message from ${channelId}: ${err.message}`);
-            }
-          }, 120000); // 2 minutes
-        }
-      } catch (err) {
-        results.push({ channel: channelId, status: 'failed', error: err.message });
-      }
-    }
-    
-    // Send confirmation to the original channel
-    const successCount = results.filter(r => r.status === 'sent').length;
-    const failedCount = results.filter(r => r.status === 'failed').length;
-    
-    await message.reply({
-      embeds: [{
-        color: 0x00FF00,
-        title: '✅ Test Send Complete',
-        description: `Successfully sent test messages to **${successCount}** channels${
-          failedCount > 0 ? `, ${failedCount} failed` : ''
-        }`,
-        fields: results.map(r => ({
-          name: r.channel.substring(0, 10) + '...',
-          value: r.status === 'sent' ? '✅ Sent and will auto-delete in 2 min' : `❌ ${r.error}`,
-          inline: false
-        })),
-        footer: { text: 'Test completed - messages will self-destruct' }
-      }]
-    });
-    
-    console.log(`✅ !testsend executed by ${message.author.username} - ${successCount} channels tested`);
-    
+    // This function should be called from Discord.js, not from Apps Script
+    // The actual test send logic is in index2.js
+    // This is just a placeholder that returns an error
+    Logger.log('⚠️ handleTestSend called in Code.gs - This should be handled by Discord.js');
+    return createResponse('error', 'Test send should be triggered from Discord bot (!testsend command)');
   } catch (err) {
-    console.error('❌ !testsend error:', err);
-    await message.reply(`❌ Test send failed: ${err.message}`);
+    Logger.log('❌ handleTestSend error: ' + err.toString());
+    return createResponse('error', err.toString());
   }
 }
 
 /**
  * Get all recorded channel IDs from the database
- * 
- * @returns {Promise<Array>} Array of channel IDs
+ * Note: This function is for Node.js Discord bot, not Google Apps Script
+ * Apps Script should not directly access MongoDB
+ * This is kept as a placeholder but won't be called from Apps Script
  */
-async function getRecordedChannels() {
-  try {
-    const db = await dbAPI.connect();
-    const collections = [
-      'attendance-TPB',
-      'members-TPB',
-      'auctionItems-TPB'
-    ];
-    
-    const channels = new Set();
-    
-    for (const collName of collections) {
-      try {
-        const collection = db.collection(collName);
-        // Get unique channel IDs from the collection
-        const docs = await collection.find({}, { projection: { channelId: 1 } }).toArray();
-        docs.forEach(doc => {
-          if (doc.channelId) channels.add(doc.channelId);
-        });
-      } catch (err) {
-        // Collection might not exist yet, skip
-      }
-    }
-    
-    return Array.from(channels);
-  } catch (err) {
-    console.error('⚠️ Could not fetch recorded channels:', err.message);
-    return [];
-  }
+function getRecordedChannels() {
+  Logger.log('⚠️ getRecordedChannels called in Apps Script - This should be handled by Discord bot');
+  return [];
 }
