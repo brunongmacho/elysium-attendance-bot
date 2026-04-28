@@ -843,13 +843,19 @@ async function moveQueueItemsToSheet(config, queueItems) {
 function isAdmin(member) {
   if (!member) return false;
   
-  // Get role IDs from config.role_ids and role names from config.admin_roles
-  const roleIds = Object.values(config.role_ids || {});
+  // Get ONLY admin role IDs (not all role IDs including member role)
+  const adminRoleIds = [
+    config.role_ids?.admins,
+    config.role_ids?.x,
+    config.role_ids?.guild_leader,
+    config.role_ids?.elites
+  ].filter(Boolean); // Remove undefined values
+  
   const roleNames = config.admin_roles || [];
   
   return member.roles.cache.some((r) => 
     roleNames.includes(r.name) || 
-    roleIds.includes(r.id)
+    adminRoleIds.includes(r.id)
   );
 }
 
