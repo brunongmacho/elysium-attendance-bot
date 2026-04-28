@@ -1083,17 +1083,17 @@ function handleOverwriteAttendance(data) {
     Logger.log(`📊 ${action} attendance: ${boss} at ${timestamp} - ${members.length} members`);
 
     // Invalidate weekly attendance cache (attendance updated)
-    try {
-      const cache = CacheService.getDocumentCache();
-      cache.remove('weeklyAttendance_v1');
-      Logger.log('🧹 Invalidated weekly attendance cache (attendance update)');
-    } catch (e) {
-      Logger.log('⚠️ Failed to invalidate cache: ' + e.message);
-    }
+      try {
+        const cache = CacheService.getDocumentCache();
+        cache.remove('weeklyAttendance_v1');
+        Logger.log('🧹 Invalidated weekly attendance cache (attendance update)');
+      } catch (e) {
+        Logger.log('⚠️ Failed to invalidate cache: ' + e.message);
+      }
 
-    return createResponse('ok', `${action}: ${members.length}`, {column: workingCol, boss, timestamp, membersCount: members.length, overwritten: isOverwrite});
-  } finally { lock.releaseLock(); }
-}
+      return createResponse('ok', `${action}: ${members.length}`, {column: workingCol, boss, timestamp, membersCount: members.length, overwritten: isOverwrite});
+    } finally { lock.releaseLock(); }
+  }
 
 function getCurrentWeekSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -5371,16 +5371,31 @@ function initializeAllSheets() {
      // Initialize TOTAL ATTENDANCE sheet
      initializeTotalAttendanceSheet(ss);
      
-     // Initialize BiddingPoints sheet
-     initializeBiddingPointsSheet(ss);
-     
-     Logger.log('✅ All sheets initialized successfully');
-     return createResponse('ok', 'All sheets initialized');
-   } catch (err) {
-     Logger.log('❌ Error initializing sheets: ' + err.toString());
-     return createResponse('error', err.toString());
-   }
-}
+      // Initialize BiddingPoints sheet
+      initializeBiddingPointsSheet(ss);
+      
+      // Auto-update totals after initialization
+      try {
+        updateTotalAttendanceAndMembers();
+        Logger.log('✅ Auto-updated TOTAL ATTENDANCE sheet');
+      } catch (e) {
+        Logger.log('⚠️ Could not update TOTAL ATTENDANCE: ' + e.message);
+      }
+      
+      try {
+        updateBiddingPoints();
+        Logger.log('✅ Auto-updated BiddingPoints sheet');
+      } catch (e) {
+        Logger.log('⚠️ Could not update BiddingPoints: ' + e.message);
+      }
+      
+      Logger.log('✅ All sheets initialized successfully');
+      return createResponse('ok', 'All sheets initialized');
+    } catch (err) {
+      Logger.log('❌ Error initializing sheets: ' + err.toString());
+      return createResponse('error', err.toString());
+    }
+  }
 
 /**
  * Initialize or get BiddingItems sheet with proper headers
@@ -5525,22 +5540,28 @@ function initializeAttendanceStateSheet(ss) {
  * Initialize or get ForDistribution sheet with proper headers
  */
 function initializeForDistributionSheet(ss) {
-   let sheet = ss.getSheetByName('ForDistribution');
-   if (!sheet) {
-     Logger.log('📋 Creating ForDistribution sheet...');
-     sheet = ss.insertSheet('ForDistribution');
-     
-     // Set headers
-     sheet.getRange(1, 1, 1, 4).setValues([[
-       'Item', 'Winner', 'Winning Bid', 'Timestamp'
-     ]])
-     .setFontWeight('bold')
-     .setBackground('#4A90E2')
-     .setFontColor('#FFFFFF');
-     
-     Logger.log('✅ ForDistribution sheet created');
-   }
-   return sheet;
+  let sheet = ss.getSheetByName('ForDistribution');
+  if (!sheet) {
+    Logger.log('📋 Creating ForDistribution sheet...');
+    sheet = ss.insertSheet('ForDistribution');
+    
+    // Set headers (same as BiddingItems columns A-D)
+    sheet.getRange(1, 1, 1, 4).setValues([[
+      'Item', 'Winner', 'Winning Bid', 'Timestamp'
+    ]])
+    .setFontWeight('bold')
+    .setBackground('#4A90E2')
+    .setFontColor('#FFFFFF');
+    
+    // Set column widths (same as BiddingItems)
+    sheet.setColumnWidth(1, 200);  // Item (same as BiddingItems)
+    sheet.setColumnWidth(2, 150);  // Winner
+    sheet.setColumnWidth(3, 120);  // Winning Bid
+    sheet.setColumnWidth(4, 150);  // Timestamp
+    
+    Logger.log('✅ ForDistribution sheet created');
+  }
+  return sheet;
 }
 
 /**
