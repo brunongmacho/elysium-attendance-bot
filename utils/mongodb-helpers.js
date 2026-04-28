@@ -643,7 +643,7 @@ async function addAttendance(data) {
 
   await addAttendanceRecord({
     memberId: member._id,
-    memberName: data.username,
+    memberName: member.nickname || data.username, // Use nickname (in-game name) first, fallback to username
     bossName: data.boss,
     bossPoints: data.points || 0,
     timestamp: timestampDate,
@@ -659,7 +659,7 @@ async function addAttendance(data) {
     bossPoints: data.points || 0
   });
 
-  console.log(`✅ [MongoDB] Added attendance for ${data.username}: ${data.boss} (+${data.points} pts)`);
+  console.log(`✅ [MongoDB] Added attendance for ${member.nickname || data.username}: ${data.boss} (+${data.points} pts)`);
   return updatedMember;
 }
 
