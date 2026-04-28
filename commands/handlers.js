@@ -942,9 +942,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
     // /overrideclose command - Close and overwrite attendance
     if (commandName === 'overrideclose') {
-      // Defer with ephemeral to acknowledge interaction
-      // The handler sends confirmation buttons and status messages to channel
-      await interaction.deferReply({ ephemeral: true });
+      // Immediately acknowledge interaction to prevent timeout
+      await interaction.reply({ content: '🔄 Processing override close...', ephemeral: true });
 
       // Create synthetic message object to reuse existing !overrideclose handler
       const syntheticMessage = {
@@ -956,7 +955,6 @@ async function handleSlashCommand(interaction, modules, config, client) {
         mentions: { members: new Map() },
         reply: async (content) => {
           // Send directly to channel (not as interaction response)
-          // This allows the handler's confirmation and status messages to work
           if (typeof content === 'string') {
             return await interaction.channel.send({ content });
           } else if (content.embeds) {
@@ -969,12 +967,20 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
       try {
         const { commandHandlers } = require('../index2.js');
-        await commandHandlers.overrideclose(syntheticMessage, interaction.member);
-        // Properly resolve the deferred interaction (ephemeral, only user sees this)
-        await interaction.editReply({ content: '✅ Command processed' });
+        // Run handler asynchronously (don't await - prevents interaction timeout)
+        commandHandlers.overrideclose(syntheticMessage, interaction.member)
+          .then(() => {
+            interaction.editReply({ content: '✅ Override close completed!', ephemeral: true })
+              .catch(err => console.log('Could not edit reply:', err.message));
+          })
+          .catch(async (error) => {
+            console.error('Error in /overrideclose command:', error);
+            interaction.editReply({ content: `❌ Error: ${error.message}`, ephemeral: true })
+              .catch(err => console.log('Could not edit reply:', err.message));
+          });
       } catch (error) {
         console.error('Error in /overrideclose command:', error);
-        await interaction.editReply({ content: `❌ Error: ${error.message}` });
+        await interaction.editReply({ content: `❌ Error: ${error.message}` }).catch(() => {});
       }
       return;
     }
