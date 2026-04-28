@@ -2241,7 +2241,7 @@ const commandHandlers = {
   // STATUS COMMAND - Displays bot health and active operations
   // =========================================================================
    status: async (message, member) => {
-     if (!message.guild || message.guild.id !== config.main_guild_id) return;
+     if (!message.guild) return;
      const guild = message.guild;
      const uptime = attendance.formatUptime(Date.now() - BOT_START_TIME);
     const timeSinceSheet =
@@ -2457,7 +2457,7 @@ const commandHandlers = {
       targetDisplayName = targetMember.displayName;
       targetQueryName = targetMember.nickname || targetMember.user.username;
      } else {
-       if (!message.guild || message.guild.id !== config.main_guild_id) return;
+       if (!message.guild) return;
        // User provided a name without @mention - use fuzzy matching
        const searchName = args.join(" ");
        const guild = message.guild;
@@ -2669,7 +2669,7 @@ const commandHandlers = {
   // CLOSEALLTHREAD COMMAND - Mass close all attendance threads
   // =========================================================================
    closeallthread: async (message, member) => {
-     if (!message.guild || message.guild.id !== config.main_guild_id) return;
+     if (!message.guild) return;
      const guild = message.guild;
     const attChannel = await guild.channels
       .fetch(config.attendance_channel_id)
@@ -3386,7 +3386,7 @@ const commandHandlers = {
         `• Use \`!overrideclose\` to close and submit (will overwrite existing column if any)\n\n` +
         `Click ✅ Confirm or ❌ Cancel button below.`,
        async (confirmMsg) => {
-         if (!message.guild || message.guild.id !== config.main_guild_id) return;
+         if (!message.guild) return;
          const guild = message.guild;
 
          // Unarchive and unlock the thread
@@ -3576,7 +3576,7 @@ const commandHandlers = {
         `\n\n${pendingInThread.length > 0 ? `⚠️ **${pendingInThread.length} pending verification(s) will be AUTO-VERIFIED!**\n\n` : ''}` +
         `Click ✅ Confirm or ❌ Cancel button below.`,
        async (confirmMsg) => {
-         if (!message.guild || message.guild.id !== config.main_guild_id) return;
+         if (!message.guild) return;
          const guild = message.guild;
 
         // Auto-verify all pending check-ins
@@ -5338,7 +5338,7 @@ client.on(Events.MessageCreate, async (message) => {
     // ⚡ PERFORMANCE: Early returns for irrelevant messages
     // NOTE: Bot message filtering happens AFTER timer server check (line ~3888)
     // This allows timer bot to create spawn threads before being blocked
-    if (message.guild.id !== config.main_guild_id && message.guild.id !== config.timer_server_id) return; // Skip wrong guild (allow timer server)
+    
 
     // 📊 ACTIVITY TRACKING: Track message for activity heatmap
     // Skip bot messages for more accurate member activity data
@@ -5408,189 +5408,7 @@ client.on(Events.MessageCreate, async (message) => {
       console.log(`🏰 Guild: ${message.guild?.name}`);
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
-    //Timer server spawn detection
-    if (message.guild && message.guild.id === config.timer_server_id) {
-      if (
-        config.timer_channel_id &&
-        message.channel.id === config.timer_channel_id
-      ) {
-        if (/will spawn in.*minutes?!/i.test(message.content)) {
-          let detectedBoss = null;
-          let timestamp = null;
 
-          const timestampMatch = message.content.match(
-            /\((\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\)/
-          );
-          if (timestampMatch) timestamp = timestampMatch[1];
-
-          const matchBold = message.content.match(
-            /[⚠️🔔⏰]*\s*\*\*(.*?)\*\*\s*will spawn/i
-          );
-          if (matchBold) {
-            detectedBoss = matchBold[1].trim();
-          } else {
-            const matchEmoji = message.content.match(
-              /[⚠️🔔⏰]+\s*([A-Za-z\s]+?)\s*will spawn/i
-            );
-            if (matchEmoji) {
-              detectedBoss = matchEmoji[1].trim();
-            } else {
-              const matchPlain = message.content.match(
-                /^([A-Za-z\s]+?)\s*will spawn/i
-              );
-              if (matchPlain) detectedBoss = matchPlain[1].trim();
-            }
-          }
-
-          if (!detectedBoss) {
-            console.log(
-              `⚠️ Could not extract boss name from: ${message.content}`
-            );
-            return;
-          }
-
-          const bossName = attendance.findBossMatch(detectedBoss);
-          if (!bossName) {
-            console.log(`⚠️ Unknown boss: ${detectedBoss}`);
-            return;
-          }
-
-          // Skip scheduled bosses - they have fixed spawn times, no need to track external kills
-          const bossType = bossTimer.getBossType(bossName);
-          if (bossType === 'schedule') {
-            console.log(`⏭️ ${bossName} is a scheduled boss - ignoring external bot announcement`);
-            return;
-          }
-
-          console.log(
-            `🎯 Boss spawn detected: ${bossName} (from ${message.author.username})`
-          );
-
-          // Parse timestamp from external bot first
-          let dateStr, timeStr, fullTimestamp;
-
-          if (timestamp) {
-            const [datePart, timePart] = timestamp.split(" ");
-            const [year, month, day] = datePart.split("-");
-            dateStr = `${month}/${day}/${year.substring(2)}`;
-            timeStr = timePart;
-            fullTimestamp = `${dateStr} ${timeStr}`;
-            console.log(`⏰ External bot timestamp: ${fullTimestamp}`);
-          } else {
-            const ts = attendance.getCurrentTimestamp();
-            dateStr = ts.date;
-            timeStr = ts.time;
-            fullTimestamp = ts.full;
-            console.log(`⏰ Using current timestamp: ${fullTimestamp}`);
-          }
-
-          // CHECK IF BOSS WAS RECENTLY HANDLED BY TIMER SYSTEM
-          const recentlyHandled = bossTimer.wasRecentlyHandled(bossName);
-          if (recentlyHandled) {
-            const timeSince = Math.round((Date.now() - recentlyHandled.handledAt) / 1000 / 60);
-            console.log(`⏭️ ${bossName} was recently handled by timer (${timeSince}min ago) - skipping external bot to prevent duplicate`);
-            return;
-          }
-
-          // CHECK IF BOSS TIMER HAS THIS BOSS
-          const timerData = bossTimer.getNextSpawn(bossName);
-          if (timerData && timerData.nextSpawn) {
-            // Check if times are close (within 1 hour)
-            // External bot time is in GMT+8 - parse it correctly
-            const [month, day, year] = dateStr.split('/').map(Number);
-            const [hours, minutes] = timeStr.split(':').map(Number);
-            const fullYear = year < 100 ? 2000 + year : year;
-            // Create UTC timestamp from GMT+8 time components
-            const gmt8Timestamp = Date.UTC(fullYear, month - 1, day, hours, minutes, 0, 0);
-            const externalBotTime = new Date(gmt8Timestamp - (8 * 60 * 60 * 1000)); // Convert GMT+8 to UTC
-            const timerTime = timerData.nextSpawn;
-            const timeDiff = Math.abs(timerTime - externalBotTime) / 1000 / 60; // minutes
-
-            if (timeDiff <= 60) {
-              // Times are close - trust timer
-              console.log(`⏭️ Timer has ${bossName} and times match (${Math.round(timeDiff)}min diff) - skipping external bot`);
-              return; // Timer will handle at 5-min reminder
-            } else {
-              // Times are far apart - trust external bot and cancel old timer
-              console.warn(`⚠️ TIME MISMATCH: Timer expects ${timerTime.toLocaleString('en-US', { timeZone: 'Asia/Manila' })}, external bot says ${externalBotTime.toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`);
-              console.warn(`⚠️ Difference: ${Math.round(timeDiff)} minutes - Using external bot spawn time`);
-
-              // Cancel the incorrect timer to prevent duplicate thread
-              await bossTimer.cancelTimer(bossName);
-              console.log(`🗑️ Cancelled incorrect timer for ${bossName}`);
-            }
-          } else {
-            console.log(`📢 No timer for ${bossName} - creating thread from external bot`);
-          }
-
-          const result = await attendance.createSpawnThreads(
-            client,
-            bossName,
-            dateStr,
-            timeStr,
-            fullTimestamp,
-            "external_bot"
-          );
-
-          if (!result || !result.success) {
-            const errorMsg = result && result.error ? result.error : 'Unknown error';
-            console.error(`❌ Failed to create spawn thread for ${bossName}: ${errorMsg}`);
-          } else {
-            console.log(`✅ Successfully created spawn thread for ${bossName} (thread ID: ${result.threadId})`);
-
-            // ADD TO RECENTLY HANDLED CACHE to prevent duplicate from external bot
-            // Parse spawn time as GMT+8
-            const [spMonth, spDay, spYear] = dateStr.split('/').map(Number);
-            const [spHours, spMinutes] = timeStr.split(':').map(Number);
-            const spFullYear = spYear < 100 ? 2000 + spYear : spYear;
-            const spGmt8Timestamp = Date.UTC(spFullYear, spMonth - 1, spDay, spHours, spMinutes, 0, 0);
-            const spawnTime = new Date(spGmt8Timestamp - (8 * 60 * 60 * 1000)); // Convert GMT+8 to UTC
-            bossTimer.addToRecentlyHandled(bossName, spawnTime, result.threadId);
-            console.log(`📌 Added ${bossName} to recently-handled cache (external bot path)`);
-
-            // ANNOUNCE TO BOSS-SPAWN-ANNOUNCEMENT CHANNEL (no timer or time mismatch)
-            try {
-              const announcementChannel = await client.channels.fetch(config.boss_spawn_announcement_channel_id);
-              if (announcementChannel) {
-                const announceTimestamp = Math.floor(spawnTime.getTime() / 1000);
-                const threadUrl = `https://discord.com/channels/${config.main_guild_id}/${config.attendance_channel_id}/${result.threadId}`;
-
-                const embed = new EmbedBuilder()
-                  .setColor(0x3498db)
-                  .setTitle(`🔔 ${bossName} Spawned!`)
-                  .setDescription('**Check in at the attendance thread!**')
-                  .addFields(
-                    { name: '🕐 Time', value: `<t:${announceTimestamp}:t>`, inline: true },
-                    { name: '📝 Thread', value: `[Click here](${threadUrl})`, inline: true }
-                  )
-                  .setTimestamp();
-
-                 // Add boss image if available
-                 const bossImage = getBossImageAttachment(bossName);
-                 const bossImageURL = getBossImageAttachmentURL(bossName, message.guild?.id);
-                 if (bossImageURL) {
-                  embed.setThumbnail(bossImageURL);
-                }
-
-                 // Add guild branding
-                 addGuildFooter(embed, message.guild?.id);
-
-                const messagePayload = { content: '@everyone', embeds: [embed] };
-                if (bossImage) {
-                  messagePayload.files = [bossImage];
-                }
-
-                await announcementChannel.send(messagePayload);
-                console.log(`📢 Announced ${bossName} spawn to announcement channel`);
-              }
-            } catch (announceError) {
-              console.error(`⚠️ Failed to announce spawn: ${announceError.message}`);
-            }
-          }
-        }
-        return;
-      }
-    }
 
     // Second bot check after timer server handling
     // Allow bot messages in attendance threads (for other bots posting check-ins)
@@ -7252,7 +7070,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     // ═══════════════════════════════════════════════════════════════════════════
     if (!interaction.isButton()) return;
     if (!interaction.message.guild) return;
-    if (interaction.message.guild.id !== config.main_guild_id) return;
+    if (!interaction.message.guild) return;
 
     const customId = interaction.customId;
     const user = interaction.user;
@@ -7679,7 +7497,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     // ⚡ PERFORMANCE: Early returns for irrelevant reactions
     if (user.bot) return; // Skip bot reactions
     if (!reaction.message.guild) return; // Skip DM reactions
-    if (reaction.message.guild.id !== config.main_guild_id) return; // Skip wrong guild
+    // Guild check removed - use role-based permissions
 
     // 👑 SPECIAL REACTION: When rohypnol or alterfrieren react to each other's messages
     // 50% chance for the bot to also react with 💙
