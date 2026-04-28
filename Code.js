@@ -867,8 +867,27 @@ function handleSubmitAttendance(data) {
     if (targetColumn) return createResponse('error', `Column exists for ${boss} at ${timestamp}`);
     
     const newCol = lastCol + 1;
+
+    // Get boss points from BossPoints sheet
+    let bossPoints = 1; // Default to 1
+    try {
+      const bpSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.BOSS_POINTS_SHEET);
+      if (bpSheet) {
+        const bpData = bpSheet.getDataRange().getValues();
+        for (let i = 1; i < bpData.length; i++) {
+          if (bpData[i][0] && bpData[i][0].toString().trim().toUpperCase() === boss) {
+            bossPoints = Number(bpData[i][1]) || 1;
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      Logger.log('⚠️ Could not read BossPoints sheet: ' + e.message);
+    }
+
     sheet.getRange(1, newCol, 2, 1).setValues([[timestamp],[boss]])
       .setFontWeight('bold').setBackground('#E8F4F8').setHorizontalAlignment('center');
+    sheet.getRange(2, newCol).setValue(bossPoints); // Set Column D (Attendance Points) for this boss
     sheet.setColumnWidth(newCol, 120);
     
     const lastRow = sheet.getLastRow();
