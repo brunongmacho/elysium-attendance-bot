@@ -1149,8 +1149,8 @@ function copyMembersFromPreviousWeek(spreadsheet, newSheet) {
     if (lastRow >= 3) {
       // Copy column A (members) as values
       const members = prevSheet.getRange(3, COLUMNS.MEMBERS, lastRow - 2, 1)
-                              .getValues()
-                              .filter(m => m[0] && m[0].toString().trim() !== '');
+                               .getValues()
+                               .filter(m => m[0] && m[0].toString().trim() !== '');
       if (members.length > 0) {
         newSheet.getRange(3, COLUMNS.MEMBERS, members.length, 1).setValues(members);
 
@@ -1162,6 +1162,22 @@ function copyMembersFromPreviousWeek(spreadsheet, newSheet) {
 
     // Return previous sheet name for logging
     return prevSheet.getName();
+  } else {
+    // FIRST TIME SETUP: Set default values/formulas for B-D columns
+    const lastRow = newSheet.getLastRow();
+    if (lastRow >= 3) {
+      // Column B (Points Consumed): default to 0
+      newSheet.getRange(3, COLUMNS.POINTS_CONSUMED, lastRow - 2, 1).setValue(0);
+      
+      // Column C (Points Left): formula = D3 - B3 (Attendance Points - Points Consumed)
+      const pointsLeftFormula = Array(lastRow - 2).fill().map((_, i) => [`=D${3 + i}-B${3 + i}`]);
+      newSheet.getRange(3, COLUMNS.POINTS_LEFT, lastRow - 2, 1).setFormulas(pointsLeftFormula);
+      
+      // Column D (Attendance Points): default to 0 (will be updated by updateBiddingPoints())
+      newSheet.getRange(3, COLUMNS.ATTENDANCE_POINTS, lastRow - 2, 1).setValue(0);
+      
+      Logger.log('✅ Set default values for B-D columns (first time setup)');
+    }
   }
 
   return null;
