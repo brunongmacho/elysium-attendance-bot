@@ -915,8 +915,12 @@ function handleSubmitAttendance(data) {
       const totalRows = lastRow + newMembersCount;
       if (totalRows >= 3) {
         const allMemberNames = sheet.getRange(3, COLUMNS.MEMBERS, totalRows - 2, 1).getValues().flat();
-        const allMembersLower = allMemberNames.map(m => (m || '').toString().trim().toLowerCase());
-        const attendanceData = allMembersLower.map(m => [membersLower.includes(m)]);
+        // Use normalizeUsername for consistent matching (ignore spaces/special chars)
+        const attendanceData = allMemberNames.map(m => {
+          const sheetNameNormalized = normalizeUsername(m); // Normalize sheet name
+          const isPresent = members.some(member => normalizeUsername(member) === sheetNameNormalized);
+          return [isPresent];
+        });
         sheet.getRange(3, newCol, attendanceData.length, 1).setValues(attendanceData).setDataValidation(checkboxRule);
       }
       
@@ -964,7 +968,9 @@ function handleSubmitAttendance(data) {
 function handleOverwriteAttendance(data) {
   const boss = (data.boss || '').toString().trim().toUpperCase();
   const timestamp = (data.timestamp || '').toString().trim();
-  const members = (data.members || []).map(m => m.trim());
+  // Normalize member names using MemberRegistry (gets current nicknames)
+  const rawMembers = (data.members || []).map(m => m.trim());
+  const members = normalizeMemberNamesFromRegistry(rawMembers);
 
   if (!boss || !timestamp || members.length === 0) {
     return createResponse('error', 'Missing boss, timestamp, or members');
@@ -1057,8 +1063,12 @@ function handleOverwriteAttendance(data) {
       const totalRows = lastRow + newMembersCount;
       if (totalRows >= 3) {
         const allMemberNames = sheet.getRange(3, COLUMNS.MEMBERS, totalRows - 2, 1).getValues().flat();
-        const allMembersLower = allMemberNames.map(m => (m || '').toString().trim().toLowerCase());
-        const attendanceData = allMembersLower.map(m => [membersLower.includes(m)]);
+        // Use normalizeUsername for consistent matching (ignore spaces/special chars)
+        const attendanceData = allMemberNames.map(m => {
+          const sheetNameNormalized = normalizeUsername(m); // Normalize sheet name
+          const isPresent = members.some(member => normalizeUsername(member) === sheetNameNormalized);
+          return [isPresent];
+        });
         sheet.getRange(3, workingCol, attendanceData.length, 1).setValues(attendanceData).setDataValidation(checkboxRule);
       }
 
