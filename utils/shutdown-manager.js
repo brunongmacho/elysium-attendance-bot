@@ -252,34 +252,15 @@ class ShutdownManager {
 
   /**
    * Initialize signal handlers
-   * Call this during bot startup to handle termination signals
+   * NOTE: Signal handling is now delegated to dedicated modules:
+   *   - Process error handlers (uncaughtException, unhandledRejection) -> bot/events/error-handlers.js
+   *   - Termination signals (SIGTERM, SIGINT)                          -> bot/shutdown.js
+   *
+   * This method remains as a no-op to avoid breaking existing callers.
+   * The shutdown() method can be called directly by any module.
    */
   initialize() {
-    // Handle SIGTERM (graceful shutdown signal from Koyeb/Docker)
-    process.on('SIGTERM', () => {
-      logger.info('Received SIGTERM signal');
-      this.shutdown('SIGTERM');
-    });
-
-    // Handle SIGINT (Ctrl+C in terminal)
-    process.on('SIGINT', () => {
-      logger.info('Received SIGINT signal (Ctrl+C)');
-      this.shutdown('SIGINT');
-    });
-
-    // Handle uncaught exceptions
-    process.on('uncaughtException', (error) => {
-      logger.error('Uncaught Exception:', error);
-      this.shutdown('UNCAUGHT_EXCEPTION');
-    });
-
-    // Handle unhandled promise rejections
-    process.on('unhandledRejection', (reason, promise) => {
-      logger.error('Unhandled Promise Rejection:', reason);
-      this.shutdown('UNHANDLED_REJECTION');
-    });
-
-    logger.info('✅ Shutdown manager initialized - signal handlers registered');
+    logger.info('✅ Shutdown manager initialized (signal handling delegated to bot modules)');
   }
 
   /**

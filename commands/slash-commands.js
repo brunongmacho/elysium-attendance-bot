@@ -26,54 +26,6 @@ function generateAttendanceCommands(attendanceChannelName = 'attendance channel'
 
   return [
     {
-      name: 'verify',
-      description: `Verify a member's attendance submission ${threadContext}`,
-      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
-      dm_permission: false,
-      options: [
-        {
-          name: 'member',
-          type: ApplicationCommandOptionType.String,
-          description: 'Member to verify',
-          required: true,
-          autocomplete: true
-        }
-      ]
-    },
-    {
-      name: 'deny',
-      description: `Deny a member's attendance submission ${threadContext}`,
-      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
-      dm_permission: false,
-      options: [
-        {
-          name: 'member',
-          type: ApplicationCommandOptionType.String,
-          description: 'Member to deny',
-          required: true,
-          autocomplete: true
-        },
-        {
-          name: 'reason',
-          type: ApplicationCommandOptionType.String,
-          description: 'Reason for denial',
-          required: false
-        }
-      ]
-    },
-    {
-      name: 'verifyall',
-      description: `Verify all pending submissions in thread ${threadContext}`,
-      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
-      dm_permission: false
-    },
-    {
-      name: 'denyall',
-      description: `Deny all pending submissions in thread ${threadContext}`,
-      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
-      dm_permission: false
-    },
-    {
       name: 'close',
       description: `Close an attendance thread ${threadContext}`,
       default_member_permissions: PermissionFlagsBits.Administrator.toString(),
@@ -93,12 +45,6 @@ function generateAttendanceCommands(attendanceChannelName = 'attendance channel'
       default_member_permissions: PermissionFlagsBits.Administrator.toString(),
       dm_permission: false
     },
-    {
-      name: 'resetpending',
-      description: `Clear the pending attendance queue ${channelContext}`,
-      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
-      dm_permission: false
-    }
   ];
 }
 
@@ -177,21 +123,6 @@ function generateBossTimerCommands(bossTimerChannelName = 'boss timer channel') 
       dm_permission: false
     },
     {
-      name: 'unkill',
-      description: `Undo a boss kill record ${channelContext}`,
-      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
-      dm_permission: false,
-      options: [
-        {
-          name: 'boss',
-          type: ApplicationCommandOptionType.String,
-          description: 'Boss name',
-          required: true,
-          autocomplete: true
-        }
-      ]
-    },
-    {
       name: 'setboss',
       description: `Set a boss status manually ${channelContext}`,
       default_member_permissions: PermissionFlagsBits.Administrator.toString(),
@@ -218,28 +149,8 @@ function generateBossTimerCommands(bossTimerChannelName = 'boss timer channel') 
       ]
     },
     {
-      name: 'nospawn',
-      description: `Mark a boss as not spawning ${channelContext}`,
-      dm_permission: false,
-      options: [
-        {
-          name: 'boss',
-          type: ApplicationCommandOptionType.String,
-          description: 'Boss name',
-          required: true,
-          autocomplete: true
-        }
-      ]
-    },
-    {
       name: 'maintenance',
       description: 'Spawn all bosses after server maintenance (admin command)',
-      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
-      dm_permission: false
-    },
-    {
-      name: 'serverdown',
-      description: 'Handle server downtime (admin command)',
       default_member_permissions: PermissionFlagsBits.Administrator.toString(),
       dm_permission: false
     },
@@ -248,6 +159,26 @@ function generateBossTimerCommands(bossTimerChannelName = 'boss timer channel') 
       description: 'Clear all boss kill records (admin command)',
       default_member_permissions: PermissionFlagsBits.Administrator.toString(),
       dm_permission: false
+    },
+    {
+      name: 'status',
+      description: 'View bot health, active spawns, and system stats',
+      default_member_permissions: '8',
+      dm_permission: false
+    },
+    {
+      name: 'remove-member',
+      description: 'Remove a member from all sheets (BiddingPoints + attendance)',
+      default_member_permissions: '8',
+      dm_permission: false,
+      options: [
+        {
+          name: 'member',
+          type: 3,
+          description: 'Member name to remove',
+          required: true
+        }
+      ]
     }
   ];
 }
@@ -359,6 +290,31 @@ function generateAuctionCommands(biddingChannelName = 'bidding') {
           name: 'forceend',
           type: ApplicationCommandOptionType.Subcommand,
           description: 'Emergency auction termination (force submit results)'
+        },
+        {
+          name: 'start-now',
+          type: 1,
+          description: 'Start auction immediately bypassing cooldown'
+        },
+        {
+          name: 'end',
+          type: 1,
+          description: 'End current auction session'
+        }
+      ]
+    },
+
+    // /bidding fix-points admin command
+    {
+      name: 'bidding',
+      description: 'Manage bidding system',
+      default_member_permissions: '8',
+      dm_permission: false,
+      options: [
+        {
+          name: 'fix-points',
+          type: 1,
+          description: 'Audit and clear stuck locked points'
         }
       ]
     },
@@ -416,19 +372,115 @@ function generateStatsCommands() {
       dm_permission: false
     },
 
-    // /cp command - Core Evaluation CP submission
+  ];
+}
+
+/**
+ * Generate member-facing commands (help, info, leaderboards, activity)
+ *
+ * @returns {Array} Member command definitions
+ */
+function generateMemberCommands() {
+  return [
     {
-      name: 'cp',
-      description: 'Submit your CP for Core Evaluation (attach screenshot)',
+      name: 'help',
+      description: 'Show context-aware help message',
+      dm_permission: false
+    },
+    {
+      name: 'newmember',
+      description: 'Show new member guide with instructions',
+      dm_permission: false
+    },
+    {
+      name: 'leaderboards',
+      description: 'Show guild leaderboards (attendance, bidding, or combined)',
       dm_permission: false,
       options: [
         {
-          name: 'cp',
-          type: ApplicationCommandOptionType.Integer,
-          description: 'Your CP number (e.g., 90492)',
+          name: 'type',
+          type: 3,
+          description: 'Leaderboard type to display',
           required: true,
-          min_value: 0,
-          max_value: 999999999
+          choices: [
+            { name: 'Attendance', value: 'attendance' },
+            { name: 'Bidding', value: 'bidding' },
+            { name: 'Combined', value: 'combined' }
+          ]
+        }
+      ]
+    },
+    {
+      name: 'activity',
+      description: 'Show guild activity heatmap visualization',
+      dm_permission: false,
+      options: [
+        {
+          name: 'week',
+          type: 3,
+          description: 'Week number (optional, defaults to current week)',
+          required: false
+        }
+      ]
+    }
+  ];
+}
+
+/**
+ * Generate emergency recovery commands (admin only)
+ *
+ * @returns {Array} Emergency command definitions
+ */
+function generateEmergencyCommand() {
+  return [
+    {
+      name: 'emergency',
+      description: 'Emergency recovery toolkit (admin only)',
+      default_member_permissions: '8',
+      dm_permission: false,
+      options: [
+        {
+          name: 'close',
+          type: 1,
+          description: 'Force close a specific attendance thread',
+          options: [
+            {
+              name: 'thread',
+              type: 7,
+              description: 'Thread to force close (defaults to current channel)',
+              required: false
+            }
+          ]
+        },
+        {
+          name: 'close-all',
+          type: 1,
+          description: 'Force close ALL active attendance threads'
+        },
+        {
+          name: 'end-auction',
+          type: 1,
+          description: 'Force end a stuck auction session'
+        },
+        {
+          name: 'unlock-points',
+          type: 1,
+          description: 'Unlock all locked bidding points'
+        },
+        {
+          name: 'clear-bids',
+          type: 1,
+          description: 'Clear all pending bid confirmations'
+        },
+        {
+          name: 'diagnostics',
+          type: 1,
+          description: 'Show comprehensive state diagnostics'
+        },
+        {
+          name: 'force-sync',
+          type: 1,
+          description: 'Force state sync to Google Sheets'
         }
       ]
     }
@@ -444,23 +496,6 @@ function generateStatsCommands() {
  * @param {string} channelNames.bidding - Bidding channel name
  * @returns {Object} Object containing command arrays
  */
-/**
- * Generate test send command (admin-only, channel-specific)
- * Sends a test embed to all recorded channels and auto-deletes after 2 minutes
- *
- * @param {string} adminLogsChannelName - Name of admin logs channel
- * @returns {Array} Test send command definition
- */
-function generateTestSendCommand(adminLogsChannelName = "") {
-  return [{
-    name: "testsend",
-    description: `Send a test embed to all recorded channels (admin-logs only)${adminLogsChannelName ? " (use in #" + adminLogsChannelName + ")" : ""}`,
-    default_member_permissions: PermissionFlagsBits.Administrator.toString(),
-    dm_permission: false,
-    options: []
-  }];
-}
-
 function generateAllCommands(channelNames = {}) {
   const { attendance = 'attendance', bossTimer = 'boss-timer', bidding = 'bidding' } = channelNames;
 
@@ -470,6 +505,8 @@ function generateAllCommands(channelNames = {}) {
   const rotationCommands = generateRotationCommands();
   const auctionCommands = generateAuctionCommands(bidding);
   const statsCommands = generateStatsCommands();
+  const memberCommands = generateMemberCommands();
+  const emergencyCommand = generateEmergencyCommand();
 
   return {
     attendanceCommands,
@@ -478,13 +515,17 @@ function generateAllCommands(channelNames = {}) {
     rotationCommands,
     auctionCommands,
     statsCommands,
+    memberCommands,
+    emergencyCommand,
     allCommands: [
       ...attendanceCommands,
       ...attendanceOverrideCommands,
       ...bossTimerCommands,
       ...rotationCommands,
       ...auctionCommands,
-      ...statsCommands
+      ...statsCommands,
+      ...memberCommands,
+      ...emergencyCommand
     ]
   };
 }
@@ -497,13 +538,8 @@ module.exports = {
    generateRotationCommands,
    generateAuctionCommands,
    generateStatsCommands,
-   generateTestSendCommand
+   generateMemberCommands,
+   generateEmergencyCommand,
 };
 
-// Update generateAllCommands to include testSend
-const originalGenerateAllCommands = generateAllCommands;
-generateAllCommands = function(channelNames = {}) {
-  const result = originalGenerateAllCommands(channelNames);
-  result.allCommands = [...result.allCommands, ...result.testSendCommand];
-  return result;
-};
+

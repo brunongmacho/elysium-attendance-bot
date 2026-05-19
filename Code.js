@@ -41,7 +41,7 @@
 
 const CONFIG = {
   SSHEET_ID: '1dGLGjmRhvG0io1Yta5ikfN-b_U-SSJJfWIHznK18qYQ',
-  SHEET_NAME_PREFIX: 'WEEK_',
+  SHEET_NAME_PREFIX: 'ELYSIUM_WEEK_',
   BOSS_POINTS_SHEET: 'BossPoints',
   BIDDING_SHEET: 'BiddingPoints',
   TIMEZONE: 'Asia/Manila',
@@ -150,7 +150,6 @@ function doPost(e) {
     if (action === 'saveBotState') return saveBotState(data);
     if (action === 'moveQueueItemsToSheet') return moveQueueItemsToSheet(data);
     if (action === 'moveAuctionedItemsToForDistribution') return moveAllItemsWithWinnersToForDistribution();
-    if (action === 'testSend') return handleTestSend(data); // NEW: Test send command
 
     // Loot logger actions
     if (action === 'submitLootEntries') return handleSubmitLootEntries(data);
@@ -167,14 +166,13 @@ function doPost(e) {
     if (action === 'getLearningData') return getLearningData(data);
     if (action === 'getLearningMetrics') return getLearningMetrics(data);
 
-     // Google Drive actions (Learning & Data Storage)
-     if (action === 'initializeDriveFolders') return initializeDriveFolders();
-     if (action === 'initializeAllSheets') return initializeAllSheets();
-     if (action === 'uploadScreenshot') return uploadScreenshot(data);
-     if (action === 'exportLearningData') return exportLearningData(data);
-     if (action === 'exportPredictionFeatures') return exportPredictionFeatures(data);
-     if (action === 'createDailyBackup') return createDailyBackup();
-     if (action === 'logAuditTrail') return logAuditTrail(data);
+    // Google Drive actions (Learning & Data Storage)
+    if (action === 'initializeDriveFolders') return initializeDriveFolders();
+    if (action === 'uploadScreenshot') return uploadScreenshot(data);
+    if (action === 'exportLearningData') return exportLearningData(data);
+    if (action === 'exportPredictionFeatures') return exportPredictionFeatures(data);
+    if (action === 'createDailyBackup') return createDailyBackup();
+    if (action === 'logAuditTrail') return logAuditTrail(data);
 
     // Bootstrap learning system
     if (action === 'bootstrapLearning') return bootstrapLearningFromHistory();
@@ -192,13 +190,12 @@ function doPost(e) {
     if (action === 'getWeeklySummary') return getWeeklySummary(data);
     if (action === 'getMemberStats') return getMemberStats(data);
 
-    // Member Registry actions
-    if (action === 'updateMemberRegistry') return handleUpdateMemberRegistry(data);
-    if (action === 'getMemberRegistry') return handleGetMemberRegistry(data);
-    if (action === 'normalizeNamesFromRegistry') return createResponse('ok', 'Names normalized', { 
-      members: normalizeMemberNamesFromRegistry(data?.members || []) 
-    });
-    if (action === 'bulkUpdateNickname') return handleBulkUpdateNickname(data);
+    // Milestone Tracking actions
+    if (action === 'getMilestoneHistory') return getMilestoneHistory(data);
+    if (action === 'updateMilestoneHistory') return updateMilestoneHistory(data);
+    if (action === 'saveMilestoneQueue') return saveMilestoneQueue(data);
+    if (action === 'loadMilestoneQueue') return loadMilestoneQueue(data);
+    if (action === 'clearMilestoneQueue') return clearMilestoneQueue(data);
 
     // Enhanced Milestone Tracking actions (new milestone types)
     if (action === 'ensureMilestoneTabsExist') return ensureMilestoneTabsExist();
@@ -370,7 +367,7 @@ function getAllWeeklyAttendance(data) {
     const allSheets = ss.getSheets();
     const weeklySheets = [];
 
-    // Filter to only weekly attendance sheets (matching pattern WEEK_*)
+    // Filter to only weekly attendance sheets (matching pattern ELYSIUM_WEEK_*)
     for (const sheet of allSheets) {
       const sheetName = sheet.getName();
       if (sheetName.startsWith(CONFIG.SHEET_NAME_PREFIX)) {
@@ -461,7 +458,7 @@ function getAllWeeklyAttendance(data) {
               bossName: bossName,
               timestamp: timestamp,
               date: timestamp, // For backward compatibility
-              weekLabel: sheetName.replace('WEEK_', ''),
+              weekLabel: sheetName.replace('ELYSIUM_WEEK_', ''),
               weekSheet: sheetName,
               points: 1 // Default points (can be enhanced later)
             });
@@ -824,9 +821,7 @@ function handleSubmitLootEntries(data) {
 function handleSubmitAttendance(data) {
   const boss = (data.boss || '').toString().trim().toUpperCase();
   const timestamp = (data.timestamp || '').toString().trim();
-  // Normalize member names using MemberRegistry (gets current nicknames)
-  const rawMembers = (data.members || []).map(m => m.trim());
-  const members = normalizeMemberNamesFromRegistry(rawMembers);
+  const members = (data.members || []).map(m => m.trim());
   
   if (!boss || !timestamp || members.length === 0) {
     return createResponse('error', 'Missing boss, timestamp, or members');
@@ -867,27 +862,8 @@ function handleSubmitAttendance(data) {
     if (targetColumn) return createResponse('error', `Column exists for ${boss} at ${timestamp}`);
     
     const newCol = lastCol + 1;
-
-    // Get boss points from BossPoints sheet
-    let bossPoints = 1; // Default to 1
-    try {
-      const bpSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.BOSS_POINTS_SHEET);
-      if (bpSheet) {
-        const bpData = bpSheet.getDataRange().getValues();
-        for (let i = 1; i < bpData.length; i++) {
-          if (bpData[i][0] && bpData[i][0].toString().trim().toUpperCase() === boss) {
-            bossPoints = Number(bpData[i][1]) || 1;
-            break;
-          }
-        }
-      }
-    } catch (e) {
-      Logger.log('⚠️ Could not read BossPoints sheet: ' + e.message);
-    }
-
     sheet.getRange(1, newCol, 2, 1).setValues([[timestamp],[boss]])
       .setFontWeight('bold').setBackground('#E8F4F8').setHorizontalAlignment('center');
-    sheet.getRange(2, newCol).setValue(bossPoints); // Set Column D (Attendance Points) for this boss
     sheet.setColumnWidth(newCol, 120);
     
     const lastRow = sheet.getLastRow();
@@ -934,12 +910,8 @@ function handleSubmitAttendance(data) {
       const totalRows = lastRow + newMembersCount;
       if (totalRows >= 3) {
         const allMemberNames = sheet.getRange(3, COLUMNS.MEMBERS, totalRows - 2, 1).getValues().flat();
-        // Use normalizeUsername for consistent matching (ignore spaces/special chars)
-        const attendanceData = allMemberNames.map(m => {
-          const sheetNameNormalized = normalizeUsername(m); // Normalize sheet name
-          const isPresent = members.some(member => normalizeUsername(member) === sheetNameNormalized);
-          return [isPresent];
-        });
+        const allMembersLower = allMemberNames.map(m => (m || '').toString().trim().toLowerCase());
+        const attendanceData = allMembersLower.map(m => [membersLower.includes(m)]);
         sheet.getRange(3, newCol, attendanceData.length, 1).setValues(attendanceData).setDataValidation(checkboxRule);
       }
       
@@ -987,9 +959,7 @@ function handleSubmitAttendance(data) {
 function handleOverwriteAttendance(data) {
   const boss = (data.boss || '').toString().trim().toUpperCase();
   const timestamp = (data.timestamp || '').toString().trim();
-  // Normalize member names using MemberRegistry (gets current nicknames)
-  const rawMembers = (data.members || []).map(m => m.trim());
-  const members = normalizeMemberNamesFromRegistry(rawMembers);
+  const members = (data.members || []).map(m => m.trim());
 
   if (!boss || !timestamp || members.length === 0) {
     return createResponse('error', 'Missing boss, timestamp, or members');
@@ -1082,12 +1052,8 @@ function handleOverwriteAttendance(data) {
       const totalRows = lastRow + newMembersCount;
       if (totalRows >= 3) {
         const allMemberNames = sheet.getRange(3, COLUMNS.MEMBERS, totalRows - 2, 1).getValues().flat();
-        // Use normalizeUsername for consistent matching (ignore spaces/special chars)
-        const attendanceData = allMemberNames.map(m => {
-          const sheetNameNormalized = normalizeUsername(m); // Normalize sheet name
-          const isPresent = members.some(member => normalizeUsername(member) === sheetNameNormalized);
-          return [isPresent];
-        });
+        const allMembersLower = allMemberNames.map(m => (m || '').toString().trim().toLowerCase());
+        const attendanceData = allMembersLower.map(m => [membersLower.includes(m)]);
         sheet.getRange(3, workingCol, attendanceData.length, 1).setValues(attendanceData).setDataValidation(checkboxRule);
       }
 
@@ -1102,17 +1068,17 @@ function handleOverwriteAttendance(data) {
     Logger.log(`📊 ${action} attendance: ${boss} at ${timestamp} - ${members.length} members`);
 
     // Invalidate weekly attendance cache (attendance updated)
-      try {
-        const cache = CacheService.getDocumentCache();
-        cache.remove('weeklyAttendance_v1');
-        Logger.log('🧹 Invalidated weekly attendance cache (attendance update)');
-      } catch (e) {
-        Logger.log('⚠️ Failed to invalidate cache: ' + e.message);
-      }
+    try {
+      const cache = CacheService.getDocumentCache();
+      cache.remove('weeklyAttendance_v1');
+      Logger.log('🧹 Invalidated weekly attendance cache (attendance update)');
+    } catch (e) {
+      Logger.log('⚠️ Failed to invalidate cache: ' + e.message);
+    }
 
-      return createResponse('ok', `${action}: ${members.length}`, {column: workingCol, boss, timestamp, membersCount: members.length, overwritten: isOverwrite});
-    } finally { lock.releaseLock(); }
-  }
+    return createResponse('ok', `${action}: ${members.length}`, {column: workingCol, boss, timestamp, membersCount: members.length, overwritten: isOverwrite});
+  } finally { lock.releaseLock(); }
+}
 
 function getCurrentWeekSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1149,8 +1115,8 @@ function copyMembersFromPreviousWeek(spreadsheet, newSheet) {
     if (lastRow >= 3) {
       // Copy column A (members) as values
       const members = prevSheet.getRange(3, COLUMNS.MEMBERS, lastRow - 2, 1)
-                               .getValues()
-                               .filter(m => m[0] && m[0].toString().trim() !== '');
+                              .getValues()
+                              .filter(m => m[0] && m[0].toString().trim() !== '');
       if (members.length > 0) {
         newSheet.getRange(3, COLUMNS.MEMBERS, members.length, 1).setValues(members);
 
@@ -1162,22 +1128,6 @@ function copyMembersFromPreviousWeek(spreadsheet, newSheet) {
 
     // Return previous sheet name for logging
     return prevSheet.getName();
-  } else {
-    // FIRST TIME SETUP: Set default values/formulas for B-D columns
-    const lastRow = newSheet.getLastRow();
-    if (lastRow >= 3) {
-      // Column B (Points Consumed): default to 0
-      newSheet.getRange(3, COLUMNS.POINTS_CONSUMED, lastRow - 2, 1).setValue(0);
-      
-      // Column C (Points Left): formula = D3 - B3 (Attendance Points - Points Consumed)
-      const pointsLeftFormula = Array(lastRow - 2).fill().map((_, i) => [`=D${3 + i}-B${3 + i}`]);
-      newSheet.getRange(3, COLUMNS.POINTS_LEFT, lastRow - 2, 1).setFormulas(pointsLeftFormula);
-      
-      // Column D (Attendance Points): default to 0 (will be updated by updateBiddingPoints())
-      newSheet.getRange(3, COLUMNS.ATTENDANCE_POINTS, lastRow - 2, 1).setValue(0);
-      
-      Logger.log('✅ Set default values for B-D columns (first time setup)');
-    }
   }
 
   return null;
@@ -1619,7 +1569,7 @@ function calculateSimilarity(str1, str2) {
  *
  * EXEMPTIONS:
  * - ForDistribution sheet is NOT touched (historical auction log)
- * - Only removes from BiddingPoints and WEEK_* attendance sheets
+ * - Only removes from BiddingPoints and ELYSIUM_WEEK_* attendance sheets
  *
  * @param {Object} data - Request data containing memberName
  * @param {string} data.memberName - Name of the member to remove
@@ -1691,13 +1641,13 @@ function handleRemoveMember(data) {
   }
 
   // ==========================================
-  // STEP 2: Remove from all attendance sheets (WEEK_*)
+  // STEP 2: Remove from all attendance sheets (ELYSIUM_WEEK_*)
   // NOTE: ForDistribution sheet is EXCLUDED as it's a historical auction log
   // ==========================================
   const allSheets = ss.getSheets();
   const attendanceSheets = allSheets.filter(s => {
     const sheetName = s.getName();
-    // Include only WEEK_ sheets, exclude ForDistribution
+    // Include only ELYSIUM_WEEK_ sheets, exclude ForDistribution
     return sheetName.startsWith(CONFIG.SHEET_NAME_PREFIX) && sheetName !== 'ForDistribution';
   });
 
@@ -1937,19 +1887,8 @@ function logAuctionResult(data) {
 }
 
 function handleSubmitBiddingResults(data) {
-  const rawResults = data.results || [];
-  const rawManualItems = data.manualItems || [];
-  
-  // Normalize all winner names using MemberRegistry (gets current nicknames)
-  const results = rawResults.map(r => ({
-    ...r,
-    winner: getCurrentNickname(r.winner || r.member || '')
-  }));
-  
-  const manualItems = rawManualItems.map(item => ({
-    ...item,
-    winner: getCurrentNickname(item.winner || '')
-  }));
+  const results = data.results || [];
+  const manualItems = data.manualItems || [];
   
   // Get session info
   const sessionTs = getSessionTimestamp();
@@ -3081,7 +3020,7 @@ function saveAttendanceState(data) {
 
 function updateTotalAttendanceAndMembers() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheets = ss.getSheets().filter(s => s.getName().startsWith("WEEK_"));
+  const sheets = ss.getSheets().filter(s => s.getName().startsWith("ELYSIUM_WEEK_"));
   const totalSheetName = "TOTAL ATTENDANCE";
   const totalSheet = ss.getSheetByName(totalSheetName);
   const memberTotals = {};
@@ -5367,280 +5306,9 @@ function updateNLPAnalytics(data) {
 }
 
 function manualInitializeNLP() {
-   const result = initializeNLPTabs();
-   Logger.log('✅ Manual NLP initialization complete: ' + result.created.join(', '));
-   return result;
-}
-
-/**
- * Initialize all required Google Sheets for the bot
- * Creates missing sheets with proper headers and formatting
- */
-function initializeAllSheets() {
-   try {
-     Logger.log('🚀 Initializing all Google Sheets...');
-     
-     const ss = SpreadsheetApp.getActiveSpreadsheet();
-     
-     // Initialize BiddingItems sheet
-     initializeBiddingItemsSheet(ss);
-     
-     // Initialize AttendanceLog sheet
-     initializeAttendanceLogSheet(ss);
-     
-     // Initialize AuctionLog sheet
-     initializeAuctionLogSheet(ss);
-     
-     // Initialize _BotState sheet
-     initializeBotStateSheet(ss);
-     
-     // Initialize _LootState sheet
-     initializeLootStateSheet(ss);
-     
-     // Initialize _AttendanceState sheet
-     initializeAttendanceStateSheet(ss);
-     
-     // Initialize ForDistribution sheet
-     initializeForDistributionSheet(ss);
-     
-     // Initialize TOTAL ATTENDANCE sheet
-     initializeTotalAttendanceSheet(ss);
-     
-      // Initialize BiddingPoints sheet
-      initializeBiddingPointsSheet(ss);
-      
-      // Auto-update totals after initialization
-      try {
-        updateTotalAttendanceAndMembers();
-        Logger.log('✅ Auto-updated TOTAL ATTENDANCE sheet');
-      } catch (e) {
-        Logger.log('⚠️ Could not update TOTAL ATTENDANCE: ' + e.message);
-      }
-      
-      try {
-        updateBiddingPoints();
-        Logger.log('✅ Auto-updated BiddingPoints sheet');
-      } catch (e) {
-        Logger.log('⚠️ Could not update BiddingPoints: ' + e.message);
-      }
-      
-      Logger.log('✅ All sheets initialized successfully');
-      return createResponse('ok', 'All sheets initialized');
-    } catch (err) {
-      Logger.log('❌ Error initializing sheets: ' + err.toString());
-      return createResponse('error', err.toString());
-    }
-  }
-
-/**
- * Initialize or get BiddingItems sheet with proper headers
- */
-function initializeBiddingItemsSheet(ss) {
-   let sheet = ss.getSheetByName('BiddingItems');
-   if (!sheet) {
-     Logger.log('📋 Creating BiddingItems sheet...');
-     sheet = ss.insertSheet('BiddingItems');
-     
-     // Set headers (12 columns total: A-L)
-     sheet.getRange(1, 1, 1, 12).setValues([[
-       'Item', 'Start Price', 'Duration', 'Winner', 'Winning Bid', 
-       'Auction Start', 'Auction End', 'Timestamp', 'Total Bids', 'Source', 'Quantity', 'Boss'
-     ]])
-     .setFontWeight('bold')
-     .setBackground('#4A90E2')
-     .setFontColor('#FFFFFF');
-     
-     // Set column widths
-     sheet.setColumnWidth(1, 200);  // Item
-     sheet.setColumnWidth(10, 100); // Source
-     sheet.setColumnWidth(11, 80);  // Quantity
-     sheet.setColumnWidth(12, 200); // Boss
-     
-     Logger.log('✅ BiddingItems sheet created');
-   }
-   return sheet;
-}
-
-/**
- * Initialize or get AttendanceLog sheet with proper headers
- */
-function initializeAttendanceLogSheet(ss) {
-   let sheet = ss.getSheetByName('AttendanceLog');
-   if (!sheet) {
-     Logger.log('📋 Creating AttendanceLog sheet...');
-     sheet = ss.insertSheet('AttendanceLog');
-     
-     // Set headers
-     sheet.getRange(1, 1, 1, 5).setValues([[
-       'Timestamp', 'Member Name', 'Boss', 'Spawn Type', 'Points Awarded'
-     ]])
-     .setFontWeight('bold')
-     .setBackground('#4A90E2')
-     .setFontColor('#FFFFFF');
-     
-     Logger.log('✅ AttendanceLog sheet created');
-   }
-   return sheet;
-}
-
-/**
- * Initialize or get AuctionLog sheet with proper headers
- */
-function initializeAuctionLogSheet(ss) {
-   let sheet = ss.getSheetByName('AuctionLog');
-   if (!sheet) {
-     Logger.log('📋 Creating AuctionLog sheet...');
-     sheet = ss.insertSheet('AuctionLog');
-     
-     // Set headers
-     sheet.getRange(1, 1, 1, 6).setValues([[
-       'Timestamp', 'Item', 'Winner', 'Winning Bid', 'Bidder Count', 'Duration (sec)'
-     ]])
-     .setFontWeight('bold')
-     .setBackground('#4A90E2')
-     .setFontColor('#FFFFFF');
-     
-     Logger.log('✅ AuctionLog sheet created');
-   }
-   return sheet;
-}
-
-/**
- * Initialize or get _BotState sheet with proper headers
- */
-function initializeBotStateSheet(ss) {
-   let sheet = ss.getSheetByName('_BotState');
-   if (!sheet) {
-     Logger.log('📋 Creating _BotState sheet...');
-     sheet = ss.insertSheet('_BotState');
-     
-     // Set headers
-     sheet.getRange(1, 1, 1, 2).setValues([[
-       'Key', 'Value'
-     ]])
-     .setFontWeight('bold')
-     .setBackground('#4A90E2')
-     .setFontColor('#FFFFFF');
-     
-     Logger.log('✅ _BotState sheet created');
-   }
-   return sheet;
-}
-
-/**
- * Initialize or get _LootState sheet with proper headers
- */
-function initializeLootStateSheet(ss) {
-   let sheet = ss.getSheetByName('_LootState');
-   if (!sheet) {
-     Logger.log('📋 Creating _LootState sheet...');
-     sheet = ss.insertSheet('_LootState');
-     
-     // Set headers
-     sheet.getRange(1, 1, 1, 2).setValues([[
-       'Key', 'Value'
-     ]])
-     .setFontWeight('bold')
-     .setBackground('#4A90E2')
-     .setFontColor('#FFFFFF');
-     
-     Logger.log('✅ _LootState sheet created');
-   }
-   return sheet;
-}
-
-/**
- * Initialize or get _AttendanceState sheet with proper headers
- */
-function initializeAttendanceStateSheet(ss) {
-   let sheet = ss.getSheetByName('_AttendanceState');
-   if (!sheet) {
-     Logger.log('📋 Creating _AttendanceState sheet...');
-     sheet = ss.insertSheet('_AttendanceState');
-     
-     // Set headers
-     sheet.getRange(1, 1, 1, 2).setValues([[
-       'Key', 'Value'
-     ]])
-     .setFontWeight('bold')
-     .setBackground('#4A90E2')
-     .setFontColor('#FFFFFF');
-     
-     Logger.log('✅ _AttendanceState sheet created');
-   }
-   return sheet;
-}
-
-/**
- * Initialize or get ForDistribution sheet with proper headers
- */
-function initializeForDistributionSheet(ss) {
-  let sheet = ss.getSheetByName('ForDistribution');
-  if (!sheet) {
-    Logger.log('📋 Creating ForDistribution sheet...');
-    sheet = ss.insertSheet('ForDistribution');
-    
-    // Set headers (same as BiddingItems columns A-D)
-    sheet.getRange(1, 1, 1, 4).setValues([[
-      'Item', 'Winner', 'Winning Bid', 'Timestamp'
-    ]])
-    .setFontWeight('bold')
-    .setBackground('#4A90E2')
-    .setFontColor('#FFFFFF');
-    
-    // Set column widths (same as BiddingItems)
-    sheet.setColumnWidth(1, 200);  // Item (same as BiddingItems)
-    sheet.setColumnWidth(2, 150);  // Winner
-    sheet.setColumnWidth(3, 120);  // Winning Bid
-    sheet.setColumnWidth(4, 150);  // Timestamp
-    
-    Logger.log('✅ ForDistribution sheet created');
-  }
-  return sheet;
-}
-
-/**
- * Initialize or get TOTAL ATTENDANCE sheet with proper headers
- */
-function initializeTotalAttendanceSheet(ss) {
-   let sheet = ss.getSheetByName('TOTAL ATTENDANCE');
-   if (!sheet) {
-     Logger.log('📋 Creating TOTAL ATTENDANCE sheet...');
-     sheet = ss.insertSheet('TOTAL ATTENDANCE');
-     
-     // Set headers
-     sheet.getRange(1, 1, 1, 4).setValues([[
-       'Member Name', 'Total Points', 'Events Attended', 'Last Attendance'
-     ]])
-     .setFontWeight('bold')
-     .setBackground('#4A90E2')
-     .setFontColor('#FFFFFF');
-     
-     Logger.log('✅ TOTAL ATTENDANCE sheet created');
-   }
-   return sheet;
-}
-
-/**
- * Initialize or get BiddingPoints sheet with proper headers
- */
-function initializeBiddingPointsSheet(ss) {
-   let sheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
-   if (!sheet) {
-     Logger.log('📋 Creating BiddingPoints sheet...');
-     sheet = ss.insertSheet(CONFIG.BIDDING_SHEET);
-     
-     // Set headers
-     sheet.getRange(1, 1, 1, 4).setValues([[
-       'Member Name', 'Points Consumed', 'Points Left', 'Attendance Points'
-     ]])
-     .setFontWeight('bold')
-     .setBackground('#4A90E2')
-     .setFontColor('#FFFFFF');
-     
-     Logger.log('✅ BiddingPoints sheet created');
-   }
-   return sheet;
+  const result = initializeNLPTabs();
+  Logger.log('✅ Manual NLP initialization complete: ' + result.created.join(', '));
+  return result;
 }
 
 // ===========================================================
@@ -7406,346 +7074,5 @@ function clearBossTimerRecovery(data) {
 }
 
 // ===========================================================
-// MEMBER REGISTRY (Google Sheets)
-// ===========================================================
-
-const MEMBER_REGISTRY_SHEET = 'MemberRegistry';
-
-/**
- * Handle member registry updates from bot
- * @param {Object} data - { action: 'upsert'|'bulk', discordId, row, data }
- * @returns {Object} Response object
- */
-function handleUpdateMemberRegistry(data) {
-  try {
-    const { action, discordId, row, data: bulkData } = data;
-    
-    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
-    
-    // Get or create MemberRegistry sheet
-    let sheet = ss.getSheetByName(MEMBER_REGISTRY_SHEET);
-    if (!sheet) {
-      sheet = ss.insertSheet(MEMBER_REGISTRY_SHEET);
-      // Add header row
-      sheet.getRange(1, 1, 1, 8).setValues([[
-        'Discord ID', 'Username', 'Global Name', 'Nickname (IGN)', 'Display Name', 
-        'Joined At', 'Registered At', 'Last Updated'
-      ]]);
-      sheet.getRange(1, 1, 1, 8).setFontWeight('bold');
-      Logger.log(`✅ Created ${MEMBER_REGISTRY_SHEET} sheet`);
-    }
-    
-    if (action === 'upsert' && discordId && row) {
-      // Find existing row by Discord ID
-      const dataRange = sheet.getDataRange();
-      const values = dataRange.getValues();
-      
-      let found = false;
-      for (let i = 1; i < values.length; i++) {
-        if (values[i][0] === discordId) {
-          // Update existing row
-          sheet.getRange(i + 1, 1, 1, row.length).setValues([row]);
-          found = true;
-          Logger.log(`✅ Updated member registry: ${row[3]} (${discordId})`);
-          break;
-        }
-      }
-      
-      if (!found) {
-        // Append new row
-        sheet.appendRow(row);
-        Logger.log(`✅ Added member to registry: ${row[3]} (${discordId})`);
-      }
-      
-      return createResponse('ok', 'Member registry updated');
-      
-    } else if (action === 'bulk' && bulkData && Array.isArray(bulkData)) {
-      // Bulk insert/update
-      const dataRange = sheet.getDataRange();
-      const existingIds = dataRange.getValues().map(r => r[0]);
-      
-      const newRows = bulkData.filter(row => !existingIds.includes(row[0]));
-      if (newRows.length > 0) {
-        sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, newRows[0].length)
-          .setValues(newRows);
-        Logger.log(`✅ Bulk added ${newRows.length} members to registry`);
-      }
-      
-      return createResponse('ok', `Synced ${newRows.length} members`);
-    }
-    
-    return createResponse('ok', 'No changes needed');
-    
-  } catch (err) {
-    Logger.log('❌ Member registry update error: ' + err.toString());
-    return createResponse('error', err.toString());
-  }
-}
-
-/**
- * Get member registry data
- * @param {Object} data - Optional filter parameters
- * @returns {Object} Response with member data
- */
-function handleGetMemberRegistry(data) {
-  try {
-    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
-    const sheet = ss.getSheetByName(MEMBER_REGISTRY_SHEET);
-    
-    if (!sheet) {
-      return createResponse('ok', 'No registry', { members: [] });
-    }
-    
-    const dataRange = sheet.getDataRange();
-    const values = dataRange.getValues();
-    
-    if (values.length <= 1) {
-      return createResponse('ok', 'No members', { members: [] });
-    }
-    
-    // Skip header row
-    const members = values.slice(1).map(row => ({
-      discordId: row[0],
-      username: row[1],
-      globalName: row[2] || null,
-      nickname: row[3],
-      displayName: row[4],
-      joinedAt: row[5],
-      registeredAt: row[6],
-      lastUpdated: row[7]
-    }));
-    
-    return createResponse('ok', 'Members retrieved', { 
-      members: members,
-      count: members.length 
-    });
-    
-  } catch (err) {
-    Logger.log('❌ Get member registry error: ' + err.toString());
-    return createResponse('error', err.toString());
-  }
-}
-
-/**
- * Normalize member names using MemberRegistry
- * Returns current nicknames for display in sheets
- * @param {Array} members - Array of member names or Discord IDs
- * @returns {Array} Array of current nicknames
- */
-function normalizeMemberNamesFromRegistry(members) {
-  try {
-    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
-    const registrySheet = ss.getSheetByName(MEMBER_REGISTRY_SHEET);
-    
-    if (!registrySheet) {
-      // No registry - return original names
-      return members;
-    }
-    
-    const dataRange = registrySheet.getDataRange();
-    const values = dataRange.getValues();
-    
-    if (values.length <= 1) {
-      return members;
-    }
-    
-    // Build lookup map: discordId -> nickname, username -> nickname
-    const discordIdToNickname = {};
-    const usernameToNickname = {};
-    
-    for (let i = 1; i < values.length; i++) {
-      const row = values[i];
-      const discordId = row[0]?.toString().trim();
-      const username = (row[1] || '').toString().trim().toLowerCase();
-      const nickname = (row[3] || row[4] || row[1] || '').toString().trim();
-      
-      if (discordId) discordIdToNickname[discordId] = nickname;
-      if (username) usernameToNickname[username] = nickname;
-    }
-    
-    // Normalize each member name
-    return members.map(m => {
-      if (!m) return m;
-      const mStr = m.toString().trim();
-      
-      // Check if it's a Discord ID (numeric string)
-      if (/^\d+$/.test(mStr) && discordIdToNickname[mStr]) {
-        return discordIdToNickname[mStr];
-      }
-      
-      // Check if it's in username map
-      const normalized = mStr.toLowerCase();
-      if (usernameToNickname[normalized]) {
-        return usernameToNickname[normalized];
-      }
-      
-      // Return original if not found in registry
-      return mStr;
-    });
-    
-  } catch (err) {
-    Logger.log('⚠️ normalizeMemberNamesFromRegistry error:', err.toString());
-    return members;
-  }
-}
-
-/**
- * Get current nickname by Discord ID or username
- * @param {string} identifier - Discord ID or username
- * @returns {string} Current nickname or original identifier
- */
-function getCurrentNickname(identifier) {
-  if (!identifier) return identifier;
-  
-  try {
-    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
-    const registrySheet = ss.getSheetByName(MEMBER_REGISTRY_SHEET);
-    
-    if (!registrySheet) return identifier;
-    
-    const dataRange = registrySheet.getDataRange();
-    const values = dataRange.getValues();
-    
-    const idStr = identifier.toString().trim();
-    
-    // Check if it's a Discord ID
-    if (/^\d+$/.test(idStr)) {
-      for (let i = 1; i < values.length; i++) {
-        if (values[i][0]?.toString().trim() === idStr) {
-          return values[i][3] || values[i][4] || values[i][1] || identifier;
-        }
-      }
-    }
-    
-    // Check by username
-    const normalized = idStr.toLowerCase();
-    for (let i = 1; i < values.length; i++) {
-      if ((values[i][1] || '').toString().trim().toLowerCase() === normalized) {
-        return values[i][3] || values[i][4] || values[i][1] || identifier;
-      }
-    }
-    
-  } catch (err) {
-    Logger.log('⚠️ getCurrentNickname error:', err.toString());
-  }
-  
-  return identifier;
-}
-
-/**
- * Bulk update all member names across all sheets when nickname changes
- * This ensures historical records always show current nickname
- * 
- * @param {Object} data - { discordId, oldNickname, newNickname }
- * @returns {Object} Response with update count
- */
-function handleBulkUpdateNickname(data) {
-  const { discordId, oldNickname, newNickname } = data;
-  
-  if (!oldNickname || !newNickname) {
-    return createResponse('error', 'Missing oldNickname or newNickname');
-  }
-  
-  try {
-    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
-    const normalizedOld = oldNickname.toLowerCase().trim();
-    const normalizedNew = newNickname.toLowerCase().trim();
-    
-    let totalUpdated = 0;
-    const sheetsToUpdate = [];
-    
-    // Find all sheets that might contain member names
-    const allSheets = ss.getSheets();
-    
-    for (const sheet of allSheets) {
-      const sheetName = sheet.getName();
-      
-      // Skip non-data sheets
-      if (sheetName.startsWith('Template') || sheetName.startsWith('_')) continue;
-      
-      try {
-        const lastRow = sheet.getLastRow();
-        const lastCol = sheet.getLastColumn();
-        
-        if (lastRow < 2 || lastCol < 1) continue;
-        
-        // Search for the old nickname in all cells
-        const searchRange = sheet.getRange(1, 1, lastRow, lastCol);
-        const values = searchRange.getValues();
-        
-        let sheetUpdated = false;
-        
-        for (let row = 0; row < values.length; row++) {
-          for (let col = 0; col < values[row].length; col++) {
-            const cellValue = (values[row][col] || '').toString().trim();
-            if (cellValue.toLowerCase() === normalizedOld) {
-              // Found a match - update it
-              sheet.getRange(row + 1, col + 1).setValue(newNickname);
-              sheetUpdated = true;
-              totalUpdated++;
-            }
-          }
-        }
-        
-        if (sheetUpdated) {
-          sheetsToUpdate.push(sheetName);
-        }
-      } catch (e) {
-        // Skip sheets with access issues
-        Logger.log(`⚠️ Skipped sheet ${sheetName}: ${e.message}`);
-      }
-    }
-    
-    Logger.log(`✅ Bulk nickname update: "${oldNickname}" → "${newNickname}"`);
-    Logger.log(`   Updated ${totalUpdated} cells across ${sheetsToUpdate.length} sheets: ${sheetsToUpdate.join(', ')}`);
-    
-    return createResponse('ok', 'Bulk update complete', {
-      oldNickname,
-      newNickname,
-      totalUpdated,
-      sheetsUpdated: sheetsToUpdate
-    });
-    
-  } catch (err) {
-    Logger.log('❌ Bulk nickname update error:', err.toString());
-    return createResponse('error', err.toString());
-  }
-}
-
-// ===========================================================
 // OPTIMIZED SHEET CREATION WITH AUTO-LOGGING
 // ===========================================================
-// ========================================================================
-// TEST SEND COMMAND - FOR ADMIN LOGS CHANNEL ONLY
-// ========================================================================
-
-/**
- * Handle !testsend command - sends a test embed to all recorded channels
- * Auto-deletes after 2 minutes
- * Only works in admin-logs channel and only for users with admin role
- * 
- * @param {Object} data - Command data
- */
-function handleTestSend(data) {
-  try {
-    // This function should be called from Discord.js, not from Apps Script
-    // The actual test send logic is in index2.js
-    // This is just a placeholder that returns an error
-    Logger.log('⚠️ handleTestSend called in Code.gs - This should be handled by Discord.js');
-    return createResponse('error', 'Test send should be triggered from Discord bot (!testsend command)');
-  } catch (err) {
-    Logger.log('❌ handleTestSend error: ' + err.toString());
-    return createResponse('error', err.toString());
-  }
-}
-
-/**
- * Get all recorded channel IDs from the database
- * Note: This function is for Node.js Discord bot, not Google Apps Script
- * Apps Script should not directly access MongoDB
- * This is kept as a placeholder but won't be called from Apps Script
- */
-function getRecordedChannels() {
-  Logger.log('⚠️ getRecordedChannels called in Apps Script - This should be handled by Discord bot');
-  return [];
-}

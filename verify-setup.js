@@ -10,15 +10,7 @@ console.log('   Guild:', config.guild_name);
 console.log('   MongoDB DB:', config.mongodb_database);
 console.log('   Sheet URL:', config.sheet_webhook_url ? 'UPDATED (new URL)' : 'MISSING');
 
-// Check 2: member-registry.js
-const regContent = fs.readFileSync('member-registry.js', 'utf8');
-const hasBulkUpdate = regContent.includes('bulkUpdateAllRecords');
-const hasGetColl = regContent.includes('getCollectionName');
-console.log('\n2. member-registry.js:');
-console.log('   bulkUpdateAllRecords:', hasBulkUpdate ? '✅' : '❌');
-console.log('   getCollectionName:', hasGetColl ? '✅' : '❌');
-
-// Check 3: sync-sheets-to-mongodb.js
+// Check 2: sync-sheets-to-mongodb.js
 const syncContent = fs.readFileSync(path.join('scripts', 'sync-sheets-to-mongodb.js'), 'utf8');
 const hasGuildName = syncContent.includes('guildName');
 const hasCollectionSuffix = syncContent.includes('${guildName.toLowerCase()');

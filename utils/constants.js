@@ -280,7 +280,7 @@ const LIMITS = {
  * @constant {Object} BOT_CONFIG
  */
 const BOT_CONFIG = {
-  VERSION: '9.1',                      // Bot version
+  VERSION: '9.0.0',                      // Bot version
   HEALTH_CHECK_PORT: 8000,             // HTTP health check port for Koyeb
   MAX_MEMORY_MB: 200,                  // Maximum memory allocation (for Koyeb)
   GC_INTERVAL: 600000,                 // Garbage collection interval (10 minutes)
@@ -350,10 +350,6 @@ const AUCTION_STATES = {
 const COMMON_ALIASES = {
   // Bidding
   'b': 'bid',
-  'mybid': 'mypoints',
-  'pts': 'mypoints',
-  'points': 'mypoints',
-  'bp': 'mypoints',
 
   // Status
   'st': 'status',

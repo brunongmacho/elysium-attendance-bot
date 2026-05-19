@@ -1,6 +1,4 @@
 {
-  "version": "3.0",
-  "guild_name": "TrailerParkB",
   "main_guild_id": "1497103427912732745",
   "timer_server_id": "1497103427912732745",
   "timer_channel_id": "1497122977207025714",
@@ -8,34 +6,21 @@
   "bidding_channel_id": "1497123391629692988",
   "admin_logs_channel_id": "1497131257258180678",
   "elysium_commands_channel_id": "1497126624628572281",
-  "guild_announcement_channel_id": "1497106258287661068",
   "bot_manual_channel_id": "1497131110600282153",
   "boss_timer_channel_id": "1497122977207025714",
   "boss_spawn_announcement_channel_id": "1497123103204184185",
-  "mongodb_database": "elysium-bot-tpb",
-  "mongodb_cluster": "elysium-bot-cluster",
-  "mongodb_uri": "mongodb+srv://elysium-bot:UMzH6WBKkE9Lrz6F@elysium-bot-cluster.ejvfuyc.mongodb.net/?appName=elysium-bot-cluster",
-  "admin_roles": [
-    "X",
-    "Admins",
-    "Guild Leader",
-    "Elites"
+  "protected_thread_ids": [
+    "1430356542871437494"
   ],
-  "role_ids": {
-    "x": "1497105838840614983",
-    "admins": "1497104658907533434",
-    "guild_leader": "1497105083253395516",
-    "elites": "1497105437034676304",
-    "member": "1497105628185890817"
-  },
-  "elysium_role": "Certified TPB",
-  "elysium_role_id": "1497105628185890817",
-  "guild_leader_role_id": "1497105083253395516",
-  "week_start": "Monday",
-  "sheet_webhook_url": "https://script.google.com/macros/s/AKfycbzw9X5Ked8QxtJCLa2s8VdUH3mva5bXACcbCVpBGHBOZB74gZn8NuUM6hCWkRN96Uxq/exec",
-  "timezone": "Asia/Manila",
-  "auto_archive_minutes": 60,
-  "ml_service_url": "",
-  "ml_enabled": false,
-  "ml_fallback_enabled": false
+  "admin_roles": [
+    "GUILD LEADER",
+    "ELITE",
+    "Admin",
+    "Martin Romualdez",
+    "BOT",
+    "XXX"
+  ],
+  "elysium_role": "ELYSIUM",
+  "sheet_webhook_url": "https://script.google.com/macros/s/AKfycbzY2sJA742QWLUZnqH06oIFosTD-X01dPd2q-uNdt8Fus-WcYo5YG3Y5ZfYfE7uFvTO/exec",
+  "auto_archive_minutes": 60
 }

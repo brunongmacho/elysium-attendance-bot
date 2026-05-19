@@ -73,14 +73,8 @@ function truncateFieldValue(lines, maxLength = DISCORD_LIMITS.FIELD_VALUE, maxIt
   return result.join('\n');
 }
 
-// Get guild name from config
-let guildName = 'TrailerParkB';
-try {
-  const config = require('../config.json');
-  guildName = config.guild_name || 'TrailerParkB';
-} catch (e) {
-  console.warn('⚠️ Could not load config for guild name, using default');
-}
+// Get guild name
+const guildName = 'ELYSIUM';
 
 // ============================================================================
 // QUERY RESULT CACHING (PHASE 3.2)

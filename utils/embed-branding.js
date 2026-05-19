@@ -24,14 +24,8 @@ function addGuildFooter(embed, guild, footerText = null) {
   const iconURL = guild.iconURL();
   if (!iconURL) return embed;
 
-  // Get guild name from config or use default
-  let guildName = 'TrailerParkB';
-  try {
-    const config = require('../config.json');
-    guildName = config.guild_name || 'TrailerParkB';
-  } catch (e) {
-    // Use default
-  }
+  // Get guild name
+  const guildName = 'ELYSIUM';
 
   // Get existing footer text or use config guild name
   const text = footerText || embed.data.footer?.text || `${guildName} Guild`;
@@ -77,7 +71,7 @@ function addGuildAuthor(embed, guild, authorName = null) {
   const iconURL = guild.iconURL();
   if (!iconURL) return embed;
 
-  const name = authorName || guild.name || guildName;
+  const name = authorName || guild.name || 'ELYSIUM';
 
   embed.setAuthor({
     name: name,

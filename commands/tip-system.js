@@ -36,16 +36,8 @@ const commandTipMapping = {
     slash: '/spawned',
     benefit: 'autocomplete for boss names'
   },
-  '!unkill': {
-    slash: '/unkill',
-    benefit: 'autocomplete for boss names'
-  },
   '!setboss': {
     slash: '/setboss',
-    benefit: 'autocomplete for boss names'
-  },
-  '!nospawn': {
-    slash: '/nospawn',
     benefit: 'autocomplete for boss names'
   },
   '!nextspawn': {
@@ -55,10 +47,6 @@ const commandTipMapping = {
   '!maintenance': {
     slash: '/maintenance',
     benefit: 'one-click spawning'
-  },
-  '!serverdown': {
-    slash: '/serverdown',
-    benefit: 'cleaner interface'
   },
   '!clearkills': {
     slash: '/clearkills',
@@ -72,28 +60,12 @@ const commandTipMapping = {
   },
 
   // Attendance Commands (Autocomplete for pending members)
-  '!verify': {
-    slash: '/verify',
-    benefit: 'autocomplete for pending members'
-  },
   '!deny': {
     slash: '/deny',
     benefit: 'autocomplete for pending members'
   },
-  '!verifyall': {
-    slash: '/verifyall',
-    benefit: 'cleaner interface'
-  },
-  '!denyall': {
-    slash: '/denyall',
-    benefit: 'cleaner interface'
-  },
   '!closeall': {
     slash: '/closeall',
-    benefit: 'cleaner interface'
-  },
-  '!resetpending': {
-    slash: '/resetpending',
     benefit: 'cleaner interface'
   },
   '!openthread': {
@@ -134,6 +106,88 @@ const commandTipMapping = {
   },
   '!monthly': {
     slash: '/monthly',
+    benefit: 'cleaner interface'
+  },
+
+  // Member Commands
+  '!help': {
+    slash: '/help',
+    benefit: 'easier command discovery'
+  },
+  '!newmember': {
+    slash: '/newmember',
+    benefit: 'cleaner interface for new member guide'
+  },
+  '!leaderboardattendance': {
+    slash: '/leaderboards',
+    benefit: 'quick leaderboard access with type selection'
+  },
+  '!leaderboardbidding': {
+    slash: '/leaderboards',
+    benefit: 'quick leaderboard access with type selection'
+  },
+  '!leaderboards': {
+    slash: '/leaderboards',
+    benefit: 'cleaner combined leaderboard interface'
+  },
+  '!activity': {
+    slash: '/activity',
+    benefit: 'quick heatmap access'
+  },
+
+  // Admin Commands
+  '!status': {
+    slash: '/status',
+    benefit: 'clean status display'
+  },
+  '!removemember': {
+    slash: '/remove-member',
+    benefit: 'autocomplete for member names'
+  },
+  '!startauctionnow': {
+    slash: '/auction start-now',
+    benefit: 'one-click bypass cooldown'
+  },
+  '!endauction': {
+    slash: '/auction end',
+    benefit: 'cleaner interface'
+  },
+  '!fixlockedpoints': {
+    slash: '/bidding fix-points',
+    benefit: 'cleaner interface'
+  },
+
+  // Emergency Commands
+  '!emergency': {
+    slash: '/emergency',
+    benefit: 'clean subcommand interface with autocomplete'
+  },
+  '!forceclosethread': {
+    slash: '/emergency close',
+    benefit: 'cleaner interface'
+  },
+  '!forcecloseallthreads': {
+    slash: '/emergency close-all',
+    benefit: 'cleaner interface'
+  },
+  '!forceendauction': {
+    slash: '/emergency end-auction',
+    benefit: 'cleaner interface'
+  },
+  '!unlockallpoints': {
+    slash: '/emergency unlock-points',
+    benefit: 'cleaner interface'
+  },
+  '!clearallbids': {
+    slash: '/emergency clear-bids',
+    benefit: 'cleaner interface'
+  },
+  '!diagnostics': {
+    slash: '/emergency diagnostics',
+    benefit: 'cleaner interface'
+  },
+  '!forcesync': {
+    slash: '/emergency force-sync',
     benefit: 'cleaner interface'
   },
 };

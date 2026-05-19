@@ -15,12 +15,66 @@ const tipSystem = require('./tip-system');
 const fs = require('fs');
 const path = require('path');
 const mongoHelpers = require('../utils/mongodb-helpers');
+const { detectChannelType, CHANNEL_TYPES } = require('../help-system-v2');
 
 // Feature Flags
 const USE_MONGODB_ATTENDANCE = process.env.USE_MONGODB_ATTENDANCE === 'true';
 
 // Load boss points configuration
 const bossPoints = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'boss_points.json')));
+
+// Channel restriction mapping for slash commands
+// Maps command name → array of allowed channel types (from CHANNEL_TYPES)
+// Commands not listed here are unrestricted (work everywhere)
+const SLASH_CHANNEL_MAP = {
+  // Attendance thread commands (only work inside attendance threads)
+  'close': [CHANNEL_TYPES.ATTENDANCE_THREAD],
+
+  // Boss timer commands (only in boss timer channel)
+  'killed': [CHANNEL_TYPES.BOSS_TIMER],
+  'spawned': [CHANNEL_TYPES.BOSS_TIMER],
+  'nextspawn': [CHANNEL_TYPES.BOSS_TIMER],
+  'setboss': [CHANNEL_TYPES.BOSS_TIMER],
+  'maintenance': [CHANNEL_TYPES.BOSS_TIMER],
+  'clearkills': [CHANNEL_TYPES.BOSS_TIMER],
+
+  // Admin commands (admin_logs channel only)
+  'status': [CHANNEL_TYPES.ADMIN_LOGS],
+  'closeall': [CHANNEL_TYPES.ADMIN_LOGS],
+  'openthread': [CHANNEL_TYPES.ADMIN_LOGS],
+  'overrideclose': [CHANNEL_TYPES.ADMIN_LOGS],
+  'remove-member': [CHANNEL_TYPES.ADMIN_LOGS],
+  'rotation': [CHANNEL_TYPES.ADMIN_LOGS],
+  'auction': [CHANNEL_TYPES.ADMIN_LOGS],
+  'bidding': [CHANNEL_TYPES.ADMIN_LOGS],
+  'queue': [CHANNEL_TYPES.ADMIN_LOGS],
+  'weekly': [CHANNEL_TYPES.ADMIN_LOGS],
+  'monthly': [CHANNEL_TYPES.ADMIN_LOGS],
+  'emergency': [CHANNEL_TYPES.ADMIN_LOGS],
+
+  // Auction thread commands (only inside auction threads)
+  'bid': [CHANNEL_TYPES.AUCTION_THREAD],
+
+  // Public commands (guild chat or bot commands)
+  'stats': [CHANNEL_TYPES.GUILD_CHAT, CHANNEL_TYPES.BOT_COMMANDS],
+  'newmember': [CHANNEL_TYPES.GUILD_CHAT, CHANNEL_TYPES.BOT_COMMANDS],
+  'leaderboards': [CHANNEL_TYPES.GUILD_CHAT, CHANNEL_TYPES.BOT_COMMANDS],
+  'activity': [CHANNEL_TYPES.GUILD_CHAT, CHANNEL_TYPES.BOT_COMMANDS, CHANNEL_TYPES.ADMIN_LOGS],
+
+  // Universal commands (help is unrestricted - 'all')
+};
+
+// Friendly channel names for error messages
+const CHANNEL_NAME_MAP = {
+  [CHANNEL_TYPES.ADMIN_LOGS]: 'Admin Logs',
+  [CHANNEL_TYPES.ATTENDANCE_THREAD]: 'an attendance thread',
+  [CHANNEL_TYPES.AUCTION_THREAD]: 'an auction thread',
+  [CHANNEL_TYPES.GUILD_CHAT]: 'Guild Chat',
+  [CHANNEL_TYPES.BOT_COMMANDS]: 'Bot Commands',
+  [CHANNEL_TYPES.BOSS_TIMER]: 'the boss timer channel',
+  [CHANNEL_TYPES.ATTENDANCE]: 'the attendance channel',
+  [CHANNEL_TYPES.BIDDING]: 'the bidding channel',
+};
 
 // Constants
 const CONFIRMATION_TIMEOUT = 30000; // 30 seconds
@@ -35,394 +89,33 @@ const CONFIRMATION_TIMEOUT = 30000; // 30 seconds
  * @returns {Promise<void>}
  */
 async function handleSlashCommand(interaction, modules, config, client) {
-  const { attendance, bossTimer, bossTimerCommands, bossRotation, bidding, auctioneering } = modules;
+  const { attendance, bossTimer, bossTimerCommands, bossRotation, bidding, auctioneering, emergencyCommands } = modules;
   const commandName = interaction.commandName;
 
   // Track slash command usage for tip system
   tipSystem.trackSlashCommandUsage(interaction.user.id, commandName);
 
   try {
+    // ═══════════════════════════════════════════════════════════════
+    // CHANNEL RESTRICTION CHECK
+    // ═══════════════════════════════════════════════════════════════
+    const allowedTypes = SLASH_CHANNEL_MAP[commandName];
+    if (allowedTypes) {
+      const channelType = detectChannelType(interaction);
+      if (!allowedTypes.includes(channelType)) {
+        const channelNames = allowedTypes.map(t => CHANNEL_NAME_MAP[t] || t);
+        const channelList = channelNames.join(' or ');
+        await interaction.reply({
+          content: `❌ This command cannot be used here. Please use it in **${channelList}**.`,
+          ephemeral: true
+        });
+        return;
+      }
+    }
+
     // =========================================================================
     // ATTENDANCE COMMANDS
     // =========================================================================
-
-    if (commandName === 'verify') {
-      const memberName = interaction.options.getString('member');
-
-      await interaction.deferReply();
-
-      try {
-        const thread = interaction.channel;
-        if (!thread.isThread()) {
-          await interaction.editReply({
-            content: '❌ This command must be used inside an attendance thread.'
-          });
-          return;
-        }
-
-        const activeSpawns = attendance.getActiveSpawns();
-        const pendingVerifications = attendance.getPendingVerifications();
-        const spawnInfo = activeSpawns[thread.id];
-
-        if (!spawnInfo || spawnInfo.closed) {
-          await interaction.editReply({
-            content: '⚠️ This spawn is closed or not found.'
-          });
-          return;
-        }
-
-        // Find the pending verification for this member
-        const pendingEntry = Object.entries(pendingVerifications).find(
-          ([msgId, p]) =>
-            p.threadId === thread.id &&
-            p.author.toLowerCase() === memberName.toLowerCase()
-        );
-
-        if (!pendingEntry) {
-          await interaction.editReply({
-            content: `⚠️ No pending verification found for **${memberName}** in this thread.`
-          });
-          return;
-        }
-
-        const [msgId, pending] = pendingEntry;
-
-        // Check for duplicates
-        const normalizeUsername = (username) => username.toLowerCase().replace(/\s+/g, '');
-        const isDuplicate = spawnInfo.members.some(
-          (m) => normalizeUsername(m) === normalizeUsername(pending.author)
-        );
-
-        if (isDuplicate) {
-          await interaction.editReply({
-            content: `⚠️ **${pending.author}** is already verified for this spawn.`
-          });
-          return;
-        }
-
-        // Add to verified members
-        spawnInfo.members.push(pending.author);
-        // Store Discord ID for reliable MongoDB lookup
-        if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
-        spawnInfo.memberIds[pending.author] = pending.authorId;
-
-        // Clean up verification buttons
-        if (pending.verificationMsgId) {
-          const verificationMsg = await thread.messages
-            .fetch(pending.verificationMsgId)
-            .catch(() => null);
-          if (verificationMsg && verificationMsg.components.length > 0) {
-            await verificationMsg.edit({ components: [] }).catch(() => {});
-          }
-        }
-
-        // Remove from pending
-        delete pendingVerifications[msgId];
-        attendance.setPendingVerifications(pendingVerifications);
-
-        await interaction.editReply({
-          content: `✅ **${pending.author}** manually verified by ${interaction.user.username}`
-        });
-
-        // Send to confirmation thread if exists
-        if (spawnInfo.confirmThreadId) {
-          const confirmThread = await interaction.guild.channels
-            .fetch(spawnInfo.confirmThreadId)
-            .catch(() => null);
-          if (confirmThread) {
-            await confirmThread.send(
-              `✅ **${pending.author}** verified by ${interaction.user.username} (slash command)`
-            );
-          }
-        }
-
-        console.log(
-          `✅ /verify: ${pending.author} for ${spawnInfo.boss} by ${interaction.user.username}`
-        );
-
-      } catch (error) {
-        console.error('Error in /verify command:', error);
-        await interaction.editReply({
-          content: `❌ Failed to verify member: ${error.message}`
-        });
-      }
-
-      return;
-    }
-
-    if (commandName === 'deny') {
-      const memberName = interaction.options.getString('member');
-      const reason = interaction.options.getString('reason') || 'No reason provided';
-
-      await interaction.deferReply();
-
-      try {
-        const thread = interaction.channel;
-        if (!thread.isThread()) {
-          await interaction.editReply({
-            content: '❌ This command must be used inside an attendance thread.'
-          });
-          return;
-        }
-
-        const activeSpawns = attendance.getActiveSpawns();
-        const pendingVerifications = attendance.getPendingVerifications();
-        const spawnInfo = activeSpawns[thread.id];
-
-        if (!spawnInfo || spawnInfo.closed) {
-          await interaction.editReply({
-            content: '⚠️ This spawn is closed or not found.'
-          });
-          return;
-        }
-
-        // Find the pending verification for this member
-        const pendingEntry = Object.entries(pendingVerifications).find(
-          ([msgId, p]) =>
-            p.threadId === thread.id &&
-            p.author.toLowerCase() === memberName.toLowerCase()
-        );
-
-        if (!pendingEntry) {
-          await interaction.editReply({
-            content: `⚠️ No pending verification found for **${memberName}** in this thread.`
-          });
-          return;
-        }
-
-        const [msgId, pending] = pendingEntry;
-
-        // Clean up verification buttons
-        if (pending.verificationMsgId) {
-          const verificationMsg = await thread.messages
-            .fetch(pending.verificationMsgId)
-            .catch(() => null);
-          if (verificationMsg && verificationMsg.components.length > 0) {
-            await verificationMsg.edit({ components: [] }).catch(() => {});
-          }
-        }
-
-        // Remove from pending (member is NOT added to verified list)
-        delete pendingVerifications[msgId];
-        attendance.setPendingVerifications(pendingVerifications);
-
-        await interaction.editReply({
-          content: `❌ **${pending.author}** denied by ${interaction.user.username}\n**Reason:** ${reason}`
-        });
-
-        // Send to confirmation thread if exists
-        if (spawnInfo.confirmThreadId) {
-          const confirmThread = await interaction.guild.channels
-            .fetch(spawnInfo.confirmThreadId)
-            .catch(() => null);
-          if (confirmThread) {
-            await confirmThread.send(
-              `❌ **${pending.author}** denied by ${interaction.user.username} - ${reason}`
-            );
-          }
-        }
-
-        console.log(
-          `❌ /deny: ${pending.author} for ${spawnInfo.boss} by ${interaction.user.username} - ${reason}`
-        );
-
-      } catch (error) {
-        console.error('Error in /deny command:', error);
-        await interaction.editReply({
-          content: `❌ Failed to deny member: ${error.message}`
-        });
-      }
-
-      return;
-    }
-
-    if (commandName === 'verifyall') {
-      await interaction.deferReply();
-
-      try {
-        const thread = interaction.channel;
-        if (!thread.isThread()) {
-          await interaction.editReply({
-            content: '❌ This command must be used inside an attendance thread.'
-          });
-          return;
-        }
-
-        const activeSpawns = attendance.getActiveSpawns();
-        const pendingVerifications = attendance.getPendingVerifications();
-        const spawnInfo = activeSpawns[thread.id];
-
-        if (!spawnInfo || spawnInfo.closed) {
-          await interaction.editReply({
-            content: '⚠️ This spawn is closed or not found.'
-          });
-          return;
-        }
-
-        const pendingInThread = Object.entries(pendingVerifications).filter(
-          ([msgId, p]) => p.threadId === thread.id
-        );
-
-        if (pendingInThread.length === 0) {
-          await interaction.editReply({
-            content: 'ℹ️ No pending verifications in this thread.'
-          });
-          return;
-        }
-
-        let verifiedCount = 0, duplicateCount = 0;
-        const verifiedMembers = [];
-        const normalizeUsername = (username) => username.toLowerCase().replace(/\s+/g, '');
-
-        for (const [msgId, pending] of pendingInThread) {
-          const isDuplicate = spawnInfo.members.some(
-            (m) => normalizeUsername(m) === normalizeUsername(pending.author)
-          );
-
-          if (!isDuplicate) {
-            spawnInfo.members.push(pending.author);
-            // Store Discord ID for reliable MongoDB lookup
-            if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
-            spawnInfo.memberIds[pending.author] = pending.authorId;
-            verifiedMembers.push(pending.author);
-            verifiedCount++;
-          } else {
-            duplicateCount++;
-          }
-
-          // Clean up verification buttons
-          if (pending.verificationMsgId) {
-            const verificationMsg = await thread.messages
-              .fetch(pending.verificationMsgId)
-              .catch(() => null);
-            if (verificationMsg && verificationMsg.components.length > 0) {
-              await verificationMsg.edit({ components: [] }).catch(() => {});
-            }
-          }
-
-          delete pendingVerifications[msgId];
-        }
-
-        attendance.setPendingVerifications(pendingVerifications);
-
-        await interaction.editReply({
-          content:
-            `✅ **Verify All Complete!**\n\n` +
-            `✅ Verified: ${verifiedCount}\n` +
-            `⚠️ Duplicates skipped: ${duplicateCount}\n` +
-            `📊 Total processed: ${pendingInThread.length}\n\n` +
-            `**Verified members:**\n${verifiedMembers.join(', ') || 'None (all were duplicates)'}`
-        });
-
-        if (spawnInfo.confirmThreadId && verifiedCount > 0) {
-          const confirmThread = await interaction.guild.channels
-            .fetch(spawnInfo.confirmThreadId)
-            .catch(() => null);
-          if (confirmThread) {
-            await confirmThread.send(
-              `✅ **Bulk Verification by ${interaction.user.username}**\n` +
-              `Verified ${verifiedCount} member(s): ${verifiedMembers.join(', ')}`
-            );
-          }
-        }
-
-        console.log(
-          `✅ /verifyall: ${verifiedCount} verified, ${duplicateCount} duplicates for ${spawnInfo.boss} by ${interaction.user.username}`
-        );
-
-      } catch (error) {
-        console.error('Error in /verifyall command:', error);
-        await interaction.editReply({
-          content: `❌ Failed to verify all: ${error.message}`
-        });
-      }
-
-      return;
-    }
-
-    if (commandName === 'denyall') {
-      await interaction.deferReply();
-
-      try {
-        const thread = interaction.channel;
-        if (!thread.isThread()) {
-          await interaction.editReply({
-            content: '❌ This command must be used inside an attendance thread.'
-          });
-          return;
-        }
-
-        const activeSpawns = attendance.getActiveSpawns();
-        const pendingVerifications = attendance.getPendingVerifications();
-        const spawnInfo = activeSpawns[thread.id];
-
-        if (!spawnInfo || spawnInfo.closed) {
-          await interaction.editReply({
-            content: '⚠️ This spawn is closed or not found.'
-          });
-          return;
-        }
-
-        const pendingInThread = Object.entries(pendingVerifications).filter(
-          ([msgId, p]) => p.threadId === thread.id
-        );
-
-        if (pendingInThread.length === 0) {
-          await interaction.editReply({
-            content: 'ℹ️ No pending verifications in this thread.'
-          });
-          return;
-        }
-
-        const deniedMembers = pendingInThread.map(([msgId, p]) => p.author);
-
-        // Clean up all verification buttons and remove from pending
-        for (const [msgId, pending] of pendingInThread) {
-          if (pending.verificationMsgId) {
-            const verificationMsg = await thread.messages
-              .fetch(pending.verificationMsgId)
-              .catch(() => null);
-            if (verificationMsg && verificationMsg.components.length > 0) {
-              await verificationMsg.edit({ components: [] }).catch(() => {});
-            }
-          }
-          delete pendingVerifications[msgId];
-        }
-
-        attendance.setPendingVerifications(pendingVerifications);
-
-        await interaction.editReply({
-          content:
-            `❌ **Deny All Complete!**\n\n` +
-            `Denied ${deniedMembers.length} member(s): ${deniedMembers.join(', ')}\n\n` +
-            `These members were NOT added to the verified list.`
-        });
-
-        if (spawnInfo.confirmThreadId) {
-          const confirmThread = await interaction.guild.channels
-            .fetch(spawnInfo.confirmThreadId)
-            .catch(() => null);
-          if (confirmThread) {
-            await confirmThread.send(
-              `❌ **Bulk Denial by ${interaction.user.username}**\n` +
-              `Denied ${deniedMembers.length} member(s): ${deniedMembers.join(', ')}`
-            );
-          }
-        }
-
-        console.log(
-          `❌ /denyall: ${deniedMembers.length} denied for ${spawnInfo.boss} by ${interaction.user.username}`
-        );
-
-      } catch (error) {
-        console.error('Error in /denyall command:', error);
-        await interaction.editReply({
-          content: `❌ Failed to deny all: ${error.message}`
-        });
-      }
-
-      return;
-    }
 
     if (commandName === 'close') {
       await interaction.deferReply();
@@ -647,8 +340,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
                   await bossRotation.deleteRotationWarning(spawnInfo.boss);
                   await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
-                  await thread.setLocked(true).catch(() => {});
-                  await thread.setArchived(true).catch(() => {});
+                  await thread.setLocked(true).catch((err) => console.error('[handlers] thread setLocked (0 members path) failed:', err?.message || err));
+                  await thread.setArchived(true).catch((err) => console.error('[handlers] thread setArchived (0 members path) failed:', err?.message || err));
 
                   delete activeSpawns[threadId];
                   successCount++;
@@ -772,8 +465,8 @@ async function handleSlashCommand(interaction, modules, config, client) {
                     await bossRotation.deleteRotationWarning(spawnInfo.boss);
                     await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
 
-                    await thread.setLocked(true).catch(() => {});
-                    await thread.setArchived(true).catch(() => {});
+                    await thread.setLocked(true).catch((err) => console.error('[handlers] thread setLocked (submitted path) failed:', err?.message || err));
+                    await thread.setArchived(true).catch((err) => console.error('[handlers] thread setArchived (submitted path) failed:', err?.message || err));
 
                     delete activeSpawns[threadId];
                     successCount++;
@@ -818,7 +511,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
             await buttonInteraction.followUp({
               content: `❌ An error occurred: ${error.message}`,
               ephemeral: true
-            }).catch(() => {});
+            }).catch((err) => console.error('[handlers] closeall button error followUp failed:', err?.message || err));
           }
         });
 
@@ -831,11 +524,11 @@ async function handleSlashCommand(interaction, modules, config, client) {
               ButtonBuilder.from(cancelButton).setDisabled(true)
             );
 
-            await interaction.editReply({ components: [disabledRow] }).catch(() => {});
+            await interaction.editReply({ components: [disabledRow] }).catch((err) => console.error('[handlers] closeall collector end editReply failed:', err?.message || err));
             await interaction.followUp({
               content: '⏱️ Confirmation timed out.',
               ephemeral: true
-            }).catch(() => {});
+            }).catch((err) => console.error('[handlers] closeall collector end followUp failed:', err?.message || err));
           }
         });
 
@@ -844,54 +537,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
         await interaction.editReply({
           content: `❌ Failed to process closeall: ${error.message}`,
           components: []
-        }).catch(() => {});
-      }
-
-      return;
-    }
-
-    if (commandName === 'resetpending') {
-      await interaction.deferReply();
-
-      try {
-        const thread = interaction.channel;
-        if (!thread.isThread()) {
-          await interaction.editReply({
-            content: '❌ This command must be used inside an attendance thread.'
-          });
-          return;
-        }
-
-        const pendingVerifications = attendance.getPendingVerifications();
-        const pendingInThread = Object.keys(pendingVerifications).filter(
-          (msgId) => pendingVerifications[msgId].threadId === thread.id
-        );
-
-        if (pendingInThread.length === 0) {
-          await interaction.editReply({
-            content: '✅ No pending verifications in this thread.'
-          });
-          return;
-        }
-
-        pendingInThread.forEach((msgId) => delete pendingVerifications[msgId]);
-        attendance.setPendingVerifications(pendingVerifications);
-
-        await interaction.editReply({
-          content:
-            `✅ **Cleared ${pendingInThread.length} pending verification(s).**\n\n` +
-            `You can now close the thread.`
-        });
-
-        console.log(
-          `🔧 /resetpending: ${thread.id} by ${interaction.user.username} (${pendingInThread.length} cleared)`
-        );
-
-      } catch (error) {
-        console.error('Error in /resetpending command:', error);
-        await interaction.editReply({
-          content: `❌ Failed to reset pending: ${error.message}`
-        });
+        }).catch((err) => console.error('[handlers] closeall outer catch editReply failed:', err?.message || err));
       }
 
       return;
@@ -980,7 +626,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
           });
       } catch (error) {
         console.error('Error in /overrideclose command:', error);
-        await interaction.editReply({ content: `❌ Error: ${error.message}` }).catch(() => {});
+        await interaction.editReply({ content: `❌ Error: ${error.message}` }).catch((err) => console.error('[handlers] overrideclose error editReply failed:', err?.message || err));
       }
       return;
     }
@@ -1076,33 +722,6 @@ async function handleSlashCommand(interaction, modules, config, client) {
       return;
     }
 
-    if (commandName === 'unkill') {
-      const boss = interaction.options.getString('boss');
-
-      await interaction.deferReply();
-
-      const syntheticMessage = {
-        content: `!unkill ${boss}`,
-        author: interaction.user,
-        channel: interaction.channel,
-        guild: interaction.guild,
-        client: client,
-        reply: async (content) => interaction.editReply(content)
-      };
-
-      try {
-        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
-        await bossTimerCommands.handleUnkill(syntheticMessage, [boss], config);
-      } catch (error) {
-        console.error('Error in /unkill command:', error);
-        await interaction.editReply({
-          content: `❌ Failed to unkill boss: ${error.message}`
-        });
-      }
-
-      return;
-    }
-
     if (commandName === 'setboss') {
       const boss = interaction.options.getString('boss');
       const status = interaction.options.getString('status');
@@ -1125,33 +744,6 @@ async function handleSlashCommand(interaction, modules, config, client) {
         console.error('Error in /setboss command:', error);
         await interaction.editReply({
           content: `❌ Failed to set boss status: ${error.message}`
-        });
-      }
-
-      return;
-    }
-
-    if (commandName === 'nospawn') {
-      const boss = interaction.options.getString('boss');
-
-      await interaction.deferReply();
-
-      const syntheticMessage = {
-        content: `!nospawn ${boss}`,
-        author: interaction.user,
-        channel: interaction.channel,
-        guild: interaction.guild,
-        client: client,
-        reply: async (content) => interaction.editReply(content)
-      };
-
-      try {
-        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
-        await bossTimerCommands.handleNoSpawn(syntheticMessage, [boss], config);
-      } catch (error) {
-        console.error('Error in /nospawn command:', error);
-        await interaction.editReply({
-          content: `❌ Failed to mark boss as not spawning: ${error.message}`
         });
       }
 
@@ -1189,43 +781,6 @@ async function handleSlashCommand(interaction, modules, config, client) {
         console.error('Error in /maintenance command:', error);
         await interaction.editReply({
           content: `❌ Failed to spawn bosses: ${error.message}`
-        });
-      }
-
-      return;
-    }
-
-    if (commandName === 'serverdown') {
-      // Check admin permission
-      const guild = interaction.guild;
-      const member = await guild.members.fetch(interaction.user.id).catch(() => null);
-
-      if (!member || !isAdmin(member, config)) {
-        await interaction.reply({
-          content: '❌ Admin only command',
-          ephemeral: true
-        });
-        return;
-      }
-
-      await interaction.deferReply();
-
-      const syntheticMessage = {
-        content: `!serverdown`,
-        author: interaction.user,
-        channel: interaction.channel,
-        guild: interaction.guild,
-        client: client,
-        reply: async (content) => interaction.editReply(content)
-      };
-
-      try {
-        // Handler will reply via syntheticMessage.reply which maps to interaction.editReply
-        await bossTimerCommands.handleServerDown(syntheticMessage);
-      } catch (error) {
-        console.error('Error in /serverdown command:', error);
-        await interaction.editReply({
-          content: `❌ Failed to activate server down mode: ${error.message}`
         });
       }
 
@@ -1575,7 +1130,7 @@ if (commandName === 'rotation') {
       };
 
       await interaction.deferReply();
-      await bidding.handleCommand(syntheticMessage, config);
+      await bidding.handleCommand('!bid', syntheticMessage, [String(amount)], client, config);
       return;
     }
 
@@ -1622,6 +1177,83 @@ if (commandName === 'rotation') {
         };
 
         await auctioneering.handleForceSubmitResults(syntheticMessage, config, bidding);
+        return;
+      }
+
+      if (subcommand === 'start-now') {
+        const auctState = auctioneering.getAuctionState();
+        if (auctState.active) {
+          await interaction.editReply({
+            content: '❌ Auction is already running!'
+          });
+          return;
+        }
+        await auctioneering.startAuctioneering(interaction.guild, config, client);
+        await interaction.editReply({
+          content: '✅ Auction started immediately (cooldown bypassed)!'
+        });
+        return;
+      }
+
+      if (subcommand === 'end') {
+        const auctState = auctioneering.getAuctionState();
+        if (!auctState.active) {
+          await interaction.editReply({
+            content: '❌ No active auction to end.'
+          });
+          return;
+        }
+        const biddingChannel = interaction.channel;
+        await auctioneering.endAuctionSession(client, config, biddingChannel);
+        await interaction.editReply({
+          content: '✅ Auction session ended.'
+        });
+        return;
+      }
+
+    }
+
+    // /bidding command - Admin bidding management
+    if (commandName === 'bidding') {
+      const subcommand = interaction.options.getSubcommand();
+
+      if (subcommand === 'fix-points') {
+        // Permission check
+        const guild = interaction.guild;
+        const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+        if (!member || !isAdmin(member, config)) {
+          await interaction.reply({
+            content: '❌ Admin only command',
+            ephemeral: true
+          });
+          return;
+        }
+
+        await interaction.deferReply();
+
+        const syntheticMessage = {
+          author: interaction.user,
+          member: interaction.member,
+          channel: interaction.channel,
+          guild: interaction.guild,
+          content: '!fixlockedpoints',
+          reply: async (content) => {
+            if (typeof content === 'string') {
+              return await interaction.editReply({ content });
+            } else if (content.embeds) {
+              return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+            } else {
+              return await interaction.editReply(content);
+            }
+          }
+        };
+
+        try {
+          await bidding.handleCommand('!fixlockedpoints', syntheticMessage, [], client, config);
+        } catch (error) {
+          console.error('Error in /bidding fix-points:', error);
+          await interaction.editReply({ content: `❌ Error: ${error.message}` });
+        }
         return;
       }
     }
@@ -1768,82 +1400,302 @@ if (commandName === 'rotation') {
       return;
     }
 
-    // /cp command - Core Evaluation CP submission
-    if (commandName === 'cp') {
-      await interaction.deferReply({ ephemeral: true });
-      
-      await interaction.editReply({ 
-        content: `❌ Please post your CP in the Core Evaluation thread.\n\nUse \`!CP <number>\` with a screenshot attached.\n\nExample: \`!CP 90,492\`` 
-      });
+    // =========================================================================
+    // MEMBER SLASH COMMANDS (NEW)
+    // =========================================================================
+
+    if (commandName === 'help') {
+      await interaction.reply({ content: '📚 Opening help...', ephemeral: true });
+
+      const syntheticMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        content: '!help',
+        reply: async (content) => {
+          if (typeof content === 'string') {
+            return await interaction.channel.send({ content });
+          } else if (content.embeds) {
+            return await interaction.channel.send({ embeds: content.embeds, content: content.content || null });
+          } else {
+            return await interaction.channel.send(content);
+          }
+        }
+      };
+
+      try {
+        const { commandHandlers } = require('../index2.js');
+        await commandHandlers.help(syntheticMessage, interaction.member);
+      } catch (error) {
+        console.error('Error in /help command:', error);
+      }
       return;
     }
 
-// =========================================================================
-// TEST SEND COMMAND
-// =========================================================================
-if (commandName === 'testsend') {
-  // Check admin permission
-  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-  if (!member || !isAdmin(member, config)) {
-    await interaction.reply({
-      content: '❌ Admin only command',
-      ephemeral: true
-    });
-    return;
-  }
+    if (commandName === 'newmember') {
+      await interaction.reply({ content: '📚 Loading new member guide...', ephemeral: true });
 
-  // Check if used in admin-logs channel
-  if (interaction.channel.id !== config.admin_logs_channel_id) {
-    await interaction.reply({
-      content: `❌ This command can only be used in <#${config.admin_logs_channel_id}>`,
-      ephemeral: true
-    });
-    return;
-  }
-
-  await interaction.deferReply();
-
-  try {
-    // Call test send function from index2
-    const { commandHandlers } = require('../index2.js');
-    const result = await commandHandlers.testsend(interaction, interaction.member);
-
-    if (result.error) {
-      await interaction.editReply({ content: '❌ Test send failed: ' + result.error });
-    } else if (result.warning) {
-      await interaction.editReply({ content: result.warning });
-    } else {
-      const failedChannels = result.channels.filter((c) => c.status === 'failed');
-      const failedCount = failedChannels.length;
-      const detailLines = failedChannels.slice(0, 8).map((c) => `• ${c.channelId}: ${c.error || 'Unknown error'}`);
-
-      const embed = {
-        color: failedCount > 0 ? 0xFFA500 : 0x00FF00,
-        title: '✅ Test Send Complete',
-        description: 'Sent to ' + result.successCount + ' channels' +
-                     (failedCount > 0 ? ', ' + failedCount + ' failed' : ''),
-        timestamp: new Date(),
-        footer: { text: 'Guild: ' + config.guild_name }
+      const syntheticMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        content: '!newmember',
+        reply: async (content) => {
+          if (typeof content === 'string') {
+            return await interaction.channel.send({ content });
+          } else if (content.embeds) {
+            return await interaction.channel.send({ embeds: content.embeds, content: content.content || null });
+          } else {
+            return await interaction.channel.send(content);
+          }
+        }
       };
 
-      if (failedCount > 0) {
-        embed.fields = [
-          {
-            name: 'Failed Channels',
-            value: detailLines.join('\n'),
-            inline: false
+      try {
+        const { commandHandlers } = require('../index2.js');
+        await commandHandlers.newmember(syntheticMessage, interaction.member);
+      } catch (error) {
+        console.error('Error in /newmember command:', error);
+      }
+      return;
+    }
+
+    if (commandName === 'leaderboards') {
+      const type = interaction.options.getString('type');
+
+      await interaction.reply({ content: '📊 Loading leaderboards...', ephemeral: true });
+
+      let handlerName;
+      if (type === 'attendance') handlerName = 'leaderboardattendance';
+      else if (type === 'bidding') handlerName = 'leaderboardbidding';
+      else handlerName = 'leaderboards';
+
+      const syntheticMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        content: `!${handlerName}`,
+        reply: async (content) => {
+          if (typeof content === 'string') {
+            return await interaction.channel.send({ content });
+          } else if (content.embeds) {
+            return await interaction.channel.send({ embeds: content.embeds, content: content.content || null });
+          } else {
+            return await interaction.channel.send(content);
           }
-        ];
+        }
+      };
+
+      try {
+        const { commandHandlers } = require('../index2.js');
+        await commandHandlers[handlerName](syntheticMessage, interaction.member);
+      } catch (error) {
+        console.error(`Error in /leaderboards ${type}:`, error);
+      }
+      return;
+    }
+
+    if (commandName === 'activity') {
+      const week = interaction.options.getString('week') || '';
+
+      await interaction.reply({ content: '📊 Generating activity heatmap...', ephemeral: true });
+
+      const syntheticMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        content: `!activity ${week}`.trim(),
+        reply: async (content) => {
+          if (typeof content === 'string') {
+            return await interaction.channel.send({ content });
+          } else if (content.embeds) {
+            return await interaction.channel.send({ embeds: content.embeds, content: content.content || null });
+          } else {
+            return await interaction.channel.send(content);
+          }
+        }
+      };
+
+      try {
+        const { commandHandlers } = require('../index2.js');
+        await commandHandlers.activity(syntheticMessage, interaction.member);
+      } catch (error) {
+        console.error('Error in /activity command:', error);
+      }
+      return;
+    }
+
+    // =========================================================================
+    // ADMIN SLASH COMMANDS (NEW)
+    // =========================================================================
+
+    if (commandName === 'status') {
+      // Permission check
+      const guild = interaction.guild;
+      const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+      if (!member || !isAdmin(member, config)) {
+        await interaction.reply({
+          content: '❌ Admin only command',
+          ephemeral: true
+        });
+        return;
       }
 
-      await interaction.editReply({ embeds: [embed] });
+      await interaction.deferReply({ ephemeral: true });
+
+      const syntheticMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        content: '!status',
+        reply: async (content) => {
+          if (typeof content === 'string') {
+            return await interaction.editReply({ content });
+          } else if (content.embeds) {
+            return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+          } else {
+            return await interaction.editReply(content);
+          }
+        }
+      };
+
+      try {
+        const { commandHandlers } = require('../index2.js');
+        await commandHandlers.status(syntheticMessage, interaction.member);
+      } catch (error) {
+        console.error('Error in /status command:', error);
+        await interaction.editReply({ content: `❌ Error: ${error.message}` });
+      }
+      return;
     }
-  } catch (err) {
-    console.error('Error in /testsend command:', err);
-    await interaction.editReply({ content: '❌ Failed to execute test send: ' + err.message });
-  }
-  return;
-}
+
+    if (commandName === 'remove-member') {
+      // Permission check
+      const guild = interaction.guild;
+      const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+      if (!member || !isAdmin(member, config)) {
+        await interaction.reply({
+          content: '❌ Admin only command',
+          ephemeral: true
+        });
+        return;
+      }
+
+      const memberName = interaction.options.getString('member');
+
+      await interaction.deferReply({ ephemeral: true });
+
+      const syntheticMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        content: `!removemember ${memberName}`,
+        reply: async (content) => {
+          if (typeof content === 'string') {
+            return await interaction.editReply({ content });
+          } else if (content.embeds) {
+            return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+          } else {
+            return await interaction.editReply(content);
+          }
+        }
+      };
+
+      try {
+        const { commandHandlers } = require('../index2.js');
+        await commandHandlers.removemember(syntheticMessage, interaction.member);
+      } catch (error) {
+        console.error('Error in /remove-member command:', error);
+        await interaction.editReply({ content: `❌ Error: ${error.message}` });
+      }
+      return;
+    }
+
+    // =========================================================================
+    // EMERGENCY SLASH COMMANDS (NEW)
+    // =========================================================================
+
+    // /emergency command - Emergency recovery toolkit
+    if (commandName === 'emergency') {
+      const subcommand = interaction.options.getSubcommand();
+
+      // Permission check
+      const guild = interaction.guild;
+      const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+      if (!member || !isAdmin(member, config)) {
+        await interaction.reply({
+          content: '❌ Admin only command',
+          ephemeral: true
+        });
+        return;
+      }
+
+      await interaction.deferReply({ ephemeral: true });
+
+      // Map subcommands to emergency handler args
+      let emergencyArgs;
+      switch (subcommand) {
+        case 'close':
+          const threadOption = interaction.options.getChannel('thread');
+          emergencyArgs = ['close', threadOption ? threadOption.id : interaction.channel.id];
+          break;
+        case 'close-all':
+          emergencyArgs = ['closeall'];
+          break;
+        case 'end-auction':
+          emergencyArgs = ['endauction'];
+          break;
+        case 'unlock-points':
+          emergencyArgs = ['unlock'];
+          break;
+        case 'clear-bids':
+          emergencyArgs = ['clearbids'];
+          break;
+        case 'diagnostics':
+          emergencyArgs = ['diag'];
+          break;
+        case 'force-sync':
+          emergencyArgs = ['sync'];
+          break;
+        default:
+          await interaction.editReply({
+            content: `❌ Unknown emergency subcommand: ${subcommand}`
+          });
+          return;
+      }
+
+      const syntheticMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        content: `!emergency ${emergencyArgs.join(' ')}`,
+        reply: async (content) => {
+          if (typeof content === 'string') {
+            return await interaction.editReply({ content });
+          } else if (content.embeds) {
+            return await interaction.editReply({ embeds: content.embeds, content: content.content || null });
+          } else {
+            return await interaction.editReply(content);
+          }
+        }
+      };
+
+      try {
+        await emergencyCommands.handleEmergencyCommand(syntheticMessage, emergencyArgs);
+      } catch (error) {
+        console.error(`Error in /emergency ${subcommand}:`, error);
+        await interaction.editReply({ content: `❌ Error: ${error.message}` });
+      }
+      return;
+    }
+
     // Unknown command
     await interaction.reply({
       content: '❌ Unknown command',

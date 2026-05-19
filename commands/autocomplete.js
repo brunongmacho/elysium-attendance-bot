@@ -264,9 +264,7 @@ async function handleAutocomplete(interaction, attendance, bossRotation = null) 
     if (
       (commandName === 'killed' ||
        commandName === 'spawned' ||
-       commandName === 'unkill' ||
-       commandName === 'setboss' ||
-       commandName === 'nospawn') &&
+       commandName === 'setboss') &&
       focusedOption.name === 'boss'
     ) {
       choices = filterBossNames(focusedValue);
@@ -282,7 +280,7 @@ async function handleAutocomplete(interaction, attendance, bossRotation = null) 
 
     // Pending member autocomplete (for verify/deny)
     else if (
-      (commandName === 'verify' || commandName === 'deny') &&
+      (commandName === 'verify') &&
       focusedOption.name === 'member'
     ) {
       choices = getPendingMembers(attendance, focusedValue);
@@ -301,7 +299,7 @@ async function handleAutocomplete(interaction, attendance, bossRotation = null) 
   } catch (error) {
     console.error('❌ Autocomplete error:', error);
     // Respond with empty array on error to prevent interaction failure
-    await interaction.respond([]).catch(() => {});
+    await interaction.respond([]).catch((err) => console.error('[autocomplete] respond failed:', err?.message || err));
   }
 }
 

@@ -66,13 +66,10 @@ const SYNC_REGISTRY = process.argv.includes('--registry') || (!hasModuleFlag() &
 
 // Load bot configuration
 let config;
-let guildName = 'TrailerParkB';
+let guildName = 'ELYSIUM';
 try {
   const configPath = path.join(__dirname, '..', 'config.json');
   config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  if (config.guild_name) {
-    guildName = config.guild_name;
-  }
 } catch (error) {
   console.error('❌ Failed to load config.json:', error.message);
   process.exit(1);

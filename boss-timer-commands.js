@@ -4,8 +4,8 @@
  * ============================================================================
  *
  * Command handlers for boss timer system.
- * Commands: !killed, !setboss, !nextspawn, !unkill, !nospawn, !spawned,
- *           !maintenance, !clearkills
+ * Commands: !killed, !setboss, !nextspawn, !spawned,
+ *           !maintenance, !clearkills, !timers
  *
  * @module boss-timer-commands
  * ============================================================================
@@ -240,40 +240,7 @@ async function handleNextSpawn(message) {
   }
 }
 
-/**
- * Handle !unkill command
- */
-async function handleUnkill(message, args, config) {
-  // Check if in correct channel
-  if (message.channel.id !== config.boss_timer_channel_id) {
-    const channel = await message.client.channels.fetch(config.boss_timer_channel_id);
-    return message.reply(`⚠️ Please use ${channel} for boss timer commands`);
-  }
 
-  if (args.length < 1) {
-    return message.reply('❌ Usage: `!unkill <boss>`\nExample: `!unkill venatus`');
-  }
-
-  const bossInput = args.join(' ');
-  const bossName = bossTimer.findBossName(bossInput);
-
-  if (!bossName) {
-    return message.reply(`❌ Boss not found: **${bossInput}**`);
-  }
-
-  try {
-    const cancelled = await bossTimer.cancelTimer(bossName);
-
-    if (cancelled) {
-      await message.reply(`↩️ Cancelled timer for **${bossName}**`);
-    } else {
-      await message.reply(`⚠️ No active timer found for **${bossName}**`);
-    }
-  } catch (error) {
-    console.error('Error in !unkill command:', error);
-    return message.reply(`❌ Error: ${error.message}`);
-  }
-}
 
 /**
  * Handle !maintenance command (admin)
@@ -318,45 +285,7 @@ async function handleMaintenance(message) {
   }
 }
 
-/**
- * Handle !serverdown command (admin)
- * Pauses boss attendance operations without affecting other bot features
- */
-async function handleServerDown(message) {
-  try {
-    const count = await bossTimer.serverDown();
 
-    const embed = new EmbedBuilder()
-      .setColor(0xe74c3c)
-      .setTitle('🛑 Server Down Mode Activated')
-      .setDescription(
-        `**Boss attendance operations paused**\n\n` +
-        `✅ Cleared **${count}** boss timers (all bosses now available)\n` +
-        `⏸️ New attendance threads will NOT be created\n` +
-        `✅ All other bot features remain active (bidding, auctions, stats)\n\n` +
-        `💡 Use \`!maintenance\` to resume normal operations`
-      )
-      .addFields({
-        name: 'ℹ️ What\'s Affected',
-        value: '• Boss spawn reminders: **Disabled**\n' +
-               '• Attendance threads: **Not created**\n' +
-               '• Boss timers: **Cleared**',
-        inline: true
-      }, {
-        name: 'ℹ️ What Still Works',
-        value: '• Bidding system: **Active**\n' +
-               '• Auction system: **Active**\n' +
-               '• Stats & leaderboards: **Active**',
-        inline: true
-      })
-      .setTimestamp();
-
-    await message.reply({ embeds: [embed] });
-  } catch (error) {
-    console.error('Error in !serverdown command:', error);
-    return message.reply(`❌ Error: ${error.message}`);
-  }
-}
 
 /**
  * Handle !clearkills command (admin)
@@ -383,73 +312,7 @@ async function handleClearKills(message) {
   }
 }
 
-/**
- * Handle !nospawn command - boss didn't spawn as predicted
- * Usage: !nospawn <boss>
- */
-async function handleNoSpawn(message, args, config) {
-  // Check if in correct channel
-  if (message.channel.id !== config.boss_timer_channel_id) {
-    const channel = await message.client.channels.fetch(config.boss_timer_channel_id);
-    return message.reply(`⚠️ Please use ${channel} for boss timer commands`);
-  }
 
-  if (args.length < 1) {
-    return message.reply('❌ Usage: `!nospawn <boss>`\nExample: `!nospawn venatus`');
-  }
-
-  // Parse boss name (might be multi-word)
-  const bossInput = args.join(' ');
-  const bossName = bossTimer.findBossName(bossInput);
-
-  if (!bossName) {
-    return message.reply(`❌ Boss "${bossInput}" not found. Use \`!timers\` to see available bosses.`);
-  }
-
-  try {
-    const result = await bossTimer.handleNoSpawn(bossName, message.author.id);
-
-    if (!result.success) {
-      return message.reply(`❌ Error: ${result.error}`);
-    }
-
-    const embed = new EmbedBuilder()
-      .setColor(0xe74c3c)
-      .setTitle('❌ False Alarm Reported')
-      .setDescription(`**${bossName}** did not spawn as predicted`)
-      .addFields({
-        name: '✅ Actions Taken',
-        value:
-          (result.timerCancelled ? '• Timer cancelled\n' : '') +
-          (result.threadFound ? '• Attendance thread locked and archived\n' : '') +
-          '• Announcement posted',
-        inline: false
-      })
-      .addFields({
-        name: 'ℹ️ Next Steps',
-        value: 'When boss actually spawns, use `!spawned <boss>` to record the correct time.',
-        inline: false
-      })
-      .setTimestamp();
-
-    // Add boss image if available
-    const bossImage = getBossImageAttachment(bossName);
-    const bossImageURL = getBossImageAttachmentURL(bossName, message.guild);
-    if (bossImageURL) {
-      embed.setThumbnail(bossImageURL);
-    }
-
-    const messagePayload = { embeds: [embed] };
-    if (bossImage) {
-      messagePayload.files = [bossImage];
-    }
-
-    await message.reply(messagePayload);
-  } catch (error) {
-    console.error('Error in !nospawn command:', error);
-    return message.reply(`❌ Error: ${error.message}`);
-  }
-}
 
 /**
  * Handle !spawned command - confirm boss spawned and create attendance thread
@@ -697,14 +560,13 @@ async function handleHelp(message) {
   await message.reply({ embeds: [embed] });
 }
 
+
+
 module.exports = {
   handleKilled,
   handleNextSpawn,
-  handleUnkill,
   handleMaintenance,
-  handleServerDown,
   handleClearKills,
-  handleNoSpawn,
   handleSpawned,
   handleSetBoss,
   handleHelp,

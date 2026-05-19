@@ -31,11 +31,6 @@ const COMMAND_ALIASES = {
   "!nm": "!newmember",
 
   // Fun commands
-  "!8ball": "!eightball",
-  "!8b": "!eightball",
-  "!magic": "!eightball",
-  "!sampal": "!slap",
-  "!hampas": "!slap",
 
   // Member info commands
   "!profile": "!stats",
@@ -63,16 +58,12 @@ const COMMAND_ALIASES = {
   // Attendance commands (admin)
   "!st": "!status",
   "!attendancestatus": "!status",  // NLP: Map attendance status queries to general status
-  "!addth": "!addthread",
-  "!v": "!verify",
-  "!vall": "!verifyall",
-  "!resetpend": "!resetpending",
-  "!fs": "!forcesubmit",
-  "!fc": "!forceclose",
-  "!debug": "!debugthread",
   "!closeall": "!closeallthread",
-  "!clear": "!clearstate",
   "!maint": "!maintenance",
+
+  // Boss spawn alias commands
+  "!whennext": "!nextspawn",
+  "!spawntimer": "!nextspawn",
 
   // Bidding commands (admin)
   "!ql": "!queuelist",
@@ -80,53 +71,16 @@ const COMMAND_ALIASES = {
   "!start": "!startauction",
   "!auction": "!startauction",  // FIX: Add !auction alias
   "!startauc": "!startauction",
-  "!resetb": "!resetbids",
-  "!forcesubmit": "!forcesubmitresults",
-  "!fixlocked": "!fixlockedpoints",
-  "!audit": "!auctionaudit",
-  "!resetauc": "!resetauction",
-  "!recover": "!recoverauction",
 
   // Emergency commands (admin) - Standalone commands
   "!emerg": "!emergency",
-  "!forceclosethread": "!forceclosethread",
   "!fct": "!forceclosethread",
-  "!forcecloseallthreads": "!forcecloseallthreads",
   "!fcat": "!forcecloseallthreads",
-  "!forceendauction": "!forceendauction",
   "!fea": "!forceendauction",
-  "!unlockallpoints": "!unlockallpoints",
   "!unlock": "!unlockallpoints",
-  "!clearallbids": "!clearallbids",
   "!clearbids": "!clearallbids",
-  "!diagnostics": "!diagnostics",
   "!diag": "!diagnostics",
-  "!forcesync": "!forcesync",
   "!fsync": "!forcesync",
-  "!testmilestones": "!testmilestones",
-  "!tm": "!testmilestones",
-
-  // Intelligence engine commands (admin)
-  "!predict": "!predictprice",
-  "!suggestprice": "!predictprice",
-  "!suggestauction": "!analyzequeue",
-  "!aq": "!analyzequeue",
-  "!auctionqueue": "!analyzequeue",
-  "!bootstrap": "!bootstraplearning",
-  "!learnhistory": "!bootstraplearning",
-  "!engage": "!engagement",
-  "!analyze": "!engagement",  // FIX: Change from !analyzeengagement to !engagement (single member)
-  "!analyzeall": "!analyzeengagement",  // NEW: For all members analysis
-  "!guildanalyze": "!analyzeengagement",
-  "!anomaly": "!detectanomalies",
-  "!fraud": "!detectanomalies",
-  "!recommend": "!recommendations",
-  "!suggest": "!recommendations",
-  "!perf": "!performance",
-  "!nextspawn": "!predictspawn",
-  "!whennext": "!predictspawn",
-  "!spawntimer": "!predictspawn",
-  "!predatt": "!predictattendance",  // NEW: Short alias for predictattendance
 
   // Member management commands (admin)
   "!removemem": "!removemember",
@@ -135,32 +89,13 @@ const COMMAND_ALIASES = {
 
   // Bidding commands (member)
   "!b": "!bid",
-  "!bstatus": "!bidstatus",
-  "!bs": "!bidstatus",
-  "!pts": "!mypoints",
-  "!mypts": "!mypoints",
-  "!mp": "!mypoints",
 
   // Auctioneering commands
   "!auc-start": "!startauction",
   "!begin-auction": "!startauction",
-  "!auc-pause": "!pause",
-  "!pauseauction": "!pause",  // FIX: Add !pauseauction alias
-  "!hold": "!pause",
-  "!auc-resume": "!resume",
-  "!resumeauction": "!resume",  // FIX: Add !resumeauction alias
-  "!continue": "!resume",
-  "!auc-stop": "!stop",
-  "!end-item": "!stop",
-  "!auc-extend": "!extend",
-  "!ext": "!extend",
   "!auc-now": "!startauctionnow",
 
   // Auction control commands
-  "!cancel": "!cancelitem",
-  "!cancelitem": "!cancelitem",
-  "!skip": "!skipitem",
-  "!skipitem": "!skipitem",
 };
 
 /**

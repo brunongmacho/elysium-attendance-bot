@@ -233,7 +233,7 @@ function findBossMatchCached(input, bossPoints) {
     if (dist < best.dist) best = { name, dist };
 
     // Also check distances to aliases
-    for (const alias of bossPoints[name].aliases || []) {
+    for (const alias of (bossPoints[name]?.aliases) || []) {
       const d2 = levenshtein.get(q, alias.toLowerCase());
       if (d2 < best.dist) best = { name, dist: d2 };
     }

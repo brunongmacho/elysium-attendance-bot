@@ -21,21 +21,8 @@ const CircuitBreaker = require('./circuit-breaker');
 
 // Helper function to get guild-specific collection name
 // All collections are now guild-specific with suffix (e.g., members-TPB)
-let _guildName = 'TrailerParkB';
-try {
-  const fs = require('fs');
-  const path = require('path');
-  const configPath = path.join(__dirname, '..', 'config.json');
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  if (config.guild_name) {
-    _guildName = config.guild_name;
-  }
-} catch (e) {
-  console.log('⚠️ Could not load config for collection naming, using default');
-}
-
 function getCollectionName(baseName) {
-  const suffix = _guildName.replace(/\s+/g, '_').toUpperCase();
+  const suffix = 'TRAILERPARKB';
   return `${baseName}-${suffix}`;
 }
 
@@ -104,7 +91,7 @@ async function getMemberByUsername(username) {
   const db = await dbAPI.connect();
   // Case-insensitive search to prevent duplicates from case variations
   return await db.collection(getCollectionName('members')).findOne({
-    username: { $regex: new RegExp(`^${username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+    username: { $regex: new RegExp(`^${escapeRegex(username)}$`, 'i') }
   });
 }
 
@@ -132,7 +119,7 @@ async function getMember(identifier) {
   // If not found, try by username (case-insensitive)
   if (!member) {
     member = await db.collection(getCollectionName('members')).findOne({
-      username: { $regex: new RegExp(`^${identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      username: { $regex: new RegExp(`^${escapeRegex(identifier)}$`, 'i') }
     });
   }
 
@@ -160,20 +147,18 @@ async function createMember(memberData) {
   const member = {
     _id: memberData.userId || `temp_${memberData.username.toLowerCase().replace(/\s+/g, '_')}`,
     username: memberData.username,
-    discordId: memberData.discordId || null,
     pointsAvailable: memberData.pointsAvailable || 0,
     pointsEarned: memberData.pointsEarned || 0,
     pointsSpent: memberData.pointsSpent || 0,
-    isActive: true,
-    attendance: memberData.attendance || {
+    attendance: {
       total: 0,
       thisWeek: 0,
       thisMonth: 0,
       byBoss: {},
       streak: { current: 0, longest: 0 }
     },
-    joinedAt: memberData.joinedAt || new Date(),
-    lastUpdated: new Date()
+    joinedAt: new Date(),
+    lastActive: new Date()
   };
 
   await db.collection(getCollectionName('members')).insertOne(member);
@@ -195,6 +180,11 @@ async function updateMember(identifier, updates) {
     throw new Error(`Member not found: ${identifier}`);
   }
 
+  // Update member
+  const result = await db.collection(getCollectionName('members')).updateOne(
+    { _id: member._id },
+    { $set: { ...updates, lastActive: new Date() } }
+  );
   return result;
 }
 
@@ -337,35 +327,6 @@ async function addAuctionItem(itemData) {
   const db = await dbAPI.connect();
 
   const item = {
-    _id: itemData.itemId || `item_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-    itemName: itemData.itemName,
-    startPrice: itemData.startPrice || 0,
-    duration: itemData.duration || 30,
-    quantity: itemData.quantity || 1,
-    boss: itemData.boss || 'Unknown',
-    source: itemData.source || 'manual',
-    status: 'pending',
-    winner: null,
-    winnerId: null,
-    winningBid: null,
-    soldAt: null,
-    addedAt: new Date(),
-    sheetRow: itemData.sheetRow || null
-  };
-
-  await db.collection(getCollectionName('auctionItems')).insertOne(item);
-  return item;
-}
-
-/**
- * Add item to auction queue
- * @param {Object} itemData - Item data
- * @returns {Promise<Object>} - Created item
- */
-async function addAuctionItem(itemData) {
-  const db = await dbAPI.connect();
-
-  const item = {
     itemName: itemData.itemName,
     startPrice: itemData.startPrice || 0,
     duration: itemData.duration || 30,
@@ -496,7 +457,7 @@ async function getLastBossSpawn(bossName) {
 
     // Find the most recent attendance record for this boss (case-insensitive)
     const lastRecord = await db.collection(getCollectionName('attendance'))
-      .find({ bossName: { $regex: new RegExp(`^${bossName}$`, 'i') } })
+      .find({ bossName: { $regex: new RegExp(`^${escapeRegex(bossName)}$`, 'i') } })
       .sort({ timestamp: -1 })
       .limit(1)
       .toArray();
@@ -643,7 +604,7 @@ async function addAttendance(data) {
 
   await addAttendanceRecord({
     memberId: member._id,
-    memberName: member.nickname || data.username, // Use nickname (in-game name) first, fallback to username
+    memberName: data.username,
     bossName: data.boss,
     bossPoints: data.points || 0,
     timestamp: timestampDate,
@@ -659,7 +620,7 @@ async function addAttendance(data) {
     bossPoints: data.points || 0
   });
 
-  console.log(`✅ [MongoDB] Added attendance for ${member.nickname || data.username}: ${data.boss} (+${data.points} pts)`);
+  console.log(`✅ [MongoDB] Added attendance for ${data.username}: ${data.boss} (+${data.points} pts)`);
   return updatedMember;
 }
 
@@ -1134,7 +1095,7 @@ function getWeekLabel() {
   const now = new Date();
   const year = now.getFullYear();
   const weekNum = getWeekNumber(now);
-  return `WEEK_${year}_${weekNum}`;
+  return `ELYSIUM_WEEK_${year}_${weekNum}`;
 }
 
 /**

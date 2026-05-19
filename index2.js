@@ -19,31 +19,14 @@
  * - Health Monitoring: HTTP server for uptime checks
  *
  * @architecture
- * ┌─────────────────────────────────────────────────────────────┐
- * │                    GUILD BOT                        │
- * ├─────────────────────────────────────────────────────────────┤
- * │ Core Systems:                                               │
- * │  - Attendance Module (./attendance.js)                      │
- * │  - Bidding Module (./bidding.js)                            │
- * │  - Auctioneering Module (./auctioneering.js)                │
- * │  - Help System (./help-system.js)                           │
- * │  - Loot System (./loot-system.js)                           │
- * │  - Leaderboard System (./leaderboard-system.js)             │
- * │  - Emergency Commands (./emergency-commands.js)             │
- * │  - Error Handler (./utils/error-handler.js)                 │
- * └─────────────────────────────────────────────────────────────┘
- *
- * @sections
- * 1. Imports & Configuration
- * 2. Discord Client Initialization
- * 3. Constants & State Management
- * 4. HTTP Health Check Server
- * 5. Utility Functions
- * 6. Bidding Channel Cleanup
- * 7. Confirmation Utilities
- * 8. Command Handlers
- * 9. Event Handlers
- * 10. Bot Initialization
+ * Core Systems:
+ *  - Attendance Module (./attendance.js)
+ *  - Bidding Module (./bidding.js)
+ *  - Auctioneering Module (./auctioneering.js)
+ *  - Help System (./help-system.js)
+ *  - Leaderboard System (./leaderboard-system.js)
+ *  - Emergency Commands (./emergency-commands.js)
+ *  - Error Handler (./utils/error-handler.js)
  *
  * @author Guild Development Team
  * @license MIT
@@ -54,429 +37,158 @@
 // =====================================================================
 
 // ═══════════════════════════════════════════════════════════════════════════
-// STRUCTURED LOGGING - Replace console.log with structured logger
+// STRUCTURED LOGGING
 // ═══════════════════════════════════════════════════════════════════════════
-const { createLogger, withCorrelationId } = require('./utils/logger');
+const { createLogger } = require('./utils/logger');
 const mainLogger = createLogger('main');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GRACEFUL DEGRADATION
 // ═══════════════════════════════════════════════════════════════════════════
-const { OperationQueue, getStalenessTracker } = require('./utils/operation-queue');
+const { OperationQueue } = require('./utils/operation-queue');
 const operationQueue = new OperationQueue();
 
 // Discord.js - Official Discord API wrapper
 const {
-  Client,           // Main Discord client class
-  GatewayIntentBits, // Gateway event subscriptions
-  Partials,         // Partial data structures for uncached entities
-  Events,           // Event type constants
-  EmbedBuilder,     // Rich embed message constructor
-  ActionRowBuilder, // Action row for buttons
-  ButtonBuilder,    // Button constructor
-  ButtonStyle,      // Button style constants
-  ComponentType,    // Component type constants
-  Options,          // Cache configuration options
+  Client,
+  GatewayIntentBits,
+  Partials,
+  Events,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  Options,
 } = require("discord.js");
 
 // External dependencies
-const fs = require("fs");             // File system operations
-const http = require("http");         // HTTP server for health checks
-const levenshtein = require("fast-levenshtein"); // Fuzzy string matching
+const fs = require("fs");
+const http = require("http");
+const path = require("path");
+const { spawn } = require("child_process");
+const v8 = require("v8");
+const levenshtein = require("fast-levenshtein");
 
 // Internal modules - Core systems
-const bidding = require("./bidding.js");                    // Auction bidding logic
-const helpSystem = require("./help-system.js");             // Command help system (legacy)
-const helpSystemV2 = require("./help-system-v2.js");        // NEW: Channel-aware help system
-const auctioneering = require("./auctioneering.js");        // Auction management
-const attendance = require("./attendance.js");              // Attendance tracking
-const bossTimer = require("./boss-timer.js");              // Boss timer system
-const bossTimerCommands = require("./boss-timer-commands.js"); // Boss timer commands
-const emergencyCommands = require("./emergency-commands.js"); // Emergency overrides
-const leaderboardSystem = require("./leaderboard-system.js"); // Leaderboards
-const errorHandler = require('./utils/error-handler');      // Centralized error handling
-const { SheetAPI, clientCache } = require('./utils/sheet-api');          // Unified Google Sheets API + cache
-const { DiscordCache } = require('./utils/discord-cache');  // Channel caching system
-const { normalizeUsername, findBossMatch, normalizeTimestamp } = require('./utils/common');    // Username normalization and boss matching
-const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images'); // Boss images utility
-const { addGuildFooter, addGuildThumbnail } = require('./utils/embed-branding'); // Guild branding utility
-const scheduler = require('./utils/maintenance-scheduler'); // Unified maintenance scheduler
-const timerRegistry = require('./utils/timer-registry'); // Centralized timer tracking
-// ❌ REMOVED: Abolished systems (intelligence-engine, proactive-intelligence, nlp-*, ml-integration, loot-system)
-const eventReminders = require('./event-reminders.js'); // Game Event Reminder System
-const bossRotation = require('./boss-rotation.js'); // Boss Rotation System (5-guild tracking)
-const coreEvaluation = null; // DISABLED: require('./core-evaluation.js'); // Core Member Evaluation System
-const activityHeatmap = require('./activity-heatmap.js'); // Activity Heatmap System
-const crashRecovery = require('./utils/crash-recovery.js'); // Crash Recovery System (state persistence)
-const dbAPI = require('./utils/database-api'); // MongoDB Database API
-const mongoHelpers = require('./utils/mongodb-helpers'); // MongoDB helper functions (Phase 4)
-const memberLore = JSON.parse(fs.readFileSync("./member-lore.json")); // Member lore data
-const { COMMAND_ALIASES, resolveCommandAlias } = require('./config/command-aliases'); // Command alias mapping
-const bossSpawnConfig = JSON.parse(fs.readFileSync("./boss_spawn_config.json")); // Boss spawn configuration
-const BackgroundSync = require('./services/background-sync'); // Background MongoDB → Sheets sync (Phase 5.1)
-const reports = require('./services/reports'); // Weekly & monthly reports (Phase 6)
+const bidding = require("./bidding.js");
+const helpSystemV2 = require("./help-system-v2.js");
+const auctioneering = require("./auctioneering.js");
+const attendance = require("./attendance.js");
+const bossTimer = require("./boss-timer.js");
+const bossTimerCommands = require("./boss-timer-commands.js");
+const emergencyCommands = require("./emergency-commands.js");
+const leaderboardSystem = require("./leaderboard-system.js");
+const errorHandler = require('./utils/error-handler');
+const { SheetAPI, clientCache } = require('./utils/sheet-api');
+const { DiscordCache } = require('./utils/discord-cache');
+const { createCommandHandlers } = require('./bot/command-handlers');
+const { normalizeUsername, findBossMatch, normalizeTimestamp } = require('./utils/common');
+const { getBossImageAttachment, getBossImageAttachmentURL } = require('./utils/boss-images');
+const { addGuildFooter, addGuildThumbnail } = require('./utils/embed-branding');
+const scheduler = require('./utils/maintenance-scheduler');
+const timerRegistry = require('./utils/timer-registry');
+const eventReminders = require('./services/event-reminders');
+const bossRotation = require('./boss-rotation.js');
+const activityHeatmap = require('./activity-heatmap.js');
+const crashRecovery = require('./utils/crash-recovery.js');
+const dbAPI = require('./utils/database-api');
+const mongoHelpers = require('./utils/mongodb-helpers');
+const memberLore = JSON.parse(fs.readFileSync("./member-lore.json"));
+const { COMMAND_ALIASES, resolveCommandAlias } = require('./config/command-aliases');
+const bossSpawnConfig = JSON.parse(fs.readFileSync("./boss_spawn_config.json"));
+const reports = require('./services/reports');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PHASE 1 CRITICAL FIXES - Graceful Shutdown & Resource Management
 // ═══════════════════════════════════════════════════════════════════════════
-const shutdownManager = require('./utils/shutdown-manager'); // CRIT-001: Timer cleanup & graceful shutdown
-const DualWriteManager = require('./utils/dual-write-manager'); // CRIT-003: Data loss prevention
+const shutdownManager = require('./utils/shutdown-manager');
 
 // PHASE 3.3 - Internal Discord Monitoring
-// ═══════════════════════════════════════════════════════════════════════════
 const discordMonitoring = require('./utils/discord-monitoring');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SLASH COMMANDS - Phase 1 Implementation
 // ═══════════════════════════════════════════════════════════════════════════
-const { registerCommands } = require('./commands/register-commands'); // Slash command registration
-const { handleSlashCommand } = require('./commands/handlers'); // Slash command handlers
-const { handleAutocomplete } = require('./commands/autocomplete'); // Autocomplete handlers
+const { registerCommands } = require('./commands/register-commands');
+const { handleSlashCommand } = require('./commands/handlers');
+const { handleAutocomplete } = require('./commands/autocomplete');
 const alterFrierenConfig = require('./config/alterfrieren-dm.json');
 
-// =====================================================================
-// SECTION 1B: COMMAND ALIASES (moved to config/command-aliases.js)
-// =====================================================================
-// The COMMAND_ALIASES constant has been extracted to ./config/command-aliases.js
-// for better maintainability. Import above provides access to both
-// COMMAND_ALIASES and resolveCommandAlias function.
-
+// ═══════════════════════════════════════════════════════════════════════════
+// EXTRACTED MODULES - All modular extractions from index2.js
+// ═══════════════════════════════════════════════════════════════════════════
+const stateManager = require('./utils/state-manager');
+const {
+  config,
+  guildName,
+  bossPoints,
+  ALTERFRIEREN_ID,
+  ROHYPnol_ID,
+  AUCTION_COOLDOWN,
+  BIDDING_CHANNEL_CLEANUP_INTERVAL,
+  BOT_VERSION,
+  BOT_START_TIME,
+  TIMING,
+  USE_MONGODB_ATTENDANCE,
+} = require('./bot/config');
+const client = require('./bot/client');
+const { createHealthServer } = require('./bot/health-server');
+const {
+  isAdmin,
+  hasElysiumRole,
+  recoverBotStateOnStartup,
+  moveQueueItemsToSheet,
+} = require('./bot/member-utils');
+const { createDisabledRow, awaitConfirmation } = require('./bot/confirm-utils');
+const { createMessageHandler } = require('./bot/message-handler');
+const { createInteractionHandler } = require('./bot/interaction-handler');
+const { createReactionHandler } = require('./bot/reaction-handler');
+const { createVoiceStateHandler } = require('./bot/events/voice-state');
+const { createThreadUpdateHandler } = require('./bot/events/thread-update');
+const { registerErrorHandlers } = require('./bot/events/error-handlers');
+const { registerShutdownHandlers } = require('./bot/shutdown');
+const { onClientReady } = require('./bot/init');
 
 // =====================================================================
 // CONFIGURATION LOADING
 // =====================================================================
 
-/**
- * Bot configuration loaded from config.json and environment variables
- * Environment variables take precedence over config.json values
- * Contains Discord IDs, API endpoints, and bot settings
- * @type {Object}
- */
-const config = (() => {
-  const fileConfig = JSON.parse(fs.readFileSync("./config.json"));
+// ═══════════════════════════════════════════════════════════════════════════
+// SPECIAL USER IDS & DM CONFIG (remaining local state)
+// ═══════════════════════════════════════════════════════════════════════════
+// Note: ALTERFRIEREN_ID and ROHYPnol_ID are imported from bot/config.js
+// lastAlterFrierenDM, ALTERFRIEREN_DM_COOLDOWN, and recentPlayfulDMs
+// are now internal to bot/events/voice-state.js
 
-  // Merge environment variables with file config
-  // Environment variables take precedence
-  return {
-    ...fileConfig,
-    // Discord bot token from environment (required for Koyeb deployment)
-    token: process.env.DISCORD_TOKEN || fileConfig.token,
-    // HTTP server port from environment (used for health checks)
-    port: process.env.PORT || fileConfig.port || 3000,
-    // Node environment
-    node_env: process.env.NODE_ENV || fileConfig.node_env || 'production'
-  };
-})();
-
-// Guild name from config
-const guildName = config.guild_name || 'TrailerParkB';
-
-// =====================================================================
-// SPECIAL USER IDS & DM CONFIG
-// =====================================================================
-const ALTERFRIEREN_ID = '517653312783253505';
-const ROHYPnol_ID = '182081219062661120';
-let lastAlterFrierenDM = 0;
-const ALTERFRIEREN_DM_COOLDOWN = 60000; // 1 minute cooldown
-
-// =====================================================================
+// ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION VALIDATION
-// =====================================================================
+// ═══════════════════════════════════════════════════════════════════════════
+// validateConfig() is called from within bot/config.js at require time.
+// If validation fails, process.exit(1) is called immediately.
 
-/**
- * Validates required configuration fields at startup
- * Prevents late failures and provides clear error messages
- * @throws {Error} If any required field is missing
- */
-function validateConfig() {
-  const requiredFields = {
-    // Discord Bot Token
-    'token': 'Discord bot token',
-    // Guild & Channel IDs
-    'main_guild_id': 'Main guild ID',
-    'attendance_channel_id': 'Attendance channel ID',
-    'admin_logs_channel_id': 'Admin logs channel ID',
-    'bidding_channel_id': 'Bidding channel ID',
-    'elysium_commands_channel_id': 'Elysium commands channel ID',
-    // Role IDs
-    'elysium_role': 'Elysium role name',
-    'admin_roles': 'Admin roles array',
-    // Google Sheets Integration
-    'sheet_webhook_url': 'Google Sheets webhook URL'
-  };
-
-  const missing = [];
-  const invalid = [];
-
-  for (const [field, description] of Object.entries(requiredFields)) {
-    if (!config[field]) {
-      missing.push(`  ❌ ${field} (${description})`);
-    } else if (field === 'admin_roles' && !Array.isArray(config[field])) {
-      invalid.push(`  ⚠️ ${field} must be an array`);
-    } else if (field === 'sheet_webhook_url' && !config[field].startsWith('http')) {
-      invalid.push(`  ⚠️ ${field} must be a valid URL`);
-    }
-  }
-
-  if (missing.length > 0 || invalid.length > 0) {
-    mainLogger.error('CONFIGURATION ERROR - Missing or invalid configuration fields');
-    if (missing.length > 0) {
-      mainLogger.error('Missing required fields:', { missing });
-    }
-    if (invalid.length > 0) {
-      mainLogger.error('Invalid field values:', { invalid });
-    }
-    mainLogger.error('Please check your config.json file');
-    process.exit(1);
-  }
-
-  mainLogger.info('Configuration validated successfully');
-}
-
-// Run validation immediately
-validateConfig();
-
-/**
- * Unified Google Sheets API client instance
- * Provides centralized access to Google Sheets with retry logic
- * @type {SheetAPI}
- */
+// ═══════════════════════════════════════════════════════════════════════════
+// GOOGLE SHEETS API
+// ═══════════════════════════════════════════════════════════════════════════
 const sheetAPI = new SheetAPI(config.sheet_webhook_url);
 
-/**
- * Feature flag: Enable MongoDB for bidding operations (Phase 4)
- * When true, commands like !mypoints, !stats, !leaderboard use MongoDB instead of Sheets
- * @type {boolean}
- */
-const USE_MONGODB_BIDDING = process.env.USE_MONGODB_BIDDING === 'true';
-
-/**
- * Feature flag: Enable MongoDB for attendance operations (Phase 4.5)
- * When true, commands like !stats use MongoDB for attendance data instead of Sheets
- * @type {boolean}
- */
-const USE_MONGODB_ATTENDANCE = process.env.USE_MONGODB_ATTENDANCE === 'true';
-
-/**
- * Global Discord channel cache instance
- * Reduces redundant channel fetch calls by 60-80%
- * @type {DiscordCache|null}
- */
+// ═══════════════════════════════════════════════════════════════════════════
+// DISCORD CHANNEL CACHE
+// ═══════════════════════════════════════════════════════════════════════════
 let discordCache = null;
 
-/**
- * Boss point values loaded from boss_points.json
- * Maps boss names to point rewards for attendance
- * @type {Object.<string, number>}
- */
-const bossPoints = JSON.parse(fs.readFileSync("./boss_points.json"));
-
-/**
- * Slap command responses loaded from slap-responses.json
- * Contains arrays of funny objects and actions for the !slap command
- * @type {Object.<string, Array<string>>}
- */
-const slapResponses = JSON.parse(fs.readFileSync("./slap-responses.json"));
-
-// =====================================================================
-// SECTION 2: DISCORD CLIENT INITIALIZATION
-// =====================================================================
-
-/**
- * Discord client instance with optimized memory management.
- *
- * Configuration priorities:
- * - Memory efficiency: Aggressive cache sweeping for 256MB environments
- * - Required intents: Guild management, messages, reactions, members
- * - Partial support: Enables handling of uncached entities
- *
- * @type {Client}
- * @constant
- */
-const client = new Client({
-  // Gateway intents - subscriptions to Discord events
-  intents: [
-    GatewayIntentBits.Guilds,              // Guild/server events
-    GatewayIntentBits.GuildMessages,       // Message events in guilds
-    GatewayIntentBits.MessageContent,      // Access to message content
-    GatewayIntentBits.GuildMessageReactions, // Reaction events
-    GatewayIntentBits.GuildMembers,        // Member events and data
-    GatewayIntentBits.DirectMessages,      // DM support
-    GatewayIntentBits.GuildVoiceStates,     // Voice channel state events
-  ],
-
-  // Partials - handle uncached entities
-  partials: [Partials.Channel, Partials.Message, Partials.Reaction],
-
-  // WebSocket options - increase timeouts to handle network instability
-  ws: {
-    handshakeTimeout: 60000, // 60 seconds (default is 30s)
-  },
-
-  // REST options - increase timeout for API requests
-  rest: {
-    timeout: 60000, // 60 seconds timeout for REST API requests
-    retries: 5,     // Retry failed requests up to 5 times
-  },
-
-  // Cache size limits to prevent unbounded memory growth (512MB environment)
-  makeCache: Options.cacheWithLimits({
-    ...Options.DefaultMakeCacheSettings,
-    MessageManager: 200,        // Limit messages per channel (down from default 200)
-    GuildMemberManager: 100,    // Limit cached members per guild (down from unlimited)
-    UserManager: 100,           // Limit cached users (down from unlimited)
-    ReactionManager: 50,        // Limit reactions per message
-    ReactionUserManager: 50,    // Limit users per reaction
-  }),
-
-  // Memory optimization: Sweep caches regularly to manage 512MB RAM limit
-  // Optimized for fast message cleanup while maintaining reaction functionality
-  sweepers: {
-    messages: {
-      interval: 180, // Run every 3 minutes (more aggressive)
-      lifetime: 300, // Remove messages older than 5 minutes (more aggressive)
-    },
-    users: {
-      interval: 300, // Run every 5 minutes (more aggressive)
-      // Remove bot users except self to reduce memory
-      filter: () => (user) => user.bot && user.id !== client.user?.id,
-    },
-    guildMembers: {
-      interval: 300, // Run every 5 minutes (more aggressive)
-      // Remove members not seen recently, keep self
-      filter: () => {
-        const now = Date.now();
-        return (member) => {
-          if (member.id === client.user?.id) return false; // Keep self
-          // Remove members not accessed in last 10 minutes
-          return now - (member._cacheTime || 0) > 600000;
-        };
-      },
-    },
-    // Add thread sweeper to clean up old threads
-    threads: {
-      interval: 600, // Every 10 minutes
-      lifetime: 1800, // Remove threads older than 30 minutes
-    },
-  },
-});
-
-// =====================================================================
-// SECTION 3: CONSTANTS & STATE MANAGEMENT
-// =====================================================================
-
-/**
- * Current bot version number
- * @type {string}
- * @constant
- */
-const BOT_VERSION = "8.1";
-
-/**
- * Bot startup timestamp for uptime calculations
- * @type {number}
- * @constant
- */
-const BOT_START_TIME = Date.now();
-
-/**
- * HTTP health check server port
- * Reads from environment variable PORT, then config.port, then defaults to 3000
- * @type {number}
- * @constant
- */
-const PORT = config.port;
-
-/**
- * Timing constants for rate limiting and delays (all values in milliseconds)
- *
- * @type {Object}
- * @constant
- * @property {number} MIN_SHEET_DELAY - Minimum delay between Google Sheets API calls
- * @property {number} OVERRIDE_COOLDOWN - Cooldown period for admin overrides
- * @property {number} CONFIRMATION_TIMEOUT - How long to wait for confirmation reactions
- * @property {number} RETRY_DELAY - Delay before retrying failed operations
- * @property {number} MASS_CLOSE_DELAY - Delay between threads in mass close operations
- * @property {number} REACTION_RETRY_ATTEMPTS - Number of times to retry reaction operations
- * @property {number} REACTION_RETRY_DELAY - Delay between reaction retry attempts
- */
-const TIMING = {
-  MIN_SHEET_DELAY: 2000,          // 2 seconds - prevents rate limiting
-  OVERRIDE_COOLDOWN: 10000,        // 10 seconds - admin action cooldown
-  CONFIRMATION_TIMEOUT: 30000,     // 30 seconds - user has 30s to confirm
-  RETRY_DELAY: 5000,               // 5 seconds - wait before retrying
-  MASS_CLOSE_DELAY: 3000,          // 3 seconds - spacing for mass operations
-  REACTION_RETRY_ATTEMPTS: 3,      // Try up to 3 times
-  REACTION_RETRY_DELAY: 1000,      // 1 second between retries
-};
-
-// =====================================================================
-// STATE VARIABLES
-// =====================================================================
-// These track active operations and cached data in memory
-
-/**
- * Maps thread IDs to spawn information
- * @type {Object.<string, Object>}
- * @property {string} boss - Boss name
- * @property {string} timestamp - Spawn timestamp
- * @property {string[]} members - List of verified members
- * @property {boolean} closed - Whether spawn is closed
- * @property {string} confirmThreadId - Confirmation thread ID
- */
-let activeSpawns = {};
-
-/**
- * Maps column identifiers to Google Sheets column assignments
- * Prevents duplicate column allocations for the same boss/timestamp
- * @type {Object.<string, string>}
- */
-let activeColumns = {};
-
-/**
- * Tracks pending member verifications awaiting admin approval
- * @type {Object.<string, Object>}
- * @property {string} threadId - Thread where verification is pending
- * @property {string} author - Username requesting verification
- * @property {string} userId - Discord user ID
- */
-let pendingVerifications = {};
-
-/**
- * Tracks pending spawn closure confirmations
- * @type {Object.<string, Object>}
- * @property {string} threadId - Thread being closed
- * @property {string} adminId - Admin who initiated closure
- * @property {string} type - Closure type ('close', 'forceclose', etc.)
- */
-let pendingClosures = {};
-
-/**
- * Maps thread IDs to confirmation message IDs for cleanup
- * @type {Object.<string, string[]>}
- */
-let confirmationMessages = {};
-
-/**
- * Timestamp of last Google Sheets API call (for rate limiting)
- * @type {number}
- */
+// ═══════════════════════════════════════════════════════════════════════════
+// REMAINING STATE VARIABLES (not in stateManager)
+// ═══════════════════════════════════════════════════════════════════════════
 let lastSheetCall = 0;
-
-/**
- * Timestamp of last admin override action (for cooldown)
- * @type {number}
- */
 let lastOverrideTime = 0;
-
-/**
- * Cache for member stats to reduce Google Sheets API calls
- * @type {Map<string, {data: Object, timestamp: number}>}
- * Format: { memberName: { data: statsObject, timestamp: Date.now() } }
- * Cache duration: 5 minutes (300000ms)
- */
+let lastAuctionEndTime = 0;
+let isRecovering = false;
+let isBidProcessing = false;
+let biddingChannelCleanupTimer = null;
 const statsCache = new Map();
-const STATS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const STATS_CACHE_DURATION = 5 * 60 * 1000;
+const PORT = config.port;
 
 /**
  * Cleanup expired entries from statsCache
@@ -498,839 +210,31 @@ function cleanupStatsCache() {
   }
 }
 
-// Run cleanup every 10 minutes (PHASE 1: Register with shutdown manager)
+// Run cleanup every 10 minutes
 const statsCleanupTimer = setInterval(cleanupStatsCache, 10 * 60 * 1000);
 shutdownManager.registerInterval('stats-cache-cleanup', statsCleanupTimer, { frequency: '10 minutes' });
 
-/**
- * Timestamp when last auction ended (for cooldown enforcement)
- * @type {number}
- */
-let lastAuctionEndTime = 0;
-
-
-
-
-
-/**
- * Flag indicating bot is currently recovering from a crash
- * @type {boolean}
- */
-let isRecovering = false;
-
-/**
- * Flag preventing concurrent bid processing
- * @type {boolean}
- */
-let isBidProcessing = false;
-
-/**
- * Timer reference for bidding channel cleanup scheduler
- * @type {NodeJS.Timeout|null}
- */
-let biddingChannelCleanupTimer = null;
-
-/**
- * Track last 8 playful DMs sent to prevent repeats
- * @type {string[]}
- */
-let recentPlayfulDMs = [];
-
-/**
- * Cooldown period after auction ends before new auction can start (10 minutes)
- * @type {number}
- * @constant
- */
-const AUCTION_COOLDOWN = 10 * 60 * 1000;
-
-/**
- * Interval for bidding channel cleanup operations (12 hours)
- * @type {number}
- * @constant
- */
-const BIDDING_CHANNEL_CLEANUP_INTERVAL = 12 * 60 * 60 * 1000;
-
 // =====================================================================
-// SECTION 4: HTTP HEALTH CHECK SERVER
+// HTTP HEALTH CHECK SERVER
 // =====================================================================
 
-/**
- * HTTP server for health monitoring and uptime checks.
- * Provides status endpoint for external monitoring services (e.g., UptimeRobot).
- *
- * Endpoints:
- * - GET /health - Returns JSON with bot status and metrics
- * - GET / - Same as /health
- *
- * @type {http.Server}
- * @constant
- */
-const server = http.createServer(async (req, res) => {
-  // Health check endpoint - returns bot status and metrics
-  if (req.url === "/health" || req.url === "/") {
-    // PHASE 2.5: Enhanced health check with MongoDB metrics
-    // PHASE 3.3: Added memory and cache metrics
-    const healthData = {
-      status: "healthy",
-      version: BOT_VERSION,
-      uptime: process.uptime(),
-      bot: client.user ? client.user.tag : "not ready",
-      activeSpawns: Object.keys(activeSpawns).length,
-      pendingVerifications: Object.keys(pendingVerifications).length,
-      timestamp: new Date().toISOString(),
-    };
-
-    // PHASE 3.3: Add memory metrics
-    const memUsage = process.memoryUsage();
-    const formatBytes = (bytes) => {
-      const mb = bytes / 1024 / 1024;
-      return `${Math.round(mb * 10) / 10} MB`;
-    };
-
-    healthData.memory = {
-      heapUsed: formatBytes(memUsage.heapUsed),
-      heapTotal: formatBytes(memUsage.heapTotal),
-      heapUsedPercent: Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100) + '%',
-      rss: formatBytes(memUsage.rss), // Resident Set Size (total memory)
-      external: formatBytes(memUsage.external),
-      arrayBuffers: formatBytes(memUsage.arrayBuffers || 0)
-    };
-
-    // PHASE 3.3: Add cache statistics
-    try {
-      const reportsCacheStats = reports.getCacheStats();
-      const attendanceCacheStats = attendance.getCacheStats();
-
-      healthData.caches = {
-        reports: reportsCacheStats,
-        attendance: attendanceCacheStats
-      };
-    } catch (cacheError) {
-      healthData.caches = { error: 'Cache stats unavailable' };
-    }
-
-    // Add MongoDB health metrics
-    try {
-      if (dbAPI.connected && dbAPI.db) {
-        const mongoStartTime = Date.now();
-
-        // Test MongoDB connection with a ping
-        await dbAPI.db.admin().ping();
-        const mongoLatency = Date.now() - mongoStartTime;
-
-        // Get collection stats
-        const collections = await dbAPI.db.listCollections().toArray();
-        const collectionNames = collections.map(c => c.name);
-
-        // Get document counts for key collections
-        const collectionStats = {};
-        for (const collName of ['attendance', 'bosses', 'members', 'event_reminders', 'boss_timers']) {
-          if (collectionNames.includes(collName)) {
-            try {
-              const count = await dbAPI.db.collection(collName).estimatedDocumentCount();
-              const stats = await dbAPI.db.collection(collName).stats();
-              collectionStats[collName] = {
-                documents: count,
-                sizeBytes: stats.size,
-                avgDocSize: stats.avgObjSize || 0,
-              };
-            } catch (err) {
-              // Collection might not exist or stats unavailable
-              collectionStats[collName] = { error: 'unavailable' };
-            }
-          }
-        }
-
-        // Get database stats
-        const dbStats = await dbAPI.db.stats();
-
-        healthData.mongodb = {
-          connected: true,
-          latencyMs: mongoLatency,
-          database: dbAPI.db.databaseName,
-          collections: {
-            total: collections.length,
-            names: collectionNames,
-            stats: collectionStats,
-          },
-          database_stats: {
-            sizeBytes: dbStats.dataSize,
-            storageSizeBytes: dbStats.storageSize,
-            indexes: dbStats.indexes,
-            indexSizeBytes: dbStats.indexSize,
-          },
-        };
-      } else {
-        healthData.mongodb = {
-          connected: false,
-          reason: 'not_initialized',
-        };
-      }
-    } catch (mongoError) {
-      healthData.mongodb = {
-        connected: false,
-        error: mongoError.message,
-      };
-    }
-
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(healthData, null, 2));
-  } else {
-    // Return 404 for all other routes
-    res.writeHead(404);
-    res.end("Not Found");
-  }
+const server = createHealthServer(client, config, {
+  botVersion: BOT_VERSION,
+  botStartTime: BOT_START_TIME,
+  stateManager,
+  dbAPI,
+  reportsGetCacheStats: () => reports.getCacheStats(),
+  attendanceGetCacheStats: () => attendance.getCacheStats(),
 });
 
-// Start HTTP server on configured port
-server.listen(PORT, () =>
-  console.log(`🌐 Health check server on port ${PORT}`)
-);
-
 // =====================================================================
-// SECTION 5: UTILITY FUNCTIONS
+// UTILITY FUNCTIONS (kept inline - used by command-handlers)
 // =====================================================================
 
-/**
- * Recovers bot state after unexpected crashes or restarts.
- *
- * Recovery process:
- * 1. Checks Google Sheets for any active auction state
- * 2. If crashed auction found, finalizes the current item
- * 3. Moves unfinished queue items back to BiddingItems sheet
- * 4. Notifies admins of recovery status
- * 5. Sets cooldown to prevent immediate auction restart
- *
- * This function is critical for maintaining data integrity after crashes,
- * ensuring no auction items or bids are lost.
- *
- * @async
- * @param {Client} client - Discord client instance
- * @param {Object} config - Bot configuration object
- * @returns {Promise<void>}
- *
- * @example
- * await recoverBotStateOnStartup(client, config);
- */
-async function recoverBotStateOnStartup(client, config) {
-  console.log(`🔄 Checking for crashed state...`);
+// isAdmin, hasElysiumRole, recoverBotStateOnStartup, moveQueueItemsToSheet,
 
-  const savedState = await bidding.loadBiddingStateFromSheet(
-    config.sheet_webhook_url
-  );
-  if (!savedState || !savedState.activeAuction) {
-    console.log(`✅ No crashed state found, starting fresh`);
-    return;
-  }
 
-  console.log(`⚠️ Found crashed auction state, recovering...`);
-
-  const adminLogs = await discordCache.getChannel('admin_logs_channel_id').catch(() => null);
-
-  if (adminLogs) {
-    await adminLogs.send({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(0xffa500)
-          .setTitle(`🔄 Bot Recovery Started`)
-          .setDescription(`Recovering crashed auction state...`)
-          .setFooter({ text: `Please wait, this may take a moment...` })
-          .setTimestamp(),
-      ],
-    });
-  }
-
-  // Recover and finalize crashed auction
-  const auctState = savedState.activeAuction;
-  if (auctState && auctState.curWin) {
-    const sessionItems = [];
-    sessionItems.push({
-      item: auctState.item,
-      winner: auctState.curWin,
-      winnerId: auctState.curWinId,
-      amount: auctState.curBid,
-      source: auctState.source || "Recovered",
-      timestamp: new Date().toISOString(),
-    });
-
-    // If there are unfinished queue items, move them to BiddingItems sheet
-    const unfinishedQueue = savedState.queue || [];
-    if (unfinishedQueue.length > 0) {
-      console.log(
-        `📋 Moving ${unfinishedQueue.length} unfinished queue items to BiddingItems sheet`
-      );
-      await moveQueueItemsToSheet(config, unfinishedQueue);
-    }
-
-    // Submit tally
-    console.log(`💾 Submitting recovered session tally...`);
-    await bidding.submitSessionTally(config, sessionItems);
-
-    if (adminLogs) {
-      await adminLogs.send({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(0x00ff00)
-            .setTitle(`✅ Recovery Complete`)
-            .setDescription(
-              `Finished item: **${auctState.item}**\nWinner: ${auctState.curWin}\nBid: ${auctState.curBid}pts`
-            )
-            .addFields({
-              name: `📋 Unfinished Items`,
-              value: `${unfinishedQueue.length} item(s) moved to BiddingItems sheet`,
-              inline: false,
-            })
-            .setFooter({ text: `Ready for next !startauction` })
-            .setTimestamp(),
-        ],
-      });
-    }
-  }
-
-  lastAuctionEndTime = Date.now();
-  console.log(`✅ Recovery complete, cooldown started`);
-}
-
-/**
- * Moves unfinished auction queue items back to the BiddingItems sheet.
- *
- * Called during recovery to preserve queue items that weren't auctioned
- * before a crash. Items are appended to the BiddingItems sheet for future
- * auction sessions.
- *
- * @async
- * @param {Object} config - Bot configuration object with sheet_webhook_url
- * @param {Array<Object>} queueItems - Array of queue items to move
- * @param {string} queueItems[].item - Item name
- * @param {string} queueItems[].source - Item source/origin
- * @param {number} queueItems[].startBid - Starting bid amount
- * @returns {Promise<void>}
- * @throws {Error} When API call fails
- *
- * @example
- * await moveQueueItemsToSheet(config, [{item: "Sword", source: "Dragon", startBid: 100}]);
- */
-async function moveQueueItemsToSheet(config, queueItems) {
-  try {
-    await sheetAPI.call('moveQueueItemsToSheet', {
-      items: queueItems,
-    });
-
-    console.log(`✅ Queue items moved to sheet`);
-  } catch (e) {
-    console.error(`❌ Move items error:`, e);
-  }
-}
-
-// resolveCommandAlias function has been moved to ./config/command-aliases.js
-// It is imported at the top of this file.
-
-/**
- * Checks if a guild member has admin privileges.
- *
- * Determines admin status by checking if the member has any of the
- * roles listed in config.admin_roles. This is used throughout the bot
- * to restrict access to administrative commands.
- *
- * @param {GuildMember} member - Discord guild member to check
- * @returns {boolean} True if member has admin role, false otherwise
- *
- * @example
- * if (isAdmin(message.member)) {
- *   // Execute admin-only command
- * }
- */
-function isAdmin(member) {
-  if (!member) return false;
-  
-  // Get ONLY admin role IDs (not all role IDs including member role)
-  const adminRoleIds = [
-    config.role_ids?.admins,
-    config.role_ids?.x,
-    config.role_ids?.guild_leader,
-    config.role_ids?.elites
-  ].filter(Boolean); // Remove undefined values
-  
-  const roleNames = config.admin_roles || [];
-  
-  return member.roles.cache.some((r) => 
-    roleNames.includes(r.name) || 
-    adminRoleIds.includes(r.id)
-  );
-}
-
-/**
- * Check if member has guild role
- * @param {GuildMember} member - Discord guild member
- * @returns {boolean} - True if member has guild role
- */
-function hasElysiumRole(member) {
-  if (!member) return false;
-  
-  const roleName = config.elysium_role;
-  const roleId = config.elysium_role_id || config.role_ids?.member;
-  
-  return member.roles.cache.some((r) => 
-    r.name === roleName || 
-    r.id === roleId
-  );
-}
-
-/**
- * Collect all unique channel IDs from the test-send collections.
- * @returns {Promise<Set<string>>}
- */
-async function collectTestSendChannelIds() {
-  const db = await dbAPI.connect();
-  const channelIds = new Set();
-  const collectionNames = ['attendance-TPB', 'members-TPB', 'auctionItems-TPB'];
-
-  for (const collectionName of collectionNames) {
-    try {
-      const docs = await db.collection(collectionName)
-        .find({}, { projection: { channelId: 1, channel_id: 1 } })
-        .toArray();
-
-      docs.forEach((doc) => {
-        if (doc?.channelId) channelIds.add(String(doc.channelId));
-        if (doc?.channel_id) channelIds.add(String(doc.channel_id));
-      });
-    } catch (error) {
-      console.warn(`⚠️ Could not read collection ${collectionName}: ${error.message}`);
-    }
-  }
-
-  return channelIds;
-}
-
-/**
- * Send the test embed message to all recorded channels and schedule cleanup.
- * @param {Guild} guild
- * @param {Client} client
- * @returns {Promise<Object>}
- */
-async function performTestSend(guild, client) {
-  if (!guild) {
-    return { error: 'Guild context is required.' };
-  }
-
-  const channelIds = await collectTestSendChannelIds();
-  if (channelIds.size === 0) {
-    return { warning: '⚠️ No channels have been recorded yet.' };
-  }
-
-  const testEmbed = new EmbedBuilder()
-    .setColor(0xFFA500)
-    .setTitle('🔧 THIS IS A TEST')
-    .setDescription('This is a test message to verify the bot is working correctly.')
-    .addFields(
-      { name: 'Status', value: '✅ Working', inline: true },
-      { name: 'Channels Tested', value: `${channelIds.size}`, inline: true },
-      { name: 'Timestamp', value: new Date().toLocaleString(), inline: false }
-    )
-    .setFooter({ text: 'Test message - will auto-delete in 2 minutes' })
-    .setTimestamp();
-
-  const results = [];
-  for (const channelId of channelIds) {
-    try {
-      const channel = await client.channels.fetch(channelId).catch(() => null);
-      if (!channel || !channel.isTextBased()) {
-        results.push({ channelId, status: 'failed', error: 'Channel not found or not text-based.' });
-        continue;
-      }
-
-      const msg = await channel.send({ embeds: [testEmbed] });
-      results.push({ channelId, status: 'sent', messageId: msg.id });
-
-      setTimeout(async () => {
-        try {
-          await msg.delete();
-          console.log(`✅ Test message deleted from channel ${channelId}`);
-        } catch (deleteError) {
-          console.warn(`⚠️ Could not delete test message from ${channelId}: ${deleteError.message}`);
-        }
-      }, 120000);
-    } catch (error) {
-      results.push({ channelId, status: 'failed', error: error.message });
-    }
-  }
-
-  const successCount = results.filter((item) => item.status === 'sent').length;
-  return {
-    success: true,
-    successCount,
-    failedCount: results.length - successCount,
-    channels: results
-  };
-}
-
-// =====================================================================
-// SECTION 6: BIDDING CHANNEL CLEANUP
-// =====================================================================
-
-/**
- * Performs comprehensive cleanup of the bidding channel.
- *
- * Cleanup operations:
- * 1. Thread Management:
- *    - Locks all active auction threads (prevents new messages)
- *    - Archives threads to remove from active list
- *    - Processes both active and archived threads
- *    - Skips cleanup if auction is currently active
- *
- * 2. Message Cleanup:
- *    - Deletes non-admin, non-bot messages
- *    - Preserves admin messages and bot messages
- *    - Rate-limited to prevent Discord API issues
- *    - Processes up to 5000 messages (50 batches of 100)
- *
- * Safety features:
- * - Will not run during active auctions (prevents interference)
- * - Rate limiting: 500ms between operations
- * - Batch processing to handle large message volumes
- * - Error handling with detailed logging
- *
- * This function is critical for maintaining a clean bidding channel
- * by removing clutter from previous auctions.
- *
- * @async
- * @returns {Promise<void>}
- * @throws {Error} Logs errors but does not throw (fail-safe design)
- *
- * @example
- * await cleanupBiddingChannel();
- */
-async function cleanupBiddingChannel() {
-  try {
-    console.log(`🧹 Starting bidding channel cleanup...`);
-
-    const guild = await client.guilds
-      .fetch(config.main_guild_id)
-      .catch(() => null);
-    if (!guild) {
-      console.error(`❌ Could not fetch guild for cleanup`);
-      return;
-    }
-
-    const biddingChannel = await guild.channels
-      .fetch(config.bidding_channel_id)
-      .catch(() => null);
-    if (!biddingChannel) {
-      console.error(`❌ Could not fetch bidding channel for cleanup`);
-      return;
-    }
-
-    // ========================================
-    // CLEANUP OLD THREADS (Lock & Archive)
-    // ========================================
-    console.log(`🧵 Checking for old auction threads...`);
-
-    // Check if there's an active auction session
-    const auctionState = auctioneering.getAuctionState();
-    const hasActiveAuction = auctionState && auctionState.active;
-
-    let threadsLocked = 0;
-    let threadsArchived = 0;
-    let threadsSkipped = 0;
-
-    if (hasActiveAuction) {
-      console.log(
-        `⚠️ Active auction detected - skipping thread cleanup to avoid interfering`
-      );
-    } else {
-      try {
-        // Fetch all active threads in the bidding channel
-        const activeThreads = await biddingChannel.threads
-          .fetchActive()
-          .catch(() => null);
-
-        if (activeThreads && activeThreads.threads.size > 0) {
-          console.log(
-            `📋 Found ${activeThreads.threads.size} active thread(s) in bidding channel`
-          );
-
-          for (const [threadId, thread] of activeThreads.threads) {
-            try {
-              // Skip specific threads that should never be locked
-              if (config.protected_thread_ids && config.protected_thread_ids.includes(threadId)) {
-                threadsSkipped++;
-                console.log(`⏭️ Skipping protected thread: ${thread.name}`);
-                continue;
-              }
-
-              // Check if thread is an auction thread (type 11 or 12)
-              if (thread.type !== 11 && thread.type !== 12) {
-                threadsSkipped++;
-                continue;
-              }
-
-              // Lock the thread if not already locked
-              if (!thread.locked && typeof thread.setLocked === "function") {
-                await thread
-                  .setLocked(true, "Bidding channel cleanup")
-                  .catch((err) => {
-                    console.warn(
-                      `⚠️ Failed to lock thread ${thread.name}:`,
-                      err.message
-                    );
-                  });
-                threadsLocked++;
-                console.log(`🔒 Locked: ${thread.name}`);
-
-                // Small delay to avoid race conditions with Discord API
-                await new Promise((resolve) => setTimeout(resolve, 300));
-              }
-
-              // Archive the thread if not already archived
-              if (
-                !thread.archived &&
-                typeof thread.setArchived === "function"
-              ) {
-                await thread
-                  .setArchived(true, "Bidding channel cleanup")
-                  .catch((err) => {
-                    console.warn(
-                      `⚠️ Failed to archive thread ${thread.name}:`,
-                      err.message
-                    );
-                  });
-                threadsArchived++;
-                console.log(`📦 Archived: ${thread.name}`);
-              }
-
-              // Rate limit: 500ms between thread operations
-              await new Promise((resolve) => setTimeout(resolve, 500));
-            } catch (err) {
-              console.warn(
-                `⚠️ Error processing thread ${thread.name}:`,
-                err.message
-              );
-              threadsSkipped++;
-            }
-          }
-
-          console.log(
-            `✅ Thread cleanup: ${threadsLocked} locked, ${threadsArchived} archived, ${threadsSkipped} skipped`
-          );
-        } else {
-          console.log(`📋 No active threads found in bidding channel`);
-        }
-
-        // Also check archived threads (fetch last 50)
-        const archivedThreads = await biddingChannel.threads
-          .fetchArchived({ limit: 50 })
-          .catch(() => null);
-
-        if (archivedThreads && archivedThreads.threads.size > 0) {
-          console.log(
-            `📋 Found ${archivedThreads.threads.size} archived thread(s) to check`
-          );
-
-          for (const [threadId, thread] of archivedThreads.threads) {
-            try {
-              // Skip specific threads that should never be locked
-              if (config.protected_thread_ids && config.protected_thread_ids.includes(threadId)) {
-                console.log(`⏭️ Skipping protected archived thread: ${thread.name}`);
-                continue;
-              }
-
-              // Lock archived threads that aren't locked yet
-              if (!thread.locked && typeof thread.setLocked === "function") {
-                // Must unarchive first, then lock, then re-archive
-                await thread
-                  .setArchived(false, "Temporary unarchive for locking")
-                  .catch(err => errorHandler.silentError(err, 'thread unarchive for locking'));
-
-                // Small delay after unarchiving
-                await new Promise((resolve) => setTimeout(resolve, 300));
-
-                await thread
-                  .setLocked(true, "Bidding channel cleanup")
-                  .catch((err) => {
-                    console.warn(
-                      `⚠️ Failed to lock archived thread ${thread.name}:`,
-                      err.message
-                    );
-                  });
-
-                // Small delay after locking
-                await new Promise((resolve) => setTimeout(resolve, 300));
-
-                await thread
-                  .setArchived(true, "Bidding channel cleanup")
-                  .catch(err => errorHandler.silentError(err, 'thread re-archive after locking'));
-                threadsLocked++;
-                console.log(`🔒 Locked archived: ${thread.name}`);
-
-                // Rate limit
-                await new Promise((resolve) => setTimeout(resolve, 500));
-              }
-            } catch (err) {
-              console.warn(
-                `⚠️ Error processing archived thread ${thread.name}:`,
-                err.message
-              );
-            }
-          }
-
-          console.log(
-            `✅ Archived thread cleanup: ${threadsLocked} additional locked`
-          );
-        }
-      } catch (err) {
-        console.error(`❌ Error during thread cleanup:`, err.message);
-      }
-    }
-
-    // ========================================
-    // CLEANUP OLD MESSAGES
-    // ========================================
-    console.log(`📊 Fetching bidding channel history...`);
-    let messagesDeleted = 0;
-    let messagesFetched = 0;
-    let batchSize = 0;
-
-    // Fetch messages in batches
-    let lastMessageId = null;
-    let shouldContinue = true;
-
-    while (shouldContinue) {
-      try {
-        const options = { limit: 100 };
-        if (lastMessageId) {
-          options.before = lastMessageId;
-        }
-
-        const messages = await biddingChannel.messages
-          .fetch(options)
-          .catch(() => null);
-        if (!messages || messages.size === 0) {
-          console.log(`📊 Reached end of message history`);
-          shouldContinue = false;
-          break;
-        }
-
-        messagesFetched += messages.size;
-        batchSize++;
-
-        for (const [msgId, message] of messages) {
-          // SKIP: Bot messages
-          if (message.author.bot) {
-            continue;
-          }
-
-          // SKIP: Admin messages
-          if (message.guild) {
-            const msgAuthor = await message.guild.members
-              .fetch(message.author.id)
-              .catch(() => null);
-            if (msgAuthor && isAdmin(msgAuthor)) {
-              continue;
-            }
-          }
-
-          // DELETE: Non-admin, non-bot messages
-          try {
-            await errorHandler.safeDelete(message, 'message deletion');
-            messagesDeleted++;
-
-            // Rate limit: 1 delete per 500ms to avoid Discord API issues
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          } catch (e) {
-            console.warn(`⚠️ Could not delete message ${msgId}: ${e.message}`);
-          }
-        }
-
-        // Get the last message ID for pagination
-        if (messages.size > 0) {
-          const lastMsg = messages.last();
-          lastMessageId = lastMsg.id;
-        }
-
-        // Safety: Stop after fetching 50 batches (5000 messages)
-        if (batchSize >= 50) {
-          console.log(
-            `⚠️ Safety limit reached (50 batches, 5000 messages). Stopping cleanup.`
-          );
-          shouldContinue = false;
-        }
-      } catch (e) {
-        console.error(`❌ Error in cleanup batch ${batchSize}: ${e.message}`);
-        shouldContinue = false;
-      }
-    }
-
-    console.log(`✅ Bidding channel cleanup complete!`);
-    console.log(
-      `📊 Messages: ${messagesFetched} fetched | ${messagesDeleted} deleted`
-    );
-    console.log(
-      `🧵 Threads: ${threadsLocked} locked | ${threadsArchived} archived | ${threadsSkipped} skipped`
-    );
-  } catch (e) {
-    console.error(`❌ Bidding channel cleanup error:`, e);
-  }
-}
-
-/**
- * Starts the automated bidding channel cleanup schedule.
- *
- * Schedule behavior:
- * - Runs cleanup immediately on bot startup
- * - Then runs every 12 hours automatically
- * - Stores timer reference in biddingChannelCleanupTimer
- *
- * This ensures the bidding channel stays clean without manual intervention.
- *
- * @returns {void}
- *
- * @example
- * startBiddingChannelCleanupSchedule();
- */
-function startBiddingChannelCleanupSchedule() {
-  console.log(`⏰ Starting bidding channel cleanup schedule (every 12 hours)`);
-
-  // Run cleanup immediately on startup
-  cleanupBiddingChannel().catch(console.error);
-
-  // Then schedule every 12 hours
-  biddingChannelCleanupTimer = setInterval(async () => {
-    try {
-      console.log(`⏰ Running scheduled bidding channel cleanup...`);
-      await cleanupBiddingChannel();
-    } catch (error) {
-      console.error("❌ Error in bidding channel cleanup:", error.message);
-      // Continue interval, don't break it
-    }
-  }, BIDDING_CHANNEL_CLEANUP_INTERVAL);
-
-  // PHASE 1: Register with shutdown manager
-  shutdownManager.registerInterval('bidding-channel-cleanup', biddingChannelCleanupTimer, { frequency: '12 hours' });
-}
-
-/**
- * Stops the automated bidding channel cleanup schedule.
- *
- * Clears the interval timer and sets the timer reference to null.
- * Used during bot shutdown or when cleanup needs to be disabled.
- *
- * @returns {void}
- *
- * @example
- * stopBiddingChannelCleanupSchedule();
- */
-function stopBiddingChannelCleanupSchedule() {
-  if (biddingChannelCleanupTimer) {
-    clearInterval(biddingChannelCleanupTimer);
-    biddingChannelCleanupTimer = null;
-    console.log(`⏹️ Bidding channel cleanup schedule stopped`);
-  }
-}
-
-// =====================================================================
-// STATS HELPER FUNCTIONS
-// =====================================================================
+// createDisabledRow, awaitConfirmation imported from bot/confirm-utils.js
 
 /**
  * Find best matching member using fuzzy search
@@ -1398,19 +302,14 @@ function findBestMemberMatch(searchName, guild) {
 
   // Return best match if found
   if (bestMatch) {
-    // Calculate confidence based on distance (lower distance = higher confidence)
     let confidence;
     if (matchType === 'contains') {
       confidence = 75;
     } else if (matchType === 'fuzzy') {
-      // Confidence inversely proportional to distance
-      // Distance of 0 = 100%, distance of 10+ = ~0%
       confidence = Math.max(0, Math.min(100, 100 - (bestScore * 10)));
 
-      // Reject fuzzy matches with too low confidence or too high relative distance
-      // For short names, we need stricter matching to avoid false positives like "Jalo" → "Joco"
-      const minConfidence = 85; // Require at least 85% confidence for fuzzy matches
-      const maxRelativeDistance = 0.3; // Max 30% character difference
+      const minConfidence = 85;
+      const maxRelativeDistance = 0.3;
       const relativeDistance = bestScore / normalizedSearch.length;
 
       if (confidence < minConfidence || relativeDistance > maxRelativeDistance) {
@@ -1439,11 +338,9 @@ function findBestMemberMatch(searchName, guild) {
 function buildStatsEmbed(stats, member) {
   const { memberName, attendance, bidding, rank, totalMembers } = stats;
 
-  // Calculate percentile (handle null/0 rank)
   const validRank = rank && rank > 0 ? rank : totalMembers;
   const percentile = totalMembers > 0 ? Math.round((1 - (validRank / totalMembers)) * 100) : 0;
 
-  // Choose embed color based on rank
   const color = getColorByRank(validRank);
 
   const embed = new EmbedBuilder()
@@ -1451,21 +348,17 @@ function buildStatsEmbed(stats, member) {
     .setTitle(`📊 Member Stats - ${memberName}`)
     .setTimestamp();
 
-  // Set thumbnail if we have a valid member object
   if (member && member.user) {
     embed.setThumbnail(member.user.displayAvatarURL());
   }
 
-  // Format rank display with savage titles
   const rankNumber = rank && rank > 0 ? `#${rank}` : `Unranked`;
   const rankTitle = getRankTitle(rank, attendance);
   const rankDisplay = rank && rank > 0 ? `**${rankNumber}**\n${rankTitle}` : rankTitle;
 
-  // Format streak display (singular vs plural)
   const streakText = attendance.streak === 1 ? '1 day' : `${attendance.streak} days`;
   const streakDisplay = attendance.streak > 0 ? `**${streakText}** 🔥` : `**${streakText}**`;
 
-  // COMPACT FORMAT - Inline fields for key metrics
   embed.addFields(
     {
       name: '🎯 Attendance',
@@ -1484,7 +377,6 @@ function buildStatsEmbed(stats, member) {
     }
   );
 
-  // Recent Activity - only show top 5
   if (attendance.recentBosses && attendance.recentBosses.length > 0) {
     const recent = attendance.recentBosses
       .slice(0, 5)
@@ -1498,28 +390,18 @@ function buildStatsEmbed(stats, member) {
     });
   }
 
-  // 🎭 ADD MEMBER LORE IF AVAILABLE
-  // CRITICAL FIX: Case-insensitive lookup for lore
-  console.log(`🎭 [LORE DEBUG] Looking up lore for member: "${memberName}"`);
   const loreKey = Object.keys(memberLore).find(
     key => key.toLowerCase() === memberName.toLowerCase() && !key.startsWith('_')
   );
-  console.log(`🎭 [LORE DEBUG] Found loreKey: ${loreKey || 'NOT FOUND'}`);
 
-  // Fall back to future member template if no specific lore found
   const lore = loreKey ? memberLore[loreKey] : memberLore['_FUTURE_MEMBER_TEMPLATE'];
   const isTemplateLore = !loreKey && memberLore['_FUTURE_MEMBER_TEMPLATE'];
-  console.log(`🎭 [LORE DEBUG] Using ${isTemplateLore ? 'TEMPLATE' : 'SPECIFIC'} lore: ${lore ? 'YES' : 'NO'}`);
 
   if (lore) {
     const skillsList = lore.skills ? lore.skills.join(', ') : 'None';
-    // Personalize the template title for the member
     const displayTitle = isTemplateLore ? `${memberName}'s Destiny Awaits` : lore.title;
 
-    // Build main lore field (original backstory + stats)
     const loreValue = `${lore.lore}\n\n**Specialty:** ${lore.specialty}\n**Reputation:** ${lore.reputation}\n**Stats:** ${lore.stats}\n**Skills:** ${skillsList}`;
-
-    console.log(`🎭 [LORE DEBUG] Adding lore field (${loreValue.length} chars) with title: "${displayTitle}"`);
 
     embed.addFields({
       name: `✨ ${displayTitle}`,
@@ -1527,29 +409,21 @@ function buildStatsEmbed(stats, member) {
       inline: false
     });
 
-    // Add recent developments as a separate field (if available)
-    // This prevents exceeding Discord's 1024 char limit per field
     if (lore.recent_developments) {
-      console.log(`🎭 [LORE DEBUG] Adding recent_developments field (${lore.recent_developments.length} chars)`);
       embed.addFields({
         name: `📜 Recent Developments`,
         value: lore.recent_developments,
         inline: false
       });
     }
-
-    console.log(`🎭 [LORE DEBUG] Lore fields added successfully`);
-  } else {
-    console.log(`🎭 [LORE DEBUG] ⚠️  No lore found - field NOT added`);
   }
 
-  // Footer with favorite boss and percentile
   const percentileText = percentile > 0 ? `Top ${percentile}%` : 'New Member';
   const statsTip = '\n💡 Tip: !stats `IGN` shows anyone\'s story';
 
   if (attendance.favoriteBoss) {
     embed.setFooter({
-      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) • ${percentileText}${statsTip}`
+      text: `Most attended: ${attendance.favoriteBoss.name} (${attendance.favoriteBoss.count}x) \u2022 ${percentileText}${statsTip}`
     });
   } else {
     embed.setFooter({
@@ -1566,11 +440,11 @@ function buildStatsEmbed(stats, member) {
  * @returns {number} Hex color code
  */
 function getColorByRank(rank) {
-  if (rank === 1) return 0xFFD700; // Gold
-  if (rank === 2) return 0xC0C0C0; // Silver
-  if (rank === 3) return 0xCD7F32; // Bronze
-  if (rank <= 10) return 0x00D9FF; // Cyan
-  return 0x5865F2; // Blurple
+  if (rank === 1) return 0xFFD700;
+  if (rank === 2) return 0xC0C0C0;
+  if (rank === 3) return 0xCD7F32;
+  if (rank <= 10) return 0x00D9FF;
+  return 0x5865F2;
 }
 
 /**
@@ -1580,74 +454,44 @@ function getColorByRank(rank) {
  * @returns {string} Title text
  */
 function getRankTitle(rank, attendance) {
-  // Special case: No attendance
   if (!attendance || attendance.total === 0) {
     return "👻 Ghost Member (Do You Even Exist?)";
   }
 
-  // Special case: Unranked
   if (!rank || rank <= 0) {
     return "🌱 Fresh Meat (Newbie)";
   }
 
-  // RANK #1 - THE ABSOLUTE GOD
   if (rank === 1) return `👑 GOD OF ${guildName} 👑`;
-
-  // TOP 2-3 - LEGENDARY STATUS
   if (rank === 2) return "🥈 ATTENDANCE DEMON 🥈";
   if (rank === 3) return "🥉 GUILD BACKBONE 🥉";
-
-  // ELITE 4-6 - INSANE DEDICATION
   if (rank === 4) return "⚡ ULTIMATE TRYHARD ⚡";
   if (rank === 5) return "💎 DIAMOND GRINDER 💎";
   if (rank === 6) return "🔱 NO SLEEP WARRIOR 🔱";
-
-  // VERY HIGH 7-10 - SUPER ACTIVE
   if (rank === 7) return "🔥 ATTENDANCE DEMON 🔥";
   if (rank === 8) return "💪 GIGACHAD MEMBER 💪";
   if (rank === 9) return "⭐ SWEATLORD SUPREME ⭐";
   if (rank === 10) return "🎯 TOP 10 BEAST 🎯";
-
-  // HIGH 11-15 - VERY CONSISTENT
   if (rank >= 11 && rank <= 12) return "⚔️ Elite Sweeper";
   if (rank >= 13 && rank <= 15) return "🌟 Hardcore Regular";
-
-  // UPPER MID 16-20 - ACTIVE
   if (rank >= 16 && rank <= 17) return "🎖️ Professional Grinder";
   if (rank >= 18 && rank <= 20) return "📈 Rising Star";
-
-  // MID 21-25 - SOLID MEMBER
   if (rank >= 21 && rank <= 23) return "💼 Solid Contributor";
   if (rank >= 24 && rank <= 25) return "🎮 Active Member";
-
-  // LOWER MID 26-30 - DECENT
   if (rank >= 26 && rank <= 28) return "😎 Chill Gamer";
   if (rank >= 29 && rank <= 30) return "🌊 Wave Rider";
-
-  // REGULAR 31-35 - AVERAGE
   if (rank >= 31 && rank <= 33) return "🌿 Grass Toucher (Has a Life)";
   if (rank >= 34 && rank <= 35) return "☕ Coffee Break Enjoyer";
-
-  // CASUAL 36-40 - PART-TIMER
   if (rank >= 36 && rank <= 38) return "📱 Part-Time Player";
   if (rank >= 39 && rank <= 40) return "🍃 Breeze Cruiser";
-
-  // LOW 41-45 - SAVAGE ZONE BEGINS
   if (rank >= 41 && rank <= 43) return "💀 Bench Warmer";
   if (rank >= 44 && rank <= 45) return "🎪 Guild Mascot";
-
-  // VERY LOW 46-48 - BRUTAL HONESTY
   if (rank === 46) return "👻 Professional AFK";
   if (rank === 47) return "🦥 Sloth Mode Activated";
   if (rank === 48) return "🪦 Barely Alive";
-
-  // BOTTOM 2 - ULTIMATE ROAST
   if (rank === 49) return "🤡 Second to Dead Last";
   if (rank === 50) return "🗿 THE ANCHOR (Congrats on Last Place!)";
-
-  // Fallback for ranks beyond 50
   if (rank > 50) return "🗿 Beyond the Abyss";
-
   return "📊 Member";
 }
 
@@ -1680,31 +524,21 @@ function getActivityLevel(rate) {
 /**
  * Start a live countdown deletion for a message with embed
  * Updates the message every 5 seconds to show remaining time, then deletes
- *
- * @param {Message} message - Original user message to delete
- * @param {Message} botMessage - Bot's reply message to update and delete
- * @param {EmbedBuilder} baseEmbed - Base embed to update (will be cloned)
- * @param {Function} updateEmbedFooter - Function to update embed footer with countdown
- *                                       Should accept (embed, countdown) and return updated embed
- * @param {number} duration - Total duration in seconds (default: 30)
  */
 async function startCountdownDeletion(message, botMessage, stats, member, updateFunction, duration = 300) {
   let remainingTime = duration;
 
-  // Delete user's command message immediately
   try {
     await errorHandler.safeDelete(message, 'message deletion');
   } catch (e) {
     console.warn(`⚠️ Could not delete user message: ${e.message}`);
   }
 
-  // Update every 5 seconds: 300s, 295s, 290s, etc.
   const updateInterval = 5;
   const countdownTimer = setInterval(async () => {
     remainingTime -= updateInterval;
 
     if (remainingTime <= 0) {
-      // Time's up - delete the message
       clearInterval(countdownTimer);
       try {
         await errorHandler.safeDelete(botMessage, 'message deletion');
@@ -1714,13 +548,11 @@ async function startCountdownDeletion(message, botMessage, stats, member, update
       return;
     }
 
-    // Update the embed with new countdown
     try {
       const updatedEmbed = updateFunction(stats, member, remainingTime);
       await botMessage.edit({ embeds: [updatedEmbed] });
     } catch (e) {
       console.warn(`⚠️ Could not update countdown: ${e.message}`);
-      // If update fails, just delete the message
       clearInterval(countdownTimer);
       try {
         await errorHandler.safeDelete(botMessage, 'message deletion');
@@ -1733,45 +565,36 @@ async function startCountdownDeletion(message, botMessage, stats, member, update
 
 /**
  * Clean up old stats and mypoints messages on bot startup
- * Prevents channel clutter from messages that didn't auto-delete before restart
  */
 async function cleanupStaleStatsMessages() {
   try {
     console.log('🧹 Cleaning up stale stats/mypoints messages...');
 
-const commandsChannel = await discordCache.getChannel('bot_manual_channel_id');
+    const commandsChannel = await discordCache.getChannel('bot_manual_channel_id');
     if (!commandsChannel) {
       console.warn('⚠️ Could not find elysium-commands channel for cleanup');
       return;
     }
 
-    // Fetch last 100 messages
     const messages = await commandsChannel.messages.fetch({ limit: 100 });
     let deletedCount = 0;
 
     for (const [, message] of messages) {
       let shouldDelete = false;
 
-      // Check if it's a bot message with stats/mypoints embed
       if (message.author.id === client.user.id) {
-        // Check if it's a stats or mypoints message
         if (message.embeds && message.embeds.length > 0) {
           const embed = message.embeds[0];
           const title = embed.title || '';
-
-          // Delete stats and mypoints messages
           if (title.includes('Member Stats') || title.includes('Your Points')) {
             shouldDelete = true;
           }
         }
-
-        // Also delete loading messages like "⏳ Fetching stats for..."
         if (message.content && message.content.includes('⏳ Fetching stats for')) {
           shouldDelete = true;
         }
       }
 
-      // Check if it's a user command message (!stats or !mypoints)
       if (message.content) {
         const content = message.content.trim().toLowerCase();
         const isStatsCommand = content.startsWith('!stats') ||
@@ -1789,7 +612,6 @@ const commandsChannel = await discordCache.getChannel('bot_manual_channel_id');
         }
       }
 
-      // Delete the message if it matches any criteria
       if (shouldDelete) {
         try {
           await message.delete();
@@ -1811,6361 +633,450 @@ const commandsChannel = await discordCache.getChannel('bot_manual_channel_id');
 }
 
 // =====================================================================
-// SECTION 7: CONFIRMATION UTILITIES
+// BIDDING CHANNEL CLEANUP
 // =====================================================================
-/**
- * Creates a disabled button row from two buttons.
- * Uses fresh ButtonBuilder instances to avoid mutation issues with ButtonBuilder.from().
- *
- * @param {ButtonBuilder} btn1 - First button to disable
- * @param {ButtonBuilder} btn2 - Second button to disable
- * @returns {ActionRowBuilder} Row with both buttons disabled
- */
-function createDisabledRow(btn1, btn2) {
-  const disabledBtn1 = new ButtonBuilder()
-    .setCustomId(btn1.data.custom_id)
-    .setLabel(btn1.data.label)
-    .setStyle(btn1.data.style)
-    .setDisabled(true);
-
-  const disabledBtn2 = new ButtonBuilder()
-    .setCustomId(btn2.data.custom_id)
-    .setLabel(btn2.data.label)
-    .setStyle(btn2.data.style)
-    .setDisabled(true);
-
-  return new ActionRowBuilder().addComponents(disabledBtn1, disabledBtn2);
-}
 
 /**
- * Universal confirmation dialog with reaction-based user response.
- *
- * Flow:
- * 1. Sends confirmation message (embed or text)
- * 2. Adds ✅ and ❌ reaction buttons
- * 3. Waits for user to react (30 second timeout)
- * 4. Executes onConfirm or onCancel callback
- * 5. Cleans up reactions after response
- *
- * This function centralizes all confirmation logic across the bot,
- * ensuring consistent UX for destructive or important operations.
- *
- * @async
- * @param {Message} message - Original message that triggered the confirmation
- * @param {GuildMember} member - Member who must confirm (only their reactions count)
- * @param {EmbedBuilder|string} embedOrText - Confirmation prompt (embed or plain text)
- * @param {Function} onConfirm - Async callback when user confirms (✅)
- * @param {Function} onCancel - Async callback when user cancels (❌)
- * @returns {Promise<void>}
- *
- * @example
- * await awaitConfirmation(
- *   message,
- *   member,
- *   "Are you sure you want to delete this?",
- *   async (confirmMsg) => { await performDeletion(); },
- *   async (confirmMsg) => { await message.reply("Canceled"); }
- * );
+ * Performs comprehensive cleanup of the bidding channel.
  */
-async function awaitConfirmation(
-  message,
-  member,
-  embedOrText,
-  onConfirm,
-  onCancel
-) {
+async function cleanupBiddingChannel() {
   try {
-    const confirmButton = new ButtonBuilder()
-      .setCustomId(`confirm_yes_${member.user.id}_${Date.now()}`)
-      .setLabel('✅ Confirm')
-      .setStyle(ButtonStyle.Success)
-      .setDisabled(false);
+    console.log(`🧹 Starting bidding channel cleanup...`);
 
-    const cancelButton = new ButtonBuilder()
-      .setCustomId(`confirm_no_${member.user.id}_${Date.now()}`)
-      .setLabel('❌ Cancel')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(false);
-
-    const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
-
-    const isEmbed = embedOrText instanceof EmbedBuilder;
-    const confirmMsg = isEmbed
-      ? await message.reply({ embeds: [embedOrText], components: [row] })
-      : await message.reply({ content: embedOrText, components: [row] });
-
-    console.log(`🔘 [BUTTON] Confirmation sent to ${member.user.tag} (${member.user.id})`);
-
-    const collector = confirmMsg.createMessageComponentCollector({
-      componentType: ComponentType.Button,
-      time: TIMING.CONFIRMATION_TIMEOUT,
-      filter: i => {
-        const matches = i.user.id === member.user.id;
-        if (!matches) {
-          console.log(`🔘 [BUTTON] Ignoring click from ${i.user.tag} (expected ${member.user.tag})`);
-        }
-        return matches;
-      }
-    });
-
-    collector.on('collect', async (interaction) => {
-      try {
-        const isConfirm = interaction.customId.startsWith('confirm_yes_');
-        console.log(`🔘 [BUTTON] ${member.user.tag} clicked ${isConfirm ? 'Confirm' : 'Cancel'}`);
-
-        // Create fresh disabled buttons (defensive: avoid any potential mutation of originals)
-        const disabledConfirmButton = new ButtonBuilder()
-          .setCustomId(confirmButton.data.custom_id)
-          .setLabel(confirmButton.data.label)
-          .setStyle(confirmButton.data.style)
-          .setDisabled(true);
-
-        const disabledCancelButton = new ButtonBuilder()
-          .setCustomId(cancelButton.data.custom_id)
-          .setLabel(cancelButton.data.label)
-          .setStyle(cancelButton.data.style)
-          .setDisabled(true);
-
-        const disabledRow = new ActionRowBuilder().addComponents(
-          disabledConfirmButton,
-          disabledCancelButton
-        );
-
-        await interaction.update({ components: [disabledRow] }).catch(err => {
-          console.error(`❌ [BUTTON] Failed to disable buttons: ${err.message}`);
-        });
-
-        if (isConfirm) {
-          await onConfirm(confirmMsg);
-        } else {
-          await onCancel(confirmMsg);
-        }
-
-        collector.stop();
-      } catch (err) {
-        console.error(`❌ [BUTTON] Error handling button click: ${err.message}`);
-        await interaction.reply({ content: `❌ An error occurred: ${err.message}`, ephemeral: true }).catch(err => errorHandler.silentError(err, 'button error interaction reply'));
-      }
-    });
-
-    collector.on('end', async (collected, reason) => {
-      console.log(`🔘 [BUTTON] Collector ended: ${reason} (${collected.size} interactions)`);
-
-      if (reason === 'time' && collected.size === 0) {
-        // Create fresh disabled buttons (defensive: avoid any potential mutation of originals)
-        const disabledConfirmButton = new ButtonBuilder()
-          .setCustomId(confirmButton.data.custom_id)
-          .setLabel(confirmButton.data.label)
-          .setStyle(confirmButton.data.style)
-          .setDisabled(true);
-
-        const disabledCancelButton = new ButtonBuilder()
-          .setCustomId(cancelButton.data.custom_id)
-          .setLabel(cancelButton.data.label)
-          .setStyle(cancelButton.data.style)
-          .setDisabled(true);
-
-        const disabledRow = new ActionRowBuilder().addComponents(
-          disabledConfirmButton,
-          disabledCancelButton
-        );
-
-        await errorHandler.safeEdit(confirmMsg, { components: [disabledRow] }, 'confirmation timeout disable buttons');
-        await message.reply("⏱️ Confirmation timed out.").catch(err => errorHandler.silentError(err, 'confirmation timeout reply'));
-      }
-    });
-  } catch (err) {
-    console.error(`❌ [BUTTON] Error in awaitConfirmation: ${err.message}`);
-    throw err;
-  }
-}
-
-// =====================================================================
-// SECTION 8: COMMAND HANDLERS
-// =====================================================================
-
-/**
- * Command handler registry mapping command names to handler functions.
- *
- * This object centralizes all command logic, making the bot modular and
- * maintainable. Each handler is an async function that receives:
- * - message: The Discord message that triggered the command
- * - member: The guild member who sent the command
- * - args: Array of command arguments (optional)
- *
- * Command categories:
- * - Help & Info: help, status, debugthread
- * - Attendance Admin: clearstate, closeallthread, forcesubmit, resetpending
- * - Auction System: startauction, (delegated to auctioneering module)
- * - Loot System: loot
- *
- * All handlers include proper error handling and admin permission checks.
- *
- * @type {Object.<string, Function>}
- * @constant
- */
-const commandHandlers = {
-  help: async (message, member) => {
-    // Use new channel-aware help system
-    await helpSystemV2.handleHelpCommand(message, member);
-  },
-
-  // =========================================================================
-  // NEW MEMBER GUIDE - Comprehensive instructions for new members
-  // =========================================================================
-  newmember: async (message, member) => {
-    // Overview embed
-    const overviewEmbed = new EmbedBuilder()
-      .setColor('#00ff00')
-      .setTitle('📚 Welcome to Elysium! New Member Guide')
-      .setDescription(
-        '**Welcome to the guild!** This guide will teach you everything you need to know about:\n\n' +
-        '1️⃣ **Boss Attendance** - How to get credit for boss kills\n' +
-        '2️⃣ **Auctions** - How to bid on boss loot\n\n' +
-        'Read both sections carefully to avoid mistakes!'
-      )
-      .setTimestamp();
-
-    // Boss Attendance Guide
-    const attendanceEmbed = new EmbedBuilder()
-      .setColor('#3498db')
-      .setTitle('1️⃣ Boss Attendance - Step by Step Guide')
-      .setDescription(
-        '**When a boss spawns, here\'s what you need to do to get attendance credit:**'
-      )
-      .addFields(
-        {
-          name: '📋 STEP 1: Find the Boss Thread',
-          value:
-            '• The bot automatically creates a thread in the attendance channel\n' +
-            '• Thread name format: `[MM/DD/YY HH:MM] Boss Name`\n' +
-            '• Example: `[11/13/25 14:30] General Aquleus`\n' +
-            '• Look for the newest thread with the boss you killed',
-          inline: false
-        },
-        {
-          name: '✅ STEP 2: Post Keyword + Screenshot (ONE MESSAGE)',
-          value:
-            '• In ONE message, type keyword AND attach screenshot:\n' +
-            '  • **Keywords:** `present`, `here`, `attending`, `join`, `checkin`\n' +
-            '  • Common typos are auto-corrected (prsnt, hre, etc.)\n' +
-            '• **CRITICAL:** Keyword and screenshot MUST be in the SAME message!\n' +
-            '• After posting, the bot will reply with verification buttons',
-          inline: false
-        },
-        {
-          name: '📸 STEP 3: Screenshot Requirements',
-          value:
-            '**Your screenshot MUST show:**\n' +
-            '✓ Your character name visible\n' +
-            '✓ Boss name visible on screen\n' +
-            '✓ Combat log or damage numbers (preferred)\n' +
-            '✓ Game timestamp/time visible\n\n' +
-            '**DO NOT:**\n' +
-            '❌ Use fake or old screenshots\n' +
-            '❌ Use someone else\'s screenshot\n' +
-            '❌ Post screenshot in separate message',
-          inline: false
-        },
-        {
-          name: '⏳ STEP 4: Wait for Admin Verification',
-          value:
-            '• Bot will reply with ✅ **Verify** and ❌ **Deny** buttons\n' +
-            '• Admin will review your screenshot and click:\n' +
-            '  • ✅ **Verify** → You get attendance credit!\n' +
-            '  • ❌ **Deny** → Screenshot rejected, you must resubmit\n' +
-            '• Check the thread to see if you were verified\n' +
-            '• Green embed = ✅ Verified | Red embed = ❌ Denied',
-          inline: false
-        },
-        {
-          name: '⏰ Important Time Limits',
-          value:
-            '• Threads **auto-close after 20 minutes**\n' +
-            '• Submit ASAP after killing the boss\n' +
-            '• Late submissions will be rejected\n' +
-            '• If thread closes before verification, contact admin',
-          inline: false
-        },
-        {
-          name: '⚠️ Common Mistakes to Avoid',
-          value:
-            '❌ Posting "present" first, then screenshot separately\n' +
-            '❌ Posting in the wrong boss thread\n' +
-            '❌ Posting in main attendance channel (not the thread)\n' +
-            '❌ Submitting after thread closes (20 min)\n' +
-            '✅ Type keyword + attach screenshot in ONE message\n' +
-            '✅ Post in the correct boss thread\n' +
-            '✅ Submit within 20 minutes',
-          inline: false
-        }
-      );
-
-    // Auction Guide
-    const auctionEmbed = new EmbedBuilder()
-      .setColor('#f39c12')
-      .setTitle('2️⃣ Auctions - Step by Step Guide')
-      .setDescription(
-        '**When loot drops from a boss, items are auctioned to guild members:**'
-      )
-      .addFields(
-        {
-          name: '🔨 STEP 1: Watch for Auction Threads',
-          value:
-            '• Admins create auction threads in the bidding channel\n' +
-            '• Thread name shows the item being auctioned\n' +
-            '• Pay attention to:\n' +
-            '  📦 **Item name** (e.g., "Arcana Mace +5")\n' +
-            '  💰 **Starting bid** (minimum bid required)\n' +
-            '  ⏱️ **Timer** (how long you have to bid)',
-          inline: false
-        },
-        {
-          name: '💵 STEP 2: Place Your Bid',
-          value:
-            '• **MUST be used inside the auction thread!**\n' +
-            '• Use command: **`!bid <amount>`**\n' +
-            '• Example: `!bid 1000` (bids 1000 points)\n' +
-            '• Your bid must be higher than current highest bid\n' +
-            '• Bot will confirm if successful or show error',
-          inline: false
-        },
-        {
-          name: '📊 STEP 3: Check Your Points',
-          value:
-            '• Use **`!mypoints`** in bidding channel (main, not thread)\n' +
-            '• Shows your total available points\n' +
-            '• Also shows: **`!mp`**, **`!pts`**, **`!mypts`** (aliases)\n' +
-            '• Make sure you have enough points before bidding!',
-          inline: false
-        },
-        {
-          name: '📋 STEP 4: Check Bid Status',
-          value:
-            '• Use **`!bidstatus`** in bidding channel\n' +
-            '• Shows all active auctions\n' +
-            '• Displays current highest bidder\n' +
-            '• Shows time remaining on each auction',
-          inline: false
-        },
-        {
-          name: '🎯 STEP 5: Winning the Auction',
-          value:
-            '• Highest bidder when timer expires wins!\n' +
-            '• Winner announced in the auction thread\n' +
-            '• Points automatically deducted from your balance\n' +
-            '• Coordinate with admins to receive your item\n' +
-            '• Item will be distributed in-game',
-          inline: false
-        },
-        {
-          name: '💡 Smart Bidding Tips',
-          value:
-            '✅ **Check `!mypoints` first** - Don\'t bid more than you have\n' +
-            '✅ **Bid in small increments** - Save points\n' +
-            '✅ **Watch the timer** - Last-minute bids can win\n' +
-            '✅ **Know item values** - Ask experienced members\n' +
-            '✅ **Bid only in auction threads** - Main channel won\'t work\n' +
-            '❌ **Don\'t bid on items you can\'t use**\n' +
-            '❌ **Bids are binding** - Can\'t cancel after placing',
-          inline: false
-        },
-        {
-          name: '📋 Available Auction Commands',
-          value:
-            '**In auction threads:**\n' +
-            '• **`!bid <amount>`** - Place a bid (ONLY in threads)\n\n' +
-            '**In main bidding channel:**\n' +
-            '• **`!mypoints`** / **`!mp`** - Check your points\n' +
-            '• **`!bidstatus`** - View active auctions\n\n' +
-            '**Aliases that work:**\n' +
-            '• `!b <amount>` = `!bid <amount>`\n' +
-            '• `!pts`, `!mypts` = `!mypoints`',
-          inline: false
-        }
-      );
-
-    // Additional Tips
-    const tipsEmbed = new EmbedBuilder()
-      .setColor('#9b59b6')
-      .setTitle('💎 Additional Tips for New Members')
-      .addFields(
-        {
-          name: '🎮 How to Earn Points',
-          value:
-            '• Attend boss kills (submit attendance screenshots)\n' +
-            '• Each verified attendance = points added\n' +
-            '• More attendance = more points to bid\n' +
-            '• Check leaderboards: `!leaderboardattendance`\n' +
-            '• Be active and help guild members!',
-          inline: false
-        },
-        {
-          name: '📞 Need Help?',
-          value:
-            '• Type **`!help`** to see all available commands\n' +
-            '• Ask admins if you\'re unsure about anything\n' +
-            '• Read pinned messages in each channel\n' +
-            '• Other members are friendly - don\'t hesitate to ask!',
-          inline: false
-        },
-        {
-          name: '⚡ Quick Command Reference',
-          value:
-            '**Attendance:**\n' +
-            '• Type `present` + attach screenshot (ONE message)\n' +
-            '• Typos auto-corrected: `prsnt`, `hre`, etc.\n\n' +
-            '**Auctions:**\n' +
-            '• `!bid <amount>` - Bid in auction thread\n' +
-            '• `!mypoints` - Check your points\n' +
-            '• `!bidstatus` - View active auctions\n\n' +
-            '**Info:**\n' +
-            '• `!help` - Full command list\n' +
-            '• `!nm` or `!newmember` - This guide\n' +
-            '• `!leaderboardattendance` - Attendance rankings',
-          inline: false
-        }
-      )
-      .setFooter({ text: 'Good luck and have fun in Elysium! 🎉' })
-      .setTimestamp();
-
-    // Send all embeds
-    await message.reply({
-      embeds: [overviewEmbed, attendanceEmbed, auctionEmbed, tipsEmbed]
-    });
-  },
-
-  // =========================================================================
-  // TEST SEND COMMAND - Send a test embed to all recorded bot channels
-  // =========================================================================
-  testsend: async (context, member) => {
-    const guild = context?.guild || context?.message?.guild || context?.channel?.guild;
-    return await performTestSend(guild, client);
-  },
-
-  // =========================================================================
-  // STATUS COMMAND - Displays bot health and active operations
-  // =========================================================================
-   status: async (message, member) => {
-     if (!message.guild) return;
-     const guild = message.guild;
-     const uptime = attendance.formatUptime(Date.now() - BOT_START_TIME);
-    const timeSinceSheet =
-      lastSheetCall > 0
-        ? `${Math.floor((Date.now() - lastSheetCall) / 1000)} seconds ago`
-        : "Never";
-
-    // Sync state from attendance module to get latest data
-    activeSpawns = attendance.getActiveSpawns();
-    pendingVerifications = attendance.getPendingVerifications();
-
-    const totalSpawns = Object.keys(activeSpawns).length;
-
-    // Sort spawns by timestamp (oldest first)
-    // This helps admins prioritize closing old spawns
-    const activeSpawnEntries = Object.entries(activeSpawns);
-    const sortedSpawns = activeSpawnEntries.sort((a, b) => {
-      // Parse timestamp format: "MM/DD/YY HH:MM"
-      const parseTimestamp = (ts) => {
-        const [date, time] = ts.split(" ");
-        const [month, day, year] = date.split("/");
-        const [hour, minute] = time.split(":");
-
-        // FIXED: Parse Manila timezone timestamp correctly
-        // The timestamp is in Manila time (UTC+8), convert to UTC for comparison
-        const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
-
-        return Date.UTC(
-          2000 + parseInt(year),
-          parseInt(month) - 1,
-          parseInt(day),
-          parseInt(hour),
-          parseInt(minute)
-        ) - MANILA_OFFSET_MS;
-      };
-      return parseTimestamp(a[1].timestamp) - parseTimestamp(b[1].timestamp);
-    });
-
-    const spawnList = sortedSpawns.slice(0, 10).map(([threadId, info], i) => {
-      const spawnTime = (() => {
-        const [date, time] = info.timestamp.split(" ");
-        const [month, day, year] = date.split("/");
-        const [hour, minute] = time.split(":");
-
-        // FIXED: Parse Manila timezone timestamp correctly
-        // The timestamp is in Manila time (UTC+8), but we need to create a UTC Date object
-        // Subtract 8 hours (28800000ms) to convert Manila time to UTC
-        const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
-
-        return Date.UTC(
-          2000 + parseInt(year),
-          parseInt(month) - 1,
-          parseInt(day),
-          parseInt(hour),
-          parseInt(minute)
-        ) - MANILA_OFFSET_MS;
-      })();
-
-      const ageMs = Date.now() - spawnTime;
-      const ageHours = Math.floor(ageMs / 3600000);
-      const ageMinutes = Math.floor((ageMs % 3600000) / 60000);
-
-      // Handle negative ages (future spawns) gracefully
-      let ageText;
-      if (ageMs < 0) {
-        const futureHours = Math.floor(Math.abs(ageMs) / 3600000);
-        const futureMinutes = Math.floor((Math.abs(ageMs) % 3600000) / 60000);
-        ageText = futureHours > 0 ? `in ${futureHours}h` : `in ${futureMinutes}m`;
-      } else {
-        ageText = ageHours > 0 ? `${ageHours}h ago` : `${ageMinutes}m ago`;
-      }
-
-      return `${i + 1}. **${info.boss}** (${info.timestamp}) - ${
-        info.members.length
-      } verified - ${ageText} - <#${threadId}>`;
-    });
-
-    const spawnListText = spawnList.length > 0 ? spawnList.join("\n") : "None";
-    const moreSpawns =
-      totalSpawns > 10
-        ? `\n\n*+${
-            totalSpawns - 10
-          } more spawns (sorted oldest first - close old ones first!)*`
-        : "";
-
-    const biddingState = bidding.getBiddingState();
-    const biddingStatus = biddingState.a
-      ? `🔴 Active: **${biddingState.a.item}** (${biddingState.a.curBid}pts)`
-      : `🟢 Queue: ${biddingState.q.length} item(s)`;
-
-    const embed = new EmbedBuilder()
-      .setColor(0x00ff00)
-      .setTitle("📊 Bot Status")
-      .setDescription("✅ **Healthy**")
-      .addFields(
-        { name: "⏱️ Uptime", value: uptime, inline: true },
-        { name: "🤖 Version", value: BOT_VERSION, inline: true },
-        {
-          name: "💾 Memory",
-          value: `${Math.round(
-            process.memoryUsage().heapUsed / 1024 / 1024
-          )}MB`,
-          inline: true,
-        },
-        { name: "🎯 Active Spawns", value: `${totalSpawns}`, inline: true },
-        {
-          name: "⏳ Pending Verifications",
-          value: `${Object.keys(pendingVerifications).length}`,
-          inline: true,
-        },
-        { name: "📊 Last Sheet Call", value: timeSinceSheet, inline: true },
-        {
-          name: "🔗 Spawn Threads (Oldest First)",
-          value: spawnListText + moreSpawns,
-          inline: false,
-        },
-        { name: "💰 Bidding System", value: biddingStatus, inline: false }
-      )
-      .setFooter({ text: `Requested by ${member.user.username}` })
-      .setTimestamp();
-
-    await message.reply({ embeds: [embed] });
-  },
-
-  // =========================================================================
-  // 8BALL COMMAND - Magic 8-Ball for fun predictions
-  // =========================================================================
-  eightball: async (message, member, args) => {
-    const question = args && args.length > 0 ? args.join(" ") : null;
-
-    if (!question) {
-      return await message.reply("🎱 Magtanong ka muna! Usage: `!8ball <tanong mo>`");
-    }
-
-    const responses = [
-      // Affirmative responses (Positive/Yes)
-      "Oo naman! 💯",
-      "Sure na sure! ✨",
-      "100% yan! 🔥",
-      "Tiwala lang! 💪",
-      "Go na yan! 🚀",
-      "Pwede na yan! 👍",
-      "Sige, bakit hindi? 😎",
-      "Aba oo! 🎉",
-      "Syempre naman! ⭐",
-      "Tapos na usapan! ✅",
-
-      // Non-committal responses (Maybe/Uncertain)
-      "Baka pwede, baka hindi 🤷",
-      "Mamaya na tanong ulit 😅",
-      "Di ko alam eh 🤔",
-      "Bahala na si Batman 🦇",
-      "Sige, isip muna 💭",
-      "Antayin mo muna ⏳",
-      "Hindi pa sure 😬",
-      "Malay ko 🙃",
-      "Baka bukas, hindi ngayon 📅",
-      "Pakiulit nga tanong 🔄",
-
-      // Negative responses (No/Doubtful)
-      "Asa ka pa! 😂",
-      "Wag na umasa 💔",
-      "Hindi yan! ❌",
-      "Dream on! 😴",
-      "Malabo yan 🌫️",
-      "Imposible! 🚫",
-      "Wag kang umasa 🙅",
-      "Forget it! 👋",
-      "Hindi pwede ⛔",
-      "Naku, wala yan 😬"
-    ];
-
-    const response = responses[Math.floor(Math.random() * responses.length)];
-
-    await message.reply(`🎱 **${response}**`);
-  },
-
-  // =========================================================================
-  // SLAP COMMAND - Slap someone with a random object
-  // =========================================================================
-  slap: async (message, member, args) => {
-    const target = args && args.length > 0 ? args.join(" ") : null;
-
-    if (!target) {
-      return await message.reply("👋 Sino ba gusto mo sampalin? Usage: `!slap <tao o bagay>`");
-    }
-
-    // Load objects and actions from external JSON file for maintainability
-    const objects = slapResponses.objects;
-    const actions = slapResponses.actions;
-
-    const object = objects[Math.floor(Math.random() * objects.length)];
-    const action = actions[Math.floor(Math.random() * actions.length)];
-
-    await message.reply(`👊 **${action} ${target}** gamit ang **${object}**!`);
-  },
-
-  // =========================================================================
-  // STATS COMMAND - Show member statistics
-  // =========================================================================
-  // Replace the !stats command handler (around line 1380-1469)
-  stats: async (message, member, args) => {
-  let targetMember = member;
-  let targetDisplayName = member.displayName; // For display purposes
-  let targetQueryName = member.nickname || member.user.username; // For MongoDB/Sheets query (use nickname to match check-in format)
-  let matchInfo = null;
-
-  // Parse target from args
-  if (args.length > 0) {
-    if (message.mentions.members.size > 0) {
-      // @mention provided - highest priority
-      targetMember = message.mentions.members.first();
-      targetDisplayName = targetMember.displayName;
-      targetQueryName = targetMember.nickname || targetMember.user.username;
-     } else {
-       if (!message.guild) return;
-       // User provided a name without @mention - use fuzzy matching
-       const searchName = args.join(" ");
-       const guild = message.guild;
-
-      if (guild) {
-        matchInfo = findBestMemberMatch(searchName, guild);
-
-        if (matchInfo) {
-          targetMember = matchInfo.member;
-          targetDisplayName = matchInfo.matchedName; // For display
-          targetQueryName = matchInfo.member.nickname || matchInfo.member.user.username; // For query (use nickname to match check-in format)
-
-          // Log match quality for debugging
-          console.log(`🔍 Stats fuzzy match: "${searchName}" → "${targetDisplayName}" (${matchInfo.matchType}, ${matchInfo.confidence}% confidence)`);
-        } else {
-          // No match found - use raw search name for both display and query
-          targetDisplayName = searchName;
-          targetQueryName = searchName;
-          targetMember = null;
-          console.log(`⚠️ Stats: No Discord match found for "${searchName}", trying database...`);
-        }
-      } else {
-        targetDisplayName = searchName;
-        targetQueryName = searchName;
-      }
-    }
-  }
-  // If no args provided, show own stats (already set to member above)
-
-  // Check cache first (use normalized name for cache key)
-  const cacheKey = targetQueryName.toLowerCase().trim();
-  const cached = statsCache.get(cacheKey);
-  if (cached && (Date.now() - cached.timestamp < STATS_CACHE_DURATION)) {
-    console.log(`📦 Using cached stats for ${targetDisplayName}`);
-
-     // CRITICAL FIX: Try to find member by the actual name returned from sheets
-     if (!targetMember && message.guild?.id === config.main_guild_id) {
-      const actualName = cached.data.memberName;
-      const foundMember = message.guild.members.cache.find(
-        m => m.displayName.toLowerCase() === actualName.toLowerCase() ||
-             m.user.username.toLowerCase() === actualName.toLowerCase()
-      );
-      if (foundMember) {
-        targetMember = foundMember;
-      }
-    }
-
-    const embed = buildStatsEmbed(cached.data, targetMember);
-    const statsMsg = await message.reply({ embeds: [embed] });
-
-    // Delete user's command message immediately
-    try {
-      await errorHandler.safeDelete(message, 'message deletion');
-    } catch (e) {
-      console.warn(`⚠️ Could not delete user message: ${e.message}`);
-    }
-
-    // Auto-delete after 5 minutes
-    setTimeout(async () => {
-      try {
-        await errorHandler.safeDelete(statsMsg, 'message deletion');
-      } catch (e) {
-        console.warn(`⚠️ Could not delete stats message: ${e.message}`);
-      }
-    }, 300000); // 5 minutes
-
-    return;
-  }
-
-  // Show loading message
-  const loadingMsg = await message.reply(`⏳ Fetching stats for **${targetDisplayName}**...`);
-
-  try {
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MONGODB-FIRST PATH (Phase 4)
-    // ═══════════════════════════════════════════════════════════════════════════
-    let result;
-
-    if (USE_MONGODB_ATTENDANCE) {
-      try {
-        // Fetch stats from MongoDB using username (not display name)
-        result = await mongoHelpers.getMemberStats(targetQueryName);
-
-        if (result.status !== 'ok') {
-          await loadingMsg.edit(`❌ Could not find stats for **${targetDisplayName}**`);
-          return;
-        }
-
-        console.log(`✅ [MongoDB] Stats fetched for ${result.memberName}`);
-
-      } catch (mongoError) {
-        console.error(`❌ [MongoDB] Stats fetch failed, falling back to Sheets:`, mongoError.message);
-        // Fall through to Sheets path below
-        result = null;
-      }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // GOOGLE SHEETS PATH (Fallback or when MongoDB disabled)
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (!result) {
-      // Fetch stats from Google Sheets (with fuzzy matching support)
-      result = await sheetAPI.call('getMemberStats', { memberName: targetQueryName });
-
-      if (result.status !== 'ok') {
-        await loadingMsg.edit(`❌ Could not find stats for **${targetDisplayName}**`);
-        return;
-      }
-
-      console.log(`✅ [Sheets] Stats fetched for ${result.memberName}`);
-    }
-
-    // CRITICAL FIX: Get the actual member name returned from sheets (for fuzzy match cases)
-    const actualMemberName = result.memberName;
-
-     // CRITICAL FIX: Try to find the actual Discord member by the returned name
-     if (message.guild?.id === config.main_guild_id) {
-      const foundMember = message.guild.members.cache.find(
-        m => m.displayName.toLowerCase() === actualMemberName.toLowerCase() ||
-             m.user.username.toLowerCase() === actualMemberName.toLowerCase()
-      );
-      if (foundMember) {
-        targetMember = foundMember;
-        console.log(`✅ Found Discord member for ${actualMemberName}: ${foundMember.displayName}`);
-      } else {
-        console.log(`⚠️ Could not find Discord member for ${actualMemberName}, using original member`);
-      }
-    }
-
-    // Cache the result (use the actual name from sheets for cache key)
-    const actualCacheKey = actualMemberName.toLowerCase().trim();
-    statsCache.set(actualCacheKey, {
-      data: result,
-      timestamp: Date.now()
-    });
-
-    // Build and send embed (now with proper targetMember for lore lookup)
-    const embed = buildStatsEmbed(result, targetMember);
-    await loadingMsg.edit({ content: null, embeds: [embed] });
-
-    // Delete user's command message immediately
-    try {
-      await errorHandler.safeDelete(message, 'message deletion');
-    } catch (e) {
-      console.warn(`⚠️ Could not delete user message: ${e.message}`);
-    }
-
-    // Auto-delete after 5 minutes
-    setTimeout(async () => {
-      try {
-        await errorHandler.safeDelete(loadingMsg, 'message deletion');
-      } catch (e) {
-        console.warn(`⚠️ Could not delete stats message: ${e.message}`);
-      }
-    }, 300000); // 5 minutes
-
-    console.log(`✅ Stats sent for ${actualMemberName} (searched: ${targetDisplayName})`);
-
-  } catch (error) {
-    console.error('Stats error:', error);
-    await loadingMsg.edit("❌ Error fetching stats. Please try again later.");
-  }
-},
-
-  // =========================================================================
-  // CLEARSTATE COMMAND - Emergency state reset
-  // =========================================================================
-  clearstate: async (message, member) => {
-    await awaitConfirmation(
-      message,
-      member,
-      `⚠️ **WARNING: Clear all bot memory?**\n\n` +
-        `This will clear:\n` +
-        `• ${Object.keys(activeSpawns).length} active spawn(s)\n` +
-        `• ${
-          Object.keys(pendingVerifications).length
-        } pending verification(s)\n` +
-        `• ${Object.keys(activeColumns).length} active column(s)\n\n` +
-        `Click ✅ Confirm or ❌ Cancel button below.`,
-      async (confirmMsg) => {
-        // Reset all state variables to empty objects
-        // This is a nuclear option for when the bot gets stuck
-        activeSpawns = {};
-        activeColumns = {};
-        pendingVerifications = {};
-        pendingClosures = {};
-        confirmationMessages = {};
-
-        // Sync state back to attendance module
-        // This ensures both index2.js and attendance.js have consistent state
-        attendance.setActiveSpawns(activeSpawns);
-        attendance.setActiveColumns(activeColumns);
-        attendance.setPendingVerifications(pendingVerifications);
-        attendance.setPendingClosures(pendingClosures);
-        attendance.setConfirmationMessages(confirmationMessages);
-
-        await message.reply(
-          `✅ **State cleared successfully!**\n\nAll bot memory has been reset. Fresh start.`
-        );
-        console.log(`🔧 State cleared by ${member.user.username}`);
-      },
-      async (confirmMsg) => {
-        await message.reply("❌ Clear state canceled.");
-      }
-    );
-  },
-
-  // =========================================================================
-  // CLOSEALLTHREAD COMMAND - Mass close all attendance threads
-  // =========================================================================
-   closeallthread: async (message, member) => {
-     if (!message.guild) return;
-     const guild = message.guild;
-    const attChannel = await guild.channels
-      .fetch(config.attendance_channel_id)
+    const guild = await client.guilds
+      .fetch(config.main_guild_id)
       .catch(() => null);
-    if (!attChannel) {
-      await message.reply("❌ Could not find attendance channel.");
+    if (!guild) {
+      console.error(`❌ Could not fetch guild for cleanup`);
       return;
     }
 
-    const attThreads = await attChannel.threads.fetchActive().catch(() => null);
-    if (!attThreads || attThreads.threads.size === 0) {
-      await message.reply("🔭 No active threads found in attendance channel.");
+    const biddingChannel = await guild.channels
+      .fetch(config.bidding_channel_id)
+      .catch(() => null);
+    if (!biddingChannel) {
+      console.error(`❌ Could not fetch bidding channel for cleanup`);
       return;
     }
 
-    const openSpawns = [];
-    for (const [threadId, thread] of attThreads.threads) {
-      const spawnInfo = activeSpawns[threadId];
-      if (spawnInfo && !spawnInfo.closed) {
-        openSpawns.push({ threadId, thread, spawnInfo });
-      }
-    }
-
-    if (openSpawns.length === 0) {
-      await message.reply("🔭 No open spawn threads found in bot memory.");
-      return;
-    }
-
-    await awaitConfirmation(
-      message,
-      member,
-      `⚠️ **MASS CLOSE ALL THREADS?**\n\n` +
-        `This will:\n` +
-        `• Verify ALL pending members in ALL threads\n` +
-        `• Close and submit ${openSpawns.length} spawn thread(s)\n` +
-        `• Process one thread at a time (to avoid rate limits)\n\n` +
-        `**Threads to close:**\n` +
-        openSpawns
-          .map(
-            (s, i) =>
-              `${i + 1}. **${s.spawnInfo.boss}** (${s.spawnInfo.timestamp}) - ${
-                s.spawnInfo.members.length
-              } verified`
-          )
-          .join("\n") +
-        `\n\nClick ✅ Confirm or ❌ Cancel button below.\n\n` +
-        `⏱️ This will take approximately ${openSpawns.length * 5} seconds.`,
-      async (confirmMsg) => {
-        await message.reply(
-          `📁 **Starting mass close...**\n\n` +
-            `Processing ${openSpawns.length} thread(s) one by one...\n` +
-            `Please wait, this may take a few minutes.`
-        );
-
-        let successCount = 0,
-          failCount = 0;
-        const results = [];
-        let totalReactionsRemoved = 0,
-          totalReactionsFailed = 0;
-
-        for (let i = 0; i < openSpawns.length; i++) {
-          const { threadId, thread, spawnInfo } = openSpawns[i];
-          const operationStartTime = Date.now();
-
-          try {
-            const progress = Math.floor(((i + 1) / openSpawns.length) * 20);
-            const progressBar =
-              "█".repeat(progress) + "░".repeat(20 - progress);
-            const progressPercent = Math.floor(
-              ((i + 1) / openSpawns.length) * 100
-            );
-
-            await message.channel.send(
-              `📋 **[${i + 1}/${
-                openSpawns.length
-              }]** ${progressBar} ${progressPercent}%\n` +
-                `Processing: **${spawnInfo.boss}** (${spawnInfo.timestamp})...`
-            );
-
-            const pendingInThread = Object.entries(pendingVerifications).filter(
-              ([msgId, p]) => p.threadId === threadId
-            );
-
-            if (pendingInThread.length > 0) {
-              await message.channel.send(
-                `   ├─ Found ${pendingInThread.length} pending verification(s)... Auto-verifying all...`
-              );
-
-              const newMembers = pendingInThread.filter(
-                ([msgId, p]) =>
-                  !spawnInfo.members.some(
-                    (m) => normalizeUsername(m) === normalizeUsername(p.author)
-                  )
-              );
-
-              // Add members and store Discord IDs
-              if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
-              for (const [msgId, p] of newMembers) {
-                spawnInfo.members.push(p.author);
-                spawnInfo.memberIds[p.author] = p.authorId;
-              }
-
-              const messageIds = pendingInThread.map(([msgId, p]) => msgId);
-              const messagePromises = messageIds.map((msgId) =>
-                thread.messages.fetch(msgId).catch(() => null)
-              );
-              const fetchedMessages = await Promise.allSettled(messagePromises);
-
-              const reactionPromises = fetchedMessages.map((result) => {
-                if (result.status === "fulfilled" && result.value) {
-                  return result.value.reactions.removeAll().catch(err => errorHandler.silentError(err, 'auto-verify reaction cleanup'));
-                }
-                return Promise.resolve();
-              });
-              await Promise.allSettled(reactionPromises);
-
-              pendingInThread.forEach(
-                ([msgId]) => delete pendingVerifications[msgId]
-              );
-
-              await message.channel.send(
-                `   ├─ ✅ Auto-verified ${newMembers.length} member(s) (${
-                  pendingInThread.length - newMembers.length
-                } were duplicates)`
-              );
-            }
-
-            await thread
-              .send(
-                `📍 Closing spawn **${spawnInfo.boss}** (${spawnInfo.timestamp})... Submitting ${spawnInfo.members.length} members to Google Sheets...`
-              )
-              .catch((err) =>
-                console.warn(
-                  `⚠️ Could not post to spawn thread ${threadId}: ${err.message}`
-                )
-              );
-
-            spawnInfo.closed = true;
-
-            // Check if there are any members to submit
-            if (spawnInfo.members.length === 0) {
-              // No members to submit - just close and archive the thread
-              await message.channel.send(
-                `   ├─ ⚠️ No members to submit (0 verified). Skipping Google Sheets submission...`
-              );
-
-              await thread
-                .send(
-                  `⚠️ Thread closed with no verified members. No data submitted to Google Sheets.`
-                )
-                .catch((err) =>
-                  console.warn(
-                    `⚠️ Could not post to spawn thread ${threadId}: ${err.message}`
-                  )
-                );
-
-              // Even with 0 members, increment boss rotation
-              await bossRotation.handleBossKill(spawnInfo.boss);
-
-              // Delete rotation warning message to avoid flooding
-              await bossRotation.deleteRotationWarning(spawnInfo.boss);
-              await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
-
-              // Close confirmation thread if it exists
-              if (spawnInfo.confirmThreadId) {
-                const confirmThread = await guild.channels
-                  .fetch(spawnInfo.confirmThreadId)
-                  .catch(() => null);
-                if (confirmThread) {
-                  await confirmThread
-                    .send(
-                      `⚠️ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - 0 members (no submission)`
-                    )
-                    .catch(err => errorHandler.silentError(err, 'confirm thread zero members notification'));
-                  await errorHandler.safeDelete(confirmThread, 'message deletion');
-                }
-              }
-
-              // Clean up reactions
-              await message.channel.send(
-                `   ├─ 🧹 Cleaning up reactions from thread...`
-              );
-              const cleanupStats = await attendance.cleanupAllThreadReactions(
-                thread
-              );
-              totalReactionsRemoved += cleanupStats.success;
-              totalReactionsFailed += cleanupStats.failed;
-
-              if (cleanupStats.failed > 0) {
-                await message.channel.send(
-                  `   ├─ ⚠️ Warning: ${cleanupStats.failed} message(s) still have reactions`
-                );
-              }
-
-              // Lock and archive the thread
-              await thread.setLocked(true, `Mass close by ${member.user.username}`)
-                .catch(err => errorHandler.silentError(err, 'mass close lock empty thread'));
-              await thread.setArchived(true, `Mass close by ${member.user.username}`)
-                .catch(err => errorHandler.silentError(err, 'mass close archive empty thread'));
-
-              // Clean up state
-              const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
-              delete activeSpawns[threadId];
-              delete activeColumns[cacheKey];
-              delete confirmationMessages[threadId];
-
-              successCount++;
-              results.push(
-                `⚠️ **${spawnInfo.boss}** - 0 members (thread closed, no submission)`
-              );
-
-              await message.channel.send(
-                `   └─ ✅ **Thread closed!** (No submission - 0 members)`
-              );
-
-              console.log(
-                `📍 Mass close: ${spawnInfo.boss} at ${spawnInfo.timestamp} (0 members - no submission)`
-              );
-            } else {
-              // Members exist - remove from activeColumns cache BEFORE checking Google Sheets
-              // This prevents false positives where the thread exists but was never submitted
-              const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
-              delete activeColumns[cacheKey];
-
-              // Check for duplicates before submitting
-              const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
-
-              if (columnExists) {
-                console.log(`⚠️ Duplicate prevented: ${spawnInfo.boss} at ${spawnInfo.timestamp} already exists`);
-
-                await message.channel.send(
-                  `   ⚠️ **Attendance already submitted!** Closing thread without duplicate submission.`
-                );
-
-                // Skip submission, just close and clean up
-                if (spawnInfo.confirmThreadId) {
-                  const confirmThread = await guild.channels
-                    .fetch(spawnInfo.confirmThreadId)
-                    .catch(() => null);
-                  if (confirmThread) {
-                    await confirmThread.send(
-                      `⚠️ Duplicate prevented: **${spawnInfo.boss}** (${spawnInfo.timestamp})`
-                    );
-                    await errorHandler.safeDelete(confirmThread, 'message deletion');
-                  }
-                }
-
-                await thread.setLocked(true, `Mass close by ${member.user.username} (duplicate prevented)`)
-                  .catch(err => errorHandler.silentError(err, 'mass close lock duplicate thread'));
-                await thread.setArchived(true, `Mass close by ${member.user.username} (duplicate prevented)`)
-                  .catch(err => errorHandler.silentError(err, 'mass close archive duplicate thread'));
-
-                // Note: activeColumns already removed before check, but keeping for safety
-                delete activeSpawns[threadId];
-                delete activeColumns[cacheKey];
-                delete confirmationMessages[threadId];
-
-                successCount++;
-                results.push(
-                  `⚠️ **${spawnInfo.boss}** - Duplicate prevented (column already exists)`
-                );
-
-                console.log(
-                  `📍 Mass close: ${spawnInfo.boss} at ${spawnInfo.timestamp} (duplicate prevented)`
-                );
-              } else {
-                // No duplicate - proceed with submission
-                await message.channel.send(
-                  `   ├─ 📊 Submitting ${spawnInfo.members.length} member(s) to Google Sheets...`
-                );
-
-                const payload = {
-                  action: "submitAttendance",
-                  boss: spawnInfo.boss,
-                  date: spawnInfo.date,
-                  time: spawnInfo.time,
-                  timestamp: spawnInfo.timestamp,
-                  members: spawnInfo.members,
-                };
-
-                const resp = await attendance.postToSheet(payload);
-
-                if (resp.ok) {
-              // Auto-increment boss rotation if it's a rotating boss
-              await bossRotation.handleBossKill(spawnInfo.boss);
-
-              // Delete rotation warning message to avoid flooding
-              await bossRotation.deleteRotationWarning(spawnInfo.boss);
-              await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
-
-              await thread
-                .send(
-                  `✅ Attendance submitted successfully! Archiving thread...`
-                )
-                .catch((err) =>
-                  console.warn(
-                    `⚠️ Could not post success to spawn thread ${threadId}: ${err.message}`
-                  )
-                );
-
-              if (spawnInfo.confirmThreadId) {
-                const confirmThread = await guild.channels
-                  .fetch(spawnInfo.confirmThreadId)
-                  .catch(() => null);
-                if (confirmThread) {
-                  await confirmThread
-                    .send(
-                      `✅ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - ${spawnInfo.members.length} members recorded`
-                    )
-                    .catch(err => errorHandler.silentError(err, 'confirm thread spawn closed notification'));
-                  await errorHandler.safeDelete(confirmThread, 'message deletion');
-                }
-              }
-
-              await message.channel.send(
-                `   ├─ 🧹 Cleaning up reactions from thread...`
-              );
-              const cleanupStats = await attendance.cleanupAllThreadReactions(
-                thread
-              );
-              totalReactionsRemoved += cleanupStats.success;
-              totalReactionsFailed += cleanupStats.failed;
-
-              if (cleanupStats.failed > 0) {
-                await message.channel.send(
-                  `   ├─ ⚠️ Warning: ${cleanupStats.failed} message(s) still have reactions`
-                );
-              }
-
-              await thread
-                .setArchived(true, `Mass close by ${member.user.username}`)
-                .catch(err => errorHandler.silentError(err, 'mass close archive thread'));
-
-              delete activeSpawns[threadId];
-              delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
-              delete confirmationMessages[threadId];
-
-              successCount++;
-              results.push(
-                `✅ **${spawnInfo.boss}** - ${spawnInfo.members.length} members submitted`
-              );
-
-              await message.channel.send(
-                `   └─ ✅ **Success!** Thread closed and archived.`
-              );
-
-              console.log(
-                `📍 Mass close: ${spawnInfo.boss} at ${spawnInfo.timestamp} (${spawnInfo.members.length} members)`
-              );
-            } else {
-              console.warn(
-                `⚠️ First attempt failed for ${spawnInfo.boss}, retrying in 5s...`
-              );
-              await message.channel.send(
-                `   ├─ ⚠️ First attempt failed, retrying in 5 seconds...`
-              );
-              await new Promise((resolve) =>
-                setTimeout(resolve, TIMING.RETRY_DELAY)
-              );
-
-              const retryResp = await attendance.postToSheet(payload);
-
-              if (retryResp.ok) {
-                if (spawnInfo.confirmThreadId) {
-                  const confirmThread = await guild.channels
-                    .fetch(spawnInfo.confirmThreadId)
-                    .catch(() => null);
-                  if (confirmThread)
-                    await errorHandler.safeDelete(confirmThread, 'message deletion');
-                }
-
-                await thread
-                  .setArchived(true, `Mass close by ${member.user.username}`)
-                  .catch(err => errorHandler.silentError(err, 'mass close archive thread after retry'));
-
-                delete activeSpawns[threadId];
-                delete activeColumns[
-                  `${spawnInfo.boss}|${spawnInfo.timestamp}`
-                ];
-
-                successCount++;
-                results.push(
-                  `✅ **${spawnInfo.boss}** - ${spawnInfo.members.length} members submitted (retry succeeded)`
-                );
-
-                await message.channel.send(
-                  `   └─ ✅ **Success on retry!** Thread closed and archived.`
-                );
-
-                console.log(
-                  `📍 Mass close (retry): ${spawnInfo.boss} at ${spawnInfo.timestamp} (${spawnInfo.members.length} members)`
-                );
-              } else {
-                failCount++;
-                results.push(
-                  `❌ **${spawnInfo.boss}** - Failed: ${
-                    retryResp.text || retryResp.err
-                  } (after retry)`
-                );
-
-                await message.channel.send(
-                  `   └─ ❌ **Failed after retry!** Error: ${
-                    retryResp.text || retryResp.err
-                  }\n` + `   Members: ${spawnInfo.members.join(", ")}`
-                );
-
-                console.error(
-                  `❌ Mass close failed (after retry) for ${spawnInfo.boss}:`,
-                  retryResp.text || retryResp.err
-                );
-              }
-            }
-              } // End of duplicate check else block
-            } // End of members.length > 0 check
-
-            const operationTime = Date.now() - operationStartTime;
-            const minDelay = TIMING.MASS_CLOSE_DELAY;
-            const remainingDelay = Math.max(0, minDelay - operationTime);
-
-            if (i < openSpawns.length - 1) {
-              if (remainingDelay > 0) {
-                await message.channel.send(
-                  `   ⏳ Waiting ${Math.ceil(
-                    remainingDelay / 1000
-                  )} seconds before next thread...`
-                );
-                await new Promise((resolve) =>
-                  setTimeout(resolve, remainingDelay)
-                );
-              } else {
-                await message.channel.send(
-                  `   ⏳ Operation took ${Math.ceil(
-                    operationTime / 1000
-                  )}s, proceeding immediately...`
-                );
-              }
-            }
-          } catch (err) {
-            failCount++;
-            results.push(`❌ **${spawnInfo.boss}** - Error: ${err.message}`);
-            await message.channel.send(`   └─ ❌ **Error!** ${err.message}`);
-            console.error(`❌ Mass close error for ${spawnInfo.boss}:`, err);
-          }
-        }
-
-        const summaryEmbed = new EmbedBuilder()
-          .setColor(successCount === openSpawns.length ? 0x00ff00 : 0xffa500)
-          .setTitle("🎉 Mass Close Complete!")
-          .setDescription(
-            `**Summary:**\n` +
-              `✅ Success: ${successCount}\n` +
-              `❌ Failed: ${failCount}\n` +
-              `📊 Total: ${openSpawns.length}`
-          )
-          .addFields(
-            {
-              name: "📋 Detailed Results",
-              value: results.join("\n"),
-              inline: false,
-            },
-            {
-              name: "🧹 Cleanup Statistics",
-              value: `✅ Reactions removed: ${totalReactionsRemoved}\n❌ Failed cleanups: ${totalReactionsFailed}`,
-              inline: false,
-            }
-          )
-          .setFooter({ text: `Executed by ${member.user.username}` })
-          .setTimestamp();
-
-        await message.reply({ embeds: [summaryEmbed] });
-
-        console.log(
-          `🔧 Mass close complete: ${successCount}/${openSpawns.length} successful by ${member.user.username}`
-        );
-      },
-      async (confirmMsg) => {
-        await message.reply("❌ Mass close canceled.");
-      }
-    );
-  },
-
-  forcesubmit: async (message, member) => {
-    const spawnInfo = activeSpawns[message.channel.id];
-    if (!spawnInfo) {
-      await message.reply(
-        "⚠️ This thread is not in bot memory. Use !debugthread to check state."
-      );
-      return;
-    }
-
-    await awaitConfirmation(
-      message,
-      member,
-      `📊 **Force submit attendance?**\n\n` +
-        `**Boss:** ${spawnInfo.boss}\n` +
-        `**Timestamp:** ${spawnInfo.timestamp}\n` +
-        `**Members:** ${spawnInfo.members.length}\n\n` +
-        `This will submit to Google Sheets WITHOUT closing the thread.\n\n` +
-        `Click ✅ Confirm or ❌ Cancel button below.`,
-      async (confirmMsg) => {
-        // Check for duplicate column before submitting
-        const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
-
-        if (columnExists) {
-          console.log(`⚠️ Duplicate prevented: ${spawnInfo.boss} at ${spawnInfo.timestamp} already exists`);
-
-          await message.channel.send(
-            `⚠️ **Attendance already submitted for this spawn!**\n\n` +
-              `Column already exists in Google Sheets. Submission cancelled to prevent duplicate.`
-          );
-
-          return;
-        }
-
-        await message.channel.send(
-          `📊 Submitting ${spawnInfo.members.length} members to Google Sheets...`
-        );
-
-        const payload = {
-          action: "submitAttendance",
-          boss: spawnInfo.boss,
-          date: spawnInfo.date,
-          time: spawnInfo.time,
-          timestamp: spawnInfo.timestamp,
-          members: spawnInfo.members,
-        };
-
-        const resp = await attendance.postToSheet(payload);
-
-        if (resp.ok) {
-          // Auto-increment boss rotation if it's a rotating boss
-          await bossRotation.handleBossKill(spawnInfo.boss);
-
-          // Delete rotation warning message to avoid flooding
-          await bossRotation.deleteRotationWarning(spawnInfo.boss);
-          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
-
-          await message.channel.send(
-            `✅ **Attendance submitted successfully!**\n\n` +
-              `${spawnInfo.members.length} members recorded.\n` +
-              `Thread remains open for additional verifications if needed.`
-          );
-
-          console.log(
-            `🔧 Force submit: ${spawnInfo.boss} by ${member.user.username} (${spawnInfo.members.length} members)`
-          );
-        } else {
-          await message.channel.send(
-            `⚠️ **Failed to submit attendance!**\n\n` +
-              `Error: ${resp.text || resp.err}\n\n` +
-              `**Members list (for manual entry):**\n${spawnInfo.members.join(
-                ", "
-              )}`
-          );
-        }
-      },
-      async (confirmMsg) => {
-        await message.reply("❌ Force submit canceled.");
-      }
-    );
-  },
-
-  debugthread: async (message, member) => {
-    const threadId = message.channel.id;
-    const spawnInfo = activeSpawns[threadId];
-
-    if (!spawnInfo) {
-      await message.reply(
-        `⚠️ **Thread not in bot memory!**\n\n` +
-          `This thread is not being tracked by the bot.\n` +
-          `It may have been:\n` +
-          `• Created before bot started\n` +
-          `• Manually created without bot\n` +
-          `• Cleared from memory\n\n` +
-          `Try using \`!clearstate\` and restarting, or use \`!forceclose\` to close it.`
-      );
-      return;
-    }
-
-    const pendingInThread = Object.values(pendingVerifications).filter(
-      (p) => p.threadId === threadId
-    );
-
-    const embed = new EmbedBuilder()
-      .setColor(0x4a90e2)
-      .setTitle("🔍 Thread Debug Info")
-      .addFields(
-        { name: "🎯 Boss", value: spawnInfo.boss, inline: true },
-        { name: "🕐 Timestamp", value: spawnInfo.timestamp, inline: true },
-        {
-          name: "🔒 Closed",
-          value: spawnInfo.closed ? "Yes" : "No",
-          inline: true,
-        },
-        {
-          name: "✅ Verified Members",
-          value: `${spawnInfo.members.length}`,
-          inline: false,
-        },
-        {
-          name: "👥 Member List",
-          value: spawnInfo.members.join(", ") || "None",
-          inline: false,
-        },
-        {
-          name: "⏳ Pending Verifications",
-          value: `${pendingInThread.length}`,
-          inline: false,
-        },
-        {
-          name: "🔗 Confirmation Thread",
-          value: spawnInfo.confirmThreadId
-            ? `<#${spawnInfo.confirmThreadId}>`
-            : "None",
-          inline: false,
-        },
-        { name: "💾 In Memory", value: "✅ Yes", inline: false }
-      )
-      .setFooter({ text: `Requested by ${member.user.username}` })
-      .setTimestamp();
-
-    await message.reply({ embeds: [embed] });
-  },
-
-  resetpending: async (message, member) => {
-    const threadId = message.channel.id;
-    const pendingInThread = Object.keys(pendingVerifications).filter(
-      (msgId) => pendingVerifications[msgId].threadId === threadId
-    );
-
-    if (pendingInThread.length === 0) {
-      await message.reply("✅ No pending verifications in this thread.");
-      return;
-    }
-
-    await awaitConfirmation(
-      message,
-      member,
-      `⚠️ **Clear ${pendingInThread.length} pending verification(s)?**\n\n` +
-        `This will remove all pending verifications for this thread.\n` +
-        `Members will NOT be added to verified list.\n\n` +
-        `Click ✅ Confirm or ❌ Cancel button below.`,
-      async (confirmMsg) => {
-        pendingInThread.forEach((msgId) => delete pendingVerifications[msgId]);
-
-        await message.reply(
-          `✅ **Cleared ${pendingInThread.length} pending verification(s).**\n\n` +
-            `You can now close the thread.`
-        );
-
-        console.log(
-          `🔧 Reset pending: ${threadId} by ${member.user.username} (${pendingInThread.length} cleared)`
-        );
-      },
-      async (confirmMsg) => {
-        await message.reply("❌ Reset pending canceled.");
-      }
-    );
-  },
-
-  // =========================================================================
-  // OPENTHREAD COMMAND - Reopen a closed attendance thread for manual override
-  // =========================================================================
-  openthread: async (message, member) => {
-    const thread = message.channel;
-
-    // Must be in a thread
-    if (!thread.isThread()) {
-      await message.reply("⚠️ This command must be used inside an attendance thread.");
-      return;
-    }
-
-    // Must be in attendance channel
-    if (thread.parentId !== config.attendance_channel_id) {
-      await message.reply("⚠️ This command only works in attendance threads.");
-      return;
-    }
-
-    // Parse thread name to get boss and timestamp
-    const parsed = attendance.parseThreadName(thread.name);
-    if (!parsed) {
-      await message.reply("⚠️ Could not parse thread name. Expected formats:\n• Boss: `[MM/DD/YY HH:MM] BOSS_NAME`\n• Event: `GvG MM-DD HH:MM` or `Guild Boss MM-DD HH:MM`");
-      return;
-    }
-
-    // Check if it's a known event type (GvG, Guild Boss) or a boss spawn
-    const EVENT_TYPES = ["GvG", "Guild Boss"];
-    const isEventThread = EVENT_TYPES.includes(parsed.boss);
-    const bossName = isEventThread ? parsed.boss : attendance.findBossMatch(parsed.boss);
-
-    if (!bossName) {
-      await message.reply(`⚠️ Unknown boss or event type: "${parsed.boss}"`);
-      return;
-    }
-
-    // Check if thread is already in activeSpawns and open
-    const existingSpawn = activeSpawns[thread.id];
-    if (existingSpawn && !existingSpawn.closed) {
-      await message.reply("ℹ️ This thread is already open and active.");
-      return;
-    }
-
-    const typeLabel = isEventThread ? "Event" : "Boss";
-    await awaitConfirmation(
-      message,
-      member,
-      `🔓 **Reopen Closed Thread?**\n\n` +
-        `**${typeLabel}:** ${bossName}\n` +
-        `**Timestamp:** ${parsed.timestamp}\n\n` +
-        `This will:\n` +
-        `• Unarchive and unlock the thread\n` +
-        `• Re-register the spawn in bot memory\n` +
-        `• Allow new check-ins and re-queue all messages as pending verifications\n` +
-        `• Use \`!overrideclose\` to close and submit (will overwrite existing column if any)\n\n` +
-        `Click ✅ Confirm or ❌ Cancel button below.`,
-       async (confirmMsg) => {
-         if (!message.guild) return;
-         const guild = message.guild;
-
-         // Unarchive and unlock the thread
-         try {
-           if (thread.archived) {
-             await thread.setArchived(false, `Reopened by ${member.user.username}`);
-           }
-           if (thread.locked) {
-             await thread.setLocked(false, `Unlocked by ${member.user.username}`);
-           }
-         } catch (err) {
-           await message.reply(`⚠️ Could not unlock/unarchive thread: ${err.message}`);
-           return;
-         }
-
-        // Try to load existing members from MongoDB (fast) or Google Sheets (fallback)
-        let existingMembers = [];
-        if (!existingSpawn) {
-          const loadMsg = await message.channel.send(`🔍 Loading existing attendance...`);
-
-          try {
-            // FAST PATH: Load from MongoDB first
-            if (USE_MONGODB_ATTENDANCE) {
-              const db = await dbAPI.connect();
-
-              // Parse timestamp to Date object for MongoDB query
-              const timestampDate = new Date(parsed.timestamp);
-
-              // Get all attendance records for this boss + timestamp
-              const attendanceRecords = await db.collection('attendance')
-                .find({
-                  bossName: bossName,
-                  timestamp: timestampDate
-                })
-                .toArray();
-
-              if (attendanceRecords.length > 0) {
-                // Extract unique member names
-                existingMembers = [...new Set(attendanceRecords.map(r => r.memberName))];
-                console.log(`   ✅ Loaded ${existingMembers.length} existing members from MongoDB (${attendanceRecords.length} records)`);
-                await loadMsg.edit(`✅ Loaded ${existingMembers.length} existing member(s) from MongoDB`);
-              } else {
-                console.log(`   ℹ️ No records found in MongoDB for this boss/timestamp`);
-              }
-            }
-
-            // No Sheets fallback needed - MongoDB is the source of truth for attendance
-            if (existingMembers.length === 0) {
-              await loadMsg.edit(`ℹ️ No existing attendance found in MongoDB`);
-            }
-          } catch (err) {
-            console.log(`   ⚠️ Could not load existing members: ${err.message}`);
-            await loadMsg.edit(`⚠️ Could not load existing members`).catch(() => {});
-          }
-        }
-
-        // Re-register spawn in activeSpawns
-        activeSpawns[thread.id] = {
-          boss: bossName,
-          date: parsed.date,
-          time: parsed.time,
-          timestamp: parsed.timestamp,
-          members: existingSpawn ? existingSpawn.members : existingMembers, // Preserve from memory OR load from MongoDB/Sheets
-          confirmThreadId: existingSpawn ? existingSpawn.confirmThreadId : null,
-          closed: false,
-          createdAt: existingSpawn ? existingSpawn.createdAt : Date.now(),
-          noAutoClose: true, // Prevent auto-close for manually reopened threads
-          reopened: true, // Mark as reopened to prevent rotation increment on close
-        };
-
-        // Sync to attendance module
-        attendance.setActiveSpawns(activeSpawns);
-
-        // Scan thread for all check-in messages and add them to pending verifications
-        await message.channel.send(`🔍 Scanning thread for check-in messages...`);
-
-        const messages = await thread.messages.fetch({ limit: 100 }).catch(() => null);
-        let foundCheckIns = 0;
-        let alreadyVerified = 0;
-        const spawnInfo = activeSpawns[thread.id];
-
-        if (messages) {
-          const exactKeywords = ["present", "here", "join", "checkin", "check-in", "attending"];
-
-          for (const [msgId, msg] of messages) {
-            // Skip bot messages
-            if (msg.author.bot) continue;
-
-            const content = msg.content.trim().toLowerCase();
-            const keyword = content.split(/\s+/)[0];
-
-            // Check if it's a check-in message
-            if (exactKeywords.includes(keyword)) {
-              const msgMember = await guild.members.fetch(msg.author.id).catch(() => null);
-              const username = msgMember ? (msgMember.nickname || msg.author.username) : msg.author.username;
-
-              // Check if already verified
-              const isVerified = spawnInfo.members.some(
-                (m) => normalizeUsername(m) === normalizeUsername(username)
-              );
-
-              if (isVerified) {
-                alreadyVerified++;
-                continue;
-              }
-
-              // Check if already in pending verifications
-              if (pendingVerifications[msgId]) {
-                continue;
-              }
-
-              // Add to pending verifications (late check-ins will also be added)
-              pendingVerifications[msgId] = {
-                author: username,
-                authorId: msg.author.id,
-                threadId: thread.id,
-                timestamp: msg.createdTimestamp,
-                verificationMsgId: null, // No button message for re-queued verifications
-              };
-              foundCheckIns++;
-            }
-          }
-        }
-
-        attendance.setPendingVerifications(pendingVerifications);
-
-        await message.reply(
-          `✅ **Thread Reopened!**\n\n` +
-            `**${typeLabel}:** ${bossName}\n` +
-            `**Timestamp:** ${parsed.timestamp}\n` +
-            `**Previously Verified:** ${spawnInfo.members.length} member(s)\n` +
-            `**Re-queued for Verification:** ${foundCheckIns} message(s)\n` +
-            `**Already Verified (skipped):** ${alreadyVerified}\n\n` +
-            `📝 You can now:\n` +
-            `• Verify pending check-ins with ✅/❌ buttons or \`!verify @member\`\n` +
-            `• Use \`!verifyall\` to verify all pending at once\n` +
-            `• Use \`!overrideclose\` to close and submit (overwrites existing column if any)\n` +
-            `• Use \`close\` for normal close (will block if column already exists)`
-        );
-
-        console.log(
-          `🔓 Thread reopened: ${bossName} (${parsed.timestamp}) by ${member.user.username} - ${foundCheckIns} pending, ${spawnInfo.members.length} verified`
-        );
-      },
-      async (confirmMsg) => {
-        await message.reply("❌ Open thread canceled.");
-      }
-    );
-  },
-
-  // =========================================================================
-  // OVERRIDECLOSE COMMAND - Close and submit with column overwrite support
-  // =========================================================================
-  overrideclose: async (message, member) => {
-    const spawnInfo = activeSpawns[message.channel.id];
-    if (!spawnInfo) {
-      await message.reply(
-        "⚠️ This thread is not in bot memory. Use `!openthread` first to reopen it."
-      );
-      return;
-    }
-
-    if (spawnInfo.closed) {
-      await message.reply("⚠️ This spawn is already closed.");
-      return;
-    }
-
-    const pendingInThread = Object.entries(pendingVerifications).filter(
-      ([msgId, p]) => p.threadId === message.channel.id
-    );
-
-    // Check if column already exists
-    const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
-    const overwriteWarning = columnExists
-      ? `\n\n⚠️ **Column already exists!** This will OVERWRITE the existing attendance data.`
-      : `\n\n✅ No existing column found. Will create new column.`;
-
-    await awaitConfirmation(
-      message,
-      member,
-      `🔒 **Override Close Spawn?**\n\n` +
-        `**Boss:** ${spawnInfo.boss}\n` +
-        `**Timestamp:** ${spawnInfo.timestamp}\n` +
-        `**Verified Members:** ${spawnInfo.members.length}\n` +
-        `**Pending Verifications:** ${pendingInThread.length}` +
-        overwriteWarning +
-        `\n\n${pendingInThread.length > 0 ? `⚠️ **${pendingInThread.length} pending verification(s) will be AUTO-VERIFIED!**\n\n` : ''}` +
-        `Click ✅ Confirm or ❌ Cancel button below.`,
-       async (confirmMsg) => {
-         if (!message.guild) return;
-         const guild = message.guild;
-
-        // Auto-verify all pending check-ins
-        if (pendingInThread.length > 0) {
-          await message.channel.send(`📋 Auto-verifying ${pendingInThread.length} pending check-in(s)...`);
-
-          for (const [msgId, pending] of pendingInThread) {
-            const isDuplicate = spawnInfo.members.some(
-              (m) => normalizeUsername(m) === normalizeUsername(pending.author)
-            );
-
-            if (!isDuplicate) {
-              spawnInfo.members.push(pending.author);
-              // Store Discord ID for reliable MongoDB lookup
-              if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
-              spawnInfo.memberIds[pending.author] = pending.authorId;
-            }
-
-            delete pendingVerifications[msgId];
-          }
-
-          attendance.setPendingVerifications(pendingVerifications);
-        }
-
-        spawnInfo.closed = true;
-        attendance.setActiveSpawns(activeSpawns);
-
-        // Check if there are any members to submit
-        if (spawnInfo.members.length === 0) {
-          await message.channel.send(
-            `⚠️ **No members to submit!**\n\nClosing thread without Google Sheets submission.`
-          );
-
-          // Clean up
-          if (spawnInfo.confirmThreadId) {
-            const confirmThread = await guild.channels
-              .fetch(spawnInfo.confirmThreadId)
-              .catch(() => null);
-            if (confirmThread) {
-              await confirmThread.send(
-                `⚠️ Override close: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - 0 members`
-              );
-              await errorHandler.safeDelete(confirmThread, 'override close delete confirm thread');
-            }
-          }
-
-          await message.channel.setLocked(true, `Override closed by ${member.user.username}`).catch(err => errorHandler.silentError(err, 'override close lock empty'));
-          await message.channel.setArchived(true, `Override closed by ${member.user.username}`).catch(err => errorHandler.silentError(err, 'override close archive empty'));
-
-          // Delete rotation warning message (prevent channel flooding)
-          await bossRotation.deleteRotationWarning(spawnInfo.boss);
-          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
-
-          delete activeSpawns[message.channel.id];
-          const cacheKey = `${spawnInfo.boss.toUpperCase()}|${attendance.getCurrentTimestamp().full}`;
-          delete activeColumns[cacheKey];
-          delete confirmationMessages[message.channel.id];
-
-          attendance.setActiveSpawns(activeSpawns);
-          attendance.setActiveColumns(activeColumns);
-          attendance.setConfirmationMessages(confirmationMessages);
-
-          return;
-        }
-
-        await message.channel.send(
-          `📊 Submitting ${spawnInfo.members.length} members to Google Sheets...` +
-            (columnExists ? ` (Overwriting existing column)` : ` (Creating new column)`)
-        );
-
-        // Prepare payload - always use overwriteAttendance action for !overrideclose
-        // This ensures proper column handling since handleOverwriteAttendance:
-        // 1. Finds and overwrites existing column if it exists
-        // 2. Creates new column if no existing column found
-        // Using submitAttendance when columnExists is false can cause issues if the
-        // check result is stale (e.g., activeColumns cache not updated after openthread)
-        const payload = {
-          action: "overwriteAttendance",
-          boss: spawnInfo.boss,
-          date: spawnInfo.date,
-          time: spawnInfo.time,
-          timestamp: spawnInfo.timestamp,
-          members: spawnInfo.members,
-        };
-
-        const resp = await attendance.postToSheet(payload);
-
-        if (resp.ok) {
-          // Invalidate client-side cache (attendance data changed)
-          clientCache.invalidate('getAllWeeklyAttendance:{}');
-          console.log(`🧹 Invalidated client cache (overwrite attendance)`);
-
-          // Override close should NOT increment rotation (it's for fixing data, not new kills)
-          console.log(`⏭️ Skipping rotation increment for ${spawnInfo.boss} (override close - fixing attendance)`);
-
-          // Delete rotation warning message (prevent channel flooding)
-          await bossRotation.deleteRotationWarning(spawnInfo.boss);
-          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
-
-          await message.channel.send(
-            `✅ **Attendance ${columnExists ? 'overwritten' : 'submitted'} successfully!**\n\n` +
-              `${spawnInfo.members.length} member(s) recorded.\n` +
-              `Archiving thread...`
-          );
-
-          if (spawnInfo.confirmThreadId) {
-            const confirmThread = await guild.channels
-              .fetch(spawnInfo.confirmThreadId)
-              .catch(() => null);
-            if (confirmThread) {
-              await confirmThread.send(
-                `✅ Override close: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - ${spawnInfo.members.length} members ${columnExists ? '(overwritten)' : '(new)'}`
-              );
-              await errorHandler.safeDelete(confirmThread, 'override close delete confirm thread');
-            }
-          }
-
-          // Lock and archive the thread
-          await message.channel
-            .setLocked(true, `Override closed by ${member.user.username}`)
-            .catch(err => errorHandler.silentError(err, 'override close lock thread'));
-          await message.channel
-            .setArchived(true, `Override closed by ${member.user.username}`)
-            .catch(err => errorHandler.silentError(err, 'override close archive thread'));
-
-          // Clean up state
-          delete activeSpawns[message.channel.id];
-          const normalizedKey = `${spawnInfo.boss.toUpperCase()}|${require('./utils/common').normalizeTimestamp(spawnInfo.timestamp)}`;
-          delete activeColumns[normalizedKey];
-          delete confirmationMessages[message.channel.id];
-
-          attendance.setActiveSpawns(activeSpawns);
-          attendance.setActiveColumns(activeColumns);
-          attendance.setConfirmationMessages(confirmationMessages);
-
-          console.log(
-            `🔒 Override close: ${spawnInfo.boss} at ${spawnInfo.timestamp} by ${member.user.username} (${spawnInfo.members.length} members, ${columnExists ? 'overwritten' : 'new'})`
-          );
-        } else {
-          await message.channel.send(
-            `⚠️ **Failed to submit attendance!**\n\n` +
-              `Error: ${resp.text || resp.err}\n\n` +
-              `**Members list (for manual entry):**\n${spawnInfo.members.join(", ")}`
-          );
-        }
-      },
-      async (confirmMsg) => {
-        await message.reply("❌ Override close canceled.");
-      }
-    );
-  },
-
-  // =========================================================================
-  // STARTAUCTION COMMAND - Initiates auction session with queue
-  // =========================================================================
-  startauction: async (message, member) => {
-    // Prevent auction start during recovery to avoid data conflicts
-    if (isRecovering) {
-      return await message.reply(
-        `⚠️ Bot is recovering from crash, please wait...`
-      );
-    }
-
-    // Check if auction is already running
-    const auctState = auctioneering.getAuctionState();
-    if (auctState.active) {
-      return await message.reply(`❌ Auction session already running`);
-    }
-
-    // Enforce 10-minute cooldown after auction ends
-    // This prevents rapid auction restarts and gives admins time to review results
-    const now = Date.now();
-    const timeSinceLast = now - lastAuctionEndTime;
-    const cooldownRemaining = AUCTION_COOLDOWN - timeSinceLast;
-
-    if (timeSinceLast < AUCTION_COOLDOWN) {
-      const mins = Math.ceil(cooldownRemaining / 60000);
-      return await message.reply(
-        `⏱️ Cooldown active. Wait ${mins} more minute(s). Or use \`!startauctionnow\` to override.`
-      );
-    }
-
-    await auctioneering.startAuctioneering(client, config, message.channel);
-    lastAuctionEndTime = Date.now();
-  },
-
-  startauctionnow: async (message, member) => {
-    if (isRecovering) {
-      return await message.reply(
-        `⚠️ Bot is recovering from crash, please wait...`
-      );
-    }
-
-    const auctState = auctioneering.getAuctionState();
-    if (auctState.active) {
-      return await message.reply(`❌ Auction session already running`);
-    }
-
-    await auctioneering.startAuctioneering(client, config, message.channel);
-    lastAuctionEndTime = Date.now();
-    await message.reply(
-      `✅ Auction started immediately. Cooldown reset to 10 minutes.`
-    );
-  },
-
-  pause: async (message, member) => {
-    const auctState = auctioneering.getAuctionState();
-    if (!auctState.active) {
-      return await message.reply(`❌ No active auction to pause`);
-    }
-    const success = auctioneering.pauseSession();
-    if (success) {
-      await message.reply(`⸸ Auction paused. Use \`!resume\` to continue.`);
-    }
-  },
-
-  resume: async (message, member) => {
-    const auctState = auctioneering.getAuctionState();
-    if (!auctState.active || !auctState.paused) {
-      return await message.reply(`❌ No paused auction to resume`);
-    }
-    const success = auctioneering.resumeSession(
-      client,
-      config,
-      message.channel
-    );
-    if (success) {
-      await message.reply(`▶️ Auction resumed.`);
-    }
-  },
-
-  stop: async (message, member) => {
-    const auctState = auctioneering.getAuctionState();
-    if (!auctState.active || !auctState.currentItem) {
-      return await message.reply(`❌ No active auction to stop`);
-    }
-    auctioneering.stopCurrentItem(client, config, message.channel);
-    await message.reply(`⏹️ Current item auction ended immediately.`);
-  },
-
-  extend: async (message, member, args) => {
-    if (args.length === 0) {
-      return await message.reply(`❌ Usage: \`!extend <minutes>\``);
-    }
-    let value = parseInt(args[0]);
-    if (isNaN(value) || value <= 0) {
-      return await message.reply(`❌ Must be positive number`);
-    }
-
-    // Check if unit is specified (from NLP: "30 seconds" vs "30 minutes")
-    const unit = args[1] ? args[1].toLowerCase() : '';
-    let mins = value;
-
-    // Convert seconds to minutes if needed
-    if (unit && (unit.startsWith('sec') || unit === 's')) {
-      mins = Math.ceil(value / 60); // Convert seconds to minutes, round up
-    }
-    // If unit is minutes or empty, treat as minutes (default)
-
-    if (mins <= 0) {
-      mins = 1; // Minimum 1 minute
-    }
-    const auctState = auctioneering.getAuctionState();
-    if (!auctState.active || !auctState.currentItem) {
-      return await message.reply(`❌ No active auction to extend`);
-    }
-    const success = auctioneering.extendCurrentItem(mins);
-    if (success) {
-      // CRITICAL: Reschedule timers to reflect new endTime
-      auctioneering.rescheduleItemTimers(client, config, message.channel);
-      await message.reply(`⏱️ Extended by ${mins} minute(s).`);
-    }
-  },
-
-  // Replace the !endauction handler in your commandHandlers object (around line 450 in index2.js)
-
-  // REPLACE the entire !endauction handler in index2.js commandHandlers object (Line ~450)
-  // This version fixes the race condition with double execution
-
-  endauction: async (message, member) => {
-    const auctState = auctioneering.getAuctionState();
-    if (!auctState.active) {
-      return await message.reply(`❌ No active auction to end`);
-    }
-
-    // Create confirmation embed
-    const confirmEmbed = new EmbedBuilder()
-      .setColor(0xffa500)
-      .setTitle(`⚠️ End Auction Session?`)
-      .setDescription(
-        `This will immediately end the current auction session and submit all completed items.\n\n` +
-          `**Current Item:** ${auctState.currentItem?.item || "None"}\n` +
-          `**Completed Items:** ${
-            auctState.sessionItems?.filter((s) => s.winner).length || 0
-          }\n\n` +
-          `Click ✅ End Session or ❌ Cancel button below.`
-      )
-      .setFooter({ text: `30 seconds to respond` })
-      .setTimestamp();
-
-    const confirmButton = new ButtonBuilder()
-      .setCustomId(`endauction_confirm_${message.author.id}_${Date.now()}`)
-      .setLabel('✅ End Session')
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(false);
-
-    const cancelButton = new ButtonBuilder()
-      .setCustomId(`endauction_cancel_${message.author.id}_${Date.now()}`)
-      .setLabel('❌ Cancel')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(false);
-
-    const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
-
-    const confirmMsg = await message.reply({ embeds: [confirmEmbed], components: [row] });
-
-    const collector = confirmMsg.createMessageComponentCollector({
-      componentType: ComponentType.Button,
-      time: 30000,
-      filter: i => i.user.id === message.author.id
-    });
-
-    // Flag to prevent double execution
-    let executed = false;
-
-    collector.on('collect', async (interaction) => {
-      // Prevent double execution
-      if (executed) return;
-      executed = true;
-
-      const isConfirm = interaction.customId.startsWith('endauction_confirm_');
-
-      const disabledRow = createDisabledRow(confirmButton, cancelButton);
-
-      await interaction.update({ components: [disabledRow] });
-
-      if (isConfirm) {
-        // User confirmed - end the auction
-        await message.reply(`🛑 Ending auction session immediately...`);
-
-        // Get bidding channel for finalization (always use parent channel, not thread)
-        const biddingChannel = await discordCache.getChannel('bidding_channel_id');
-
-        // Don't call stopCurrentItem() here - endAuctionSession handles it
-        // stopCurrentItem() would call itemEnd() which moves to next item,
-        // but we want to END the entire session, not move to next item
-
-        // CRITICAL: Always use the parent bidding channel (type 0 or 5), never a thread (type 11)
-        // endAuctionSession will handle stopping the current item and finalizing
-        await auctioneering.endAuctionSession(client, config, biddingChannel);
-
-        await message.reply(`✅ Auction session ended and results submitted.`);
-      } else {
-        // User cancelled
-        await message.reply(`❌ End auction canceled`);
-      }
-
-      collector.stop();
-    });
-
-    collector.on('end', async (collected, reason) => {
-      if (reason === 'time' && collected.size === 0) {
-        // Prevent double execution
-        if (executed) return;
-        executed = true;
-
-        const disabledRow = createDisabledRow(confirmButton, cancelButton);
-
-        await errorHandler.safeEdit(confirmMsg, { components: [disabledRow] }, 'auction reset confirmation timeout');
-        await message.reply(`⏱️ Confirmation timeout - auction continues`);
-      }
-    });
-  },
-
-  queuelist: async (message, member) => {
-    await auctioneering.handleQueueList(message, bidding.getBiddingState());
-  },
-
-  mypoints: async (message, member) => {
-    await auctioneering.handleMyPoints(message, bidding, config);
-  },
-
-  bidstatus: async (message, member) => {
-    await auctioneering.handleBidStatus(message, config);
-  },
-
-  cancelitem: async (message, member) => {
-    await auctioneering.handleCancelItem(message);
-  },
-
-  skipitem: async (message, member) => {
-    await auctioneering.handleSkipItem(message);
-  },
-
-  forcesubmitresults: async (message, member) => {
-    await auctioneering.handleForceSubmitResults(message, config, bidding);
-  },
-
-  maintenance: async (message, member) => {
-    // Load timer-based bosses from configuration (these spawn during maintenance)
-    // ENHANCED: Now dynamic and uses the same config as spawn predictions
-    let maintenanceBosses = [];
-
-    // Use hardcoded list of timer-based bosses
-    maintenanceBosses = [
-      "Venatus", "Viorent", "Ego", "Livera", "Araneo", "Undomiel",
-      "Lady Dalia", "General Aquleus", "Amentis", "Baron Braudmore",
-      "Wannitas", "Metus", "Duplican", "Shuliar", "Gareth", "Titore",
-      "Larba", "Catena", "Secreta", "Ordo", "Asta", "Supore",
-    ];
-
-    // Show confirmation message
-    await awaitConfirmation(
-      message,
-      member,
-      `⚠️ **Spawn Maintenance Threads?**\n\n` +
-        `This will create spawn threads for **${maintenanceBosses.length} bosses** that spawn during maintenance:\n\n` +
-        `${maintenanceBosses.map((b, i) => `${i + 1}. ${b}`).join("\n")}\n\n` +
-        `**Spawn time:** 5 minutes from now\n\n` +
-        `Click ✅ Confirm or ❌ Cancel button below.`,
-      async (confirmMsg) => {
-        // Get current time + 5 minutes in Manila timezone (GMT+8)
-        // IMPORTANT: Properly handle GMT+8 timezone conversion
-        const futureTime = new Date(Date.now() + 5 * 60 * 1000);
-
-        // Use Intl.DateTimeFormat to get components directly in Manila timezone
-        const formatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: 'Asia/Manila',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        });
-
-        const parts = formatter.formatToParts(futureTime);
-        const year = parts.find(p => p.type === 'year').value;
-        const month = parts.find(p => p.type === 'month').value;
-        const day = parts.find(p => p.type === 'day').value;
-        const hours = parts.find(p => p.type === 'hour').value;
-        const minutes = parts.find(p => p.type === 'minute').value;
-        const yearShort = year.slice(-2);
-
-        // Format: MM/DD/YY HH:MM (required by createSpawnThreads)
-        const formattedTimestamp = `${month}/${day}/${yearShort} ${hours}:${minutes}`;
-
-        await message.reply(
-          `🔄 **Creating maintenance spawn threads...**\n\n` +
-            `Spawning ${maintenanceBosses.length} boss threads...\n` +
-            `Please wait...`
-        );
-
-        let successCount = 0;
-        let failCount = 0;
-        const results = [];
-
-        for (const bossName of maintenanceBosses) {
-          try {
-            // Create the thread using attendance module with noAutoClose flag
-            const result = await attendance.createSpawnThreads(
-              client,
-              bossName,
-              `${month}/${day}/${yearShort}`,
-              `${hours}:${minutes}`,
-              formattedTimestamp,
-              "manual",
-              true,  // noAutoClose = true for maintenance threads
-              true   // skipColumnCheck = true (maintenance = fresh sheets, no duplicates possible)
-            );
-
-            if (result && result.success) {
-              successCount++;
-              results.push(`✅ ${bossName}`);
-            } else {
-              failCount++;
-              const errorMsg = result && result.error ? result.error : 'Unknown error';
-              results.push(`❌ ${bossName} - ${errorMsg}`);
-            }
-
-            // Small delay to avoid rate limits
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          } catch (err) {
-            failCount++;
-            results.push(`❌ ${bossName} - ${err.message}`);
-          }
-        }
-
-        // Send summary with truncation handling for Discord embed limits (max 1024 chars per field)
-        let resultsText = results.join("\n");
-        if (resultsText.length > 1024) {
-          // Truncate and add "..." indicator
-          resultsText = resultsText.substring(0, 1000) + "\n... (truncated)";
-        }
-
-        const summary = new EmbedBuilder()
-          .setColor(successCount > 0 ? 0x00ff00 : 0xff0000)
-          .setTitle(`✅ Maintenance Threads Created`)
-          .setDescription(
-            `**Success:** ${successCount}/${maintenanceBosses.length}\n` +
-              `**Failed:** ${failCount}/${maintenanceBosses.length}`
-          )
-          .addFields({
-            name: "📋 Results",
-            value: resultsText || "No results",
-            inline: false,
-          })
-          .setFooter({ text: `Executed by ${member.user.username}` })
-          .setTimestamp();
-
-        await message.reply({ embeds: [summary] });
-
-        console.log(
-          `🔧 Maintenance threads created: ${successCount}/${maintenanceBosses.length} successful by ${member.user.username}`
-        );
-      },
-      async (confirmMsg) => {
-        await message.reply("❌ Maintenance spawn canceled.");
-      }
-    );
-  },
-
-  // ==========================================
-  // MEMBER MANAGEMENT COMMANDS
-  // ==========================================
-
-  /**
-   * Remove a member from the BiddingPoints sheet
-   * Used when members are kicked or banned from the guild
-   *
-   * Usage: !removemember <member_name>
-   * Aliases: !removemem, !rmmember, !delmember
-   */
-  removemember: async (message, member) => {
-    const args = message.content.trim().split(/\s+/).slice(1);
-
-    if (args.length === 0) {
-      await message.reply(
-        `❌ **Usage:** \`!removemember <member_name>\`\n\n` +
-          `**Example:** \`!removemember PlayerName\`\n\n` +
-          `**Aliases:** \`!removemem\`, \`!rmmember\`, \`!delmember\`\n\n` +
-          `This command removes a member from:\n` +
-          `• BiddingPoints sheet\n` +
-          `• All attendance week sheets\n\n` +
-          `**Exemption:** ForDistribution sheet (historical log) is NOT touched.\n\n` +
-          `Use this when a member is kicked or banned from the guild.`
-      );
-      return;
-    }
-
-    const memberName = args.join(" ").trim();
-
-    await awaitConfirmation(
-      message,
-      member,
-      `⚠️ **Remove member from ALL sheets?**\n\n` +
-        `**Member:** ${memberName}\n\n` +
-        `This will:\n` +
-        `• Remove the member from BiddingPoints sheet\n` +
-        `• Remove the member from ALL attendance week sheets\n` +
-        `• Delete all their point and attendance history\n` +
-        `• ForDistribution sheet will NOT be touched (historical log)\n` +
-        `• This action cannot be undone\n\n` +
-        `Click ✅ Confirm or ❌ Cancel button below.`,
-      async (confirmMsg) => {
-        try {
-          // Call Google Sheets to remove the member
-          const result = await sheetAPI.call('removeMember', {
-            memberName: memberName,
-          });
-
-          if (result.status === "ok" && result.removed) {
-            const actualName = result.memberName;
-            const pointsLost = result.pointsLeft || 0;
-            const biddingRemoved = result.biddingSheetRemoved || false;
-            const attendanceRemoved = result.attendanceSheetsRemoved || 0;
-            const totalAttendanceRemoved = result.totalAttendanceRemoved || false;
-            const totalSheets = result.totalSheetsAffected || 0;
-            const totalAttendance = result.totalAttendancePoints || 0;
-            const attendanceDetails = result.attendanceSheetsDetails || [];
-
-            // Build detailed description
-            let description = `**Member:** ${actualName}\n\n`;
-
-            if (biddingRemoved) {
-              description += `**BiddingPoints Sheet:**\n`;
-              description += `• Removed (had ${pointsLost} points)\n\n`;
-            }
-
-            if (attendanceRemoved > 0) {
-              description += `**Attendance Sheets:**\n`;
-              description += `• Removed from ${attendanceRemoved} week sheet(s)\n`;
-              description += `• Total attendance points: ${totalAttendance}\n\n`;
-
-              if (attendanceDetails.length > 0 && attendanceDetails.length <= 5) {
-                description += `**Details:**\n`;
-                attendanceDetails.forEach(detail => {
-                  description += `• ${detail.sheet}: ${detail.attendancePoints} pts\n`;
-                });
-              } else if (attendanceDetails.length > 5) {
-                description += `**Recent sheets:**\n`;
-                attendanceDetails.slice(0, 5).forEach(detail => {
-                  description += `• ${detail.sheet}: ${detail.attendancePoints} pts\n`;
-                });
-                description += `• ... and ${attendanceDetails.length - 5} more\n`;
-              }
-            }
-
-            if (totalAttendanceRemoved) {
-              description += `**TOTAL ATTENDANCE Sheet:**\n`;
-              description += `• Removed from aggregated attendance sheet\n\n`;
-            }
-
-            description += `\n**Total sheets affected:** ${totalSheets}`;
-
-            const embed = new EmbedBuilder()
-              .setColor(0x00ff00)
-              .setTitle(`✅ Member Removed Successfully`)
-              .setDescription(description)
-              .setFooter({ text: `Removed by ${member.user.username}` })
-              .setTimestamp();
-
-            await message.reply({ embeds: [embed] });
-
-            // Log to admin-logs channel
-            const adminLogsChannel = await discordCache.getChannel('admin_logs_channel_id');
-
-            if (adminLogsChannel) {
-              const logEmbed = new EmbedBuilder()
-                .setColor(0xff9900)
-                .setTitle(`🗑️ Member Removed from All Sheets`)
-                .setDescription(
-                  `**Removed Member:** ${actualName}\n` +
-                    `**Bidding Points Lost:** ${pointsLost}\n` +
-                    `**Attendance Points Lost:** ${totalAttendance}\n` +
-                    `**Attendance Sheets:** ${attendanceRemoved}\n` +
-                    `**Total Sheets:** ${totalSheets}\n` +
-                    `**Removed By:** ${member.user.username}`
-                )
-                .setTimestamp();
-
-              await adminLogsChannel.send({ embeds: [logEmbed] });
-            }
-
-            console.log(
-              `🗑️ Removed member: ${actualName} from ${totalSheets} sheet(s) (${pointsLost} bidding pts, ${totalAttendance} attendance pts) by ${member.user.username}`
-            );
-          } else {
-            throw new Error(
-              result.message || "Member not found"
-            );
-          }
-        } catch (err) {
-          console.error("❌ Remove member error:", err);
-          await message.reply(
-            `❌ **Failed to remove member!**\n\n` +
-              `Error: ${err.message}\n\n` +
-              `The member might not exist in the sheet, or there was a connection error.`
-          );
-        }
-      },
-      async (confirmMsg) => {
-        await message.reply("❌ Member removal canceled.");
-      }
-    );
-  },
-
-  // ==========================================
-  // LEADERBOARD COMMANDS
-  // ==========================================
-
-  leaderboardattendance: async (message, member) => {
-    // Permission check is done in routing logic
-    console.log(`📊 ${member.user.username} requested attendance leaderboard`);
-    await leaderboardSystem.displayAttendanceLeaderboard(message);
-  },
-
-  leaderboardbidding: async (message, member) => {
-    // Permission check is done in routing logic
-    console.log(`📊 ${member.user.username} requested bidding leaderboard`);
-    await leaderboardSystem.displayBiddingLeaderboard(message);
-  },
-
-  leaderboards: async (message, member) => {
-    // Permission check is done in routing logic
-    console.log(`📊 ${member.user.username} requested combined leaderboards`);
-    await leaderboardSystem.displayCombinedLeaderboards(message);
-  },
-
-  // ==========================================
-  // WEEKLY & MONTHLY REPORT COMMANDS (Phase 6)
-  // ==========================================
-
-  weekly: async (message, member) => {
-    try {
-      console.log(`📊 ${member.user.username} requested weekly report`);
-      await message.channel.send('📊 Generating weekly report...');
-
-      const data = await reports.generateWeeklyReport();
-      const embed = reports.buildWeeklyReportEmbed(data);
-
-      await message.channel.send({ embeds: [embed] });
-    } catch (error) {
-      console.error('❌ Failed to generate weekly report:', error);
-      await message.reply('⚠️ Failed to generate weekly report. Please try again later.');
-    }
-  },
-
-  monthly: async (message, member) => {
-    try {
-      console.log(`📊 ${member.user.username} requested monthly report`);
-      await message.channel.send('📊 Generating monthly report...');
-
-      const data = await reports.generateMonthlyReport();
-      const embed = reports.buildMonthlyReportEmbed(data);
-
-      await message.channel.send({ embeds: [embed] });
-    } catch (error) {
-      console.error('❌ Failed to generate monthly report:', error);
-      await message.reply('⚠️ Failed to generate monthly report. Please try again later.');
-    }
-  },
-
-  weeklyreport: async (message, member) => {
-    // Permission check is done in routing logic
-    console.log(`📅 ${member.user.username} manually triggered weekly report in channel: ${message.channel?.name || message.channel?.id}`);
-    await message.reply({ content: "📊 Generating weekly report...", failIfNotExists: false });
-
-    // Validate channel before passing
-    if (!message.channel) {
-      console.error('❌ message.channel is null/undefined');
-      await message.reply({ content: "❌ Error: Unable to determine channel for report", failIfNotExists: false });
-      return;
-    }
-
-    // Pass the channel where the command was invoked so report is sent only there
-    await leaderboardSystem.sendWeeklyReport(message.channel);
-  },
-
-  monthlyreport: async (message, member) => {
-    try {
-      // Permission check is done in routing logic
-      console.log(`📅 ${member.user.username} manually triggered monthly report`);
-
-      // Validate channel exists before proceeding
-      if (!message.channel) {
-        console.error('❌ message.channel is null/undefined');
-        await message.reply({ content: "❌ Error: Unable to determine channel for report", failIfNotExists: false });
-        return;
-      }
-
-      // Pass the channel where the command was invoked so report is sent only there
-      await leaderboardSystem.sendMonthlyReport(message.channel);
-      console.log(`✅ Monthly report command completed successfully`);
-    } catch (error) {
-      console.error(`❌ Error in monthlyreport command:`, error);
-      await message.reply(`❌ Error generating monthly report: ${error.message}`).catch(err => errorHandler.silentError(err, 'monthly report error reply'));
-    }
-  },
-
-  // ==========================================
-  // ACTIVITY HEATMAP COMMANDS
-  // ==========================================
-
-  activity: async (message, member) => {
-    try {
-      // Permission check is done in routing logic
-      const args = message.content.trim().split(/\s+/).slice(1);
-      const mode = args[0]?.toLowerCase();
-
-      console.log(`📊 ${member.user.username} requested activity heatmap${mode ? ` (${mode})` : ''}`);
-      await activityHeatmap.displayActivityHeatmap(message, mode);
-      console.log(`✅ Activity heatmap command completed successfully`);
-    } catch (error) {
-      console.error(`❌ Error in activity command:`, error);
-      await message.reply(`❌ Error generating activity heatmap: ${error.message}`).catch(err => errorHandler.silentError(err, 'activity heatmap error reply'));
-    }
-  },
-
-
-  // =========================================================================
-  // STANDALONE EMERGENCY COMMAND HANDLERS
-  // =========================================================================
-  // These wrap the emergency-commands module for easier access
-
-  /**
-   * Force close a specific attendance thread
-   * Usage: !forceclosethread | !fct
-   */
-  forceclosethread: async (message, member) => {
-    await emergencyCommands.handleEmergencyCommand(message, ['close', message.channel.id]);
-  },
-
-  /**
-   * Force close ALL attendance threads
-   * Usage: !forcecloseallthreads | !fcat
-   */
-  forcecloseallthreads: async (message, member) => {
-    await emergencyCommands.handleEmergencyCommand(message, ['closeall']);
-  },
-
-  /**
-   * Force end stuck auction
-   * Usage: !forceendauction | !fea
-   */
-  forceendauction: async (message, member) => {
-    await emergencyCommands.handleEmergencyCommand(message, ['endauction']);
-  },
-
-  /**
-   * Unlock all locked bidding points
-   * Usage: !unlockallpoints | !unlock
-   */
-  unlockallpoints: async (message, member) => {
-    await emergencyCommands.handleEmergencyCommand(message, ['unlock']);
-  },
-
-  /**
-   * Clear all pending bid confirmations
-   * Usage: !clearallbids | !clearbids
-   */
-  clearallbids: async (message, member) => {
-    await emergencyCommands.handleEmergencyCommand(message, ['clearbids']);
-  },
-
-  /**
-   * Show comprehensive state diagnostics
-   * Usage: !diagnostics | !diag
-   */
-  diagnostics: async (message, member) => {
-    await emergencyCommands.handleEmergencyCommand(message, ['diag']);
-  },
-
-  /**
-   * Force sync state to Google Sheets
-   * Usage: !forcesync | !fsync
-   */
-  forcesync: async (message, member) => {
-    await emergencyCommands.handleEmergencyCommand(message, ['sync']);
-  },
-
-  /**
-   * Force run Core Evaluation immediately
-   * Usage: !forcecore | !fcore
-   */
-  forcecore: async (message, member) => {
-    if (!isAdmin(member)) {
-      await message.reply('❌ Admin-only command.');
-      return;
-    }
-    
-    await message.reply('🔧 Running Core Evaluation now...');
-    // DISABLED: await coreEvaluation.forceEvaluationNow(client);
-    await message.reply('✅ Core Evaluation complete!');
-  },
-
-  /**
-   * Force close Core Evaluation thread
-   * Usage: !fclose
-   */
-  fclose: async (message, member) => {
-    if (!isAdmin(member)) {
-      await message.reply('❌ Admin-only command.');
-      return;
-    }
-    
-    await message.reply('🔒 Closing Core Evaluation thread...');
-    // DISABLED: await coreEvaluation.forceCloseCycle(client);
-    await message.reply('✅ Thread closed!');
-  },
-
-  /**
-   * Force reset Core Evaluation cycle
-   * Usage: !freset
-   */
-  freset: async (message, member) => {
-    if (!isAdmin(member)) {
-      await message.reply('❌ Admin-only command.');
-      return;
-    }
-    
-    await message.reply('🔄 Resetting Core Evaluation cycle...');
-    // DISABLED: await coreEvaluation.forceResetCycle();
-    await message.reply('✅ Cycle reset! Use !forcecore to start fresh.');
-  },
-
-
-  /**
-   * Boss rotation management commands
-   * Usage: !rotation status | !rotation set <boss> <index> | !rotation increment <boss>
-   */
-  rotation: async (message, member) => {
-    if (!isAdmin(member)) {
-      await message.reply('❌ Admin-only command.');
-      return;
-    }
-
-    const args = message.content.trim().split(/\s+/).slice(1); // Remove "!rotation"
-    const subcommand = args[0]?.toLowerCase();
-
-    try {
-      // !rotation status - Show all rotation statuses with ML predictions
-      if (!subcommand || subcommand === 'status') {
-        const rotations = await bossRotation.getAllRotations();
-        const rotatingBosses = bossRotation.getRotatingBosses();
-
-        if (Object.keys(rotations).length === 0) {
-          await message.reply('⚠️ No rotation data available. BossRotation sheet may not be set up.');
-          return;
-        }
-
-        const embeds = [];
-        let embed = new EmbedBuilder()
-          .setColor(0x4a90e8)
-          .setTitle('🔄 Boss Rotation Status')
-          .setDescription('Current rotation for 5-guild system with ML-enhanced spawn predictions')
-          .setTimestamp();
-
-        let fieldCount = 0;
-        const MAX_FIELDS = 25;
-
-        const bossData = [];
-
-        for (const boss of rotatingBosses) {
-          const rotation = rotations[boss];
-          if (rotation) {
-            const emoji = rotation.isOurTurn ? '🟢' : '🔴';
-            const status = rotation.isOurTurn ? `${guildName}'S TURN` : `${rotation.currentGuild}'s turn`;
-
-            // Get spawn time - check boss timer first, then fall back to attendance predictions
-            let spawnInfo = '';
-            let spawnTimestamp = null;
-            let mlWindow = '';
-            let isFromTimer = false;
-
-            // First, check boss timer for recorded spawn times
+    // Cleanup old threads (Lock & Archive)
+    console.log(`🧵 Checking for old auction threads...`);
+
+    const auctionState = auctioneering.getAuctionState();
+    const hasActiveAuction = auctionState && auctionState.active;
+
+    let threadsLocked = 0;
+    let threadsArchived = 0;
+    let threadsSkipped = 0;
+
+    if (hasActiveAuction) {
+      console.log(`⚠️ Active auction detected - skipping thread cleanup to avoid interfering`);
+    } else {
+      try {
+        const activeThreads = await biddingChannel.threads
+          .fetchActive()
+          .catch(() => null);
+
+        if (activeThreads && activeThreads.threads.size > 0) {
+          console.log(`📋 Found ${activeThreads.threads.size} active thread(s) in bidding channel`);
+
+          for (const [threadId, thread] of activeThreads.threads) {
             try {
-              const timerData = bossTimer.getNextSpawn(boss);
-              if (timerData && timerData.nextSpawn) {
-                spawnTimestamp = Math.floor(timerData.nextSpawn.getTime() / 1000);
-                isFromTimer = true;
+              if (config.protected_thread_ids && config.protected_thread_ids.includes(threadId)) {
+                threadsSkipped++;
+                console.log(`⏭️ Skipping protected thread: ${thread.name}`);
+                continue;
               }
-            } catch (timerError) {
-              // Silently continue to prediction fallback
-            }
 
-            // Fallback: Get last spawn from attendance records
-            if (!spawnTimestamp) {
-              try {
-                const lastSpawn = await mongoHelpers.getLastBossSpawn(boss);
-                if (lastSpawn && lastSpawn.timestamp && bossSpawnConfig && bossSpawnConfig.timerBasedBosses[boss]) {
-                  const bossConfig = bossSpawnConfig.timerBasedBosses[boss];
-                  const intervalMs = bossConfig.spawnIntervalHours * 60 * 60 * 1000;
-                  const lastSpawnDate = new Date(lastSpawn.timestamp);
-                  const now = new Date();
-
-                  // Calculate next spawn by adding intervals until we get a future time
-                  let nextSpawnDate = new Date(lastSpawnDate.getTime() + intervalMs);
-                  while (nextSpawnDate < now) {
-                    nextSpawnDate = new Date(nextSpawnDate.getTime() + intervalMs);
-                  }
-
-                  spawnTimestamp = Math.floor(nextSpawnDate.getTime() / 1000);
-                  mlWindow = ' 📋'; // Attendance-based prediction
-                }
-              } catch (attendanceError) {
-                // Silently continue without spawn info
+              if (thread.type !== 11 && thread.type !== 12) {
+                threadsSkipped++;
+                continue;
               }
+
+              if (!thread.locked && typeof thread.setLocked === "function") {
+                await thread.setLocked(true, "Bidding channel cleanup").catch((err) => {
+                  console.warn(`⚠️ Failed to lock thread ${thread.name}:`, err.message);
+                });
+                threadsLocked++;
+                console.log(`🔒 Locked: ${thread.name}`);
+                await new Promise((resolve) => setTimeout(resolve, 300));
+              }
+
+              if (!thread.archived && typeof thread.setArchived === "function") {
+                await thread.setArchived(true, "Bidding channel cleanup").catch((err) => {
+                  console.warn(`⚠️ Failed to archive thread ${thread.name}:`, err.message);
+                });
+                threadsArchived++;
+                console.log(`📦 Archived: ${thread.name}`);
+              }
+
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            } catch (err) {
+              console.warn(`⚠️ Error processing thread ${thread.name}:`, err.message);
+              threadsSkipped++;
             }
-
-            if (spawnTimestamp) {
-              const sourceIndicator = isFromTimer ? ' ⏱️' : mlWindow;
-              spawnInfo = `\n📍 Next Spawn: <t:${spawnTimestamp}:R>${sourceIndicator}`;
-            }
-
-            const guildCount = rotation.guilds ? rotation.guilds.length : 5;
-            const nextGuild = rotation.guilds
-              ? rotation.guilds[rotation.currentIndex % guildCount]
-              : (rotation.nextGuild || rotation.currentGuild || 'Unknown');
-
-            bossData.push({
-              boss,
-              emoji,
-              status,
-              rotation,
-              guildCount,
-              nextGuild,
-              spawnInfo,
-              isOurTurn: rotation.isOurTurn || false,
-              sortKey: spawnTimestamp ? spawnTimestamp * 1000 : Number.MAX_SAFE_INTEGER
-            });
-          }
-        }
-
-        bossData.sort((a, b) => {
-          if (a.isOurTurn !== b.isOurTurn) {
-            return b.isOurTurn ? 1 : -1;
-          }
-          return a.sortKey - b.sortKey;
-        });
-
-        for (const data of bossData) {
-          if (fieldCount === MAX_FIELDS) {
-            embeds.push(embed);
-            embed = new EmbedBuilder()
-              .setColor(0x4a90e8)
-              .setTitle('🔄 Boss Rotation Status (cont.)')
-              .setTimestamp();
-            fieldCount = 0;
           }
 
-          embed.addFields({
-            name: `${data.emoji} ${data.boss}`,
-            value: `Guild ${data.rotation.currentIndex}/${data.guildCount} - **${data.status}**\nNext: ${data.nextGuild}${data.spawnInfo}`,
-            inline: false
-          });
-          fieldCount++;
-        }
-
-        embeds.push(embed);
-        await message.reply({ embeds });
-      }
-      // !rotation set <boss> <index> - Manually set rotation
-      else if (subcommand === 'set') {
-        // Parse boss name (can be multi-word like "Baron Braudmore")
-        // Last arg should be the index, everything else is the boss name
-        if (args.length < 3) {
-          await message.reply('❌ Usage: `!rotation set <boss> <index>`\nExample: `!rotation set Baron Braudmore 1`');
-          return;
-        }
-
-        const newIndex = parseInt(args[args.length - 1]); // Last arg is the index
-        const rawBossName = args.slice(1, -1).join(' '); // Everything between subcommand and index
-
-        if (!rawBossName || isNaN(newIndex)) {
-          await message.reply('❌ Usage: `!rotation set <boss> <index>`\nExample: `!rotation set Baron Braudmore 1`');
-          return;
-        }
-
-        // Use fuzzy matching to find the correct boss name
-        const bossName = findBossMatch(rawBossName, bossPoints);
-        if (!bossName) {
-          await message.reply(`❌ Unknown boss: "${rawBossName}"\n💡 Try: Amentis, Baron Braudmore, or General Aquleus`);
-          return;
-        }
-
-        // Get rotation data to check guild count for this specific boss
-        const rotations = await bossRotation.getAllRotations();
-        const rotation = rotations[bossName];
-
-        if (!rotation) {
-          await message.reply(`❌ **${bossName}** is not a rotating boss`);
-          return;
-        }
-
-        const guildCount = rotation.guilds ? rotation.guilds.length : 5;
-
-        if (newIndex < 1 || newIndex > guildCount) {
-          await message.reply(`❌ Index must be between 1 and ${guildCount} for **${bossName}** (${guildCount}-guild rotation)`);
-          return;
-        }
-
-        await message.reply(`⚙️ Setting **${bossName}** rotation to index ${newIndex}...`);
-
-        const result = await bossRotation.setRotation(bossName, newIndex);
-
-        if (result.success) {
-          const emoji = result.data.isOurTurn ? '🟢' : '🔴';
-          const status = result.data.isOurTurn ? `${guildName}'S TURN` : `${result.data.currentGuild}'s turn`;
-          await message.reply(
-            `✅ **${bossName}** rotation set to index **${newIndex}**\n\n` +
-            `${emoji} Status: **${status}**\n` +
-            `Guild: ${result.data.currentGuild}`
-          );
+          console.log(`✅ Thread cleanup: ${threadsLocked} locked, ${threadsArchived} archived, ${threadsSkipped} skipped`);
         } else {
-          await message.reply(`❌ ${result.message}`);
-        }
-      }
-      // !rotation increment <boss> - Manually advance rotation
-      else if (subcommand === 'increment' || subcommand === 'inc') {
-        // Parse boss name (can be multi-word like "Baron Braudmore")
-        // Everything after the subcommand is the boss name
-        if (args.length < 2) {
-          await message.reply('❌ Usage: `!rotation increment <boss>`\nExample: `!rotation increment Baron Braudmore`');
-          return;
+          console.log(`📋 No active threads found in bidding channel`);
         }
 
-        const rawBossName = args.slice(1).join(' '); // Join all remaining args
-
-        // Use fuzzy matching to find the correct boss name
-        const bossName = findBossMatch(rawBossName, bossPoints);
-        if (!bossName) {
-          await message.reply(`❌ Unknown boss: "${rawBossName}"\n💡 Try: Amentis, Baron Braudmore, or General Aquleus`);
-          return;
-        }
-
-        await message.reply(`🔄 Advancing **${bossName}** rotation...`);
-
-        const result = await bossRotation.incrementRotation(bossName);
-
-        if (result.updated !== false) {
-          const emoji = result.isNowOurTurn ? '🟢' : '🔴';
-          const status = result.isNowOurTurn ? `${guildName}'S TURN` : `${result.newGuild}'s turn`;
-          await message.reply(
-            `✅ **${bossName}** rotation advanced\n\n` +
-            `${result.oldIndex} (${result.oldGuild}) → ${result.newIndex} (${result.newGuild})\n\n` +
-            `${emoji} Status: **${status}**`
-          );
-        } else {
-          await message.reply(`❌ ${bossName} is not a rotating boss or update failed`);
-        }
-      }
-      // !rotation refresh - Force reload rotation data from Google Sheets
-      else if (subcommand === 'refresh' || subcommand === 'reload') {
-        await message.reply('🔄 Refreshing rotation data from Google Sheets...');
-
-        await bossRotation.refreshRotationCache();
-
-        const rotations = await bossRotation.getAllRotations();
-        const rotatingBosses = bossRotation.getRotatingBosses();
-
-        if (Object.keys(rotations).length === 0) {
-          await message.reply('⚠️ No rotation data found after refresh. BossRotation sheet may not be set up.');
-          return;
-        }
-
-        const embed = new EmbedBuilder()
-          .setColor(0x00ff00)
-          .setTitle('✅ Rotation Data Refreshed')
-          .setDescription(`Loaded ${rotatingBosses.length} rotating bosses from Google Sheets`)
-          .setTimestamp();
-
-        for (const boss of rotatingBosses) {
-          const rotation = rotations[boss];
-          if (rotation) {
-            const emoji = rotation.isOurTurn ? '🟢' : '🔴';
-            const status = rotation.isOurTurn ? `${guildName}'S TURN` : `${rotation.currentGuild}'s turn`;
-            embed.addFields({
-              name: `${emoji} ${boss}`,
-              value: `Guild ${rotation.currentIndex}/${rotation.guilds ? rotation.guilds.length : 5} - **${status}**`,
-              inline: false
-            });
-          }
-        }
-
-        await message.reply({ embeds: [embed] });
-      }
-      else {
-        await message.reply(
-          `❌ Unknown subcommand: ${subcommand}\n\n` +
-          `**Valid commands:**\n` +
-          `• \`!rotation\` or \`!rotation status\` - Show all rotation statuses\n` +
-          `• \`!rotation set <boss> <index>\` - Set rotation (1-5)\n` +
-          `  Example: \`!rotation set Baron Braudmore 3\`\n` +
-          `• \`!rotation increment <boss>\` - Advance rotation\n` +
-          `  Example: \`!rotation inc General Aquleus\`\n` +
-          `• \`!rotation refresh\` - Reload boss data from Google Sheets\n\n` +
-          `💡 **Tip:** Boss names support fuzzy matching! Try "baron", "braud", or "aquleus"`
-        );
-      }
-    } catch (error) {
-      console.error('[ROTATION] Command error:', error);
-      await message.reply(`❌ Error: ${error.message}`);
-    }
-  },
-};
-
-/**
- * =========================================================================
- * CLIENT READY EVENT HANDLER
- * =========================================================================
- *
- * Triggered once when the bot successfully connects to Discord.
- * Performs critical initialization sequence:
- *
- * 1. Configuration:
- *    - Attaches config to client for module access
- *    - Logs bot identity and version information
- *
- * 2. Module Initialization:
- *    - Auction cache (ensures 100% uptime for point data)
- *    - Attendance module (spawn tracking, verification system)
- *    - Bidding module (point management, queue system)
- *    - Auctioneering module (live auction state management)
- *    - Leaderboard module (statistics and rankings)
- *    - Emergency commands (backup and override tools)
- *
- * 3. Recovery Operations:
- *    - Checks for crashed auction state
- *    - Recovers unfinished items
- *    - Restores point locks
- *
- * 4. Scheduled Tasks:
- *    - Starts bidding channel cleanup (every 12 hours)
- *    - Initializes garbage collection monitoring (every 10 minutes)
- *
- * Order is critical - modules depend on each other and must
- * initialize in sequence to ensure proper dependency resolution.
- *
- * @event ClientReady
- */
-client.once(Events.ClientReady, async () => {
-  // Track startup time for performance metrics
-  const startupStartTime = Date.now();
-
-  mainLogger.info('Bot logged in successfully', {
-    tag: client.user.tag,
-    bossCount: Object.keys(bossPoints).length,
-    guildId: config.main_guild_id,
-    version: BOT_VERSION,
-  });
-
-  // INITIALIZE OPERATION QUEUE (Graceful degradation)
-  try {
-    await operationQueue.initialize();
-    mainLogger.info('Operation queue initialized');
-  } catch (error) {
-    mainLogger.error('Failed to initialize operation queue', error);
-  }
-
-  // INITIALIZE MONGODB CONNECTION (Non-blocking for Phase 2 testing)
-  try {
-    console.log('🔌 Connecting to MongoDB...');
-    await dbAPI.connect();
-    console.log('✅ MongoDB connected successfully');
-
-    // Get connection health info
-    const health = await dbAPI.healthCheck();
-    console.log(`📊 MongoDB Health: ${health.healthy ? '✅ Healthy' : '❌ Unhealthy'} (Latency: ${health.latency}ms)`);
-
-    // Get database stats
-    const stats = await dbAPI.getStats();
-    console.log(`📦 Database: ${stats.database} | Collections: ${stats.collections} | Size: ${stats.dataSize}`);
-
-    // Migrate temp IDs to real Discord IDs on startup
-    try {
-      const discordIdMapper = require('./utils/discord-id-mapper');
-      const stats = await discordIdMapper.getMigrationStats();
-
-      if (stats.withTempId > 0) {
-        console.log(`🔄 [MongoDB] Migrating ${stats.withTempId} members with temp IDs...`);
-        const migrationResult = await discordIdMapper.batchMigrateAllMembers(client, config.main_guild_id);
-        console.log(`✅ [MongoDB] Migration complete: ${migrationResult.migrated} migrated, ${migrationResult.notFound} not found`);
-      } else {
-        console.log(`✅ [MongoDB] All members have real Discord IDs`);
-      }
-    } catch (migrationError) {
-      console.error('⚠️ Discord ID migration failed (non-critical):', migrationError.message);
-    }
-  } catch (error) {
-    console.error('⚠️ MongoDB connection failed (non-critical for now):', error.message);
-    console.log('📝 Bot will continue with Google Sheets only until Phase 4');
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PHASE 1: INITIALIZE GRACEFUL SHUTDOWN MANAGER (CRIT-001)
-  // ═══════════════════════════════════════════════════════════════════════════
-  console.log('🛡️ Initializing graceful shutdown manager...');
-  shutdownManager.initialize();
-
-  // Register MongoDB cleanup handler (Priority 10 - runs early)
-  shutdownManager.registerCleanup('mongodb', async () => {
-    console.log('🔄 Closing MongoDB connection...');
-    await dbAPI.close();
-  }, 10);
-
-  // Register Discord client cleanup handler (Priority 20 - runs after MongoDB)
-  shutdownManager.registerCleanup('discord', async () => {
-    console.log('🔄 Destroying Discord client...');
-    client.removeAllListeners();
-    await client.destroy();
-  }, 20);
-
-  // Configure MongoDB admin channel for alerts (CRIT-005)
-  try {
-    const adminChannel = await client.channels.fetch(config.admin_logs_channel_id);
-    dbAPI.setAdminChannel(adminChannel);
-    console.log('✅ MongoDB admin alerts configured');
-
-    // PHASE 3.3: Initialize Discord monitoring system
-    discordMonitoring.initialize(adminChannel);
-    console.log('✅ Discord monitoring initialized');
-  } catch (error) {
-    console.error('⚠️ Failed to configure MongoDB admin alerts:', error.message);
-  }
-
-  console.log('✅ Graceful shutdown manager initialized');
-
-  // Attach config to client for module access
-  client.config = config;
-
-  // INITIALIZE DISCORD CHANNEL CACHE (60-80% API call reduction)
-  discordCache = new DiscordCache(client, config);
-
-  // INITIALIZE MULTI-LEVEL CACHE CLEANUP
-  const cacheManager = require('./utils/cache-manager');
-  cacheManager.startCacheCleanup();
-
-  // INITIALIZE AUCTION CACHE (100% uptime guarantee)
-  const auctionCache = require('./utils/auction-cache');
-  await auctionCache.init();
-
-
-   // INITIALIZE MEMBER REGISTRY
-   const memberRegistry = require('./member-registry');
-   await memberRegistry.initialize(config, dbAPI.client);
-  console.log('✅ Member registry initialized');
-
-  // INITIALIZE ALL MODULES IN CORRECT ORDER
-  attendance.initialize(config, bossPoints, isAdmin, discordCache);
-  await bossTimer.initialize(client, config, sheetAPI, attendance); // Boss timer system
-  helpSystem.initialize(config, isAdmin, BOT_VERSION);
-  helpSystemV2.initialize(config, isAdmin, BOT_VERSION); // NEW: Initialize channel-aware help system
-  auctioneering.initialize(config, isAdmin, bidding, discordCache);
-  bidding.initializeBidding(config, isAdmin, auctioneering, discordCache);
-  auctioneering.setPostToSheet(attendance.postToSheet);
-  emergencyCommands.initialize(config, attendance, bidding, auctioneering, isAdmin, discordCache);
-  leaderboardSystem.init(client, config, discordCache);
-  activityHeatmap.init(client, config);
-
-  // CRITICAL: Await boss rotation initialization to ensure rotation cache is loaded
-  // before daily schedule posts (prevents showing "no bosses" when bosses exist)
-  await bossRotation.initialize(config, client, bossTimer);
-
-  console.log("🔄 Running state recovery...");
-  isRecovering = true;
-
-  await recoverBotStateOnStartup(client, config);
-  const sweep1 = await attendance.recoverStateFromThreads(client);
-
-  let sweep2LoadedState = false;
-  if (!sweep1.success || sweep1.recovered === 0) {
-    sweep2LoadedState = await attendance.loadAttendanceStateFromSheet();
-  }
-
-  const sweep3 = await attendance.validateStateConsistency(client);
-  isRecovering = false;
-
-  await cleanupStaleStatsMessages();
-
-  const recoveryStatus = sweep1.recovered || 0;
-  const discrepancies = sweep3 ?
-    (sweep3.threadsWithoutColumns?.length || 0) +
-    (sweep3.columnsWithoutThreads?.length || 0) +
-    (sweep3.duplicateColumns?.length || 0) : 0;
-
-  console.log(`✅ Recovery complete: ${recoveryStatus} spawns, ${discrepancies} discrepancies`);
-
-  if (!sweep1.success || Object.keys(attendance.getActiveSpawns()).length === 0) {
-    await attendance.loadAttendanceStateFromSheet();
-  }
-
-  await bidding.recoverBiddingState(client, config);
-  attendance.schedulePeriodicStateSync();
-  attendance.startAutoCloseScheduler(client);
-
-  // Sync state references
-  activeSpawns = attendance.getActiveSpawns();
-  activeColumns = attendance.getActiveColumns();
-  pendingVerifications = attendance.getPendingVerifications();
-  pendingClosures = attendance.getPendingClosures();
-  confirmationMessages = attendance.getConfirmationMessages();
-
-  // START SCHEDULERS
-  startBiddingChannelCleanupSchedule();
-  leaderboardSystem.scheduleWeeklyReport();
-  leaderboardSystem.scheduleMonthlyReport();
-  auctioneering.scheduleWeeklySundayAuction(client, config);
-
-  // PRE-AUCTION SYNC (Sheets → MongoDB) - Runs before weekly auction (configured in bidding-schedule.json)
-  auctioneering.schedulePreAuctionSync(sheetAPI, bossRotation);
-  console.log('✅ Pre-auction sync scheduled (see config/bidding-schedule.json) - syncs manual Sheets edits to MongoDB');
-
-  // EVENT LISTENERS FOR MEMBER REGISTRY
-  // Track member joins and nickname changes
-  client.on(Events.GuildMemberAdd, async (member) => {
-    if (member.guild.id === config.main_guild_id) {
-      try {
-        await memberRegistry.onMemberJoin(member);
-      } catch (err) {
-        console.error('❌ GuildMemberAdd error:', err.message);
-      }
-    }
-  });
-
-  client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
-    if (newMember.guild.id === config.main_guild_id) {
-      try {
-        // Check for nickname change
-        if (oldMember.nickname !== newMember.nickname) {
-          await memberRegistry.onNicknameChange(newMember, oldMember.nickname);
-        }
-        // Check for username change
-        if (oldMember.user?.username !== newMember.user?.username) {
-          await memberRegistry.onUsernameChange(oldMember.user, newMember.user);
-        }
-      } catch (err) {
-        console.error('❌ GuildMemberUpdate error:', err.message);
-      }
-    }
-  });
-
-  console.log('✅ Member registry event listeners registered');
-
-  // EVENT REMINDER SERVICE (Phase 10) - MongoDB-powered reminder system
-  const mongoEventReminders = require('./services/event-reminders');
-  mongoEventReminders.initialize(client);
-  mongoEventReminders.start();
-  console.log('✅ MongoDB Event reminder service started - checking for due reminders every 60 seconds');
-
-  // BACKGROUND SYNC SERVICE DISABLED (Phase 7)
-  // Reason: Redundant after implementing parallel dual-write (Phase 7)
-  // All MongoDB writes now have simultaneous Sheets writes via Promise.all()
-  // Background sync caused circuit breaker issues with non-existent Apps Script actions
-  console.log('⏸️ Background sync service disabled (redundant with Phase 7 parallel dual-write)');
-
-  // LAZY CACHE LOADING - Cache will be populated on-demand to reduce startup memory
-  // Previous aggressive warmup caused 91% heap usage immediately (30MB/33MB)
-  // Now using lazy loading: data cached on first access instead of preloading
-  console.log('✅ Cache configured for lazy loading (on-demand) - reduced startup memory pressure');
-
-  // START PERIODIC AUTO-SYNC (15 minutes - sync Google Sheets → MongoDB)
-  console.log('🔄 Starting periodic auto-sync (every 15 minutes)...');
-  const { spawn } = require('child_process');
-  const path = require('path');
-
-  async function runPeriodicSync() {
-    console.log('🔄 [Auto-Sync] Running periodic sync from Google Sheets → MongoDB...');
-
-    return new Promise((resolve) => {
-      const syncScriptPath = path.join(__dirname, 'scripts', 'sync-sheets-to-mongodb.js');
-      const syncProcess = spawn('node', [syncScriptPath], {
-        cwd: __dirname,
-        stdio: 'pipe' // Capture output
-      });
-
-      let output = '';
-      syncProcess.stdout.on('data', (data) => {
-        output += data.toString();
-      });
-
-      syncProcess.stderr.on('data', (data) => {
-        console.error(`⚠️ [Auto-Sync] ${data.toString()}`);
-      });
-
-      syncProcess.on('close', (code) => {
-        if (code === 0) {
-          console.log('✅ [Auto-Sync] Periodic sync complete');
-          // Log summary only (last few lines)
-          const lines = output.trim().split('\n');
-          const summaryStart = lines.findIndex(l => l.includes('SYNC SUMMARY'));
-          if (summaryStart >= 0) {
-            console.log(lines.slice(summaryStart).join('\n'));
-          }
-        } else {
-          console.error(`❌ [Auto-Sync] Sync failed with exit code ${code}`);
-        }
-        resolve();
-      });
-
-      syncProcess.on('error', (error) => {
-        console.error(`❌ [Auto-Sync] Failed to run sync script: ${error.message}`);
-        resolve();
-      });
-    });
-  }
-
-  // Run first sync after 1 minute (allow bot to fully start up)
-  setTimeout(() => {
-    runPeriodicSync().catch(err => console.error('❌ [Auto-Sync] Error:', err));
-  }, 60 * 1000);
-
-  // Then run every 15 minutes
-  const periodicSyncTimer = setInterval(() => {
-    runPeriodicSync().catch(err => console.error('❌ [Auto-Sync] Error:', err));
-  }, 15 * 60 * 1000);
-
-  // PHASE 1: Register with shutdown manager
-  shutdownManager.registerInterval('periodic-sync', periodicSyncTimer, { frequency: '15 minutes' });
-
-  console.log('✅ Periodic auto-sync scheduled (15 min intervals)');
-
-  // PHASE 3.3: Schedule daily health digest (9 AM)
-  const scheduleDailyDigest = () => {
-    const now = new Date();
-    const next9AM = new Date(now);
-    next9AM.setHours(9, 0, 0, 0);
-
-    // If 9 AM has already passed today, schedule for tomorrow
-    if (next9AM <= now) {
-      next9AM.setDate(next9AM.getDate() + 1);
-    }
-
-    const msUntil9AM = next9AM - now;
-    const hoursUntil = Math.round(msUntil9AM / 1000 / 60 / 60);
-
-    console.log(`📅 Daily health digest scheduled for 9 AM (in ~${hoursUntil}h)`);
-
-    setTimeout(async () => {
-      try {
-        // Fetch health data from /health endpoint
-        const http = require('http');
-        const healthResponse = await new Promise((resolve, reject) => {
-          http.get(`http://localhost:${PORT}/health`, (res) => {
-            let data = '';
-            res.on('data', (chunk) => data += chunk);
-            res.on('end', () => resolve(JSON.parse(data)));
-          }).on('error', reject);
-        });
-
-        await discordMonitoring.sendDailyHealthDigest(healthResponse);
-        console.log('✅ Daily health digest sent');
-      } catch (err) {
-        console.error('❌ Failed to send daily health digest:', err.message);
-      }
-
-      // Schedule next day
-      scheduleDailyDigest();
-    }, msUntil9AM);
-  };
-
-  // Start daily digest scheduler
-  scheduleDailyDigest();
-
-  // PHASE 3.3: Periodic memory monitoring (every 10 minutes)
-  // DISABLED: Heap warnings removed from admin logs
-  // const memoryCheckInterval = setInterval(() => {
-  //   discordMonitoring.checkMemoryUsage();
-  // }, 10 * 60 * 1000); // 10 minutes
-
-  // shutdownManager.registerInterval('memory-monitoring', memoryCheckInterval, { frequency: '10 minutes' });
-  // console.log('✅ Memory monitoring active (checks every 10 minutes)');
-
-  // Register GC task (every 3 minutes - more aggressive for 512MB)
-  if (global.gc) {
-    let lastMemoryWarning = 0; // Track last memory warning to prevent log spam
-
-    scheduler.registerTask('gc-management', async () => {
-      const memUsage = process.memoryUsage();
-      const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
-      const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
-      const rssMB = Math.round(memUsage.rss / 1024 / 1024);
-
-      // Calculate memory pressure based on HEAP LIMIT, not current allocation
-      // This prevents false high-pressure warnings when V8 allocates conservatively
-      const v8 = require('v8');
-      const heapStats = v8.getHeapStatistics();
-      const heapLimitMB = Math.round(heapStats.heap_size_limit / 1024 / 1024);
-      const memoryPressure = (heapUsedMB / heapLimitMB) * 100;
-
-      // Run garbage collection
-      global.gc();
-
-      // Reduced logging spam - only log if memory is critically high
-      if (memoryPressure > 90 || rssMB > 400) {
-        console.log(
-          `🧹 GC: Heap ${heapUsedMB}MB/${heapTotalMB}MB (${Math.round(memoryPressure)}%) | RSS: ${rssMB}MB`
-        );
-      }
-
-      // Proactive cleanup for 512MB Koyeb - trigger at 65% to prevent buildup (lowered threshold)
-      if (memoryPressure > 65) {
-        // Clear cache-manager caches for high pressure
-        if (memoryPressure > 75) {
-          cacheManager.clearGeneralCache();
-          console.log('🧹 [GC] Cleared cache-manager general caches');
-        }
-
-        // Clear fuzzy match cache if very high pressure (>85%)
-        if (memoryPressure > 85) {
-          cacheManager.clearFuzzyMatchCache();
-          console.log('🧹 [GC] Cleared fuzzy match cache');
-        }
-
-        global.gc();
-
-        // Extra GC pass and warning for very high pressure
-        if (memoryPressure > 80) {
-          const now = Date.now();
-          const oneHour = 60 * 60 * 1000;
-
-          if (now - lastMemoryWarning > oneHour) {
-            console.warn(`⚠️ HIGH MEMORY PRESSURE (${Math.round(memoryPressure)}%) - Running aggressive GC`);
-            lastMemoryWarning = now;
-          }
-
-          global.gc(); // Second pass for aggressive collection
-        }
-      }
-
-      // Alert if approaching Koyeb 512MB limit (rate limited to once per hour)
-      if (rssMB > 450) {
-        const now = Date.now();
-        const oneHour = 60 * 60 * 1000;
-
-        if (now - lastMemoryWarning > oneHour) {
-          console.error(`🚨 MEMORY ALERT: ${rssMB}MB RSS (Limit: 512MB) - Consider restarting`);
-          lastMemoryWarning = now;
-        }
-      }
-    }, 3 * 60 * 1000); // Every 3 minutes (more aggressive)
-  } else {
-    console.warn("⚠️ Garbage collection not available. Run with --expose-gc flag.");
-  }
-
-  scheduler.startScheduler();
-
-  await eventReminders.initializeEventReminders(client, config, sheetAPI, attendance);
-  // DISABLED: await coreEvaluation.initialize(config);
-  // DISABLED: await coreEvaluation.scheduleEvaluationCheck(client);
-  // DISABLED: await coreEvaluation.scheduleEvaluationReminder(client);
-  await crashRecovery.initialize(client, config);
-
-  leaderboardSystem.init(client, config, discordCache, crashRecovery);
-  scheduler.setCrashRecovery(crashRecovery);
-
-  if (await crashRecovery.checkMissedWeeklyReport()) {
-    await leaderboardSystem.sendWeeklyReport();
-    await crashRecovery.markWeeklyReportCompleted();
-  }
-
-  // Lock all archived threads on startup
-  try {
-    const attChannel = await discordCache.getChannel('attendance_channel_id');
-    const archivedThreads = await attChannel.threads.fetchArchived();
-    let lockedCount = 0;
-
-    for (const [threadId, thread] of archivedThreads.threads) {
-      if (thread.archived && !thread.locked) {
-        try {
-          // Discord requires unarchiving before locking
-          await thread.setArchived(false, "Temporarily unarchive to lock");
-          await thread.setLocked(true, "Startup: Lock thread");
-          await thread.setArchived(true, "Re-archive after locking");
-          lockedCount++;
-        } catch (err) {
-          console.error(`Failed to lock thread ${threadId}:`, err.message);
-        }
-      }
-    }
-
-    if (lockedCount > 0) {
-      console.log(`🔒 Locked ${lockedCount} archived thread(s) on startup`);
-    }
-  } catch (err) {
-    console.error('Failed to lock archived threads on startup:', err.message);
-  }
-
-  // Log startup performance metrics
-  const startupDuration = Date.now() - startupStartTime;
-  const memUsage = process.memoryUsage();
-  const heapUsedMB = (memUsage.heapUsed / 1024 / 1024).toFixed(1);
-  const heapTotalMB = (memUsage.heapTotal / 1024 / 1024).toFixed(1);
-  const heapPercent = Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100);
-  const rssMB = (memUsage.rss / 1024 / 1024).toFixed(1);
-
-  // Get V8 heap statistics to verify memory limits
-  const v8 = require('v8');
-  const heapStats = v8.getHeapStatistics();
-  const heapLimitMB = (heapStats.heap_size_limit / 1024 / 1024).toFixed(0);
-  const totalHeapMB = (heapStats.total_heap_size / 1024 / 1024).toFixed(1);
-
-  console.log('');
-  console.log('═══════════════════════════════════════════════════════════════');
-  console.log('📊 STARTUP METRICS');
-  console.log('═══════════════════════════════════════════════════════════════');
-  console.log(`⏱️  Startup Time: ${(startupDuration / 1000).toFixed(1)}s`);
-  console.log(`💾 Heap: ${heapUsedMB}MB / ${heapTotalMB}MB (${heapPercent}%)`);
-  console.log(`🎯 Heap Limit: ${heapLimitMB}MB (V8 max)`);
-  console.log(`📈 RSS: ${rssMB}MB`);
-  console.log('═══════════════════════════════════════════════════════════════');
-  console.log('');
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // REGISTER SLASH COMMANDS
-  // ═══════════════════════════════════════════════════════════════════════════
-  try {
-    console.log('🔧 Registering slash commands...');
-    // Register as guild commands for instant updates during development/testing
-    // Switch to global (null) for production after testing phase
-    await registerCommands(client, config.main_guild_id);
-    console.log('✅ Slash commands registered successfully!');
-  } catch (error) {
-    console.error('❌ Failed to register slash commands:', error);
-    console.log('⚠️ Bot will continue with prefix commands only');
-  }
-
-  console.log("✅ Bot ready for operations!");
-});
-
-// =====================================================================
-// SECTION 9: EVENT HANDLERS
-// =====================================================================
-
-/**
- * =========================================================================
- * MESSAGE CREATE EVENT HANDLER
- * =========================================================================
- *
- * Main message processing pipeline. Handles:
- *
- * 1. Bidding Channel Protection:
- *    - Deletes non-admin messages (except valid member commands)
- *    - Preserves bot and admin messages
- *    - Keeps channel clean for auction announcements
- *
- * 2. Command Routing:
- *    - Resolves aliases (!b -> !bid, !st -> !status)
- *    - Checks permissions (admin vs member commands)
- *    - Routes to appropriate handler in commandHandlers
- *    - Delegates to specialized modules (attendance, bidding, auctioneering)
- *
- * 3. Spawn Thread Management:
- *    - Handles member check-ins in attendance threads
- *    - Processes admin verification commands (!verify, !verifyall)
- *    - Manages thread closure (close, !forceclose)
- *
- * 4. Auction Thread Handling:
- *    - Processes !bid commands in auction threads
- *    - Validates bid amounts and user points
- *    - Creates confirmation dialogs
- *
- * Flow:
- * Message -> Channel Check -> Permission Check -> Command Routing -> Handler Execution
- *
- * @event MessageCreate
- * @param {Message} message - The Discord message object
- */
-client.on(Events.MessageCreate, async (message) => {
-  try {
-    // 👑 SPECIAL DM FORWARDING: Forward Alter's replies to Hesu
-
-    // Handle DMs to the bot
-    if (!message.guild) {
-      // If Alter replies to the bot's DM, forward to Hesu
-      if (message.author.id === ALTERFRIEREN_ID) {
-        try {
-          const rohypnolUser = await client.users.fetch(ROHYPnol_ID);
-          await rohypnolUser.send(`💬 AlterFrieren replied: ${message.content}`).catch(err => console.error(`💬 Failed to forward DM to Rohypnol: ${err.message}`));
-        } catch (e) {
-          console.error(`💬 Error forwarding DM: ${e.message}`);
-        }
-      }
-      // Hesu can send secret replies to AlterFrieren using !reply command
-      else if (message.author.id === ROHYPnol_ID) {
-        const content = message.content.trim();
-        if (content.startsWith('!reply ')) {
-          const replyMsg = content.slice(7).trim();
-          if (replyMsg) {
-            const alterUser = await client.users.fetch(ALTERFRIEREN_ID);
-            await alterUser.send(replyMsg).catch(err => console.error(`💬 Failed to send secret reply to Alter: ${err.message}`));
-            console.log(`💬 Secret reply sent to AlterFrieren: "${replyMsg}"`);
-          }
-        }
-      }
-      return; // Stop processing DMs
-    }
-
-    // ⚡ PERFORMANCE: Early returns for irrelevant messages
-    // NOTE: Bot message filtering happens AFTER timer server check (line ~3888)
-    // This allows timer bot to create spawn threads before being blocked
-    
-
-    // 📊 ACTIVITY TRACKING: Track message for activity heatmap
-    // Skip bot messages for more accurate member activity data
-    if (activityHeatmap && !message.author.bot) {
-      try {
-        activityHeatmap.trackMessage(message);
-      } catch (error) {
-        console.error(`❌ Activity tracking error: ${error.message}`);
-      }
-    }
-
-    // 🧹 BIDDING CHANNEL PROTECTION: Delete non-admin messages immediately
-    // EXCEPT for member commands (!mypoints, !bidstatus, etc.)
-    // OPTIMIZED: Check command first, only fetch member if needed
-    // Skip for bot messages (will be handled later)
-    if (
-      message.channel.id === config.bidding_channel_id &&
-      !message.author.bot
-    ) {
-      const content = message.content.trim().toLowerCase();
-      const memberCommands = [
-        '!mypoints', '!mp', '!pts', '!mypts',
-        '!bidstatus', '!bs', '!bstatus'
-      ];
-
-       // Check if it's a member command BEFORE fetching member (faster)
-       const isMemberCommand = memberCommands.some(cmd => content.startsWith(cmd));
-
-       // Only fetch member if it's NOT a member command (will be deleted)
-       if (!isMemberCommand && message.guild?.id === config.main_guild_id) {
-        const member = await message.guild.members
-          .fetch(message.author.id)
+        const archivedThreads = await biddingChannel.threads
+          .fetchArchived({ limit: 50 })
           .catch(() => null);
 
-        // If not an admin, delete the message
-        if (member && !isAdmin(member)) {
-          try {
-            await errorHandler.safeDelete(message, 'message deletion');
-            console.log(
-              `🧹 Deleted non-admin message from ${message.author.username} in bidding channel`
-            );
-          } catch (e) {
-            console.warn(
-              `⚠️ Could not delete message from ${message.author.username}: ${e.message}`
-            );
+        if (archivedThreads && archivedThreads.threads.size > 0) {
+          console.log(`📋 Found ${archivedThreads.threads.size} archived thread(s) to check`);
+
+          for (const [threadId, thread] of archivedThreads.threads) {
+            try {
+              if (config.protected_thread_ids && config.protected_thread_ids.includes(threadId)) {
+                console.log(`⏭️ Skipping protected archived thread: ${thread.name}`);
+                continue;
+              }
+
+              if (!thread.locked && typeof thread.setLocked === "function") {
+                await thread.setArchived(false, "Temporary unarchive for locking")
+                  .catch(err => errorHandler.silentError(err, 'thread unarchive for locking'));
+
+                await new Promise((resolve) => setTimeout(resolve, 300));
+
+                await thread.setLocked(true, "Bidding channel cleanup").catch((err) => {
+                  console.warn(`⚠️ Failed to lock archived thread ${thread.name}:`, err.message);
+                });
+
+                await new Promise((resolve) => setTimeout(resolve, 300));
+
+                await thread.setArchived(true, "Bidding channel cleanup")
+                  .catch(err => errorHandler.silentError(err, 'thread re-archive after locking'));
+                threadsLocked++;
+                console.log(`🔒 Locked archived: ${thread.name}`);
+
+                await new Promise((resolve) => setTimeout(resolve, 500));
+              }
+            } catch (err) {
+              console.warn(`⚠️ Error processing archived thread ${thread.name}:`, err.message);
+            }
           }
-          return; // Stop processing
+
+          console.log(`✅ Archived thread cleanup: ${threadsLocked} additional locked`);
         }
+      } catch (err) {
+        console.error(`❌ Error during thread cleanup:`, err.message);
       }
-      // If it IS a member command, continue processing below
-    }
-    // Debug for !bid detection
-    if (
-      message.content.startsWith("!bid") ||
-      message.content.startsWith("!b")
-    ) {
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log("🔔 BID COMMAND DETECTED");
-      console.log(
-        `👤 Author: ${message.author.username} (${message.author.id})`
-      );
-      console.log(`📝 Content: ${message.content}`);
-      console.log(
-        `📍 Channel: ${message.channel.name} (${message.channel.id})`
-      );
-      console.log(`🤖 Is Bot: ${message.author.bot}`);
-      console.log(`🏰 Guild: ${message.guild?.name}`);
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
 
+    // Cleanup old messages
+    console.log(`📊 Fetching bidding channel history...`);
+    let messagesDeleted = 0;
+    let messagesFetched = 0;
+    let batchSize = 0;
 
-    // Second bot check after timer server handling
-    // Allow bot messages in attendance threads (for other bots posting check-ins)
-    // BUT process them separately and exit early (don't allow NLP/command processing)
-    if (message.author.bot) {
-      const inAttendanceThread = message.channel.isThread() &&
-        message.channel.parentId === config.attendance_channel_id;
-      if (inAttendanceThread) {
-        // Bot messages in attendance threads are allowed for reading only
-        // Don't process them further (no NLP, no commands, no responses)
-        // Future: Add logic here to parse attendance data from bot messages
-        return;
-      }
-      // All other bot messages are blocked
-      return;
-    }
+    let lastMessageId = null;
+    let shouldContinue = true;
 
-    // Boss timer commands (before other command processing)
-    const content = message.content.toLowerCase();
-    const inBossTimerChannel = message.channel.id === config.boss_timer_channel_id;
-
-    // Boss timer channel specific commands
-    if (content.startsWith('!killed ')) {
-      const args = message.content.slice(8).trim().split(/\s+/);
-      return await bossTimerCommands.handleKilled(message, args, config);
-    }
-    if (content === '!nextspawn') {
-      return await bossTimerCommands.handleNextSpawn(message);
-    }
-    if (content.startsWith('!unkill ')) {
-      const args = message.content.slice(8).trim().split(/\s+/);
-      return await bossTimerCommands.handleUnkill(message, args, config);
-    }
-    if (content === '!maintenance') {
-      const guild = message.guild;
-      if (!guild) return;
-      const member = await guild.members.fetch(message.author.id).catch(() => null);
-      if (!member || !isAdmin(member)) {
-        return message.reply('❌ Admin only command');
-      }
-      return await bossTimerCommands.handleMaintenance(message);
-    }
-    if (content === '!serverdown') {
-      const guild = message.guild;
-      if (!guild) return;
-      const member = await guild.members.fetch(message.author.id).catch(() => null);
-      if (!member || !isAdmin(member)) {
-        return message.reply('❌ Admin only command');
-      }
-      return await bossTimerCommands.handleServerDown(message);
-    }
-    if (content === '!clearkills') {
-      const guild = message.guild;
-      if (!guild) return;
-      const member = await guild.members.fetch(message.author.id).catch(() => null);
-      if (!member || !isAdmin(member)) {
-        return message.reply('❌ Admin only command');
-      }
-      return await bossTimerCommands.handleClearKills(message);
-    }
-    if (content.startsWith('!nospawn ')) {
-      const args = message.content.slice(9).trim().split(/\s+/);
-      return await bossTimerCommands.handleNoSpawn(message, args, config);
-    }
-    if (content.startsWith('!spawned ')) {
-      const args = message.content.slice(9).trim().split(/\s+/);
-      return await bossTimerCommands.handleSpawned(message, args, config);
-    }
-    if (content.startsWith('!setboss ')) {
-      const args = message.content.slice(9).trim().split(/\s+/);
-      return await bossTimerCommands.handleSetBoss(message, args, config);
-    }
-    // !help in boss timer channel shows boss timer help
-    if (content === '!help' && inBossTimerChannel) {
-      return await bossTimerCommands.handleHelp(message);
-    }
-
-    // Block all other commands in boss timer channel
-    if (inBossTimerChannel && content.startsWith('!')) {
-      return message.reply('❌ Only boss timer commands work here. Use `!help` to see available commands.');
-    }
-
-    const guild = message.guild;
-    if (!guild) return;
-
-    const member = await guild.members
-      .fetch(message.author.id)
-      .catch(() => null);
-    if (!member) return;
-
-    const userIsAdmin = isAdmin(member);
-    const inAdminLogs =
-      message.channel.id === config.admin_logs_channel_id ||
-      (message.channel.isThread() &&
-        message.channel.parentId === config.admin_logs_channel_id);
-    const inBiddingChannel =
-      message.channel.id === config.bidding_channel_id ||
-      (message.channel.isThread() &&
-        message.channel.parentId === config.bidding_channel_id);
-    const inElysiumCommandsChannel =
-      message.channel.id === config.elysium_commands_channel_id ||
-      (message.channel.isThread() &&
-        message.channel.parentId === config.elysium_commands_channel_id);
-
-    // ═════════════════════════════════════════════════════════════════════
-    // NLP PROCESSING: DISABLED
-    // ═════════════════════════════════════════════════════════════════════
-    // Bot now relies on invoked commands only (! prefix and slash commands)
-    // Natural language interpretation, conversation, and learning systems are disabled
-
-    // ✅ HANDLE !BID AND ALIASES IMMEDIATELY
-    const rawCmd = message.content.trim().toLowerCase().split(/\s+/)[0];
-    const resolvedCmd = resolveCommandAlias(rawCmd);
-
-    if (resolvedCmd === "!bid") {
-      // RACE CONDITION PROTECTION
-      if (isBidProcessing) {
-        console.log(`⚠️ Bid already processing, queueing this one...`);
-        await message.reply(
-          `⏳ Processing previous bid, please wait 1 second...`
-        );
-        return;
-      }
-
-      console.log(`🔍 !bid or alias detected - Checking channel validity...`);
-      console.log(`   Raw command: ${rawCmd} -> Resolved: ${resolvedCmd}`);
-      console.log(
-        `   Channel: ${message.channel.name} (${message.channel.id})`
-      );
-      console.log(`   Is Thread: ${message.channel.isThread()}`);
-      console.log(`   Parent ID: ${message.channel.parentId}`);
-      console.log(`   Expected Parent: ${config.bidding_channel_id}`);
-      console.log(`   inBiddingChannel: ${inBiddingChannel}`);
-
-      // Bid commands must be in threads only, not main bidding channel
-      if (
-        !message.channel.isThread() ||
-        message.channel.parentId !== config.bidding_channel_id
-      ) {
-        console.log(`❌ !bid blocked - not in auction thread`);
-        await message.reply(
-          `❌ You can only use \`${rawCmd}\` in auction threads (inside <#${config.bidding_channel_id}>)!`
-        );
-        return;
-      }
-
-      const args = message.content.trim().split(/\s+/).slice(1);
-
-      console.log(
-        `🎯 Bid command detected in ${
-          message.channel.isThread() ? "thread" : "channel"
-        }: ${message.channel.name}`
-      );
-
-      isBidProcessing = true;
+    while (shouldContinue) {
       try {
-        await bidding.handleCommand(resolvedCmd, message, args, client, config);
-      } finally {
-        isBidProcessing = false;
-      }
-      return;
-    }
-
-    // ✅ HANDLE !MYPOINTS AND ALIASES - BIDDING CHANNEL OR BOT-COMMANDS CHANNEL (NOT DURING AUCTION)
-    // Define bot commands channel first
-    const inBotCommandsChannelForPoints = message.channel.id === config.bot_manual_channel_id ||
-      (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
-
-    if (
-      resolvedCmd === "!mypoints" &&
-      (inBiddingChannel || inElysiumCommandsChannel || inBotCommandsChannelForPoints) &&
-      !message.channel.isThread()
-    ) {
-      // If invoked in guild chat, redirect to BOT-COMMANDS
-      if (inElysiumCommandsChannel && !inBiddingChannel && !inBotCommandsChannelForPoints) {
-        // Send redirect message in guild chat that auto-deletes after 30 seconds
-        const redirectMsg = await message.reply(
-          `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
-          `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
-        ).catch(() => null);
-
-        // Delete both messages after 30 seconds
-        setTimeout(async () => {
-          if (redirectMsg) {
-            await errorHandler.safeDelete(redirectMsg, 'mypoints redirect cleanup');
-          }
-          await errorHandler.safeDelete(message, 'mypoints original message cleanup');
-        }, 30000);
-
-        return;
-      }
-
-      const args = message.content.trim().split(/\s+/).slice(1);
-      console.log(`🎯 My points command (${rawCmd}): ${resolvedCmd}`);
-      await commandHandlers.mypoints(message, member);
-      return;
-    }
-
-    // ✅ HANDLE !BIDSTATUS AND ALIASES - BIDDING CHANNEL OR BOT-COMMANDS CHANNEL
-    // Define bot commands channel first
-    const inBotCommandsChannelForBidStatus = message.channel.id === config.bot_manual_channel_id ||
-      (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
-
-    if (resolvedCmd === "!bidstatus" && (inBiddingChannel || inElysiumCommandsChannel || inBotCommandsChannelForBidStatus)) {
-      // If invoked in guild chat, redirect to BOT-COMMANDS
-      if (inElysiumCommandsChannel && !inBiddingChannel && !inBotCommandsChannelForBidStatus) {
-        // Send redirect message in guild chat that auto-deletes after 30 seconds
-        const redirectMsg = await message.reply(
-          `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
-          `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
-        ).catch(() => null);
-
-        // Delete both messages after 30 seconds
-        setTimeout(async () => {
-          if (redirectMsg) {
-            await errorHandler.safeDelete(redirectMsg, 'bidstatus redirect cleanup');
-          }
-          await errorHandler.safeDelete(message, 'bidstatus original message cleanup');
-        }, 30000);
-
-        return;
-      }
-
-      const args = message.content.trim().split(/\s+/).slice(1);
-      console.log(`🎯 Bidding status command (${rawCmd}): ${resolvedCmd}`);
-      await commandHandlers.bidstatus(message, member);
-      return;
-    }
-
-    // ✅ HANDLE AUCTION THREAD-ONLY COMMANDS (!pause, !resume, !stop, !extend)
-    // These commands must be used in auction threads (bidding channel threads) only
-    if (
-      ["!pause", "!resume", "!stop", "!extend"].includes(resolvedCmd) &&
-      message.channel.isThread() &&
-      message.channel.parentId === config.bidding_channel_id
-    ) {
-      if (!userIsAdmin) {
-        await message.reply(`❌ Admin only`);
-        return;
-      }
-
-      const args = message.content.trim().split(/\s+/).slice(1);
-      const handlerName = resolvedCmd.slice(1); // Remove the "!"
-      console.log(`🎯 Thread auction command (${rawCmd}): ${resolvedCmd}`);
-
-      if (commandHandlers[handlerName]) {
-        await commandHandlers[handlerName](message, member, args);
-      }
-      return;
-    }
-
-    // Block !pause, !resume, !stop, !extend if not in auction thread
-    if (["!pause", "!resume", "!stop", "!extend"].includes(resolvedCmd)) {
-      await message.reply(
-        `❌ This command can only be used in auction threads (in <#${config.bidding_channel_id}>)`
-      );
-      return;
-    }
-
-    // Help command (anyone can use in BOT-COMMANDS or admin logs, not spawn threads)
-    if (resolvedCmd === "!help") {
-      // Define bot commands channel
-      const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
-        (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
-
-      if (
-        message.channel.isThread() &&
-        message.channel.parentId === config.attendance_channel_id
-      ) {
-        await message.reply(
-          "⚠️ Please use `!help` in BOT-COMMANDS channel to avoid cluttering spawn threads."
-        );
-        return;
-      }
-
-      // If invoked in guild chat, redirect to BOT-COMMANDS
-      if (inElysiumCommandsChannel && !inBotCommandsChannel && !inAdminLogs) {
-        // Send redirect message in guild chat that auto-deletes after 30 seconds
-        const redirectMsg = await message.reply(
-          `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
-          `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
-        ).catch(() => null);
-
-        // Delete both messages after 30 seconds
-        setTimeout(async () => {
-          if (redirectMsg) {
-            await errorHandler.safeDelete(redirectMsg, 'help redirect cleanup');
-          }
-          await errorHandler.safeDelete(message, 'help original message cleanup');
-        }, 30000);
-
-        return;
-      }
-
-      await commandHandlers.help(message, member);
-      return;
-    }
-
-    // New member guide (anyone can use in BOT-COMMANDS or admin logs, not spawn threads)
-    if (resolvedCmd === "!newmember") {
-      // Define bot commands channel
-      const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
-        (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
-
-      if (
-        message.channel.isThread() &&
-        message.channel.parentId === config.attendance_channel_id
-      ) {
-        await message.reply(
-          "⚠️ Please use `!newmember` in BOT-COMMANDS channel to avoid cluttering spawn threads."
-        );
-        return;
-      }
-
-      // If invoked in guild chat, redirect to BOT-COMMANDS
-      if (inElysiumCommandsChannel && !inBotCommandsChannel && !inAdminLogs) {
-        // Send redirect message in guild chat that auto-deletes after 30 seconds
-        const redirectMsg = await message.reply(
-          `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
-          `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
-        ).catch(() => null);
-
-        // Delete both messages after 30 seconds
-        setTimeout(async () => {
-          if (redirectMsg) {
-            await errorHandler.safeDelete(redirectMsg, 'newmember redirect cleanup');
-          }
-          await errorHandler.safeDelete(message, 'newmember original message cleanup');
-        }, 30000);
-
-        return;
-      }
-
-      await commandHandlers.newmember(message, member);
-      return;
-    }
-
-    if (resolvedCmd === "!testsend") {
-      if (!userIsAdmin) {
-        await message.reply('❌ Admin only command');
-        return;
-      }
-
-      if (message.channel.id !== config.admin_logs_channel_id) {
-        await message.reply(`❌ This command can only be used in <#${config.admin_logs_channel_id}>`);
-        return;
-      }
-
-      const result = await commandHandlers.testsend(message, member);
-      if (result.error) {
-        await message.reply(`❌ Test send failed: ${result.error}`);
-        return;
-      }
-
-      if (result.warning) {
-        await message.reply(result.warning);
-        return;
-      }
-
-      const failedChannels = result.channels.filter((c) => c.status === 'failed');
-      const failedCount = failedChannels.length;
-      const summaryEmbed = new EmbedBuilder()
-        .setColor(failedCount > 0 ? 0xFFA500 : 0x00FF00)
-        .setTitle('✅ Test Send Complete')
-        .setDescription(`Sent to ${result.successCount} channel(s)` + (failedCount > 0 ? `, ${failedCount} failed` : ''))
-        .setTimestamp()
-        .setFooter({ text: 'Guild: ' + config.guild_name });
-
-      if (failedCount > 0) {
-        const detailLines = failedChannels.slice(0, 8).map((c) => `• ${c.channelId}: ${c.error || 'Unknown error'}`);
-        summaryEmbed.addFields({
-          name: 'Failed Channels',
-          value: detailLines.join('\n'),
-          inline: false
-        });
-      }
-
-      await message.reply({ embeds: [summaryEmbed] });
-      return;
-    }
-
-    // Leaderboard commands (admin only OR guild role in BOT-COMMANDS channel, anywhere except spawn threads)
-    if (
-      resolvedCmd === "!leaderboardattendance" ||
-      resolvedCmd === "!leaderboardbidding" ||
-      resolvedCmd === "!leaderboards" ||
-      resolvedCmd === "!weeklyreport" ||
-      resolvedCmd === "!monthlyreport" ||
-      resolvedCmd === "!weekly" ||
-      resolvedCmd === "!monthly" ||
-      resolvedCmd === "!activity"
-    ) {
-      // Define bot commands channel (reuse from above if already defined)
-      const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
-        (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
-
-      // Check permissions: either admin OR guild role in BOT-COMMANDS channel
-      const hasPermission = userIsAdmin || (hasElysiumRole(member) && (inBotCommandsChannel || inElysiumCommandsChannel));
-
-      if (!hasPermission) {
-        await message.reply("❌ Only admins or guild members can use leaderboard commands.");
-        return;
-      }
-
-      // If invoked in guild chat, redirect to BOT-COMMANDS (for both admins and members)
-      if (inElysiumCommandsChannel && !inBotCommandsChannel) {
-        // Send redirect message in guild chat that auto-deletes after 30 seconds
-        const redirectMsg = await message.reply(
-          `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
-          `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
-        ).catch(() => null);
-
-        // Delete both messages after 30 seconds
-        setTimeout(async () => {
-          if (redirectMsg) {
-            await errorHandler.safeDelete(redirectMsg, 'leaderboard redirect cleanup');
-          }
-          await errorHandler.safeDelete(message, 'leaderboard original message cleanup');
-        }, 30000);
-
-        return;
-      }
-
-      if (
-        message.channel.isThread() &&
-        message.channel.parentId === config.attendance_channel_id
-      ) {
-        await message.reply(
-          "⚠️ Please use leaderboard commands in BOT-COMMANDS channel to avoid cluttering spawn threads."
-        );
-        return;
-      }
-
-      if (resolvedCmd === "!leaderboardattendance") {
-        await commandHandlers.leaderboardattendance(message, member);
-      } else if (resolvedCmd === "!leaderboardbidding") {
-        await commandHandlers.leaderboardbidding(message, member);
-      } else if (resolvedCmd === "!leaderboards") {
-        await commandHandlers.leaderboards(message, member);
-      } else if (resolvedCmd === "!weeklyreport") {
-        await commandHandlers.weeklyreport(message, member);
-      } else if (resolvedCmd === "!monthlyreport") {
-        await commandHandlers.monthlyreport(message, member);
-      } else if (resolvedCmd === "!weekly") {
-        await commandHandlers.weekly(message, member);
-      } else if (resolvedCmd === "!monthly") {
-        await commandHandlers.monthly(message, member);
-      } else if (resolvedCmd === "!activity") {
-        await commandHandlers.activity(message, member);
-      }
-      return;
-    }
-
-
-    // =========================================================================
-    // BOSS ROTATION COMMAND - Admin Only
-    // =========================================================================
-    if (resolvedCmd === "!rotation") {
-      if (!userIsAdmin) {
-        await message.reply("❌ This command is admin-only.");
-        return;
-      }
-
-      if (
-        message.channel.isThread() &&
-        message.channel.parentId === config.attendance_channel_id
-      ) {
-        await message.reply(
-          "⚠️ Please use this command in admin logs channel to avoid cluttering spawn threads."
-        );
-        return;
-      }
-
-      await commandHandlers.rotation(message, member);
-      return;
-    }
-
-
-    // =========================================================================
-    // SPAWN THREAD CHECK-IN SYSTEM
-    // =========================================================================
-    // Handles member attendance in spawn threads
-    // Keywords: "present", "here", "join", "checkin", "check-in"
-    // Also handles common misspellings with fuzzy matching
-    if (
-      message.channel.isThread() &&
-      message.channel.parentId === config.attendance_channel_id
-    ) {
-      // Sync state from attendance module to get latest data
-      activeSpawns = attendance.getActiveSpawns();
-      pendingVerifications = attendance.getPendingVerifications();
-
-      const content = message.content.trim().toLowerCase();
-      const keyword = content.split(/\s+/)[0];
-
-      // Helper function: Check if keyword matches attendance keywords (with fuzzy matching)
-      const isAttendanceKeyword = (word) => {
-        // Exact matches
-        const exactKeywords = ["present", "here", "join", "checkin", "check-in", "attending"];
-        if (exactKeywords.includes(word)) return true;
-
-        // Common misspellings (comprehensive list)
-        const misspellings = {
-          // "present" misspellings
-          "prsnt": "present", "presnt": "present", "presen": "present",
-          "preent": "present", "prsetn": "present", "preasent": "present",
-          "prasent": "present", "presemt": "present", "presetn": "present",
-          "prresent": "present", "pressent": "present", "prezent": "present",
-          "prsnts": "present", "prsntt": "present", "pesent": "present",
-          "prsent": "present", "prresent": "present",
-
-          // "here" misspellings
-          "hre": "here", "her": "here", "heer": "here", "herre": "here",
-          "heere": "here", "hrre": "here", "hhere": "here",
-
-          // "attending" misspellings
-          "atending": "attending", "attending": "attending", "attnding": "attending",
-          "attendng": "attending", "attening": "attending", "atending": "attending",
-          "attednign": "attending", "attneding": "attending",
-
-          // "join" misspellings
-          "jon": "join", "jion": "join", "jojn": "join", "joiin": "join",
-
-          // "checkin" misspellings
-          "chekin": "checkin", "chckin": "checkin", "checkn": "checkin",
-          "checin": "checkin", "chkin": "checkin"
-        };
-
-        if (misspellings[word]) {
-          console.log(`✏️ Auto-corrected "${word}" → "${misspellings[word]}"`);
-          return true;
+        const options = { limit: 100 };
+        if (lastMessageId) {
+          options.before = lastMessageId;
         }
 
-        // Levenshtein distance check for close matches (1-2 character difference)
-        const calculateDistance = (a, b) => {
-          const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
-
-          for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
-          for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
-
-          for (let j = 1; j <= b.length; j++) {
-            for (let i = 1; i <= a.length; i++) {
-              const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
-              matrix[j][i] = Math.min(
-                matrix[j][i - 1] + 1,
-                matrix[j - 1][i] + 1,
-                matrix[j - 1][i - 1] + indicator
-              );
-            }
-          }
-
-          return matrix[b.length][a.length];
-        };
-
-        // Check distance to each keyword (allow 1-2 character difference)
-        for (const validKeyword of exactKeywords) {
-          const distance = calculateDistance(word, validKeyword);
-          if (distance <= 2 && word.length >= 3) {
-            console.log(`✏️ Fuzzy matched "${word}" → "${validKeyword}" (distance: ${distance})`);
-            return true;
-          }
-        }
-
-        return false;
-      };
-
-      // Check if message is a check-in keyword (with fuzzy matching)
-      if (isAttendanceKeyword(keyword)) {
-        // Ignore bot check-ins (bots can't attend spawns)
-        // This allows reading bot messages in threads without letting them check in
-        if (message.author.bot) return;
-
-        const spawnInfo = activeSpawns[message.channel.id];
-
-        // Validate spawn is still open
-        if (!spawnInfo || spawnInfo.closed) {
-          await message.reply(
-            "⚠️ This spawn is closed. No more check-ins accepted."
-          );
-          return;
-        }
-
-        // Non-admin members MUST attach screenshot as proof
-        // Admins can fast-track without screenshot
-        if (
-          !userIsAdmin &&
-          (!message.attachments || message.attachments.size === 0)
-        ) {
-          await message.reply(
-            "⚠️ **Screenshot required!** Attach a screenshot showing boss and timestamp."
-          );
-          return;
-        }
-
-        // Check for duplicate check-in (normalized username comparison)
-        const username = member.nickname || message.author.username;
-        const isDuplicate = spawnInfo.members.some(
-          (m) => normalizeUsername(m) === normalizeUsername(username)
-        );
-
-        if (isDuplicate) {
-          await message.reply(`⚠️ You already checked in for this spawn.`);
-          return;
-        }
-
-        const statusText = userIsAdmin
-          ? `⏩ **${username}** (Admin) registered for **${spawnInfo.boss}**\n\nFast-track verification (no screenshot required)...\n\nℹ️ !stats \`${username}\` in <#${config.bot_manual_channel_id}>`
-          : `⏳ **${username}** registered for **${spawnInfo.boss}**\n\nWaiting for admin verification...\n\nℹ️ !stats \`${username}\` in <#${config.bot_manual_channel_id}>`;
-
-        const embed = new EmbedBuilder()
-          .setColor(userIsAdmin ? 0x00ff00 : 0xffa500)
-          .setDescription(statusText)
-          .setFooter({ text: "Admins: Click a button to verify or deny" });
-
-        // Create buttons for admin approval
-        const approveButton = new ButtonBuilder()
-          .setCustomId(`verify_approve_${message.id}_${Date.now()}`)
-          .setLabel('✅ Verify')
-          .setStyle(ButtonStyle.Success)
-          .setDisabled(false);
-
-        const denyButton = new ButtonBuilder()
-          .setCustomId(`verify_deny_${message.id}_${Date.now()}`)
-          .setLabel('❌ Deny')
-          .setStyle(ButtonStyle.Danger)
-          .setDisabled(false);
-
-        const row = new ActionRowBuilder().addComponents(approveButton, denyButton);
-
-        const verificationMsg = await message.reply({ embeds: [embed], components: [row] });
-
-        // Track pending verification in state
-        pendingVerifications[message.id] = {
-          author: username,
-          authorId: message.author.id,
-          threadId: message.channel.id,
-          timestamp: Date.now(),
-          verificationMsgId: verificationMsg.id,
-        };
-        attendance.setPendingVerifications(pendingVerifications);
-
-        console.log(`📝 PENDING ADDED: ${username} for ${spawnInfo.boss} | Thread: ${message.channel.id} | MsgID: ${message.id} | Total pending: ${Object.keys(pendingVerifications).length}`);
-
-        if (spawnInfo.confirmThreadId) {
-          const confirmThread = await guild.channels
-            .fetch(spawnInfo.confirmThreadId)
-            .catch(() => null);
-          if (confirmThread) {
-            const notifText = userIsAdmin
-              ? `⏩ **${username}** (Admin) - Fast-track check-in (no screenshot)`
-              : `⏳ **${username}** - Pending verification`;
-            await confirmThread.send(notifText);
-          }
-        }
-
-        console.log(
-          `🔍 Pending: ${username} for ${spawnInfo.boss}${
-            userIsAdmin ? " (admin fast-track)" : ""
-          }`
-        );
-        return;
-      }
-
-      // Admin commands in spawn threads
-      if (!userIsAdmin) return;
-
-      // ADD THIS LINE:
-      const spawnCmd = resolveCommandAlias(content.split(/\s+/)[0]);
-
-      // !verifyall
-      if (spawnCmd === "!verifyall") {
-        const spawnInfo = activeSpawns[message.channel.id];
-        if (!spawnInfo || spawnInfo.closed) {
-          await message.reply("⚠️ This spawn is closed or not found.");
-          return;
-        }
-
-        const pendingInThread = Object.entries(pendingVerifications).filter(
-          ([msgId, p]) => p.threadId === message.channel.id
-        );
-
-        if (pendingInThread.length === 0) {
-          await message.reply("ℹ️ No pending verifications in this thread.");
-          return;
-        }
-
-        await awaitConfirmation(
-          message,
-          member,
-          `⚠️ **Verify ALL ${pendingInThread.length} pending member(s)?**\n\n` +
-            `This will automatically verify:\n` +
-            pendingInThread
-              .map(([msgId, p]) => `• **${p.author}**`)
-              .join("\n") +
-            `\n\nClick ✅ Confirm or ❌ Cancel button below.`,
-          async (confirmMsg) => {
-            let verifiedCount = 0,
-              duplicateCount = 0;
-            const verifiedMembers = [];
-
-            for (const [msgId, pending] of pendingInThread) {
-              const isDuplicate = spawnInfo.members.some(
-                (m) => normalizeUsername(m) === normalizeUsername(pending.author)
-              );
-
-              if (!isDuplicate) {
-                spawnInfo.members.push(pending.author);
-                // Store Discord ID for reliable MongoDB lookup
-                if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
-                spawnInfo.memberIds[pending.author] = pending.authorId;
-                verifiedMembers.push(pending.author);
-                verifiedCount++;
-              } else {
-                duplicateCount++;
-              }
-
-              const originalMsg = await message.channel.messages
-                .fetch(msgId)
-                .catch(() => null);
-              if (originalMsg)
-                await attendance.removeAllReactionsWithRetry(originalMsg);
-
-              // Remove/disable verification buttons from the bot's reply message
-              if (pending.verificationMsgId) {
-                const verificationMsg = await message.channel.messages
-                  .fetch(pending.verificationMsgId)
-                  .catch(() => null);
-                if (verificationMsg && verificationMsg.components.length > 0) {
-                  await errorHandler.safeEdit(verificationMsg, { components: [] }, 'verify all disable buttons');
-                }
-              }
-
-              delete pendingVerifications[msgId];
-            }
-
-            await message.reply(
-              `✅ **Verify All Complete!**\n\n` +
-                `✅ Verified: ${verifiedCount}\n` +
-                `⚠️ Duplicates skipped: ${duplicateCount}\n` +
-                `📊 Total processed: ${pendingInThread.length}\n\n` +
-                `**Verified members:**\n${
-                  verifiedMembers.join(", ") || "None (all were duplicates)"
-                }`
-            );
-
-            if (spawnInfo.confirmThreadId && verifiedCount > 0) {
-              const confirmThread = await guild.channels
-                .fetch(spawnInfo.confirmThreadId)
-                .catch(() => null);
-              if (confirmThread) {
-                await confirmThread.send(
-                  `✅ **Bulk Verification by ${message.author.username}**\n` +
-                    `Verified ${verifiedCount} member(s): ${verifiedMembers.join(
-                      ", "
-                    )}`
-                );
-              }
-            }
-
-            console.log(
-              `✅ Verify all: ${verifiedCount} verified, ${duplicateCount} duplicates for ${spawnInfo.boss} by ${message.author.username}`
-            );
-          },
-          async (confirmMsg) => {
-            await message.reply("❌ Verify all canceled.");
-          }
-        );
-
-        return;
-      }
-
-      // !verify @member
-      if (spawnCmd === "!verify") {
-        const mentioned = message.mentions.users.first();
-        if (!mentioned) {
-          await message.reply("⚠️ Usage: `!verify @member`");
-          return;
-        }
-
-        const spawnInfo = activeSpawns[message.channel.id];
-        if (!spawnInfo || spawnInfo.closed) {
-          await message.reply("⚠️ This spawn is closed or not found.");
-          return;
-        }
-
-        const mentionedMember = await guild.members
-          .fetch(mentioned.id)
+        const messages = await biddingChannel.messages
+          .fetch(options)
           .catch(() => null);
-        const username = mentionedMember
-          ? mentionedMember.nickname || mentioned.username
-          : mentioned.username;
-
-        const isDuplicate = spawnInfo.members.some(
-          (m) => normalizeUsername(m) === normalizeUsername(username)
-        );
-
-        if (isDuplicate) {
-          await message.reply(
-            `⚠️ **${username}** is already verified for this spawn.`
-          );
-          return;
-        }
-
-        spawnInfo.members.push(username);
-        // Store Discord ID for reliable MongoDB lookup
-        if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
-        spawnInfo.memberIds[username] = mentioned.id;
-
-        // Find and disable verification buttons for this user
-        const pendingInThread = Object.entries(pendingVerifications).filter(
-          ([msgId, p]) => p.threadId === message.channel.id && normalizeUsername(p.author) === normalizeUsername(username)
-        );
-
-        for (const [msgId, pending] of pendingInThread) {
-          if (pending.verificationMsgId) {
-            const verificationMsg = await message.channel.messages
-              .fetch(pending.verificationMsgId)
-              .catch(() => null);
-            if (verificationMsg && verificationMsg.components.length > 0) {
-              await errorHandler.safeEdit(verificationMsg, { components: [] }, 'manual verify disable buttons');
-            }
-          }
-          delete pendingVerifications[msgId];
-        }
-        attendance.setPendingVerifications(pendingVerifications);
-
-        await message.reply(
-          `✅ **${username}** manually verified by ${message.author.username}`
-        );
-
-        if (spawnInfo.confirmThreadId) {
-          const confirmThread = await guild.channels
-            .fetch(spawnInfo.confirmThreadId)
-            .catch(() => null);
-          if (confirmThread) {
-            await confirmThread.send(
-              `✅ **${username}** verified by ${message.author.username} (manual override)`
-            );
-          }
-        }
-
-        console.log(
-          `✅ Manual verify: ${username} for ${spawnInfo.boss} by ${message.author.username}`
-        );
-        return;
-      }
-
-      // close command
-      if (content === "close") {
-        const spawnInfo = activeSpawns[message.channel.id];
-        if (!spawnInfo || spawnInfo.closed) {
-          await message.reply("⚠️ This spawn is already closed or not found.");
-          return;
-        }
-
-        const pendingInThread = Object.entries(pendingVerifications).filter(
-          ([msgId, p]) => p.threadId === message.channel.id
-        );
-
-        // AUTO-VERIFY pending members (like !closeall does) instead of blocking close
-        // This ensures all valid check-ins are included in the attendance tally
-        if (pendingInThread.length > 0) {
-          await message.reply(
-            `🔍 Found **${pendingInThread.length} pending verification(s)**.\n\n` +
-            `Auto-verifying all before closing...`
-          );
-
-          // Filter out duplicates and add new members
-          const newMembers = pendingInThread.filter(
-            ([msgId, p]) =>
-              !spawnInfo.members.some(
-                (m) => normalizeUsername(m) === normalizeUsername(p.author)
-              )
-          );
-
-          // Add members and store Discord IDs
-          if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
-          for (const [msgId, p] of newMembers) {
-            spawnInfo.members.push(p.author);
-            spawnInfo.memberIds[p.author] = p.authorId;
-          }
-
-          // Clean up verification button messages
-          const messageIds = pendingInThread.map(([msgId, p]) => msgId);
-          const messagePromises = messageIds.map((msgId) =>
-            message.channel.messages.fetch(msgId).catch(() => null)
-          );
-          const fetchedMessages = await Promise.allSettled(messagePromises);
-
-          const reactionPromises = fetchedMessages.map((result) => {
-            if (result.status === "fulfilled" && result.value) {
-              return result.value.reactions.removeAll().catch(err => errorHandler.silentError(err, 'auto-verify reaction cleanup'));
-            }
-            return Promise.resolve();
-          });
-          await Promise.allSettled(reactionPromises);
-
-          // Remove from pending verifications
-          pendingInThread.forEach(
-            ([msgId]) => delete pendingVerifications[msgId]
-          );
-
-          attendance.setPendingVerifications(pendingVerifications);
-          attendance.setActiveSpawns(activeSpawns);
-
-          await message.channel.send(
-            `✅ Auto-verified **${newMembers.length}** member(s). ` +
-            `(${pendingInThread.length - newMembers.length} were duplicates)\n\n` +
-            `Total members: **${spawnInfo.members.length}**`
-          );
-        }
-
-        const closeEmbed = new EmbedBuilder()
-          .setColor(0xffa500)
-          .setTitle('🔒 Close Spawn Confirmation')
-          .setDescription(
-            `Close spawn **${spawnInfo.boss}** (${spawnInfo.timestamp})?\n\n` +
-            `**${spawnInfo.members.length} members** will be submitted to Google Sheets.`
-          )
-          .setFooter({ text: 'Click a button to confirm or cancel' });
-
-        // Create buttons for confirmation
-        const confirmButton = new ButtonBuilder()
-          .setCustomId(`close_confirm_${message.author.id}_${Date.now()}`)
-          .setLabel('✅ Confirm')
-          .setStyle(ButtonStyle.Success)
-          .setDisabled(false);
-
-        const cancelButton = new ButtonBuilder()
-          .setCustomId(`close_cancel_${message.author.id}_${Date.now()}`)
-          .setLabel('❌ Cancel')
-          .setStyle(ButtonStyle.Secondary)
-          .setDisabled(false);
-
-        const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
-
-        const confirmMsg = await message.reply({ embeds: [closeEmbed], components: [row] });
-
-        pendingClosures[confirmMsg.id] = {
-          threadId: message.channel.id,
-          adminId: message.author.id,
-          type: "close",
-          timestamp: Date.now(), // For stale entry cleanup
-        };
-
-        if (!confirmationMessages[message.channel.id])
-          confirmationMessages[message.channel.id] = [];
-        confirmationMessages[message.channel.id].push(confirmMsg.id);
-
-        return;
-      }
-
-      // !forceclose
-      if (spawnCmd === "!forceclose") {
-        const spawnInfo = activeSpawns[message.channel.id];
-        if (!spawnInfo || spawnInfo.closed) {
-          await message.reply("⚠️ This spawn is already closed or not found.");
-          return;
-        }
-
-        const pendingInThread = Object.keys(pendingVerifications).filter(
-          (msgId) => pendingVerifications[msgId].threadId === message.channel.id
-        );
-        pendingInThread.forEach((msgId) => delete pendingVerifications[msgId]);
-
-        spawnInfo.closed = true;
-
-        // Remove from activeColumns cache BEFORE checking Google Sheets
-        // This prevents false positives where the thread exists but was never submitted
-        const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
-        delete activeColumns[cacheKey];
-
-        // Check for duplicate column before submitting
-        const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
-
-        if (columnExists) {
-          console.log(`⚠️ Duplicate prevented: ${spawnInfo.boss} at ${spawnInfo.timestamp} already exists`);
-
-          await message.reply(
-            `⚠️ **Attendance already submitted for this spawn!**\n\n` +
-              `Column already exists in Google Sheets. Closing thread without duplicate submission.`
-          );
-
-          // Skip submission, just close and clean up
-          if (spawnInfo.confirmThreadId) {
-            const confirmThread = await guild.channels
-              .fetch(spawnInfo.confirmThreadId)
-              .catch(() => null);
-            if (confirmThread) {
-              await confirmThread.send(
-                `⚠️ Duplicate prevented: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - Column already exists`
-              );
-              await confirmThread.delete().catch(console.error);
-            }
-          }
-
-          await message.channel
-            .setLocked(true, `Force locked by ${message.author.username} (duplicate prevented)`)
-            .catch(console.error);
-          await message.channel
-            .setArchived(true, `Force closed by ${message.author.username} (duplicate prevented)`)
-            .catch(console.error);
-
-          delete activeSpawns[message.channel.id];
-          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
-          delete confirmationMessages[message.channel.id];
-
-          attendance.setActiveSpawns(activeSpawns);
-          attendance.setActiveColumns(activeColumns);
-          attendance.setConfirmationMessages(confirmationMessages);
-
-          return;
-        }
-
-        // Check if there are any members to submit
-        if (spawnInfo.members.length === 0) {
-          // No members to submit - just close and archive the thread
-          await message.reply(
-            `⚠️ **FORCE CLOSING** spawn **${spawnInfo.boss}**...\n` +
-              `No members to submit (0 verified, ${pendingInThread.length} pending ignored). Skipping Google Sheets submission...`
-          );
-
-          await message.channel.send(
-            `⚠️ Thread closed with no verified members. No data submitted to Google Sheets.`
-          );
-
-          if (spawnInfo.confirmThreadId) {
-            const confirmThread = await guild.channels
-              .fetch(spawnInfo.confirmThreadId)
-              .catch(() => null);
-            if (confirmThread) {
-              await confirmThread.send(
-                `⚠️ **${spawnInfo.boss}** (${spawnInfo.timestamp}) force closed with 0 members`
-              );
-              await confirmThread.delete().catch(console.error);
-            }
-          }
-
-          // Lock and archive the thread to prevent spam
-          await message.channel
-            .setLocked(true, `Force locked by ${message.author.username} (no members)`)
-            .catch(console.error);
-          await message.channel
-            .setArchived(true, `Force closed by ${message.author.username} (no members)`)
-            .catch(console.error);
-
-          delete activeSpawns[message.channel.id];
-          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
-
-          console.log(
-            `🔒 FORCE CLOSE: ${spawnInfo.boss} at ${spawnInfo.timestamp} by ${message.author.username} (0 members)`
-          );
-
-          return;
-        }
-
-        await message.reply(
-          `⚠️ **FORCE CLOSING** spawn **${spawnInfo.boss}**...\n` +
-            `Submitting ${spawnInfo.members.length} members (ignoring ${pendingInThread.length} pending verifications)`
-        );
-
-        const payload = {
-          action: "submitAttendance",
-          boss: spawnInfo.boss,
-          date: spawnInfo.date,
-          time: spawnInfo.time,
-          timestamp: spawnInfo.timestamp,
-          members: spawnInfo.members,
-        };
-
-        const resp = await attendance.postToSheet(payload);
-
-        if (resp.ok) {
-          // Auto-increment boss rotation if it's a rotating boss
-          await bossRotation.handleBossKill(spawnInfo.boss);
-
-          // Delete rotation warning message to avoid flooding
-          await bossRotation.deleteRotationWarning(spawnInfo.boss);
-          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
-
-          await message.channel.send(
-            `✅ Attendance submitted successfully! (${spawnInfo.members.length} members)`
-          );
-
-          if (spawnInfo.confirmThreadId) {
-            const confirmThread = await guild.channels
-              .fetch(spawnInfo.confirmThreadId)
-              .catch(() => null);
-            if (confirmThread) {
-              await confirmThread.delete().catch(console.error);
-              console.log(
-                `🗑️ Deleted confirmation thread for ${spawnInfo.boss}`
-              );
-            }
-          }
-
-          // Lock and archive the thread to prevent spam
-          await message.channel
-            .setLocked(true, `Force locked by ${message.author.username}`)
-            .catch(console.error);
-          await message.channel
-            .setArchived(true, `Force closed by ${message.author.username}`)
-            .catch(console.error);
-
-          delete activeSpawns[message.channel.id];
-          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
-
-          console.log(
-            `🔒 FORCE CLOSE: ${spawnInfo.boss} at ${spawnInfo.timestamp} by ${message.author.username} (${spawnInfo.members.length} members)`
-          );
-        } else {
-          await message.channel.send(
-            `⚠️ **Failed to submit attendance!**\n\n` +
-              `Error: ${resp.text || resp.err}\n\n` +
-              `**Members list (for manual entry):**\n${spawnInfo.members.join(
-                ", "
-              )}\n\n` +
-              `Please manually update the Google Sheet.`
-          );
-        }
-
-        return;
-      }
-
-      // Thread-specific override commands
-      if (
-        ["!forcesubmit", "!debugthread", "!resetpending", "!openthread", "!overrideclose"].includes(spawnCmd)
-      ) {
-        const now = Date.now();
-        if (now - lastOverrideTime < TIMING.OVERRIDE_COOLDOWN) {
-          const remaining = Math.ceil(
-            (TIMING.OVERRIDE_COOLDOWN - (now - lastOverrideTime)) / 1000
-          );
-          await message.reply(
-            `⚠️ Please wait ${remaining} seconds between override commands.`
-          );
-          return;
-        }
-
-        lastOverrideTime = now;
-        console.log(
-          `🔧 Override (${rawCmd} -> ${spawnCmd}): used by ${member.user.username} in thread ${message.channel.id}`
-        );
-
-        if (spawnCmd === "!forcesubmit")
-          await commandHandlers.forcesubmit(message, member);
-        else if (spawnCmd === "!debugthread")
-          await commandHandlers.debugthread(message, member);
-        else if (spawnCmd === "!resetpending")
-          await commandHandlers.resetpending(message, member);
-        else if (spawnCmd === "!openthread")
-          await commandHandlers.openthread(message, member);
-        else if (spawnCmd === "!overrideclose")
-          await commandHandlers.overrideclose(message, member);
-        return;
-      }
-
-      return;
-    }
-
-    // =========================================================================
-    // MEMBER COMMANDS IN BOT-COMMANDS CHANNEL
-    // =========================================================================
-    // Define bot commands channel
-    // DISABLED: Core Evaluation commands channel - no longer used
-    const inBotCommandsChannel = message.channel.id === config.bot_manual_channel_id ||
-      (message.channel.isThread() && message.channel.parentId === config.bot_manual_channel_id);
-      // Also allow Core Evaluation commands - check thread ID or parent channel
-      // DISABLED: message.channel.id === config.core_evaluation_commands_channel ||
-      // DISABLED: (message.channel.isThread() && 
-      // DISABLED:   (message.channel.id === config.core_evaluation_commands_channel || 
-      // DISABLED:    message.channel.parentId === config.core_evaluation_commands_channel ||
-      // DISABLED:    // Also allow Core Evaluation threads from bot_manual OR timer channel
-      // DISABLED:    message.channel.parentId === config.bot_manual_channel_id ||
-      // DISABLED:    message.channel.parentId === config.timer_channel_id));
-
-    // Fun commands available to all members in BOT-COMMANDS channel
-    if (inBotCommandsChannel || inElysiumCommandsChannel) {
-      const memberCmd = resolveCommandAlias(rawCmd);
-      const args = message.content.trim().split(/\s+/).slice(1);
-
-      // Check if this is a member command
-      const isMemberCommand = ["!eightball", "!slap", "!stats"].includes(memberCmd);
-
-      if (isMemberCommand) {
-        // If invoked in guild chat, redirect to BOT-COMMANDS (for both admins and members)
-        if (inElysiumCommandsChannel && !inBotCommandsChannel) {
-          const redirectMsg = await message.reply(
-            `⚠️ **Please use \`${rawCmd}\` in <#${config.bot_manual_channel_id}>**\n` +
-            `Guild chat is reserved for announcements. This message will be deleted in 30 seconds. 🙏`
-          ).catch(() => null);
-
-          setTimeout(async () => {
-            if (redirectMsg) {
-              await errorHandler.safeDelete(redirectMsg, 'member command redirect cleanup');
-            }
-            await errorHandler.safeDelete(message, 'member command original message cleanup');
-          }, 30000);
-
-          return;
-        }
-
-        // Execute command
-        if (memberCmd === "!eightball") {
-          await commandHandlers.eightball(message, member, args);
-          return;
-        }
-        if (memberCmd === "!slap") {
-          await commandHandlers.slap(message, member, args);
-          return;
-        }
-        if (memberCmd === "!stats") {
-          await commandHandlers.stats(message, member, args);
-          return;
-        }
-      }
-
-      // !CP command - Core Evaluation CP submission (always allowed in bot commands channel)
-      if (memberCmd === "!cp" || rawCmd.startsWith("!cp ") || rawCmd.startsWith("!cp") || rawCmd.startsWith("!CP")) {
-        const content = message.content.trim();
-        const cpMatch = content.match(/^!CP\s+([\d,]+)$/i) || content.match(/^!cp\s+([\d,]+)$/i);
-        
-        if (!cpMatch) {
-          await message.reply(
-            `❌ Invalid format. Use: \`!CP <number>\`\n` +
-            `Example: \`!CP 90,492\` or \`!CP 90492\`\n` +
-            `Attach a screenshot showing your CP.`
-          );
-          return;
-        }
-        
-        const cpNumber = parseInt(cpMatch[1].replace(/,/g, ''));
-        const discordNickname = member.nickname || message.author.username;
-        
-        console.log(`📊 CP submission: ${discordNickname} - ${cpNumber}`);
-        
-        // DISABLED: const result = await coreEvaluation.handleCPCommand(message, cpNumber, discordNickname);
-        return;
-      }
-    }
-
-    // Admin-only commands in admin logs
-    if (!userIsAdmin) return;
-
-    if (inAdminLogs) {
-      const adminCmd = resolveCommandAlias(rawCmd);
-      const args = message.content.trim().split(/\s+/).slice(1);
-
-      // Admin logs override commands
-      if (
-        [
-          "!clearstate",
-          "!status",
-          "!closeallthread",
-          "!emergency",
-          "!maintenance",
-          "!removemember",
-          "!forceclosethread",
-          "!forcecloseallthreads",
-          "!forceendauction",
-          "!unlockallpoints",
-          "!clearallbids",
-          "!diagnostics",
-          "!submittallyfromsheet", // Submit tallies from BiddingItems sheet (crash recovery)
-          "!resetsession", // Reset stuck sessionFinalized flag
-          "!forcesync",
-          "!forcecore",
-          "!fcore",
-          "!fclose",
-          "!freset",
-          "!testmilestones",
-        ].includes(adminCmd)
-      ) {
-        const now = Date.now();
-        if (now - lastOverrideTime < TIMING.OVERRIDE_COOLDOWN) {
-          const remaining = Math.ceil(
-            (TIMING.OVERRIDE_COOLDOWN - (now - lastOverrideTime)) / 1000
-          );
-          await message.reply(
-            `⚠️ Please wait ${remaining} seconds between override commands.`
-          );
-          return;
-        }
-
-        lastOverrideTime = now;
-        console.log(
-          `🔧 Override (${rawCmd} -> ${adminCmd}): used by ${member.user.username}`
-        );
-
-        if (adminCmd === "!clearstate")
-          await commandHandlers.clearstate(message, member);
-        else if (adminCmd === "!status")
-          await commandHandlers.status(message, member);
-        else if (adminCmd === "!closeallthread")
-          await commandHandlers.closeallthread(message, member);
-        else if (adminCmd === "!emergency")
-          await emergencyCommands.handleEmergencyCommand(message, args);
-        else if (adminCmd === "!maintenance")
-          await commandHandlers.maintenance(message, member);
-        else if (adminCmd === "!removemember")
-          await commandHandlers.removemember(message, member);
-        // Standalone emergency commands
-        else if (adminCmd === "!forceclosethread")
-          await commandHandlers.forceclosethread(message, member);
-        else if (adminCmd === "!forcecloseallthreads")
-          await commandHandlers.forcecloseallthreads(message, member);
-        else if (adminCmd === "!forceendauction")
-          await commandHandlers.forceendauction(message, member);
-        else if (adminCmd === "!unlockallpoints")
-          await commandHandlers.unlockallpoints(message, member);
-        else if (adminCmd === "!clearallbids")
-          await commandHandlers.clearallbids(message, member);
-        else if (adminCmd === "!diagnostics")
-          await commandHandlers.diagnostics(message, member);
-        else if (adminCmd === "!forcesync")
-          await commandHandlers.forcesync(message, member);
-        else if (adminCmd === "!forcecore" || adminCmd === "!fcore")
-          await commandHandlers.forcecore(message, member);
-        else if (adminCmd === "!fclose")
-          await commandHandlers.fclose(message, member);
-        else if (adminCmd === "!freset")
-          await commandHandlers.freset(message, member);
-        else if (adminCmd === "!testmilestones")
-          await commandHandlers.testmilestones(message, member);
-        else if (adminCmd === "!submittallyfromsheet" || adminCmd === "!resetsession")
-          await bidding.handleCommand(adminCmd, message, args, client, config);
-        // ═══════════════════════════════════════════════════════════════════════════
-        // PHASE 1 ADMIN COMMANDS - Monitoring & Control
-        // ═══════════════════════════════════════════════════════════════════════════
-        else if (adminCmd === "!shutdownstatus") {
-          const status = shutdownManager.getStatus();
-          const embed = new EmbedBuilder()
-            .setColor(0x3498DB)
-            .setTitle('🛡️ Shutdown Manager Status')
-            .addFields(
-              { name: 'Timeouts Registered', value: `${status.timeouts}`, inline: true },
-              { name: 'Intervals Registered', value: `${status.intervals}`, inline: true },
-              { name: 'Cleanup Handlers', value: `${status.cleanupHandlers}`, inline: true },
-              {
-                name: 'Active Intervals',
-                value: status.timers.intervals.length > 0
-                  ? status.timers.intervals.map(name => `• ${name}`).join('\n')
-                  : 'None',
-                inline: false
-              },
-              {
-                name: 'Cleanup Handlers',
-                value: status.handlers.map(h => `• ${h.name} (priority: ${h.priority})`).join('\n'),
-                inline: false
-              }
-            )
-            .setTimestamp();
-
-          addGuildFooter(embed);
-          await message.reply({ embeds: [embed] });
-        }
-        else if (adminCmd === "!cachestats") {
-          const stats = attendance.getCacheStats();
-          const embed = new EmbedBuilder()
-            .setColor(0x3498DB)
-            .setTitle('📊 LRU Cache Statistics')
-            .addFields(
-              { name: 'Current Size', value: `${stats.size}/${stats.maxSize}`, inline: true },
-              { name: 'Utilization', value: `${stats.utilizationPercent}%`, inline: true },
-              { name: 'Hit Rate', value: stats.hitRate, inline: true },
-              { name: 'Total Hits', value: `${stats.hits}`, inline: true },
-              { name: 'Total Misses', value: `${stats.misses}`, inline: true },
-              { name: 'Cache Efficiency', value: `${stats.hits}/${stats.hits + stats.misses} requests`, inline: true },
-              { name: 'Evictions', value: `${stats.evictions}`, inline: true },
-              { name: 'Expirations', value: `${stats.expirations}`, inline: true },
-              { name: 'Total Sets', value: `${stats.sets}`, inline: true }
-            )
-            .setDescription('Column check cache prevents redundant Google Sheets API calls during attendance windows.')
-            .setTimestamp();
-
-          addGuildFooter(embed);
-          await message.reply({ embeds: [embed] });
-        }
-        else if (adminCmd === "!mongoindexes") {
-          try {
-            await message.reply('🔄 Recreating MongoDB indexes...');
-
-            const results = await dbAPI.createIndexes();
-            const totalIndexes = results.created.length + results.skipped.length + results.failed.length;
-            const successRate = Math.round(((results.created.length + results.skipped.length) / totalIndexes) * 100);
-
-            const embed = new EmbedBuilder()
-              .setColor(results.failed.length === 0 ? 0x00FF00 : (results.failed.filter(f => f.critical).length > 0 ? 0xFF0000 : 0xFFA500))
-              .setTitle('📇 MongoDB Index Creation Results')
-              .setDescription(`Successfully processed ${totalIndexes} indexes (${successRate}% success rate)`)
-              .addFields(
-                { name: '✅ Created', value: `${results.created.length}`, inline: true },
-                { name: '⏭️ Already Existed', value: `${results.skipped.length}`, inline: true },
-                { name: '❌ Failed', value: `${results.failed.length}`, inline: true },
-                { name: '✓ Critical Verified', value: `${results.verified.length}`, inline: true }
-              );
-
-            // Add failures if any
-            if (results.failed.length > 0) {
-              const criticalFailures = results.failed.filter(f => f.critical);
-              const regularFailures = results.failed.filter(f => !f.critical);
-
-              if (criticalFailures.length > 0) {
-                embed.addFields({
-                  name: '🔴 Critical Failures',
-                  value: criticalFailures
-                    .map(f => `• ${f.collection}.${f.name}`)
-                    .join('\n')
-                    .substring(0, 200),
-                  inline: false
-                });
-              }
-
-              if (regularFailures.length > 0) {
-                embed.addFields({
-                  name: '⚠️ Non-Critical Failures',
-                  value: regularFailures
-                    .map(f => `• ${f.collection}.${f.name}`)
-                    .join('\n')
-                    .substring(0, 200),
-                  inline: false
-                });
-              }
-
-              embed.addFields({
-                name: '💡 Note',
-                value: results.failed.length > 0
-                  ? 'Check MongoDB Atlas dashboard for detailed error information'
-                  : 'All indexes created or already exist',
-                inline: false
-              });
-            }
-
-            embed.setTimestamp();
-            addGuildFooter(embed);
-
-            await message.reply({ embeds: [embed] });
-          } catch (error) {
-            await message.reply(`❌ Index creation failed: ${error.message}`);
-          }
-        }
-        return;
-      }
-
-      // BIDDING & AUCTIONEERING COMMANDS - Admin logs only
-      // NOTE: !pause, !resume, !stop, !extend are thread-only commands now
-      if (
-        [
-          "!queuelist",
-          "!startauction",
-          "!startauctionnow",
-          "!resetbids",
-          "!forcesubmitresults",
-          "!endauction",
-          "!movetodistribution",
-          "!fixlockedpoints",
-          "!auctionaudit",
-          "!resetauction",
-          "!recoverauction",
-        ].includes(adminCmd)
-      ) {
-        console.log(`🎯 Processing auction command (${rawCmd} -> ${adminCmd})`);
-
-        // Route to appropriate handler
-        // These are handled by commandHandlers
-        if (
-          ["!startauction", "!startauctionnow", "!endauction"].includes(
-            adminCmd
-          )
-        ) {
-          const handlerName = adminCmd.slice(1); // Remove the "!"
-          if (commandHandlers[handlerName]) {
-            await commandHandlers[handlerName](message, member, args);
-          }
-        }
-        // These are handled by auctioneering module
-        else if (
-          [
-            "!queuelist",
-            "!forcesubmitresults",
-            "!cancelitem",
-            "!skipitem",
-            "!movetodistribution",
-          ].includes(adminCmd)
-        ) {
-          const handler = adminCmd.slice(1); // Remove the "!"
-
-          if (handler === "queuelist") {
-            await auctioneering.handleQueueList(
-              message,
-              bidding.getBiddingState()
-            );
-          } else if (handler === "forcesubmitresults") {
-            await auctioneering.handleForceSubmitResults(
-              message,
-              config,
-              bidding
-            );
-          } else if (handler === "cancelitem") {
-            await auctioneering.handleCancelItem(message);
-          } else if (handler === "skipitem") {
-            await auctioneering.handleSkipItem(message);
-          } else if (handler === "movetodistribution") {
-            await auctioneering.handleMoveToDistribution(message, config, client);
-          }
-        }
-        // Everything else (!resetbids, etc.) goes to bidding.handleCommand
-        else {
-          await bidding.handleCommand(adminCmd, message, args, client, config);
-        }
-        return;
-      }
-
-      // !addthread - Admin only command for manual spawn thread creation
-      if (adminCmd === "!addthread") {
-        // Explicit admin check (redundant with line 3526, but provides clear error message)
-        if (!isAdmin(member, config)) {
-          await message.reply("❌ **Admin only command**\n\nOnly admins can create spawn threads manually.");
-          return;
-        }
-
-        const fullText = message.content.substring("!addthread".length).trim();
-
-        const timestampMatch = fullText.match(
-          /\((\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\)/
-        );
-        if (!timestampMatch) {
-          await message.reply(
-            "⚠️ **Invalid format!**\n\n" +
-              "**Usage:** `!addthread [BossName] will spawn in X minutes! (YYYY-MM-DD HH:MM)`\n\n" +
-              "**Example:** `!addthread Clemantis will spawn in 5 minutes! (2025-10-22 11:30)`"
-          );
-          return;
-        }
-
-        const timestampStr = timestampMatch[1];
-
-        const bossMatch = fullText.match(/^(.+?)\s+will spawn/i);
-        if (!bossMatch) {
-          await message.reply(
-            "⚠️ **Cannot detect boss name!**\n\nFormat: `!addthread [BossName] will spawn in X minutes! (YYYY-MM-DD HH:MM)`"
-          );
-          return;
-        }
-
-        const detectedBoss = bossMatch[1].trim();
-        const bossName = attendance.findBossMatch(detectedBoss);
-
-        if (!bossName) {
-          await message.reply(
-            `⚠️ **Unknown boss:** "${detectedBoss}"\n\n**Available bosses:** ${Object.keys(
-              bossPoints
-            ).join(", ")}`
-          );
-          return;
-        }
-
-        const [datePart, timePart] = timestampStr.split(" ");
-        const [year, month, day] = datePart.split("-");
-
-        const dateStr = `${month}/${day}/${year.substring(2)}`;
-        const timeStr = timePart;
-        const fullTimestamp = `${dateStr} ${timeStr}`;
-
-        console.log(
-          `🔧 Manual spawn creation: ${bossName} at ${fullTimestamp} by ${message.author.username}`
-        );
-
-        const result = await attendance.createSpawnThreads(
-          client,
-          bossName,
-          dateStr,
-          timeStr,
-          fullTimestamp,
-          "timer"
-        );
-
-        if (!result || !result.success) {
-          const errorMsg = result && result.error ? result.error : 'Unknown error';
-          await message.reply(
-            `❌ **Failed to create spawn thread!**\n\n` +
-              `**Boss:** ${bossName}\n` +
-              `**Time:** ${fullTimestamp}\n` +
-              `**Error:** ${errorMsg}\n\n` +
-              `Please try again or contact an admin.`
-          );
-          console.error(`❌ Failed to create manual spawn thread for ${bossName}: ${errorMsg}`);
-          return;
-        }
-
-        await message.reply(
-          `✅ **Spawn thread created successfully!**\n\n` +
-            `**Boss:** ${bossName}\n` +
-            `**Time:** ${fullTimestamp}\n` +
-            `**Thread ID:** ${result.threadId}\n\n` +
-            `Members can now check in!`
-        );
-
-        return;
-      }
-    }
-
-    // Other bidding commands (admin only)
-    if (inBiddingChannel) {
-      const biddingCmd = resolveCommandAlias(rawCmd);
-      const args = message.content.trim().split(/\s+/).slice(1);
-
-      // !bidstatus - also available to members
-      if (biddingCmd === "!bidstatus") {
-        console.log(`🎯 Bidding status command (${rawCmd} -> ${biddingCmd})`);
-        await bidding.handleCommand(biddingCmd, message, args, client, config);
-        return;
-      }
-    }
-  } catch (err) {
-    console.error("❌ Message handler error:", err);
-  }
-});
-
-/**
- * =========================================================================
- * INTERACTION EVENT HANDLER
- * =========================================================================
- *
- * Handles all Discord interactions:
- * - Slash Commands (/killed, /verify, /rotation, etc.)
- * - Autocomplete (boss names, members, etc.)
- * - Button Interactions (✅ Verify / ❌ Deny, Thread closure)
- */
-client.on(Events.InteractionCreate, async (interaction) => {
-  try {
-    // ═══════════════════════════════════════════════════════════════════════════
-    // SLASH COMMAND HANDLING
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (interaction.isChatInputCommand()) {
-      const modules = {
-        attendance,
-        bossTimer,
-        bossTimerCommands,
-        bossRotation,
-        bidding,
-        auctioneering
-      };
-
-      await handleSlashCommand(interaction, modules, config, client);
-      return;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // AUTOCOMPLETE HANDLING
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (interaction.isAutocomplete()) {
-      await handleAutocomplete(interaction, attendance, bossRotation);
-      return;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // BUTTON INTERACTION HANDLING
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (!interaction.isButton()) return;
-    if (!interaction.message.guild) return;
-    if (!interaction.message.guild) return;
-
-    const customId = interaction.customId;
-    const user = interaction.user;
-    const msg = interaction.message;
-    const guild = interaction.guild;
-
-    // Sync state from attendance module
-    activeSpawns = attendance.getActiveSpawns();
-    pendingVerifications = attendance.getPendingVerifications();
-    pendingClosures = attendance.getPendingClosures();
-
-    // Handle attendance verification buttons
-    if (customId.startsWith('verify_')) {
-      // Check if admin
-      const adminMember = await guild.members.fetch(user.id).catch(() => null);
-      if (!adminMember || !isAdmin(adminMember)) {
-        await interaction.reply({ content: '⚠️ Only admins can verify attendance.', ephemeral: true });
-        return;
-      }
-
-      // Re-sync state immediately before processing (prevent race conditions)
-      activeSpawns = attendance.getActiveSpawns();
-      pendingVerifications = attendance.getPendingVerifications();
-
-      // Find the pending verification
-      let pendingMsgId = null;
-      let pending = null;
-      for (const [msgId, verification] of Object.entries(pendingVerifications)) {
-        if (verification.verificationMsgId === msg.id) {
-          pendingMsgId = msgId;
-          pending = verification;
+        if (!messages || messages.size === 0) {
+          console.log(`📊 Reached end of message history`);
+          shouldContinue = false;
           break;
         }
-      }
 
-      if (!pending) {
-        await interaction.reply({ content: '⚠️ Verification already processed or expired.', ephemeral: true });
-        return;
-      }
+        messagesFetched += messages.size;
+        batchSize++;
 
-      const spawnInfo = activeSpawns[pending.threadId];
+        for (const [msgId, message] of messages) {
+          if (message.author.bot) continue;
 
-      if (!spawnInfo || spawnInfo.closed) {
-        await interaction.update({ content: "⚠️ This spawn is closed.", components: [] });
-        delete pendingVerifications[pendingMsgId];
-        attendance.setPendingVerifications(pendingVerifications);
-        return;
-      }
-
-      const isApprove = customId.startsWith('verify_approve_');
-
-      // Disable buttons
-      const btn1 = interaction.message.components[0].components[0];
-      const btn2 = interaction.message.components[0].components[1];
-      const disabledRow = createDisabledRow(btn1, btn2);
-
-      if (isApprove) {
-        const isDuplicate = spawnInfo.members.some(
-          (m) => normalizeUsername(m) === normalizeUsername(pending.author)
-        );
-
-        if (isDuplicate) {
-          await interaction.update({
-            embeds: [EmbedBuilder.from(msg.embeds[0]).setColor(0xff0000).setFooter({ text: 'Already verified' })],
-            components: [disabledRow]
-          });
-          await interaction.followUp({ content: `⚠️ **${pending.author}** already verified.`, ephemeral: false });
-          delete pendingVerifications[pendingMsgId];
-          attendance.setPendingVerifications(pendingVerifications);
-          return;
-        }
-
-        spawnInfo.members.push(pending.author);
-        // Store Discord ID for reliable MongoDB lookup
-        if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
-        spawnInfo.memberIds[pending.author] = pending.authorId;
-        attendance.setActiveSpawns(activeSpawns);
-
-        console.log(`✅ VERIFY: ${pending.author} added to ${spawnInfo.boss} (${spawnInfo.timestamp}) by ${user.username} | Total: ${spawnInfo.members.length} members`);
-        console.log(`   📊 Current verified members: ${spawnInfo.members.join(', ')}`);
-
-        await interaction.update({
-          embeds: [EmbedBuilder.from(msg.embeds[0]).setColor(0x00ff00).setFooter({ text: `Verified by ${user.username}` })],
-          components: [disabledRow]
-        });
-        await interaction.followUp({ content: `✅ **${pending.author}** verified by ${user.username}!`, ephemeral: false });
-
-        if (spawnInfo.confirmThreadId) {
-          const confirmThread = await guild.channels
-            .fetch(spawnInfo.confirmThreadId)
-            .catch(() => null);
-          if (confirmThread) {
-            const embed = new EmbedBuilder()
-              .setColor(0x00ff00)
-              .setTitle("✅ Attendance Verified")
-              .setDescription(
-                `**${pending.author}** verified for **${spawnInfo.boss}**`
-              )
-              .addFields(
-                { name: "Verified By", value: user.username, inline: true },
-                {
-                  name: "Points",
-                  value: `+${bossPoints[spawnInfo.boss].points}`,
-                  inline: true,
-                },
-                {
-                  name: "Total Verified",
-                  value: `${spawnInfo.members.length}`,
-                  inline: true,
-                }
-              )
-              .setTimestamp();
-
-            await confirmThread.send({ embeds: [embed] });
-          }
-        }
-
-        delete pendingVerifications[pendingMsgId];
-        attendance.setPendingVerifications(pendingVerifications);
-      } else {
-        // Deny
-        await interaction.update({
-          embeds: [EmbedBuilder.from(msg.embeds[0]).setColor(0xff0000).setFooter({ text: `Denied by ${user.username}` })],
-          components: [disabledRow]
-        });
-
-        await interaction.followUp({
-          content: `<@${pending.authorId}>, your attendance was **denied** by ${user.username}. ` +
-            `Please repost with a proper screenshot.`,
-          ephemeral: false
-        });
-
-        delete pendingVerifications[pendingMsgId];
-        attendance.setPendingVerifications(pendingVerifications);
-      }
-
-      return;
-    }
-
-    // Handle close confirmation buttons
-    if (customId.startsWith('close_')) {
-      // Check if admin
-      const adminMember = await guild.members.fetch(user.id).catch(() => null);
-      if (!adminMember || !isAdmin(adminMember)) {
-        await interaction.reply({ content: '⚠️ Only admins can close spawns.', ephemeral: true });
-        return;
-      }
-
-      const closePending = pendingClosures[msg.id];
-      if (!closePending) {
-        await interaction.reply({ content: '⚠️ Closure already processed or expired.', ephemeral: true });
-        return;
-      }
-
-      const spawnInfo = activeSpawns[closePending.threadId];
-      const isConfirm = customId.startsWith('close_confirm_');
-
-      // Disable buttons
-      const btn1 = interaction.message.components[0].components[0];
-      const btn2 = interaction.message.components[0].components[1];
-      const disabledRow = createDisabledRow(btn1, btn2);
-
-      if (isConfirm) {
-        if (!spawnInfo || spawnInfo.closed) {
-          await interaction.update({
-            embeds: [EmbedBuilder.from(msg.embeds[0]).setFooter({ text: 'Already closed' })],
-            components: [disabledRow]
-          });
-          await interaction.followUp({ content: "⚠️ Spawn already closed.", ephemeral: false });
-          delete pendingClosures[msg.id];
-          attendance.setPendingClosures(pendingClosures);
-          return;
-        }
-
-        console.log(`🔒 MANUAL CLOSE: Marking ${spawnInfo.boss} (${spawnInfo.timestamp}) as closed by ${user.username}`);
-        spawnInfo.closed = true;
-        attendance.setActiveSpawns(activeSpawns);
-
-        await interaction.update({
-          embeds: [EmbedBuilder.from(msg.embeds[0]).setColor(0x00ff00).setFooter({ text: `Closed by ${user.username}` })],
-          components: [disabledRow]
-        });
-
-        // Remove from activeColumns cache BEFORE checking Google Sheets
-        // This prevents false positives where the thread exists but was never submitted
-        const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
-        delete activeColumns[cacheKey];
-
-        // Check for duplicate column before submitting
-        const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
-
-        if (columnExists) {
-          console.log(`⚠️ Duplicate prevented: ${spawnInfo.boss} at ${spawnInfo.timestamp} already exists`);
-
-          await interaction.followUp({
-            content: `⚠️ **Attendance already submitted for this spawn!**\n\nColumn already exists in Google Sheets. Closing thread without duplicate submission.`,
-            ephemeral: false
-          });
-
-          // Skip submission, just close and clean up
-          if (spawnInfo.confirmThreadId) {
-            const confirmThread = await guild.channels
-              .fetch(spawnInfo.confirmThreadId)
+          if (message.guild) {
+            const msgAuthor = await message.guild.members
+              .fetch(message.author.id)
               .catch(() => null);
-            if (confirmThread) {
-              await confirmThread.send(
-                `⚠️ Duplicate prevented: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - Column already exists`
-              );
-              await errorHandler.safeDelete(confirmThread, 'message deletion');
-            }
+            if (msgAuthor && isAdmin(msgAuthor)) continue;
           }
 
-          // Lock and archive the thread
-          await interaction.channel
-            .setLocked(true, `Locked by ${user.username} (duplicate prevented)`)
-            .catch(err => errorHandler.silentError(err, 'button close lock duplicate thread'));
-          await interaction.channel
-            .setArchived(true, `Closed by ${user.username} (duplicate prevented)`)
-            .catch(err => errorHandler.silentError(err, 'button close archive duplicate thread'));
-
-          // Delete rotation warning message (prevent channel flooding)
-          await bossRotation.deleteRotationWarning(spawnInfo.boss);
-          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
-
-          delete activeSpawns[closePending.threadId];
-          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
-          delete pendingClosures[msg.id];
-          delete confirmationMessages[closePending.threadId];
-
-          attendance.setActiveSpawns(activeSpawns);
-          attendance.setActiveColumns(activeColumns);
-          attendance.setPendingClosures(pendingClosures);
-          attendance.setConfirmationMessages(confirmationMessages);
-
-          return;
-        }
-
-        // Check if there are any members to submit
-        if (spawnInfo.members.length === 0) {
-          // No members to submit - just close and archive the thread
-          await interaction.followUp({
-            content: `⚠️ **No members to submit** (0 verified). Closing thread without Google Sheets submission...`,
-            ephemeral: false
-          });
-
-          await interaction.channel.send(
-            `⚠️ Thread closed with no verified members. No data submitted to Google Sheets.`
-          );
-
-          if (spawnInfo.confirmThreadId) {
-            const confirmThread = await guild.channels
-              .fetch(spawnInfo.confirmThreadId)
-              .catch(() => null);
-            if (confirmThread) {
-              await confirmThread.send(
-                `⚠️ **${spawnInfo.boss}** (${spawnInfo.timestamp}) closed with 0 members`
-              );
-              await errorHandler.safeDelete(confirmThread, 'message deletion');
-            }
-          }
-
-          // Lock and archive the thread
-          await interaction.channel
-            .setLocked(true, `Locked by ${user.username} (no members)`)
-            .catch(err => errorHandler.silentError(err, 'button close lock no members'));
-          await interaction.channel
-            .setArchived(true, `Closed by ${user.username} (no members)`)
-            .catch(err => errorHandler.silentError(err, 'button close archive no members'));
-
-          // Delete rotation warning message (prevent channel flooding)
-          await bossRotation.deleteRotationWarning(spawnInfo.boss);
-          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
-
-          delete activeSpawns[closePending.threadId];
-          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
-          delete pendingClosures[msg.id];
-          delete confirmationMessages[closePending.threadId];
-
-          // Sync all changes
-          attendance.setActiveSpawns(activeSpawns);
-          attendance.setActiveColumns(activeColumns);
-          attendance.setPendingClosures(pendingClosures);
-          attendance.setConfirmationMessages(confirmationMessages);
-
-          return;
-        }
-
-        await interaction.followUp({
-          content: `🔒 Closing spawn **${spawnInfo.boss}**... Submitting ${spawnInfo.members.length} members...`,
-          ephemeral: false
-        });
-
-        console.log(`📊 MANUAL CLOSE: Submitting ${spawnInfo.members.length} members for ${spawnInfo.boss} (${spawnInfo.timestamp})`);
-        console.log(`   ├─ Members: ${spawnInfo.members.join(', ')}`);
-
-        const payload = {
-          action: "submitAttendance",
-          boss: spawnInfo.boss,
-          date: spawnInfo.date,
-          time: spawnInfo.time,
-          timestamp: spawnInfo.timestamp,
-          members: spawnInfo.members,
-        };
-
-        const resp = await attendance.postToSheet(payload);
-
-        if (resp.ok) {
-          // Auto-increment boss rotation if it's a rotating boss
-          await bossRotation.handleBossKill(spawnInfo.boss);
-
-          // Delete rotation warning message to avoid flooding
-          await bossRotation.deleteRotationWarning(spawnInfo.boss);
-          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
-
-          await interaction.channel.send(`✅ Attendance submitted! Archiving...`);
-
-          if (spawnInfo.confirmThreadId) {
-            const confirmThread = await guild.channels
-              .fetch(spawnInfo.confirmThreadId)
-              .catch(() => null);
-            if (confirmThread) {
-              await confirmThread.send(
-                `✅ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - ${spawnInfo.members.length} members`
-              );
-              await errorHandler.safeDelete(confirmThread, 'message deletion');
-            }
-          }
-
-          // Lock and archive the thread
-          await interaction.channel
-            .setLocked(true, `Locked by ${user.username}`)
-            .catch(err => errorHandler.silentError(err, 'button close lock thread'));
-          await interaction.channel
-            .setArchived(true, `Closed by ${user.username}`)
-            .catch(err => errorHandler.silentError(err, 'button close archive thread'));
-
-          // Delete rotation warning message (prevent channel flooding)
-          await bossRotation.deleteRotationWarning(spawnInfo.boss);
-          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
-
-          delete activeSpawns[closePending.threadId];
-          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
-          delete pendingClosures[msg.id];
-          delete confirmationMessages[closePending.threadId];
-
-          // Sync all changes
-          attendance.setActiveSpawns(activeSpawns);
-          attendance.setActiveColumns(activeColumns);
-          attendance.setPendingClosures(pendingClosures);
-          attendance.setConfirmationMessages(confirmationMessages);
-        } else {
-          await interaction.channel.send(
-            `⚠️ **Failed!**\n\nError: ${resp.text || resp.err}\n\n` +
-              `**Members:** ${spawnInfo.members.join(", ")}`
-          );
-        }
-      } else {
-        // Cancel
-        await interaction.update({
-          embeds: [EmbedBuilder.from(msg.embeds[0]).setFooter({ text: `Cancelled by ${user.username}` })],
-          components: [disabledRow]
-        });
-        await interaction.followUp({ content: "❌ Close canceled.", ephemeral: false });
-        delete pendingClosures[msg.id];
-        attendance.setPendingClosures(pendingClosures);
-      }
-
-      return;
-    }
-  } catch (err) {
-    console.error("❌ Button interaction error:", err);
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: '⚠️ An error occurred processing your request.', ephemeral: true }).catch(err => errorHandler.silentError(err, 'button interaction error reply'));
-    }
-  }
-});
-
-/**
- * =========================================================================
- * MESSAGE REACTION ADD EVENT HANDLER (LEGACY - FOR BACKWARD COMPATIBILITY)
- * =========================================================================
- *
- * Handles old reaction-based interactions for backward compatibility.
- * Modern system uses buttons (handled in InteractionCreate event).
- * Primary uses:
- *
- * 1. Attendance Verification:
- *    - Admin clicks ✅ Verify button to approve member check-in
- *    - Admin clicks ❌ Deny button to reject check-in
- *    - Updates spawn member list and notifies user
- *
- * 2. Spawn Closure Confirmations:
- *    - Admin clicks ✅ Confirm button to close spawn
- *    - Submits attendance to Google Sheets
- *    - Archives thread and cleans up state
- *
- * 3. Bid Confirmations:
- *    - User clicks ✅ Confirm Bid button to place bid
- *    - User clicks ❌ Cancel button to cancel bid
- *    - Handles both regular bidding and auctioneering modes
- *    - Manages point locking/unlocking
- *    - Handles outbid notifications
- *
- * 4. State Management:
- *    - Tracks pending operations in pendingVerifications
- *    - Manages bid state in bidding module
- *    - Cleans up confirmation messages after response
- *
- * Safety features:
- * - Ignores bot reactions
- * - Fetches partial data (uncached entities)
- * - Validates user permissions
- * - Error handling with detailed logging
- *
- * Flow:
- * Reaction -> Partial Fetch -> State Lookup -> Permission Check -> Action Execution
- *
- * @event MessageReactionAdd
- * @param {MessageReaction} reaction - The reaction object
- * @param {User} user - User who added the reaction
- */
-client.on(Events.MessageReactionAdd, async (reaction, user) => {
-  try {
-    // ⚡ PERFORMANCE: Early returns for irrelevant reactions
-    if (user.bot) return; // Skip bot reactions
-    if (!reaction.message.guild) return; // Skip DM reactions
-    // Guild check removed - use role-based permissions
-
-    // 👑 SPECIAL REACTION: When rohypnol or alterfrieren react to each other's messages
-    // 50% chance for the bot to also react with 💙
-
-    if ((user.id === ROHYPnol_ID || user.id === ALTERFRIEREN_ID) && reaction.message.author) {
-      const otherPersonId = user.id === ROHYPnol_ID ? ALTERFRIEREN_ID : ROHYPnol_ID;
-      if (reaction.message.author.id === otherPersonId) {
-        if (Math.random() < 0.50) {
-          await reaction.message.react('💙').catch(err => console.error(`Failed to react with 💙: ${err.message}`));
-        }
-      }
-    }
-
-    if (reaction.partial) await reaction.fetch();
-    if (reaction.message.partial) await reaction.message.fetch();
-
-    const msg = reaction.message;
-    const guild = msg.guild;
-
-    // Sync state from attendance module
-    activeSpawns = attendance.getActiveSpawns();
-    pendingVerifications = attendance.getPendingVerifications();
-    pendingClosures = attendance.getPendingClosures();
-
-    // Guard against closed threads
-    if (
-      msg.channel.isThread() &&
-      msg.channel.parentId === config.attendance_channel_id
-    ) {
-      const spawnInfo = activeSpawns[msg.channel.id];
-
-      if (!spawnInfo || spawnInfo.closed) {
-        try {
-          await reaction.users.remove(user.id);
-          await msg.channel
-            .send(`⚠️ <@${user.id}>, this spawn is closed. Reaction removed.`)
-            .then((m) => setTimeout(() => errorHandler.safeDelete(m, 'closed spawn warning cleanup'), 5000));
-        } catch (err) {
-          console.error(
-            `❌ Failed to send/delete closed spawn message:`,
-            err.message
-          );
-        }
-        return;
-      }
-    }
-
-    // NOTE: Bidding confirmations removed - all bids are now instant (no reactions/buttons needed)
-    // This prevents timeouts and last-minute bidding issues
-
-    // Attendance verification
-    const pending = pendingVerifications[msg.id];
-    const closePending = pendingClosures[msg.id];
-
-    // Admin check ONLY for attendance-related reactions
-    if (pending || closePending) {
-      const adminMember = await guild.members.fetch(user.id).catch(() => null);
-      if (!adminMember || !isAdmin(adminMember)) {
-        try {
-          await reaction.users.remove(user.id);
-        } catch (e) {
-          console.error(
-            `❌ Failed to remove non-admin reaction from ${user.tag}:`,
-            e.message
-          );
-        }
-        return;
-      }
-    } else {
-      // Not an attendance-related message, ignore this reaction
-      return;
-    }
-
-    if (pending) {
-      const spawnInfo = activeSpawns[pending.threadId];
-
-      if (!spawnInfo || spawnInfo.closed) {
-        await msg.reply("⚠️ This spawn is closed.");
-        delete pendingVerifications[msg.id];
-        attendance.setPendingVerifications(pendingVerifications); // Sync
-        return;
-      }
-
-      if (reaction.emoji.name === "✅") {
-        const isDuplicate = spawnInfo.members.some(
-          (m) => normalizeUsername(m) === normalizeUsername(pending.author)
-        );
-
-        if (isDuplicate) {
-          await msg.reply(`⚠️ **${pending.author}** already verified.`);
-          await attendance.removeAllReactionsWithRetry(msg); // CHANGED
-          delete pendingVerifications[msg.id];
-          attendance.setPendingVerifications(pendingVerifications); // Sync
-          return;
-        }
-
-        spawnInfo.members.push(pending.author);
-        // Store Discord ID for reliable MongoDB lookup
-        if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
-        spawnInfo.memberIds[pending.author] = pending.authorId;
-        attendance.setActiveSpawns(activeSpawns); // Sync
-
-        await attendance.removeAllReactionsWithRetry(msg); // CHANGED
-        await msg.reply(
-          `✅ **${pending.author}** verified by ${user.username}!`
-        );
-
-        if (spawnInfo.confirmThreadId) {
-          const confirmThread = await guild.channels
-            .fetch(spawnInfo.confirmThreadId)
-            .catch(() => null);
-          if (confirmThread) {
-            const embed = new EmbedBuilder()
-              .setColor(0x00ff00)
-              .setTitle("✅ Attendance Verified")
-              .setDescription(
-                `**${pending.author}** verified for **${spawnInfo.boss}**`
-              )
-              .addFields(
-                { name: "Verified By", value: user.username, inline: true },
-                {
-                  name: "Points",
-                  value: `+${bossPoints[spawnInfo.boss].points}`,
-                  inline: true,
-                },
-                {
-                  name: "Total Verified",
-                  value: `${spawnInfo.members.length}`,
-                  inline: true,
-                }
-              )
-              .setTimestamp();
-
-            await confirmThread.send({ embeds: [embed] });
+          try {
+            await errorHandler.safeDelete(message, 'message deletion');
+            messagesDeleted++;
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          } catch (e) {
+            console.warn(`⚠️ Could not delete message ${msgId}: ${e.message}`);
           }
         }
 
-        delete pendingVerifications[msg.id];
-        attendance.setPendingVerifications(pendingVerifications); // Sync
-      } else if (reaction.emoji.name === "❌") {
-        await errorHandler.safeDelete(msg, 'message deletion');
-        await msg.channel.send(
-          `<@${pending.authorId}>, your attendance was **denied** by ${user.username}. ` +
-            `Please repost with a proper screenshot.`
-        );
+        if (messages.size > 0) {
+          const lastMsg = messages.last();
+          lastMessageId = lastMsg.id;
+        }
 
-        delete pendingVerifications[msg.id];
-        attendance.setPendingVerifications(pendingVerifications); // Sync
+        if (batchSize >= 50) {
+          console.log(`⚠️ Safety limit reached (50 batches, 5000 messages). Stopping cleanup.`);
+          shouldContinue = false;
+        }
+      } catch (e) {
+        console.error(`❌ Error in cleanup batch ${batchSize}: ${e.message}`);
+        shouldContinue = false;
       }
     }
 
-    // Close confirmation
-    if (closePending) {
-      const spawnInfo = activeSpawns[closePending.threadId];
-
-      if (reaction.emoji.name === "✅") {
-        if (!spawnInfo || spawnInfo.closed) {
-          await msg.channel.send("⚠️ Spawn already closed.");
-          delete pendingClosures[msg.id];
-          attendance.setPendingClosures(pendingClosures); // Sync
-          await attendance.removeAllReactionsWithRetry(msg); // CHANGED
-          return;
-        }
-
-        spawnInfo.closed = true;
-        attendance.setActiveSpawns(activeSpawns); // Sync
-
-        // Remove from activeColumns cache BEFORE checking Google Sheets
-        // This prevents false positives where the thread exists but was never submitted
-        const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
-        delete activeColumns[cacheKey];
-
-        // Check for duplicate column before submitting
-        const columnExists = await attendance.checkColumnExists(spawnInfo.boss, spawnInfo.timestamp);
-
-        if (columnExists) {
-          console.log(`⚠️ Duplicate prevented: ${spawnInfo.boss} at ${spawnInfo.timestamp} already exists`);
-
-          await msg.channel.send(
-            `⚠️ **Attendance already submitted for this spawn!**\n\n` +
-              `Column already exists in Google Sheets. Closing thread without duplicate submission.`
-          );
-
-          await attendance.removeAllReactionsWithRetry(msg);
-
-          // Skip submission, just close and clean up
-          if (spawnInfo.confirmThreadId) {
-            const confirmThread = await guild.channels
-              .fetch(spawnInfo.confirmThreadId)
-              .catch(() => null);
-            if (confirmThread) {
-              await confirmThread.send(
-                `⚠️ Duplicate prevented: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - Column already exists`
-              );
-              await errorHandler.safeDelete(confirmThread, 'message deletion');
-            }
-          }
-
-          await msg.channel
-            .setLocked(true, `Locked by ${user.username} (duplicate prevented)`)
-            .catch(err => errorHandler.silentError(err, 'reaction close lock duplicate thread'));
-          await msg.channel
-            .setArchived(true, `Closed by ${user.username} (duplicate prevented)`)
-            .catch(err => errorHandler.silentError(err, 'reaction close archive duplicate thread'));
-
-          // Delete rotation warning message (prevent channel flooding)
-          await bossRotation.deleteRotationWarning(spawnInfo.boss);
-          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
-
-          delete activeSpawns[closePending.threadId];
-          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
-          delete pendingClosures[msg.id];
-          delete confirmationMessages[closePending.threadId];
-
-          attendance.setActiveSpawns(activeSpawns);
-          attendance.setActiveColumns(activeColumns);
-          attendance.setPendingClosures(pendingClosures);
-          attendance.setConfirmationMessages(confirmationMessages);
-
-          return;
-        }
-
-        await msg.channel.send(
-          `🔒 Closing spawn **${spawnInfo.boss}**... Submitting ${spawnInfo.members.length} members...`
-        );
-
-        const payload = {
-          action: "submitAttendance",
-          boss: spawnInfo.boss,
-          date: spawnInfo.date,
-          time: spawnInfo.time,
-          timestamp: spawnInfo.timestamp,
-          members: spawnInfo.members,
-        };
-
-        const resp = await attendance.postToSheet(payload); // CHANGED
-
-        if (resp.ok) {
-          // Auto-increment boss rotation if it's a rotating boss
-          await bossRotation.handleBossKill(spawnInfo.boss);
-
-          // Delete rotation warning message to avoid flooding
-          await bossRotation.deleteRotationWarning(spawnInfo.boss);
-          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
-
-          await msg.channel.send(`✅ Attendance submitted! Archiving...`);
-
-          await attendance.removeAllReactionsWithRetry(msg); // CHANGED
-
-          if (spawnInfo.confirmThreadId) {
-            const confirmThread = await guild.channels
-              .fetch(spawnInfo.confirmThreadId)
-              .catch(() => null);
-            if (confirmThread) {
-              await confirmThread.send(
-                `✅ Spawn closed: **${spawnInfo.boss}** (${spawnInfo.timestamp}) - ${spawnInfo.members.length} members`
-              );
-              await errorHandler.safeDelete(confirmThread, 'message deletion');
-            }
-          }
-
-          // Lock and archive the thread to prevent spam
-          await msg.channel
-            .setLocked(true, `Locked by ${user.username}`)
-            .catch(err => errorHandler.silentError(err, 'reaction close lock thread'));
-          await msg.channel
-            .setArchived(true, `Closed by ${user.username}`)
-            .catch(err => errorHandler.silentError(err, 'reaction close archive thread'));
-
-          // Delete rotation warning message (prevent channel flooding)
-          await bossRotation.deleteRotationWarning(spawnInfo.boss);
-          await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
-
-          delete activeSpawns[closePending.threadId];
-          delete activeColumns[`${spawnInfo.boss}|${spawnInfo.timestamp}`];
-          delete pendingClosures[msg.id];
-          delete confirmationMessages[closePending.threadId];
-
-          // Sync all changes
-          attendance.setActiveSpawns(activeSpawns);
-          attendance.setActiveColumns(activeColumns);
-          attendance.setPendingClosures(pendingClosures);
-          attendance.setConfirmationMessages(confirmationMessages);
-        } else {
-          await msg.channel.send(
-            `⚠️ **Failed!**\n\nError: ${resp.text || resp.err}\n\n` +
-              `**Members:** ${spawnInfo.members.join(", ")}`
-          );
-          await attendance.removeAllReactionsWithRetry(msg); // CHANGED
-        }
-      } else if (reaction.emoji.name === "❌") {
-        await msg.channel.send("❌ Close canceled.");
-        await attendance.removeAllReactionsWithRetry(msg); // CHANGED
-        delete pendingClosures[msg.id];
-        attendance.setPendingClosures(pendingClosures); // Sync
-      }
-
-      return;
-    }
-  } catch (err) {
-    console.error("❌ Reaction handler error:", err);
-  }
-});
-
-// ==========================================
-// VOICE CHANNEL JOIN/LEAVE LOGGING
-// ==========================================
-
-client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
-  try {
-    const member = newState.member;
-    
-    if (member.user.bot) return;
-    
-    // ONLY process voice updates from TrailerParkB guild
-    const guild = newState.guild;
-    if (!guild || guild.id !== config.main_guild_id) {
-      return; // Skip voice updates from other servers
-    }
-    
-    const commandsChannel = await discordCache.getChannel('bot_manual_channel_id');
-    
-    if (!commandsChannel) return;
-    
-     const voiceGuild = commandsChannel.guild;
-    
-    const memberName = member.displayName;
-    const loreKey = Object.keys(memberLore).find(
-      key => key.toLowerCase() === memberName.toLowerCase() && !key.startsWith('_')
-    );
-    const memberTitle = loreKey ? memberLore[loreKey].title : null;
-    
-    const joinedChannel = newState.channelId && !oldState.channelId;
-    const leftChannel = !newState.channelId && oldState.channelId;
-    
-    if (joinedChannel) {
-      const channel = newState.channel;
-      
-      const joinEmbed = new EmbedBuilder()
-        .setColor(0x3498DB)
-        .setTitle(memberTitle ? `✨ ${memberTitle} has joined` : '🎤 Voice Channel Joined')
-        .setThumbnail(member.displayAvatarURL())
-        .addFields(
-          { name: 'Member', value: member.displayName, inline: true },
-          { name: 'Channel', value: channel.name, inline: true }
-        )
-        .setFooter({ text: `${guildName} Guild`, iconURL: guild.iconURL() })
-        .setTimestamp();
-      
-      await commandsChannel.send({ embeds: [joinEmbed] });
-
-      // 👑 SPECIAL VOICE DM: Send playful DM when both are in same channel
-      const generalDMs = alterFrierenConfig.general || [];
-      const whenSheJoins = alterFrierenConfig.whenSheJoins || [];
-      const whenHeJoins = alterFrierenConfig.whenHeJoins || [];
-
-      console.log(`🎤 Voice check - general: ${generalDMs.length}, sheJoins: ${whenSheJoins.length}, heJoins: ${whenHeJoins.length}`);
-
-      // Helper function to get a random DM that hasn't been sent recently
-      const getRandomPlayfulDM = (dmArray) => {
-        console.log(`🎤 Pool size: ${dmArray.length}, recentPlayfulDMs: ${recentPlayfulDMs.length}`);
-        
-        // Filter out recently sent messages
-        const availableDMs = dmArray.filter(dm => !recentPlayfulDMs.includes(dm));
-        console.log(`🎤 Available after filter: ${availableDMs.length}`);
-        
-        // If all messages used recently, reset the tracking
-        let pool = availableDMs.length > 0 ? availableDMs : dmArray;
-        
-        const selectedDM = pool[Math.floor(Math.random() * pool.length)];
-        
-        // Add to recent list, keep only last 8
-        recentPlayfulDMs.push(selectedDM);
-        if (recentPlayfulDMs.length > 8) {
-          recentPlayfulDMs.shift();
-        }
-        
-        return selectedDM;
-      };
-
-      // Check if the new joiner is AlterFrieren and Rohypnol is already in the same channel
-      const joiningUserId = member.id;
-      if (joiningUserId === ALTERFRIEREN_ID) {
-        // Find if Rohypnol is in THIS channel via voice states
-        let rohypnolInThisChannel = false;
-        console.log(`🎤 Rohypnol in this channel? ${rohypnolInThisChannel}`);
-        if (rohypnolInThisChannel) {
-          console.log(`💌 Sending DM to AlterFrieren - She joined, Rohypnol is in channel`);
-          const rohypnolUser = await client.users.fetch(ROHYPnol_ID);
-          await rohypnolUser.send(`💌 Sent to AlterFrieren: "${randomDM}"`).catch(err => console.error(`💌 Failed to notify Rohypnol: ${err.message}`));
-        }
-      }
-
-      // Check if the new joiner is Rohypnol and AlterFrieren is already in the same channel
-      else if (member.id === ROHYPnol_ID) {
-        console.log(`🎤 Rohypnol joined. Checking channel...`);
-        
-        // Try both channel.members and guild.voiceStates
-        const channelMembers = channel.members;
-        console.log(`🎤 Channel members: ${[...channelMembers.values()].map(m => m.displayName).join(', ')}`);
-        
-        // Check voice states from guild
-        const guild = commandsChannel.guild;
-        const voiceStates = guild.voiceStates.cache;
-        console.log(`🎤 Total voice states: ${voiceStates.size}`);
-        
-        // Find if AlterFrieren is in THIS channel via voice states
-        let alterInThisChannel = false;
-        for (const [userId, vs] of voiceStates) {
-          if (vs.channelId === channel.id) {
-            // Check by user ID first (use the key from the collection)
-            if (userId === ALTERFRIEREN_ID) {
-              console.log(`🎤 Voice state found: AlterFrieren (by ID)`);
-              alterInThisChannel = true;
-              break;
-            }
-            // Fallback to name check
-            const name = vs.member?.displayName || vs.member?.user?.username || 'unknown';
-            console.log(`🎤 Voice state found: ${name} (ID: ${userId})`);
-            if (name.toLowerCase().includes('alter') || 
-                name.toLowerCase().includes('zoe_bebe') ||
-                name.toLowerCase().includes('alterfrieren')) {
-              alterInThisChannel = true;
-              break;
-            }
-          }
-        }
-        
-        console.log(`🎤 Alter in this channel? ${alterInThisChannel}`);
-        
-        if (alterInThisChannel) {
-          console.log(`💌 Sending DM to AlterFrieren - Hesu joined, She is in channel`);
-          
-          // Check cooldown
-          const now = Date.now();
-          if (now - lastAlterFrierenDM < ALTERFRIEREN_DM_COOLDOWN) {
-            console.log(`💌 DM skipped - cooldown active (${Math.round((ALTERFRIEREN_DM_COOLDOWN - (now - lastAlterFrierenDM))/1000)}s remaining)`);
-          } else {
-            // Combine general + whenHeJoins pools
-            const pool = [...generalDMs, ...whenHeJoins];
-            const randomDM = getRandomPlayfulDM(pool);
-            try {
-              const alterUser = await client.users.fetch(ALTERFRIEREN_ID);
-              await alterUser.send(randomDM).catch(err => console.error(`💌 Failed to send DM to AlterFrieren: ${err.message}`));
-              const rohypnolUser = await client.users.fetch(ROHYPnol_ID);
-              await rohypnolUser.send(`💌 Sent to AlterFrieren: "${randomDM}"`).catch(err => console.error(`💌 Failed to notify Rohypnol: ${err.message}`));
-              lastAlterFrierenDM = Date.now();
-              console.log(`💌 DM sent: "${randomDM}"`);
-            } catch (e) {
-              console.error(`💌 Error sending DM: ${e.message}`);
-            }
-          }
-        }
-      }
-      
-    } else if (leftChannel) {
-      const channel = oldState.channel;
-      
-      const leaveEmbed = new EmbedBuilder()
-        .setColor(0xE74C3C)
-        .setTitle(memberTitle ? `✨ ${memberTitle} has left` : '🔌 Voice Channel Left')
-        .setThumbnail(member.displayAvatarURL())
-        .addFields(
-          { name: 'Member', value: member.displayName, inline: true },
-          { name: 'Channel', value: channel.name, inline: true }
-        )
-        .setFooter({ text: `${guildName} Guild`, iconURL: guild.iconURL() })
-        .setTimestamp();
-      
-      await commandsChannel.send({ embeds: [leaveEmbed] });
-    }
-    
-  } catch (error) {
-    console.error('❌ Error handling voice state update:', error.message);
-  }
-});
-
-// THREAD UPDATE HANDLING (Manual Discord UI Archiving)
-// ==========================================
-
-/**
- * Handle thread updates (detects manual archiving through Discord UI)
- * Cleans up rotation warning messages when threads are manually archived
- */
-client.on(Events.ThreadUpdate, async (oldThread, newThread) => {
-  try {
-    // Only process if thread was archived
-    if (!oldThread.archived && newThread.archived) {
-      // Check if this is an attendance thread in our active spawns
-      const spawnInfo = activeSpawns[newThread.id];
-
-      if (spawnInfo) {
-        console.log(`🔔 Thread manually archived: ${spawnInfo.boss} (${spawnInfo.timestamp})`);
-
-        // Delete rotation warning message (prevent channel flooding)
-        await bossRotation.deleteRotationWarning(spawnInfo.boss);
-        await bossRotation.checkAndDeleteDailySchedule(spawnInfo.boss);
-        console.log(`🗑️ Cleaned up rotation warning for ${spawnInfo.boss}`);
-
-        // Clean up spawn from active state
-        delete activeSpawns[newThread.id];
-        const cacheKey = `${spawnInfo.boss.toUpperCase()}|${normalizeTimestamp(spawnInfo.timestamp)}`;
-        delete activeColumns[cacheKey];
-        delete confirmationMessages[newThread.id];
-
-        attendance.setActiveSpawns(activeSpawns);
-        attendance.setActiveColumns(activeColumns);
-        attendance.setConfirmationMessages(confirmationMessages);
-
-        console.log(`✅ Cleaned up manually archived thread: ${spawnInfo.boss}`);
-      }
-    }
-  } catch (error) {
-    console.error('❌ Error handling thread update:', error.message);
-  }
-});
-
-// ==========================================
-// ERROR HANDLING
-// ==========================================
-
-// Handle Discord client errors
-client.on(Events.Error, (error) => {
-  console.error("❌ Discord client error:", error);
-  // Don't crash on client errors - Discord.js will handle reconnection
-});
-
-// Handle WebSocket/Shard errors (including timeout errors)
-client.on(Events.ShardError, (error, shardId) => {
-  console.error(`❌ WebSocket error on shard ${shardId}:`, error.message);
-  // Don't crash - Discord.js will automatically attempt to reconnect
-  if (error.message.includes('timeout')) {
-    console.log(`⏱️ Shard ${shardId} timed out, waiting for automatic reconnection...`);
-  }
-});
-
-// Handle shard disconnections
-client.on(Events.ShardDisconnect, (event, shardId) => {
-  console.warn(`⚠️ Shard ${shardId} disconnected (code: ${event.code})`);
-});
-
-// Handle shard reconnection attempts
-client.on(Events.ShardReconnecting, (shardId) => {
-  console.log(`🔄 Shard ${shardId} is reconnecting...`);
-});
-
-// Handle shard resume (successful reconnection)
-client.on(Events.ShardResume, (shardId, replayedEvents) => {
-  console.log(`✅ Shard ${shardId} resumed (replayed ${replayedEvents} events)`);
-});
-
-// Handle unhandled promise rejections without crashing
-process.on("unhandledRejection", (error) => {
-  console.error("❌ Unhandled promise rejection:", error);
-  // Log but don't crash - allow the bot to continue operating
-  // Koyeb will automatically restart if the process exits
-});
-
-// Handle uncaught exceptions
-process.on("uncaughtException", (error) => {
-  console.error("❌ Uncaught exception:", error);
-  // For critical errors, we may need to exit and let Koyeb restart
-  if (error.message && error.message.includes('FATAL')) {
-    console.error("💥 Fatal error detected, exiting for restart...");
-    process.exit(1);
-  }
-  // Otherwise, try to continue
-});
-
-// =====================================================================
-// GRACEFUL SHUTDOWN HANDLER
-// =====================================================================
-
-let isShuttingDown = false; // Prevent multiple shutdown attempts
-
-/**
- * Comprehensive graceful shutdown handler
- * Cleans up all resources to prevent memory leaks
- * @param {string} signal - Signal name (SIGTERM, SIGINT, etc.)
- */
-async function gracefulShutdown(signal) {
-  if (isShuttingDown) {
-    console.log(`⏭️ Shutdown already in progress, ignoring ${signal}`);
-    return;
-  }
-
-  isShuttingDown = true;
-  console.log(`\n🛑 ${signal} received - starting graceful shutdown...`);
-
-  // Set a forced shutdown timeout (30 seconds)
-  const forceShutdownTimeout = setTimeout(() => {
-    console.error('⚠️ Graceful shutdown timeout - forcing exit');
-    process.exit(1);
-  }, 30000);
-
-  try {
-    // Step 1: Stop accepting new requests
-    console.log('1️⃣ Stopping bidding channel cleanup...');
-    stopBiddingChannelCleanupSchedule();
-
-    // Step 2: Stop scheduled tasks
-    console.log('2️⃣ Stopping maintenance scheduler...');
-    scheduler.stopScheduler();
-
-    // Step 3: Clear all timers
-    console.log('3️⃣ Clearing all timers...');
-    timerRegistry.clearAllTimers();
-
-    // Step 4: Save state before shutdown
-    console.log('4️⃣ Saving bot state...');
-    if (typeof crashRecovery.saveState === 'function') {
-      await crashRecovery.saveState();
-    }
-
-    // Step 5: Close MongoDB connection
-    console.log('5️⃣ Closing MongoDB connection...');
-    try {
-      await dbAPI.close();
-      console.log('✅ MongoDB connection closed');
-    } catch (error) {
-      console.log('⚠️ MongoDB close skipped (not connected)');
-    }
-
-    // Step 6: Close HTTP server
-    console.log('6️⃣ Closing HTTP server...');
-    await new Promise((resolve) => {
-      server.close(() => {
-        console.log('✅ HTTP server closed');
-        resolve();
-      });
-      // Force close after 5 seconds
-      setTimeout(resolve, 5000);
-    });
-
-    // Step 7: Remove all Discord event listeners
-    console.log('7️⃣ Removing Discord event listeners...');
-    client.removeAllListeners();
-
-    // Step 8: Destroy Discord client
-    console.log('8️⃣ Destroying Discord client...');
-    await client.destroy();
-    console.log('✅ Discord client destroyed');
-
-    // Step 9: Clear the forced shutdown timeout
-    clearTimeout(forceShutdownTimeout);
-
-    console.log('✅ Graceful shutdown complete!');
-    process.exit(0);
-
-  } catch (error) {
-    console.error('❌ Error during graceful shutdown:', error);
-    clearTimeout(forceShutdownTimeout);
-    process.exit(1);
+    console.log(`✅ Bidding channel cleanup complete!`);
+    console.log(`📊 Messages: ${messagesFetched} fetched | ${messagesDeleted} deleted`);
+    console.log(`🧵 Threads: ${threadsLocked} locked | ${threadsArchived} archived | ${threadsSkipped} skipped`);
+  } catch (e) {
+    console.error(`❌ Bidding channel cleanup error:`, e);
   }
 }
 
-// Register shutdown handlers
-process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
-process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+/**
+ * Starts the automated bidding channel cleanup schedule.
+ */
+function startBiddingChannelCleanupSchedule() {
+  console.log(`⏰ Starting bidding channel cleanup schedule (every 12 hours)`);
+
+  cleanupBiddingChannel().catch(console.error);
+
+  biddingChannelCleanupTimer = setInterval(async () => {
+    try {
+      console.log(`⏰ Running scheduled bidding channel cleanup...`);
+      await cleanupBiddingChannel();
+    } catch (error) {
+      console.error("❌ Error in bidding channel cleanup:", error.message);
+    }
+  }, BIDDING_CHANNEL_CLEANUP_INTERVAL);
+
+  shutdownManager.registerInterval('bidding-channel-cleanup', biddingChannelCleanupTimer, { frequency: '12 hours' });
+}
+
+/**
+ * Stops the automated bidding channel cleanup schedule.
+ */
+function stopBiddingChannelCleanupSchedule() {
+  if (biddingChannelCleanupTimer) {
+    clearInterval(biddingChannelCleanupTimer);
+    biddingChannelCleanupTimer = null;
+    console.log(`⏹️ Bidding channel cleanup schedule stopped`);
+  }
+}
 
 // =====================================================================
-// SECTION 10: MODULE EXPORTS & BOT INITIALIZATION
+// COMMAND HANDLERS
+// =====================================================================
+
+const commandHandlers = createCommandHandlers({
+  config,
+  client,
+  activeSpawns: stateManager.activeSpawns,
+  pendingVerifications: stateManager.pendingVerifications,
+  activeColumns: stateManager.activeColumns,
+  pendingClosures: stateManager.pendingClosures,
+  confirmationMessages: stateManager.confirmationMessages,
+  discordCache,
+  sheetAPI,
+  bidding,
+  auctioneering,
+  attendance,
+  bossTimer,
+  bossTimerCommands,
+  emergencyCommands,
+  leaderboardSystem,
+  helpSystemV2,
+  eventReminders,
+  bossRotation,
+  activityHeatmap,
+  crashRecovery,
+  scheduler,
+  reports,
+  mongoHelpers,
+  dbAPI,
+  memberLore,
+  bossPoints,
+  bossSpawnConfig,
+  alterFrierenConfig,
+  isAdmin,
+  BOT_VERSION,
+  BOT_START_TIME,
+  TIMING,
+  AUCTION_COOLDOWN,
+  BIDDING_CHANNEL_CLEANUP_INTERVAL,
+  ALTERFRIEREN_ID,
+  ROHYPnol_ID,
+  USE_MONGODB_ATTENDANCE,
+  lastAuctionEndTime,
+  isRecovering,
+  statsCache,
+  lastSheetCall,
+  guildName,
+  STATS_CACHE_DURATION,
+  findBestMemberMatch,
+  buildStatsEmbed,
+});
+
+// =====================================================================
+// BOT INITIALIZATION (ClientReady)
+// =====================================================================
+
+client.once(Events.ClientReady, async () => {
+  // Initialize Discord channel cache before anything else
+  discordCache = new DiscordCache(client, config);
+
+  await onClientReady(client, config, {
+    mainLogger,
+    bossPoints,
+    BOT_VERSION,
+    PORT,
+    operationQueue,
+    dbAPI,
+    shutdownManager,
+    discordMonitoring,
+    discordCache,
+    attendance,
+    bossTimer,
+    helpSystemV2,
+    auctioneering,
+    bidding,
+    emergencyCommands,
+    leaderboardSystem,
+    activityHeatmap,
+    bossRotation,
+    isAdmin,
+    recoverBotStateOnStartup,
+    moveQueueItemsToSheet,
+    stateManager,
+    sheetAPI,
+    cleanupStaleStatsMessages,
+    startBiddingChannelCleanupSchedule,
+    eventReminders,
+    crashRecovery,
+    scheduler,
+    registerCommands,
+    isRecovering,
+    lastAuctionEndTime,
+  });
+});
+
+// =====================================================================
+// EVENT HANDLERS
+// =====================================================================
+
+// ── Message Create Handler ─────────────────────────────────────────
+const messageHandler = createMessageHandler(client, config, {
+  stateManager,
+  attendance,
+  bidding,
+  auctioneering,
+  bossTimerCommands,
+  emergencyCommands,
+  commandHandlers,
+  bossRotation,
+  bossPoints,
+  activityHeatmap,
+  shutdownManager,
+  dbAPI,
+  TIMING,
+  isAdmin,
+  hasElysiumRole,
+  addGuildFooter,
+  createDisabledRow,
+  awaitConfirmation,
+  ALTERFRIEREN_ID,
+  ROHYPnol_ID,
+  errorHandler,
+  lastOverrideTime,
+  isBidProcessing,
+  bossTimer,
+  findBossMatch: (input) => attendance.findBossMatch(input),
+  lazyAttendance: {
+    createSpawnThreads: (bossName, dateStr, timeStr, fullTimestamp, _message, _client, _config) => {
+      return attendance.createSpawnThreads(_client, bossName, dateStr, timeStr, fullTimestamp, 'timer');
+    },
+  },
+});
+
+client.on(Events.MessageCreate, messageHandler);
+
+// ── Interaction Create Handler ─────────────────────────────────────
+const interactionHandler = createInteractionHandler(client, config, {
+  stateManager,
+  attendance,
+  bossPoints,
+  bossRotation,
+  errorHandler,
+  normalizeUsername,
+  normalizeTimestamp,
+  isAdmin,
+  handleSlashCommand,
+  handleAutocomplete,
+  createDisabledRow,
+  bossTimer,
+  bossTimerCommands,
+  bidding,
+  auctioneering,
+});
+
+client.on(Events.InteractionCreate, interactionHandler);
+
+// ── Reaction Add Handler (Legacy backward compatibility) ──────────
+const reactionHandler = createReactionHandler(client, config, {
+  stateManager,
+  attendance,
+  errorHandler,
+  bossRotation,
+  bossPoints,
+  normalizeUsername,
+  normalizeTimestamp,
+  ALTERFRIEREN_ID,
+  ROHYPnol_ID,
+  isAdmin,
+});
+
+client.on(Events.MessageReactionAdd, reactionHandler);
+
+// ── Voice State Update Handler ─────────────────────────────────────
+const voiceStateHandler = createVoiceStateHandler(client, config, {
+  discordCache,
+  ALTERFRIEREN_ID,
+  ROHYPnol_ID,
+  memberLore,
+  alterFrierenConfig,
+});
+
+client.on(Events.VoiceStateUpdate, voiceStateHandler);
+
+// ── Thread Update Handler ──────────────────────────────────────────
+const threadUpdateHandler = createThreadUpdateHandler(client, config, {
+  stateManager,
+  bossRotation,
+  attendance,
+  normalizeTimestamp,
+});
+
+client.on(Events.ThreadUpdate, threadUpdateHandler);
+
+// ── Error Handlers ─────────────────────────────────────────────────
+registerErrorHandlers(client);
+
+// ── Graceful Shutdown Handlers ─────────────────────────────────────
+registerShutdownHandlers(client, config, {
+  server,
+  stopBiddingChannelCleanupSchedule,
+  scheduler,
+  timerRegistry,
+  crashRecovery,
+  dbAPI,
+});
+
+// =====================================================================
+// MODULE EXPORTS & BOT LOGIN
 // =====================================================================
 
 /**
@@ -8174,26 +1085,12 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
  */
 global.postToSheet = attendance.postToSheet;
 
-/**
- * =========================================================================
- * BOT LOGIN & STARTUP
- * =========================================================================
- *
- * Final step: Authenticates bot with Discord using token.
- *
- * The token is loaded from DISCORD_TOKEN environment variable,
- * or falls back to token field in config.json.
- * Without it, the bot cannot connect to Discord and will exit.
- *
- * After successful login, the ClientReady event fires and
- * triggers the full initialization sequence.
- */
+// Export commandHandlers for slash command reuse
+module.exports = { commandHandlers };
+
 if (!config.token) {
   console.error("❌ Discord token not found! Set DISCORD_TOKEN environment variable or add token to config.json");
   process.exit(1);
 }
-
-// Export commandHandlers for slash command reuse
-module.exports = { commandHandlers };
 
 client.login(config.token);
