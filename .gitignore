@@ -14,3 +14,9 @@ ml-service/.env
 ml-service/saved_models/*
 !ml-service/saved_models/.gitkeep
 ml-service/data/
+
+# PM2 ecosystem config (contains secrets — local only)
+ecosystem.config.js
+
+# Logs
+logs/
