@@ -13,7 +13,7 @@
  * - Simpler code (getChannel() vs fetch chain)
  *
  * @module utils/discord-cache
- * @author Elysium Attendance Bot Team
+ * @author Tenchu Attendance Bot Team
  * @version 1.0
  * ============================================================================
  */

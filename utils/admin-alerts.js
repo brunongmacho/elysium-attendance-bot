@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * ELYSIUM GUILD BOT - Admin Alert System
+ * TENCHU GUILD BOT - Admin Alert System
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Sends critical alerts to admin-logs channel

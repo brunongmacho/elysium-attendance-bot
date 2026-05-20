@@ -54,7 +54,7 @@ async function sendWeeklyReport(targetChannel = null) {
     }
 
     let adminLogsChannel = null;
-    let elysiumCommandsChannel = null;
+    let tenchuCommandsChannel = null;
 
     if (targetChannel) {
       if (!targetChannel || typeof targetChannel.send !== 'function') {
@@ -75,8 +75,8 @@ async function sendWeeklyReport(targetChannel = null) {
       }
 
       adminLogsChannel = await state.discordCache.getChannel('admin_logs_channel_id');
-      elysiumCommandsChannel = state.config.elysium_commands_channel_id
-        ? await state.discordCache.getChannel('elysium_commands_channel_id').catch(() => null)
+      tenchuCommandsChannel = state.config.tenchu_commands_channel_id
+        ? await state.discordCache.getChannel('tenchu_commands_channel_id').catch(() => null)
         : null;
 
       if (!adminLogsChannel) {
@@ -316,8 +316,8 @@ async function sendWeeklyReport(targetChannel = null) {
       await adminLogsChannel.send({ embeds: [embed] });
       console.log('✅ Weekly report sent to admin logs channel');
 
-      if (elysiumCommandsChannel) {
-        await elysiumCommandsChannel.send({ embeds: [embed] });
+      if (tenchuCommandsChannel) {
+        await tenchuCommandsChannel.send({ embeds: [embed] });
         console.log(`✅ Weekly report sent to guild commands channel`);
       }
 
@@ -369,7 +369,7 @@ async function sendMonthlyReport(targetChannel = null) {
           console.error('❌ Error fetching admin logs channel:', err);
           return null;
         }),
-        state.client.channels.fetch(state.config.elysium_commands_channel_id).catch((err) => {
+        state.client.channels.fetch(state.config.tenchu_commands_channel_id).catch((err) => {
           console.error('❌ Error fetching guild chat channel:', err);
           return null;
         })

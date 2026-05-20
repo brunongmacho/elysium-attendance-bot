@@ -7,7 +7,7 @@
  * This allows users to use shortcuts like "!b" instead of "!bid".
  *
  * @module config/command-aliases
- * @author Elysium Attendance Bot Team
+ * @author Tenchu Attendance Bot Team
  * @version 1.0
  * ============================================================================
  */

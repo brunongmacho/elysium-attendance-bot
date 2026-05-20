@@ -36,7 +36,7 @@
  * @requires fs/promises - For disk persistence
  * @requires path - For cache file path resolution
  *
- * @author Elysium Attendance Bot Team
+ * @author Tenchu Attendance Bot Team
  * @version 2.0
  * ============================================================================
  */

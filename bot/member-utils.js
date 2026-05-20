@@ -31,13 +31,13 @@ function isAdmin(member) {
 }
 
 /**
- * Check if member has the guild (Elysium) role.
+ * Check if member has the guild (Tenchu) role.
  *
  * @param {import('discord.js').GuildMember} member - Discord guild member
  * @returns {boolean} True if member has guild role
  */
-function hasElysiumRole(member) {
-  return member.roles.cache.some((r) => r.name === config.elysium_role);
+function hasTenchuRole(member) {
+  return member.roles.cache.some((r) => r.name === config.tenchu_role);
 }
 
 // =============================================================================
@@ -188,7 +188,7 @@ async function recoverBotStateOnStartup(client, config, deps) {
 
 module.exports = {
   isAdmin,
-  hasElysiumRole,
+  hasTenchuRole,
   recoverBotStateOnStartup,
   moveQueueItemsToSheet,
 };

@@ -18,7 +18,7 @@
  * - Thread-safe for single-process Node.js environment
  *
  * @module utils/timestamp-cache
- * @author Elysium Attendance Bot Team
+ * @author Tenchu Attendance Bot Team
  * @version 1.0
  * ============================================================================
  */

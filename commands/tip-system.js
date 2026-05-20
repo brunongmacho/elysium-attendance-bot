@@ -7,7 +7,7 @@
  * adoption without being intrusive.
  *
  * @module commands/tip-system
- * @author ELYSIUM Development Team
+ * @author TENCHU Development Team
  */
 
 /**

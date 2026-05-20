@@ -1,13 +1,13 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * ELYSIUM ATTENDANCE SYSTEM MODULE (Decomposed)
+ * TENCHU ATTENDANCE SYSTEM MODULE (Decomposed)
  * ═══════════════════════════════════════════════════════════════════════════════
  *
  * Main entry point - wires together all sub-modules and re-exports the full API.
  * All ~32+ exports from the original monolith are preserved here.
  *
  * @module attendance
- * @author ELYSIUM Development Team
+ * @author TENCHU Development Team
  * @version 2.0.0
  */
 

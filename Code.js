@@ -1,5 +1,5 @@
 /**
- * ELYSIUM Guild System - Google Apps Script v6.2 (OPTIMIZED)
+ * TENCHU Guild System - Google Apps Script v6.2 (OPTIMIZED)
  *
  * OPTIMIZATION UPDATES (v6.2 - Performance Enhancements):
  * ✅ SERVER-SIDE CACHING - getBiddingPoints now uses CacheService (40-60% API reduction)
@@ -41,7 +41,7 @@
 
 const CONFIG = {
   SSHEET_ID: '1dGLGjmRhvG0io1Yta5ikfN-b_U-SSJJfWIHznK18qYQ',
-  SHEET_NAME_PREFIX: 'ELYSIUM_WEEK_',
+  SHEET_NAME_PREFIX: 'WEEK_',
   BOSS_POINTS_SHEET: 'BossPoints',
   BIDDING_SHEET: 'BiddingPoints',
   TIMEZONE: 'Asia/Manila',
@@ -124,6 +124,11 @@ function doPost(e) {
 
     // Auto-initialize Member Registry tab if needed
     ensureMemberRegistryTab();
+    ensureBiddingPointsSheet();
+    ensureTotalAttendanceSheet();
+    ensureBossPointsSheet();
+    ensureBiddingItemsSheet();
+    ensureForDistributionSheet();
 
     Logger.log(`🔥 Action: ${action}`);
 
@@ -306,7 +311,7 @@ function getAllWeeklyAttendance(data) {
     const allSheets = ss.getSheets();
     const weeklySheets = [];
 
-    // Filter to only weekly attendance sheets (matching pattern ELYSIUM_WEEK_*)
+    // Filter to only weekly attendance sheets (matching pattern WEEK_*)
     for (const sheet of allSheets) {
       const sheetName = sheet.getName();
       if (sheetName.startsWith(CONFIG.SHEET_NAME_PREFIX)) {
@@ -397,7 +402,7 @@ function getAllWeeklyAttendance(data) {
               bossName: bossName,
               timestamp: timestamp,
               date: timestamp, // For backward compatibility
-              weekLabel: sheetName.replace('ELYSIUM_WEEK_', ''),
+              weekLabel: sheetName.replace(CONFIG.SHEET_NAME_PREFIX, ''),
               weekSheet: sheetName,
               points: 1 // Default points (can be enhanced later)
             });
@@ -1166,7 +1171,7 @@ function calculateSimilarity(str1, str2) {
  *
  * EXEMPTIONS:
  * - ForDistribution sheet is NOT touched (historical auction log)
- * - Only removes from BiddingPoints and ELYSIUM_WEEK_* attendance sheets
+ * - Only removes from BiddingPoints and WEEK_* attendance sheets
  *
  * @param {Object} data - Request data containing memberName
  * @param {string} data.memberName - Name of the member to remove
@@ -1238,13 +1243,13 @@ function handleRemoveMember(data) {
   }
 
   // ==========================================
-  // STEP 2: Remove from all attendance sheets (ELYSIUM_WEEK_*)
+  // STEP 2: Remove from all attendance sheets (WEEK_*)
   // NOTE: ForDistribution sheet is EXCLUDED as it's a historical auction log
   // ==========================================
   const allSheets = ss.getSheets();
   const attendanceSheets = allSheets.filter(s => {
     const sheetName = s.getName();
-    // Include only ELYSIUM_WEEK_ sheets, exclude ForDistribution
+    // Include only WEEK_ sheets, exclude ForDistribution
     return sheetName.startsWith(CONFIG.SHEET_NAME_PREFIX) && sheetName !== 'ForDistribution';
   });
 
@@ -1495,17 +1500,8 @@ function handleSubmitBiddingResults(data) {
   let biddingSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
   if (!biddingSheet) return createResponse('error', `Sheet not found: ${CONFIG.BIDDING_SHEET}`);
   
+  ensureBiddingItemsSheet();
   let biddingItemsSheet = ss.getSheetByName('BiddingItems');
-  if (!biddingItemsSheet) {
-    biddingItemsSheet = ss.insertSheet('BiddingItems');
-    biddingItemsSheet.getRange(1, 1, 1, 12).setValues([[
-      'Item', 'Start Price', 'Duration', 'Winner', 'Winning Bid',
-      'Auction Start', 'Auction End', 'Timestamp', 'Total Bids', 'Source', 'Quantity', 'Boss'
-    ]])
-    .setFontWeight('bold')
-    .setBackground('#4A90E2')
-    .setFontColor('#FFFFFF');
-  }
   
   // STEP 1: Add manual items to BiddingItems sheet (only if they were auctioned)
   if (manualItems && manualItems.length > 0) {
@@ -2039,7 +2035,7 @@ function saveAttendanceState(data) {
 
 function updateTotalAttendanceAndMembers() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheets = ss.getSheets().filter(s => s.getName().startsWith("ELYSIUM_WEEK_"));
+  const sheets = ss.getSheets().filter(s => s.getName().startsWith(CONFIG.SHEET_NAME_PREFIX));
   const totalSheetName = "TOTAL ATTENDANCE";
   const totalSheet = ss.getSheetByName(totalSheetName);
   const memberTotals = {};
@@ -2983,16 +2979,8 @@ function moveItemToForDistribution(sourceSheetName, rowNumber) {
     Logger.log(`✅ Found source sheet: ${sourceSheet.getName()}`);
     
     // Get or create ForDistribution sheet
+    ensureForDistributionSheet();
     let targetSheet = ss.getSheetByName('ForDistribution');
-    if (!targetSheet) {
-      Logger.log('📋 Creating ForDistribution sheet...');
-      targetSheet = ss.insertSheet('ForDistribution');
-      targetSheet.getRange(1, 1, 1, 13).setValues([[
-        'Item', 'Start Price', 'Duration', 'Winner', 'Winning Bid', 
-        'Auction Start', 'Auction End', 'Timestamp', 'Total Bids', 'Source', 'Quantity', 'Boss', 'Notes'
-      ]]).setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
-      Logger.log('✅ ForDistribution sheet created');
-    }
     
     // Validate row number
     const lastRow = sourceSheet.getLastRow();
@@ -3241,29 +3229,15 @@ function ensureBossRotationSheetExists() {
         .setFontColor('#ffffff')
         .setFontWeight('bold');
 
-      // Add initial data for 3 rotating bosses
-      const rotatingBosses = [
-        ['Amentis', 1, 'ELYSIUM', 'Guild B', 'Guild C', 'Guild D', 'Guild E'],
-        ['General Aquleus', 1, 'ELYSIUM', 'Guild B', 'Guild C', 'Guild D', 'Guild E'],
-        ['Baron Braudmore', 1, 'ELYSIUM', 'Guild B', 'Guild C', 'Guild D', 'Guild E']
-      ];
-
-      sheet.getRange(2, 1, rotatingBosses.length, headers.length).setValues(rotatingBosses);
-
-      // Format data rows
-      sheet.setColumnWidth(1, 150); // Boss Name
-      sheet.setColumnWidth(2, 100); // Current Index
-      for (let i = 3; i <= 7; i++) {
-        sheet.setColumnWidth(i, 120); // Guild columns
+      // Set column widths
+      for (let i = 1; i <= headers.length; i++) {
+        sheet.setColumnWidth(i, i === 1 ? 150 : i === 2 ? 100 : 120);
       }
-
-      // Center align index column
-      sheet.getRange(2, 2, rotatingBosses.length, 1).setHorizontalAlignment('center');
 
       // Freeze header row
       sheet.setFrozenRows(1);
 
-      Logger.log('✅ BossRotation sheet created successfully');
+      Logger.log('✅ BossRotation sheet created (empty - add rotating bosses manually)');
     }
 
     return createResponse('ok', 'BossRotation sheet ready', { exists: true });
@@ -3370,12 +3344,12 @@ function getBossRotation(data) {
 
     // If no guilds found, default to 5 guilds
     if (guilds.length === 0) {
-      guilds.push('ELYSIUM', 'Guild2', 'Guild3', 'Guild4', 'Guild5');
+      guilds.push('TENCHU', 'Guild2', 'Guild3', 'Guild4', 'Guild5');
     }
 
     const guildCount = guilds.length;
     const currentGuild = guilds[currentIndex - 1] || guilds[0];
-    const isOurTurn = (currentIndex === 1); // ELYSIUM is always Guild1
+    const isOurTurn = (currentIndex === 1); // TENCHU is always Guild1
 
     Logger.log(`✅ Rotation for ${bossName}: Index ${currentIndex} (${currentGuild}) - ${isOurTurn ? 'OUR TURN' : 'NOT OUR TURN'} [${guildCount} guilds]`);
 
@@ -3398,7 +3372,7 @@ function getBossRotation(data) {
 
 /**
  * Increment rotation counter for a boss (called after boss is killed)
- * Advances from 1→2→3→4→5→1 (loops back to ELYSIUM)
+ * Advances from 1→2→3→4→5→1 (loops back to TENCHU)
  * @param {Object} data - Contains bossName
  * @returns {Object} Response with updated rotation data
  */
@@ -3450,7 +3424,7 @@ function incrementBossRotation(data) {
 
     // If no guilds found, default to 5 guilds
     if (guilds.length === 0) {
-      guilds.push('ELYSIUM', 'Guild2', 'Guild3', 'Guild4', 'Guild5');
+      guilds.push('TENCHU', 'Guild2', 'Guild3', 'Guild4', 'Guild5');
     }
 
     const guildCount = guilds.length;
@@ -3534,7 +3508,7 @@ function setBossRotation(data) {
 
     // If no guilds found, default to 5 guilds
     if (guilds.length === 0) {
-      guilds.push('ELYSIUM', 'Guild2', 'Guild3', 'Guild4', 'Guild5');
+      guilds.push('TENCHU', 'Guild2', 'Guild3', 'Guild4', 'Guild5');
     }
 
     const guildCount = guilds.length;
@@ -3754,6 +3728,166 @@ function ensureMemberRegistryTab() {
     // Freeze header row
     sheet.setFrozenRows(1);
     Logger.log('✅ Member Registry tab created');
+  }
+}
+
+/**
+ * Ensure BiddingPoints sheet exists
+ * Creates it with headers if missing
+ */
+function ensureBiddingPointsSheet() {
+  const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+  let sheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
+  
+  if (!sheet) {
+    Logger.log('📝 Creating BiddingPoints sheet (first run)...');
+    sheet = ss.insertSheet(CONFIG.BIDDING_SHEET);
+    sheet.getRange(1, 1, 1, 3).setValues([[
+      'MEMBERS', 'BIDDING POINTS AVAILABLE', 'TOTAL BIDDING POINTS CONSUMED'
+    ]]);
+    sheet.getRange('1:1').setFontWeight('bold').setBackground('#4a86e8').setFontColor('#ffffff');
+    sheet.setColumnWidth(1, 200);
+    sheet.setColumnWidth(2, 200);
+    sheet.setColumnWidth(3, 200);
+    sheet.setFrozenRows(1);
+    Logger.log('✅ BiddingPoints sheet created');
+  }
+}
+
+/**
+ * Ensure TOTAL ATTENDANCE sheet exists
+ * Creates it with headers if missing
+ */
+function ensureTotalAttendanceSheet() {
+  const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+  let sheet = ss.getSheetByName('TOTAL ATTENDANCE');
+  
+  if (!sheet) {
+    Logger.log('📝 Creating TOTAL ATTENDANCE sheet (first run)...');
+    sheet = ss.insertSheet('TOTAL ATTENDANCE');
+    sheet.getRange(1, 1, 1, 2).setValues([[
+      'Member', 'Total Attendance (Days)'
+    ]]);
+    sheet.getRange('1:1').setFontWeight('bold').setBackground('#4a86e8').setFontColor('#ffffff');
+    sheet.setColumnWidth(1, 200);
+    sheet.setColumnWidth(2, 200);
+    sheet.setFrozenRows(1);
+    Logger.log('✅ TOTAL ATTENDANCE sheet created');
+  }
+}
+
+/**
+ * Ensure BossPoints sheet exists
+ * Creates it with boss name and points data if missing
+ */
+function ensureBossPointsSheet() {
+  const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+  let sheet = ss.getSheetByName(CONFIG.BOSS_POINTS_SHEET);
+  
+  if (!sheet) {
+    Logger.log('📝 Creating BossPoints sheet (first run)...');
+    sheet = ss.insertSheet(CONFIG.BOSS_POINTS_SHEET);
+    
+    const headers = ['Boss Name', 'Points'];
+    const bosses = [
+      ['Venatus', 1],
+      ['Viorent', 1],
+      ['Ego', 1],
+      ['Clemantis', 1],
+      ['Livera', 1],
+      ['Araneo', 1],
+      ['Undomiel', 1],
+      ['Saphirus', 1],
+      ['Neutro', 1],
+      ['Lady Dalia', 1],
+      ['General Aquleus', 1],
+      ['Thymele', 1],
+      ['Amentis', 1],
+      ['Baron Braudmore', 1],
+      ['Milavy', 2],
+      ['Wannitas', 2],
+      ['Metus', 2],
+      ['Duplican', 2],
+      ['Shuliar', 2],
+      ['Ringor', 2],
+      ['Roderick', 2],
+      ['Titore', 2],
+      ['Larba', 2],
+      ['Gareth', 2],
+      ['Catena', 3],
+      ['Auraq', 3],
+      ['Secreta', 3],
+      ['Ordo', 3],
+      ['Asta', 3],
+      ['Supore', 3],
+      ['Chaiflock', 5],
+      ['Benji', 3],
+      ['Guild Boss', 5],
+      ['GvG', 5],
+      ['Icaruthia', 10],
+      ['Motti', 10],
+      ['Nevaeh', 10],
+      ['Tumier', 5],
+      ['Libitina', 5],
+      ['Rakajeth', 5]
+    ];
+    
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(2, 1, bosses.length, headers.length).setValues(bosses);
+    
+    sheet.getRange('1:1').setFontWeight('bold').setBackground('#4a86e8').setFontColor('#ffffff');
+    sheet.setColumnWidth(1, 180);
+    sheet.setColumnWidth(2, 100);
+    sheet.setFrozenRows(1);
+    
+    Logger.log('✅ BossPoints sheet created with ' + bosses.length + ' bosses');
+  }
+}
+
+/**
+ * Ensure BiddingItems sheet exists
+ * Creates it with headers if missing
+ */
+function ensureBiddingItemsSheet() {
+  const headers = ['Item', 'Start Price', 'Duration', 'Winner', 'Winning Bid',
+    'Auction Start', 'Auction End', 'Timestamp', 'Total Bids', 'Source', 'Quantity', 'Boss', 'Notes'];
+  const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+  let sheet = ss.getSheetByName('BiddingItems');
+  
+  if (!sheet) {
+    Logger.log('📝 Creating BiddingItems sheet (first run)...');
+    sheet = ss.insertSheet('BiddingItems');
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange('1:1').setFontWeight('bold').setBackground('#4A90E2').setFontColor('#FFFFFF');
+    sheet.setFrozenRows(1);
+    // Set column widths
+    for (let i = 1; i <= headers.length; i++) {
+      sheet.setColumnWidth(i, i <= 2 ? 150 : 120);
+    }
+    Logger.log('✅ BiddingItems sheet created with ' + headers.length + ' columns');
+  }
+}
+
+/**
+ * Ensure ForDistribution sheet exists
+ * Creates it with headers if missing
+ */
+function ensureForDistributionSheet() {
+  const headers = ['Item', 'Start Price', 'Duration', 'Winner', 'Winning Bid',
+    'Auction Start', 'Auction End', 'Timestamp', 'Total Bids', 'Source', 'Quantity', 'Boss', 'STATUS'];
+  const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+  let sheet = ss.getSheetByName('ForDistribution');
+  
+  if (!sheet) {
+    Logger.log('📝 Creating ForDistribution sheet (first run)...');
+    sheet = ss.insertSheet('ForDistribution');
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange('1:1').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
+    sheet.setFrozenRows(1);
+    for (let i = 1; i <= headers.length; i++) {
+      sheet.setColumnWidth(i, i <= 2 ? 150 : 120);
+    }
+    Logger.log('✅ ForDistribution sheet created with ' + headers.length + ' columns');
   }
 }
 

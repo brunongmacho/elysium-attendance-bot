@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * ELYSIUM GUILD BOT - Background Sheet Sync Service
+ * TENCHU GUILD BOT - Background Sheet Sync Service
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Background sync service: MongoDB → Google Sheets

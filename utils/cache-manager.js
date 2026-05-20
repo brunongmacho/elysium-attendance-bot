@@ -30,7 +30,7 @@
  * @requires ./constants - For cache configuration
  * @requires ./error-handler - For debug logging
  *
- * @author Elysium Attendance Bot Team
+ * @author Tenchu Attendance Bot Team
  * @version 3.0 - Multi-Level Caching
  * ============================================================================
  */

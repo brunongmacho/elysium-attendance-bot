@@ -59,7 +59,7 @@ function createVoiceStateHandler(client, config, modules) {
     alterFrierenConfig,
   } = modules;
 
-  const guildName = 'ELYSIUM';
+  const guildName = 'TENCHU';
 
   return async (oldState, newState) => {
     try {

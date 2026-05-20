@@ -19,7 +19,7 @@ const path = require('path');
 const envPath = path.join(__dirname, '..', '.env');
 const envContent = fs.readFileSync(envPath, 'utf8');
 const MONGODB_URI = envContent.match(/MONGODB_URI=(.+)/)?.[1]?.trim();
-const DB_NAME = 'elysium-bot';
+const DB_NAME = 'tenchu-bot';
 
 if (!MONGODB_URI) {
   console.error('❌ MONGODB_URI environment variable is required');

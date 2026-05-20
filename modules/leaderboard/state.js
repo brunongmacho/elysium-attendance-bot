@@ -26,7 +26,7 @@ let monthlyReportTimer = null;
 // GUILD NAME & LOGGER
 // ============================================================================
 
-let guildName = 'ELYSIUM';
+let guildName = 'TENCHU';
 
 const logger = createLogger('leaderboard');
 

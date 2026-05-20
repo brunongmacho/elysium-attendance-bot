@@ -12,7 +12,7 @@
  */
 module.exports = {
   apps: [{
-    name: 'elysium-bot',
+    name: 'tenchu-bot',
     script: 'index2.js',
 
     // Node.js flags for memory optimization (512MB RAM target)

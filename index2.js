@@ -136,7 +136,7 @@ const client = require('./bot/client');
 const { createHealthServer } = require('./bot/health-server');
 const {
   isAdmin,
-  hasElysiumRole,
+  hasTenchuRole,
   recoverBotStateOnStartup,
   moveQueueItemsToSheet,
 } = require('./bot/member-utils');
@@ -231,7 +231,7 @@ const server = createHealthServer(client, config, {
 // UTILITY FUNCTIONS (kept inline - used by command-handlers)
 // =====================================================================
 
-// isAdmin, hasElysiumRole, recoverBotStateOnStartup, moveQueueItemsToSheet,
+// isAdmin, hasTenchuRole, recoverBotStateOnStartup, moveQueueItemsToSheet,
 
 
 // createDisabledRow, awaitConfirmation imported from bot/confirm-utils.js
@@ -572,7 +572,7 @@ async function cleanupStaleStatsMessages() {
 
     const commandsChannel = await discordCache.getChannel('bot_manual_channel_id');
     if (!commandsChannel) {
-      console.warn('⚠️ Could not find elysium-commands channel for cleanup');
+      console.warn('⚠️ Could not find tenchu-commands channel for cleanup');
       return;
     }
 
@@ -984,7 +984,7 @@ const messageHandler = createMessageHandler(client, config, {
   dbAPI,
   TIMING,
   isAdmin,
-  hasElysiumRole,
+  hasTenchuRole,
   addGuildFooter,
   createDisabledRow,
   awaitConfirmation,

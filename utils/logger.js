@@ -51,7 +51,7 @@ const baseLogger = pino({
   timestamp: pino.stdTimeFunctions.isoTime,
   base: {
     env: process.env.NODE_ENV || 'development',
-    service: 'elysium-attendance-bot',
+    service: 'tenchu-attendance-bot',
   },
 });
 

@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * ELYSIUM GUILD BOT - MongoDB Helper Functions
+ * TENCHU GUILD BOT - MongoDB Helper Functions
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Helper functions for MongoDB operations
@@ -1095,7 +1095,7 @@ function getWeekLabel() {
   const now = new Date();
   const year = now.getFullYear();
   const weekNum = getWeekNumber(now);
-  return `ELYSIUM_WEEK_${year}_${weekNum}`;
+  return `WEEK_${year}_${weekNum}`;
 }
 
 /**

@@ -7,7 +7,7 @@
  * Provides boss names, pending members, and other dynamic data.
  *
  * @module commands/autocomplete
- * @author ELYSIUM Development Team
+ * @author TENCHU Development Team
  */
 
 const fs = require('fs');

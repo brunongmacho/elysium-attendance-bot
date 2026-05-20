@@ -7,7 +7,7 @@
  * Maintains compatibility with existing prefix commands.
  *
  * @module commands/handlers
- * @author ELYSIUM Development Team
+ * @author TENCHU Development Team
  */
 
 const { EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, ComponentType } = require('discord.js');
@@ -862,10 +862,10 @@ if (commandName === 'rotation') {
         if (!rotation) continue;
 
         const emoji = rotation.isOurTurn ? '🟢' : '🔴';
-        const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
+        const status = rotation.isOurTurn ? 'TENCHU\'S TURN' : `${rotation.currentGuild}'s turn`;
 
         let spawnInfo = '';
-        let elysiumTurnInfo = '';
+        let tenchuTurnInfo = '';
         let nextSpawnDate = null;
 
         try {
@@ -893,7 +893,7 @@ if (commandName === 'rotation') {
           nextGuild,
           guildCount,
           spawnInfo,
-          elysiumTurnInfo,
+          tenchuTurnInfo,
           dataWarning,
           isOurTurn: rotation.isOurTurn || false,
           sortKey: nextSpawnDate ? nextSpawnDate.getTime() : Number.MAX_SAFE_INTEGER
@@ -928,7 +928,7 @@ if (commandName === 'rotation') {
 
         embed.addFields({
           name: `${data.emoji} ${data.boss}`,
-          value: `Guild ${data.rotation.currentIndex}/${data.guildCount} - **${data.status}**\nNext: ${data.nextGuild}${data.spawnInfo}${data.elysiumTurnInfo}${data.dataWarning}`,
+          value: `Guild ${data.rotation.currentIndex}/${data.guildCount} - **${data.status}**\nNext: ${data.nextGuild}${data.spawnInfo}${data.tenchuTurnInfo}${data.dataWarning}`,
           inline: false
         });
 
@@ -967,7 +967,7 @@ if (commandName === 'rotation') {
 
       const data = result.data;
       const emoji = data.isOurTurn ? '🟢' : '🔴';
-      const status = data.isOurTurn ? 'ELYSIUM\'S TURN' : `${data.currentGuild}'s turn`;
+      const status = data.isOurTurn ? 'TENCHU\'S TURN' : `${data.currentGuild}'s turn`;
 
       const embed = new EmbedBuilder()
         .setColor(data.isOurTurn ? 0x00ff00 : 0xff0000)
@@ -1008,7 +1008,7 @@ if (commandName === 'rotation') {
       }
 
       const emoji = result.isNowOurTurn ? '🟢' : '🔴';
-      const status = result.isNowOurTurn ? 'ELYSIUM\'S TURN' : `${result.newGuild}'s turn`;
+      const status = result.isNowOurTurn ? 'TENCHU\'S TURN' : `${result.newGuild}'s turn`;
 
       const embed = new EmbedBuilder()
         .setColor(result.isNowOurTurn ? 0x00ff00 : 0xff0000)
@@ -1075,7 +1075,7 @@ if (commandName === 'rotation') {
         }
 
         const emoji = rotation.isOurTurn ? '🟢' : '🔴';
-        const status = rotation.isOurTurn ? 'ELYSIUM\'S TURN' : `${rotation.currentGuild}'s turn`;
+        const status = rotation.isOurTurn ? 'TENCHU\'S TURN' : `${rotation.currentGuild}'s turn`;
         const hasGuilds = Array.isArray(rotation.guilds) && rotation.guilds.length > 0;
         const guildCount = hasGuilds ? rotation.guilds.length : 5;
         const dataWarning = !hasGuilds ? ' ⚠️ (incomplete)' : '';

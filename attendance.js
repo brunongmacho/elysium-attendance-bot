@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * ELYSIUM ATTENDANCE SYSTEM - THIN WRAPPER
+ * TENCHU ATTENDANCE SYSTEM - THIN WRAPPER
  * ═══════════════════════════════════════════════════════════════════════════════
  *
  * This file is a thin compatibility wrapper that re-exports all functions from

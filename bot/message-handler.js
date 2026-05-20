@@ -56,7 +56,7 @@ const logger = createLogger('message-handler');
  * @param {Object} deps.dbAPI - MongoDB database API
  * @param {Object} deps.TIMING - Timing constants
  * @param {Function} deps.isAdmin - Admin check function (member) => boolean
- * @param {Function} deps.hasElysiumRole - Elysium role check function (member) => boolean
+ * @param {Function} deps.hasTenchuRole - Tenchu role check function (member) => boolean
  * @param {Function} deps.addGuildFooter - Guild branding footer utility
  * @param {Function} deps.createDisabledRow - Button disabling utility
  * @param {Function} deps.awaitConfirmation - Confirmation dialog utility

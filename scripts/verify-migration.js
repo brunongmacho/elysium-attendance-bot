@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * ELYSIUM GUILD BOT - Migration Verification Script
+ * TENCHU GUILD BOT - Migration Verification Script
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Verifies data integrity after MongoDB migration
@@ -373,7 +373,7 @@ async function compareWithSheets() {
 
 async function runVerification() {
   console.log('\n═══════════════════════════════════════════════════════════════');
-  console.log('🔍 ELYSIUM GUILD BOT - MIGRATION VERIFICATION');
+  console.log('🔍 TENCHU GUILD BOT - MIGRATION VERIFICATION');
   console.log('═══════════════════════════════════════════════════════════════');
   console.log(`Detailed Mode: ${CONFIG.DETAILED ? 'ON' : 'OFF'}`);
   console.log(`Collection Filter: ${CONFIG.COLLECTION || 'All'}`);

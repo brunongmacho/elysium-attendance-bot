@@ -19,7 +19,7 @@
  * ```
  *
  * @module utils/points-cache
- * @author Elysium Attendance Bot Team
+ * @author Tenchu Attendance Bot Team
  * @version 1.0
  * ============================================================================
  */

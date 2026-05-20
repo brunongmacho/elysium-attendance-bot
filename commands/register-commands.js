@@ -9,7 +9,7 @@
  * Dynamically fetches channel names from Discord to include in command descriptions.
  *
  * @module commands/register-commands
- * @author ELYSIUM Development Team
+ * @author TENCHU Development Team
  */
 
 const { REST, Routes } = require('discord.js');

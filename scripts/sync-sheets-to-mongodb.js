@@ -66,7 +66,7 @@ const SYNC_REGISTRY = process.argv.includes('--registry') || (!hasModuleFlag() &
 
 // Load bot configuration
 let config;
-let guildName = 'ELYSIUM';
+let guildName = 'TENCHU';
 try {
   const configPath = path.join(__dirname, '..', 'config.json');
   config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
@@ -76,7 +76,7 @@ try {
 }
 
 // Get MongoDB database name from config
-const DB_NAME = config.mongodb_database || `elysium-bot-${guildName.toLowerCase().replace(/\s+/g, '-')}`;
+const DB_NAME = config.mongodb_database || `tenchu-bot-${guildName.toLowerCase().replace(/\s+/g, '-')}`;
 
 // Load Discord ID mapping (nickname -> Discord ID)
 let discordIdMap = {};

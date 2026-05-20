@@ -25,7 +25,7 @@ const config = (() => {
 })();
 
 // Guild name from config
-const guildName = 'ELYSIUM';
+const guildName = 'TENCHU';
 
 // Boss point values loaded from boss_points.json
 // Maps boss names to point rewards for attendance
@@ -100,8 +100,8 @@ function validateConfig() {
     'attendance_channel_id': 'Attendance channel ID',
     'admin_logs_channel_id': 'Admin logs channel ID',
     'bidding_channel_id': 'Bidding channel ID',
-    'elysium_commands_channel_id': 'Elysium commands channel ID',
-    'elysium_role': 'Elysium role name',
+    'tenchu_commands_channel_id': 'Tenchu commands channel ID',
+    'tenchu_role': 'Tenchu role name',
     'admin_roles': 'Admin roles array',
     'sheet_webhook_url': 'Google Sheets webhook URL'
   };

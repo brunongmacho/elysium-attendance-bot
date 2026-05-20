@@ -20,7 +20,7 @@
  * - Structured formatting for readability
  *
  * @module utils/error-handler
- * @author Elysium Attendance Bot Team
+ * @author Tenchu Attendance Bot Team
  * @version 2.0
  * ============================================================================
  */

@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * ELYSIUM GUILD BOT - Fast Startup Script
+ * TENCHU GUILD BOT - Fast Startup Script
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Optimized startup that gets the bot online ASAP.
@@ -28,7 +28,7 @@ const SKIP_SYNC = process.env.SKIP_BACKGROUND_SYNC === 'true';
 // ═══════════════════════════════════════════════════════════════════════════
 
 console.log('═══════════════════════════════════════════════════════════════');
-console.log('🚀 ELYSIUM GUILD BOT - FAST STARTUP');
+console.log('🚀 TENCHU GUILD BOT - FAST STARTUP');
 console.log('═══════════════════════════════════════════════════════════════');
 console.log('');
 

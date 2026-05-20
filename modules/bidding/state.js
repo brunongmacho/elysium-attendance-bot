@@ -181,8 +181,8 @@ state.getColor = function getColor(color) {
  */
 state.hasRole = function hasRole(m) {
   return m.roles.cache.some((r) => {
-    const roleName = state.cfg?.elysium_role || 'Certified TPB';
-    const roleId = state.cfg?.elysium_role_id || state.cfg?.role_ids?.member;
+    const roleName = state.cfg?.tenchu_role || 'Certified TPB';
+    const roleId = state.cfg?.tenchu_role_id || state.cfg?.role_ids?.member;
     return r.name === roleName || r.id === roleId;
   });
 };

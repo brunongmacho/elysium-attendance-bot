@@ -25,7 +25,7 @@ function addGuildFooter(embed, guild, footerText = null) {
   if (!iconURL) return embed;
 
   // Get guild name
-  const guildName = 'ELYSIUM';
+  const guildName = 'TENCHU';
 
   // Get existing footer text or use config guild name
   const text = footerText || embed.data.footer?.text || `${guildName} Guild`;
@@ -71,7 +71,7 @@ function addGuildAuthor(embed, guild, authorName = null) {
   const iconURL = guild.iconURL();
   if (!iconURL) return embed;
 
-  const name = authorName || guild.name || 'ELYSIUM';
+  const name = authorName || guild.name || 'TENCHU';
 
   embed.setAuthor({
     name: name,

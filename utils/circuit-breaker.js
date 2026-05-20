@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * ELYSIUM GUILD BOT - Circuit Breaker Pattern
+ * TENCHU GUILD BOT - Circuit Breaker Pattern
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Circuit Breaker for MongoDB operations with Google Sheets fallback

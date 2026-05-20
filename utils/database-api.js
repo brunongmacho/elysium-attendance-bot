@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * ELYSIUM GUILD BOT - MongoDB Database API
+ * TENCHU GUILD BOT - MongoDB Database API
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Purpose: Centralized MongoDB connection and query interface
@@ -18,7 +18,7 @@
 const { MongoClient } = require('mongodb');
 
 const MONGODB_URI = process.env.MONGODB_URI;
-const DB_NAME = 'elysium-bot';
+const DB_NAME = 'tenchu-bot';
 
 class DatabaseAPI {
   constructor() {

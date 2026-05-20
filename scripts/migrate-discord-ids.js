@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * ELYSIUM GUILD BOT - Discord ID Migration Script
+ * TENCHU GUILD BOT - Discord ID Migration Script
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * One-time migration script to map temp member IDs to real Discord IDs
@@ -48,7 +48,7 @@ const DRY_RUN = process.env.DRY_RUN === 'true';
 
 async function migrateDiscordIds() {
   console.log('═══════════════════════════════════════════════════════════════');
-  console.log('  ELYSIUM GUILD BOT - Discord ID Migration');
+  console.log('  TENCHU GUILD BOT - Discord ID Migration');
   console.log('═══════════════════════════════════════════════════════════════\n');
 
   if (DRY_RUN) {

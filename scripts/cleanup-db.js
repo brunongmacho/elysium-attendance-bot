@@ -9,7 +9,7 @@
 const { MongoClient } = require('mongodb');
 
 const MONGODB_URI = process.env.MONGODB_URI;
-const DB_NAME = 'elysium-bot';
+const DB_NAME = 'tenchu-bot';
 
 if (!MONGODB_URI) {
   console.error('❌ MONGODB_URI environment variable is required');

@@ -21,7 +21,7 @@
  * - Easier to add features (compression, caching, etc.)
  *
  * @module utils/sheet-api
- * @author Elysium Attendance Bot Team
+ * @author Tenchu Attendance Bot Team
  * @version 1.0
  * ============================================================================
  */

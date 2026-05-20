@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * ELYSIUM GUILD BOT - Migration Rollback Script
+ * TENCHU GUILD BOT - Migration Rollback Script
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Rolls back migration by dropping migrated collections
@@ -49,7 +49,7 @@ function log(message, level = 'info') {
 
 async function rollback() {
   console.log('\n═══════════════════════════════════════════════════════════════');
-  console.log('🔄 ELYSIUM GUILD BOT - MIGRATION ROLLBACK');
+  console.log('🔄 TENCHU GUILD BOT - MIGRATION ROLLBACK');
   console.log('═══════════════════════════════════════════════════════════════');
   console.log(`Mode: ${CONFIG.DRY_RUN ? '🧪 DRY-RUN (preview only)' : '⚠️  LIVE ROLLBACK'}`);
   console.log(`Target: ${CONFIG.COLLECTION || 'All migrated collections'}`);

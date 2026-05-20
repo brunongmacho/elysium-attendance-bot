@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * ELYSIUM GUILD BOT - Discord ID Mapper
+ * TENCHU GUILD BOT - Discord ID Mapper
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Maps Discord user IDs to member documents

@@ -74,7 +74,7 @@ function truncateFieldValue(lines, maxLength = DISCORD_LIMITS.FIELD_VALUE, maxIt
 }
 
 // Get guild name
-const guildName = 'ELYSIUM';
+const guildName = 'TENCHU';
 
 // ============================================================================
 // QUERY RESULT CACHING (PHASE 3.2)

@@ -63,7 +63,7 @@ function createCommandHandlers(deps) {
     // Overview embed
     const overviewEmbed = new EmbedBuilder()
       .setColor('#00ff00')
-      .setTitle('📚 Welcome to Elysium! New Member Guide')
+      .setTitle('📚 Welcome to Tenchu! New Member Guide')
       .setDescription(
         '**Welcome to the guild!** This guide will teach you everything you need to know about:\n\n' +
         '1️⃣ **Boss Attendance** - How to get credit for boss kills\n' +
@@ -248,7 +248,7 @@ function createCommandHandlers(deps) {
           inline: false
         }
       )
-      .setFooter({ text: 'Good luck and have fun in Elysium! 🎉' })
+      .setFooter({ text: 'Good luck and have fun in Tenchu! 🎉' })
       .setTimestamp();
 
     // Send all embeds
@@ -2015,8 +2015,8 @@ function createCommandHandlers(deps) {
           break;
 
         case 'commands':
-          fileConfig.elysiums_commands_channel_id = channelId;
-          config.elysiums_commands_channel_id = channelId;
+          fileConfig.tenchu_commands_channel_id = channelId;
+          config.tenchu_commands_channel_id = channelId;
           await message.reply(`✅ **Commands channel configured!** <#${channelId}> is now the guild commands channel.`);
           break;
 
@@ -2033,7 +2033,7 @@ function createCommandHandlers(deps) {
             { name: '🎯 Attendance', value: config.attendance_channel_id ? `<#${config.attendance_channel_id}>` : '❌ Not set', inline: true },
             { name: '💰 Bidding', value: config.bidding_channel_id ? `<#${config.bidding_channel_id}>` : '❌ Not set', inline: true },
             { name: '👑 Admin Logs', value: config.admin_logs_channel_id ? `<#${config.admin_logs_channel_id}>` : '❌ Not set', inline: true },
-            { name: '💬 Commands', value: config.elysiums_commands_channel_id ? `<#${config.elysiums_commands_channel_id}>` : '❌ Not set', inline: true },
+            { name: '💬 Commands', value: config.tenchu_commands_channel_id ? `<#${config.tenchu_commands_channel_id}>` : '❌ Not set', inline: true },
             { name: '🤖 Bot Commands', value: config.bot_manual_channel_id ? `<#${config.bot_manual_channel_id}>` : '❌ Not set', inline: true },
             { name: '👑 Admin Roles', value: config.admin_roles.length > 0 ? config.admin_roles.map(id => `<@&${id}>`).join(', ') : '❌ None configured', inline: false },
           ];

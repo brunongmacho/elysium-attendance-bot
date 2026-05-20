@@ -32,6 +32,13 @@ async function initialize(cfg, discordClient, bossTimer = null) {
   await scheduleBosses.refreshRotationCache();
   console.log('✅ Rotation cache loaded - ready to post daily schedules');
 
+  // If no rotating bosses configured, skip all timers and schedules
+  if (state.ROTATING_BOSSES.length === 0) {
+    console.log('⏭️ No rotating bosses configured - rotation system disabled (skip timers, cron, reminders)');
+    console.log('   Add bosses to the BossRotation sheet and run !rotation refresh to enable');
+    return;
+  }
+
   // Start spawn warning monitor if boss timer available
   if (state.bossTimerModule) {
     spawnMonitor.startSpawnMonitor();

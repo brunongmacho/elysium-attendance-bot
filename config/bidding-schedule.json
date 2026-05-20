@@ -10,8 +10,8 @@
 
   "auction": {
     "_description": "Main auction schedule - when the weekly auction starts",
-    "dayOfWeek": 0,
-    "dayName": "Sunday",
+    "dayOfWeek": 6,
+    "dayName": "Saturday",
     "hour": 12,
     "minute": 0,
     "_instructions": {
@@ -24,7 +24,7 @@
 
   "preAuctionSync": {
     "_description": "Pre-auction sync settings - syncs bidding points from Google Sheets to MongoDB before auction",
-    "hoursBeforeAuction": 1,
+    "hoursBeforeAuction": 2,
     "_instructions": {
       "hoursBeforeAuction": "How many hours before the auction to sync data (recommended: 1)"
     }

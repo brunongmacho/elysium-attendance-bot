@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * ELYSIUM GUILD BOT - CHANNEL-AWARE HELP SYSTEM v10.0
+ * TENCHU GUILD BOT - CHANNEL-AWARE HELP SYSTEM v10.0
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Features:
@@ -103,7 +103,7 @@ function detectChannelType(message) {
   }
 
   // Guild chat
-  if (channelId === config.elysium_commands_channel_id || parentId === config.elysium_commands_channel_id) {
+  if (channelId === config.tenchu_commands_channel_id || parentId === config.tenchu_commands_channel_id) {
     return CHANNEL_TYPES.GUILD_CHAT;
   }
 

@@ -26,7 +26,7 @@ async function fetchRotatingBosses() {
       state.ROTATING_BOSSES = result.bosses;
       console.log(`✅ Loaded ${result.bosses.length} rotating bosses: ${result.bosses.join(', ')}`);
     } else {
-      console.warn('⚠️ No rotating bosses found in sheet, using default list');
+      console.warn('ℹ️ No rotating bosses found in sheet - rotation system disabled');
     }
   } catch (err) {
     console.error('❌ Error fetching rotating bosses:', err.message);
@@ -436,10 +436,10 @@ async function sendRotationWarning(bossName, predictedSpawnTime) {
 
     if (!rotation.isRotating || !rotation.isOurTurn) return;
 
-    const elysiumCommandsChannelId = state.config.elysium_commands_channel_id;
-    if (!elysiumCommandsChannelId) return;
+    const tenchuCommandsChannelId = state.config.tenchu_commands_channel_id;
+    if (!tenchuCommandsChannelId) return;
 
-    const channel = await state.client.channels.fetch(elysiumCommandsChannelId);
+    const channel = await state.client.channels.fetch(tenchuCommandsChannelId);
     if (!channel) return;
 
     const spawnTimestamp = Math.floor(predictedSpawnTime.getTime() / 1000);
@@ -658,13 +658,13 @@ async function postDailyRotationSchedule() {
       return;
     }
 
-    const elysiumCommandsChannelId = state.config.elysium_commands_channel_id;
-    if (!elysiumCommandsChannelId) {
+    const tenchuCommandsChannelId = state.config.tenchu_commands_channel_id;
+    if (!tenchuCommandsChannelId) {
       console.warn('⚠️ Guild commands channel not configured - cannot post daily schedule');
       return;
     }
 
-    const channel = await state.client.channels.fetch(elysiumCommandsChannelId);
+    const channel = await state.client.channels.fetch(tenchuCommandsChannelId);
     if (!channel) {
       console.warn('⚠️ Guild commands channel not found');
       return;
@@ -894,7 +894,7 @@ async function postDailyRotationSchedule() {
 
     embed.addFields({
       name: '\u200B',
-      value: `**Total Rotations:** ${guildRotations.length}\n**Stay alert and check #elysium-commands for 15-min warnings!**`,
+      value: `**Total Rotations:** ${guildRotations.length}\n**Stay alert and check #tenchu-commands for 15-min warnings!**`,
       inline: false
     });
 

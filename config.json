@@ -5,14 +5,14 @@
   "attendance_channel_id": "",
   "bidding_channel_id": "",
   "admin_logs_channel_id": "",
-  "elysium_commands_channel_id": "",
+  "tenchu_commands_channel_id": "",
   "bot_manual_channel_id": "",
   "boss_timer_channel_id": "",
   "boss_spawn_announcement_channel_id": "",
   "protected_thread_ids": [],
   "admin_roles": [],
-  "elysium_role": "ELYSIUM",
+  "tenchu_role": "TENCHU",
   "owner_id": "182081219062661120",
-  "sheet_webhook_url": "https://script.google.com/macros/s/AKfycbzY2sJA742QWLUZnqH06oIFosTD-X01dPd2q-uNdt8Fus-WcYo5YG3Y5ZfYfE7uFvTO/exec",
+  "sheet_webhook_url": "https://script.google.com/macros/s/AKfycbz2jYqSY_aj8YhsysaLk25kdpSAyktfH5Q4gyjIJueWberIN1Y4yDo_Z4izID-TD3r-/exec",
   "auto_archive_minutes": 60
 }

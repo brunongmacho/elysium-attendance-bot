@@ -9,7 +9,7 @@
  * Command descriptions are dynamically generated with actual channel names on bot startup.
  *
  * @module commands/slash-commands
- * @author ELYSIUM Development Team
+ * @author TENCHU Development Team
  */
 
 const { ApplicationCommandOptionType, PermissionFlagsBits } = require('discord.js');

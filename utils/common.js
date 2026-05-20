@@ -20,7 +20,7 @@
  * @requires ./cache-manager - For cached boss matching
  * @requires ./constants - For shared constants
  *
- * @author Elysium Attendance Bot Team
+ * @author Tenchu Attendance Bot Team
  * @version 2.0
  * ============================================================================
  */

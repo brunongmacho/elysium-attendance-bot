@@ -7,7 +7,7 @@
  * Entry point that wires all sub-modules together and re-exports the public API.
  *
  * @module boss-timer
- * @author Elysium Attendance Bot Team
+ * @author Tenchu Attendance Bot Team
  * ============================================================================
  */
 
