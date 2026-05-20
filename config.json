@@ -1,26 +1,18 @@
 {
-  "main_guild_id": "1497103427912732745",
-  "timer_server_id": "1497103427912732745",
-  "timer_channel_id": "1497122977207025714",
-  "attendance_channel_id": "1497123031703883846",
-  "bidding_channel_id": "1497123391629692988",
-  "admin_logs_channel_id": "1497131257258180678",
-  "elysium_commands_channel_id": "1497126624628572281",
-  "bot_manual_channel_id": "1497131110600282153",
-  "boss_timer_channel_id": "1497122977207025714",
-  "boss_spawn_announcement_channel_id": "1497123103204184185",
-  "protected_thread_ids": [
-    "1430356542871437494"
-  ],
-  "admin_roles": [
-    "GUILD LEADER",
-    "ELITE",
-    "Admin",
-    "Martin Romualdez",
-    "BOT",
-    "XXX"
-  ],
+  "main_guild_id": "",
+  "timer_server_id": "",
+  "timer_channel_id": "",
+  "attendance_channel_id": "",
+  "bidding_channel_id": "",
+  "admin_logs_channel_id": "",
+  "elysium_commands_channel_id": "",
+  "bot_manual_channel_id": "",
+  "boss_timer_channel_id": "",
+  "boss_spawn_announcement_channel_id": "",
+  "protected_thread_ids": [],
+  "admin_roles": [],
   "elysium_role": "ELYSIUM",
+  "owner_id": "182081219062661120",
   "sheet_webhook_url": "https://script.google.com/macros/s/AKfycbzY2sJA742QWLUZnqH06oIFosTD-X01dPd2q-uNdt8Fus-WcYo5YG3Y5ZfYfE7uFvTO/exec",
   "auto_archive_minutes": 60
 }

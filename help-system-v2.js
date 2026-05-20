@@ -255,6 +255,14 @@ const COMMANDS = {
       channels: [CHANNEL_TYPES.ADMIN_LOGS],
       category: "Admin"
     },
+    setup: {
+      usage: "!setup <feature>",
+      description: "Configure the bot for this server. 💡 Run this command IN the channel you want to assign. Features: guild, timer, attendance, bidding, admin, commands, bot, adminrole (add/remove admin roles), view (show config). Config is saved to disk immediately.",
+      aliases: [],
+      adminOnly: true,
+      channels: [CHANNEL_TYPES.ADMIN_LOGS],
+      category: "Admin"
+    },
     overrideclose: {
       usage: "!overrideclose / /overrideclose",
       description: "Forcibly close the CURRENT thread immediately, bypassing the 20-minute auto-close timer. 💡 Use on threads that need to be closed before the timer expires. All pending members are verified and submitted.",

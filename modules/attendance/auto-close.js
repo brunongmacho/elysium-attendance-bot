@@ -8,6 +8,7 @@ const { cleanupAllThreadReactions } = require('./reactions');
 const bossRotation = require('../../boss-rotation.js');
 const errorHandler = require('../../utils/error-handler');
 const mongoHelpers = require('../../utils/mongodb-helpers');
+const discordIdMapper = require('../../utils/discord-id-mapper');
 const { clientCache } = require('../../utils/sheet-api');
 const state = require('./state');
 
@@ -285,6 +286,19 @@ async function checkAndAutoCloseThreads(client) {
                 for (const memberName of spawnInfo.members) {
                   const discordId = spawnInfo.memberIds?.[memberName];
 
+                  // Ensure Discord ID is mapped to nickname in MongoDB
+                  if (discordId) {
+                    try {
+                      await discordIdMapper.ensureMemberExists({
+                        id: discordId,
+                        username: memberName,
+                        nickname: memberName
+                      });
+                    } catch (mapErr) {
+                      console.error(`   ⚠️ Failed to map Discord ID for ${memberName}:`, mapErr.message);
+                    }
+                  }
+
                   await mongoHelpers.addAttendance({
                     username: memberName,
                     discordId: discordId,
@@ -382,6 +396,23 @@ async function checkAndAutoCloseThreads(client) {
 
           if (submitted) {
             console.log(`   📊 Submission source: ${submissionSource}`);
+
+            // Sync member registry to Google Sheets (fire-and-forget)
+            if (spawnInfo.members.length > 0) {
+              const registryMembers = spawnInfo.members
+                .map(name => ({
+                  discordId: spawnInfo.memberIds?.[name],
+                  nickname: name
+                }))
+                .filter(m => m.discordId);
+
+              if (registryMembers.length > 0) {
+                postToSheet({
+                  action: "syncMemberRegistry",
+                  members: registryMembers
+                }).catch(err => console.warn(`⚠️ Member registry sync failed:`, err.message));
+              }
+            }
 
             // Invalidate client-side cache (attendance data changed)
             clientCache.invalidate('getAllWeeklyAttendance:{}');

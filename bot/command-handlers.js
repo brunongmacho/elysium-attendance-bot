@@ -1937,6 +1937,170 @@ function createCommandHandlers(deps) {
     await emergencyCommands.handleEmergencyCommand(message, ['close', message.channel.id]);
   },
 
+  // =========================================================================
+  // SETUP COMMAND - Configure bot channels and guild (admin only)
+  // =========================================================================
+  setup: async (message, member, args) => {
+    if (!deps.isAdmin(member)) {
+      await message.reply('❌ Admin only command.');
+      return;
+    }
+
+    if (args.length === 0) {
+      await message.reply(
+        '**Usage:** `!setup <feature>`\n\n' +
+        '**Features:**\n' +
+        '• `guild` - Set this guild as the main server\n' +
+        '• `timer` - Set this channel as the boss timer channel\n' +
+        '• `attendance` - Set this channel as the attendance channel\n' +
+        '• `bidding` - Set this channel as the bidding channel\n' +
+        '• `admin` - Set this channel as the admin logs channel\n' +
+        '• `commands` - Set this channel as the guild commands channel\n' +
+        '• `bot` - Set this channel as the bot commands channel\n' +
+        '• `adminrole <@role>` - Add a role as admin (@mention the role)\n' +
+        '• `adminrole remove <@role>` - Remove a role from admin list\n' +
+        '• `view` - Show current configuration\n\n' +
+        '💡 Run `!setup <feature>` **in** the channel you want to configure.'
+      );
+      return;
+    }
+
+    const feature = args[0].toLowerCase();
+    const channelId = message.channel.id;
+    const guildId = message.guild ? message.guild.id : null;
+
+    if (!guildId) {
+      await message.reply('❌ This command must be used in a server channel.');
+      return;
+    }
+
+    try {
+      const fs = require('fs');
+      const configPath = __dirname + '/../config.json';
+      const fileConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+
+      switch (feature) {
+        case 'guild':
+          fileConfig.main_guild_id = guildId;
+          fileConfig.timer_server_id = guildId;
+          config.main_guild_id = guildId;
+          config.timer_server_id = guildId;
+          await message.reply(`✅ **Guild configured!** This server is now the main guild. Run \`!setup <feature>\` in each channel to complete setup.`);
+          break;
+
+        case 'timer':
+          fileConfig.boss_timer_channel_id = channelId;
+          fileConfig.timer_channel_id = channelId;
+          config.boss_timer_channel_id = channelId;
+          config.timer_channel_id = channelId;
+          await message.reply(`✅ **Timer channel configured!** <#${channelId}> is now the boss timer channel.`);
+          break;
+
+        case 'attendance':
+          fileConfig.attendance_channel_id = channelId;
+          config.attendance_channel_id = channelId;
+          await message.reply(`✅ **Attendance channel configured!** <#${channelId}> is now the attendance channel.`);
+          break;
+
+        case 'bidding':
+          fileConfig.bidding_channel_id = channelId;
+          config.bidding_channel_id = channelId;
+          await message.reply(`✅ **Bidding channel configured!** <#${channelId}> is now the bidding channel.`);
+          break;
+
+        case 'admin':
+          fileConfig.admin_logs_channel_id = channelId;
+          config.admin_logs_channel_id = channelId;
+          await message.reply(`✅ **Admin logs configured!** <#${channelId}> is now the admin logs channel.`);
+          break;
+
+        case 'commands':
+          fileConfig.elysiums_commands_channel_id = channelId;
+          config.elysiums_commands_channel_id = channelId;
+          await message.reply(`✅ **Commands channel configured!** <#${channelId}> is now the guild commands channel.`);
+          break;
+
+        case 'bot':
+          fileConfig.bot_manual_channel_id = channelId;
+          config.bot_manual_channel_id = channelId;
+          await message.reply(`✅ **Bot commands configured!** <#${channelId}> is now the bot commands channel.`);
+          break;
+
+        case 'view':
+          const fields = [
+            { name: '🏰 Main Guild', value: config.main_guild_id ? `<#${config.main_guild_id}>` : '❌ Not set', inline: true },
+            { name: '⏱️ Timer Channel', value: config.boss_timer_channel_id ? `<#${config.boss_timer_channel_id}>` : '❌ Not set', inline: true },
+            { name: '🎯 Attendance', value: config.attendance_channel_id ? `<#${config.attendance_channel_id}>` : '❌ Not set', inline: true },
+            { name: '💰 Bidding', value: config.bidding_channel_id ? `<#${config.bidding_channel_id}>` : '❌ Not set', inline: true },
+            { name: '👑 Admin Logs', value: config.admin_logs_channel_id ? `<#${config.admin_logs_channel_id}>` : '❌ Not set', inline: true },
+            { name: '💬 Commands', value: config.elysiums_commands_channel_id ? `<#${config.elysiums_commands_channel_id}>` : '❌ Not set', inline: true },
+            { name: '🤖 Bot Commands', value: config.bot_manual_channel_id ? `<#${config.bot_manual_channel_id}>` : '❌ Not set', inline: true },
+            { name: '👑 Admin Roles', value: config.admin_roles.length > 0 ? config.admin_roles.map(id => `<@&${id}>`).join(', ') : '❌ None configured', inline: false },
+          ];
+          const embed = new EmbedBuilder()
+            .setColor(0x3498db)
+            .setTitle('📋 Current Configuration')
+            .addFields(fields)
+            .setFooter({ text: 'Use !setup <feature> in the target channel to configure' })
+            .setTimestamp();
+          await message.reply({ embeds: [embed] });
+          return;
+
+        case 'adminrole':
+          if (args.length < 2) {
+            await message.reply('Usage: `!setup adminrole <@role>` or `!setup adminrole remove <@role>`\n\nAdd or remove roles that have admin access to the bot. Mention the role with @.');
+            return;
+          }
+          if (args[1] === 'remove') {
+            if (args.length < 3) {
+              await message.reply('Usage: `!setup adminrole remove <@role>`\n\nRemove a role from admin list. Mention the role with @.');
+              return;
+            }
+            const removeRoleRole = message.mentions.roles.first();
+            if (!removeRoleRole) {
+              await message.reply('❌ Please mention the role to remove (e.g., `!setup adminrole remove @Leader`).');
+              return;
+            }
+            const roleIndex = fileConfig.admin_roles.indexOf(removeRoleRole.id);
+            if (roleIndex === -1) {
+              await message.reply(`❌ Role **${removeRoleRole.name}** is not in the admin list.`);
+              return;
+            }
+            fileConfig.admin_roles.splice(roleIndex, 1);
+            config.admin_roles = fileConfig.admin_roles;
+            await message.reply(`✅ Removed **${removeRoleRole.name}** (\`${removeRoleRole.id}\`) from admin roles.`);
+          } else {
+            const addRoleRole = message.mentions.roles.first();
+            if (!addRoleRole) {
+              await message.reply('❌ Please mention the role to add (e.g., `!setup adminrole @Leader`).');
+              return;
+            }
+            if (fileConfig.admin_roles.includes(addRoleRole.id)) {
+              await message.reply(`ℹ️ **${addRoleRole.name}** (\`${addRoleRole.id}\`) is already an admin role.`);
+              return;
+            }
+            fileConfig.admin_roles.push(addRoleRole.id);
+            config.admin_roles = fileConfig.admin_roles;
+            await message.reply(`✅ Added **${addRoleRole.name}** (\`${addRoleRole.id}\`) to admin roles.`);
+          }
+          // Write updated config to disk (this feature writes immediately, not at end of switch)
+          fs.writeFileSync(configPath, JSON.stringify(fileConfig, null, 2), 'utf8');
+          return;
+
+        default:
+          await message.reply(`❌ Unknown feature: \`${feature}\`. Try: guild, timer, attendance, bidding, admin, commands, bot, adminrole, or view.`);
+          return;
+      }
+
+      // Write updated config to disk
+      fs.writeFileSync(configPath, JSON.stringify(fileConfig, null, 2), 'utf8');
+
+    } catch (err) {
+      console.error('❌ Setup error:', err);
+      await message.reply(`❌ Failed to save configuration: ${err.message}`);
+    }
+  },
+
   /**
    * Force close ALL attendance threads
    * Usage: !forcecloseallthreads | !fcat

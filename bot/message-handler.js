@@ -101,7 +101,14 @@ function createMessageHandler(client, config, deps) {
 
       // ⚡ PERFORMANCE: Early returns for irrelevant messages
       // Allows timer server bot to create spawn threads before being blocked
-      if (message.guild.id !== config.main_guild_id && message.guild.id !== config.timer_server_id) return;
+      // Allow !setup commands even when guild is not yet configured
+      const guildConfigured = config.main_guild_id && config.timer_server_id;
+      if (guildConfigured) {
+        if (message.guild.id !== config.main_guild_id && message.guild.id !== config.timer_server_id) return;
+      } else if (!message.content.trim().toLowerCase().startsWith('!setup')) {
+        // Guild not configured - only allow !setup commands
+        return;
+      }
 
       // 📊 ACTIVITY TRACKING: Track message for activity heatmap
       // Skip bot messages for more accurate member activity data
@@ -121,7 +128,7 @@ function createMessageHandler(client, config, deps) {
         !message.author.bot
       ) {
         const content = message.content.trim().toLowerCase();
-        const memberCommands = ['!bid', '!b', '!help', '!?', '!commands', '!cmds', '!stats', '!status', '!update'];
+        const memberCommands = ['!bid', '!b', '!help', '!?', '!commands', '!cmds', '!stats', '!status', '!update', '!setup'];
 
          // Check if it's a member command BEFORE fetching member (faster)
          const isMemberCommand = memberCommands.some(cmd => content.startsWith(cmd));

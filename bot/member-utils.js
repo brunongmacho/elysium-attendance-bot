@@ -25,7 +25,9 @@ const logger = createLogger('member-utils');
  * @returns {boolean} True if member has admin role, false otherwise
  */
 function isAdmin(member) {
-  return member.roles.cache.some((r) => config.admin_roles.includes(r.name));
+  // Bot owner is always admin
+  if (config.owner_id && member.id === config.owner_id) return true;
+  return member.roles.cache.some((r) => config.admin_roles.includes(r.id));
 }
 
 /**
