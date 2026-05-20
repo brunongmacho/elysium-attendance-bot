@@ -4,7 +4,7 @@
 
 Converted all manual countdown timers to Discord's native relative timestamp feature (`<t:timestamp:R>`).
 
-## Check 1: All Countdown Conversions ✅
+## Check 1: All Countdown Conversions 
 
 ### boss-timer-commands.js
 - **Line 117**: `/killed` (scheduled boss) - Next Scheduled Spawn countdown
