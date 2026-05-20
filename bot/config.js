@@ -120,17 +120,16 @@ function validateConfig() {
   }
 
   if (missing.length > 0 || invalid.length > 0) {
-    mainLogger.error('CONFIGURATION ERROR - Missing or invalid configuration fields');
-    if (missing.length > 0) mainLogger.error('Missing required fields:', { missing });
-    if (invalid.length > 0) mainLogger.error('Invalid field values:', { invalid });
-    mainLogger.error('Please check your config.json file');
-    process.exit(1);
+    mainLogger.warn('⚠️  Bot not yet configured — run !setup guild in your server to begin');
+    if (missing.length > 0) mainLogger.warn('Missing config fields (will be set via !setup):', { missing });
+    if (invalid.length > 0) mainLogger.warn('Invalid field values:', { invalid });
+    return;  // Don't crash — allow !setup to configure interactively
   }
 
   mainLogger.info('Configuration validated successfully');
 }
 
-// Run validation immediately
+// Run validation immediately (non-fatal — logs warnings, allows !setup)
 validateConfig();
 
 module.exports = {
