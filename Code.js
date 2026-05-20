@@ -40,7 +40,7 @@
  */
 
 const CONFIG = {
-  SSHEET_ID: '1dGLGjmRhvG0io1Yta5ikfN-b_U-SSJJfWIHznK18qYQ',
+  SSHEET_ID: '1K07R6lXnsha7NshyAnIL4Iq034PlYCP64TaiPJwseCw',
   SHEET_NAME_PREFIX: 'WEEK_',
   BOSS_POINTS_SHEET: 'BossPoints',
   BIDDING_SHEET: 'BiddingPoints',
