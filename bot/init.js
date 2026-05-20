@@ -437,7 +437,7 @@ async function onClientReady(client, config, modules) {
 
   scheduler.startScheduler();
 
-  await eventReminders.initializeEventReminders(client, config, sheetAPI, attendance);
+  eventReminders.initialize(client);
   await crashRecovery.initialize(client, config);
 
   leaderboardSystem.init(client, config, discordCache, crashRecovery);
