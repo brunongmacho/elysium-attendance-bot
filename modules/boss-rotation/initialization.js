@@ -8,7 +8,7 @@ const shutdownManager = require('../../utils/shutdown-manager');
 const cron = require('node-cron');
 const state = require('./state');
 const { spawnMonitor } = require('./spawn-monitor');
-const { scheduleBosses } = require('./schedule-bosses');
+const scheduleBosses = require('./schedule-bosses');
 
 /**
  * Initializes the boss rotation system
