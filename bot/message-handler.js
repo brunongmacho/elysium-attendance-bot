@@ -283,6 +283,60 @@ function createMessageHandler(client, config, deps) {
       }
 
       // ═══════════════════════════════════════════════════════════════════
+      // ATTENDANCE THREAD CHECK-IN DETECTION
+      // ═══════════════════════════════════════════════════════════════════
+      // Detects member check-in messages ("here", "present") in attendance threads
+      // Adds them as pending verifications for admin review (via reaction)
+      if (
+        !message.author.bot &&
+        message.channel.isThread() &&
+        message.channel.parentId === config.attendance_channel_id
+      ) {
+        const content = message.content.trim().toLowerCase();
+        const checkInKeywords = ['here', 'present', 'join', 'checkin', 'check-in', 'attending'];
+        const isCheckIn = checkInKeywords.some(keyword => content.startsWith(keyword));
+
+        if (isCheckIn) {
+          console.log(`📋 Check-in detected from ${message.author.username} in thread ${message.channel.name}`);
+
+          try {
+            const member = await message.guild.members.fetch(message.author.id).catch(() => null);
+            const displayName = member?.nickname || member?.displayName || message.author.username;
+
+            // Add to pending verifications via stateManager
+            if (deps.stateManager && deps.stateManager.pendingVerifications) {
+              deps.stateManager.pendingVerifications[message.id] = {
+                threadId: message.channel.id,
+                author: displayName,
+                authorId: message.author.id,
+                messageId: message.id,
+              };
+              console.log(`   ✅ Added ${displayName} (${message.author.id}) to pending verifications for thread ${message.channel.id}`);
+            }
+
+            // Add bot reaction to acknowledge the check-in was seen
+            try {
+              await message.react('👀');
+            } catch (reactErr) {
+              // Reaction failures are non-critical
+            }
+
+            // Send acknowledgment reply to the member
+            try {
+              await message.reply({
+                content: `✅ Check-in recorded, <@${message.author.id}>! An admin will verify your screenshot shortly.`,
+                allowedMentions: { repliedUser: true }
+              });
+            } catch (replyErr) {
+              console.warn(`⚠️ Could not send check-in acknowledgment: ${replyErr.message}`);
+            }
+          } catch (err) {
+            console.error(`❌ Error processing check-in for ${message.author.username}:`, err.message);
+          }
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════════
       // PREFIX COMMAND ROUTING
       // ═══════════════════════════════════════════════════════════════════
       if (!message.author.bot && message.content.startsWith('!')) {

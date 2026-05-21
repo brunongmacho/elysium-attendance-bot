@@ -41,8 +41,8 @@ const SLASH_CHANNEL_MAP = {
   // Admin commands (admin_logs channel only)
   'status': [CHANNEL_TYPES.ADMIN_LOGS],
   'closeall': [CHANNEL_TYPES.ADMIN_LOGS],
-  'openthread': [CHANNEL_TYPES.ADMIN_LOGS],
-  'overrideclose': [CHANNEL_TYPES.ADMIN_LOGS],
+  'openthread': [CHANNEL_TYPES.ATTENDANCE_THREAD],
+  'overrideclose': [CHANNEL_TYPES.ATTENDANCE_THREAD],
   'remove-member': [CHANNEL_TYPES.ADMIN_LOGS],
   'rotation': [CHANNEL_TYPES.ADMIN_LOGS],
   'auction': [CHANNEL_TYPES.ADMIN_LOGS],

@@ -310,10 +310,6 @@ function createCommandHandlers(deps) {
         ? `${Math.floor((Date.now() - lastSheetCall) / 1000)} seconds ago`
         : "Never";
 
-    // Sync state from attendance module to get latest data
-    activeSpawns = attendance.getActiveSpawns();
-    pendingVerifications = attendance.getPendingVerifications();
-
     const totalSpawns = Object.keys(activeSpawns).length;
 
     // Sort spawns by timestamp (oldest first)
@@ -1285,6 +1281,30 @@ function createCommandHandlers(deps) {
               foundCheckIns++;
             }
           }
+
+          // Clean up: delete non-check-in member messages to keep thread tidy
+          let deletedCount = 0;
+          for (const [msgId, msg] of messages) {
+            // Skip bot messages (embeds, instructions)
+            if (msg.author.bot) continue;
+
+            const content = msg.content.trim().toLowerCase();
+            const firstWord = content.split(/\s+/)[0];
+
+            // Skip check-in messages (keep them for admin verification)
+            if (exactKeywords.includes(firstWord)) continue;
+
+            // Delete non-check-in member messages
+            try {
+              await msg.delete();
+              deletedCount++;
+            } catch (delErr) {
+              // If can't delete (e.g., no permission), just log it
+              if (delErr.code !== 10008) { // Ignore "Unknown Message" errors
+                console.warn(`⚠️ Could not delete message ${msgId}: ${delErr.message}`);
+              }
+            }
+          }
         }
 
         attendance.setPendingVerifications(pendingVerifications);
@@ -1295,6 +1315,7 @@ function createCommandHandlers(deps) {
             `**Timestamp:** ${parsed.timestamp}\n` +
             `**Previously Verified:** ${spawnInfo.members.length} member(s)\n` +
             `**Re-queued for Verification:** ${foundCheckIns} message(s)\n` +
+            `**Cleaned Up:** ${deletedCount} non-check-in message(s) deleted\n` +
             `**Already Verified (skipped):** ${alreadyVerified}\n\n` +
             `📝 You can now:\n` +
             `• Verify pending check-ins with ✅/❌ buttons or \`!verify @member\`\n` +
@@ -1955,6 +1976,8 @@ function createCommandHandlers(deps) {
         '• `attendance` - Set this channel as the attendance channel\n' +
         '• `bidding` - Set this channel as the bidding channel\n' +
         '• `admin` - Set this channel as the admin logs channel\n' +
+        '• `spawn` - Set this channel as the boss spawn announcement channel\n' +
+        '• `reminders` - Set this channel for event reminders\n' +
         '• `commands` - Set this channel as the guild commands channel\n' +
         '• `bot` - Set this channel as the bot commands channel\n' +
         '• `adminrole <@role>` - Add a role as admin (@mention the role)\n' +
@@ -2026,6 +2049,18 @@ function createCommandHandlers(deps) {
           await message.reply(`✅ **Bot commands configured!** <#${channelId}> is now the bot commands channel.`);
           break;
 
+        case 'spawn':
+          fileConfig.boss_spawn_announcement_channel_id = channelId;
+          config.boss_spawn_announcement_channel_id = channelId;
+          await message.reply(`✅ **Spawn announcement channel configured!** <#${channelId}> will now receive 5-minute boss spawn announcements with @everyone pings.`);
+          break;
+
+        case 'reminders':
+          fileConfig.reminders_channel_id = channelId;
+          config.reminders_channel_id = channelId;
+          await message.reply(`✅ **Reminders channel configured!** <#${channelId}> will now receive event reminders.`);
+          break;
+
         case 'view':
           const fields = [
             { name: '🏰 Main Guild', value: config.main_guild_id ? `<#${config.main_guild_id}>` : '❌ Not set', inline: true },
@@ -2035,6 +2070,8 @@ function createCommandHandlers(deps) {
             { name: '👑 Admin Logs', value: config.admin_logs_channel_id ? `<#${config.admin_logs_channel_id}>` : '❌ Not set', inline: true },
             { name: '💬 Commands', value: config.tenchu_commands_channel_id ? `<#${config.tenchu_commands_channel_id}>` : '❌ Not set', inline: true },
             { name: '🤖 Bot Commands', value: config.bot_manual_channel_id ? `<#${config.bot_manual_channel_id}>` : '❌ Not set', inline: true },
+            { name: '🔔 Spawn Announcements', value: config.boss_spawn_announcement_channel_id ? `<#${config.boss_spawn_announcement_channel_id}>` : '❌ Not set', inline: true },
+            { name: '📅 Reminders', value: config.reminders_channel_id ? `<#${config.reminders_channel_id}>` : '❌ Not set', inline: true },
             { name: '👑 Admin Roles', value: config.admin_roles.length > 0 ? config.admin_roles.map(id => `<@&${id}>`).join(', ') : '❌ None configured', inline: false },
           ];
           const embed = new EmbedBuilder()
@@ -2088,7 +2125,7 @@ function createCommandHandlers(deps) {
           return;
 
         default:
-          await message.reply(`❌ Unknown feature: \`${feature}\`. Try: guild, timer, attendance, bidding, admin, commands, bot, adminrole, or view.`);
+          await message.reply(`❌ Unknown feature: \`${feature}\`. Try: guild, timer, attendance, bidding, admin, spawn, commands, bot, reminders, adminrole, or view.`);
           return;
       }
 

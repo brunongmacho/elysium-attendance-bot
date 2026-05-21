@@ -58,11 +58,6 @@ async function checkColumnExists(boss, timestamp) {
   const normalizedTimestamp = normalizeTimestamp(timestamp);
   const cacheKey = `${boss.toUpperCase()}|${normalizedTimestamp}`;
 
-  // O(1) lookup in stateManager.activeColumns using normalized key
-  if (state.stateManager.activeColumns[cacheKey]) {
-    return true;
-  }
-
   // Check LRU cache (auto-handles TTL expiration)
   const cached = state.columnCheckCache.get(cacheKey);
   if (cached !== undefined) {

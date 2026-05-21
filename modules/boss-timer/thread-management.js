@@ -123,13 +123,6 @@ async function triggerSpawnReminder(bossName, spawnTime) {
       return;
     }
 
-    // Get announcement channel
-    const announcementChannel = await state.client.channels.fetch(state.config.boss_spawn_announcement_channel_id);
-    if (!announcementChannel) {
-      console.error('❌ Boss spawn announcement channel not found');
-      return;
-    }
-
     // Check if spawn already exists (prevent duplicates)
     const activeSpawns = state.attendance.getActiveSpawns();
     if (activeSpawns[bossName]) {
@@ -147,7 +140,7 @@ async function triggerSpawnReminder(bossName, spawnTime) {
       return;
     }
 
-    // Create attendance thread (with duplicate handling)
+    // Create attendance thread FIRST (always, regardless of announcement channel)
     let thread;
     try {
       thread = await state.attendance.createThreadForBoss(state.client, bossName, spawnTime);
@@ -168,38 +161,50 @@ async function triggerSpawnReminder(bossName, spawnTime) {
       throw error; // Re-throw if not a duplicate error
     }
 
-    // Post reminder to announcement channel with embed and thumbnail
-    const timestamp = Math.floor(spawnTime.getTime() / 1000);
+    // Post announcement to spawn channel (OPTIONAL - only if configured)
+    try {
+      const announcementChannel = state.config.boss_spawn_announcement_channel_id
+        ? await state.client.channels.fetch(state.config.boss_spawn_announcement_channel_id)
+        : null;
 
-    const embed = new EmbedBuilder()
-      .setColor(0xffaa00)
-      .setTitle(`⏰ ${bossName} Spawning Soon!`)
-      .setDescription(`**Spawning in 5 minutes!**`)
-      .addFields(
-        { name: '🕐 Spawn Time', value: `<t:${timestamp}:t>`, inline: true },
-        { name: '📝 Thread', value: `[Click here](${thread.url})`, inline: true }
-      )
-      .setTimestamp();
+      if (announcementChannel) {
+        const timestamp = Math.floor(spawnTime.getTime() / 1000);
 
-    // Fetch guild for branding and boss image fallback
-    const guild = await state.client.guilds.fetch(state.config.main_guild_id);
+        const embed = new EmbedBuilder()
+          .setColor(0xffaa00)
+          .setTitle(`⏰ ${bossName} Spawning Soon!`)
+          .setDescription(`**Spawning in 5 minutes!**`)
+          .addFields(
+            { name: '🕐 Spawn Time', value: `<t:${timestamp}:t>`, inline: true },
+            { name: '📝 Thread', value: `[Click here](${thread.url})`, inline: true }
+          )
+          .setTimestamp();
 
-    // Add boss image if available
-    const bossImage = getBossImageAttachment(bossName);
-    const bossImageURL = getBossImageAttachmentURL(bossName, guild);
-    if (bossImageURL) {
-      embed.setThumbnail(bossImageURL);
+        // Fetch guild for branding and boss image fallback
+        const guild = await state.client.guilds.fetch(state.config.main_guild_id);
+
+        // Add boss image if available
+        const bossImage = getBossImageAttachment(bossName);
+        const bossImageURL = getBossImageAttachmentURL(bossName, guild);
+        if (bossImageURL) {
+          embed.setThumbnail(bossImageURL);
+        }
+
+        // Add guild branding
+        addGuildFooter(embed, guild);
+
+        const messagePayload = { content: '@everyone', embeds: [embed] };
+        if (bossImage) {
+          messagePayload.files = [bossImage];
+        }
+
+        await announcementChannel.send(messagePayload);
+      } else {
+        console.log('ℹ️ No spawn announcement channel configured - skipping @everyone ping');
+      }
+    } catch (announceErr) {
+      console.error(`⚠️ Failed to send spawn announcement for ${bossName}:`, announceErr.message);
     }
-
-    // Add guild branding
-    addGuildFooter(embed, guild);
-
-    const messagePayload = { content: '@everyone', embeds: [embed] };
-    if (bossImage) {
-      messagePayload.files = [bossImage];
-    }
-
-    await announcementChannel.send(messagePayload);
 
     // Clear from kill times cache (timer completed)
     state.bossKillTimes.delete(bossName.toLowerCase());
