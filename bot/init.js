@@ -515,17 +515,17 @@ async function onClientReady(client, config, modules) {
 
   console.log("✅ Bot ready for operations!");
 
-  // Send ready confirmation to commands channel
-  const commandsChannelId = config.tenchu_commands_channel_id || config.tenchu_commands_channel_id;
-  if (commandsChannelId) {
+  // Send ready confirmation to admin logs channel (fallback to commands channel)
+  const readyChannelId = config.admin_logs_channel_id || config.tenchu_commands_channel_id;
+  if (readyChannelId) {
     try {
-      const commandsChannel = await client.channels.fetch(commandsChannelId).catch(() => null);
-      if (commandsChannel) {
-        await commandsChannel.send('✅ **Bot online and ready!**');
+      const readyChannel = await client.channels.fetch(readyChannelId).catch(() => null);
+      if (readyChannel) {
+        await readyChannel.send('✅ **Bot online and ready!**');
       }
     } catch (e) {
       // Non-critical - just log
-      console.log(`⚠️ Could not send ready message to commands channel: ${e.message}`);
+      console.log(`⚠️ Could not send ready message: ${e.message}`);
     }
   }
 }
