@@ -64,6 +64,7 @@ function createGuildMemberUpdateHandler(client, config, { sheetAPI }) {
         discordId: id,
         oldNickname: oldNickname,
         newNickname: newNickname,
+        discordUsername: newMember.user.username,
       });
 
       logger.info(`✅ Registry updated: ${oldNickname} → ${newNickname} (${tag}): ${result.message}`);

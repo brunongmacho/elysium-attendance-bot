@@ -124,6 +124,7 @@ function doPost(e) {
 
     // Auto-initialize Member Registry tab if needed
     ensureMemberRegistryTab();
+    ensureRegistryHasUsernameColumn();
     ensureBiddingPointsSheet();
     ensureTotalAttendanceSheet();
     ensureBossPointsSheet();
@@ -3751,16 +3752,46 @@ function ensureMemberRegistryTab() {
   if (!sheet) {
     Logger.log('📝 Creating Member Registry tab (first run)...');
     sheet = ss.insertSheet('Member Registry', 0); // Insert as first sheet
-    sheet.getRange(1, 1, 1, 3).setValues([[
-      'Discord ID', 'Current Nickname', 'Last Updated'
+    sheet.getRange(1, 1, 1, 4).setValues([[
+      'Discord ID', 'Current Nickname', 'Last Updated', 'Discord Username'
     ]]);
     sheet.getRange('1:1').setFontWeight('bold').setBackground('#4a86e8').setFontColor('#ffffff');
     sheet.setColumnWidth(1, 200); // Discord ID
     sheet.setColumnWidth(2, 200); // Current Nickname
     sheet.setColumnWidth(3, 150); // Last Updated
+    sheet.setColumnWidth(4, 200); // Discord Username
     // Freeze header row
     sheet.setFrozenRows(1);
     Logger.log('✅ Member Registry tab created');
+  }
+}
+
+/**
+ * Ensure the Discord Username column exists in existing Member Registry sheets
+ * In case the sheet was created before the Discord Username column was added
+ */
+function ensureRegistryHasUsernameColumn() {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const registrySheet = ss.getSheetByName('Member Registry');
+    if (!registrySheet) return; // Sheet doesn't exist yet
+    
+    const headers = registrySheet.getDataRange().getValues()[0];
+    if (headers.includes('Discord Username')) return; // Already has the column
+    
+    Logger.log('📝 Adding Discord Username column to existing Member Registry...');
+    
+    // Insert column D (index 4, 1-indexed)
+    registrySheet.insertColumnAfter(3); // Insert after column C (Last Updated)
+    
+    // Add the header
+    registrySheet.getRange(1, 4).setValue('Discord Username');
+    registrySheet.getRange('1:1').setFontWeight('bold');
+    registrySheet.setColumnWidth(4, 200);
+    
+    Logger.log('✅ Discord Username column added to Member Registry');
+  } catch (err) {
+    Logger.log('⚠️ Failed to ensure Discord Username column: ' + err.toString());
   }
 }
 
@@ -3940,6 +3971,7 @@ function handleSyncMemberRegistry(data) {
     Logger.log(`🔄 Syncing ${members.length} members to registry...`);
     
     ensureMemberRegistryTab();
+    ensureRegistryHasUsernameColumn();
     const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
     const registrySheet = ss.getSheetByName('Member Registry');
     const existingData = registrySheet.getDataRange().getValues();
@@ -3947,23 +3979,26 @@ function handleSyncMemberRegistry(data) {
     const idCol = headers.indexOf('Discord ID');
     const nickCol = headers.indexOf('Current Nickname');
     const updatedCol = headers.indexOf('Last Updated');
+    const usernameCol = headers.indexOf('Discord Username');
     const rows = existingData.slice(1); // Skip header
     
     let added = 0;
     let updated = 0;
     
     for (const member of members) {
-      const { discordId, nickname } = member;
+      const { discordId, nickname, discordUsername } = member;
       if (!discordId || !nickname) continue;
       
       // Look up by Discord ID
       let rowIndex = -1;
       let oldNickname = null;
+      let oldUsername = null;
       
       for (let i = 0; i < rows.length; i++) {
         if (rows[i][idCol] === discordId) {
           rowIndex = i + 2; // +2 for 1-indexed + header
           oldNickname = rows[i][nickCol];
+          if (usernameCol !== -1) oldUsername = rows[i][usernameCol];
           break;
         }
       }
@@ -4002,10 +4037,20 @@ function handleSyncMemberRegistry(data) {
         // Update nickname and timestamp
         registrySheet.getRange(rowIndex, nickCol + 1).setValue(nickname);
         registrySheet.getRange(rowIndex, updatedCol + 1).setValue(dateStr);
+        
+        // Update Discord Username if provided
+        if (discordUsername && usernameCol !== -1) {
+          registrySheet.getRange(rowIndex, usernameCol + 1).setValue(discordUsername);
+        }
+        
         updated++;
       } else {
         // New entry
-        registrySheet.appendRow([discordId, nickname, dateStr]);
+        if (discordUsername && usernameCol !== -1) {
+          registrySheet.appendRow([discordId, nickname, dateStr, discordUsername]);
+        } else {
+          registrySheet.appendRow([discordId, nickname, dateStr]);
+        }
         added++;
       }
     }
@@ -4115,7 +4160,7 @@ function handleBatchLookupMembers(data) {
  */
 function handleRenameMember(data) {
   try {
-    const { discordId, oldNickname, newNickname } = data;
+    const { discordId, oldNickname, newNickname, discordUsername } = data;
     if (!discordId || !oldNickname || !newNickname) {
       return createResponse('error', 'Missing required fields: discordId, oldNickname, newNickname');
     }
@@ -4123,6 +4168,7 @@ function handleRenameMember(data) {
     Logger.log(`📝 Rename request: ${oldNickname} → ${newNickname} (${discordId})`);
     
     ensureMemberRegistryTab();
+    ensureRegistryHasUsernameColumn();
     const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
     const registrySheet = ss.getSheetByName('Member Registry');
     const existingData = registrySheet.getDataRange().getValues();
@@ -4130,6 +4176,7 @@ function handleRenameMember(data) {
     const idCol = headers.indexOf('Discord ID');
     const nickCol = headers.indexOf('Current Nickname');
     const updatedCol = headers.indexOf('Last Updated');
+    const usernameCol = headers.indexOf('Discord Username');
     
     if (idCol === -1 || nickCol === -1) {
       return createResponse('error', 'Member Registry not properly initialized');
@@ -4137,9 +4184,11 @@ function handleRenameMember(data) {
     
     // Find the member by Discord ID
     let rowIndex = -1;
+    let storedUsername = null;
     for (let i = 1; i < existingData.length; i++) {
       if (String(existingData[i][idCol]) === String(discordId)) {
         rowIndex = i + 1; // Convert to 1-indexed (row 1 = header)
+        if (usernameCol !== -1) storedUsername = existingData[i][usernameCol];
         break;
       }
     }
@@ -4150,29 +4199,47 @@ function handleRenameMember(data) {
     if (rowIndex === -1) {
       // Not found in registry - add them as new entry
       Logger.log(`📝 ${newNickname} not in registry, adding new entry`);
-      registrySheet.appendRow([discordId, newNickname, dateStr]);
+      if (discordUsername && usernameCol !== -1) {
+        registrySheet.appendRow([discordId, newNickname, dateStr, discordUsername]);
+      } else {
+        registrySheet.appendRow([discordId, newNickname, dateStr]);
+      }
       Logger.log(`✅ Added ${newNickname} to registry`);
     } else {
       // Update nickname in registry
       registrySheet.getRange(rowIndex, nickCol + 1).setValue(newNickname);
       registrySheet.getRange(rowIndex, updatedCol + 1).setValue(dateStr);
+      
+      // Update Discord Username if provided
+      if (discordUsername && usernameCol !== -1) {
+        registrySheet.getRange(rowIndex, usernameCol + 1).setValue(discordUsername);
+      }
+      
       Logger.log(`✅ Registry updated: ${oldNickname} → ${newNickname}`);
       
       // Find-and-replace old nickname across all WEEK_* sheets
       const allSheets = ss.getSheets();
+      const searchTerms = [oldNickname];
+      // Also search by stored Discord username if different from the nickname
+      if (storedUsername && storedUsername !== oldNickname && storedUsername !== newNickname) {
+        searchTerms.push(storedUsername);
+      }
+      
       let totalReplacements = 0;
       
       for (const sheet of allSheets) {
         const sheetName = sheet.getName();
         if (sheetName.startsWith(CONFIG.SHEET_NAME_PREFIX)) {
-          const textFinder = sheet.createTextFinder(oldNickname);
-          const foundRanges = textFinder.findAll();
-          if (foundRanges.length > 0) {
-            Logger.log(`  📄 ${sheetName}: Replacing ${foundRanges.length} occurrences`);
-            for (const range of foundRanges) {
-              range.setValue(newNickname);
+          for (const searchTerm of searchTerms) {
+            const textFinder = sheet.createTextFinder(searchTerm);
+            const foundRanges = textFinder.findAll();
+            if (foundRanges.length > 0) {
+              Logger.log(`  📄 ${sheetName}: Replacing ${foundRanges.length} occurrences of "${searchTerm}"`);
+              for (const range of foundRanges) {
+                range.setValue(newNickname);
+              }
+              totalReplacements += foundRanges.length;
             }
-            totalReplacements += foundRanges.length;
           }
         }
       }

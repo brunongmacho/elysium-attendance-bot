@@ -551,6 +551,7 @@ async function onClientReady(client, config, modules) {
         .map(m => ({
           discordId: m.id,
           nickname: m.nickname || m.user.displayName,
+          discordUsername: m.user.username,
         }));
 
       console.log(`📋 [AUTO-REGISTRY] Syncing ${members.length} members...`);

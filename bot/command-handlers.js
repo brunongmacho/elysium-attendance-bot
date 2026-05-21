@@ -2492,7 +2492,8 @@ function createCommandHandlers(deps) {
           const nickname = guildMember.nickname || guildMember.displayName || guildMember.user.username;
           registryMembers.push({
             discordId: id,
-            nickname: nickname
+            nickname: nickname,
+            discordUsername: guildMember.user.username
           });
         }
 
