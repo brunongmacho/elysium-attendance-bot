@@ -1238,6 +1238,7 @@ function createCommandHandlers(deps) {
         const messages = await thread.messages.fetch({ limit: 100 }).catch(() => null);
         let foundCheckIns = 0;
         let alreadyVerified = 0;
+        let deletedCount = 0;
         const spawnInfo = activeSpawns[thread.id];
 
         if (messages) {
@@ -1283,7 +1284,7 @@ function createCommandHandlers(deps) {
           }
 
           // Clean up: delete non-check-in member messages to keep thread tidy
-          let deletedCount = 0;
+          deletedCount = 0;
           for (const [msgId, msg] of messages) {
             // Skip bot messages (embeds, instructions)
             if (msg.author.bot) continue;
