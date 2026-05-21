@@ -4011,27 +4011,61 @@ function handleSyncMemberRegistry(data) {
         if (oldNickname && oldNickname !== nickname) {
           Logger.log(`🔄 Nickname changed: ${oldNickname} → ${nickname} (${discordId})`);
           
-          // Find-and-replace old nickname across ALL weekly sheets
+          // Find-and-replace across ALL weekly sheets
           const allSheets = ss.getSheets();
           let totalReplacements = 0;
+          
+          // Build search terms: always search by old nickname
+          const searchTerms = [oldNickname];
+          // Also search by Discord username if different from both nicknames
+          if (discordUsername && discordUsername !== nickname && discordUsername !== oldNickname) {
+            searchTerms.push(discordUsername);
+          }
           
           for (const sheet of allSheets) {
             const sheetName = sheet.getName();
             if (sheetName.startsWith(CONFIG.SHEET_NAME_PREFIX)) {
-              const textFinder = sheet.createTextFinder(oldNickname);
-              const foundRanges = textFinder.findAll();
-              
-              if (foundRanges.length > 0) {
-                Logger.log(`  📄 ${sheetName}: Replacing ${foundRanges.length} occurrences`);
-                for (const range of foundRanges) {
-                  range.setValue(nickname);
+              for (const term of searchTerms) {
+                const textFinder = sheet.createTextFinder(term);
+                const foundRanges = textFinder.findAll();
+                if (foundRanges.length > 0) {
+                  Logger.log(`  📄 ${sheetName}: Replacing ${foundRanges.length} occurrences of "${term}"`);
+                  for (const range of foundRanges) {
+                    range.setValue(nickname);
+                  }
+                  totalReplacements += foundRanges.length;
                 }
-                totalReplacements += foundRanges.length;
               }
             }
           }
           
           Logger.log(`✅ Replaced ${totalReplacements} occurrences across weekly sheets`);
+        }
+        
+        // Also search by Discord username if newly provided and different from nickname
+        // Handles the case where check-in records used the Discord username instead of nickname
+        if (discordUsername && usernameCol !== -1 && discordUsername !== nickname) {
+          const allSheets = ss.getSheets();
+          let usernameReplacements = 0;
+          
+          for (const sheet of allSheets) {
+            const sheetName = sheet.getName();
+            if (sheetName.startsWith(CONFIG.SHEET_NAME_PREFIX)) {
+              const textFinder = sheet.createTextFinder(discordUsername);
+              const foundRanges = textFinder.findAll();
+              if (foundRanges.length > 0) {
+                Logger.log(`  📄 ${sheetName}: Replacing ${foundRanges.length} occurrences of username "${discordUsername}"`);
+                for (const range of foundRanges) {
+                  range.setValue(nickname);
+                }
+                usernameReplacements += foundRanges.length;
+              }
+            }
+          }
+          
+          if (usernameReplacements > 0) {
+            Logger.log(`✅ Replaced ${usernameReplacements} username occurrences in weekly sheets`);
+          }
         }
         
         // Update nickname and timestamp
