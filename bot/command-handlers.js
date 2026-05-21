@@ -2464,7 +2464,73 @@ function createCommandHandlers(deps) {
       console.error('[ROTATION] Command error:', error);
       await message.reply(`❌ Error: ${error.message}`);
     }
-  },
+    },
+
+    // =========================================================================
+    // SYNCREGISTRY - Manually sync all guild members to Member Registry
+    // =========================================================================
+    syncregistry: async (message, member) => {
+      if (!isAdmin(member)) {
+        await message.reply('❌ Admin-only command.');
+        return;
+      }
+
+      const statusMsg = await message.reply('🔄 Syncing all guild members to Member Registry...');
+
+      try {
+        // Fetch all members from guild
+        const guild = message.guild;
+        await guild.members.fetch(); // Ensure full cache
+
+        const members = guild.members.cache;
+        const registryMembers = [];
+
+        for (const [id, guildMember] of members) {
+          // Skip bots
+          if (guildMember.user.bot) continue;
+
+          const nickname = guildMember.nickname || guildMember.displayName || guildMember.user.username;
+          registryMembers.push({
+            discordId: id,
+            nickname: nickname
+          });
+        }
+
+        // Send in batches of 50 to avoid payload size limits
+        const batchSize = 50;
+        let totalAdded = 0;
+        let totalUpdated = 0;
+
+        for (let i = 0; i < registryMembers.length; i += batchSize) {
+          const batch = registryMembers.slice(i, i + batchSize);
+          const result = await sheetAPI.call('syncMemberRegistry', { members: batch });
+          if (result.status === 'ok') {
+            // Parse result message for counts if available
+            const match = result.message?.match(/(\d+) added.*(\d+) updated/);
+            if (match) {
+              totalAdded += parseInt(match[1]);
+              totalUpdated += parseInt(match[2]);
+            }
+          }
+          // Update progress every batch
+          if (i % (batchSize * 2) === 0 && i > 0) {
+            await statusMsg.edit(`🔄 Syncing... ${Math.min(i + batchSize, registryMembers.length)}/${registryMembers.length} members processed`);
+          }
+        }
+
+        await statusMsg.edit(
+          `✅ **Registry Sync Complete!**\n\n` +
+          `**Total Members:** ${registryMembers.length}\n` +
+          `**Bots Skipped:** ${members.filter(m => m.user.bot).size}\n\n` +
+          `The Member Registry in your Google Sheet now has Discord ID mappings for all guild members.`
+        );
+
+        console.log(`✅ Registry sync: ${registryMembers.length} members synced`);
+      } catch (error) {
+        console.error('❌ Registry sync error:', error);
+        await statusMsg.edit(`❌ Sync failed: ${error.message}`);
+      }
+    },
   };
 
   return commandHandlers;
