@@ -148,6 +148,7 @@ const { createReactionHandler } = require('./bot/reaction-handler');
 const { createVoiceStateHandler } = require('./bot/events/voice-state');
 const { createThreadUpdateHandler } = require('./bot/events/thread-update');
 const { registerErrorHandlers } = require('./bot/events/error-handlers');
+const { createGuildMemberUpdateHandler } = require('./bot/events/guild-member-update');
 const { registerShutdownHandlers } = require('./bot/shutdown');
 const { onClientReady } = require('./bot/init');
 
@@ -973,6 +974,7 @@ client.once(Events.ClientReady, async () => {
 const messageHandler = createMessageHandler(client, config, {
   stateManager,
   attendance,
+  sheetAPI,
   bidding,
   auctioneering,
   bossTimerCommands,
@@ -1062,6 +1064,13 @@ const threadUpdateHandler = createThreadUpdateHandler(client, config, {
 });
 
 client.on(Events.ThreadUpdate, threadUpdateHandler);
+
+// ── Guild Member Update Handler ──────────────────────────────────
+const guildMemberUpdateHandler = createGuildMemberUpdateHandler(client, config, {
+  sheetAPI,
+});
+
+client.on(Events.GuildMemberUpdate, guildMemberUpdateHandler);
 
 // ── Error Handlers ─────────────────────────────────────────────────
 registerErrorHandlers(client);

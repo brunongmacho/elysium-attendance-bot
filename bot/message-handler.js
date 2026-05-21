@@ -301,7 +301,22 @@ function createMessageHandler(client, config, deps) {
 
           try {
             const member = await message.guild.members.fetch(message.author.id).catch(() => null);
-            const displayName = member?.nickname || member?.displayName || message.author.username;
+            const discordName = member?.nickname || member?.displayName || message.author.username;
+
+            // Look up registered name from Member Registry (Google Sheets)
+            let displayName = discordName;
+            if (deps.sheetAPI && message.author.id) {
+              try {
+                const result = await deps.sheetAPI.call('lookupMemberName', { discordId: message.author.id });
+                if (result?.nickname) {
+                  displayName = result.nickname;
+                  console.log(`   📋 Using registered name "${displayName}" from Member Registry for ${message.author.id}`);
+                }
+              } catch (lookupErr) {
+                // Non-critical - fall back to Discord name
+                console.warn(`⚠️ Registry lookup failed for ${message.author.id}: ${lookupErr.message}`);
+              }
+            }
 
             // Add to pending verifications via stateManager
             if (deps.stateManager && deps.stateManager.pendingVerifications) {

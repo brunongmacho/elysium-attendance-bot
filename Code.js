@@ -184,6 +184,9 @@ function doPost(e) {
 
     // Member Registry
     if (action === 'syncMemberRegistry') return handleSyncMemberRegistry(data);
+    if (action === 'lookupMemberName') return handleLookupMemberName(data);
+    if (action === 'batchLookupMembers') return handleBatchLookupMembers(data);
+    if (action === 'renameMember') return handleRenameMember(data);
 
     Logger.log(`❌ Unknown: ${action}`);
     return createResponse('error', 'Unknown action: ' + action);
@@ -550,6 +553,21 @@ function handleSubmitAttendance(data) {
       Logger.log('⚠️ Failed to invalidate cache: ' + e.message);
     }
 
+    // Auto-update TOTAL ATTENDANCE and BiddingPoints sheets
+    try {
+      updateTotalAttendanceAndMembers();
+      Logger.log('📊 Auto-updated TOTAL ATTENDANCE sheet');
+    } catch (e) {
+      Logger.log('⚠️ Failed to update TOTAL ATTENDANCE: ' + e.message);
+    }
+
+    try {
+      updateBiddingPoints();
+      Logger.log('💰 Auto-updated BiddingPoints sheet');
+    } catch (e) {
+      Logger.log('⚠️ Failed to update BiddingPoints: ' + e.message);
+    }
+
     return createResponse('ok', `Submitted: ${members.length}`, {column: newCol, boss, timestamp, membersCount: members.length});
   } finally { lock.releaseLock(); }
 }
@@ -676,6 +694,21 @@ function handleOverwriteAttendance(data) {
       Logger.log('🧹 Invalidated weekly attendance cache (attendance update)');
     } catch (e) {
       Logger.log('⚠️ Failed to invalidate cache: ' + e.message);
+    }
+
+    // Auto-update TOTAL ATTENDANCE and BiddingPoints sheets
+    try {
+      updateTotalAttendanceAndMembers();
+      Logger.log('📊 Auto-updated TOTAL ATTENDANCE sheet');
+    } catch (e) {
+      Logger.log('⚠️ Failed to update TOTAL ATTENDANCE: ' + e.message);
+    }
+
+    try {
+      updateBiddingPoints();
+      Logger.log('💰 Auto-updated BiddingPoints sheet');
+    } catch (e) {
+      Logger.log('⚠️ Failed to update BiddingPoints: ' + e.message);
     }
 
     return createResponse('ok', `${action}: ${members.length}`, {column: workingCol, boss, timestamp, membersCount: members.length, overwritten: isOverwrite});
@@ -3982,6 +4015,175 @@ function handleSyncMemberRegistry(data) {
     
   } catch (err) {
     Logger.log('❌ Error syncing member registry: ' + err.toString());
+    return createResponse('error', err.toString());
+  }
+}
+
+/**
+ * Look up a member's registered nickname by Discord ID
+ * @param {Object} data - { discordId: string }
+ * @returns {Object} Response with { nickname: string|null }
+ */
+function handleLookupMemberName(data) {
+  try {
+    const discordId = data.discordId;
+    if (!discordId) {
+      return createResponse('error', 'No discordId provided');
+    }
+    
+    ensureMemberRegistryTab();
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const registrySheet = ss.getSheetByName('Member Registry');
+    const existingData = registrySheet.getDataRange().getValues();
+    const headers = existingData[0];
+    const idCol = headers.indexOf('Discord ID');
+    const nickCol = headers.indexOf('Current Nickname');
+    
+    if (idCol === -1 || nickCol === -1) {
+      return createResponse('ok', 'Registry not properly initialized', { nickname: null });
+    }
+    
+    // Search for the Discord ID (skip header row)
+    for (let i = 1; i < existingData.length; i++) {
+      if (String(existingData[i][idCol]) === String(discordId)) {
+        const nickname = existingData[i][nickCol];
+        Logger.log(`✅ Looked up ${discordId} → ${nickname}`);
+        return createResponse('ok', 'Member found', { nickname: nickname });
+      }
+    }
+    
+    // Not found
+    Logger.log(`ℹ️ Discord ID ${discordId} not found in registry`);
+    return createResponse('ok', 'Member not found', { nickname: null });
+    
+  } catch (err) {
+    Logger.log('❌ Error looking up member: ' + err.toString());
+    return createResponse('error', err.toString(), { nickname: null });
+  }
+}
+
+/**
+ * Batch lookup multiple members by Discord ID
+ * @param {Object} data - { members: [{ discordId: string }] }
+ * @returns {Object} Response with { names: { [discordId]: string|null } }
+ */
+function handleBatchLookupMembers(data) {
+  try {
+    const members = data.members || [];
+    if (members.length === 0) {
+      return createResponse('ok', 'No members provided', { names: {} });
+    }
+    
+    ensureMemberRegistryTab();
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const registrySheet = ss.getSheetByName('Member Registry');
+    const existingData = registrySheet.getDataRange().getValues();
+    const headers = existingData[0];
+    const idCol = headers.indexOf('Discord ID');
+    const nickCol = headers.indexOf('Current Nickname');
+    
+    if (idCol === -1 || nickCol === -1) {
+      return createResponse('ok', 'Registry not initialized', { names: {} });
+    }
+    
+    // Build a lookup map from the registry
+    const registry = {};
+    for (let i = 1; i < existingData.length; i++) {
+      registry[String(existingData[i][idCol])] = existingData[i][nickCol];
+    }
+    
+    // Look up each requested Discord ID
+    const names = {};
+    for (const member of members) {
+      const id = String(member.discordId);
+      names[id] = registry[id] || null;
+    }
+    
+    return createResponse('ok', `Looked up ${members.length} members`, { names: names });
+    
+  } catch (err) {
+    Logger.log('❌ Error batch looking up members: ' + err.toString());
+    return createResponse('error', err.toString(), { names: {} });
+  }
+}
+
+/**
+ * Handle single member rename (triggered by Discord guildMemberUpdate event)
+ * Updates Member Registry + find-and-replaces old nickname in all WEEK_* sheets
+ * @param {Object} data - { discordId: string, oldNickname: string, newNickname: string }
+ * @returns {Object} Response
+ */
+function handleRenameMember(data) {
+  try {
+    const { discordId, oldNickname, newNickname } = data;
+    if (!discordId || !oldNickname || !newNickname) {
+      return createResponse('error', 'Missing required fields: discordId, oldNickname, newNickname');
+    }
+    
+    Logger.log(`📝 Rename request: ${oldNickname} → ${newNickname} (${discordId})`);
+    
+    ensureMemberRegistryTab();
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const registrySheet = ss.getSheetByName('Member Registry');
+    const existingData = registrySheet.getDataRange().getValues();
+    const headers = existingData[0];
+    const idCol = headers.indexOf('Discord ID');
+    const nickCol = headers.indexOf('Current Nickname');
+    const updatedCol = headers.indexOf('Last Updated');
+    
+    if (idCol === -1 || nickCol === -1) {
+      return createResponse('error', 'Member Registry not properly initialized');
+    }
+    
+    // Find the member by Discord ID
+    let rowIndex = -1;
+    for (let i = 1; i < existingData.length; i++) {
+      if (String(existingData[i][idCol]) === String(discordId)) {
+        rowIndex = i + 1; // Convert to 1-indexed (row 1 = header)
+        break;
+      }
+    }
+    
+    const now = new Date();
+    const dateStr = Utilities.formatDate(now, CONFIG.TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
+    
+    if (rowIndex === -1) {
+      // Not found in registry - add them as new entry
+      Logger.log(`📝 ${newNickname} not in registry, adding new entry`);
+      registrySheet.appendRow([discordId, newNickname, dateStr]);
+      Logger.log(`✅ Added ${newNickname} to registry`);
+    } else {
+      // Update nickname in registry
+      registrySheet.getRange(rowIndex, nickCol + 1).setValue(newNickname);
+      registrySheet.getRange(rowIndex, updatedCol + 1).setValue(dateStr);
+      Logger.log(`✅ Registry updated: ${oldNickname} → ${newNickname}`);
+      
+      // Find-and-replace old nickname across all WEEK_* sheets
+      const allSheets = ss.getSheets();
+      let totalReplacements = 0;
+      
+      for (const sheet of allSheets) {
+        const sheetName = sheet.getName();
+        if (sheetName.startsWith(CONFIG.SHEET_NAME_PREFIX)) {
+          const textFinder = sheet.createTextFinder(oldNickname);
+          const foundRanges = textFinder.findAll();
+          if (foundRanges.length > 0) {
+            Logger.log(`  📄 ${sheetName}: Replacing ${foundRanges.length} occurrences`);
+            for (const range of foundRanges) {
+              range.setValue(newNickname);
+            }
+            totalReplacements += foundRanges.length;
+          }
+        }
+      }
+      
+      Logger.log(`✅ Replaced ${totalReplacements} occurrences across WEEK_* sheets`);
+    }
+    
+    return createResponse('ok', `Renamed ${oldNickname} → ${newNickname}`);
+    
+  } catch (err) {
+    Logger.log('❌ Error renaming member: ' + err.toString());
     return createResponse('error', err.toString());
   }
 }

@@ -10,6 +10,7 @@
  */
 
 const fs = require('fs');
+const cron = require('node-cron');
 const { spawn } = require('child_process');
 const path = require('path');
 const http = require('http');
@@ -528,6 +529,41 @@ async function onClientReady(client, config, modules) {
       console.log(`⚠️ Could not send ready message: ${e.message}`);
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCHEDULE DAILY MEMBER REGISTRY SYNC (12:00 AM Manila Time)
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log('📋 Scheduling daily member registry sync (12:00 AM Manila time)...');
+  cron.schedule('0 0 * * *', async () => {
+    try {
+      console.log('⏰ [AUTO-REGISTRY] Running daily member registry sync...');
+
+      const guild = client.guilds.cache.get(config.main_guild_id);
+      if (!guild) {
+        console.error('❌ [AUTO-REGISTRY] Guild not found');
+        return;
+      }
+
+      // Fetch all guild members
+      await guild.members.fetch();
+      const members = guild.members.cache
+        .filter(m => !m.user.bot)
+        .map(m => ({
+          discordId: m.id,
+          nickname: m.nickname || m.user.displayName,
+        }));
+
+      console.log(`📋 [AUTO-REGISTRY] Syncing ${members.length} members...`);
+
+      const result = await sheetAPI.call('syncMemberRegistry', { members });
+      console.log(`✅ [AUTO-REGISTRY] Daily sync complete: ${result?.message || 'OK'}`);
+    } catch (error) {
+      console.error('❌ [AUTO-REGISTRY] Failed:', error.message);
+    }
+  }, {
+    scheduled: true,
+    timezone: "Asia/Manila"
+  });
 }
 
 module.exports = { onClientReady };
