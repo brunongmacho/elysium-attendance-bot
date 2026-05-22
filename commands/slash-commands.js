@@ -488,6 +488,30 @@ function generateEmergencyCommand() {
 }
 
 /**
+ * Generate webhook URL update command (admin only)
+ *
+ * @returns {Array} Weburl command definition
+ */
+function generateWeburlCommand() {
+  return [
+    {
+      name: 'weburl',
+      description: 'Update Google Sheets webhook URL and restart bot (admin only)',
+      default_member_permissions: '8',
+      dm_permission: false,
+      options: [
+        {
+          name: 'url',
+          type: 3,
+          description: 'New Google Apps Script webhook URL (must start with https://)',
+          required: true
+        }
+      ]
+    }
+  ];
+}
+
+/**
  * Generate all commands with dynamic channel names
  *
  * @param {Object} channelNames - Object containing channel names
@@ -507,6 +531,7 @@ function generateAllCommands(channelNames = {}) {
   const statsCommands = generateStatsCommands();
   const memberCommands = generateMemberCommands();
   const emergencyCommand = generateEmergencyCommand();
+  const weburlCommand = generateWeburlCommand();
 
   return {
     attendanceCommands,
@@ -517,6 +542,7 @@ function generateAllCommands(channelNames = {}) {
     statsCommands,
     memberCommands,
     emergencyCommand,
+    weburlCommand,
     allCommands: [
       ...attendanceCommands,
       ...attendanceOverrideCommands,
@@ -525,7 +551,8 @@ function generateAllCommands(channelNames = {}) {
       ...auctionCommands,
       ...statsCommands,
       ...memberCommands,
-      ...emergencyCommand
+      ...emergencyCommand,
+      ...weburlCommand
     ]
   };
 }
@@ -540,6 +567,7 @@ module.exports = {
    generateStatsCommands,
    generateMemberCommands,
    generateEmergencyCommand,
+   generateWeburlCommand,
 };
 
 

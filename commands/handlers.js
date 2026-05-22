@@ -89,7 +89,7 @@ const CONFIRMATION_TIMEOUT = 30000; // 30 seconds
  * @returns {Promise<void>}
  */
 async function handleSlashCommand(interaction, modules, config, client) {
-  const { attendance, bossTimer, bossTimerCommands, bossRotation, bidding, auctioneering, emergencyCommands } = modules;
+  const { attendance, bossTimer, bossTimerCommands, bossRotation, bidding, auctioneering, emergencyCommands, sheetAPI } = modules;
   const commandName = interaction.commandName;
 
   // Track slash command usage for tip system
@@ -1692,6 +1692,66 @@ if (commandName === 'rotation') {
       } catch (error) {
         console.error(`Error in /emergency ${subcommand}:`, error);
         await interaction.editReply({ content: `❌ Error: ${error.message}` });
+      }
+      return;
+    }
+
+    // =========================================================================
+    // WEBHOOK URL COMMAND
+    // =========================================================================
+
+    // /weburl command - Update webhook URL
+    if (commandName === 'weburl') {
+      const guild = interaction.guild;
+      const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+      if (!member || !isAdmin(member, config)) {
+        await interaction.reply({
+          content: '❌ Admin only command',
+          ephemeral: true
+        });
+        return;
+      }
+
+      const newUrl = interaction.options.getString('url', true).trim();
+      if (!newUrl.startsWith('https://')) {
+        await interaction.reply({
+          content: '❌ Invalid URL. Must start with `https://`',
+          ephemeral: true
+        });
+        return;
+      }
+
+      await interaction.deferReply();
+
+      try {
+        // Update runtime config
+        config.sheet_webhook_url = newUrl;
+
+        // Update sheetAPI instance immediately
+        sheetAPI.webhookUrl = newUrl;
+
+        // Save to config.json
+        const configPath = __dirname + '/../config.json';
+        const fileConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        fileConfig.sheet_webhook_url = newUrl;
+        fs.writeFileSync(configPath, JSON.stringify(fileConfig, null, 2), 'utf8');
+
+        console.log(`🌐 Webhook URL updated to: ${newUrl} (via /weburl)`);
+
+        await interaction.editReply({
+          content: '✅ **Webhook URL updated!** Bot restarting in 2 seconds...'
+        });
+
+        setTimeout(() => {
+          console.log('🔄 Restarting after webhook URL update...');
+          process.exit(0);
+        }, 2000);
+
+      } catch (error) {
+        console.error('❌ /weburl failed:', error.message);
+        await interaction.editReply({
+          content: `❌ Failed to update webhook URL: ${error.message}`
+        });
       }
       return;
     }

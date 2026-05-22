@@ -10,6 +10,7 @@ const { normalizeUsername, findBossMatch, normalizeTimestamp } = require('../uti
 const { createDisabledRow, awaitConfirmation } = require('./confirm-utils');
 const { clientCache } = require('../utils/sheet-api');
 const { execSync } = require('child_process');
+const fs = require('fs');
 
 /**
  * Creates the command handlers object with all dependencies injected
@@ -294,6 +295,61 @@ function createCommandHandlers(deps) {
       console.error('❌ Git pull failed:', err.message);
       await message.reply({
         content: `❌ Update failed: ${err.message}`
+      });
+    }
+  },
+
+  // =========================================================================
+  // WEBURL COMMAND - Update webhook URL and restart
+  // =========================================================================
+  weburl: async (message, member) => {
+    if (!deps.isAdmin(member)) {
+      await message.reply({ content: '❌ Admin only command.' });
+      return;
+    }
+
+    const args = message.content.split(' ').slice(1);
+    if (args.length === 0) {
+      await message.reply({
+        content: '❌ Usage: `!weburl <url>`\nExample: `!weburl https://script.google.com/macros/s/.../exec`'
+      });
+      return;
+    }
+
+    const newUrl = args[0].trim();
+    if (!newUrl.startsWith('https://')) {
+      await message.reply({ content: '❌ Invalid URL. Must start with `https://`' });
+      return;
+    }
+
+    try {
+      // Update runtime config
+      config.sheet_webhook_url = newUrl;
+
+      // Update sheetAPI instance immediately (so commands don't need restart to work)
+      sheetAPI.webhookUrl = newUrl;
+
+      // Save to config.json
+      const configPath = __dirname + '/../config.json';
+      const fileConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      fileConfig.sheet_webhook_url = newUrl;
+      fs.writeFileSync(configPath, JSON.stringify(fileConfig, null, 2), 'utf8');
+
+      console.log(`🌐 Webhook URL updated to: ${newUrl}`);
+
+      await message.reply({
+        content: '✅ **Webhook URL updated!** Bot restarting in 2 seconds...'
+      });
+
+      setTimeout(() => {
+        console.log('🔄 Restarting after webhook URL update...');
+        process.exit(0);
+      }, 2000);
+
+    } catch (err) {
+      console.error('❌ Webhook URL update failed:', err.message);
+      await message.reply({
+        content: `❌ Failed to update webhook URL: ${err.message}`
       });
     }
   },

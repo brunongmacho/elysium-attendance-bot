@@ -55,6 +55,7 @@ function createInteractionHandler(client, config, deps) {
     bossTimerCommands,
     bidding,
     auctioneering,
+    sheetAPI,
   } = deps;
 
   return async (interaction) => {
@@ -70,6 +71,7 @@ function createInteractionHandler(client, config, deps) {
           bossRotation,
           bidding,
           auctioneering,
+          sheetAPI,
         };
 
         await handleSlashCommand(interaction, modules, config, client);

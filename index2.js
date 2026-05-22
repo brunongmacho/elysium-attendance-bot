@@ -1024,6 +1024,7 @@ const interactionHandler = createInteractionHandler(client, config, {
   bossTimerCommands,
   bidding,
   auctioneering,
+  sheetAPI,
 });
 
 client.on(Events.InteractionCreate, interactionHandler);
