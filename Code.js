@@ -188,6 +188,7 @@ function doPost(e) {
     if (action === 'syncMemberRegistry') return handleSyncMemberRegistry(data);
     if (action === 'lookupMemberName') return handleLookupMemberName(data);
     if (action === 'batchLookupMembers') return handleBatchLookupMembers(data);
+    if (action === 'syncWeekAttendance') return handleSyncWeekAttendance(data);
     if (action === 'renameMember') return handleRenameMember(data);
 
     Logger.log(`❌ Unknown: ${action}`);
@@ -4222,6 +4223,121 @@ function handleBatchLookupMembers(data) {
   } catch (err) {
     Logger.log('❌ Error batch looking up members: ' + err.toString());
     return createResponse('error', err.toString(), { names: {} });
+  }
+}
+
+/**
+ * Sync attendance data for a specific week (rebuilds from scratch)
+ * Called by !syncattend command — scans closed threads and rebuilds week attendance
+ *
+ * @param {Object} data - { weekIndex: "20260517", attendanceData: [{ boss, timestamp, members[] }] }
+ */
+function handleSyncWeekAttendance(data) {
+  const weekIndex = (data.weekIndex || '').toString().trim();
+  const attendanceData = data.attendanceData || [];
+
+  if (!weekIndex || attendanceData.length === 0) {
+    return createResponse('error', 'Missing weekIndex or attendanceData');
+  }
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (e) {
+    return createResponse('error', 'Lock timeout');
+  }
+
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const sheetName = CONFIG.SHEET_NAME_PREFIX + weekIndex;
+    let sheet = ss.getSheetByName(sheetName);
+
+    // Create sheet if it doesn't exist
+    if (!sheet) {
+      Logger.log('📝 Creating week sheet ' + sheetName + ' (first sync)...');
+      sheet = ss.insertSheet(sheetName);
+      const headerData = [['MEMBERS', 'POINTS CONSUMED', 'POINTS LEFT', 'ATTENDANCE POINTS']];
+      sheet.getRange(1, COLUMNS.MEMBERS, 1, COLUMNS.ATTENDANCE_POINTS).setValues(headerData)
+           .setFontWeight('bold').setBackground('#4A90E2').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+      sheet.getRange(2, COLUMNS.MEMBERS, 1, COLUMNS.ATTENDANCE_POINTS).setBackground('#E8F4F8');
+      sheet.setColumnWidth(COLUMNS.MEMBERS, 150).setColumnWidth(COLUMNS.POINTS_CONSUMED, 120)
+           .setColumnWidth(COLUMNS.POINTS_LEFT, 100).setColumnWidth(COLUMNS.ATTENDANCE_POINTS, 150);
+      copyMembersFromPreviousWeek(ss, sheet);
+      Logger.log('✅ Created week sheet: ' + sheetName);
+    }
+
+    // Clear existing spawn columns (E onwards) — preserve member column A-D
+    const lastCol = sheet.getLastColumn();
+    if (lastCol >= COLUMNS.FIRST_SPAWN) {
+      // Clear headers in row 1-2 (timestamp + boss)
+      const clearCols = lastCol - COLUMNS.FIRST_SPAWN + 1;
+      sheet.getRange(1, COLUMNS.FIRST_SPAWN, 2, clearCols).clearContent();
+
+      // Clear attendance data in rows 3+
+      const lastRow = sheet.getLastRow();
+      if (lastRow >= 3) {
+        sheet.getRange(3, COLUMNS.FIRST_SPAWN, lastRow - 2, clearCols).clearContent();
+      }
+    }
+
+    // Process each attendance entry
+    let spawnCount = 0;
+    let totalCheckins = 0;
+    const checkboxRule = SpreadsheetApp.newDataValidation().requireCheckbox().setAllowInvalid(false).build();
+
+    for (const entry of attendanceData) {
+      const boss = (entry.boss || '').toString().trim().toUpperCase();
+      const timestamp = (entry.timestamp || '').toString().trim();
+      const members = (entry.members || []).map(m => m.toString().trim());
+
+      if (!boss || !timestamp || members.length === 0) continue;
+
+      const newCol = COLUMNS.FIRST_SPAWN + spawnCount;
+
+      // Add timestamp + boss header
+      sheet.getRange(1, newCol, 2, 1).setValues([[timestamp], [boss]])
+           .setFontWeight('bold').setBackground('#E8F4F8').setHorizontalAlignment('center');
+      sheet.setColumnWidth(newCol, 120);
+
+      // Add attendance checkboxes
+      const currentLastRow = sheet.getLastRow();
+      if (currentLastRow >= 3) {
+        const allMemberNames = sheet.getRange(3, COLUMNS.MEMBERS, currentLastRow - 2, 1).getValues().flat();
+        const allMembersLower = allMemberNames.map(m => (m || '').toString().trim().toLowerCase());
+        const membersLower = members.map(m => m.toLowerCase());
+
+        const attendanceColData = allMembersLower.map(m => [membersLower.includes(m)]);
+        sheet.getRange(3, newCol, attendanceColData.length, 1).setValues(attendanceColData).setDataValidation(checkboxRule);
+      }
+
+      spawnCount++;
+      totalCheckins += members.length;
+    }
+
+    Logger.log(`📊 Synced ${spawnCount} spawns, ${totalCheckins} check-ins to ${sheetName}`);
+
+    // Auto-update totals
+    try {
+      updateTotalAttendanceAndMembers();
+      Logger.log('📊 Auto-updated TOTAL ATTENDANCE sheet');
+    } catch (e) {
+      Logger.log('⚠️ Failed to update TOTAL ATTENDANCE: ' + e.message);
+    }
+
+    try {
+      updateBiddingPoints();
+      Logger.log('💰 Auto-updated BiddingPoints sheet');
+    } catch (e) {
+      Logger.log('⚠️ Failed to update BiddingPoints: ' + e.message);
+    }
+
+    return createResponse('ok', `Synced ${spawnCount} spawns, ${totalCheckins} check-ins to ${sheetName}`, {
+      sheetName: sheetName,
+      spawnCount: spawnCount,
+      totalCheckins: totalCheckins
+    });
+  } finally {
+    lock.releaseLock();
   }
 }
 

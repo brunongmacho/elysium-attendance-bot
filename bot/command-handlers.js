@@ -2467,6 +2467,197 @@ function createCommandHandlers(deps) {
     },
 
     // =========================================================================
+    // SYNCATTEND - Scan attendance threads for a given week and rebuild data
+    // =========================================================================
+    syncattend: async (message, member) => {
+      if (!isAdmin(member)) {
+        await message.reply('❌ Admin-only command.');
+        return;
+      }
+
+      // Parse args: !syncattend 5/17/2026
+      const args = message.content.split(' ').slice(1);
+      if (args.length === 0) {
+        await message.reply('❌ Usage: `!syncattend <date>` - e.g., `!syncattend 5/17/2026`\nThis will scan all attendance threads for the week containing that date and rebuild the attendance sheet.');
+        return;
+      }
+
+      const inputDate = new Date(args[0]);
+      if (isNaN(inputDate.getTime())) {
+        await message.reply('❌ Invalid date. Use format: M/D/YYYY (e.g., `!syncattend 5/17/2026`)');
+        return;
+      }
+
+      // Calculate week boundaries in Manila timezone
+      const manilaOffset = 8 * 60; // Asia/Manila is UTC+8
+      const localDate = new Date(inputDate.getTime() + (inputDate.getTimezoneOffset() + manilaOffset) * 60000);
+
+      // Find the Sunday of this week
+      const sunday = new Date(localDate);
+      sunday.setDate(sunday.getDate() - sunday.getDay()); // Go back to Sunday
+      sunday.setHours(0, 0, 0, 0);
+
+      // Saturday (end of week)
+      const saturday = new Date(sunday);
+      saturday.setDate(saturday.getDate() + 6);
+      saturday.setHours(23, 59, 59, 999);
+
+      // Generate week index for sheet name (yyyyMMdd)
+      const padNum = (n) => String(n).padStart(2, '0');
+      const weekIndex = `${sunday.getFullYear()}${padNum(sunday.getMonth() + 1)}${padNum(sunday.getDate())}`;
+
+      const weekStartStr = sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const weekEndStr = saturday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+      const statusMsg = await message.reply(`🔄 Scanning attendance threads for week of **${weekStartStr}** - **${weekEndStr}**...`);
+
+      try {
+        const guild = message.guild;
+        const attChannel = await guild.channels.fetch(config.attendance_channel_id);
+        if (!attChannel) {
+          await statusMsg.edit('❌ Attendance channel not found.');
+          return;
+        }
+
+        // Fetch archived threads (paginate to get enough)
+        const allThreads = [];
+        let lastId = null;
+        let hasMore = true;
+        let fetchCount = 0;
+        const MAX_FETCH = 500; // Safety limit
+
+        while (hasMore && fetchCount < MAX_FETCH) {
+          const options = { limit: 100 };
+          if (lastId) options.before = lastId;
+
+          const archived = await attChannel.threads.fetchArchived(options);
+
+          if (archived.threads.size === 0) {
+            hasMore = false;
+            break;
+          }
+
+          for (const [id, thread] of archived.threads) {
+            allThreads.push(thread);
+            fetchCount++;
+          }
+
+          lastId = archived.threads.last()?.id;
+        }
+
+        // Also fetch active threads
+        const active = await attChannel.threads.fetchActive();
+        for (const [id, thread] of active.threads) {
+          allThreads.push(thread);
+        }
+
+        // Filter threads that fall within our target week (by creation date)
+        const weekThreads = allThreads.filter(t => {
+          const created = t.createdAt;
+          return created >= sunday && created <= saturday;
+        });
+
+        if (weekThreads.length === 0) {
+          await statusMsg.edit(`ℹ️ No attendance threads found for week of ${weekStartStr} - ${weekEndStr}.`);
+          return;
+        }
+
+        await statusMsg.edit(`🔄 Found ${weekThreads.length} threads. Scanning messages for check-ins...`);
+
+        // Scan each thread for check-in messages
+        const attendanceData = [];
+        const checkInKeywords = ['here', 'present', 'join', 'checkin', 'check-in', 'attending'];
+        let processed = 0;
+        let threadsWithData = 0;
+
+        for (const thread of weekThreads) {
+          processed++;
+
+          // Update progress every 5 threads
+          if (processed % 5 === 0 || processed === weekThreads.length) {
+            await statusMsg.edit(`🔄 Scanning thread ${processed}/${weekThreads.length}: ${threadsWithData} with check-ins found so far...`);
+          }
+
+          try {
+            // Parse thread name: [MM/DD/YY HH:MM] BossName
+            const nameMatch = thread.name.match(/^\[(\d{2}\/\d{2}\/\d{2} \d{1,2}:\d{2})\] (.+)$/);
+            if (!nameMatch) continue;
+
+            const timestamp = nameMatch[1]; // "05/17/26 12:00"
+            const bossName = nameMatch[2];  // "VALAKAS"
+
+            // Fetch messages (bot pins first message, so check-in messages may be after)
+            const messages = await thread.messages.fetch({ limit: 100 });
+
+            const checkInMembers = [];
+            for (const [msgId, msg] of messages) {
+              if (msg.author.bot) continue;
+              const content = msg.content.toLowerCase().trim();
+              const firstWord = content.split(/\s+/)[0];
+
+              if (checkInKeywords.some(kw => firstWord === kw || content.startsWith(kw + ' '))) {
+                // Get display name — prefer nickname, fallback to displayName, then username
+                let displayName;
+                try {
+                  displayName = msg.member?.nickname || msg.member?.displayName || msg.author.displayName || msg.author.username;
+                } catch {
+                  displayName = msg.author.displayName || msg.author.username;
+                }
+                checkInMembers.push(displayName);
+              }
+            }
+
+            // Deduplicate
+            const uniqueMembers = [...new Set(checkInMembers)];
+
+            if (uniqueMembers.length > 0) {
+              attendanceData.push({
+                boss: bossName,
+                timestamp: timestamp,
+                members: uniqueMembers
+              });
+              threadsWithData++;
+            }
+          } catch (err) {
+            console.warn(`⚠️ Error scanning thread "${thread.name}": ${err.message}`);
+          }
+
+          // Small delay to avoid rate limits
+          if (processed % 10 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+
+        if (attendanceData.length === 0) {
+          await statusMsg.edit(`ℹ️ No check-in data found in ${weekThreads.length} threads for week of ${weekStartStr} - ${weekEndStr}.`);
+          return;
+        }
+
+        await statusMsg.edit(`🔄 Writing ${attendanceData.length} spawn records (${attendanceData.reduce((sum, s) => sum + s.members.length, 0)} check-ins) to sheet...`);
+
+        // Send to Code.js
+        const result = await sheetAPI.call('syncWeekAttendance', {
+          weekIndex: weekIndex,
+          attendanceData: attendanceData
+        });
+
+        await statusMsg.edit(
+          `✅ **Week Sync Complete!**\n\n` +
+          `**Week:** ${weekStartStr} - ${weekEndStr}\n` +
+          `**Threads Scanned:** ${weekThreads.length}\n` +
+          `**Spawns Written:** ${attendanceData.length}\n` +
+          `**Total Check-ins:** ${attendanceData.reduce((sum, s) => sum + s.members.length, 0)}\n` +
+          `**Sheet:** ${result.sheetName || weekIndex}`
+        );
+
+        console.log(`✅ SyncAttendance: ${attendanceData.length} spawns, ${weekThreads.length} threads scanned for week ${weekIndex}`);
+      } catch (error) {
+        console.error('❌ SyncAttendance error:', error);
+        await statusMsg.edit(`❌ Sync failed: ${error.message}`);
+      }
+    },
+
+    // =========================================================================
     // SYNCREGISTRY - Manually sync all guild members to Member Registry
     // =========================================================================
     syncregistry: async (message, member) => {
