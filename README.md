@@ -1,12 +1,11 @@
-# ELYSIUM Guild Bot
+# TENCHU Guild Bot
 
-A production Discord bot for MMORPG guild management — attendance tracking, auction systems, boss spawn timers, leaderboards, and emergency recovery. Built for the ELYSIUM guild, adaptable to any game.
+A production Discord bot for MMORPG guild management — attendance tracking, auction systems, boss spawn timers, leaderboards, Member Registry, and emergency recovery. Built for the TENCHU guild.
 
 ![Status](https://img.shields.io/badge/status-production-success)
-![Version](https://img.shields.io/badge/version-9.0.0-blue)
+![Version](https://img.shields.io/badge/version-10.0.0-blue)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
 ![Discord.js](https://img.shields.io/badge/discord.js-v14.25.1-5865F2)
-![MongoDB](https://img.shields.io/badge/MongoDB-primary-success)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
@@ -28,19 +27,9 @@ A production Discord bot for MMORPG guild management — attendance tracking, au
 
 ## Overview
 
-ELYSIUM Guild Bot handles the day-to-day operations of an active MMORPG guild inside Discord. Members check in to boss spawns, bid on loot, and track their stats — all without leaving the server. Admins get tools for rotation management, emergency recovery, attendance verification, and detailed reporting.
+TENCHU Guild Bot handles the day-to-day operations of an active MMORPG guild inside Discord. Members check in to boss spawns, bid on loot, and track their stats — all without leaving the server. Admins get tools for rotation management, emergency recovery, attendance verification, Member Registry auto-sync, and detailed reporting.
 
-The bot runs on Node.js with Discord.js v14, stores data in MongoDB (with a Google Sheets backup layer), and uses cron-based scheduling for weekly reports, daily rotation posts, and event reminders.
-
-### What changed in v9.0
-
-The codebase was refactored from a monolithic 8,199-line entry point into a modular structure:
-- Core systems extracted into `bot/` modules (message handler, command handlers, interaction handler, confirm utils, init orchestration)
-- Boss timer broken into `modules/boss-timer/` submodules
-- Slash command system lives in `commands/` with definitions, handlers, autocomplete, and registration
-- 69 slash commands registered alongside traditional `!` prefix commands
-- Help system rebuilt to show both forms with aliases and tips
-- MongoDB provides 40–200x speedup over legacy Google Sheets
+The bot runs on Node.js with Discord.js v14, stores data in Google Sheets, and uses cron-based scheduling for daily registry syncs, weekly reports, and event reminders.
 
 ---
 
@@ -48,11 +37,11 @@ The codebase was refactored from a monolithic 8,199-line entry point into a modu
 
 ### Attendance Tracking
 
-Members check in to boss spawns via attendance threads. Screenshot uploads are required for non-admin members. Admins verify submissions with reaction buttons (checkmark / cross). Threads auto-close after 30 minutes to prevent late submissions. Points sync automatically to MongoDB and Google Sheets.
+Members check in to boss spawns via attendance threads. Screenshot uploads are required for non-admin members. Admins verify submissions with reaction buttons (checkmark / cross). Threads auto-close after 30 minutes to prevent late submissions. Attendance points auto-calculate via sheet formulas. Names are auto-synced via the Member Registry — if someone changes their Discord nickname, it propagates to all WEEK_ sheets automatically.
 
 ### Auction System
 
-Open point-based bidding — any ELYSIUM member can bid on loot items. The system includes a 30-second preview phase, auto-extend on last-minute bids (anti-snipe), dedicated threads per item, session history, and admin controls (pause, resume, extend, skip, cancel). Auctions run on a Sunday schedule with a 10-minute cooldown between sessions.
+Open point-based bidding — any TENCHU member can bid on loot items. The system includes a 30-second preview phase, auto-extend on last-minute bids (anti-snipe), dedicated threads per item, session history, and admin controls (pause, resume, extend, skip, cancel). Auctions run on a Saturday schedule with a 10-minute cooldown between sessions. Bidding points reset weekly — each week starts fresh based on that week's attendance.
 
 ### Boss Timer & Spawn Prediction
 
@@ -65,7 +54,7 @@ Fuzzy name matching handles typos via Levenshtein distance. All predictions use 
 
 ### Boss Rotation
 
-Multi-guild rotation tracking for shared world bosses. Supports any number of guilds (typically 3–5). ELYSIUM is always position 1. Auto-increments after kills, posts daily schedule at midnight Manila time, and falls back to attendance records when timers are unavailable.
+Multi-guild rotation tracking for shared world bosses. Supports any number of guilds (typically 3–5). TENCHU is always position 1. Auto-increments after kills, posts daily schedule at midnight Manila time, and falls back to attendance records when timers are unavailable.
 
 ### Leaderboards & Reports
 
@@ -83,6 +72,10 @@ A full toolkit for stuck states: force-close threads, force-end auctions, unlock
 
 Channel-aware — shows only relevant commands based on where you are. Attendance threads show attendance commands. Auction threads show bidding commands. Admin channels show admin commands. Both `!` prefix and `/` slash forms are displayed together with aliases.
 
+### Member Registry
+
+Auto-synced database that maps Discord IDs to server nicknames and usernames. The !syncregistry command populates it on demand. A daily midnight cron keeps it in sync. When a member changes their Discord nickname, the guildMemberUpdate event triggers an automatic find-and-replace across all WEEK_ sheets — so historical attendance records always show the current name.
+
 ---
 
 ## Quick Start
@@ -91,8 +84,7 @@ Channel-aware — shows only relevant commands based on where you are. Attendanc
 
 - Node.js >= 18.0.0
 - A Discord bot token (from Discord Developer Portal)
-- A MongoDB Atlas account (free tier works)
-- Google Sheets with Apps Script webhook (optional, for backup)
+- Google Sheets with Apps Script webhook
 - 512 MB RAM minimum
 
 ### Setup
@@ -107,7 +99,7 @@ npm install
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your Discord token and MongoDB URI
+# Edit .env with your Discord token
 
 # Configure bot settings
 # Edit config.json with your Discord server IDs and channel IDs
@@ -116,17 +108,14 @@ cp .env.example .env
 npm start
 ```
 
-On first run, the bot syncs historical data from Google Sheets to MongoDB, then connects to Discord and restores any active state from MongoDB.
-
 ### Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DISCORD_TOKEN` | Yes | Discord bot token |
-| `MONGODB_URI` | Yes | MongoDB connection string |
 | `NODE_ENV` | No | `production` or `development` |
-| `PORT` | No | HTTP server port (default 3000) |
 | `LOG_LEVEL` | No | `debug`, `info`, `warn`, `error` |
+| `USE_MONGODB_ATTENDANCE` | No | Set to `true` to enable MongoDB (disabled by default) |
 | `SKIP_ATTENDANCE_SYNC` | No | Skip sync on startup |
 
 ---
@@ -142,10 +131,10 @@ The main configuration file is `config.json`:
   "attendance_channel_id": "CHANNEL_ID",
   "bidding_channel_id": "CHANNEL_ID",
   "admin_logs_channel_id": "CHANNEL_ID",
-  "elysium_commands_channel_id": "CHANNEL_ID",
+  "tenchu_commands_channel_id": "CHANNEL_ID",
   "boss_timer_channel_id": "CHANNEL_ID",
   "admin_roles": ["GUILD LEADER", "ELITE", "Admin"],
-  "elysium_role": "ELYSIUM",
+  "tenchu_role": "TENCHU",
   "timezone": "Asia/Manila",
   "auto_archive_minutes": 60,
   "sheet_webhook_url": "YOUR_WEBHOOK_URL"
@@ -195,10 +184,14 @@ Every command comes in two forms: `!prefix` for fast typing and `/slash` for dis
 | `!maintenance` / `/maintenance` | Create maintenance threads | `!maint` |
 | `!openthread <boss>` / `/openthread` | Open new attendance thread | |
 | `!overrideclose` / `/overrideclose` | Force-close current thread | |
+| `!setup <feature>` | Configure bot (guild/timer/attendance/bidding/admin/commands/bot/spawn/reminders/view) | |
 | `!removemember` / `/remove-member` | Remove a member | `!removemem`, `!rmmember`, `!delmember` |
 | `!rotation` / `/rotation` | Manage boss rotation (status/set/increment/refresh) | |
 | `!weekly` / `/weekly` | Generate weekly report | `!week` |
 | `!monthly` / `/monthly` | Generate monthly report | `!month` |
+| `!syncregistry` | Sync all members to Member Registry | `!sr` |
+| `!syncattend <date>` | Rebuild week attendance from closed threads | |
+| `!weburl <url>` / `/weburl <url>` | Update Google Sheets webhook URL | |
 
 ### Auction Admin (admin_logs, admin only)
 
@@ -255,12 +248,12 @@ elysium-attendance-bot/
 ├── index2.js                  # Entry point — wires modules together (1,104 lines)
 ├── bot/                       # Extracted modules
 │   ├── message-handler.js     # Message create event dispatch
-│   ├── command-handlers.js    # All !prefix command handlers (30 handlers)
+│   ├── command-handlers.js    # All !prefix command handlers (33 handlers)
 │   ├── interaction-handler.js # Slash interaction handling
 │   ├── init.js                # Module initialization orchestration
 │   └── confirm-utils.js       # Confirmation dialog helpers
 ├── commands/                  # Slash command system
-│   ├── slash-commands.js      # 69 slash command definitions
+│   ├── slash-commands.js      # 70 slash command definitions
 │   ├── handlers.js            # Slash command → synthetic message bridge
 │   ├── autocomplete.js        # Autocomplete suggestions
 │   ├── register-commands.js   # Command registration with Discord
@@ -268,8 +261,6 @@ elysium-attendance-bot/
 ├── modules/boss-timer/        # Boss timer submodules
 │   ├── index.js, state.js, admin-commands.js, spawn-tracking.js
 ├── utils/                     # Shared infrastructure
-│   ├── database-api.js        # MongoDB connection pooling
-│   ├── mongodb-helpers.js     # CRUD operations
 │   ├── sheet-api.js           # Google Sheets API wrapper
 │   ├── logger.js              # Pino structured logging
 │   ├── error-handler.js       # Centralized error handling
@@ -281,8 +272,7 @@ elysium-attendance-bot/
 │   ├── boss_points.json       # Boss names and point values
 │   └── boss_spawn_config.json # Spawn intervals and schedules
 └── scripts/                   # Startup and maintenance
-    ├── startup.js             # Full startup with sync
-    ├── sync-sheets-to-mongodb.js
+    └── startup.js             # Full startup with sync
 ```
 
 ### Data Flow
@@ -301,7 +291,6 @@ index2.js (entry point)
       ↓
 ┌──────────────────────────────┐
 │         utils/ layer         │
-│  database-api  ── MongoDB    │
 │  sheet-api     ── Sheets     │
 │  logger, error-handler       │
 └──────────────────────────────┘
@@ -310,10 +299,9 @@ index2.js (entry point)
 ### Design Principles
 
 - **Module pattern** — clean function APIs for each system
-- **Dual-write** — MongoDB primary with Google Sheets backup (zero data loss)
-- **Circuit breaker** — graceful degradation for external services
+- **Google Sheets** — primary data store with webhook API
 - **In-memory cache** — O(1) lookups for hot paths
-- **Self-healing** — full state restoration in <1 second on restart
+- **Self-healing** — full state restoration via crash recovery sheet
 
 ---
 
@@ -375,8 +363,7 @@ index2.js (entry point)
 |-------|-----------|
 | Runtime | Node.js 18+ |
 | Discord | Discord.js v14.25.1 |
-| Database | MongoDB (Atlas) |
-| Backup | Google Sheets + Apps Script |
+| Data | Google Sheets + Apps Script |
 | Scheduling | node-cron |
 | Logging | Pino + pino-pretty |
 | Fuzzy matching | fast-levenshtein |
@@ -385,14 +372,13 @@ index2.js (entry point)
 ### Dependencies
 
 ```
-discord.js ^14.25.1    axios ^1.13.2          mongodb ^7.0.0
-node-cron ^4.2.1       node-fetch ^3.3.2      pino ^10.1.0
-pino-pretty ^13.1.3    fast-levenshtein ^3.0.0  uuid ^13.0.0
+discord.js ^14.25.1    axios ^1.13.2          node-cron ^4.2.1
+node-fetch ^3.3.2      pino ^10.1.0           pino-pretty ^13.1.3
+fast-levenshtein ^3.0.0  uuid ^13.0.0
 ```
 
 ### Performance
 
-- MongoDB queries: 10–500ms depending on operation
 - Memory: ~95–105 MB RSS, fits comfortably in 512 MB instances
 - Crash recovery: <1 second with full state restoration
 - CPU: <5% average under normal load
@@ -412,19 +398,18 @@ npm run start:direct         # Direct start with GC flags
 ### Docker
 
 ```bash
-docker build -t elysium-bot .
+docker build -t tenchu-bot .
 docker run -d \
-  --name elysium-bot \
+  --name tenchu-bot \
   -e DISCORD_TOKEN=your_token \
-  -e MONGODB_URI=your_mongodb_uri \
-  elysium-bot
+  tenchu-bot
 ```
 
 ### PM2 (recommended for production)
 
 ```bash
 npm install -g pm2
-pm2 start index2.js --name elysium-bot
+pm2 start index2.js --name tenchu-bot
 pm2 save
 pm2 startup
 ```
@@ -442,7 +427,7 @@ An HTTP server exposes health status at `/health`:
 
 ### Supported Platforms
 
-Koyeb, Railway, Render, Heroku, or any VPS with Node.js 18+ and 512 MB RAM.
+Koyeb, Railway, Render, or any VPS with Node.js 18+ and 512 MB RAM.
 
 ---
 
@@ -455,7 +440,7 @@ Koyeb, Railway, Render, Heroku, or any VPS with Node.js 18+ and 512 MB RAM.
 | `npm start` | Fast startup (sync in background) |
 | `npm run start:sync` | Full sync before bot starts |
 | `npm run start:direct` | Direct start with GC flags |
-| `npm run sync` | Manual MongoDB sync |
+| `npm run sync` | Manual data sync |
 | `npm test` | Run Jest tests |
 | `npm run test:coverage` | Coverage report |
 
@@ -483,4 +468,4 @@ Koyeb, Railway, Render, Heroku, or any VPS with Node.js 18+ and 512 MB RAM.
 
 MIT License — see [LICENSE](./LICENSE).
 
-Built for ELYSIUM Guild with Discord.js v14 and MongoDB.
+Built for TENCHU Guild

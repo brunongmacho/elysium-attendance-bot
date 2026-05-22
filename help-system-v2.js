@@ -257,7 +257,7 @@ const COMMANDS = {
     },
     setup: {
       usage: "!setup <feature>",
-      description: "Configure the bot for this server. 💡 Run this command IN the channel you want to assign. Features: guild, timer, attendance, bidding, admin, commands, bot, adminrole (add/remove admin roles), view (show config). Config is saved to disk immediately.",
+      description: "Configure the bot for this server. 💡 Run this command IN the channel you want to assign. Features: guild, timer, attendance, bidding, admin, commands, bot, spawn, reminders, adminrole (add/remove admin roles), view (show config). Config is saved to disk immediately.",
       aliases: [],
       adminOnly: true,
       channels: [CHANNEL_TYPES.ADMIN_LOGS],
@@ -406,6 +406,30 @@ const COMMANDS = {
       adminOnly: true,
       channels: [CHANNEL_TYPES.ADMIN_LOGS],
       category: "Emergency"
+    },
+    syncregistry: {
+      usage: "!syncregistry",
+      description: "Sync ALL guild members to the Member Registry in Google Sheets. 💡 Run this once after deploying to populate nickname mappings. Members are matched by Discord ID, and their current server nickname + Discord username are stored. Future nickname changes are auto-detected and propagated to all WEEK_ sheets. The !sr alias is faster.",
+      aliases: ["!sr"],
+      adminOnly: true,
+      channels: [CHANNEL_TYPES.ADMIN_LOGS],
+      category: "Admin"
+    },
+    syncattend: {
+      usage: "!syncattend <date>",
+      description: "Rebuild attendance data for an entire week by scanning all closed attendance threads. 💡 Provide any date in the target week (e.g., `!syncattend 5/17/2026`). The bot finds all closed threads from that Sunday-Saturday, reads check-in messages and bot verification records, then rebuilds the WEEK_ sheet from scratch. Handles up to 500 messages per thread. Useful for fixing missing or split records (e.g., when members checked in with both nickname and username).",
+      aliases: [],
+      adminOnly: true,
+      channels: [CHANNEL_TYPES.ADMIN_LOGS],
+      category: "Admin"
+    },
+    weburl: {
+      usage: "!weburl <url> / /weburl <url>",
+      description: "Update the Google Sheets webhook URL without editing files. 💡 Provide a full https:// URL to the Apps Script web app. The bot updates config in memory, saves to config.json on disk, and restarts automatically (PM2 brings it back). Useful when redeploying the Apps Script project. Example: !weburl https://script.google.com/macros/s/.../exec",
+      aliases: [],
+      adminOnly: true,
+      channels: [CHANNEL_TYPES.ADMIN_LOGS],
+      category: "Admin"
     }
   },
 
@@ -565,10 +589,36 @@ async function generateChannelHelp(message, isAdmin) {
       'Help': EMOJI.BOOK
     }[category] || EMOJI.INFO;
 
-    embed.addFields({
-      name: `${categoryEmoji} ${category}`,
-      value: commandList,
-      inline: false
+    // Split into chunks if command list exceeds Discord's 1024-char field limit
+    const MAX_FIELD_LENGTH = 1024;
+    const chunks = [];
+    if (commandList.length > MAX_FIELD_LENGTH) {
+      let remaining = commandList;
+      while (remaining.length > 0) {
+        if (remaining.length <= MAX_FIELD_LENGTH) {
+          chunks.push(remaining);
+          break;
+        }
+        // Break at the last double-newline (between commands) before the limit
+        let breakPoint = remaining.lastIndexOf('\n\n', MAX_FIELD_LENGTH);
+        if (breakPoint === -1) {
+          breakPoint = remaining.lastIndexOf('\n', MAX_FIELD_LENGTH);
+        }
+        if (breakPoint === -1) {
+          breakPoint = MAX_FIELD_LENGTH;
+        }
+        chunks.push(remaining.substring(0, breakPoint));
+        remaining = remaining.substring(breakPoint).trimStart();
+      }
+    } else {
+      chunks.push(commandList);
+    }
+
+    chunks.forEach((chunk, i) => {
+      const fieldName = chunks.length > 1
+        ? `${categoryEmoji} ${category} (${i + 1}/${chunks.length})`
+        : `${categoryEmoji} ${category}`;
+      embed.addFields({ name: fieldName, value: chunk, inline: false });
     });
   });
 
