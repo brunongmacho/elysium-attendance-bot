@@ -4316,6 +4316,16 @@ function handleSyncWeekAttendance(data) {
 
     Logger.log(`📊 Synced ${spawnCount} spawns, ${totalCheckins} check-ins to ${sheetName}`);
 
+    // Deduplicate member names
+    try {
+      const dedupCount = deduplicateMemberNames(sheet);
+      if (dedupCount > 0) {
+        Logger.log(`🧹 Merged ${dedupCount} duplicate member row(s) in ${sheetName}`);
+      }
+    } catch (e) {
+      Logger.log('⚠️ Failed to deduplicate members: ' + e.message);
+    }
+
     // Auto-update totals
     try {
       updateTotalAttendanceAndMembers();
@@ -4339,6 +4349,60 @@ function handleSyncWeekAttendance(data) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * Deduplicate member names in column A by merging spawn data and removing extra rows.
+ * Uses case-insensitive matching to find duplicates.
+ *
+ * @param {Sheet} sheet - The WEEK_ sheet to deduplicate
+ * @returns {number} Number of duplicate rows merged/deleted
+ */
+function deduplicateMemberNames(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return 0;
+
+  const memberData = sheet.getRange(3, COLUMNS.MEMBERS, lastRow - 2, 1).getValues();
+  const seen = {}; // lowercase name → sheet row number (first occurrence)
+  const rowsToDelete = [];
+  let dedupCount = 0;
+
+  for (let i = 0; i < memberData.length; i++) {
+    const name = (memberData[i][0] || '').toString().trim();
+    if (!name) continue;
+    const nameLower = name.toLowerCase();
+
+    if (seen[nameLower] !== undefined) {
+      // Duplicate found — merge spawn data from this row into the first occurrence
+      const firstRow = seen[nameLower];      // Sheet row of first occurrence
+      const currentRow = 3 + i;              // Sheet row of this duplicate
+
+      const lastCol = sheet.getLastColumn();
+      if (lastCol >= COLUMNS.FIRST_SPAWN) {
+        // Get spawn data from both rows
+        const spawnCols = lastCol - COLUMNS.FIRST_SPAWN + 1;
+        const firstData = sheet.getRange(firstRow, COLUMNS.FIRST_SPAWN, 1, spawnCols).getValues()[0];
+        const currentData = sheet.getRange(currentRow, COLUMNS.FIRST_SPAWN, 1, spawnCols).getValues()[0];
+
+        // Merge: TRUE if either row has TRUE (OR logic)
+        const merged = firstData.map((val, idx) => val === true || currentData[idx] === true);
+        sheet.getRange(firstRow, COLUMNS.FIRST_SPAWN, 1, merged.length).setValues([merged]);
+      }
+
+      rowsToDelete.push(currentRow);
+      dedupCount++;
+    } else {
+      seen[nameLower] = 3 + i; // Sheet row number (3-indexed)
+    }
+  }
+
+  // Delete duplicate rows bottom-up to preserve indices
+  rowsToDelete.sort((a, b) => b - a);
+  for (const row of rowsToDelete) {
+    sheet.deleteRow(row);
+  }
+
+  return dedupCount;
 }
 
 /**
