@@ -2674,6 +2674,17 @@ function createCommandHandlers(deps) {
           return;
         }
 
+        // Sort attendance data chronologically (oldest first)
+        attendanceData.sort((a, b) => {
+          const parseTime = (ts) => {
+            const [datePart, timePart] = ts.split(' ');
+            const [month, day, year] = datePart.split('/');
+            const [hour, minute] = timePart.split(':');
+            return `${year}${month}${day}${hour.padStart(2, '0')}${minute.padStart(2, '0')}`;
+          };
+          return parseTime(a.timestamp).localeCompare(parseTime(b.timestamp));
+        });
+
         await statusMsg.edit(`🔄 Writing ${attendanceData.length} spawn records (${attendanceData.reduce((sum, s) => sum + s.members.length, 0)} check-ins) to sheet...`);
 
         // Send to Code.js
