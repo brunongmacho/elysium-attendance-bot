@@ -2586,16 +2586,37 @@ function createCommandHandlers(deps) {
             const timestamp = nameMatch[1]; // "05/17/26 12:00"
             const bossName = nameMatch[2];  // "VALAKAS"
 
-            // Fetch messages (bot pins first message, so check-in messages may be after)
-            const messages = await thread.messages.fetch({ limit: 100 });
+            // Fetch ALL messages by paginating backwards (check-ins are typically the earliest messages)
+            // Without 'before', Discord returns the latest messages, so we paginate to get everything
+            const allThreadMessages = [];
+            let beforeId = undefined;
+            let reachedEnd = false;
+
+            for (let page = 0; page < 3 && !reachedEnd; page++) { // Max 3 pages = ~300 messages
+              const options = { limit: 100 };
+              if (beforeId) options.before = beforeId;
+
+              const batch = await thread.messages.fetch(options).catch(() => null);
+              if (!batch || batch.size === 0) break;
+
+              const msgs = [...batch.values()];
+              allThreadMessages.push(...msgs);
+
+              if (batch.size < 100) reachedEnd = true;
+              else beforeId = msgs[msgs.length - 1].id;
+            }
 
             const checkInMembers = [];
-            for (const [msgId, msg] of messages) {
+            for (const msg of allThreadMessages) {
               if (msg.author.bot) continue;
               const content = msg.content.toLowerCase().trim();
+              if (!content) continue;
               const firstWord = content.split(/\s+/)[0];
 
-              if (checkInKeywords.some(kw => firstWord === kw || content.startsWith(kw + ' '))) {
+              // Strip trailing punctuation for better keyword matching
+              const cleanWord = firstWord.replace(/[^a-z0-9-]/g, '');
+
+              if (checkInKeywords.some(kw => cleanWord === kw)) {
                 // Get display name — prefer nickname, fallback to displayName, then username
                 let displayName;
                 try {
