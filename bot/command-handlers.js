@@ -2575,7 +2575,7 @@ function createCommandHandlers(deps) {
 
           // Update progress every 5 threads
           if (processed % 5 === 0 || processed === weekThreads.length) {
-            await statusMsg.edit(`🔄 Scanning thread ${processed}/${weekThreads.length}: ${threadsWithData} with check-ins found so far...`);
+            await statusMsg.edit(`🔄 Deep-scanning thread ${processed}/${weekThreads.length} (up to 500 messages each): ${threadsWithData} with check-ins found...`);
           }
 
           try {
@@ -2586,29 +2586,44 @@ function createCommandHandlers(deps) {
             const timestamp = nameMatch[1]; // "05/17/26 12:00"
             const bossName = nameMatch[2];  // "VALAKAS"
 
-            // Fetch ALL messages by paginating backwards (check-ins are typically the earliest messages)
-            // Without 'before', Discord returns the latest messages, so we paginate to get everything
+            // Fetch ALL messages by paginating backwards (matches state-recovery's scanThreadForPendingReactions)
             const allThreadMessages = [];
             let beforeId = undefined;
-            let reachedEnd = false;
+            let fetchPage = 0;
+            const MAX_MESSAGE_FETCHES = 5; // Max 500 messages (5 * 100)
 
-            for (let page = 0; page < 3 && !reachedEnd; page++) { // Max 3 pages = ~300 messages
+            while (fetchPage < MAX_MESSAGE_FETCHES) {
               const options = { limit: 100 };
               if (beforeId) options.before = beforeId;
 
               const batch = await thread.messages.fetch(options).catch(() => null);
               if (!batch || batch.size === 0) break;
 
-              const msgs = [...batch.values()];
-              allThreadMessages.push(...msgs);
+              allThreadMessages.push(...batch.values());
+              if (batch.size < 100) break; // Reached the end
 
-              if (batch.size < 100) reachedEnd = true;
-              else beforeId = msgs[msgs.length - 1].id;
+              beforeId = [...batch.keys()].pop();
+              fetchPage++;
             }
 
-            const checkInMembers = [];
+            // Scan messages for check-ins — TWO approaches:
+            // 1. Bot verification messages: "**username** verified by admin" → already verified members
+            // 2. Member check-in keywords: "here", "present", etc.
+            const checkInMembers = new Set();
+
             for (const msg of allThreadMessages) {
+              // Bot messages: extract already-verified members from confirmation messages
+              if (msg.author.id === message.client.user.id) {
+                const verifiedMatch = msg.content.match(/\*\*(.+?)\*\* verified by/);
+                if (verifiedMatch) {
+                  checkInMembers.add(verifiedMatch[1]);
+                }
+                continue;
+              }
+
+              // Member messages: skip bots
               if (msg.author.bot) continue;
+
               const content = msg.content.toLowerCase().trim();
               if (!content) continue;
               const firstWord = content.split(/\s+/)[0];
@@ -2616,7 +2631,7 @@ function createCommandHandlers(deps) {
               // Strip trailing punctuation for better keyword matching
               const cleanWord = firstWord.replace(/[^a-z0-9-]/g, '');
 
-              if (checkInKeywords.some(kw => cleanWord === kw)) {
+              if (checkInKeywords.includes(cleanWord)) {
                 // Get display name — prefer nickname, fallback to displayName, then username
                 let displayName;
                 try {
@@ -2624,7 +2639,7 @@ function createCommandHandlers(deps) {
                 } catch {
                   displayName = msg.author.displayName || msg.author.username;
                 }
-                checkInMembers.push(displayName);
+                checkInMembers.add(displayName);
               }
             }
 
