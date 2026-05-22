@@ -758,9 +758,13 @@ function copyMembersFromPreviousWeek(spreadsheet, newSheet) {
       if (members.length > 0) {
         newSheet.getRange(3, COLUMNS.MEMBERS, members.length, 1).setValues(members);
 
-        // Copy columns B, C, D (formulas)
+        // Copy columns C, D (formulas = POINTS LEFT, ATTENDANCE POINTS)
         const formulas = prevSheet.getRange(3, 2, members.length, 3).getFormulas();
         newSheet.getRange(3, 2, members.length, 3).setFormulas(formulas);
+
+        // **Reset Column B (POINTS CONSUMED) to 0 — new week, fresh start**
+        newSheet.getRange(3, COLUMNS.POINTS_CONSUMED, members.length, 1).clearContent();
+        newSheet.getRange(3, COLUMNS.POINTS_CONSUMED, members.length, 1).setValue(0);
       }
     }
 
@@ -1110,57 +1114,32 @@ function logAuctionEvent(eventData) {
  * @returns {Object} Response with points data
  */
 function handleGetBiddingPoints(data) {
-  const cache = CacheService.getDocumentCache();
-  const cacheKey = 'biddingPoints_v1';
+  Logger.log('📊 Reading bidding points from current week sheet Column D (ATTENDANCE POINTS)');
 
-  // Check if force refresh requested
-  const forceFresh = data && data.forceFresh === true;
-
-  // Try to get from cache first (unless force refresh)
-  if (!forceFresh) {
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      try {
-        const cachedData = JSON.parse(cached);
-        Logger.log('✅ Cache hit for bidding points');
-        return createResponse('ok', 'Points fetched (cached)', { points: cachedData });
-      } catch (e) {
-        Logger.log('⚠️ Cache parse error, fetching fresh: ' + e.message);
-        // Continue to fresh fetch if cache is corrupted
-      }
-    }
-  }
-
-  // Cache miss or force refresh - read from sheet
-  Logger.log('📊 Cache miss, reading from sheet');
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
-  if (!sheet) return createResponse('error', `Sheet not found: ${CONFIG.BIDDING_SHEET}`);
-
+  // Always read fresh — formulas update in real-time
+  const sheet = getCurrentWeekSheet();
   const lastRow = sheet.getLastRow();
-  if (lastRow < 2) {
-    // Cache empty result too
-    cache.put(cacheKey, JSON.stringify({}), CONFIG.CACHE_TTL_SECONDS);
-    return createResponse('ok', 'No members', { points: {} });
+
+  if (lastRow < 3) {
+    return createResponse('ok', 'No members in current week sheet', { points: {} });
   }
 
-  const dataRange = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  // Read Column A (names) and Column D (attendance points) from row 3 onwards
+  const dataRange = sheet.getRange(3, 1, lastRow - 2, 4);
+  const values = dataRange.getValues();
+
   const points = {};
-  dataRange.forEach(r => {
+  values.forEach(r => {
     const member = (r[0] || '').toString().trim();
-    if (member) points[member] = Number(r[1]) || 0;
+    if (member) {
+      let attPoints = Number(r[3]) || 0; // Column D = index 3 (0-based)
+      if (isNaN(attPoints)) attPoints = 0;
+      points[member] = attPoints;
+    }
   });
 
-  // Store in cache for future requests
-  try {
-    cache.put(cacheKey, JSON.stringify(points), CONFIG.CACHE_TTL_SECONDS);
-    Logger.log(`✅ Cached ${Object.keys(points).length} members' points for ${CONFIG.CACHE_TTL_SECONDS}s`);
-  } catch (e) {
-    Logger.log('⚠️ Failed to cache points: ' + e.message);
-    // Continue anyway, just won't be cached
-  }
-
-  return createResponse('ok', 'Points fetched (fresh)', { points });
+  Logger.log(`✅ Fetched bidding points for ${Object.keys(points).length} members from current week sheet`);
+  return createResponse('ok', 'Points fetched (current week attendance)', { points });
 }
 
 /**
@@ -1527,131 +1506,113 @@ function logAuctionResult(data) {
 function handleSubmitBiddingResults(data) {
   const results = data.results || [];
   const manualItems = data.manualItems || [];
-  
-  // Get session info
-  const sessionTs = getSessionTimestamp();
-  const columnHeader = sessionTs.columnHeader; // MM/DD/YY HH:MM #N
-  
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let biddingSheet = ss.getSheetByName(CONFIG.BIDDING_SHEET);
-  if (!biddingSheet) return createResponse('error', `Sheet not found: ${CONFIG.BIDDING_SHEET}`);
-  
-  ensureBiddingItemsSheet();
-  let biddingItemsSheet = ss.getSheetByName('BiddingItems');
-  
-  // STEP 1: Add manual items to BiddingItems sheet (only if they were auctioned)
-  if (manualItems && manualItems.length > 0) {
-    const lastRow = biddingItemsSheet.getLastRow();
-    let insertRow = lastRow + 1;
-    
-    for (let item of manualItems) {
-      const winner = item.winner || '';
-      const bid = item.winningBid || '';
-      
-      biddingItemsSheet.getRange(insertRow, 1).setValue(item.item);
-      biddingItemsSheet.getRange(insertRow, 2).setValue(item.startPrice);
-      biddingItemsSheet.getRange(insertRow, 3).setValue(item.duration);
-      biddingItemsSheet.getRange(insertRow, 4).setValue(winner);
-      biddingItemsSheet.getRange(insertRow, 5).setValue(bid);
-      biddingItemsSheet.getRange(insertRow, 6).setValue(item.auctionStartTime || '');
-      biddingItemsSheet.getRange(insertRow, 7).setValue(item.auctionEndTime || '');
-      biddingItemsSheet.getRange(insertRow, 8).setValue(new Date().toISOString());
-      biddingItemsSheet.getRange(insertRow, 10).setValue('Manual');
-      biddingItemsSheet.getRange(insertRow, 11).setValue(1);  // Quantity = 1
-      
-      insertRow++;
-    }
-    
-    Logger.log(`✅ Added ${manualItems.length} manual items to BiddingItems sheet`);
-  }
-  
-  // STEP 2: Submit combined tally to BiddingPoints (all members, including 0s)
-  const lastRow = biddingSheet.getLastRow();
-  let timestampColumn = -1;
 
-  // Check if column already exists
-  if (lastRow >= 1) {
-    const headers = biddingSheet.getRange(1, 3, 1, biddingSheet.getLastColumn() - 2).getValues()[0];
-    for (let i = 0; i < headers.length; i++) {
-      if (headers[i].toString().trim() === columnHeader) {
-        timestampColumn = i + 3;
-        break;
-      }
-    }
-  }
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(30000); } catch (e) { return createResponse('error', 'Lock timeout'); }
 
-  // Create new column if doesn't exist
-  if (timestampColumn === -1) {
-    timestampColumn = biddingSheet.getLastColumn() + 1;
-    biddingSheet.getRange(1, timestampColumn).setValue(columnHeader)
-      .setFontWeight('bold')
-      .setBackground('#4A90E2')
-      .setFontColor('#FFFFFF')
-      .setHorizontalAlignment('center');
-  }
-
-  // Get all member names from sheet
-  const memberNames = biddingSheet.getRange(2, 1, lastRow - 1, 1).getValues().flat();
-
-  // Process results (includes all members with 0 for non-winners)
-  const updates = [];
-  const unmappedBidders = [];
-  if (results && results.length > 0) {
-    results.forEach(r => {
-      const member = r.member.trim();
-      const total = r.totalSpent || 0;
-      // Use normalizeUsername for consistent matching (removes special chars, normalizes spacing)
-      const normalizedMember = normalizeUsername(member);
-      let rowIndex = memberNames.findIndex(m => normalizeUsername((m||'').toString()) === normalizedMember);
-      if (rowIndex !== -1) {
-        updates.push({row: rowIndex + 2, amount: total});
-      } else if (total > 0) {
-        // CRITICAL: Log when bidder not found in sheet (accounting mismatch!)
-        unmappedBidders.push({member: member, amount: total});
-        Logger.log(`⚠️ WARNING: Bidder "${member}" not found in BiddingPoints sheet. ${total}pts not recorded!`);
-      }
-    });
-
-    // Apply all updates
-    updates.forEach(u => biddingSheet.getRange(u.row, timestampColumn).setValue(u.amount));
-  }
-
-  // STEP 3: Update BiddingPoints (left side columns) with manual update flag
-  // Set flag to prevent onEdit() from triggering again (prevents double execution)
-  isManualUpdate = true;
-  let pointsUpdateFailed = false;
   try {
-    updateBiddingPoints();
-  } catch (updateError) {
-    pointsUpdateFailed = true;
-    Logger.log(`❌ CRITICAL: updateBiddingPoints failed: ${updateError.toString()}`);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // STEP 1: Add manual items to BiddingItems sheet (same as before)
+    if (manualItems && manualItems.length > 0) {
+      ensureBiddingItemsSheet();
+      const biddingItemsSheet = ss.getSheetByName('BiddingItems');
+      const lastRow = biddingItemsSheet.getLastRow();
+      let insertRow = lastRow + 1;
+
+      for (let item of manualItems) {
+        const winner = item.winner || '';
+        const bid = item.winningBid || '';
+
+        biddingItemsSheet.getRange(insertRow, 1).setValue(item.item);
+        biddingItemsSheet.getRange(insertRow, 2).setValue(item.startPrice);
+        biddingItemsSheet.getRange(insertRow, 3).setValue(item.duration);
+        biddingItemsSheet.getRange(insertRow, 4).setValue(winner);
+        biddingItemsSheet.getRange(insertRow, 5).setValue(bid);
+        biddingItemsSheet.getRange(insertRow, 6).setValue(item.auctionStartTime || '');
+        biddingItemsSheet.getRange(insertRow, 7).setValue(item.auctionEndTime || '');
+        biddingItemsSheet.getRange(insertRow, 8).setValue(new Date().toISOString());
+        biddingItemsSheet.getRange(insertRow, 10).setValue('Manual');
+        biddingItemsSheet.getRange(insertRow, 11).setValue(1);
+
+        insertRow++;
+      }
+
+      Logger.log(`✅ Added ${manualItems.length} manual items to BiddingItems sheet`);
+    }
+
+    // STEP 2: Update POINTS CONSUMED (Column B) in current WEEK_ sheet
+    const weekSheet = getCurrentWeekSheet();
+    const weekLastRow = weekSheet.getLastRow();
+
+    if (weekLastRow < 3) {
+      return createResponse('error', 'No members in current week sheet');
+    }
+
+    // Read Column A (member names) for matching
+    const memberNames = weekSheet.getRange(3, COLUMNS.MEMBERS, weekLastRow - 2, 1).getValues().flat();
+
+    // Read current Column B values (POINTS CONSUMED) to accumulate
+    const currentB = weekSheet.getRange(3, COLUMNS.POINTS_CONSUMED, weekLastRow - 2, 1).getValues().flat();
+
+    const updates = [];
+    const unmappedBidders = [];
+
+    if (results && results.length > 0) {
+      results.forEach(r => {
+        const member = (r.member || '').toString().trim();
+        const totalSpent = Number(r.totalSpent) || 0;
+
+        // Use normalizeUsername for consistent matching
+        const normalizedMember = normalizeUsername(member);
+        let rowIndex = memberNames.findIndex(m => normalizeUsername((m || '').toString()) === normalizedMember);
+
+        if (rowIndex !== -1) {
+          // Get current spent value, then add new spend
+          let currentSpent = Number(currentB[rowIndex]) || 0;
+          if (isNaN(currentSpent)) currentSpent = 0;
+          const newSpent = currentSpent + totalSpent;
+          updates.push({ row: rowIndex + 3, amount: newSpent });
+        } else if (totalSpent > 0) {
+          unmappedBidders.push({ member, amount: totalSpent });
+          Logger.log(`⚠️ WARNING: Bidder "${member}" not found in current week sheet. ${totalSpent}pts not recorded!`);
+        }
+      });
+
+      // Apply all updates to Column B (POINTS CONSUMED)
+      updates.forEach(u => weekSheet.getRange(u.row, COLUMNS.POINTS_CONSUMED).setValue(u.amount));
+
+      Logger.log(`✅ Updated POINTS CONSUMED (B) for ${updates.length} members in current week sheet`);
+    }
+
+    // Invalidate cache
+    try {
+      const cache = CacheService.getDocumentCache();
+      cache.remove('biddingPoints_v1');
+    } catch (e) {
+      Logger.log('⚠️ Failed to invalidate cache: ' + e.message);
+    }
+
+    // Build response
+    let warnings = [];
+    if (unmappedBidders.length > 0) {
+      Logger.log(`⚠️ ACCOUNTING WARNING: ${unmappedBidders.length} bidder(s) not found in current week sheet!`);
+      warnings.push(`${unmappedBidders.length} bidder(s) not found in current week sheet`);
+    }
+
+    const baseMsg = `Submitted: ${updates.length} members updated in current week sheet B column`;
+    const warningMsg = warnings.length > 0 ? `${baseMsg} | ⚠️ WARNING: ${warnings.join(', ')} - check logs!` : baseMsg;
+
+    Logger.log(`✅ Bidding results submitted: ${baseMsg}`);
+
+    return createResponse('ok', warningMsg, {
+      updates: updates.length,
+      warnings: warnings,
+      unmappedBidders: unmappedBidders
+    });
   } finally {
-    isManualUpdate = false;
+    lock.releaseLock();
   }
-
-  Logger.log(`✅ Session tally submitted: ${columnHeader}`);
-
-  // Build response with warnings
-  let warnings = [];
-  if (unmappedBidders.length > 0) {
-    Logger.log(`⚠️ ACCOUNTING WARNING: ${unmappedBidders.length} bidder(s) not found in sheet!`);
-    warnings.push(`${unmappedBidders.length} bidder(s) not found in sheet`);
-  }
-  if (pointsUpdateFailed) {
-    warnings.push('Points update failed (lock timeout)');
-  }
-
-  const baseMsg = `Submitted: Session ${columnHeader} with ${updates.length} members`;
-  const warningMsg = warnings.length > 0 ? `${baseMsg} | ⚠️ WARNING: ${warnings.join(', ')} - check logs!` : baseMsg;
-
-  return createResponse('ok', warningMsg, {
-    timestampColumn,
-    membersUpdated: updates.length,
-    sessionHeader: columnHeader,
-    manualItemsAdded: manualItems ? manualItems.length : 0,
-    unmappedBidders: unmappedBidders.length > 0 ? unmappedBidders : undefined,
-    pointsUpdateFailed: pointsUpdateFailed
-  });
 }
 
 function getBotState(data) {
