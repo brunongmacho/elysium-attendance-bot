@@ -125,6 +125,7 @@ function doPost(e) {
     // Auto-initialize Member Registry tab if needed
     ensureMemberRegistryTab();
     ensureRegistryHasUsernameColumn();
+    ensureRegistryHasLastKnownColumn();
     ensureBiddingPointsSheet();
     ensureTotalAttendanceSheet();
     ensureBossPointsSheet();
@@ -3752,14 +3753,15 @@ function ensureMemberRegistryTab() {
   if (!sheet) {
     Logger.log('📝 Creating Member Registry tab (first run)...');
     sheet = ss.insertSheet('Member Registry', 0); // Insert as first sheet
-    sheet.getRange(1, 1, 1, 4).setValues([[
-      'Discord ID', 'Current Nickname', 'Last Updated', 'Discord Username'
+    sheet.getRange(1, 1, 1, 5).setValues([[
+      'Discord ID', 'Current Nickname', 'Last Updated', 'Discord Username', 'Last Known Nickname'
     ]]);
     sheet.getRange('1:1').setFontWeight('bold').setBackground('#4a86e8').setFontColor('#ffffff');
     sheet.setColumnWidth(1, 200); // Discord ID
     sheet.setColumnWidth(2, 200); // Current Nickname
     sheet.setColumnWidth(3, 150); // Last Updated
     sheet.setColumnWidth(4, 200); // Discord Username
+    sheet.setColumnWidth(5, 200); // Last Known Nickname
     // Freeze header row
     sheet.setFrozenRows(1);
     Logger.log('✅ Member Registry tab created');
@@ -3792,6 +3794,32 @@ function ensureRegistryHasUsernameColumn() {
     Logger.log('✅ Discord Username column added to Member Registry');
   } catch (err) {
     Logger.log('⚠️ Failed to ensure Discord Username column: ' + err.toString());
+  }
+}
+
+/**
+ * Ensure the Last Known Nickname column exists in existing Member Registry sheets
+ */
+function ensureRegistryHasLastKnownColumn() {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SSHEET_ID);
+    const registrySheet = ss.getSheetByName('Member Registry');
+    if (!registrySheet) return;
+    
+    const headers = registrySheet.getDataRange().getValues()[0];
+    if (headers.includes('Last Known Nickname')) return;
+    
+    Logger.log('📝 Adding Last Known Nickname column to existing Member Registry...');
+    
+    const lastCol = registrySheet.getLastColumn();
+    registrySheet.insertColumnAfter(lastCol);
+    registrySheet.getRange(1, lastCol + 1).setValue('Last Known Nickname');
+    registrySheet.getRange('1:1').setFontWeight('bold');
+    registrySheet.setColumnWidth(lastCol + 1, 200);
+    
+    Logger.log('✅ Last Known Nickname column added');
+  } catch (err) {
+    Logger.log('⚠️ Failed to ensure Last Known Nickname column: ' + err.toString());
   }
 }
 
@@ -3980,6 +4008,7 @@ function handleSyncMemberRegistry(data) {
     const nickCol = headers.indexOf('Current Nickname');
     const updatedCol = headers.indexOf('Last Updated');
     const usernameCol = headers.indexOf('Discord Username');
+    const lastKnownCol = headers.indexOf('Last Known Nickname');
     const rows = existingData.slice(1); // Skip header
     
     let added = 0;
@@ -3993,12 +4022,14 @@ function handleSyncMemberRegistry(data) {
       let rowIndex = -1;
       let oldNickname = null;
       let oldUsername = null;
+      let oldLastKnown = null;
       
       for (let i = 0; i < rows.length; i++) {
         if (rows[i][idCol] === discordId) {
           rowIndex = i + 2; // +2 for 1-indexed + header
           oldNickname = rows[i][nickCol];
           if (usernameCol !== -1) oldUsername = rows[i][usernameCol];
+          if (lastKnownCol !== -1) oldLastKnown = rows[i][lastKnownCol];
           break;
         }
       }
@@ -4021,6 +4052,9 @@ function handleSyncMemberRegistry(data) {
           if (discordUsername && discordUsername !== nickname && discordUsername !== oldNickname) {
             searchTerms.push(discordUsername);
           }
+          if (oldLastKnown && oldLastKnown !== oldNickname && oldLastKnown !== nickname) {
+            searchTerms.push(oldLastKnown);
+          }
           
           for (const sheet of allSheets) {
             const sheetName = sheet.getName();
@@ -4040,6 +4074,11 @@ function handleSyncMemberRegistry(data) {
           }
           
           Logger.log(`✅ Replaced ${totalReplacements} occurrences across weekly sheets`);
+          
+          // Store old nickname as Last Known Nickname
+          if (lastKnownCol !== -1) {
+            registrySheet.getRange(rowIndex, lastKnownCol + 1).setValue(oldNickname);
+          }
         }
         
         // Also search by Discord username if newly provided and different from nickname
@@ -4081,9 +4120,9 @@ function handleSyncMemberRegistry(data) {
       } else {
         // New entry
         if (discordUsername && usernameCol !== -1) {
-          registrySheet.appendRow([discordId, nickname, dateStr, discordUsername]);
+          registrySheet.appendRow([discordId, nickname, dateStr, discordUsername, '']);
         } else {
-          registrySheet.appendRow([discordId, nickname, dateStr]);
+          registrySheet.appendRow([discordId, nickname, dateStr, '', '']);
         }
         added++;
       }
@@ -4211,6 +4250,7 @@ function handleRenameMember(data) {
     const nickCol = headers.indexOf('Current Nickname');
     const updatedCol = headers.indexOf('Last Updated');
     const usernameCol = headers.indexOf('Discord Username');
+    const lastKnownCol = headers.indexOf('Last Known Nickname');
     
     if (idCol === -1 || nickCol === -1) {
       return createResponse('error', 'Member Registry not properly initialized');
@@ -4219,10 +4259,12 @@ function handleRenameMember(data) {
     // Find the member by Discord ID
     let rowIndex = -1;
     let storedUsername = null;
+    let storedLastKnown = null;
     for (let i = 1; i < existingData.length; i++) {
       if (String(existingData[i][idCol]) === String(discordId)) {
         rowIndex = i + 1; // Convert to 1-indexed (row 1 = header)
         if (usernameCol !== -1) storedUsername = existingData[i][usernameCol];
+        if (lastKnownCol !== -1) storedLastKnown = existingData[i][lastKnownCol];
         break;
       }
     }
@@ -4234,9 +4276,9 @@ function handleRenameMember(data) {
       // Not found in registry - add them as new entry
       Logger.log(`📝 ${newNickname} not in registry, adding new entry`);
       if (discordUsername && usernameCol !== -1) {
-        registrySheet.appendRow([discordId, newNickname, dateStr, discordUsername]);
+        registrySheet.appendRow([discordId, newNickname, dateStr, discordUsername, '']);
       } else {
-        registrySheet.appendRow([discordId, newNickname, dateStr]);
+        registrySheet.appendRow([discordId, newNickname, dateStr, '', '']);
       }
       Logger.log(`✅ Added ${newNickname} to registry`);
     } else {
@@ -4257,6 +4299,9 @@ function handleRenameMember(data) {
       // Also search by stored Discord username if different from the nickname
       if (storedUsername && storedUsername !== oldNickname && storedUsername !== newNickname) {
         searchTerms.push(storedUsername);
+      }
+      if (storedLastKnown && storedLastKnown !== oldNickname && storedLastKnown !== newNickname) {
+        searchTerms.push(storedLastKnown);
       }
       
       let totalReplacements = 0;
@@ -4279,6 +4324,11 @@ function handleRenameMember(data) {
       }
       
       Logger.log(`✅ Replaced ${totalReplacements} occurrences across WEEK_* sheets`);
+      
+      // Store old nickname as Last Known Nickname
+      if (lastKnownCol !== -1) {
+        registrySheet.getRange(rowIndex, lastKnownCol + 1).setValue(oldNickname);
+      }
     }
     
     return createResponse('ok', `Renamed ${oldNickname} → ${newNickname}`);
