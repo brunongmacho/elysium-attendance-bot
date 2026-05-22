@@ -440,6 +440,17 @@ function createCommandHandlers(deps) {
           } more spawns (sorted oldest first - close old ones first!)*`
         : "";
 
+    // Truncate spawn text to avoid Discord 1024-char embed field limit
+    let totalSpawnsText = spawnListText + moreSpawns;
+    if (totalSpawnsText.length > 900 && spawnList.length > 8) {
+      const truncated = spawnList
+        .slice(0, 8)
+        .join("\n");
+      totalSpawnsText =
+        truncated +
+        `\n\n➕ ...and ${totalSpawns - 8} more active spawns`;
+    }
+
     const biddingState = bidding.getBiddingState();
     const biddingStatus = biddingState.a
       ? `🔴 Active: **${biddingState.a.item}** (${biddingState.a.curBid}pts)`
@@ -468,7 +479,7 @@ function createCommandHandlers(deps) {
         { name: "📊 Last Sheet Call", value: timeSinceSheet, inline: true },
         {
           name: "🔗 Spawn Threads (Oldest First)",
-          value: spawnListText + moreSpawns,
+          value: totalSpawnsText,
           inline: false,
         },
         { name: "💰 Bidding System", value: biddingStatus, inline: false }
@@ -1128,7 +1139,13 @@ function createCommandHandlers(deps) {
           .addFields(
             {
               name: "📋 Detailed Results",
-              value: results.join("\n"),
+              value: (() => {
+                let resultsText = results.join("\n");
+                if (resultsText.length > 950) {
+                  resultsText = results.slice(0, 12).join("\n") + `\n\n➕ ...and ${results.length - 12} more`;
+                }
+                return resultsText;
+              })(),
               inline: false,
             },
             {

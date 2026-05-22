@@ -226,6 +226,17 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
         const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 
+        // Build confirmation content, truncating spawn list to stay under 2000-char limit
+        const spawnListLines = openSpawns
+          .map(
+            (s, i) =>
+              `${i + 1}. **${s.spawnInfo.boss}** (${s.spawnInfo.timestamp}) - ${s.spawnInfo.members.length} verified`
+          );
+        let spawnListBlock = spawnListLines.slice(0, 20).join('\n');
+        if (openSpawns.length > 20) {
+          spawnListBlock += `\n\n➕ ...and ${openSpawns.length - 20} more`;
+        }
+
         const confirmMsg = await interaction.editReply({
           content:
             `⚠️ **MASS CLOSE ALL THREADS?**\n\n` +
@@ -234,12 +245,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
             `• Close and submit ${openSpawns.length} spawn thread(s)\n` +
             `• Process one thread at a time (to avoid rate limits)\n\n` +
             `**Threads to close:**\n` +
-            openSpawns
-              .map(
-                (s, i) =>
-                  `${i + 1}. **${s.spawnInfo.boss}** (${s.spawnInfo.timestamp}) - ${s.spawnInfo.members.length} verified`
-              )
-              .join('\n') +
+            spawnListBlock +
             `\n\nClick ✅ Confirm or ❌ Cancel button below.\n\n` +
             `⏱️ This will take approximately ${openSpawns.length * 5} seconds.`,
           components: [row]
@@ -491,6 +497,11 @@ async function handleSlashCommand(interaction, modules, config, client) {
             }
 
             // Send summary
+            let summaryResults = results.join('\n');
+            if (summaryResults.length > 3800) {
+              summaryResults = results.slice(0, 50).join('\n') + `\n\n➕ ...and ${results.length - 50} more`;
+            }
+
             const summaryEmbed = new EmbedBuilder()
               .setColor(failCount === 0 ? 0x00ff00 : 0xffa500)
               .setTitle('📋 Mass Close Complete')
@@ -498,7 +509,7 @@ async function handleSlashCommand(interaction, modules, config, client) {
                 `**Summary:**\n` +
                 `✅ Success: ${successCount}\n` +
                 `❌ Failed: ${failCount}\n\n` +
-                `**Results:**\n${results.join('\n')}`
+                `**Results:**\n${summaryResults}`
               )
               .setTimestamp();
 
