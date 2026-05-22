@@ -2519,6 +2519,16 @@ function createCommandHandlers(deps) {
           return;
         }
 
+        // Cache all guild members for reliable nickname resolution
+        await guild.members.fetch();
+        const memberNameMap = {};
+        for (const [id, gm] of guild.members.cache) {
+          // Skip bots
+          if (gm.user.bot) continue;
+          // Use server nickname, fallback to displayName, then username
+          memberNameMap[id] = gm.nickname || gm.displayName || gm.user.username;
+        }
+
         // Fetch archived threads (paginate to get enough)
         const allThreads = [];
         let lastId = null;
@@ -2562,7 +2572,7 @@ function createCommandHandlers(deps) {
           return;
         }
 
-        await statusMsg.edit(`🔄 Found ${weekThreads.length} threads. Scanning messages for check-ins...`);
+        await statusMsg.edit(`🔄 Found ${weekThreads.length} threads. Deep-scanning messages using cached member names...`);
 
         // Scan each thread for check-in messages
         const attendanceData = [];
@@ -2575,7 +2585,7 @@ function createCommandHandlers(deps) {
 
           // Update progress every 5 threads
           if (processed % 5 === 0 || processed === weekThreads.length) {
-            await statusMsg.edit(`🔄 Deep-scanning thread ${processed}/${weekThreads.length} (up to 500 messages each): ${threadsWithData} with check-ins found...`);
+            await statusMsg.edit(`🔄 Deep-scanning thread ${processed}/${weekThreads.length} (up to 500 msg each, caching ${Object.keys(memberNameMap).length} members): ${threadsWithData} found...`);
           }
 
           try {
@@ -2632,13 +2642,8 @@ function createCommandHandlers(deps) {
               const cleanWord = firstWord.replace(/[^a-z0-9-]/g, '');
 
               if (checkInKeywords.includes(cleanWord)) {
-                // Get display name — prefer nickname, fallback to displayName, then username
-                let displayName;
-                try {
-                  displayName = msg.member?.nickname || msg.member?.displayName || msg.author.displayName || msg.author.username;
-                } catch {
-                  displayName = msg.author.displayName || msg.author.username;
-                }
+                // Look up the server nickname from the guild member cache
+                const displayName = memberNameMap[msg.author.id] || msg.author.displayName || msg.author.username;
                 checkInMembers.add(displayName);
               }
             }
