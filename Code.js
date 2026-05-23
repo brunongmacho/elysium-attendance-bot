@@ -1508,7 +1508,7 @@ function handleSubmitBiddingResults(data) {
   const manualItems = data.manualItems || [];
 
   const lock = LockService.getScriptLock();
-  try { lock.waitLock(30000); } catch (e) { return createResponse('error', 'Lock timeout'); }
+  try { lock.waitLock(60000); } catch (e) { return createResponse('error', 'Lock timeout after 60s'); }
 
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -4203,9 +4203,9 @@ function handleSyncWeekAttendance(data) {
 
   const lock = LockService.getScriptLock();
   try {
-    lock.waitLock(30000);
+    lock.waitLock(60000);
   } catch (e) {
-    return createResponse('error', 'Lock timeout');
+    return createResponse('error', 'Lock timeout after 60s');
   }
 
   try {
