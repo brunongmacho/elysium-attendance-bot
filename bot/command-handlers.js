@@ -1658,7 +1658,7 @@ function createCommandHandlers(deps) {
       return await message.reply(`❌ Auction session already running`);
     }
 
-    await auctioneering.startAuctioneering(client, config, message.channel);
+    await auctioneering.startAuctioneering(client, config, message.channel, true);
     lastAuctionEndTime = Date.now();
     await message.reply(
       `✅ Auction started immediately. Cooldown reset to 10 minutes.`
@@ -2160,7 +2160,7 @@ function createCommandHandlers(deps) {
             { name: '🔔 Spawn Announcements', value: config.boss_spawn_announcement_channel_id ? `<#${config.boss_spawn_announcement_channel_id}>` : '❌ Not set', inline: true },
             { name: '📅 Reminders', value: config.reminders_channel_id ? `<#${config.reminders_channel_id}>` : '❌ Not set', inline: true },
             { name: '👑 Admin Roles', value: config.admin_roles.length > 0 ? config.admin_roles.map(id => `<@&${id}>`).join(', ') : '❌ None configured', inline: false },
-            { name: '👤 Member Role', value: config.tenchu_role ? `<@&${config.tenchu_role_id}> (${config.tenchu_role})` : '❌ Not set', inline: false },
+            { name: '👤 Member Role', value: config.tenchu_role_id ? `<@&${config.tenchu_role_id}> (${config.tenchu_role})` : config.tenchu_role || '❌ Not set', inline: false },
           ];
           const embed = new EmbedBuilder()
             .setColor(0x3498db)

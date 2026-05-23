@@ -96,6 +96,8 @@ const COMMAND_ALIASES = {
   "!auc-now": "!startauctionnow",
 
   // Auction control commands
+  "!auctionend": "!endauction",
+  "!end": "!endauction",
 };
 
 /**

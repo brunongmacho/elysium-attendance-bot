@@ -24,7 +24,7 @@ const { finalizeSession } = require('./item-completion');
  * @param {Discord.TextChannel} channel - Discord channel to start auction in
  * @returns {Promise<void>}
  */
-async function startAuctioneering(client, config, channel) {
+async function startAuctioneering(client, config, channel, skipCountdown = false) {
   if (!client || !config || !channel) {
     state.logger.error(`${EMOJI.ERROR} Invalid parameters to startAuctioneering`);
     return;
@@ -197,6 +197,24 @@ async function startAuctioneering(client, config, channel) {
   state.auctionState.sessionFinalized = false;
   state.auctionState.sessionItems = allItems;
   state.auctionState.currentItemIndex = 0;
+
+  // If skipCountdown, start immediately without preview/countdown
+  if (skipCountdown) {
+    try {
+      await auctionNextItem(client, config, channel);
+    } catch (err) {
+      state.logger.error("❌ Failed to start auction:", err);
+      state.auctionState.active = false;
+      clearAllTimers();
+      if (state.biddingModule && typeof state.biddingModule.stopCacheAutoRefresh === "function") {
+        state.biddingModule.stopCacheAutoRefresh();
+      }
+      await channel.send(
+        `❌ Failed to start auction. Please try again or contact an admin.`
+      ).catch(state.errorHandler.safeCatch('send auction start failure message'));
+    }
+    return;
+  }
 
   // Show preview
   const previewList = allItems

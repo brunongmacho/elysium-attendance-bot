@@ -1162,7 +1162,7 @@ if (commandName === 'rotation') {
         }
 
         // Start auction
-        await auctioneering.startAuctioneering(interaction.guild, config, client);
+        await auctioneering.startAuctioneering(client, config, interaction.channel);
         await interaction.editReply({
           content: '✅ Auction session started!'
         });
@@ -1188,6 +1188,8 @@ if (commandName === 'rotation') {
         };
 
         await auctioneering.handleForceSubmitResults(syntheticMessage, config, bidding);
+        // Update the original deferred reply after force submit completes
+        await interaction.editReply({ content: '✅ Force submit completed. Check the channel for results.' }).catch(() => {});
         return;
       }
 
@@ -1199,7 +1201,7 @@ if (commandName === 'rotation') {
           });
           return;
         }
-        await auctioneering.startAuctioneering(interaction.guild, config, client);
+        await auctioneering.startAuctioneering(client, config, interaction.channel, true);
         await interaction.editReply({
           content: '✅ Auction started immediately (cooldown bypassed)!'
         });
