@@ -62,7 +62,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   }
 
   const m = msg.member,
-    u = m.nickname || msg.author.username,
+    u = m.nickname || m.displayName || msg.author.displayName || msg.author.username,
     uid = msg.author.id;
 
   if (!state.hasRole(m) && !state.isAdm(m, config)) {
@@ -393,7 +393,7 @@ async function procBid(msg, amt, cfg) {
   if (msg.channel.id !== a.threadId) return { ok: false, msg: "Wrong thread" };
 
   const m = msg.member,
-    u = m.nickname || msg.author.username,
+    u = m.nickname || m.displayName || msg.author.displayName || msg.author.username,
     uid = msg.author.id;
   if (!state.hasRole(m) && !state.isAdm(m, cfg)) {
     await msg.reply(`${EMOJI.ERROR} Need guild role`);

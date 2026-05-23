@@ -301,7 +301,22 @@ function createMessageHandler(client, config, deps) {
 
           try {
             const member = await message.guild.members.fetch(message.author.id).catch(() => null);
-            const discordName = member?.nickname || member?.displayName || message.author.username;
+            const discordName = member?.nickname || member?.displayName || message.author.displayName || message.author.username;
+
+            // SCREENSHOT CHECK: Non-admin members must attach an image
+            // (Admins are exempt as stated in the thread instructions)
+            if (member && deps.isAdmin && !deps.isAdmin(member)) {
+              const hasImage = message.attachments.size > 0 &&
+                message.attachments.some(a => a.contentType?.startsWith('image/'));
+
+              if (!hasImage) {
+                await message.reply({
+                  content: `📸 **Screenshot Required**, <@${message.author.id}>!\n\nPlease reply with \`here\` and attach a **screenshot** of the boss kill/loot to confirm your attendance.\n\n💡 Admins are exempt from this requirement.`,
+                  allowedMentions: { repliedUser: true }
+                });
+                return; // Don't process — no screenshot attached
+              }
+            }
 
             // Look up registered name from Member Registry (Google Sheets)
             let displayName = discordName;
@@ -339,7 +354,7 @@ function createMessageHandler(client, config, deps) {
             // Send acknowledgment reply to the member
             try {
               await message.reply({
-                content: `✅ Check-in recorded, <@${message.author.id}>! An admin will verify your screenshot shortly.`,
+                content: `✅ Check-in recorded, <@${message.author.id}>! An admin will verify your attendance shortly.`,
                 allowedMentions: { repliedUser: true }
               });
             } catch (replyErr) {
