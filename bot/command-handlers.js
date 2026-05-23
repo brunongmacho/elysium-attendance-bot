@@ -595,11 +595,12 @@ function createCommandHandlers(deps) {
         result = await mongoHelpers.getMemberStats(targetQueryName);
 
         if (result.status !== 'ok') {
-          await loadingMsg.edit(`❌ Could not find stats for **${targetDisplayName}**`);
-          return;
+          // Don't return here — fall through to Sheets which handles "not found" gracefully
+          console.warn(`⚠️ [MongoDB] Member not found, falling back to Sheets: ${targetQueryName}`);
+          result = null;
+        } else {
+          console.log(`✅ [MongoDB] Stats fetched for ${result.memberName}`);
         }
-
-        console.log(`✅ [MongoDB] Stats fetched for ${result.memberName}`);
 
       } catch (mongoError) {
         console.error(`❌ [MongoDB] Stats fetch failed, falling back to Sheets:`, mongoError.message);
