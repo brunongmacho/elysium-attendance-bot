@@ -213,13 +213,13 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     timestamp: now,
   });
 
-  // CRITICAL: Check if bid is in last minute - extend time by 1 minute
+  // CRITICAL: Check if bid is in last 65 seconds - extend time by 1 minute
   // MUST clear timers BEFORE checking to prevent race condition where timer fires during processing
   const timeLeft = currentItem.endTime - Date.now();
   if (!currentItem.extCnt) currentItem.extCnt = 0;
 
   let timeExtended = false;
-  if (timeLeft < 60000 && timeLeft > 0 && currentItem.extCnt < ME) {
+  if (timeLeft < 65000 && timeLeft > 0 && currentItem.extCnt < ME) {
     // CRITICAL: Validate auctioneering module has required methods
     if (!auctRef ||
         typeof auctRef.safelyClearItemTimers !== "function" ||

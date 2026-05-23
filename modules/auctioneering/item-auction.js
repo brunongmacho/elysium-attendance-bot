@@ -62,7 +62,6 @@ async function auctionNextItem(client, config, channel) {
     state.auctionState.currentItemIndex >= state.auctionState.sessionItems.length
   ) {
     await channel.send(`✅ All items completed`);
-    state.auctionState.active = false;
     // Lazy require to break circular dependency
     const { finalizeSession } = require('./item-completion');
     await finalizeSession(client, config, channel);
@@ -187,7 +186,6 @@ async function auctionNextItem(client, config, channel) {
     // Send embed inside the thread (only if we used threads.create)
     if (channel.threads && typeof channel.threads.create === "function") {
       await auctionThread.send({
-        content: `@everyone`,
         embeds: [
           new EmbedBuilder()
             .setColor(COLORS.AUCTION)
@@ -232,7 +230,7 @@ async function auctionNextItem(client, config, channel) {
     // Save state
     try {
       if (state.cfg?.sheet_webhook_url) {
-        await saveAuctionState(state.cfg.sheet_webhook_url);
+        await saveAuctionState();
       }
     } catch (_) {
       // ignore; best-effort

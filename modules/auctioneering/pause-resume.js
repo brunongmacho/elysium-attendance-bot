@@ -32,9 +32,7 @@ function pauseSession() {
   clearAllAuctionTimers();
   state.logger.info(`${EMOJI.PAUSE} Session paused`);
 
-  if (state.cfg && state.cfg.sheet_webhook_url) {
-    saveAuctionState(state.cfg.sheet_webhook_url).catch(err => console.error('Failed to save auction state on pause:', err.message));
-  }
+  saveAuctionState().catch(err => state.logger.error('Failed to save auction state on pause:', err.message));
 
   return true;
 }
@@ -51,13 +49,16 @@ function resumeSession(client, config, channel) {
   if (!state.auctionState.active || !state.auctionState.paused) return false;
   state.auctionState.paused = false;
 
+  if (!state.auctionState.currentItem) {
+    state.logger.warn('No current item to resume');
+    return true; // session resumed but no item to adjust
+  }
+
   const pausedDuration = Date.now() - state.auctionState.pausedTime;
   state.auctionState.currentItem.endTime += pausedDuration;
 
   // Clean up remainingTime field after resume
-  if (state.auctionState.currentItem) {
-    delete state.auctionState.currentItem.remainingTime;
-  }
+  delete state.auctionState.currentItem.remainingTime;
 
   scheduleItemTimers(client, config, channel);
   state.logger.info(`${EMOJI.PLAY} Session resumed`);

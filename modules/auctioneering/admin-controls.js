@@ -109,7 +109,7 @@ function extendCurrentItem(minutes) {
   if (!state.auctionState.active || !state.auctionState.currentItem) return false;
   if (state.cfg && state.cfg.sheet_webhook_url) {
     const { saveAuctionState } = require('./persistence');
-    saveAuctionState(state.cfg.sheet_webhook_url).catch(err => console.error('Failed to save auction state on extend:', err.message));
+    saveAuctionState().catch(err => console.error('Failed to save auction state on extend:', err.message));
   }
 
   state.auctionState.currentItem.endTime += minutes * 60000;

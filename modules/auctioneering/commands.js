@@ -165,7 +165,7 @@ async function handleQueueList(message, biddingState) {
     return;
   }
 
-  const sheetItems = await fetchSheetItems(cfg.sheet_webhook_url);
+  const sheetItems = await fetchSheetItems();
 
   if (sheetItems === null) {
     await loadingMsg.edit(
@@ -617,22 +617,24 @@ async function handleForceSubmitResults(message, config, biddingModule) {
       }
 
       const channel = interaction.channel;
-      for (const embed of fullEmbeds) {
-        await channel.send({ embeds: [embed] });
+      try {
+        for (const embed of fullEmbeds) {
+          await channel.send({ embeds: [embed] });
+        }
+
+        const successEmbed = new EmbedBuilder()
+          .setColor(0x00ff00)
+          .setTitle(`${EMOJI.SUCCESS} Results Submitted`)
+          .setDescription(`Results submitted successfully!\nSent ${fullEmbeds.length} embed(s) with all results.`)
+          .setTimestamp();
+
+        await interaction.update({ embeds: [successEmbed], components: [disabledRow] });
+      } finally {
+        state.auctionState.sessionItems = [];
+        delete state.auctionState._pendingForceSubmitEmbeds;
+        delete state.auctionState._pendingForceSubmitTotalPoints;
+        collector.stop();
       }
-
-      state.auctionState.sessionItems = [];
-      delete state.auctionState._pendingForceSubmitEmbeds;
-      delete state.auctionState._pendingForceSubmitTotalPoints;
-
-      const successEmbed = new EmbedBuilder()
-        .setColor(0x00ff00)
-        .setTitle(`${EMOJI.SUCCESS} Results Submitted`)
-        .setDescription(`Results submitted successfully!\nSent ${fullEmbeds.length} embed(s) with all results.`)
-        .setTimestamp();
-
-      await interaction.update({ embeds: [successEmbed], components: [disabledRow] });
-      collector.stop();
     } else {
       const cancelEmbed = new EmbedBuilder()
         .setColor(0xff0000)
@@ -714,9 +716,14 @@ async function endAuctionSession(client, config, channel) {
   }
 
   // Finalize the session
-  await finalizeSession(client, config, channel);
-
-  state.logger.info(`✅ Auction session ended successfully`);
+  try {
+    await finalizeSession(client, config, channel);
+    state.logger.info(`✅ Auction session ended successfully`);
+  } catch (err) {
+    state.logger.error(`Failed to finalize auction session:`, err.message);
+    state.auctionState.sessionItems = []; // Still clear on failure
+    state.auctionState.active = false;
+  }
 }
 
 /**

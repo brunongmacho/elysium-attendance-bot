@@ -71,20 +71,24 @@ async function itemGo1(client, config, channel) {
   const item = state.auctionState.currentItem;
   const endTimestamp = Math.floor(item.endTime / 1000);
 
-  await channel.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.WARNING)
-        .setTitle(`${EMOJI.WARNING} GOING ONCE!`)
-        .setDescription(`Auction ends <t:${endTimestamp}:R>`)
-        .addFields({
-          name: `${EMOJI.BID} Current`,
-          value: item.curWin
-            ? `${item.curBid}pts by ${item.curWin}`
-            : `${item.startPrice}pts (no bids)`,
-        }),
-    ],
-  });
+  try {
+    await channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(COLORS.WARNING)
+          .setTitle(`${EMOJI.WARNING} GOING ONCE!`)
+          .setDescription(`Auction ends <t:${endTimestamp}:R>`)
+          .addFields({
+            name: `${EMOJI.BID} Current`,
+            value: item.curWin
+              ? `${item.curBid}pts by ${item.curWin}`
+              : `${item.startPrice}pts (no bids)`,
+          }),
+      ],
+    });
+  } catch (err) {
+    state.logger.error(`${EMOJI.ERROR} Failed to send GOING ONCE message:`, err);
+  }
 }
 
 /**
@@ -102,45 +106,54 @@ async function itemGo2(client, config, channel) {
   const item = state.auctionState.currentItem;
   const endTimestamp = Math.floor(item.endTime / 1000);
 
-  await channel.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.WARNING)
-        .setTitle(`${EMOJI.WARNING} GOING TWICE!`)
-        .setDescription(`Auction ends <t:${endTimestamp}:R>`)
-        .addFields({
-          name: `${EMOJI.BID} Current`,
-          value: item.curWin
-            ? `${item.curBid}pts by ${item.curWin}`
-            : `${item.startPrice}pts (no bids)`,
-        }),
-    ],
-  });
+  try {
+    await channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(COLORS.WARNING)
+          .setTitle(`${EMOJI.WARNING} GOING TWICE!`)
+          .setDescription(`Auction ends <t:${endTimestamp}:R>`)
+          .addFields({
+            name: `${EMOJI.BID} Current`,
+            value: item.curWin
+              ? `${item.curBid}pts by ${item.curWin}`
+              : `${item.startPrice}pts (no bids)`,
+          }),
+      ],
+    });
+  } catch (err) {
+    state.logger.error(`${EMOJI.ERROR} Failed to send GOING TWICE message:`, err);
+  }
 }
 
 /**
  * Announces 10 seconds remaining in the auction (final countdown).
  */
 async function itemGo3(client, config, channel) {
-  if (!state.auctionState.active || !state.auctionState.currentItem) return;
+  if (!state.auctionState.active || !state.auctionState.currentItem || state.auctionState.currentItem.go3) return;
+  state.auctionState.currentItem.go3 = true;
 
   const item = state.auctionState.currentItem;
   const endTimestamp = Math.floor(item.endTime / 1000);
 
-  await channel.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.ERROR)
-        .setTitle(`${EMOJI.WARNING} FINAL CALL!`)
-        .setDescription(`Auction ends <t:${endTimestamp}:R>`)
-        .addFields({
-          name: `${EMOJI.BID} Current`,
-          value: item.curWin
-            ? `${item.curBid}pts by ${item.curWin}`
-            : `${item.startPrice}pts (no bids)`,
-        }),
-    ],
-  });
+  try {
+    await channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(COLORS.ERROR)
+          .setTitle(`${EMOJI.WARNING} FINAL CALL!`)
+          .setDescription(`Auction ends <t:${endTimestamp}:R>`)
+          .addFields({
+            name: `${EMOJI.BID} Current`,
+            value: item.curWin
+              ? `${item.curBid}pts by ${item.curWin}`
+              : `${item.startPrice}pts (no bids)`,
+          }),
+      ],
+    });
+  } catch (err) {
+    state.logger.error(`${EMOJI.ERROR} Failed to send FINAL CALL message:`, err);
+  }
 }
 
 /**

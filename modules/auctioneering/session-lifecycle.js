@@ -104,7 +104,7 @@ async function startAuctioneering(client, config, channel) {
   }
 
   // Fetch sheet items with fallback cache
-  const sheetItems = await fetchSheetItems(config.sheet_webhook_url);
+  const sheetItems = await fetchSheetItems();
 
   if (sheetItems.length === 0) {
     const status = state.auctionCache.getStatus();

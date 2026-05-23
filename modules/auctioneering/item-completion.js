@@ -52,38 +52,41 @@ async function itemEnd(client, config, channel) {
 
   if (item.curWin) {
     // ITEM SOLD
-    await channel.send({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(COLORS.AUCTION)
-          .setTitle(`${EMOJI.AUCTION} SOLD!`)
-          .setDescription(`**${item.item}** sold!`)
-          .addFields(
-            {
-              name: `${EMOJI.FIRE} Winner`,
-              value: `<@${item.curWinId}>`,
-              inline: true,
-            },
-            {
-              name: `${EMOJI.BID} Price`,
-              value: `${item.curBid} pts`,
-              inline: true,
-            },
-            {
-              name: `${EMOJI.INFO} Source`,
-              value: "📊 Google Sheet",
-              inline: true,
-            }
-          )
-          .setFooter({ text: `${timestamp}` })
-          .setTimestamp(),
-      ],
-    });
+    try {
+      await channel.send({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLORS.AUCTION)
+            .setTitle(`${EMOJI.AUCTION} SOLD!`)
+            .setDescription(`**${item.item}** sold!`)
+            .addFields(
+              {
+                name: `${EMOJI.FIRE} Winner`,
+                value: `<@${item.curWinId}>`,
+                inline: true,
+              },
+              {
+                name: `${EMOJI.BID} Price`,
+                value: `${item.curBid} pts`,
+                inline: true,
+              },
+              {
+                name: `${EMOJI.INFO} Source`,
+                value: "📊 Google Sheet",
+                inline: true,
+              }
+            )
+            .setFooter({ text: `${timestamp}` })
+            .setTimestamp(),
+        ],
+      });
+    } catch (err) {
+      state.logger.error(`${EMOJI.ERROR} Failed to send SOLD message:`, err);
+    }
 
     // Log result to sheet/database
     try {
       await logAuctionResult(
-        config.webhook_url,
         item.source === "GoogleSheet" ? item.sheetIndex : -1,
         item.curWin,
         item.curBid,
@@ -142,21 +145,25 @@ async function itemEnd(client, config, channel) {
     }
   } else {
     // NO WINNER
-    await channel.send({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(COLORS.INFO)
-          .setTitle(`${EMOJI.ERROR} NO BIDS`)
-          .setDescription(
-            `**${item.item}** had no bids (will not be recorded).`
-          )
-          .addFields({
-            name: `${EMOJI.INFO} Note`,
-            value: "Item remains in BiddingItems sheet for future auctions.",
-            inline: false,
-          }),
-      ],
-    });
+    try {
+      await channel.send({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLORS.INFO)
+            .setTitle(`${EMOJI.ERROR} NO BIDS`)
+            .setDescription(
+              `**${item.item}** had no bids (will not be recorded).`
+            )
+            .addFields({
+              name: `${EMOJI.INFO} Note`,
+              value: "Item remains in BiddingItems sheet for future auctions.",
+              inline: false,
+            }),
+        ],
+      });
+    } catch (err) {
+      state.logger.error(`${EMOJI.ERROR} Failed to send NO BIDS message:`, err);
+    }
   }
 
   // Lock and archive the thread after the auction ends
@@ -282,13 +289,17 @@ async function finalizeSession(client, config, channel) {
     // Build combined results for tally
     const combinedResults = await buildCombinedResults(config);
 
-    // Submit combined results
-    const submitPayload = {
-      action: "submitBiddingResults",
-      results: combinedResults,
-    };
+    // Skip submission if no results were built
+    if (combinedResults.length === 0) {
+      state.logger.warn(`${EMOJI.WARNING} No combined results available - skipping bidding results submission`);
+    } else {
+      // Submit combined results
+      const submitPayload = {
+        action: "submitBiddingResults",
+        results: combinedResults,
+      };
 
-    try {
+      try {
       if (!state.postToSheetFunc) {
         state.logger.error(
           `${EMOJI.ERROR} postToSheet not initialized - cannot submit session results`
@@ -329,13 +340,14 @@ async function finalizeSession(client, config, channel) {
           }
         }
       }
-    } catch (err) {
+      } catch (err) {
       state.logger.error(`${EMOJI.ERROR} Failed to submit bidding results:`, err);
       state.logger.info(
         `${EMOJI.WARNING} Session results (for manual recovery):`,
         JSON.stringify(submitPayload, null, 2)
       );
-    }
+      }
+      }
 
     // Move all auctioned items to ForDistribution sheet
     state.logger.info(`📦 Moving completed auction items to ForDistribution...`);
@@ -479,7 +491,7 @@ async function finalizeSession(client, config, channel) {
 
     // Save state if config is available
     if (state.cfg && state.cfg.sheet_webhook_url) {
-      await saveAuctionState(state.cfg.sheet_webhook_url).catch((err) => {
+      await saveAuctionState().catch((err) => {
         state.logger.error(`${EMOJI.ERROR} Failed to save state:`, err);
       });
     }

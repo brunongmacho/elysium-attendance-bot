@@ -378,7 +378,7 @@ function schedulePreAuctionSync(sheetAPI, bossRotation) {
     const GMT8_OFFSET = state.biddingScheduleConfig.timezone.offsetHours * 60 * 60 * 1000;
     const nowGMT8 = new Date(now.getTime() + GMT8_OFFSET);
     const targetGMT8 = new Date(nowGMT8);
-    const syncHour = auctionHour - hoursBeforeAuction;
+    const syncHour = ((auctionHour - hoursBeforeAuction) + 24) % 24;
     targetGMT8.setUTCHours(syncHour, auctionMinute, 0, 0);
 
     const currentDay = targetGMT8.getUTCDay();
@@ -478,7 +478,7 @@ function schedulePreAuctionSync(sheetAPI, bossRotation) {
   };
 
   scheduleNext();
-  const syncHour = auctionHour - hoursBeforeAuction;
+  const syncHour = ((auctionHour - hoursBeforeAuction) + 24) % 24;
   const timeStr = `${syncHour}:${String(auctionMinute).padStart(2, '0')}`;
   state.logger.info(`${EMOJI.SUCCESS} Pre-auction sync scheduler initialized (${timeStr} GMT+8 every ${targetDayName})`);
 }

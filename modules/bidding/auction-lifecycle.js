@@ -530,6 +530,9 @@ async function endAuc(cli, cfg) {
       );
   }
 
+  // Wait for Discord API to process the lock before archiving
+  await new Promise(r => setTimeout(r, 500));
+
   await th
     .setArchived(true, "Ended")
     .catch((err) =>
@@ -695,9 +698,14 @@ async function finalize(cli, cfg) {
         .setFooter({ text: "Points deducted" });
 
       // Send all embeds
-      for (const embed of sessionEmbeds) {
-        await bch.send({ embeds: [embed] });
-        await adm.send({ embeds: [embed] });
+      try {
+        for (const embed of sessionEmbeds) {
+          await bch.send({ embeds: [embed] });
+          await adm.send({ embeds: [embed] });
+        }
+      } catch (err) {
+        state.logger.error(`Failed to send session summary embeds:`, err.message);
+        // Still continue to cleanup below
       }
     } else {
       const d = res

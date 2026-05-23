@@ -21,12 +21,11 @@ const { EMOJI } = require('./constants');
  * - Never returns null (returns empty array on total failure)
  * - Records success/failure metrics for monitoring
  *
- * @param {string} url - Google Sheets webhook URL
  * @param {number} [retries=3] - Maximum retry attempts
  * @param {boolean} [allowCache=true] - Allow fallback to cached items
  * @returns {Promise<Array<Object>>} Items array (never null, but may be empty)
  */
-async function fetchSheetItems(url, retries = 3, allowCache = true) {
+async function fetchSheetItems(retries = 3, allowCache = true) {
   // Check circuit breaker - skip if open and use cache
   if (!state.auctionCache.canAttemptFetch()) {
     state.logger.info(`${EMOJI.WARNING} Circuit breaker OPEN - using cached items`);
@@ -100,7 +99,6 @@ async function fetchSheetItems(url, retries = 3, allowCache = true) {
 /**
  * Logs auction results to Google Sheets for permanent record keeping.
  *
- * @param {string} url - Google Sheets webhook URL
  * @param {number} itemIndex - Index of item in the sheet
  * @param {string} winner - Winner's Discord username (or empty if no winner)
  * @param {number} winningBid - Final winning bid amount in points
@@ -111,7 +109,6 @@ async function fetchSheetItems(url, retries = 3, allowCache = true) {
  * @returns {Promise<boolean>} True if successfully logged, false otherwise
  */
 async function logAuctionResult(
-  url,
   itemIndex,
   winner,
   winningBid,
@@ -151,10 +148,9 @@ async function logAuctionResult(
  * - Auto-save triggers on important state changes
  * - Enables session recovery after bot restart
  *
- * @param {string} url - Google Sheets webhook URL
  * @returns {Promise<boolean>} True if successfully saved, false otherwise
  */
-async function saveAuctionState(url) {
+async function saveAuctionState() {
   const cleanItem =
     state.auctionState.currentItem && typeof state.auctionState.currentItem === "object"
       ? {
