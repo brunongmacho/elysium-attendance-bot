@@ -1900,60 +1900,52 @@ function updateBiddingPoints() {
  */
 function getBiddingPoints(data) {
   try {
-    Logger.log('📊 Fetching bidding points data...');
+    Logger.log('📊 Fetching bidding points from current week sheet Column D (ATTENDANCE POINTS)...');
 
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName('BiddingPoints');
-
-    if (!sheet) {
-      return createResponse('ok', 'BiddingPoints sheet not found', { members: [] });
-    }
-
+    const sheet = getCurrentWeekSheet();
     const lastRow = sheet.getLastRow();
-    if (lastRow < 2) {
-      return createResponse('ok', 'No data in BiddingPoints', { members: [] });
+
+    if (lastRow < 3) {
+      return createResponse('ok', 'No members in current week sheet', { members: [], points: {} });
     }
 
-    // Get all columns: Username (A), Points Left (B), Points Consumed (C), Session Spends (D+)
-    const lastCol = sheet.getLastColumn();
-    const dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
+    // Read Column A (names), Column B (points consumed), Column D (attendance points)
+    const dataRange = sheet.getRange(3, 1, lastRow - 2, 4);
     const values = dataRange.getValues();
 
     const members = [];
-    const points = {}; // Legacy map for backward compatibility
+    const points = {};
+
     for (let i = 0; i < values.length; i++) {
       const row = values[i];
       const username = (row[0] || '').toString().trim();
-      const pointsLeft = parseInt(row[1]) || 0;
-      const pointsConsumed = parseInt(row[2]) || 0;
-
-      // Sum all session spend columns (D onward)
-      let totalSpent = 0;
-      for (let col = 3; col < row.length; col++) {
-        totalSpent += parseInt(row[col]) || 0;
-      }
+      const pointsConsumed = Number(row[1]) || 0;  // Column B: POINTS CONSUMED
+      const attPoints = Number(row[3]) || 0;       // Column D: ATTENDANCE POINTS (formula)
 
       if (username) {
+        // pointsLeft = attendance points (what they can spend)
+        const pointsLeft = isNaN(attPoints) ? 0 : attPoints;
+        const consumed = isNaN(pointsConsumed) ? 0 : pointsConsumed;
+
         members.push({
           username,
-          pointsLeft,           // Column B: Points remaining
-          pointsConsumed,       // Column C: Points already used
-          attendancePoints: pointsLeft,  // Alias for backwards compatibility
-          biddingPoints: pointsConsumed, // Alias for backwards compatibility
-          totalSpent            // Sum of columns D+: Total spent across all sessions
+          pointsLeft,           // Column D: Attendance points = available to bid
+          pointsConsumed: consumed,       // Column B: Already spent this week
+          attendancePoints: pointsLeft,   // Alias for backwards compatibility
+          biddingPoints: consumed,        // Alias for backwards compatibility
+          totalSpent: consumed            // Total spent = Column B (current week only)
         });
 
-        // Populate legacy points map
         points[username] = pointsLeft;
       }
     }
 
-    Logger.log(`✅ Fetched bidding data for ${members.length} members`);
+    Logger.log(`✅ Fetched bidding data for ${members.length} members from current week sheet`);
     return createResponse('ok', 'Bidding data fetched', { members, points });
 
   } catch (err) {
     Logger.log('❌ Error fetching bidding points: ' + err.toString());
-    return createResponse('error', err.toString(), { members: [] });
+    return createResponse('error', err.toString(), { members: [], points: {} });
   }
 }
 
