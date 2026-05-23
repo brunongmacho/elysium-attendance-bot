@@ -90,7 +90,7 @@ async function scanThreadForPendingReactions(thread, client, bossName, parsed) {
     if (["present", "here", "join", "checkin", "check-in"].includes(keyword)) {
       // Get member display name (nickname or username)
       const author = await thread.guild.members.fetch(msg.author.id).catch(() => null);
-      const username = author ? (author.nickname || msg.author.username) : msg.author.username;
+      const username = author ? (author.nickname || author.displayName || msg.author.displayName || msg.author.username) : msg.author.displayName || msg.author.username;
 
       // Look for bot reply with buttons (new system) or verification confirmation
       const hasBotReply = Array.from(allMessages.values()).some(

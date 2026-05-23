@@ -1327,7 +1327,19 @@ function createCommandHandlers(deps) {
             // Check if it's a check-in message
             if (exactKeywords.includes(keyword)) {
               const msgMember = await guild.members.fetch(msg.author.id).catch(() => null);
-              const username = msgMember ? (msgMember.nickname || msg.author.username) : msg.author.username;
+              let username = msgMember ? (msgMember.nickname || msgMember.displayName || msg.author.displayName || msg.author.username) : msg.author.displayName || msg.author.username;
+
+              // Try to look up registered name from Member Registry
+              try {
+                if (sheetAPI && msg.author.id) {
+                  const regResult = await sheetAPI.call('lookupMemberName', { discordId: msg.author.id });
+                  if (regResult && regResult.nickname) {
+                    username = regResult.nickname;
+                  }
+                }
+              } catch (regErr) {
+                // Registry lookup is non-critical — keep the Discord-resolved name
+              }
 
               // Check if already verified
               const isVerified = spawnInfo.members.some(
