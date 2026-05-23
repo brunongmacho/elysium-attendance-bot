@@ -2068,6 +2068,7 @@ function createCommandHandlers(deps) {
         '• `bot` - Set this channel as the bot commands channel\n' +
         '• `adminrole <@role>` - Add a role as admin (@mention the role)\n' +
         '• `adminrole remove <@role>` - Remove a role from admin list\n' +
+        '• `member <@role>` - Set the role required for bidding (member/guild role)\n' +
         '• `view` - Show current configuration\n\n' +
         '💡 Run `!setup <feature>` **in** the channel you want to configure.'
       );
@@ -2159,6 +2160,7 @@ function createCommandHandlers(deps) {
             { name: '🔔 Spawn Announcements', value: config.boss_spawn_announcement_channel_id ? `<#${config.boss_spawn_announcement_channel_id}>` : '❌ Not set', inline: true },
             { name: '📅 Reminders', value: config.reminders_channel_id ? `<#${config.reminders_channel_id}>` : '❌ Not set', inline: true },
             { name: '👑 Admin Roles', value: config.admin_roles.length > 0 ? config.admin_roles.map(id => `<@&${id}>`).join(', ') : '❌ None configured', inline: false },
+            { name: '👤 Member Role', value: config.tenchu_role ? `<@&${config.tenchu_role_id}> (${config.tenchu_role})` : '❌ Not set', inline: false },
           ];
           const embed = new EmbedBuilder()
             .setColor(0x3498db)
@@ -2210,8 +2212,25 @@ function createCommandHandlers(deps) {
           fs.writeFileSync(configPath, JSON.stringify(fileConfig, null, 2), 'utf8');
           return;
 
+        case 'member':
+          if (args.length < 2) {
+            await message.reply('Usage: `!setup member <@role>`\n\nSet the role that members need to participate in bidding/auctions. Mention the role with @.');
+            return;
+          }
+          const memberRole = message.mentions.roles.first();
+          if (!memberRole) {
+            await message.reply('❌ Please mention the role to set (e.g., `!setup member @Member`).');
+            return;
+          }
+          fileConfig.tenchu_role = memberRole.name;
+          fileConfig.tenchu_role_id = memberRole.id;
+          config.tenchu_role = fileConfig.tenchu_role;
+          config.tenchu_role_id = fileConfig.tenchu_role_id;
+          await message.reply(`✅ Member role set to **${memberRole.name}** (\`${memberRole.id}\`). Members with this role can now bid.`);
+          break;
+
         default:
-          await message.reply(`❌ Unknown feature: \`${feature}\`. Try: guild, timer, attendance, bidding, admin, spawn, commands, bot, reminders, adminrole, or view.`);
+          await message.reply(`❌ Unknown feature: \`${feature}\`. Try: guild, timer, attendance, bidding, admin, spawn, commands, bot, reminders, adminrole, member, or view.`);
           return;
       }
 
