@@ -2614,30 +2614,46 @@ function createCommandHandlers(deps) {
           memberNameMap[id] = gm.nickname || gm.displayName || gm.user.username;
         }
 
-        // Fetch archived threads (paginate to get enough)
+        // Fetch archived threads — paginate with safety limits
         const allThreads = [];
-        let lastId = null;
-        let hasMore = true;
-        let fetchCount = 0;
-        const MAX_FETCH = 500; // Safety limit
+        const MAX_PAGES = 3; // Max 3 batches (300 threads) — enough for any real use
+        
+        await statusMsg.edit(`🔄 Searching archived threads for week of **${weekStartStr}** - **${weekEndStr}**...`);
 
-        while (hasMore && fetchCount < MAX_FETCH) {
-          const options = { limit: 100 };
-          if (lastId) options.before = lastId;
-
-          const archived = await attChannel.threads.fetchArchived(options);
-
-          if (archived.threads.size === 0) {
-            hasMore = false;
-            break;
+        for (let page = 0; page < MAX_PAGES; page++) {
+          // Use timestamp-based cursor (more reliable than snowflake ID)
+          const fetchOptions = { limit: 100 };
+          if (page > 0) {
+            const lastThread = allThreads[allThreads.length - 1];
+            if (lastThread) {
+              // Use the thread's creation timestamp as cursor (works reliably)
+              fetchOptions.before = lastThread.createdAt;
+            }
           }
+
+          const archived = await attChannel.threads.fetchArchived(fetchOptions);
+
+          if (archived.threads.size === 0) break;
+
+          // Track if any thread in this batch is within our target week
+          let foundInBatch = false;
 
           for (const [id, thread] of archived.threads) {
             allThreads.push(thread);
-            fetchCount++;
+            
+            // Check if this thread's creation date is within our target week
+            if (!foundInBatch && thread.createdAt >= sunday && thread.createdAt <= saturday) {
+              foundInBatch = true;
+            }
           }
 
-          lastId = archived.threads.last()?.id;
+          // Stop early if this batch had no threads from our target week
+          // (threads are sorted by archive time desc, so older batches won't have them)
+          if (!foundInBatch && allThreads.length > 100) {
+            // Only stop if we've fetched at least one full batch (100+ threads)
+            // First batch might have mixed dates
+            break;
+          }
         }
 
         // Also fetch active threads
