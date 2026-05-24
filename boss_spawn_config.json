@@ -201,7 +201,7 @@
       "schedules": [
         {
           "day": "Sunday",
-          "time": "07:00",
+          "time": "15:00",
           "dayOfWeek": 0
         }
       ],
