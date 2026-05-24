@@ -135,7 +135,14 @@ async function createSpawnThreads(
           try {
             const parseTimestamp = (ts) => {
               const [datePart, timePart] = ts.split(' ');
-              const [month, day, year] = datePart.split('/').map(Number);
+              let month, day, year;
+              if (datePart.includes('/')) {
+                [month, day, year] = datePart.split('/').map(Number);
+              } else if (datePart.includes('-')) {
+                [year, month, day] = datePart.split('-').map(Number);
+              } else {
+                throw new Error(`Unrecognized date format: ${datePart}`);
+              }
               const [hours, minutes] = timePart.split(':').map(Number);
               const fullYear = year < 100 ? 2000 + year : year;
               return new Date(fullYear, month - 1, day, hours, minutes);

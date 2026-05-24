@@ -263,6 +263,16 @@ function createMessageHandler(client, config, deps) {
               config
             );
 
+            // Also populate recentlyHandled cache so internal timer won't create a duplicate
+            if (result && result.success && deps.bossTimer?.addToRecentlyHandled) {
+              // Convert fullTimestamp string to Date for the cache
+              const [datePart, timePart] = fullTimestamp.split(' ');
+              const [y, m, d] = datePart.split('-').map(Number);
+              const [h, min] = timePart.split(':').map(Number);
+              const spawnDate = new Date(y, m - 1, d, h, min);
+              deps.bossTimer.addToRecentlyHandled(bossName, spawnDate, result.threadId);
+            }
+
             return;
           }
         }

@@ -125,7 +125,10 @@ async function triggerSpawnReminder(bossName, spawnTime) {
 
     // Check if spawn already exists (prevent duplicates)
     const activeSpawns = state.attendance.getActiveSpawns();
-    if (activeSpawns[bossName]) {
+    const hasActiveSpawn = Object.values(activeSpawns).some(
+      spawn => spawn.boss?.toLowerCase() === bossName?.toLowerCase() && !spawn.closed
+    );
+    if (hasActiveSpawn) {
       console.log(`⚠️ Spawn already exists for ${bossName}, skipping reminder to prevent duplicate`);
 
       state.bossKillTimes.delete(bossName.toLowerCase());
