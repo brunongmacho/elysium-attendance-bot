@@ -200,12 +200,12 @@
     "Chaiflock": {
       "schedules": [
         {
-          "day": "Saturday",
-          "time": "22:00",
-          "dayOfWeek": 6
+          "day": "Sunday",
+          "time": "07:00",
+          "dayOfWeek": 0
         }
       ],
-      "description": "Spawns Saturday 22:00"
+      "description": "Spawns Sunday 7:00"
     },
     "Benji": {
       "schedules": [
