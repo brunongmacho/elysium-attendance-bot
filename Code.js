@@ -3023,7 +3023,7 @@ function moveItemToForDistribution(sourceSheetName, rowNumber) {
  * Can also be called manually from Apps Script editor for cleanup
  */
 function moveAllItemsWithWinnersToForDistribution() {
-  Logger.log('📋 === SCANNING FOR ITEMS WITH WINNERS ===');
+  Logger.log('📋 === SCANNING ALL ROWS FOR WINNERS ===');
 
   try {
     const ss = SpreadsheetApp.getActive();
@@ -3048,77 +3048,56 @@ function moveAllItemsWithWinnersToForDistribution() {
       });
     }
 
-    Logger.log(`📊 Initial scan: ${lastRow - 1} rows`);
+    Logger.log(`📊 Scanning ${lastRow - 1} rows...`);
 
+    // Pass 1: Scan ALL rows and collect those with winners
+    const winnerRows = [];
+    for (let row = 2; row <= lastRow; row++) {
+      const winnerCell = biddingSheet.getRange(row, 4).getValue();
+      const winnerValue = winnerCell ? winnerCell.toString().trim() : '';
+      const itemName = biddingSheet.getRange(row, 1).getValue() || 'Unknown';
+
+      if (winnerValue && winnerValue.length > 0) {
+        Logger.log(`  ✅ Row ${row}: "${itemName}" → Winner: "${winnerValue}"`);
+        winnerRows.push(row);
+      } else {
+        Logger.log(`  ⏭️ Row ${row}: "${itemName}" → No winner, skipping`);
+      }
+    }
+
+    Logger.log(`📋 Found ${winnerRows.length} row(s) with winners out of ${lastRow - 1} total`);
+
+    // Pass 2: Process from bottom to top so row indices don't shift
     let movedCount = 0;
     let skippedCount = 0;
-    let totalRows = lastRow - 1;
 
-    // IMPORTANT: Scan from BOTTOM to TOP so row numbers don't shift as we delete
-    // We dynamically check the current last row in each iteration to handle deletions
-    while (biddingSheet.getLastRow() >= 2) {
-      const currentLastRow = biddingSheet.getLastRow();
+    for (let i = winnerRows.length - 1; i >= 0; i--) {
+      const rowNumber = winnerRows[i];
+      Logger.log(`\n📦 Processing row ${rowNumber} (index ${i})...`);
 
-      // Process the last row (bottom-up approach)
-      const rowNumber = currentLastRow;
+      const success = moveItemToForDistribution('BiddingItems', rowNumber);
 
-      // Get winner value from Column D (Winner column)
-      const winnerCell = biddingSheet.getRange(rowNumber, 4).getValue();
-      const winnerValue = winnerCell ? winnerCell.toString().trim() : '';
-
-      // Get item name for logging (Column A)
-      const itemName = biddingSheet.getRange(rowNumber, 1).getValue() || 'Unknown Item';
-
-      Logger.log(`\n📋 Checking row ${rowNumber}: "${itemName}"`);
-      Logger.log(`  Winner value: "${winnerValue}" (length: ${winnerValue.length})`);
-
-      // STRICT validation: Only move if winner has actual content
-      if (winnerValue && winnerValue.length > 0) {
-        Logger.log(`  ✅ Has winner: "${winnerValue}" - attempting move...`);
-        const success = moveItemToForDistribution('BiddingItems', rowNumber);
-
-        if (success) {
-          movedCount++;
-          Logger.log(`  ✅ Successfully moved "${itemName}"`);
-        } else {
-          skippedCount++;
-          Logger.log(`  ⚠️ Move failed for "${itemName}" - skipped`);
-          // If move failed, manually move to next row to avoid infinite loop
-          break;
-        }
+      if (success) {
+        movedCount++;
+        Logger.log(`  ✅ Successfully moved row ${rowNumber}`);
       } else {
-        Logger.log(`  ⏭️ No winner - skipping "${itemName}"`);
         skippedCount++;
-        // Since this row has no winner and we're processing bottom-up,
-        // we need to stop here (can't delete rows without winners)
-        // All remaining rows above will also be skipped
-        break;
+        Logger.log(`  ⚠️ Move failed for row ${rowNumber}`);
       }
 
       // Add small delay to prevent overwhelming the API
       Utilities.sleep(100);
-
-      // Safety check: prevent infinite loops
-      if (movedCount + skippedCount > totalRows + 50) {
-        Logger.log('⚠️ Safety limit reached - stopping scan');
-        break;
-      }
     }
 
-    Logger.log(`\n✅ === SCAN COMPLETE ===`);
-    Logger.log(`📦 Moved: ${movedCount} items`);
-    Logger.log(`⭐ Skipped: ${skippedCount} items (no winner or move failed)`);
-    Logger.log(`📊 Total processed: ${totalRows} rows`);
-
-    return createResponse('ok', `Moved ${movedCount} items to ForDistribution`, {
+    Logger.log(`\n✅ Done! Moved: ${movedCount}, Skipped: ${skippedCount}`);
+    return createResponse('ok', 'Items moved', {
       moved: movedCount,
       skipped: skippedCount,
-      total: totalRows
+      total: lastRow - 1
     });
 
   } catch (err) {
-    Logger.log(`❌ Error in moveAllItemsWithWinnersToForDistribution: ${err.toString()}`);
-    Logger.log(err.stack);
+    Logger.log('❌ Error in moveAllItemsWithWinnersToForDistribution: ' + err.toString());
     return createResponse('error', err.toString(), {
       moved: 0,
       skipped: 0,

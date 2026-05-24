@@ -522,6 +522,9 @@ async function finalizeSession(client, config, channel) {
 
     state.logger.info("🧹 Clearing session data...");
     state.auctionState.sessionItems = [];
+    state.auctionState.threadItems = {};
+    state.auctionState.activeThreadCount = 0;
+    state.auctionState.currentBatchSize = 1;
 
     // Clear bidding module cache
     if (!state.biddingModule) {

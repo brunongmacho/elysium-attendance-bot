@@ -220,7 +220,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   if (!currentItem.extCnt) currentItem.extCnt = 0;
 
   let timeExtended = false;
-  if (timeLeft < 65000 && timeLeft > 0 && currentItem.extCnt < ME) {
+  if (timeLeft < 20000 && timeLeft > 0 && currentItem.extCnt < ME) {
     // CRITICAL: Validate auctioneering module has required methods
     if (!auctRef ||
         typeof auctRef.safelyClearItemTimers !== "function" ||
