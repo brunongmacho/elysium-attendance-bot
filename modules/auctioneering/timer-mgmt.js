@@ -21,33 +21,39 @@ const { COLORS, EMOJI } = require('./constants');
  * @param {Discord.ThreadChannel} channel - Auction thread channel
  */
 function scheduleItemTimers(client, config, channel) {
-  if (!client || !config || !channel || !state.auctionState.currentItem) {
+  if (!client || !config || !channel) {
     state.logger.error(`${EMOJI.ERROR} Invalid parameters to scheduleItemTimers`);
     return;
   }
 
-  const item = state.auctionState.currentItem;
+  const tid = channel.id;
+  const item = state.auctionState.threadItems?.[tid] || state.auctionState.currentItem;
+  if (!item) {
+    state.logger.error(`${EMOJI.ERROR} No item found for thread ${tid} in scheduleItemTimers`);
+    return;
+  }
+
   const t = Math.max(0, item.endTime - Date.now());
 
   if (t > 60000 && !item.go1) {
-    state.auctionState.timers.go1 = setTimeout(
+    state.auctionState.timers[`${tid}_go1`] = setTimeout(
       async () => await itemGo1(client, config, channel),
       t - 60000
     );
   }
   if (t > 30000 && !item.go2) {
-    state.auctionState.timers.go2 = setTimeout(
+    state.auctionState.timers[`${tid}_go2`] = setTimeout(
       async () => await itemGo2(client, config, channel),
       t - 30000
     );
   }
   if (t > 10000) {
-    state.auctionState.timers.go3 = setTimeout(
+    state.auctionState.timers[`${tid}_go3`] = setTimeout(
       async () => await itemGo3(client, config, channel),
       t - 10000
     );
   }
-  state.auctionState.timers.itemEnd = setTimeout(
+  state.auctionState.timers[`${tid}_itemEnd`] = setTimeout(
     async () => {
       const { itemEnd } = require('./item-completion');
       await itemEnd(client, config, channel);
@@ -60,15 +66,15 @@ function scheduleItemTimers(client, config, channel) {
  * Announces 60 seconds remaining in the auction.
  */
 async function itemGo1(client, config, channel) {
+  const tid = channel?.id;
+  const item = state.auctionState.threadItems?.[tid] || state.auctionState.currentItem;
   if (
     !state.auctionState.active ||
-    !state.auctionState.currentItem ||
-    state.auctionState.currentItem.go1
+    !item ||
+    item.go1
   )
     return;
-  state.auctionState.currentItem.go1 = true;
-
-  const item = state.auctionState.currentItem;
+  item.go1 = true;
   const endTimestamp = Math.floor(item.endTime / 1000);
 
   try {
@@ -95,15 +101,15 @@ async function itemGo1(client, config, channel) {
  * Announces 30 seconds remaining in the auction.
  */
 async function itemGo2(client, config, channel) {
+  const tid = channel?.id;
+  const item = state.auctionState.threadItems?.[tid] || state.auctionState.currentItem;
   if (
     !state.auctionState.active ||
-    !state.auctionState.currentItem ||
-    state.auctionState.currentItem.go2
+    !item ||
+    item.go2
   )
     return;
-  state.auctionState.currentItem.go2 = true;
-
-  const item = state.auctionState.currentItem;
+  item.go2 = true;
   const endTimestamp = Math.floor(item.endTime / 1000);
 
   try {
@@ -130,10 +136,10 @@ async function itemGo2(client, config, channel) {
  * Announces 10 seconds remaining in the auction (final countdown).
  */
 async function itemGo3(client, config, channel) {
-  if (!state.auctionState.active || !state.auctionState.currentItem || state.auctionState.currentItem.go3) return;
-  state.auctionState.currentItem.go3 = true;
-
-  const item = state.auctionState.currentItem;
+  const tid = channel?.id;
+  const item = state.auctionState.threadItems?.[tid] || state.auctionState.currentItem;
+  if (!state.auctionState.active || !item || item.go3) return;
+  item.go3 = true;
   const endTimestamp = Math.floor(item.endTime / 1000);
 
   try {
@@ -158,14 +164,17 @@ async function itemGo3(client, config, channel) {
 
 /**
  * Safely cleans up specific timers by key.
+ * If channelId is provided, keys are prefixed: `${channelId}_${key}`.
  *
+ * @param {string} [channelId] - Optional thread ID for prefixed timer keys
  * @param {...string} timerKeys - Timer keys to clean up
  */
-function safelyCleanupTimers(...timerKeys) {
+function safelyCleanupTimers(channelId, ...timerKeys) {
   timerKeys.forEach((key) => {
-    if (state.auctionState.timers[key]) {
-      clearTimeout(state.auctionState.timers[key]);
-      delete state.auctionState.timers[key];
+    const fullKey = channelId ? `${channelId}_${key}` : key;
+    if (state.auctionState.timers[fullKey]) {
+      clearTimeout(state.auctionState.timers[fullKey]);
+      delete state.auctionState.timers[fullKey];
     }
   });
 }

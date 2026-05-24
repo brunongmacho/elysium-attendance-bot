@@ -326,8 +326,8 @@ async function ensureThreadCapacity(channel) {
     const activeThreads = await channel.threads.fetchActive();
     const activeCount = activeThreads.threads.size;
 
-    const THREAD_LIMIT = 50;
-    const THREAD_WARNING = 40;
+    const THREAD_LIMIT = 30;
+    const THREAD_WARNING = 20;
 
     state.logger.info(`📊 Active threads in ${channel.name}: ${activeCount}/${THREAD_LIMIT}`);
 

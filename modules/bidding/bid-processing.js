@@ -27,7 +27,7 @@ const { normalizeUsername } = require('./utilities');
  * CRITICAL FEATURES:
  * 1. INSTANT PROCESSING - No confirmation required
  * 2. RACE CONDITION PREVENTION - Rate limiting, points locking
- * 3. TIME EXTENSION - Bids in final 60 seconds extend by 1 minute
+ * 3. TIME EXTENSION - Bids in final 15 seconds extend by 15 seconds
  * 4. VALIDATION CHECKS - Role, rate limit, amount, points
  * 5. STATE UPDATES - Lock/unlock points, update current item
  * 6. USER FEEDBACK - Immediate confirmation embed
@@ -40,7 +40,8 @@ const { normalizeUsername } = require('./utilities');
  * @returns {Promise<Object>} { ok: boolean, msg?: string, instant?: true }
  */
 async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
-  const currentItem = auctState.currentItem;
+  const itemFromThread = msg.channel?.id ? auctState.threadItems?.[msg.channel.id] : null;
+  const currentItem = itemFromThread || auctState.currentItem;
 
   // Safety check: Ensure currentItem and currentSession exist
   if (!currentItem) {
@@ -213,7 +214,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     timestamp: now,
   });
 
-  // CRITICAL: Check if bid is in last 65 seconds - extend time by 1 minute
+  // CRITICAL: Check if bid is in last 65 seconds - extend time by 15 seconds
   // MUST clear timers BEFORE checking to prevent race condition where timer fires during processing
   const timeLeft = currentItem.endTime - Date.now();
   if (!currentItem.extCnt) currentItem.extCnt = 0;
@@ -232,17 +233,17 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     }
 
     // STEP 1: Clear ALL timers IMMEDIATELY to prevent old itemEnd from firing
-    auctRef.safelyClearItemTimers();
+    auctRef.safelyClearItemTimers(msg.channel.id);
     state.logger.info(`🛑 Cleared timers to prevent race condition`);
 
     // STEP 2: Update endTime (now safe since timers are cleared)
-    const extensionTime = 60000; // 1 minute
+    const extensionTime = 15000; // 15 seconds
     currentItem.endTime += extensionTime;
     currentItem.extCnt++;
     timeExtended = true;
 
     state.logger.info(
-      `⏰ Time extended for ${currentItem.item} by 1 minute (bid in final minute, ext #${currentItem.extCnt}/${ME})`
+      `⏰ Time extended for ${currentItem.item} by 15 seconds (bid in final 15s, ext #${currentItem.extCnt}/${ME})`
     );
     state.logger.info(`Old end time: ${new Date(currentItem.endTime - extensionTime).toLocaleTimeString()}`);
     state.logger.info(`New end time: ${new Date(currentItem.endTime).toLocaleTimeString()}`);
@@ -252,7 +253,8 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     auctRef.rescheduleItemTimers(
       msg.client,
       config,
-      msg.channel
+      msg.channel,
+      msg.channel.id
     );
     state.logger.info(`✅ Timers rescheduled with new endTime`);
   }
@@ -268,7 +270,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
       curWin: u,
       curWinId: uid,
       bids: currentItem.bids,
-    });
+    }, msg.channel.id);
   }
 
   // Save state
@@ -340,7 +342,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
           .setColor(0xffa500)
           .setTitle(`⏰ Time Extended!`)
           .setDescription(
-            `Bid placed in final minute - adding 1 more minute to the auction!`
+            `Bid placed in final seconds - adding 15 more seconds to the auction!`
           )
           .addFields({
             name: "⏱️ Ends",

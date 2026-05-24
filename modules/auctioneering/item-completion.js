@@ -31,13 +31,17 @@ async function itemEnd(client, config, channel) {
     return;
   }
 
-  if (!state.auctionState.active || !state.auctionState.currentItem) return;
+  if (!state.auctionState.active) return;
 
-  const item = state.auctionState.currentItem;
+  // Resolve item from threadItems or currentItem
+  const threadId = channel?.id;
+  const item = state.auctionState.threadItems?.[threadId] || state.auctionState.currentItem;
+  if (!item) return;
+
   item.status = "ended";
 
-  // Clear timers to avoid duplicates
-  safelyCleanupTimers("itemEnd", "go1", "go2", "go3");
+  // Clear timers to avoid duplicates (use prefixed keys for thread items)
+  safelyCleanupTimers(threadId && state.auctionState.threadItems?.[threadId] ? threadId : null, "itemEnd", "go1", "go2", "go3");
 
   const timestamp = state.getTimestamp();
   const totalBids = item.bids ? item.bids.length : 0;
@@ -135,13 +139,16 @@ async function itemEnd(client, config, channel) {
     }
 
     // Update item in queue array with winner info
-    const currentItem = state.auctionState.sessionItems[state.auctionState.currentItemIndex];
-    if (currentItem) {
-      currentItem.winner = item.curWin;
-      currentItem.winnerId = item.curWinId;
-      currentItem.amount = item.curBid;
-      currentItem.timestamp = timestamp;
-      currentItem.auctionEndTime = endTimeStr;
+    const sessionIdx = state.auctionState.threadItems?.[threadId]
+      ? state.auctionState.sessionItems.findIndex(si => si === item)
+      : state.auctionState.currentItemIndex;
+    const sessionItem = state.auctionState.sessionItems[sessionIdx];
+    if (sessionItem) {
+      sessionItem.winner = item.curWin;
+      sessionItem.winnerId = item.curWinId;
+      sessionItem.amount = item.curBid;
+      sessionItem.timestamp = timestamp;
+      sessionItem.auctionEndTime = endTimeStr;
     }
   } else {
     // NO WINNER
@@ -206,7 +213,42 @@ async function itemEnd(client, config, channel) {
     state.logger.warn(`⚠️ Error locking/archiving thread:`, err.message);
   }
 
-  // Move to next item
+  // If this was a parallel thread item, remove from threadItems
+  if (threadId && state.auctionState.threadItems?.[threadId]) {
+    delete state.auctionState.threadItems[threadId];
+
+    state.auctionState.activeThreadCount--;
+
+    if (state.auctionState.activeThreadCount > 0) {
+      // More parallel threads still running — return without advancing currentItemIndex
+      state.logger.info(`⏳ ${state.auctionState.activeThreadCount} parallel thread(s) still running for this batch...`);
+      return;
+    }
+
+    // All threads in batch complete — advance by batch size
+    state.auctionState.currentItemIndex += state.auctionState.currentBatchSize || 1;
+    state.auctionState.currentItem = null;
+
+    // Get the parent bidding channel
+    let biddingChannel = channel;
+    if (channel && (channel.type === 11 || channel.type === 12) && channel.parent) {
+      biddingChannel = channel.parent;
+    }
+
+    // Check if there are more items
+    if (state.auctionState.currentItemIndex < state.auctionState.sessionItems.length) {
+      state.logger.info(`⏭️ Moving to next item...`);
+      const { auctionNextItem } = require('./item-auction');
+      await auctionNextItem(client, config, biddingChannel);
+    } else {
+      state.logger.info(`🎉 All items completed. Finalizing session.`);
+      const { finalizeSession } = require('./item-completion');
+      await finalizeSession(client, config, biddingChannel);
+    }
+    return;
+  }
+
+  // Move to next item (single-item session path)
   state.auctionState.currentItemIndex++;
   state.auctionState.currentItem = null;
 

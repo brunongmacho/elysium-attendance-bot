@@ -667,11 +667,20 @@ async function handleForceSubmitResults(message, config, biddingModule) {
 
 /**
  * Updates the current item's state with new values.
+ * If threadId is provided, also updates the item in threadItems.
+ *
+ * @param {Object} updates - State updates to apply
+ * @param {string} [threadId] - Optional thread ID for threadItems sync
  */
-function updateCurrentItemState(updates) {
-  if (!state.auctionState.currentItem) return false;
+function updateCurrentItemState(updates, threadId) {
+  if (!state.auctionState.currentItem && !(threadId && state.auctionState.threadItems?.[threadId])) return false;
 
-  Object.assign(state.auctionState.currentItem, updates);
+  if (threadId && state.auctionState.threadItems?.[threadId]) {
+    Object.assign(state.auctionState.threadItems[threadId], updates);
+  }
+  if (state.auctionState.currentItem) {
+    Object.assign(state.auctionState.currentItem, updates);
+  }
   state.logger.info(`${EMOJI.SUCCESS} Item state updated:`, Object.keys(updates));
   return true;
 }

@@ -39,7 +39,7 @@ async function stopCurrentItem(client, config, channel) {
     return false;
   }
 
-  safelyCleanupTimers("itemEnd", "go1", "go2", "go3");
+  safelyCleanupTimers(null, "itemEnd", "go1", "go2", "go3");
 
   const item = state.auctionState.currentItem;
 
@@ -119,14 +119,18 @@ function extendCurrentItem(minutes) {
 
 /**
  * Safely clears only item-specific timers without affecting session timers.
+ * If threadId is provided, uses prefixed timer keys: `${threadId}_go1`, etc.
+ *
+ * @param {string} [threadId] - Optional thread ID for prefixed timers
  */
-function safelyClearItemTimers() {
+function safelyClearItemTimers(threadId) {
   const timerKeys = ['go1', 'go2', 'go3', 'itemEnd'];
   timerKeys.forEach(key => {
-    if (state.auctionState.timers[key]) {
-      clearTimeout(state.auctionState.timers[key]);
-      delete state.auctionState.timers[key];
-      state.logger.info(`🛑 Cleared timer: ${key}`);
+    const fullKey = threadId ? `${threadId}_${key}` : key;
+    if (state.auctionState.timers[fullKey]) {
+      clearTimeout(state.auctionState.timers[fullKey]);
+      delete state.auctionState.timers[fullKey];
+      state.logger.info(`🛑 Cleared timer: ${fullKey}`);
     }
   });
 }
@@ -137,10 +141,12 @@ function safelyClearItemTimers() {
  * @param {Discord.Client} client - Discord bot client
  * @param {Object} config - Bot configuration
  * @param {Discord.ThreadChannel} channel - Auction thread channel
+ * @param {string} [threadId] - Optional thread ID for prefixed timer keys
  * @returns {boolean} True if successfully rescheduled, false if no active item
  */
-function rescheduleItemTimers(client, config, channel) {
-  if (!state.auctionState.active || !state.auctionState.currentItem) {
+function rescheduleItemTimers(client, config, channel, threadId) {
+  const item = state.auctionState.threadItems?.[threadId] || state.auctionState.currentItem;
+  if (!state.auctionState.active || !item) {
     state.logger.warn(`${EMOJI.WARNING} Cannot reschedule timers - no active item`);
     return false;
   }
@@ -148,20 +154,20 @@ function rescheduleItemTimers(client, config, channel) {
   // Clear existing item timers FIRST to prevent race condition
   const timerKeys = ['go1', 'go2', 'go3', 'itemEnd'];
   timerKeys.forEach(key => {
-    if (state.auctionState.timers[key]) {
-      clearTimeout(state.auctionState.timers[key]);
-      delete state.auctionState.timers[key];
+    const fullKey = threadId ? `${threadId}_${key}` : key;
+    if (state.auctionState.timers[fullKey]) {
+      clearTimeout(state.auctionState.timers[fullKey]);
+      delete state.auctionState.timers[fullKey];
     }
   });
 
   // Reset announcement flags AFTER clearing timers
-  const item = state.auctionState.currentItem;
   item.go1 = false;
   item.go2 = false;
 
   // Reschedule based on new endTime
   scheduleItemTimers(client, config, channel);
-  state.logger.info(`${EMOJI.SUCCESS} Item timers rescheduled for ${state.auctionState.currentItem.item}`);
+  state.logger.info(`${EMOJI.SUCCESS} Item timers rescheduled for ${item.item}`);
   return true;
 }
 

@@ -17,7 +17,26 @@ const { scheduleItemTimers } = require('./timer-mgmt');
 // Lazy-require item-completion to avoid circular dependency at load time
 
 /**
- * Auctions the next item in the session queue.
+ * Groups consecutive same-name items into batches.
+ * @param {Array} items - Array of item objects with .item name property
+ * @returns {Array} Batches of items: [{name: string, items: []}]
+ */
+function groupItemsByName(items) {
+  const batches = [];
+  let current = null;
+  for (const item of items) {
+    if (!current || current.name !== item.item) {
+      current = { name: item.item, items: [] };
+      batches.push(current);
+    }
+    current.items.push(item);
+  }
+  return batches;
+}
+
+/**
+ * Auctions the next item(s) in the session queue.
+ * Same-name items are batched and run in parallel threads.
  *
  * @param {Discord.Client} client - Discord bot client
  * @param {Object} config - Bot configuration
@@ -68,30 +87,31 @@ async function auctionNextItem(client, config, channel) {
     return;
   }
 
-  const item = state.auctionState.sessionItems[state.auctionState.currentItemIndex];
-  if (!item) {
-    state.logger.error("❌ No item at current index, finalizing...");
-    const { finalizeSession } = require('./item-completion');
-    await finalizeSession(client, config, channel);
-    return;
-  }
+  // Get the current batch of same-name items
+  const batches = groupItemsByName(state.auctionState.sessionItems.slice(state.auctionState.currentItemIndex));
+  const batch = batches[0];
+  const batchSize = batch.items.length;
+  state.auctionState.currentBatchSize = batchSize;
 
-  // 30-SECOND PREVIEW BEFORE ITEM STARTS
-  const remainingItems =
-    state.auctionState.sessionItems.length - state.auctionState.currentItemIndex;
+  // Send single preview per batch
+  const previewText = batchSize > 1
+    ? `**${batchSize}x ${batch.name}** auctions starting in 30 seconds!`
+    : `**${batch.name}** auction starting in 30 seconds!`;
+
+  const remainingItems = state.auctionState.sessionItems.length - state.auctionState.currentItemIndex;
   const previewEmbed = new EmbedBuilder()
     .setColor(COLORS.AUCTION)
     .setTitle(`${EMOJI.CLOCK} NEXT ITEM COMING UP`)
-    .setDescription(`**${item.item}**`)
+    .setDescription(previewText)
     .addFields(
       {
-        name: `${EMOJI.BID} Starting Bid`,
-        value: `${item.startPrice || 0} points`,
+        name: `${EMOJI.BID} Starting Price`,
+        value: `${batch.items[0].startPrice || 0}pts`,
         inline: true,
       },
       {
-        name: `${EMOJI.TIME} Duration`,
-        value: `${item.duration || 2} minutes`,
+        name: `${EMOJI.LIST} Quantity`,
+        value: `${batchSize}x`,
         inline: true,
       },
       {
@@ -101,10 +121,10 @@ async function auctionNextItem(client, config, channel) {
       }
     );
 
-  if (item.bossName && item.bossName !== "Unknown") {
+  if (batch.items[0].bossName && batch.items[0].bossName !== "Unknown") {
     previewEmbed.addFields({
       name: `${EMOJI.TROPHY} Boss`,
-      value: `${item.bossName}`,
+      value: `${batch.items[0].bossName}`,
       inline: true,
     });
   }
@@ -118,193 +138,156 @@ async function auctionNextItem(client, config, channel) {
     embeds: [previewEmbed],
   });
 
-  state.logger.info(`${EMOJI.CLOCK} 30-second preview for: ${item.item}`);
+  state.logger.info(`${EMOJI.CLOCK} 30-second preview for batch: ${batchSize}x ${batch.name}`);
 
   // Wait 30 seconds before starting
   await new Promise((resolve) => setTimeout(resolve, TIMEOUTS.PREVIEW_DELAY));
 
-  // START THE ACTUAL AUCTION
-  state.auctionState.currentItem = item;
-  state.auctionState.currentItem.status = "active";
-  state.auctionState.currentItem.bids = [];
-
-  const threadName = `${item.item} | ${item.startPrice || 0}pts${
-    item.bossName !== "Unknown" ? ` | ${item.bossName}` : ""
-  }`;
-
-  let auctionThread = null;
-
+  // Check thread capacity before creating threads
+  const { ensureThreadCapacity } = require('./session-lifecycle');
   try {
-    // Check thread limit before creating
-    const { ensureThreadCapacity } = require('./session-lifecycle');
     await ensureThreadCapacity(channel);
+  } catch (err) {
+    state.logger.error("❌ Thread capacity check failed:", err);
+    state.auctionState.active = false;
+    await channel.send(`❌ Cannot start auction - ${err.message}`);
+    return;
+  }
 
-    // Try normal thread creation first
-    if (channel.threads && typeof channel.threads.create === "function") {
-      auctionThread = await channel.threads.create({
-        name: threadName,
-        autoArchiveDuration: config.auto_archive_minutes || 60,
-        reason: `Auction for ${item.item}`,
-      });
-    } else {
-      // Fallback: send starter message and create thread from it
-      state.logger.warn(
-        "⚠️ channel.threads.create not available – using message.startThread() fallback"
-      );
-      const starterMsg = await channel.send({
-        content: `@everyone`,
-        embeds: [
-          new EmbedBuilder()
-            .setColor(COLORS.AUCTION)
-            .setTitle(`${EMOJI.AUCTION} New Auction Started`)
-            .setDescription(
-              `**Item:** ${item.item}\n**Start Price:** ${item.startPrice || 0} pts\n**Duration:** ${item.duration || 2} min`
-            )
-            .setFooter({
-              text: `Thread created per item • ${state.getTimestamp()}`,
-            }),
-        ],
-      });
+  // Initialize threadItems map and counter
+  state.auctionState.threadItems = state.auctionState.threadItems || {};
+  state.auctionState.activeThreadCount = batchSize;
 
-      if (starterMsg && typeof starterMsg.startThread === "function") {
-        auctionThread = await starterMsg.startThread({
+  // Create threads for ALL items in the batch in parallel
+  const threads = [];
+  let threadCreationFailed = false;
+
+  for (let i = 0; i < batchSize; i++) {
+    const item = batch.items[i];
+    const displayName = `${item.item} #${i + 1}`;
+
+    const threadName = `${displayName} | ${item.startPrice || 0}pts${item.bossName && item.bossName !== "Unknown" ? ` | ${item.bossName}` : ""}`;
+
+    let auctionThread = null;
+
+    try {
+      if (channel.threads && typeof channel.threads.create === "function") {
+        auctionThread = await channel.threads.create({
           name: threadName,
           autoArchiveDuration: config.auto_archive_minutes || 60,
           reason: `Auction for ${item.item}`,
         });
       } else {
-        throw new Error(
-          "Neither channel.threads.create nor message.startThread are available."
-        );
+        const starterMsg = await channel.send({
+          content: `@everyone`,
+          embeds: [
+            new EmbedBuilder()
+              .setColor(COLORS.AUCTION)
+              .setTitle(`${EMOJI.AUCTION} New Auction Started`)
+              .setDescription(
+                `**Item:** ${displayName}\n**Start Price:** ${item.startPrice || 0} pts\n**Duration:** ${item.duration || 2} min`
+              )
+              .setFooter({
+                text: `Thread created per item • ${state.getTimestamp()}`,
+              }),
+          ],
+        });
+
+        if (starterMsg && typeof starterMsg.startThread === "function") {
+          auctionThread = await starterMsg.startThread({
+            name: threadName,
+            autoArchiveDuration: config.auto_archive_minutes || 60,
+            reason: `Auction for ${item.item}`,
+          });
+        } else {
+          throw new Error("Neither channel.threads.create nor message.startThread are available.");
+        }
       }
-    }
 
-    if (!auctionThread) {
-      throw new Error("Failed to create auction thread (unknown reason).");
-    }
+      if (!auctionThread) {
+        throw new Error("Failed to create auction thread (unknown reason).");
+      }
 
-    // Send embed inside the thread (only if we used threads.create)
-    if (channel.threads && typeof channel.threads.create === "function") {
+      // Initialize item state
+      item.curBid = item.startPrice || 0;
+      item.curWin = null;
+      item.curWinId = null;
+      item.bids = [];
+      item.extCnt = 0;
+
+      const duration = (item.duration || 2) * 60 * 1000;
+      item.endTime = Date.now() + duration;
+      item.thread = auctionThread;
+      item.threadId = auctionThread.id;
+
+      // Set dummy session for bidding.js compatibility
+      item.currentSession = {
+        bossName: item.bossName || "Open",
+        bossKey: "open",
+        attendees: [],
+      };
+
+      // Store in threadItems map
+      state.auctionState.threadItems[auctionThread.id] = item;
+
+      threads.push(auctionThread);
+
+      // Send "Auction Started" to thread
       await auctionThread.send({
+        content: `@everyone`,
         embeds: [
           new EmbedBuilder()
             .setColor(COLORS.AUCTION)
-            .setTitle(`${EMOJI.AUCTION} New Auction Started`)
+            .setTitle(`${EMOJI.AUCTION} Auction Started: ${displayName}`)
             .setDescription(
-              `**Item:** ${item.item}\n**Start Price:** ${item.startPrice || 0} pts\n**Duration:** ${item.duration || 2} min\n\n✅ **All guild members can bid!**`
+              `**Boss:** ${item.bossName !== "Unknown" ? item.bossName : "OPEN"}\n` +
+                `**Starting Price:** ${item.startPrice || 0} pts\n` +
+                `**Duration:** ${item.duration || 2} min\n\n` +
+                `Use \`!bid <amount>\` to place your bids.\n` +
+                `✅ **All guild members can bid!**`
             )
-            .setFooter({
-              text: `Thread created per item • ${state.getTimestamp()}`,
-            }),
+            .setFooter({ text: "Auction open — place your bids now!" })
+            .setTimestamp(),
         ],
       });
-    }
-  } catch (err) {
-    state.logger.error("❌ Failed to create auction thread:", err);
-    state.logger.error(
-      "→ Check: Bot needs 'Create Public Threads' & 'Send Messages in Threads' in the bidding channel."
-    );
 
-    // COMPREHENSIVE cleanup to prevent auction from being stuck
-    // Clear all timers first
-    const { clearAllTimers } = require('./session-lifecycle');
-    clearAllTimers();
+      // Schedule per-thread timers
+      scheduleItemTimers(client, config, auctionThread);
 
-    // Clear current item and deactivate
-    state.auctionState.currentItem = null;
-    state.auctionState.active = false;
+      state.logger.info(`${EMOJI.SUCCESS} Auction started for: ${displayName} (${duration/60000} min)`);
+    } catch (err) {
+      state.logger.error(`❌ Failed to create thread for ${displayName}:`, err);
+      threadCreationFailed = true;
 
-    // Clear locked points from failed auction
-    try {
-      if (!state.biddingModule) {
-        state.biddingModule = require("../../bidding.js");
+      // Cleanup already created threads
+      for (const t of threads) {
+        try {
+          await t.setLocked(true, "Auction cancelled due to thread creation failure");
+          await t.setArchived(true, "Auction cancelled");
+        } catch (_) { /* ignore */ }
       }
-      const biddingState = state.biddingModule.getBiddingState();
-      biddingState.lp = {};
-      state.biddingModule.saveBiddingState();
-      state.logger.info(`${EMOJI.SUCCESS} Cleared locked points after thread creation failure`);
-    } catch (unlockErr) {
-      state.logger.error(`${EMOJI.ERROR} Failed to clear locked points:`, unlockErr);
-    }
 
-    // Save state
-    try {
-      if (state.cfg?.sheet_webhook_url) {
-        await saveAuctionState();
-      }
-    } catch (_) {
-      // ignore; best-effort
-    }
+      state.auctionState.threadItems = {};
+      state.auctionState.activeThreadCount = 0;
+      state.auctionState.active = false;
 
-    try {
-      await channel.send(
-        `❌ Unable to create thread for **${item.item}**. Thread creation failed. Auction cancelled.`
-      );
-    } catch (e) {
-      state.logger.error("❌ Also failed to send fallback message:", e);
+      // Clear locked points
+      try {
+        if (!state.biddingModule) {
+          state.biddingModule = require("../../bidding.js");
+        }
+        const biddingState = state.biddingModule.getBiddingState();
+        biddingState.lp = {};
+        state.biddingModule.saveBiddingState();
+      } catch (_) { /* ignore */ }
+
+      await channel.send(`❌ Failed to start auction for **${displayName}**. Auction cancelled.`);
+      return;
     }
-    return;
   }
 
-  // Set currentItem properly BEFORE starting the auction
-  state.auctionState.currentItem = item;
-  item.status = "active";
-  item.auctionStartTime = state.getTimestamp();
-
-  // Initialize item auction state
-  item.curBid = item.startPrice || 0;
-  item.curWin = null;
-  item.curWinId = null;
-  item.bids = [];
-  item.extCnt = 0;
-
-  const duration = (item.duration || 2) * 60 * 1000;
-  item.endTime = Date.now() + duration;
-
-  // Store thread reference for later use
-  item.thread = auctionThread;
-  item.threadId = auctionThread.id;
-
-  // Set dummy session for bidding.js compatibility
-  item.currentSession = {
-    bossName: item.bossName || "Open",
-    bossKey: "open",
-    attendees: [],
-  };
-
-  // Start bidding in this thread - send announcement
-  try {
-    await auctionThread.send({
-      content: `@everyone`,
-      embeds: [
-        new EmbedBuilder()
-          .setColor(COLORS.AUCTION)
-          .setTitle(`${EMOJI.AUCTION} Auction Started: ${item.item}`)
-          .setDescription(
-            `**Boss:** ${item.bossName !== "Unknown" ? item.bossName : "OPEN"}\n` +
-              `**Starting Price:** ${item.startPrice || 0} pts\n` +
-              `**Duration:** ${item.duration || 2} min\n\n` +
-              `Use \`!bid <amount>\` to place your bids.\n` +
-              `✅ **All guild members can bid!**`
-          )
-          .setFooter({ text: "Auction open — place your bids now!" })
-          .setTimestamp(),
-      ],
-    });
-
-    // Schedule the auction end timers
-    scheduleItemTimers(client, config, auctionThread);
-
-    state.logger.info(
-      `${EMOJI.SUCCESS} Auction started for: ${item.item} (${duration/60000} min)`
-    );
-  } catch (err) {
-    state.logger.error("❌ Error starting item auction:", err);
-    await channel.send(`❌ Failed to start auction for ${item.item}: ${err.message}`);
-
-    state.auctionState.currentItem = null;
-    return;
-  }
+  // Set currentItem to null (using threadItems instead)
+  state.auctionState.currentItem = null;
 }
 
 module.exports = {
