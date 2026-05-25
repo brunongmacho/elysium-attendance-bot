@@ -314,6 +314,13 @@ function createMessageHandler(client, config, deps) {
         );
 
         if (isCheckIn) {
+          // Guard: Reject check-in if spawn is already closed
+          const spawnInfo = deps.stateManager?.activeSpawns?.[message.channel.id];
+          if (!spawnInfo || spawnInfo.closed) {
+            console.log(`⏭️ Rejected check-in from ${message.author.username} in thread ${message.channel.name} - spawn ${spawnInfo?.boss || 'unknown'} is already closed`);
+            return;
+          }
+
           console.log(`📋 Check-in detected from ${message.author.username} in thread ${message.channel.name}`);
 
           try {

@@ -92,6 +92,13 @@ async function scanThreadForPendingReactions(thread, client, bossName, parsed) {
     // Check if message is a valid check-in keyword (original or fuzzy)
     const checkInKeywords = ["present", "here", "join", "checkin", "check-in"];
     if (checkInKeywords.includes(keyword) || checkInKeywords.includes(fuzzyKeyword)) {
+      // Guard: Skip check-in if spawn is already closed
+      const spawnInfo = state.stateManager?.activeSpawns?.[thread.id];
+      if (!spawnInfo || spawnInfo.closed) {
+        console.log(`⏭️ Recovery: Skipping check-in from ${msg.author.username} - spawn is already closed`);
+        continue;
+      }
+
       // Get member display name (nickname or username)
       const author = await thread.guild.members.fetch(msg.author.id).catch(() => null);
       const username = author ? (author.nickname || author.displayName || msg.author.displayName || msg.author.username) : msg.author.displayName || msg.author.username;
