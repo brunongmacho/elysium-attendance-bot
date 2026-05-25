@@ -3,7 +3,7 @@
 A production Discord bot for MMORPG guild management — attendance tracking, auction systems, boss spawn timers, leaderboards, Member Registry, and emergency recovery. Built for the TENCHU guild.
 
 ![Status](https://img.shields.io/badge/status-production-success)
-![Version](https://img.shields.io/badge/version-10.0.0-blue)
+![Version](https://img.shields.io/badge/version-11.0.0-blue)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
 ![Discord.js](https://img.shields.io/badge/discord.js-v14.25.1-5865F2)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -37,18 +37,17 @@ The bot runs on Node.js with Discord.js v14, stores data in Google Sheets, and u
 
 ### Attendance Tracking
 
-Members check in to boss spawns via attendance threads. Screenshot uploads are required for non-admin members. Admins verify submissions with reaction buttons (checkmark / cross). Threads auto-close after 30 minutes to prevent late submissions. Attendance points auto-calculate via sheet formulas. Names are auto-synced via the Member Registry — if someone changes their Discord nickname, it propagates to all WEEK_ sheets automatically.
+Members check in to boss spawns via attendance threads. Screenshot uploads are required for non-admin members. Admins verify submissions with reaction buttons (checkmark / cross). Threads auto-close after 30 minutes to prevent late submissions. Attendance points auto-calculate via sheet formulas. Names are auto-synced via the Member Registry — if someone changes their Discord nickname, it propagates to all WEEK_ sheets automatically. Fuzzy keyword matching handles typos — 'heerreeee', 'pprresenttt' all work.
 
 ### Auction System
 
-Open point-based bidding — any TENCHU member can bid on loot items. The system includes a 30-second preview phase, auto-extend on last-minute bids (anti-snipe), dedicated threads per item, session history, and admin controls (pause, resume, extend, skip, cancel). Auctions run on a Saturday schedule with a 10-minute cooldown between sessions. Bidding points reset weekly — each week starts fresh based on that week's attendance.
+Open point-based bidding — any TENCHU member can bid on loot items. The system includes a 30-second preview phase (or instant start with `!startauctionnow`), auto-extend on last-minute bids (anti-snipe with 15-second extensions), dedicated threads per item with parallel same-name items running concurrently, and admin controls (pause, resume, extend, skip, cancel). Auctions run on demand with no cooldown. Bidding points reset weekly — each week starts fresh based on that week's attendance.
 
 ### Boss Timer & Spawn Prediction
 
-37 bosses tracked across two modes:
+36 bosses tracked across two modes:
 - **Timer-based** (22 bosses) — dynamic predictions using kill time + spawn interval (10h–62h)
-- **Schedule-based** (14 bosses) — fixed weekly schedule with 99% confidence predictions
-- **Guild Boss** (15 points) — special tracked event
+- **Schedule-based** (17 bosses) — fixed weekly schedule with 99% confidence predictions
 
 Fuzzy name matching handles typos via Levenshtein distance. All predictions use Discord native relative timestamps for live countdowns.
 
@@ -68,9 +67,13 @@ Multi-guild rotation tracking for shared world bosses. Supports any number of gu
 
 A full toolkit for stuck states: force-close threads, force-end auctions, unlock points, clear bids, diagnostics, and force-sync to Google Sheets. All emergency commands require confirmation with a 30-second timeout.
 
+### Voice Activity Logging
+
+Tracks member join/leave events in voice channels and sends clean, color-coded embeds directly to each voice channel's text chat area. Green embed for joins, red embed for leaves — member avatar shown prominently.
+
 ### Help System
 
-Channel-aware — shows only relevant commands based on where you are. Attendance threads show attendance commands. Auction threads show bidding commands. Admin channels show admin commands. Both `!` prefix and `/` slash forms are displayed together with aliases.
+Channel-aware — shows only relevant commands based on where you are. Attendance threads show attendance commands. Auction threads show bidding commands. Admin channels show admin commands. Both `!` prefix and `/` slash forms are displayed together with aliases. Help output is paginated by category to stay within Discord embed limits.
 
 ### Member Registry
 
@@ -184,7 +187,7 @@ Every command comes in two forms: `!prefix` for fast typing and `/slash` for dis
 | `!maintenance` / `/maintenance` | Create maintenance threads | `!maint` |
 | `!openthread <boss>` / `/openthread` | Open new attendance thread | |
 | `!overrideclose` / `/overrideclose` | Force-close current thread | |
-| `!setup <feature>` | Configure bot (guild/timer/attendance/bidding/admin/commands/bot/spawn/reminders/view) | |
+| `!setup <feature>` | Configure bot (guild/timer/attendance/bidding/admin/commands/bot/spawn/reminders/member/adminrole/view) | |
 | `!removemember` / `/remove-member` | Remove a member | `!removemem`, `!rmmember`, `!delmember` |
 | `!rotation` / `/rotation` | Manage boss rotation (status/set/increment/refresh) | |
 | `!weekly` / `/weekly` | Generate weekly report | `!week` |
@@ -239,6 +242,10 @@ All available via `!emergency <subcommand>` / `/emergency <subcommand>` (alias: 
 The following keywords trigger attendance check-in (with screenshot):
 `present`, `here`, `join`, `checkin`
 
+### Voice Activity
+
+Voice channel join/leave logs appear automatically in each voice channel's text chat — no command needed.
+
 ---
 
 ## Architecture
@@ -247,6 +254,7 @@ The following keywords trigger attendance check-in (with screenshot):
 elysium-attendance-bot/
 ├── index2.js                  # Entry point — wires modules together (1,104 lines)
 ├── bot/                       # Extracted modules
+│   ├── events/voice-state.js  # Voice activity logging
 │   ├── message-handler.js     # Message create event dispatch
 │   ├── command-handlers.js    # All !prefix command handlers (33 handlers)
 │   ├── interaction-handler.js # Slash interaction handling
@@ -302,12 +310,13 @@ index2.js (entry point)
 - **Google Sheets** — primary data store with webhook API
 - **In-memory cache** — O(1) lookups for hot paths
 - **Self-healing** — full state restoration via crash recovery sheet
+- **Paginated embeds** — automatic pagination for all large data sets (commands, spawn lists, results, reports) to stay within Discord embed limits
 
 ---
 
 ## Boss System
 
-### All 37 Bosses
+### All 36 Bosses
 
 **Timer-based (22)** — spawn interval determines next spawn time:
 
@@ -337,9 +346,12 @@ index2.js (entry point)
 | Ringor | Sat 17:00 |
 | Roderick | Fri 19:00 |
 | Auraq | Fri 22:00, Wed 21:00 |
-| Chaiflock | Sat 22:00 |
+| Chaiflock | Sun 15:00 |
 | Benji | Sun 21:00 |
-| Guild Boss | Mon 21:30 |
+| Tumier | Sun 19:00 |
+| Libitina | Mon 21:00, Sat 21:00 |
+| Rakajeth | Tue 22:00, Sun 19:00 |
+| Lucus | Sat 14:00 |
 | Icaruthia | Tue 21:00, Fri 21:00 |
 | Motti | Wed 19:00, Sat 19:00 |
 | Nevaeh | Sun 22:00 |
@@ -351,9 +363,8 @@ index2.js (entry point)
 | 1 | Venatus, Viorent, Ego, Clemantis, Livera, Araneo, Undomiel, Saphirus, Neutro, Lady Dalia, General Aquleus, Thymele, Amentis, Baron Braudmore |
 | 2 | Milavy, Wannitas, Metus, Duplican, Shuliar, Ringor, Roderick, Gareth, Titore, Larba |
 | 3 | Catena, Auraq, Secreta, Ordo, Asta, Supore, Chaiflock, Benji |
-| 4 | Icaruthia, Motti, Nevaeh |
-| 5 | GvG |
-| 15 | Guild Boss |
+| 5 | Tumier, Libitina, Lucus |
+| 10 | Icaruthia, Motti, Nevaeh |
 
 ---
 
