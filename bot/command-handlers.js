@@ -8,6 +8,7 @@ const logger = createLogger('command-handlers');
 const errorHandler = require('../utils/error-handler');
 const { normalizeUsername, findBossMatch, normalizeTimestamp } = require('../utils/common');
 const { createDisabledRow, awaitConfirmation } = require('./confirm-utils');
+const { createPaginatedEmbeds } = require('../utils/ui-helpers');
 const { clientCache } = require('../utils/sheet-api');
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -432,25 +433,6 @@ function createCommandHandlers(deps) {
       } verified - ${ageText} - <#${threadId}>`;
     });
 
-    const spawnListText = spawnList.length > 0 ? spawnList.join("\n") : "None";
-    const moreSpawns =
-      totalSpawns > 10
-        ? `\n\n*+${
-            totalSpawns - 10
-          } more spawns (sorted oldest first - close old ones first!)*`
-        : "";
-
-    // Truncate spawn text to avoid Discord 1024-char embed field limit
-    let totalSpawnsText = spawnListText + moreSpawns;
-    if (totalSpawnsText.length > 900 && spawnList.length > 8) {
-      const truncated = spawnList
-        .slice(0, 8)
-        .join("\n");
-      totalSpawnsText =
-        truncated +
-        `\n\n➕ ...and ${totalSpawns - 8} more active spawns`;
-    }
-
     const biddingState = bidding.getBiddingState();
     const biddingStatus = biddingState.a
       ? `🔴 Active: **${biddingState.a.item}** (${biddingState.a.curBid}pts)`
@@ -477,17 +459,26 @@ function createCommandHandlers(deps) {
           inline: true,
         },
         { name: "📊 Last Sheet Call", value: timeSinceSheet, inline: true },
-        {
-          name: "🔗 Spawn Threads (Oldest First)",
-          value: totalSpawnsText,
-          inline: false,
-        },
         { name: "💰 Bidding System", value: biddingStatus, inline: false }
       )
       .setFooter({ text: `Requested by ${member.user.username}` })
       .setTimestamp();
 
     await message.reply({ embeds: [embed] });
+
+    if (spawnList.length > 0) {
+      const spawnEmbeds = createPaginatedEmbeds(
+        "🔗 Spawn Threads (Oldest First)",
+        spawnList,
+        8,
+        { color: 0x00ff00 }
+      );
+      const [firstPage, ...restPages] = spawnEmbeds;
+      await message.reply({ embeds: [firstPage] });
+      for (const page of restPages) {
+        await message.channel.send({ embeds: [page] });
+      }
+    }
   },
 
 
@@ -1144,17 +1135,6 @@ function createCommandHandlers(deps) {
           )
           .addFields(
             {
-              name: "📋 Detailed Results",
-              value: (() => {
-                let resultsText = results.join("\n");
-                if (resultsText.length > 950) {
-                  resultsText = results.slice(0, 12).join("\n") + `\n\n➕ ...and ${results.length - 12} more`;
-                }
-                return resultsText;
-              })(),
-              inline: false,
-            },
-            {
               name: "🧹 Cleanup Statistics",
               value: `✅ Reactions removed: ${totalReactionsRemoved}\n❌ Failed cleanups: ${totalReactionsFailed}`,
               inline: false,
@@ -1164,6 +1144,20 @@ function createCommandHandlers(deps) {
           .setTimestamp();
 
         await message.reply({ embeds: [summaryEmbed] });
+
+        if (results.length > 0) {
+          const resultEmbeds = createPaginatedEmbeds(
+            "📋 Detailed Results",
+            results,
+            15,
+            { color: successCount === openSpawns.length ? 0x00ff00 : 0xffa500 }
+          );
+          const [firstPage, ...restPages] = resultEmbeds;
+          await message.reply({ embeds: [firstPage] });
+          for (const page of restPages) {
+            await message.channel.send({ embeds: [page] });
+          }
+        }
 
         console.log(
           `🔧 Mass close complete: ${successCount}/${openSpawns.length} successful by ${member.user.username}`
@@ -1856,19 +1850,6 @@ function createCommandHandlers(deps) {
               description += `**Attendance Sheets:**\n`;
               description += `• Removed from ${attendanceRemoved} week sheet(s)\n`;
               description += `• Total attendance points: ${totalAttendance}\n\n`;
-
-              if (attendanceDetails.length > 0 && attendanceDetails.length <= 5) {
-                description += `**Details:**\n`;
-                attendanceDetails.forEach(detail => {
-                  description += `• ${detail.sheet}: ${detail.attendancePoints} pts\n`;
-                });
-              } else if (attendanceDetails.length > 5) {
-                description += `**Recent sheets:**\n`;
-                attendanceDetails.slice(0, 5).forEach(detail => {
-                  description += `• ${detail.sheet}: ${detail.attendancePoints} pts\n`;
-                });
-                description += `• ... and ${attendanceDetails.length - 5} more\n`;
-              }
             }
 
             if (totalAttendanceRemoved) {
@@ -1886,6 +1867,23 @@ function createCommandHandlers(deps) {
               .setTimestamp();
 
             await message.reply({ embeds: [embed] });
+
+            if (attendanceDetails.length > 0) {
+              const detailEntries = attendanceDetails.map(
+                detail => `• ${detail.sheet}: ${detail.attendancePoints} pts`
+              );
+              const detailEmbeds = createPaginatedEmbeds(
+                "📋 Attendance Details",
+                detailEntries,
+                10,
+                { color: 0x00ff00 }
+              );
+              const [firstPage, ...restPages] = detailEmbeds;
+              await message.reply({ embeds: [firstPage] });
+              for (const page of restPages) {
+                await message.channel.send({ embeds: [page] });
+              }
+            }
 
             // Log to admin-logs channel
             const adminLogsChannel = await discordCache.getChannel('admin_logs_channel_id');
@@ -1962,9 +1960,9 @@ function createCommandHandlers(deps) {
       await message.channel.send('📊 Generating weekly report...');
 
       const data = await reports.generateWeeklyReport();
-      const embed = reports.buildWeeklyReportEmbed(data);
+      const embeds = reports.buildWeeklyReportEmbed(data);
 
-      await message.channel.send({ embeds: [embed] });
+      await message.channel.send({ embeds });
     } catch (error) {
       console.error('❌ Failed to generate weekly report:', error);
       await message.reply('⚠️ Failed to generate weekly report. Please try again later.');
@@ -2161,6 +2159,14 @@ function createCommandHandlers(deps) {
           break;
 
         case 'view':
+          const adminRolesStr = config.admin_roles.length > 0
+            ? config.admin_roles.map(id => `<@&${id}>`).join(', ')
+            : null;
+          const adminRolesValue = adminRolesStr
+            ? (adminRolesStr.length > 950
+              ? adminRolesStr.substring(0, 950) + `\n...and ${config.admin_roles.length} roles`
+              : adminRolesStr)
+            : '❌ None configured';
           const fields = [
             { name: '🏰 Main Guild', value: config.main_guild_id ? `<#${config.main_guild_id}>` : '❌ Not set', inline: true },
             { name: '⏱️ Timer Channel', value: config.boss_timer_channel_id ? `<#${config.boss_timer_channel_id}>` : '❌ Not set', inline: true },
@@ -2171,8 +2177,8 @@ function createCommandHandlers(deps) {
             { name: '🤖 Bot Commands', value: config.bot_manual_channel_id ? `<#${config.bot_manual_channel_id}>` : '❌ Not set', inline: true },
             { name: '🔔 Spawn Announcements', value: config.boss_spawn_announcement_channel_id ? `<#${config.boss_spawn_announcement_channel_id}>` : '❌ Not set', inline: true },
             { name: '📅 Reminders', value: config.reminders_channel_id ? `<#${config.reminders_channel_id}>` : '❌ Not set', inline: true },
-            { name: '👑 Admin Roles', value: config.admin_roles.length > 0 ? config.admin_roles.map(id => `<@&${id}>`).join(', ') : '❌ None configured', inline: false },
-            { name: '👤 Member Role', value: config.tenchu_role_id ? `<@&${config.tenchu_role_id}> (${config.tenchu_role})` : config.tenchu_role || '❌ Not set', inline: false },
+            { name: '👑 Admin Roles', value: adminRolesValue, inline: false },
+            { name: '👤 Member Role', value: (config.tenchu_role_id ? `<@&${config.tenchu_role_id}> (${config.tenchu_role})` : config.tenchu_role || '❌ Not set').substring(0, 1024), inline: false },
           ];
           const embed = new EmbedBuilder()
             .setColor(0x3498db)
@@ -2542,26 +2548,31 @@ function createCommandHandlers(deps) {
           return;
         }
 
-        const embed = new EmbedBuilder()
-          .setColor(0x00ff00)
-          .setTitle('✅ Rotation Data Refreshed')
-          .setDescription(`Loaded ${rotatingBosses.length} rotating bosses from Google Sheets`)
-          .setTimestamp();
-
+        const bossEntries = [];
         for (const boss of rotatingBosses) {
           const rotation = rotations[boss];
           if (rotation) {
             const emoji = rotation.isOurTurn ? '🟢' : '🔴';
             const status = rotation.isOurTurn ? `${guildName}'S TURN` : `${rotation.currentGuild}'s turn`;
-            embed.addFields({
-              name: `${emoji} ${boss}`,
-              value: `Guild ${rotation.currentIndex}/${rotation.guilds ? rotation.guilds.length : 5} - **${status}**`,
-              inline: false
-            });
+            bossEntries.push(
+              `${emoji} **${boss}**\n` +
+              `Guild ${rotation.currentIndex}/${rotation.guilds ? rotation.guilds.length : 5} — **${status}**`
+            );
           }
         }
 
-        await message.reply({ embeds: [embed] });
+        const embeds = createPaginatedEmbeds(
+          '✅ Rotation Data Refreshed',
+          bossEntries,
+          15,
+          { color: 0x00ff00, footer: `Loaded ${rotatingBosses.length} rotating bosses from Google Sheets` }
+        );
+
+        await message.reply({ embeds: [embeds[0]] });
+        for (let i = 1; i < embeds.length; i++) {
+          const channel = message.channel;
+          await channel.send({ embeds: [embeds[i]] });
+        }
       }
       else {
         await message.reply(

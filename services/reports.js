@@ -31,6 +31,7 @@ const dbAPI = require('../utils/database-api');
 const mongoHelpers = require('../utils/mongodb-helpers');
 const errorHandler = require('../utils/error-handler');
 const LRUCache = require('../utils/lru-cache');
+const { createPaginatedEmbeds } = require('../utils/ui-helpers');
 
 // Discord embed limits
 const DISCORD_LIMITS = {
@@ -486,6 +487,9 @@ function buildWeeklyReportEmbed(reportData) {
     });
   }
 
+  // Storage for embeds beyond the main report (pagination overflow)
+  const extraEmbeds = [];
+
   // Top 10 members
   if (thisWeek.top10Members.length > 0) {
     const memberLines = thisWeek.top10Members.map((m, i) => {
@@ -497,11 +501,38 @@ function buildWeeklyReportEmbed(reportData) {
       return `${medal} **${m.name}** - ${m.spawnsAttended}/${thisWeek.totalSpawns} (${m.percentage}%) ${stars}`;
     });
 
-    embed.addFields({
-      name: '👥 TOP 10 MOST ACTIVE MEMBERS',
-      value: truncateFieldValue(memberLines),
-      inline: false
-    });
+    const fullText = memberLines.join('\n');
+    if (fullText.length <= DISCORD_LIMITS.FIELD_VALUE) {
+      embed.addFields({
+        name: '👥 TOP 10 MOST ACTIVE MEMBERS',
+        value: fullText,
+        inline: false
+      });
+    } else {
+      // Build summary field with overflow count
+      let truncated = [];
+      let len = 0;
+      for (const line of memberLines) {
+        if (len + line.length + 1 > DISCORD_LIMITS.FIELD_VALUE) break;
+        truncated.push(line);
+        len += line.length + 1;
+      }
+      const dropped = memberLines.length - truncated.length;
+      embed.addFields({
+        name: '👥 TOP 10 MOST ACTIVE MEMBERS',
+        value: truncated.join('\n') + `\n\n*...and ${dropped} more members*`,
+        inline: false
+      });
+
+      // Create paginated embeds with full data
+      const fullEmbeds = createPaginatedEmbeds(
+        `👥 Full Member Rankings (${memberLines.length} members)`,
+        memberLines,
+        10,
+        { color: 0x3498DB }
+      );
+      extraEmbeds.push(...fullEmbeds);
+    }
   }
 
   // Top 3 from LAST week (for guild rewards)
@@ -577,7 +608,7 @@ function buildWeeklyReportEmbed(reportData) {
 
   embed.setFooter({ text: `Generated: ${new Date().toLocaleDateString()} | Next Report: Next Sunday` });
 
-  return embed;
+  return [embed, ...extraEmbeds];
 }
 
 // ============================================================================

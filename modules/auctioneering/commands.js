@@ -567,21 +567,22 @@ async function handleForceSubmitResults(message, config, biddingModule) {
   const totalItems = state.auctionState.sessionItems.length;
   const totalPoints = state.auctionState.sessionItems.reduce((sum, a) => sum + (a.amount || 0), 0);
 
-  const previewEmbed = new EmbedBuilder()
-    .setColor(0xffa500)
-    .setTitle(`${EMOJI.WARNING} Force Submit?`)
-    .setDescription(`**${totalItems} items** to submit\n**Total points:** ${totalPoints} pts`)
-    .addFields({
-      name: `${EMOJI.LIST} Preview (first 10)`,
-      value: resultsList.slice(0, 10).join('\n') + (totalItems > 10 ? `\n*... and ${totalItems - 10} more*` : ''),
-      inline: false,
-    })
-    .setFooter({ text: 'Click a button below to confirm' });
+  const previewEmbeds = createPaginatedEmbeds(
+    `${EMOJI.WARNING} Force Submit? Confirm or Cancel`,
+    resultsList,
+    10,
+    { color: 0xffa500, footer: `Total: ${totalItems} items, ${totalPoints} pts · Click a button below to confirm or cancel` }
+  );
 
+  const [firstPreview, ...restPreviews] = previewEmbeds;
   const fsMsg = await message.reply({
-    embeds: [previewEmbed],
+    embeds: [firstPreview],
     components: [row],
   });
+
+  for (const embed of restPreviews) {
+    await message.channel.send({ embeds: [embed] });
+  }
 
   const fullResultsEmbeds = createPaginatedEmbeds(
     `${EMOJI.LIST} All Results - Force Submit`,

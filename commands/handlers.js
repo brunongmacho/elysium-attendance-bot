@@ -16,6 +16,7 @@ const fs = require('fs');
 const path = require('path');
 const mongoHelpers = require('../utils/mongodb-helpers');
 const { detectChannelType, CHANNEL_TYPES } = require('../help-system-v2');
+const { createPaginatedEmbeds } = require('../utils/ui-helpers');
 
 // Feature Flags
 const USE_MONGODB_ATTENDANCE = process.env.USE_MONGODB_ATTENDANCE === 'true';
@@ -232,9 +233,18 @@ async function handleSlashCommand(interaction, modules, config, client) {
             (s, i) =>
               `${i + 1}. **${s.spawnInfo.boss}** (${s.spawnInfo.timestamp}) - ${s.spawnInfo.members.length} verified`
           );
-        let spawnListBlock = spawnListLines.slice(0, 20).join('\n');
-        if (openSpawns.length > 20) {
-          spawnListBlock += `\n\n➕ ...and ${openSpawns.length - 20} more`;
+        const MAX_CONFIRM_CHARS = 1900;
+        let spawnListBlock = spawnListLines.join('\n');
+        if (spawnListBlock.length > MAX_CONFIRM_CHARS) {
+          let charCount = 0;
+          let lineCount = 0;
+          for (const line of spawnListLines) {
+            const nextCount = charCount + line.length + (charCount > 0 ? 1 : 0);
+            if (nextCount > MAX_CONFIRM_CHARS) break;
+            charCount = nextCount;
+            lineCount++;
+          }
+          spawnListBlock = spawnListLines.slice(0, lineCount).join('\n') + `\n...and ${spawnListLines.length - lineCount} more`;
         }
 
         const confirmMsg = await interaction.editReply({
@@ -502,23 +512,27 @@ async function handleSlashCommand(interaction, modules, config, client) {
             }
 
             // Send summary
-            let summaryResults = results.join('\n');
-            if (summaryResults.length > 3800) {
-              summaryResults = results.slice(0, 50).join('\n') + `\n\n➕ ...and ${results.length - 50} more`;
-            }
-
-            const summaryEmbed = new EmbedBuilder()
+            const mainEmbed = new EmbedBuilder()
               .setColor(failCount === 0 ? 0x00ff00 : 0xffa500)
               .setTitle('📋 Mass Close Complete')
-              .setDescription(
-                `**Summary:**\n` +
-                `✅ Success: ${successCount}\n` +
-                `❌ Failed: ${failCount}\n\n` +
-                `**Results:**\n${summaryResults}`
+              .addFields(
+                { name: '✅ Success', value: `${successCount}`, inline: true },
+                { name: '❌ Failed', value: `${failCount}`, inline: true }
               )
               .setTimestamp();
 
-            await interaction.followUp({ embeds: [summaryEmbed] });
+            const resultEmbeds = createPaginatedEmbeds(
+              '📋 Detailed Results',
+              results,
+              15,
+              { color: failCount === 0 ? 0x00ff00 : 0xffa500 }
+            );
+
+            // Discord allows up to 10 embeds per message
+            const allEmbeds = [mainEmbed, ...resultEmbeds];
+            for (let i = 0; i < allEmbeds.length; i += 10) {
+              await interaction.followUp({ embeds: allEmbeds.slice(i, i + 10) });
+            }
 
             collector.stop();
 
@@ -1068,27 +1082,10 @@ if (commandName === 'rotation') {
         return;
       }
 
-      const embeds = [];
-      let embed = new EmbedBuilder()
-        .setColor(0x00ff00)
-        .setTitle('✅ Rotation Data Refreshed')
-        .setDescription(`Loaded ${rotatingBosses.length} rotating bosses`)
-        .setTimestamp();
-
-      let fieldCount = 0;
-
+      const bossEntries = [];
       for (const boss of rotatingBosses) {
         const rotation = allRotations[boss];
         if (!rotation) continue;
-
-        if (fieldCount === MAX_FIELDS) {
-          embeds.push(embed);
-          embed = new EmbedBuilder()
-            .setColor(0x00ff00)
-            .setTitle('✅ Rotation Data Refreshed (cont.)')
-            .setTimestamp();
-          fieldCount = 0;
-        }
 
         const emoji = rotation.isOurTurn ? '🟢' : '🔴';
         const status = rotation.isOurTurn ? 'TENCHU\'S TURN' : `${rotation.currentGuild}'s turn`;
@@ -1096,17 +1093,23 @@ if (commandName === 'rotation') {
         const guildCount = hasGuilds ? rotation.guilds.length : 5;
         const dataWarning = !hasGuilds ? ' ⚠️ (incomplete)' : '';
 
-        embed.addFields({
-          name: `${emoji} ${boss}`,
-          value: `Guild ${rotation.currentIndex}/${guildCount} - **${status}**${dataWarning}`,
-          inline: false
-        });
-
-        fieldCount++;
+        bossEntries.push(
+          `${emoji} **${boss}**\n` +
+          `Guild ${rotation.currentIndex}/${guildCount} — **${status}**${dataWarning}`
+        );
       }
 
-      embeds.push(embed);
-      await interaction.editReply({ embeds });
+      const embeds = createPaginatedEmbeds(
+        '✅ Rotation Data Refreshed',
+        bossEntries,
+        15,
+        { color: 0x00ff00, footer: `Loaded ${rotatingBosses.length} rotating bosses from Google Sheets` }
+      );
+
+      await interaction.editReply({ embeds: [embeds[0]] });
+      for (let i = 1; i < embeds.length; i++) {
+        await interaction.followUp({ embeds: [embeds[i]] });
+      }
 
     } catch (error) {
       console.error('Error in /rotation refresh:', error);

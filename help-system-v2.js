@@ -552,19 +552,56 @@ async function generateChannelHelp(message, isAdmin) {
     grouped[cmd.category].push(cmd);
   });
 
-  const embed = new EmbedBuilder()
+  const embeds = [];
+  const sortedCategories = Object.entries(grouped).sort();
+
+  // Category emoji mapping
+  const categoryEmoji = {
+    'Attendance': EMOJI.BOSS,
+    'Auction': EMOJI.COIN,
+    'Auction Admin': `${EMOJI.COIN}${EMOJI.ADMIN}`,
+    'Admin': EMOJI.ADMIN,
+    'Emergency': EMOJI.EMERGENCY,
+    'Member': EMOJI.MEMBER,
+    'Fun': '🎮',
+    'Leaderboards': EMOJI.TROPHY,
+    'Analytics': EMOJI.CHART,
+    'Reports': '📋',
+    'Boss Management': '🐉',
+    'Help': EMOJI.BOOK
+  };
+
+  // Build a summary embed first (shows channel name and total count)
+  const summaryEmbed = new EmbedBuilder()
     .setColor(COLORS.PRIMARY)
     .setTitle(`${EMOJI.BOOK} Commands Available in ${channelName}`)
     .setDescription(
-      `Showing **${commands.length} command(s)** available here.\n` +
+      `Showing **${commands.length} command(s)** across **${sortedCategories.length} categor${sortedCategories.length === 1 ? 'y' : 'ies'}**.\n` +
       `${isAdmin ? `${EMOJI.ADMIN} **Admin Mode** - You can see all commands.\n` : ''}\n` +
-      `💡 **Tip:** Commands shown are filtered for this channel!`
+      `💡 Scroll through the messages below for each category.`
     )
     .setFooter({ text: `Bot Version ${BOT_VERSION} • Context-Aware Help System` })
     .setTimestamp();
 
-  // Add commands by category
-  Object.entries(grouped).sort().forEach(([category, cmds]) => {
+  // Add channel guidance
+  if (channelType === CHANNEL_TYPES.UNKNOWN) {
+    summaryEmbed.addFields({
+      name: '⚠️ Unknown Channel',
+      value: 'This channel may not be configured for bot commands. Try using bot commands in:\n' +
+             '• Admin Logs (admins only)\n' +
+             '• Guild Chat\n' +
+             '• Bot Commands Channel\n' +
+             '• Attendance/Auction threads',
+      inline: false
+    });
+  }
+
+  embeds.push(summaryEmbed);
+
+  // Build one embed per category
+  sortedCategories.forEach(([category, cmds]) => {
+    const emoji = categoryEmoji[category] || EMOJI.INFO;
+
     const commandList = cmds.map(cmd => {
       const aliasText = cmd.aliases && cmd.aliases.length > 0
         ? ` (${cmd.aliases.join(', ')})`
@@ -573,23 +610,8 @@ async function generateChannelHelp(message, isAdmin) {
       return `• \`${cmd.usage}\`${aliasText}${adminBadge}\n  ${cmd.description}`;
     }).join('\n\n');
 
-    // Get emoji for category
-    const categoryEmoji = {
-      'Attendance': EMOJI.BOSS,
-      'Auction': EMOJI.COIN,
-      'Auction Admin': `${EMOJI.COIN}${EMOJI.ADMIN}`,
-      'Admin': EMOJI.ADMIN,
-      'Emergency': EMOJI.EMERGENCY,
-      'Member': EMOJI.MEMBER,
-      'Fun': '🎮',
-      'Leaderboards': EMOJI.TROPHY,
-      'Analytics': EMOJI.CHART,
-      'Reports': '📋',
-      'Boss Management': '🐉',
-      'Help': EMOJI.BOOK
-    }[category] || EMOJI.INFO;
-
-    // Split into chunks if command list exceeds Discord's 1024-char field limit
+    // If this category's content would exceed Discord's 1024-char field limit,
+    // split into multiple embeds
     const MAX_FIELD_LENGTH = 1024;
     const chunks = [];
     if (commandList.length > MAX_FIELD_LENGTH) {
@@ -599,7 +621,6 @@ async function generateChannelHelp(message, isAdmin) {
           chunks.push(remaining);
           break;
         }
-        // Break at the last double-newline (between commands) before the limit
         let breakPoint = remaining.lastIndexOf('\n\n', MAX_FIELD_LENGTH);
         if (breakPoint === -1) {
           breakPoint = remaining.lastIndexOf('\n', MAX_FIELD_LENGTH);
@@ -615,34 +636,16 @@ async function generateChannelHelp(message, isAdmin) {
     }
 
     chunks.forEach((chunk, i) => {
-      const fieldName = chunks.length > 1
-        ? `${categoryEmoji} ${category} (${i + 1}/${chunks.length})`
-        : `${categoryEmoji} ${category}`;
-      embed.addFields({ name: fieldName, value: chunk, inline: false });
+      const categoryEmbed = new EmbedBuilder()
+        .setColor(COLORS.INFO)
+        .setTitle(`${emoji} ${category}${chunks.length > 1 ? ` (${i + 1}/${chunks.length})` : ''}`)
+        .setDescription(chunk);
+
+      embeds.push(categoryEmbed);
     });
   });
 
-  // Add channel guidance
-  if (channelType === CHANNEL_TYPES.UNKNOWN) {
-    embed.addFields({
-      name: '⚠️ Unknown Channel',
-      value: 'This channel may not be configured for bot commands. Try using bot commands in:\n' +
-             '• Admin Logs (admins only)\n' +
-             '• Guild Chat\n' +
-             '• Bot Commands Channel\n' +
-             '• Attendance/Auction threads',
-      inline: false
-    });
-  } else if (commands.length === 1) {
-    // Only help command available
-    embed.addFields({
-      name: '💡 More Commands Available',
-      value: 'Try using `/help` in other channels to see more commands!',
-      inline: false
-    });
-  }
-
-  return embed;
+  return embeds;
 }
 
 /**
@@ -653,8 +656,19 @@ async function generateChannelHelp(message, isAdmin) {
  */
 async function handleHelpCommand(message, member) {
   const isAdmin = isAdminFunc ? isAdminFunc(member) : false;
-  const embed = await generateChannelHelp(message, isAdmin);
-  await message.reply({ embeds: [embed] });
+  const embeds = await generateChannelHelp(message, isAdmin);
+
+  if (!embeds || embeds.length === 0) {
+    await message.reply('❌ No commands available for this channel.');
+    return;
+  }
+
+  // Send first embed as reply, rest as follow-up messages
+  await message.reply({ embeds: [embeds[0]] });
+
+  for (let i = 1; i < embeds.length; i++) {
+    await message.channel.send({ embeds: [embeds[i]] });
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -708,10 +708,26 @@ async function finalize(cli, cfg) {
         // Still continue to cleanup below
       }
     } else {
-      const d = res
-        .filter((r) => r.totalSpent > 0)
-        .map((r) => `${r.member}: ${r.totalSpent}pts`)
-        .join("\n");
+      const filteredMembers = res.filter((r) => r.totalSpent > 0);
+      const items = filteredMembers.map((r) => `${r.member}: ${r.totalSpent}pts`);
+      const allData = items.join("\n");
+      const d = allData.length > 1020
+        ? (() => {
+            let count = 0;
+            let body = "";
+            for (const item of items) {
+              const candidate = count === 0 ? item : `${body}\n${item}`;
+              const suffix = `\n...and ${items.length - count - 1} more items`;
+              if (candidate.length + suffix.length > 1020) break;
+              body = candidate;
+              count++;
+            }
+            const remaining = items.length - count;
+            return remaining > 0
+              ? (count > 0 ? `${body}\n` : "") + `...and ${remaining} more items`
+              : body;
+          })()
+        : allData;
       await adm.send({
         embeds: [
           new EmbedBuilder()

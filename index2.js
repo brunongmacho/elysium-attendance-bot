@@ -403,7 +403,7 @@ function buildStatsEmbed(stats, member) {
     const skillsList = lore.skills ? lore.skills.join(', ') : 'None';
     const displayTitle = isTemplateLore ? `${memberName}'s Destiny Awaits` : lore.title;
 
-    const loreValue = `${lore.lore}\n\n**Specialty:** ${lore.specialty}\n**Reputation:** ${lore.reputation}\n**Stats:** ${lore.stats}\n**Skills:** ${skillsList}`;
+    const loreValue = `${(lore.lore || '').substring(0, 1024)}\n\n**Specialty:** ${(lore.specialty || 'Unknown').substring(0, 1024)}\n**Reputation:** ${(lore.reputation || 'Unknown').substring(0, 1024)}\n**Stats:** ${(lore.stats || 'Unknown').substring(0, 1024)}\n**Skills:** ${(skillsList || 'None').substring(0, 1024)}`;
 
     embed.addFields({
       name: `✨ ${displayTitle}`,
@@ -414,7 +414,7 @@ function buildStatsEmbed(stats, member) {
     if (lore.recent_developments) {
       embed.addFields({
         name: `📜 Recent Developments`,
-        value: lore.recent_developments,
+        value: (lore.recent_developments || 'Unknown').substring(0, 1024),
         inline: false
       });
     }

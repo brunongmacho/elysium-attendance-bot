@@ -473,13 +473,17 @@ async function finalizeSession(client, config, channel) {
       const itemsWithWinners = soldItems.length;
       const totalRevenue = soldItems.reduce((sum, s) => sum + s.amount, 0);
 
-      let summaryValue = summary || "No sales recorded";
-      if (summaryValue.length > 1024) {
-        summaryValue = summaryValue.substring(0, 1020) + "...";
-      }
-      if (!summaryValue || summaryValue.trim().length === 0) {
-        summaryValue = "No sales recorded";
-      }
+      const resultLines = soldItems.map(
+        (s, i) => `${i + 1}. **${s.item}** 📊: ${s.winner} - ${s.amount}pts`
+      );
+      const fullText = resultLines.join('\n');
+      const fitsInField = resultLines.length === 0 || fullText.length <= 1024;
+
+      const fieldValue = resultLines.length === 0
+        ? 'No sales recorded'
+        : fitsInField
+          ? fullText
+          : `${resultLines[0]}\n...and ${resultLines.length - 1} more items`;
 
       const adminEmbed = new EmbedBuilder()
         .setColor(COLORS.SUCCESS)
@@ -500,7 +504,7 @@ async function finalizeSession(client, config, channel) {
           },
           {
             name: `📋 Results`,
-            value: summaryValue,
+            value: fieldValue,
             inline: false,
           }
         );
@@ -518,6 +522,19 @@ async function finalizeSession(client, config, channel) {
         .setTimestamp();
 
       await adminLogs.send({ embeds: [adminEmbed] });
+
+      // Send paginated full results if they don't fit in one field
+      if (resultLines.length > 0 && !fitsInField) {
+        const paginatedEmbeds = createPaginatedEmbeds(
+          `${EMOJI.SUCCESS} Full Results (${resultLines.length} items)`,
+          resultLines,
+          15,
+          { color: COLORS.SUCCESS }
+        );
+        for (const pe of paginatedEmbeds) {
+          await adminLogs.send({ embeds: [pe] });
+        }
+      }
     }
 
     state.logger.info("🧹 Clearing session data...");
