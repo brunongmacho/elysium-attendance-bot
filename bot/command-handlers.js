@@ -781,6 +781,11 @@ function createCommandHandlers(deps) {
               // Add members and store Discord IDs
               if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
               for (const [msgId, p] of newMembers) {
+                // Re-check: spawn might have been closed by another process
+                if (spawnInfo.closed) {
+                  console.log(`⏭️ Skipping ${p.author} - spawn for ${spawnInfo.boss} was closed during processing`);
+                  continue;
+                }
                 spawnInfo.members.push(p.author);
                 spawnInfo.memberIds[p.author] = p.authorId;
               }
@@ -1462,6 +1467,12 @@ function createCommandHandlers(deps) {
        async (confirmMsg) => {
          if (!message.guild) return;
          const guild = message.guild;
+
+         // Re-check: spawn may have been closed while awaiting confirmation
+         if (spawnInfo.closed) {
+           await confirmMsg.reply({ content: '⚠️ This spawn was already closed by another process.', ephemeral: true });
+           return;
+         }
 
         // Auto-verify all pending check-ins
         if (pendingInThread.length > 0) {

@@ -326,6 +326,11 @@ async function handleSlashCommand(interaction, modules, config, client) {
 
                   if (!spawnInfo.memberIds) spawnInfo.memberIds = {};
                   for (const [msgId, p] of newMembers) {
+                    // Re-check: spawn might have been closed by another process
+                    if (spawnInfo.closed) {
+                      console.log(`⏭️ Skipping ${p.author} - spawn for ${spawnInfo.boss} was closed during processing`);
+                      continue;
+                    }
                     spawnInfo.members.push(p.author);
                     spawnInfo.memberIds[p.author] = p.authorId;
                   }

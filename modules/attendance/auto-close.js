@@ -74,6 +74,15 @@ async function checkAndAutoCloseThreads(client) {
         }
         console.log(`   📋 Total pending verifications in system: ${Object.keys(state.stateManager.pendingVerifications).length}`);
 
+        // RE-CHECK: Verify this thread wasn't closed by manual close while we were processing
+        const liveSpawnInfo = state.stateManager.activeSpawns[threadId];
+        if (!liveSpawnInfo || liveSpawnInfo.closed) {
+          console.log(`   ⚠️ Thread was closed by another process (manual close). Skipping auto-close submission.`);
+          closed++;
+          closedBosses.push(spawnInfo.boss);
+          continue;
+        }
+
         const pendingInThread = Object.entries(state.stateManager.pendingVerifications).filter(
           ([msgId, p]) => p.threadId === threadId
         );
@@ -111,17 +120,7 @@ async function checkAndAutoCloseThreads(client) {
           console.log(`      ├─ Members to submit: ${spawnInfo.members.join(', ')}`);
         }
 
-        // RE-CHECK: Verify this thread wasn't closed by manual close while we were processing
-        const liveSpawnInfo = state.stateManager.activeSpawns[threadId];
-        if (!liveSpawnInfo || liveSpawnInfo.closed) {
-          console.log(`   ⚠️ Thread was closed by another process (manual close). Skipping auto-close submission.`);
-          closed++;
-          closedBosses.push(spawnInfo.boss);
-          continue;
-        }
-
         // Mark as closed in live state to prevent other processes from submitting
-        liveSpawnInfo.closed = true;
         spawnInfo.closed = true;
 
         // Remove from stateManager.activeColumns cache BEFORE checking Google Sheets
