@@ -227,16 +227,6 @@
       ],
       "description": "Spawns Sunday 19:00"
     },
-    "Guild Boss": {
-      "schedules": [
-        {
-          "day": "Monday",
-          "time": "21:30",
-          "dayOfWeek": 1
-        }
-      ],
-      "description": "Guild boss raid every Monday 21:30"
-    },
     "Libitina": {
       "schedules": [
         {
