@@ -43,19 +43,15 @@ let recentPlayfulDMs = [];
  * @param {import('discord.js').Client} client - Discord Client
  * @param {Object} config - Bot configuration
  * @param {Object} modules - Additional dependencies
- * @param {Object} modules.discordCache - Discord channel cache
  * @param {string} modules.ALTERFRIEREN_ID - AlterFrieren's Discord user ID
  * @param {string} modules.ROHYPnol_ID - Rohypnol's Discord user ID
- * @param {Object} modules.memberLore - Member lore/title data
  * @param {Object} modules.alterFrierenConfig - AlterFrieren DM config
  * @returns {Function} Async handler function (oldState, newState) => Promise<void>
  */
 function createVoiceStateHandler(client, config, modules) {
   const {
-    discordCache,
     ALTERFRIEREN_ID,
     ROHYPnol_ID,
-    memberLore,
     alterFrierenConfig,
   } = modules;
 
@@ -73,16 +69,6 @@ function createVoiceStateHandler(client, config, modules) {
         return; // Skip voice updates from other servers
       }
 
-      const commandsChannel = await discordCache.getChannel('bot_manual_channel_id');
-
-      if (!commandsChannel) return;
-
-      const memberName = member.displayName;
-      const loreKey = Object.keys(memberLore).find(
-        key => key.toLowerCase() === memberName.toLowerCase() && !key.startsWith('_')
-      );
-      const memberTitle = loreKey ? memberLore[loreKey].title : null;
-
       const joinedChannel = newState.channelId && !oldState.channelId;
       const leftChannel = !newState.channelId && oldState.channelId;
 
@@ -90,17 +76,21 @@ function createVoiceStateHandler(client, config, modules) {
         const channel = newState.channel;
 
         const joinEmbed = new EmbedBuilder()
-          .setColor(0x3498DB)
-          .setTitle(memberTitle ? `✨ ${memberTitle} has joined` : '🎤 Voice Channel Joined')
+          .setColor(0x43B581)
+          .setAuthor({
+            name: member.displayName,
+            iconURL: member.displayAvatarURL()
+          })
+          .setDescription(`🟢 **Joined** ${channel.name}`)
           .setThumbnail(member.displayAvatarURL())
-          .addFields(
-            { name: 'Member', value: member.displayName, inline: true },
-            { name: 'Channel', value: channel.name, inline: true }
-          )
-          .setFooter({ text: `${guildName} Guild`, iconURL: guild.iconURL() })
+          .setFooter({
+            text: `${guildName} Guild`,
+            iconURL: guild.iconURL()
+          })
           .setTimestamp();
 
-        await commandsChannel.send({ embeds: [joinEmbed] });
+        await channel.send({ embeds: [joinEmbed] })
+          .catch(err => console.error('❌ Failed to send voice join log:', err.message));
 
         // 👑 SPECIAL VOICE DM: Send playful DM when both are in same channel
         const generalDMs = alterFrierenConfig.general || [];
@@ -153,7 +143,7 @@ function createVoiceStateHandler(client, config, modules) {
           console.log(`🎤 Channel members: ${[...channelMembers.values()].map(m => m.displayName).join(', ')}`);
 
           // Check voice states from guild
-          const guild = commandsChannel.guild;
+          const guild = channel.guild;
           const voiceStates = guild.voiceStates.cache;
           console.log(`🎤 Total voice states: ${voiceStates.size}`);
 
@@ -210,17 +200,21 @@ function createVoiceStateHandler(client, config, modules) {
         const channel = oldState.channel;
 
         const leaveEmbed = new EmbedBuilder()
-          .setColor(0xE74C3C)
-          .setTitle(memberTitle ? `✨ ${memberTitle} has left` : '🔌 Voice Channel Left')
+          .setColor(0xF04747)
+          .setAuthor({
+            name: member.displayName,
+            iconURL: member.displayAvatarURL()
+          })
+          .setDescription(`🔴 **Left** ${channel.name}`)
           .setThumbnail(member.displayAvatarURL())
-          .addFields(
-            { name: 'Member', value: member.displayName, inline: true },
-            { name: 'Channel', value: channel.name, inline: true }
-          )
-          .setFooter({ text: `${guildName} Guild`, iconURL: guild.iconURL() })
+          .setFooter({
+            text: `${guildName} Guild`,
+            iconURL: guild.iconURL()
+          })
           .setTimestamp();
 
-        await commandsChannel.send({ embeds: [leaveEmbed] });
+        await channel.send({ embeds: [leaveEmbed] })
+          .catch(err => console.error('❌ Failed to send voice leave log:', err.message));
       }
 
     } catch (error) {
