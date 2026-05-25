@@ -304,7 +304,14 @@ function createMessageHandler(client, config, deps) {
       ) {
         const content = message.content.trim().toLowerCase();
         const checkInKeywords = ['here', 'present', 'join', 'checkin', 'check-in', 'attending'];
-        const isCheckIn = checkInKeywords.some(keyword => content.startsWith(keyword));
+
+        // Fuzzy match: compress repeated characters so "heerreeee" -> "here"
+        // Check both original (for words with legitimate double letters like "attending")
+        // and fuzzy version (for exaggerated repeats like "heerreeee" or "pprresenttt")
+        const fuzzyContent = content.replace(/(.)\1+/g, '$1');
+        const isCheckIn = checkInKeywords.some(keyword =>
+          content.startsWith(keyword) || fuzzyContent.startsWith(keyword)
+        );
 
         if (isCheckIn) {
           console.log(`📋 Check-in detected from ${message.author.username} in thread ${message.channel.name}`);

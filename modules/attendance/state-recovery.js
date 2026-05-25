@@ -86,8 +86,12 @@ async function scanThreadForPendingReactions(thread, client, bossName, parsed) {
     const content = msg.content.trim().toLowerCase();
     const keyword = content.split(/\s+/)[0];
 
-    // Check if message is a valid check-in keyword
-    if (["present", "here", "join", "checkin", "check-in"].includes(keyword)) {
+    // Fuzzy match: compress repeated characters for typo tolerance
+    const fuzzyKeyword = keyword.replace(/(.)\1+/g, '$1');
+
+    // Check if message is a valid check-in keyword (original or fuzzy)
+    const checkInKeywords = ["present", "here", "join", "checkin", "check-in"];
+    if (checkInKeywords.includes(keyword) || checkInKeywords.includes(fuzzyKeyword)) {
       // Get member display name (nickname or username)
       const author = await thread.guild.members.fetch(msg.author.id).catch(() => null);
       const username = author ? (author.nickname || author.displayName || msg.author.displayName || msg.author.username) : msg.author.displayName || msg.author.username;
