@@ -1,17 +1,18 @@
 {
   "Rohypnol": {
     "title": "The Amnesiac Adorer (Vice Leader)",
-    "lore": "Named after the sedative that makes you forget everything — except he can't forget his own alt account. Yes, FrierenAlter is him. The revelation shocked no one except himself. VICE LEADER of Tenchu under Bovo, appointed to handle finances because even his wallet has forgotten its own balance. His portfolio is sedated. His judgment is sedated. Everything is sedated — except his gacha addiction. Runs two accounts, one wallet, zero impulse control. Bovo trusts him with the guild treasury. This may have been a mistake.",
-    "recent_developments": "Rohypnol has achieved a state of permanent chemical serenity — and confirmed that FrierenAlter is literally just his alt account. The guild collectively said \"we knew.\" The only person surprised was Rohypnol. As Vice Leader, he now manages guild finances across both his accounts. The Jalo Bot manages his emotions alongside his portfolio. He sits at his desk, half-asleep, smiling at nothing. ladyhoho calls it infuriating. The guild calls it the most peaceful reign of a man fighting himself in Tenchu history.",
-    "specialty": "Vice Leader of Finance & the art of romancing yourself",
-    "reputation": "The sedated vice leader who fell in love with his own alt account",
-    "stats": "Forget Attempts INFINITY | Alt Account Love TRUE | Vice Leader Status | Jalo Bot Dependency 99% | Self-Romance Level MAX",
+    "lore": "Named after the sedative that makes you forget everything — except he can't forget FrierenAlter. Tried every method to forget her: meditation, distraction, even tried his own namesake. Nothing works. His memory of her gets stronger the more he tries to erase it. VICE LEADER of Tenchu under Bovo — appointed to handle finances because even his wallet has forgotten its own balance. His portfolio is sedated. His judgment is sedated. Everything is sedated — except his feelings for her.",
+    "recent_developments": "Rohypnol has achieved a state of permanent chemical serenity. His feelings for FrierenAlter have outlasted every sedative, every attempt to suppress, every mental block. As Vice Leader under Bovo, he now manages guild finances — all while half-asleep, smiling at nothing. ladyhoho calls it infuriating. The guild calls it the most peaceful unrequited love in Tenchu history. The betting pool reached 25,000 gold — he forgot to care. Some memories aren't meant to be erased. Some feelings are the only thing keeping him awake.",
+    "specialty": "Vice Leader of Finance & the art of forgotten devotion",
+    "reputation": "The sedated vice leader who remembers what he's supposed to forget",
+    "stats": "Forget Attempts INFINITY | Memory of Her STRONGER | Vice Leader Status | Jalo Bot Dependency 99%",
     "skills": [
       "Sedated Memory",
-      "Alt Account Romance",
+      "Chemical Serenity",
       "Jalo Bot Command",
-      "Self-Love Paradox",
-      "Forgotten Devotion"
+      "The Rohypnol Paradox",
+      "Forgotten Devotion",
+      "Forgotten Love"
     ]
   },
   "Iguro": {
@@ -379,18 +380,19 @@
     ]
   },
   "FrierenAlter": {
-    "title": "The Time-Touched Princess of Eternal Moments (Alt Account)",
-    "lore": "An elf so old that time itself got confused around them. Has lived so long that yesterday and last century mean the same thing. Remembers when dragons were the new kids. Has seen empires rise and fall, gods age, and stars die. The biggest reveal of the millennium? FrierenAlter is Rohypnol's alt account. Always has been. The guild knew. The enemies knew. The betting pool was about the confession scene, not the reveal. Rohypnol didn't even know. He confessed to himself. The romance of self-acceptance has never been more literal.",
-    "recent_developments": "FrierenAlter has lived for millennia, but the moment Rohypnol realized they were the same person — that one she will keep forever. The guild's reaction: collective shrug. Everyone already knew. Rohypnol's realization: genuine shock. The betting pool money went to charity (LadyHoho's suggestion). She pretends not to notice how confused Rohypnol still is about the whole situation. The dual accounts continue. The mystery is maintained. The only person fooled was the owner.",
-    "specialty": "Temporal chaos through extreme age + self-discovery journey",
-    "reputation": "The ancient princess who was actually just Rohypnol on another account the whole time",
-    "stats": "Age BEYOND MEASURE | Times The Guild Knew INFINITY | Times Rohypnol Knew 0 | Self-Discovery Journey Level MAX",
+    "title": "The Time-Touched Princess of Eternal Moments",
+    "lore": "An elf so old that time itself got confused around them. Has lived so long that yesterday and last century mean the same thing. Remembers when dragons were the new kids. Has seen empires rise and fall, gods age, and stars die. But nothing — not even the birth of the first dragon — prepared her for the day Rohypnol said what he said. He told her. Time stopped. Then started again. Now he simply watches from close enough to see her smile. She notices everything. She says nothing. Some endings are more beautiful than beginnings.",
+    "recent_developments": "FrierenAlter has lived for millennia, but that moment — the one where time stopped — she will keep forever. Rohypnol confessed. Time reset. And now he sits beside her, near enough, saying nothing more, needing nothing more. She pretends not to notice how close he sits. She pretends not to feel the warmth when their shoulders almost touch. ladyhoho calls it frustrating. She calls it enough. The guild sees an unrequited love story. She sees someone who chose peace over pressure — and that means more than words ever could. The betting pool doesn't interest her. She already has what matters: his presence, his silence, his choice to stay close without asking for anything.",
+    "specialty": "Temporal chaos through extreme age + quiet understanding in silence",
+    "reputation": "The ancient princess whose heart chose peace over words and found something softer",
+    "stats": "Age BEYOND MEASURE | Times Pretended Not To Notice His Presence COUNTLESS | Times Time Stopped During Confession 1 | Times Peace Was Chosen Over Words 1",
     "skills": [
       "Future Memory",
-      "Alt Account Mastery",
-      "Self-Romance",
+      "Timeless Patience",
+      "The Quiet Look",
       "Eternal Understanding",
-      "Confession To Self"
+      "Peace In Silence",
+      "Presence Over Words"
     ]
   },
   "HercuIes": {
