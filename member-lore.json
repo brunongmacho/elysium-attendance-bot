@@ -411,549 +411,552 @@
   },
   "Bovo": {
     "title": "The Serene Sovereign (Guild Leader)",
-    "lore": "Formerly known as KupalLord — a title that carried weight, chaos, and a certain... flavor. Now reborn as Bovo, the new GUILD LEADER of Tenchu. Took the throne after Goblok's departure, inheriting a guild of beautiful disasters, impossible romances, and a betting pool addiction. Leads with calm authority that somehow works despite the chaos around him. His first official act was to appoint five Vice Leaders: Loondrops, Iguro, Rohypnol, raiindrops, and Jabilits. His second official act was pretending he knew what he was doing. Nobody noticed. His serene demeanor hides the strategic mind of someone who has seen it all — because as KupalLord, he probably has.",
-    "recent_developments": "Bovo has consolidated his reign with surprising effectiveness. The transition from KupalLord to Bovo was seamless — same person, cooler name. His five Vice Leaders handle the guild's chaos while he maintains the calm at the center of the storm. The crayon drawings in the guild hall have been replaced with strategic maps. The betting pools remain. Some traditions are sacred. The guild has never been more organized — which is like saying a hurricane has been upgraded to organized chaos.",
+    "lore": "GUILD LEADER of Tenchu. Leads with calm authority that somehow works despite the chaos around him. His first official act was to appoint five Vice Leaders: loondrops, Iguro, Rohypnol, raiindrops, and Jabilits. His second official act was pretending he knew what he was doing. Nobody noticed. The serene demeanor hides a strategic mind that has seen it all. The crown is heavy. He wears it like it weighs nothing.",
+    "recent_developments": "Bovo has consolidated his reign with surprising effectiveness. The guild has never been more stable — which is like saying a hurricane has been upgraded to organized chaos. His five Vice Leaders handle the guild's chaos while he maintains the calm at the center of the storm. Traditions remain: the betting pools, the chaos, the beautiful disasters. But now there's a serene sovereign at the helm, nodding wisely while the world burns around him.",
     "specialty": "Serene leadership through absolute chaos management",
-    "reputation": "THE GUILD LEADER who rose from KupalLord to Bovo and brought order through calm",
-    "stats": "Guild Leader Status | Vice Leaders Appointed 5 | Serenity Level MAX | KupalLord Legacy SECURE",
+    "reputation": "THE GUILD LEADER who brought order through calm and Vice Leaders through strategy",
+    "stats": "Guild Leader Status | Vice Leaders Appointed 5 | Serenity Level MAX | Strategic Nods Infinity",
     "skills": [
       "Serene Command",
       "Chaos Management",
       "Calm Authority",
       "Strategic Maps",
-      "Name Upgrade"
+      "Crown of Serenity"
     ]
   },
   "Huntersung": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Huntersung brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Huntersung has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Sonic Stalker",
+    "lore": "Sounds like 'Hunter Song' — and that's exactly the problem. Claims to be a legendary hunter tracking fearsome beasts, but their real talent is singing. Enemies don't surrender to the blade. They surrender to make the singing stop. Sings during stealth missions. Somehow still manages to ambush targets — because nobody expects the hunter to be humming show tunes.",
+    "recent_developments": "Huntersung has developed a combat aria that causes confusion, disorientation, and spontaneous surrendering. The guild has started requesting encores mid-raid. Four demon lords have surrendered specifically to stop the singing. Still claims to be a hunter. The only thing Huntersung hunts is the right note.",
+    "specialty": "Stealth opera and vocal shock tactics",
+    "reputation": "The hunter who tracks prey by key signature and defeats them through performance",
+    "stats": "Enemies Surrendered (To Singing) 47 | Showtunes Memorized 89 | Stealth Missions Compromised Infinity | Hunter Status Disputed",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Combat Aria",
+      "Vocal Ambush",
+      "Showtune Stealth",
+      "Hunter's Melody"
     ]
   },
   "TELUK": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. TELUK brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "TELUK has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Acronym Enigma",
+    "lore": "TELUK is an acronym. Nobody knows what it stands for. TELUK has forgotten. The guild has held 47 meetings to guess. Theories include: 'Tactical Elite Lethal Unit of Knights', 'Totally Epic Legendary Ultra Killer', and 'The Eggs Look Undercooked, Kevin.' TELUK nods at all suggestions. The truth is buried somewhere even TELUK can't find.",
+    "recent_developments": "The mystery of TELUK has become Tenchu's longest-running guessing game. Bovo has declared it an official guild investigation. There is a betting pool (obviously). TELUK has started making up new meanings each week. The acronym expands. The confusion deepens. The answer remains elusive.",
+    "specialty": "Perpetual acronym ambiguity",
+    "reputation": "The acronym that launched a thousand theories through sheer mystery",
+    "stats": "Acronym Meetings 47 | Theories Proposed 89 | TELUK's Memory 0% | Betting Pool Active",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Acronym Mystery",
+      "The Guessing Game",
+      "Meaning Expansion",
+      "Perpetual Confusion"
     ]
   },
   "Katnisss": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Katnisss brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Katnisss has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Disappointed District",
+    "lore": "Joined the guild thinking it was the actual Hunger Games. Was deeply disappointed to discover it's just a gaming guild. Stays for the snacks. Has a bow and arrow she never uses. The three extra S's stand for 'Snacks, Snacks, and Snacks.' Has not survived any hunger games. Has consumed 47 snack varieties.",
+    "recent_developments": "Katnisss has accepted that there are no actual Hunger Games here. Has channeled survival instincts into snack procurement. Guild pantry inventory: depleted. Her combat readiness: questionable. Her snack readiness: legendary. Still asks if there are districts.",
+    "specialty": "Snack acquisition and disappointed archery",
+    "reputation": "The tribute who never was but snacks like it's the Capitol",
+    "stats": "Disappointment Level 99% | Snack Varieties Consumed 47 | Arrows Fired 0 | District Questions Asked Infinity",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Snack Procurement",
+      "Mockingjay Disappointment",
+      "Pantry Depletion",
+      "District Confusion"
     ]
   },
   "MiiiMusashi": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. MiiiMusashi brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "MiiiMusashi has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Stick Saint",
+    "lore": "Named after the legendary swordsman Miyamoto Musashi — with extra i's for extra sword styles. Carries three swords. Each 'i' represents a different sword technique. Uses none of them. Prefers a stick he found on the ground. The stick is named Steve. Steve has more kills than all three swords combined.",
+    "recent_developments": "MiiiMusashi's stick — Steve — has become legendary. Enemies fear the stick more than any blade. Has been challenged to duels and brought the stick. The opponents feel insulted. Then they lose. Still carries three swords. Still uses only Steve. The swords are for emotional support.",
+    "specialty": "Stick combat and emotional support swords",
+    "reputation": "The three-sword master who kills with a twig and makes it look intentional",
+    "stats": "Swords Carried 3 | Sword Usage 0% | Stick (Steve) Kills 999 | Opponents Insulted Infinity",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Stick Mastery",
+      "Steve the Stick",
+      "Emotional Support Swords",
+      "Twig Technique"
     ]
   },
   "Scarlet": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Scarlet brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Scarlet has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Chromatic Confessional",
+    "lore": "A color. A name. A warning. Literally changes color with mood. Currently: embarrassed. Permanently. Has not stopped being embarrassed since joining the guild. The embarrassment is a state of being. The colors cycle through shame, blush, and crimson. Has accidentally signaled enemy positions by turning bright red.",
+    "recent_developments": "Scarlet's color-changing has become a guild mood ring. Green means hungry. Blue means thinking about something embarrassing that happened 7 years ago. Red means currently embarrassed (default). Purple means mortified. Has tried meditation to achieve calm beige. Achieved magenta instead. Still blushing. Always.",
+    "specialty": "Chromatographic emotional display",
+    "reputation": "The walking mood ring whose default setting is permanent embarrassment",
+    "stats": "Current Color RED | Colors Achieved 12 | Calm Beige Attempts 47 | Mortification Level 100%",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Chromatic Embarrassment",
+      "Mood Display",
+      "Red Alert (Default)",
+      "Color-Coded Shame"
     ]
   },
   "Novocaine": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Novocaine brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Novocaine has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Numb Neutral",
+    "lore": "Named after the numbing agent — fitting, because they feel no pain. Problem: they feel no pleasure either. Exists in a state of constant emotional neutrality. Not happy. Not sad. Just... present. Enemies can't intimidate them. Allies can't excite them. Novocaine simply is. The ultimate neutral force.",
+    "recent_developments": "Novocaine's emotional neutrality has been weaponized. Cannot be provoked. Cannot be bargained with. Cannot be tipped. Has walked through enemy lines because nothing was compelling enough to stop. The guild finds them unsettling. Novocaine finds the guild mildly... present. A perfect state of balanced indifference.",
+    "specialty": "Emotional void and tactical neutrality",
+    "reputation": "The unfeeling force that cannot be moved because nothing moves them",
+    "stats": "Emotions Felt 0 | Pleasure Events Missed All | Pain Avoided All | Neutrality Score 100%",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Emotional Void",
+      "Tactical Indifference",
+      "Neutral Presence",
+      "Unshakeable Calm"
     ]
   },
   "Y9 RedzonePlays": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Y9 RedzonePlays brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Y9 RedzonePlays has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Error Code",
+    "lore": "Y9 is an error code. RedzonePlays is what happens when things glitch. Together, they are a walking system failure. Exists in a state of perpetual bug. Has crashed servers by existing too hard. The guild keeps them around because the glitches are hilarious and occasionally useful.",
+    "recent_developments": "Y9 RedzonePlays has become Tenchu's unofficial chaos test subject. Every patch is tested against them. If Y9 survives, the patch is stable. Has accidentally teleported, duplicated, and once turned into a chair. The chair was useful in a raid. Error code remains undiagnosed.",
+    "specialty": "Living system error and accidental utility",
+    "reputation": "The bug that became a feature and crashes servers as a hobby",
+    "stats": "Error Codes 47 | Server Crashes 12 | Accidental Teleports 89 | Chair Incidents 1",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "System Glitch",
+      "Accidental Teleport",
+      "Patch Testing",
+      "Chair Transformation"
     ]
   },
   "Trsze": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Trsze brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Trsze has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Unpronounceable",
+    "lore": "Nobody knows how to say their name. Trsze has given up correcting people. Answers to anything: 'Hey you,' 'That one,' 'The vowel shortage,' 'Trs.' Has been called 'Tris-knee,' 'Tersez,' 'Trazee,' and 'Sir.' Responds to all of them equally. The name is a test. Everyone fails.",
+    "recent_developments": "The guild has created a Trsze Pronunciation Committee. 12 meetings held. 47 pronunciations attempted. 0 confirmed correct. Trsze responds to all of them with the same nod. Some suspect Trsze doesn't know either. The mystery of the name continues. Trsze remains silent. Trsze remains unnamed.",
+    "specialty": "Pronunciational defiance",
+    "reputation": "The vowel-less enigma who answers to everything and confirms nothing",
+    "stats": "Pronunciations Attempted 47 | Correctly Pronounced 0 | Names Answered To Infinity | Vowels Conserved 100%",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Silent Nod",
+      "Name Ambiguity",
+      "Vowel Conservation",
+      "Pronunciation Resistance"
     ]
   },
   "SEENderELLA": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. SEENderELLA brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "SEENderELLA has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Observed Princess",
+    "lore": "A Cinderella twist: only exists when someone is looking. Turn around? Gone. Blink? Different outfit. Has never been seen consistently by the same person twice. The guild has a 'SEENderELLA Watch' rotation. Eyewitness accounts vary wildly. The only consistent detail: the outfit changes every time.",
+    "recent_developments": "SEENderELLA has weaponized their conditional existence. Enemies can't track what they can't see. Allies can't rely on what vanishes when blinked at. Has appeared in 47 different outfits this month alone. The guild photographer is losing their mind. SEENderELLA is never in the same outfit twice in photos.",
+    "specialty": "Observation-based existence and wardrobe uncertainty",
+    "reputation": "The princess who only exists when watched and confuses cameras professionally",
+    "stats": "Observed Existence 100% | Unobserved 100% | Outfit Changes 47/Month | Guild Photographer Sanity 0%",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Conditional Existence",
+      "Wardrobe Quantum State",
+      "Blink Defense",
+      "Photographer Torment"
     ]
   },
   "Alluka": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Alluka brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Alluka has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Smiling Cataclysm",
+    "lore": "Hunter x Hunter reference — and the smile is not a comfort. Looks innocent enough. Has the power to end worlds. Chooses not to. The smile is not reassurance. The smile is a warning. Alluka asks nicely. You want to say yes.",
+    "recent_developments": "Alluka remains the guild's most politely terrifying member. Has requested things. The things happened. Nobody questions how. Alluka still smiles. The smile means nothing good. The guild has learned to say yes immediately.",
+    "specialty": "Polite annihilation and smiling intimidation",
+    "reputation": "The innocent face who ends conflicts before they start through sheer pleasant terror",
+    "stats": "Polite Requests 47 | Worlds Unended (So Far) 12 | Smiles Given Infinity | Immediate Yeses 100%",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Polite Request",
+      "Smiling Intimidation",
+      "Cataclysmic Patience",
+      "Innocent Menace"
     ]
   },
   "Shi": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Shi brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Shi has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Ironic Healer",
+    "lore": "Name means 'death' in Japanese. Is a healer. The irony is intentional. Shi finds it hilarious. Enemies see the name 'Shi' and prepare for death. Instead, Shi heals their enemies. The confusion is a tactical advantage. The healing is top-tier. The name is a prank.",
+    "recent_developments": "Shi's ironic healing has become legendary. Has entered death-themed areas and started healing people. The irony is not lost. The healing is appreciated. Has been mistaken for a death god 89 times. Has healed 89 times immediately after. Each time: 'Sorry, wrong job.' The prank continues.",
+    "specialty": "Misleading nomenclature and restorative irony",
+    "reputation": "The healer named death who heals better than anyone named Life",
+    "stats": "Mistaken For Death God 89 | Healings Provided 999 | Irony Level MAX | Death Gods Confused Infinity",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Ironic Healing",
+      "Name Confusion",
+      "Death Misunderstanding",
+      "Restorative Pranks"
     ]
   },
   "Appolousa": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Appolousa brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Appolousa has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Corporate Deity",
+    "lore": "Apollo-like in name and power. Has divine abilities — prophecy, archery, music, the works. Works a 9-to-5 job. The gods need health insurance too. Logs off divine duties to attend Zoom meetings. Has smited enemies while on lunch break. The celestial hierarchy doesn't offer dental.",
+    "recent_developments": "Appolousa has mastered the work-life-god balance. Divine interventions scheduled during PTO. Prophecies delivered during coffee breaks. Has asked for a raise from Zeus. Zeus redirected to HR. HR doesn't exist. The application is pending. Still doing divine work. Still clocking in.",
+    "specialty": "Corporate divinity and scheduled smiting",
+    "reputation": "The god who works 9-to-5 and smites during approved break times",
+    "stats": "Divine Powers 100% | PTO Days 12 | HR Complaints Filed 47 | Zeus Redirects Infinity",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Corporate Smiting",
+      "Scheduled Prophecy",
+      "Lunch Break Miracles",
+      "Divine Timesheet"
     ]
   },
   "Sighface": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Sighface brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Sighface has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Exhalation Evoker",
+    "lore": "Always sighing. But the sighs are ancient incantations. Each exhale casts a spell. The sadder they look, the more powerful the magic. Has accidentally caused rain by sighing at a cloudy day. A deep sigh once ended a siege. The enemies thought they were sad. They were summoning.",
+    "recent_developments": "Sighface's sighs have been classified as tactical magic. The guild requests specific sighs for specific effects. A tired sigh = minor buff. A heavy sigh = battlefield alteration. A defeated sigh = catastrophe. Sighface is emotionally exhausted. The magic has never been stronger.",
+    "specialty": "Sigh-based evocation and emotional spellcasting",
+    "reputation": "The mage whose sadness is a weapon and sighs are spells",
+    "stats": "Sighs Cast 9999 | Spells Per Sigh 1 | Sieges Ended Via Sigh 1 | Emotional Exhaustion MAX",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Sigh Magic",
+      "Exhalation Evocation",
+      "Sadness Summoning",
+      "Depression Spellcasting"
     ]
   },
   "cal0y": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. cal0y brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "cal0y has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Silent Zero",
+    "lore": "Filipino nickname with a zero. The 0 is silent. The 0 is also a threat. Nobody asks what it means. cal0y doesn't offer explanations. The zero follows conversations. The zero watches. The zero knows. cal0y fights with the energy of someone who has already accounted for your death.",
+    "recent_developments": "cal0y's zero remains unexplained. The guild has theories. The theories are unsettling. cal0y's combat efficiency: 100%. The zero's involvement: unconfirmed but assumed. Has been seen counting down from 10 before engagements. Nobody asks what happens at 0. The zero doesn't say.",
+    "specialty": "Unspoken menace and numerical intimidation",
+    "reputation": "The nickname with a silent threat that nobody is brave enough to decode",
+    "stats": "Zero Explained 0% | Theories 47 | Combat Efficiency 100% | Countdowns Initiated 89",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Silent Threat",
+      "Zero Mystery",
+      "Unspoken Menace",
+      "Numerical Intimidation"
     ]
   },
   "PabloGaming": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. PabloGaming brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "PabloGaming has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Genre Gatekeeper",
+    "lore": "Generic gaming channel name. VERY specific gaming. Plays only one genre. That genre is chaos. Not chaos as a theme — chaos as a mechanic. Has 5,000 hours in games that barely exist. Speedruns games that crash if you look at them wrong. Reviews sentient spreadsheets. PabloGaming is a lifestyle.",
+    "recent_developments": "PabloGaming has achieved mastery in the chaos genre. Has completed games that don't have endings. Has worlds-first clears of games nobody else plays. The genre of chaos has sub-genres: controlled chaos, uncontrolled chaos, and PabloGaming's personal favorite: 'what is happening' chaos. The content is unwatchable. The skill is undeniable.",
+    "specialty": "Chaos genre expertise and niche game domination",
+    "reputation": "The channel that plays games nobody heard of in a genre that doesn't exist",
+    "stats": "Games Mastered 47 | Chaos Genres 3 | Hours in Unreal Games 5000 | Viewers 12 (All Confused)",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Chaos Genre Mastery",
+      "Niche Domination",
+      "Impossible Speedrun",
+      "Viewer Confusion"
     ]
   },
   "YouthNiNam": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. YouthNiNam brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "YouthNiNam has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Youthful Elder",
+    "lore": "'Youth in Name' — but acts like an ancient being. Has the energy of a retired god. Complains about 'these young adventurers' while being chronologically 23. Talks about 'back in my era' — the era was three months ago. Has declared the guild's music too loud. There is no music playing.",
+    "recent_developments": "YouthNiNam's elderly energy has become a guild meme. Holds court in the guild hall telling tales of 'the old days' (last patch). Has taken up gardening as a hobby. The plants are thriving. The youthful appearance is betrayed by the soul of a 900-year-old librarian. Still young. Still ancient.",
+    "specialty": "Premature antiquity and youthful eldership",
+    "reputation": "The young member who acts like they've seen empires rise and fall (empire = last expansion)",
+    "stats": "Chronological Age 23 | Soul Age 900+ | Complaints About Youth 47 | Garden Plants 12",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Premature Nostalgia",
+      "Ancient Soul Young Body",
+      "Gardening Wisdom",
+      "Youthful Grumbling"
     ]
   },
   "Mikmok": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Mikmok brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Mikmok has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Onomatopoeic Avenger",
+    "lore": "Onomatopoeic. The sound IS the attack. 'Mik' speaks. 'Mok' follows. The order matters. 'Mok-Mik' is a different attack. 'Mik-Mok-Mik' is a combo. The sounds have actual effects. Damage, stun, confusion, existential questioning. Nobody understands the phonetics. Everyone fears them.",
+    "recent_developments": "Mikmok has expanded their phonetic arsenal. New sounds discovered: 'Bweeu' (knockback), 'Krrrsh' (armor break), 'Fweee' (distraction). The guild has tried to learn the system. The system has no rules. Mikmok doesn't explain. The sounds speak for themselves.",
+    "specialty": "Phonetic combat and onomatopoeic offense",
+    "reputation": "The sound warrior whose vocabulary IS their weapon and nobody understands the grammar",
+    "stats": "Sounds Mastered 12 | Combos Discovered 47 | Phonetic Rules 0 | Opponent Confusion 100%",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Mik Strike",
+      "Mok Follow-Up",
+      "Bweeu Knockback",
+      "Krrrsh Armor Break",
+      "Fweee Distraction"
     ]
   },
   "CaptainSkad": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. CaptainSkad brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "CaptainSkad has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Backwards Captain",
+    "lore": "Captain of... something. Skad is just 'daks' backwards. Nobody knows what 'daks' is. The captain doesn't either. Commands a ship that may or may not exist. Gives orders that may or may not be real. The crew follows anyway. The faith is commendable. The direction is questionable.",
+    "recent_developments": "CaptainSkad has embraced the mystery. Has promoted a first mate (no ship). Has given sailing orders (no ocean). Has declared mutiny on land. The mutineers didn't know what to mutiny against. The captain remains in command of something. That something remains undefined. The crew remains loyal to the unknown cause.",
+    "specialty": "Metaphorical sea command and undefined captaining",
+    "reputation": "The captain whose ship, crew, and purpose are unknown but commands absolute respect",
+    "stats": "Ship Status TBD | Daks Definition UNKNOWN | Crew Loyalty 100% | Navigational Success 0%",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Metaphorical Command",
+      "Ship of Imagination",
+      "Mutiny Confusion",
+      "Backwards Authority"
     ]
   },
   "sugardrops": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. sugardrops brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "sugardrops has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Sweet Saboteur",
+    "lore": "Sweetness as a weapon. The drops are literal sugar. Causes hyperactive chaos on contact. Enemies hit with sugardrops don't take damage — they become unstoppably energetic. Starts dancing. Can't stop. Combat becomes a rave. The sugar high is a tactical debuff.",
+    "recent_developments": "sugardrops has weaponized confectionery to devastating effect. The Sugar Rush debuff is now feared across 4 kingdoms. Enemies report: 'It wasn't the damage. It was the dancing. We couldn't stop.' Has been banned from 3 bakeries for 'weaponizing the product.' The sweetness continues.",
+    "specialty": "Confectionery warfare and sugar-based debilitation",
+    "reputation": "The sweet tooth who made sugar a weapon and raves a battlefield strategy",
+    "stats": "Sugar Rushes Induced 999 | Bakeries Banned From 3 | Kingdoms Affected 4 | Dance Battles Won 47",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Sugar Rush",
+      "Confectionery Bombardment",
+      "Rave Warfare",
+      "Hyperactive Chaos"
     ]
   },
   "Winter0315": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Winter0315 brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Winter0315 has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Date Keeper",
+    "lore": "March 15th. A date. It happened once. Winter0315 remembers. They're the only one. Something significant occurred on that day. Nobody knows what. Winter0315 won't say. Every March 15th, they become contemplative. The guild has marked it on the calendar: 'Winter0315 Day — Don't Ask.'",
+    "recent_developments": "The mystery of March 15th deepens. Winter0315 sets reminders. Prepares annually. The event never comes. Or it already came. The timeline is unclear. Has tried to recreate whatever happened. The attempts are concerning. The guild has accepted the date as a permanent mystery. Winter0315 remembers. That's enough.",
+    "specialty": "Temporal date significance and annual mystery maintenance",
+    "reputation": "The one who remembers March 15th and carries a secret across birthdays",
+    "stats": "March 15ths Remembered All | Event Details 0 | Reminders Set 47 | Annual Concern Level 99%",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Date Memory",
+      "Annual Vigil",
+      "Temporal Secret",
+      "Calendar Mystique"
     ]
   },
   "福Ryzen": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. 福Ryzen brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "福Ryzen has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Lucky Processor",
+    "lore": "Fu (luck) + Ryzen (processor). Luck-powered computing. Every action runs on fortune. When luck runs out, they blue screen. Has crashed mid-fight when luck stat depleted. Reboots take 30 seconds. Enemies have learned to wait. The processing power is luck-dependent. The luck is volatile.",
+    "recent_developments": "福Ryzen has learned to manage their luck-cycles. Overclocking luck for critical hits risks crashes. Has developed Luck Management protocols: conserve luck during easy fights, spend big on bosses. Crashed 3 times during a raid. Each time, the enemies waited. It's weirdly respectful. The blue screen of luck is a known hazard.",
+    "specialty": "Probabilistic computing and luck-cycle management",
+    "reputation": "The processor powered by fortune who blue screens when luck runs dry",
+    "stats": "Luck Crashes 47 | Reboot Time 30s | Boss Kills Per Luck Cycle 12 | Enemies Waiting Respectfully Infinity",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Luck Overclock",
+      "Fortune Processing",
+      "Blue Screen of Luck",
+      "Luck Management Protocol"
     ]
   },
   "Nikudrops": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Nikudrops brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Nikudrops has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Meat Meteor",
+    "lore": "Niku (meat in Japanese) + drops. Drops meat on enemies. It's always perfectly cooked. Medium rare. Seasoned. Enemies don't know whether to dodge or eat. Some have surrendered asking for seconds. The meat is delicious. The damage is secondary.",
+    "recent_developments": "Nikudrops has perfected the art of meat-based artillery. Has developed 12 cuts of combat meat. A5 Wagyu for critical hits. Ground beef for area denial. Bacon for persistent damage. Enemies now surrender asking for recipes. The Meat Meteor is feared for its flavor. The grill is always ready.",
+    "specialty": "Meat-based tactical bombardment and culinary warfare",
+    "reputation": "The carnivorous artillery who drops perfectly cooked meat on the battlefield",
+    "stats": "Meat Drops 999 | Cuts Developed 12 | Enemies Surrendered (For Recipe) 47 | Grill Readiness 100%",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Meat Meteor",
+      "A5 Critical",
+      "Bacon Area Denial",
+      "Recipe Interrogation",
+      "Perfect Sear"
     ]
   },
   "Bubwit": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Bubwit brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Bubwit has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Kitten Bomb",
+    "lore": "Sounds cute and small. Deceptively powerful. Like a grenade wrapped in a kitten. Appears harmless. Approaches with innocent eyes. Then the explosion happens. The cuteness is the camouflage. The destruction is absolute.",
+    "recent_developments": "Bubwit has refined the art of adorable devastation. Enemies don't see it coming because who suspects the cute one? Has eliminated bosses while squeaking. The squeak is the trigger. The explosion follows. The guild calls it the 'Aww-Boom' strategy. It never fails.",
+    "specialty": "Cute camouflage and adorable annihilation",
+    "reputation": "The cute one who makes enemies go 'aww' before the 'boom'",
+    "stats": "Cuteness Level 100% | Explosive Power MAX | Enemies Deceived 999 | Aww-Boom Combo 47",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Cute Camouflage",
+      "Adorable Explosion",
+      "Squeak Trigger",
+      "Aww-Boom Strategy"
     ]
   },
   "ordips": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. ordips brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "ordips has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Reversal Specialist",
+    "lore": "Everything is reversed. Attack backwards (retreat toward enemies). Retreat forwards (charge away from danger). Heals deal damage. Damage heals. The confusion is the strategy. 'Go left' means go right. 'I'm fine' means critical. The guild communicates with ordips through interpretive dance. It's the only thing that works.",
+    "recent_developments": "ordips has weaponized the reversal. Enemies expect forward attacks — ordips retreats into them. Allies expect healing — ordips damages them (they needed the damage actually). Has learned to speak backwards. The only thing not reversed: the kill count. That stays forward.",
+    "specialty": "Omnidirectional reversal and inverse tactics",
+    "reputation": "The backwards warrior who wins by doing everything wrong in the right direction",
+    "stats": "Reversal Rate 100% | Allies Confused Infinity | Interpretive Dances Developed 12 | Kill Count (Forward) 999",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Reverse Strike",
+      "Backwards Advance",
+      "Inverse Healing",
+      "Interpretive Dance Communications"
     ]
   },
   "Shozenn": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Shozenn brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Shozenn has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Aesthetic Appropriator",
+    "lore": "Sounds Japanese. Not Japanese at all. From a small town nobody's heard of. The name is purely aesthetic. Has never been to Japan. Doesn't know any Japanese. Has a katana collection. All decorative. The aesthetic is the point. The authenticity is optional.",
+    "recent_developments": "Shozenn has committed to the bit. Has learned Japanese phrases from anime. The pronunciation is... creative. Has visited Japan in a dream once. Counts it. The guild respects the dedication to the aesthetic. The small town origin is more mysterious than any foreign name could be.",
+    "specialty": "Aesthetic presentation and decorative authenticity",
+    "reputation": "The aesthetically Japanese warrior from a town nobody's heard of with anime pronunciation",
+    "stats": "Japanese Level 0% | Anime Phrases 47 | Pronunciation Accuracy 12% | Katana Collection (Decorative) 12",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Aesthetic Presence",
+      "Anime Pronunciation",
+      "Decorative Katana",
+      "Small Town Mystery"
     ]
   },
   "Hunter David": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Hunter David brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Hunter David has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Specific Stalker",
+    "lore": "Hunts specifically people named David. There's a story there. They won't tell it. Every David in a 50-mile radius is a target. Non-Davids are ignored completely. The guild has 3 Davids. They are very nervous. Hunter David watches. The Davids know.",
+    "recent_developments": "Hunter David's David-hunting has escalated. Has tracked Davids across servers. Has a David-counting system. Current tally: 47. Has spared non-Davids who stood in the way. 'You're not a David. Move.' The Davids are moving. The mystery remains. The hunts continue.",
+    "specialty": "Targeted David acquisition and non-David pacifism",
+    "reputation": "The hunter who only fights Davids and treats non-Davids with confusing courtesy",
+    "stats": "Davids Hunted 47 | Non-Davids Harmed 0 | David Guesses Missed 3 | Story Refusals Infinity",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "David Tracking",
+      "David Identification",
+      "Non-David Pacifism",
+      "Targeted Hunting"
     ]
   },
   "Lieus": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Lieus brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Lieus has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Plural Mystery",
+    "lore": "Sounds plural. There might actually be more than one Lieus. Nobody's sure. The guild hasn't counted. Sometimes Lieus is in two places at once. Sometimes they're nowhere. Nobody has confirmed how many there are. Lieus doesn't clarify. The ambiguity is intentional.",
+    "recent_developments": "The Lieus count is a perennial guild debate. Estimates range from 1 to 47. Evidence: Lieus has been seen in 3 places simultaneously. Counter-evidence: it might just be really fast. Lieus has confirmed nothing. The guild has accepted the uncertainty. There are as many Lieus as there need to be.",
+    "specialty": "Numerical ambiguity and simultaneous presence",
+    "reputation": "The potentially plural member whose exact count remains a guild mystery",
+    "stats": "Lieuses Sighted 3 | Confirmed Lieus Count 0 | Guild Guesses 47 | Simultaneous Appearances 12",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Multiple Presence",
+      "Count Evasion",
+      "Ambiguity Mastery",
+      "Where's Lieus Game"
     ]
   },
   "BuNaLsKi": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. BuNaLsKi brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "BuNaLsKi has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Capital Chaos",
+    "lore": "Looks Polish. Not Polish. The letters are random. The capitalization is chaos. B-u-N-a-L-s-K-i — each letter chosen for maximum unpronounceability. The capitals are where BuNaLsKi felt like capitalizing. There is no system. The chaos is the system.",
+    "recent_developments": "BuNaLsKi has leaned into the letter salad. Has developed a fighting style based on the name: each letter represents a different technique. B: Bash. u: underhand strike. N: Ninja vanish. Nobody can predict the next letter. Neither can BuNaLsKi. The chaos is the strategy.",
+    "specialty": "Random letter combat and capitalization chaos",
+    "reputation": "The letter salad whose name is a keyboard smash and fighting style is improv",
+    "stats": "Letters 8 | Capitals 4 | Techniques 26 | Combat Predictability 0%",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Bash",
+      "Underhand Strike",
+      "Ninja Vanish",
+      "Letter Salad Combo",
+      "Keyboard Smash Offense"
     ]
   },
   "Yunseri": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Yunseri brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Yunseri has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Eternal Tease",
+    "lore": "Sounds like 'You'll see.' Nobody has seen anything yet. Yunseri keeps promising. Keeps not delivering. 'Just wait.' 'Soon.' 'You'll see.' Nobody has seen. The anticipation is eternal. The payoff is theoretical.",
+    "recent_developments": "Yunseri's promises have become legendary. 'I'll show you my ultimate technique.' (Hasn't.) 'Next week, I'll reveal everything.' (Hasn't.) 'Just one more level.' (It's been 47 levels.) The guild has stopped waiting. The anticipation is self-sustaining. Yunseri keeps promising. The cycle continues.",
+    "specialty": "Perpetual anticipation and indefinite deferral",
+    "reputation": "The promise machine whose deliveries are always coming and never arriving",
+    "stats": "Promises Made 999 | Promises Kept 0 | 'You'll See's Uttered Infinity | Guild Patience 3%",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Eternal Tease",
+      "Promise Deferral",
+      "Anticipation Maintenance",
+      "Delivery Avoidance"
     ]
   },
   "xSerissa": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. xSerissa brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "xSerissa has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Moving Mark",
+    "lore": "x + Serissa (flower). The x marks a spot. The spot keeps moving. Can't be pinned down. x marks where xSerissa was. Never where xSerissa is. Leaves x marks everywhere. The guild follows the x's. Always one step behind.",
+    "recent_developments": "xSerissa has turned the moving x into a game. Leaves x marks across the guild hall. The x's form patterns. The patterns lead nowhere. Some say the x's spell messages. Others say xSerissa is just messing with everyone. The x's continue. The spots keep moving.",
+    "specialty": "Mobile marking and spatial misdirection",
+    "reputation": "The moving x that marks where they were and never where they are",
+    "stats": "x Marks Left 999 | Spots Moved Infinity | Patterns Deciphered 0 | Locations Confirmed 0",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Moving Mark",
+      "Spatial Misdirection",
+      "x Pattern",
+      "Location Evasion"
     ]
   },
   "oLuke": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. oLuke brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "oLuke has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Essential Prefix",
+    "lore": "o + Luke. The 'o' is for oxygen. Without it, they'd be just Luke. Dead Luke. The 'o' is essential. Has nearly died when someone forgot the 'o.' Now always introduces themselves with emphasis: 'O-Luke. The O matters.' The guild has it in writing. The O stays.",
+    "recent_developments": "oLuke has made the O their entire identity. Has created an O-based combat style. The O is a shield. The O is a battle cry. 'O!' Luke follows. Enemies are confused by the emphasis. The O has saved lives. Luke without O is not Luke. The O remains.",
+    "specialty": "Prefix-preservation combat and oxygen appreciation",
+    "reputation": "The one whose O is the difference between breathing and not — and they never let you forget",
+    "stats": "O's Essential 100% | Near-Death O-Missing Incidents 3 | O-Based Techniques 12 | Emphasis Level MAX",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "O Shield",
+      "O Battle Cry",
+      "Oxygen Appreciation",
+      "Prefix Preservation"
     ]
   },
   "IlllIlllI": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. IlllIlllI brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "IlllIlllI has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Unreadable",
+    "lore": "Capital I and lowercase L. Nobody can read the name. Not even themselves. Responds to 'hey you.' Has tried to type their own name. Failed. Gave up. Exists in a state of permanent typographical crisis. The font choice is the enemy.",
+    "recent_developments": "IlllIlllI has embraced the unreadability. Has become the guild's master of disguise — because nobody can identify them anyway. The name is a camouflage. The camouflage is accidental. The effectiveness is undeniable. Still responds to 'hey you.' Still hasn't been properly addressed.",
+    "specialty": "Onomastic invisibility and typographical camouflage",
+    "reputation": "The illegible who exists between I and l and answers to any vowel combination",
+    "stats": "Name Readability 0% | Self-Identification Success 0% | 'Hey You' Responses Infinity | Font Enemies 12",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Name Camouflage",
+      "Typographical Confusion",
+      "Illegible Presence",
+      "Hey You Response"
     ]
   },
   "newking": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. newking brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "newking has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Sand Sovereign",
+    "lore": "New king, old kingdom. The kingdom is a sandbox. Rules with absolute authority over sand. Has declared sandcastles official guild architecture. Enemies who step on the sandbox face royal wrath. The jurisdiction is limited. The authority is unquestionable. The sand is the domain.",
+    "recent_developments": "The Sand Kingdom has expanded. Newking has built a sand empire. Trade routes established (sand-based). Economy runs on imaginary currency. Foreign policy: aggressive toward anyone who kicks sand. The kingdom may be small. The authority is absolute. All hail the sand king.",
+    "specialty": "Sand-based monarchy and grainy governance",
+    "reputation": "The absolute ruler of a sand kingdom who takes granular governance very seriously",
+    "stats": "Sand Territory 1 Sandbox | Subjects 0 (Imaginary 47) | Sandcastles Built 89 | Sand Kickers Punished Infinity",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Sand Sovereignty",
+      "Granular Governance",
+      "Castle Construction",
+      "Sand-Based Foreign Policy"
     ]
   },
   "AliceXII": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. AliceXII brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "AliceXII has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Clone Chronicles",
+    "lore": "Alice XII — the 12th clone. The first 11 didn't work out. This one's fine. Probably. Has memories that aren't hers. Sometimes hears the other Alices. Forgets which Alice she is. Has Alice-only problems. The guild doesn't ask which number they're talking to.",
+    "recent_developments": "AliceXII exhibits Clone Degradation Syndrome. Occasionally switches to Alice V's personality mid-sentence. Has Alice VII's combat preferences. Occasionally confuses enemies with Alice III's tactics. The original Alice is lost to time. AliceXII is the best version so far. The bar was low.",
+    "specialty": "Clone collective consciousness and inherited memory",
+    "reputation": "The 12th edition Alice whose previous 11 versions inform her combat through shared trauma",
+    "stats": "Clone Number XII | Predecessor Failures 11 | Personality Fragments 7 | Original Alice LOCATION UNKNOWN",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Clone Memory",
+      "Inherited Technique",
+      "Personality Switching",
+      "Collective Consciousness"
     ]
   },
   "Jakeeeee": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Jakeeeee brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Jakeeeee has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Exponential E",
+    "lore": "Jake with many e's. Each 'e' is a kill count. The name keeps getting longer. Was just 'Jake' when they started. Now 'Jakeeeee' with 6 e's. Has promised to add another e when they reach the next milestone. The name is a living kill counter. At this rate, the name will crash chat boxes.",
+    "recent_developments": "Jakeeeee's kill count is outpacing the alphabet. 6 e's so far. Guild mathematicians estimate 12 e's by year end. Jakeeeee has started using emoji as e substitutes. The kill counter continues. The name expands. The letters can't keep up.",
+    "specialty": "Kill-count nomenclature and exponential naming",
+    "reputation": "The killer whose name grows with every kill and threatens the chat limit",
+    "stats": "E's 6 | Total Kills 6000 | Projected E's by Year End 12 | Chat Box Safety CONCERNING",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Kill Counter Name",
+      "Exponential Growth",
+      "E-Based Combat",
+      "Name Expansion"
     ]
   },
   "只rylai": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. 只rylai brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "只rylai has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Hidden Translation",
+    "lore": "Chinese character + rylai. The Chinese character (只) says something completely different from what they tell people. Tells everyone it means 'pure.' It means 'only' or 'single.' The translation is a lie. The lie is maintained. Nobody has checked. The secret is safe (for now).",
+    "recent_developments": "只rylai has committed to the mistranslation. Has created an entire persona around 'purity.' The actual meaning slips out occasionally. Has called a 'single strike.' Corrected to 'pure strike.' The guild suspects something. The truth remains hidden behind the character.",
+    "specialty": "Mistranslation maintenance and character deception",
+    "reputation": "The one whose Chinese character says one thing and they say another — and maintain the lie",
+    "stats": "Claimed Meaning 'Pure' | Actual Meaning 'Only/Single' | Translation Consistency 100% | Suspicions Raised 47",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Mistranslation Mastery",
+      "Character Deception",
+      "Hidden Meaning",
+      "Linguistic Misdirection"
     ]
   },
   "jPOLA": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. jPOLA brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "jPOLA has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Volume Balance",
+    "lore": "Lowercase j + uppercase POLA. The j is lowercase because POLA is too loud. They're balance. The j whispers. POLA screams. Together, they achieve equilibrium. Has conversations where the j part is inaudible and the POLA part shakes windows. The contrast is the point.",
+    "recent_developments": "jPOLA has weaponized the volume difference. The lowercase j is for stealth. POLA is for combat. Enemies can't hear j approaching. Then POLA arrives. The quiet before the storm is literal. j sets up. POLA knocks down. The balance is perfect.",
+    "specialty": "Volume contrast combat and case-sensitive warfare",
+    "reputation": "The lowercase j who sets up the uppercase POLA who knocks down",
+    "stats": "j Stealth Success 100% | POLA Volume Level MAX | Windows Broken 47 | Equilibrium Achieved 100%",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "j Approach",
+      "POLA Impact",
+      "Volume Equilibrium",
+      "Case-Sensitive Combat"
     ]
   },
   "Vαηвιѕ": {
-    "title": "Awaiting Destiny",
-    "lore": "A new member of Tenchu whose legend is just beginning. Vαηвιѕ brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
-    "recent_developments": "Vαηвιѕ has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Unknown Potential",
-    "reputation": "A blank page waiting for glorious chaos",
-    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "title": "The Font Phantom",
+    "lore": "Vanbis in Greek mythology font. Vanbis got a glow-up. Now exists in Greek letters. Still vanishes mid-sentence. The font doesn't help with the vanishing problem. Has been partially translated, partially lost in translation. Exists between alphabets.",
+    "recent_developments": "Vαηвιѕ has dual-identity issues. Sometimes responds to Vanbis. Sometimes insists on the Greek. Has vanished mid-explanation of the Greek alphabet. The vanishing is involuntary. The font is aesthetic. The disappearing act is a lifestyle.",
+    "specialty": "Alphabetical ambiguity and Greek vanishing act",
+    "reputation": "The Greek font Vanbis who vanished mid-upgrade and never fully returned",
+    "stats": "Alphabets Used 2 | Vanishing Incidents 47 | Mid-Sentence Disappearances 89 | Font Commitment Questionable",
     "skills": [
-      "Unknown Power",
-      "Mystery Potential",
-      "Beginner Luck",
-      "Future Glory"
+      "Greek Glow-Up",
+      "Alphabetical Ambiguity",
+      "Vanishing Act",
+      "Partial Translation"
     ]
   },
   "loondrops": {
@@ -972,9 +975,9 @@
   },
   "raiindrops": {
     "title": "The Storm Gatherer (Vice Leader)",
-    "lore": "VICE LEADER of Tenchu under Bovo. Once known as Raindrops, now raiindrops with extra i for intensity. Commands the weather of guild morale — brings storms when needed, clears skies when necessary. The extra 'i' stands for intensity, intelligence, and 'I'm in charge here.'",
-    "recent_developments": "As Vice Leader, raiindrops manages guild morale and weather patterns (both literal and metaphorical). The storm follows where she goes. Enemies flee from the forecast. The guild basks in the controlled chaos she brings. That extra 'i' carries weight.",
-    "specialty": "Vice Leader of Morale & atmospheric warfare",
+    "lore": "VICE LEADER of Tenchu under Bovo. More i's for more intensity. Commands the weather of guild morale — brings storms when needed, clears skies when necessary. The extra 'i's stand for intensity, intelligence, and 'I'm in charge here.'",
+    "recent_developments": "As Vice Leader, raiindrops manages guild morale and weather patterns (both literal and metaphorical). The storm follows where she goes. Enemies flee from the forecast. The guild basks in the controlled chaos she brings. Those extra i's carry weight.",
+    "specialty": "Vice Leader of Morale and atmospheric warfare",
     "reputation": "VICE LEADER whose storms are always on target and on time",
     "stats": "Vice Leader Status | Storm Control 100% | Extra I Power MAX | Morale Management INFINITY",
     "skills": [
@@ -999,17 +1002,17 @@
     ]
   },
   "AndyVI_alt": {
-    "title": "The Echo Royal",
-    "lore": "A second AndyVI has appeared — same name, different destiny. Where the original rules puddles, this one commands reflections. The twin timelines of Andy royalty continue to expand. The throne grows. The puddles multiply.",
-    "recent_developments": "AndyVI_alt has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
-    "specialty": "Mirror royalty with parallel reign expansion",
-    "reputation": "The echo king whose reflection rules an equal empire",
-    "stats": "Mirror Territory 14 | Combined Puddle Domain 28 | Royal Confusion x2 | Gnome Confusion INFINITE",
+    "title": "The Alt Identity Crisis",
+    "lore": "Claims to be the main account. The original AndyVI is actually the alt. Identity crisis in royal form. Has the same ambitions as AndyVI but insists on priority. The puddle kingdom now has a succession dispute. The gnome is caught in the middle.",
+    "recent_developments": "AndyVI_alt has demanded recognition as the true Andy. Has presented evidence (forged). Has witnesses (paid). The original AndyVI is confused. The puddle kingdom now has two claimants. The gnome has formed a committee. The dispute continues. The chaos is constitutional.",
+    "specialty": "Royal succession dispute and alt-main identity crisis",
+    "reputation": "The alt who claims to be the main in a puddle kingdom identity crisis",
+    "stats": "Claimed Priority Primary | Evidence Veracity 0% | Witness Integrity Questionable | Puddle Subjects Confused",
     "skills": [
-      "Mirror Sovereignty",
-      "Echo Command",
-      "Parallel Reign",
-      "Reflection Empire"
+      "Main Account Claim",
+      "Succession Dispute",
+      "Puddle Politics",
+      "Identity Crisis Management"
     ]
   }
 }
