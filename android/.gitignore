@@ -1,0 +1,52 @@
+# Built artifacts
+bin
+gen
+out
+build/
+app/build/
+*.apk
+*.aar
+*.ap_
+*.dex
+*.class
+
+# Gradle
+.gradle/
+build.gradle.cxx
+local.properties
+.kotlin/
+.gradle-caches/
+
+# Android Studio / IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+*.hprof
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Signing files
+# It is generally recommended to keep keystores out of version control.
+# If you need them for CI/CD, use GitHub Secrets.
+*.jks
+*.keystore
+# Explicitly allowing debug.keystore if you rely on it being in the repo
+# !debug.keystore
+
+# Project specific scripts & temporary files
+diagnose.bat
+build-apk.bat
+build-apk.ps1
+new_repo_setup.sh
+SETUP_COMPLETE.md
+app/src/main/new.sh
+
+# Secrets
+secrets.properties

@@ -22,6 +22,7 @@
  */
 
 const dbAPI = require('./database-api');
+const { getCollectionName } = require('./mongodb-helpers');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DISCORD ID MAPPING
@@ -48,7 +49,7 @@ async function ensureMemberExists(discordUser) {
   const inGameName = nickname || username;
 
   const db = await dbAPI.connect();
-  const membersCollection = db.collection('members');
+  const membersCollection = db.collection(getCollectionName('members'));
 
   // Step 1: Try to find by Discord ID first (fastest path)
   let member = await membersCollection.findOne({ _id: id });
@@ -130,7 +131,7 @@ async function ensureMemberExists(discordUser) {
  */
 async function mapDiscordIdToMember(username, discordId) {
   const db = await dbAPI.connect();
-  const membersCollection = db.collection('members');
+  const membersCollection = db.collection(getCollectionName('members'));
 
   // Find member by username
   const member = await membersCollection.findOne({ username });
@@ -185,7 +186,7 @@ async function batchMigrateAllMembers(discordClient, guildId) {
   console.log(`🔄 [Discord ID Mapper] Starting batch migration for guild: ${guildId}`);
 
   const db = await dbAPI.connect();
-  const membersCollection = db.collection('members');
+  const membersCollection = db.collection(getCollectionName('members'));
 
   // Get all members with temp IDs
   const tempMembers = await membersCollection.find({
@@ -263,7 +264,7 @@ async function batchMigrateAllMembers(discordClient, guildId) {
  */
 async function getMigrationStats() {
   const db = await dbAPI.connect();
-  const membersCollection = db.collection('members');
+  const membersCollection = db.collection(getCollectionName('members'));
 
   const totalMembers = await membersCollection.countDocuments();
   const tempIdMembers = await membersCollection.countDocuments({

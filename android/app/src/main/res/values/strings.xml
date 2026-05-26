@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Elysium Guild</string>
+    <string name="dashboard_title">Guild Dashboard</string>
+    <string name="boss_timers">Boss Timers</string>
+    <string name="attendance">Attendance</string>
+    <string name="leaderboard">Leaderboard</string>
+    <string name="events">Events</string>
+    <string name="profile">Profile</string>
+    <string name="notifications">Notifications</string>
+    <string name="settings">Settings</string>
+    
+    <!-- Boss Timer Strings -->
+    <string name="boss_spawn_soon">Spawning Soon</string>
+    <string name="boss_ready">Ready Now</string>
+    <string name="boss_overdue">Overdue</string>
+    <string name="next_spawn">Next Spawn: %s</string>
+    <string name="last_killed">Last Killed: %s</string>
+    <string name="mark_as_killed">Mark as Killed</string>
+    <string name="real_time_tracker">REAL-TIME RAID TRACKER</string>
+    <string name="search_encounter">Search encounter...</string>
+    <string name="guild_filter">Guild Filter</string>
+    <string name="no_encounter_match">No encounter matches \"%s\"</string>
+    <string name="no_guild_bosses">No guild bosses active</string>
+    <string name="archives_empty">The archives are empty</string>
+    <string name="reset_filters">RESET FILTERS</string>
+
+    <!-- Attendance & Leaderboard -->
+    <string name="total_points">Total Points</string>
+    <string name="attendance_rate">Attendance Rate</string>
+    <string name="current_streak">Current Streak</string>
+    <string name="weekly_rank">Weekly Rank</string>
+    <string name="boss_kills">Boss Kills</string>
+    <string name="search_members">Search members...</string>
+    <string name="no_data_available">No data available</string>
+    <string name="no_members_found">No members found matching \"%s\"</string>
+    <string name="guild_turn_label">GUILD TURN</string>
+
+    <!-- Event Strings -->
+    <string name="world_boss">World Boss</string>
+    <string name="guild_dungeon">Guild Dungeon</string>
+    <string name="arena_battle">Arena Battle</string>
+    <string name="guild_boss">Guild Boss</string>
+    <string name="gvg">GvG</string>
+    <string name="special_event">Special Event</string>
+    <string name="guild_activities_updates">GUILD ACTIVITIES &amp; UPDATES</string>
+    <string name="event_status_active">ACTIVE</string>
+    <string name="event_status_soon">SOON</string>
+    <string name="event_status_upcoming">UPCOMING</string>
+    <string name="event_status_completed">COMPLETED</string>
+
+    <!-- Error Strings -->
+    <string name="error_network">Network error. Please check your connection.</string>
+    <string name="error_server">Server unreachable. The archives are temporarily sealed.</string>
+    <string name="error_timeout">Request timed out. Try again, champion.</string>
+    <string name="error_unknown">A mysterious error occurred.</string>
+    <string name="retry">Retry</string>
+    
+    <!-- Notification Strings -->
+    <string name="boss_spawn_notification">%s is spawning soon!</string>
+    <string name="boss_spawn_channel">Boss Spawn Notifications</string>
+    <string name="event_reminder_channel">Event Reminders</string>
+    
+    <!-- Settings Strings -->
+    <string name="notifications_enabled">Enable Notifications</string>
+    <string name="boss_spawn_alerts">Boss Spawn Alerts</string>
+    <string name="event_reminders">Event Reminders</string>
+    <string name="notification_sound">Notification Sound</string>
+    <string name="notification_vibration">Vibration</string>
+    <string name="sync_interval">Sync Interval</string>
+    <string name="configuration_saved">Configuration Saved</string>
+    <string name="discard_changes">Discard</string>
+    <string name="save_settings">Save Settings</string>
+    <string name="fix_permission">FIX</string>
+    <string name="unsaved_change">Unsaved Change</string>
+    <string name="system_health">System Health</string>
+    <string name="app_update">App Update</string>
+    <string name="alert_interaction">Alert and interaction</string>
+    <string name="appearance_time">Appearance and Time</string>
+    <string name="help_onboarding">Help and Onboarding</string>
+    <string name="guild_support">Guild Support</string>
+</resources>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- This xml participates in the data backup and restore process.
+             It defines what data should be backed up and what should be excluded.
+             For cloud backup include statement, see:
+             https://developer.android.com/guide/topics/data/autobackup#xml-syntax
+        -->
+        <include domain="file" path="."/>
+        <exclude domain="file" path="no_backup/"/>
+    </cloud-backup>
+    <device-transfer>
+        <!-- This xml participates in the device transfer process.
+             It defines what data should be transferred and what should be excluded.
+             For device transfer include statement, see:
+             https://developer.android.com/guide/topics/data/device-to-device#xml-syntax
+        -->
+        <include domain="file" path="."/>
+        <exclude domain="file" path="no_backup/"/>
+    </device-transfer>
+</data-extraction-rules>

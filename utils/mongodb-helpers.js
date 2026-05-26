@@ -20,9 +20,9 @@ const dbAPI = require('./database-api');
 const CircuitBreaker = require('./circuit-breaker');
 
 // Helper function to get guild-specific collection name
-// All collections are now guild-specific with suffix (e.g., members-TPB)
+// All collections are now guild-specific with suffix (e.g., members-tenchu)
 function getCollectionName(baseName) {
-  const suffix = 'TRAILERPARKB';
+  const suffix = 'tenchu';
   return `${baseName}-${suffix}`;
 }
 
@@ -1439,6 +1439,7 @@ module.exports = {
   getRemindersByType,
 
   // Utilities
+  getCollectionName,
   getCircuitStatus,
   resetCircuit,
 

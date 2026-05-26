@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="160dp"
+    android:layout_height="160dp"
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
+    <ImageView
+        android:id="@+id/close_icon"
+        android:layout_width="65dp"
+        android:layout_height="65dp"
+        android:layout_gravity="center"
+        android:src="@android:drawable/ic_menu_delete"
+        android:background="@drawable/bg_bubble_close"
+        android:padding="18dp"
+        android:tint="@color/on_surface"
+        android:elevation="12dp"
+        android:scaleType="centerInside" />
+
+</FrameLayout>
