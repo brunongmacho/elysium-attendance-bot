@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  swcMinify: false,  // Force Babel (SWC binary not available for android-arm64)
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb',
