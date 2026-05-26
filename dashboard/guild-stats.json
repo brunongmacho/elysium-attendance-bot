@@ -2,7 +2,7 @@
   [
     { "value": "100%", "label": "Jalo Bot Financial Accuracy", "sublabel": "(Rohypnol: 0%)", "color": "primary" },
     { "value": "∞/0", "label": "Rohypnol's Net Worth", "sublabel": "(Sedated State)", "color": "accent" },
-    { "value": "50", "label": "Elysium's Active Members", "sublabel": "(All Legendary)", "color": "success" },
+    { "value": "50", "label": "Tenchu's Active Members", "sublabel": "(All Legendary)", "color": "success" },
     { "value": "9999", "label": "Ztig's Ally Precision Score", "sublabel": "", "color": "danger" }
   ],
   [
@@ -249,6 +249,6 @@
     { "value": "???", "label": "Goblok's IQ", "sublabel": "(Possibly Negative)", "color": "primary" },
     { "value": "34", "label": "Goblok's Retroactively Correct Plans", "sublabel": "(Transcendent Idiocy)", "color": "accent" },
     { "value": "1", "label": "Military Theories Named After Goblok", "sublabel": "(Goblokian Paradox)", "color": "success" },
-    { "value": "∞", "label": "Guild's Total Chaos Level", "sublabel": "(Elysium Standard)", "color": "danger" }
+    { "value": "∞", "label": "Guild's Total Chaos Level", "sublabel": "(Tenchu Standard)", "color": "danger" }
   ]
 ]
