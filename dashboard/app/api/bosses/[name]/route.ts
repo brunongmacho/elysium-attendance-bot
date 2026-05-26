@@ -34,7 +34,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-          error: "You must be a member of the ELYSIUM guild to perform this action.",
+          error: "You must be a member of the TENCHU guild to perform this action.",
         },
         { status: 403 }
       );
@@ -44,7 +44,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-          error: "You don't have permission to mark bosses as killed. ELYSIUM role or admin role required.",
+          error: "You don't have permission to mark bosses as killed. TENCHU role or admin role required.",
         },
         { status: 403 }
       );
@@ -184,7 +184,7 @@ export async function DELETE(
       return NextResponse.json(
         {
           success: false,
-          error: "You must be a member of the ELYSIUM guild to perform this action.",
+          error: "You must be a member of the TENCHU guild to perform this action.",
         },
         { status: 403 }
       );

@@ -132,7 +132,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 id="modal-title"
                 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-3 sm:mb-4 text-center font-game-decorative"
               >
-                Sign in to ELYSIUM
+                Sign in to TENCHU
               </h2>
 
               {/* Description */}
