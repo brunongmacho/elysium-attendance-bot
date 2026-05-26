@@ -8,12 +8,14 @@
  *
  * Usage: node scripts/migrate-to-tenchu.js
  * Requires MONGODB_URI environment variable
+ * Optionally set MONGODB_DB_NAME to specify the database (default: tenchu-bot)
  */
 
 const { MongoClient } = require('mongodb');
 
 const SUFFIX_OLD = 'TRAILERPARKB';
 const SUFFIX_NEW = 'tenchu';
+const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'tenchu-bot';
 
 async function migrate() {
   const uri = process.env.MONGODB_URI;
@@ -30,7 +32,8 @@ async function migrate() {
     await client.connect();
     console.log('Connected to MongoDB\n');
 
-    const db = client.db();
+    const db = client.db(MONGODB_DB_NAME);
+    console.log(`Using database: ${MONGODB_DB_NAME}`);
     const allCollections = await db.listCollections().toArray();
     const collectionNames = allCollections.map(c => c.name);
 
