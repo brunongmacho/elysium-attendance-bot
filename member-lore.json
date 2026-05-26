@@ -1,75 +1,32 @@
 {
-  "AmielJohn": {
-    "title": "The Caloric Warlord Supreme",
-    "lore": "Legend says AmielJohn's hunger once collapsed a dungeon's economy by eating all the loot drops. Invented Snack Diplomacy — a foreign policy where enemies are bribed with jerky. The Cold Snack War with M1ssy has escalated to MAD (Mutually Assured Digestion) — Goblok now mediates by eating their evidence. Recently promoted to Supply General by Goblok; all supplies vanished within the hour as predicted. His battle cry evolved from aggressive chewing to motivational eating speeches.",
-    "recent_developments": "AmielJohn's hunger has evolved beyond physical consumption — he now absorbs battle strategies through taste. The Cold Snack War with M1ssy has reached nuclear detente; both parties signed the Jerky Non-Proliferation Treaty officiated by Goblok. His promotion to Supply General was rescinded after the Great Vanishing, then reinstated because at least hes consistent. Now commands the Edible Intelligence Division where captured enemy rations are interrogated (eaten). Has adopted a cautious approach to resource allocation — prefers stockpiling snacks over spending them strategically.",
-    "specialty": "Strategic consumption & edible intelligence gathering",
-    "reputation": "The general who literally digests enemy plans but hoards the snacks, rarely seen but always hungry",
-    "stats": "Hunger 12000 | Culinary Warfare 850 | Treaty Compliance 92 | Cooking Show Episodes 24",
-    "skills": ["Strategic Digestion", "Ration Interrogation", "Snack Peace Treaty", "Battle Feast Inspiration"]
-  },
-  "Azryth": {
-    "title": "The Enlightened Nightlight Assassin",
-    "lore": "Named after Azrael, the Angel of Death — except this one carries a Hello Kitty nightlight into assassinations. Wrote a 200-page thesis on Why Darkness is Overrated while hiding from his own shadow. Goblok charges him snack fees for listening to his problems. Once failed an assassination because he stopped to debate the target about Nietzsche. The target joined Tenchu out of philosophical exhaustion.",
-    "recent_developments": "Azryth has embraced his contradiction — now teaches Illuminated Death Studies at three assassination academies. His Hello Kitty nightlight collection has grown to 89 pieces, each named after a philosopher. The thesis became a bestseller in both assassination and self-help genres. Goblok now co-authors papers on Existential Combat Psychology when he is not eating. His recruitment method (philosophical exhaustion) has been weaponized. Accumulates influence with scholarly patience — prefers observation over aggressive action. Shows up religiously to guild activities.",
-    "specialty": "Academic assassination in well-documented environments",
-    "reputation": "Deaths most published apprentice with tenure, strategic restraint, and perfect attendance",
-    "stats": "Stealth 120 | Philosophy Papers 47 | Nightlight Arsenal 89 | Academic Influence 450",
-    "skills": ["Thesis Strike", "Illuminated Doctorate", "Philosophical Submission", "Nightlight Symposium"]
-  },
-  "Goblok": {
-    "title": "The Transcendent Fool Emperor",
-    "lore": "Name literally means stupid in Indonesian — wears it as a crown. The GUILD LEADER of Tenchu by unanimous vote (he was the only candidate and nobody else wanted the job). Every decision defies logic so hard that logic filed a restraining order. Enemies prepare for his stupidity; he out-stupids their preparations. Recently declared Munchyy as Biological Siege Artillery after witnessing a sneeze shatter a fortress wall. His crayon drawings now include stick figures of new members. Military academies created a new course: Applied Goblokian Theory. Hes banned from teaching it.",
-    "recent_developments": "Gobloks stupidity has evolved beyond mortal comprehension — he now makes decisions that retroactively become correct. Logic didnt just file a restraining order; it moved to another dimension. As guild leader, he appointed five Vice Leaders: Rohypnol (forgotten finance + hopeless romance), Inihaw (food operations), Jalo (strategic confusion), xAustinx (unpredictability), and Iguro (dimensional disaster). He noticed Rohypnols confession to AlterFrieren — even Goblok cant miss that one. His Biological Siege Artillery strategy is taught in 12 military academies. Recently promoted Carrera to Chrono-Tactician after realizing time crimes win wars. The Goblokian Paradox is now a formal military theory: The stupider the plan, the more genius it becomes.",
-    "specialty": "Retroactive genius through transcendent idiocy",
-    "reputation": "THE GUILD LEADER whose impossible decisions somehow work and vice leaders fear his crayon strategies",
-    "stats": "IQ ??? (Possibly Negative) | Retroactive Strategies 34 | Vice Leaders Appointed 5 | Total Guild Chaos UNMEASURABLE",
-    "skills": ["Retroactive Correctness", "Time Crime Strategy", "Crayon Manuscripts", "Transcendent Stupidity"]
-  },
   "Rohypnol": {
-    "title": "The Amnesiac Adorer",
-    "lore": "Named after the sedative that makes you forget everything — except he can't forget AlterFrieren. Tried every method to forget her: meditation, distraction, even tried his own namesake. Nothing works. His memory of her gets stronger the more he tries to erase it. Goblok calls this The Rohypnol Paradox: The only substance in existence that enhances rather than erases memory. VICE LEADER of Tenchu — appointed to handle finances because even his wallet has forgotten its own balance. His portfolio is sedated. His judgment is sedated. Everything is sedated — except his feelings for her.",
-    "recent_developments": "Rohypnol has achieved a state of permanent chemical serenity. His feelings for AlterFrieren have outlasted every sedative, every attempt to suppress, every mental block. The Jalo Bot now manages his emotions alongside his finances — both equally sedated. He sits at his desk, half-asleep, smiling at nothing. ladyhoho calls it infuriating. The guild calls it the most peaceful unrequited love in Tenchu history. The betting pool reached 25,000 gold — he forgot to care. Some memories aren't meant to be erased. Some feelings are the only thing keeping him awake.",
-    "specialty": "Vice Leader of Finance & the art of forgotten devotion",
-    "reputation": "The sedated vice leader who remembers what he's supposed to forget",
-    "stats": "Forget Attempts INFINITY | Memory of Her STRONGER | Vice Leader Status | Jalo Bot Dependency 99%",
-    "skills": ["Sedated Memory", "Chemical Serenity", "Jalo Bot Command", "The Rohypnol Paradox", "Forgotten Devotion", "Forgotten Love"]
+    "title": "The Amnesiac Adorer (Vice Leader)",
+    "lore": "Named after the sedative that makes you forget everything — except he can't forget his own alt account. Yes, FrierenAlter is him. The revelation shocked no one except himself. VICE LEADER of Tenchu under Bovo, appointed to handle finances because even his wallet has forgotten its own balance. His portfolio is sedated. His judgment is sedated. Everything is sedated — except his gacha addiction. Runs two accounts, one wallet, zero impulse control. Bovo trusts him with the guild treasury. This may have been a mistake.",
+    "recent_developments": "Rohypnol has achieved a state of permanent chemical serenity — and confirmed that FrierenAlter is literally just his alt account. The guild collectively said \"we knew.\" The only person surprised was Rohypnol. As Vice Leader, he now manages guild finances across both his accounts. The Jalo Bot manages his emotions alongside his portfolio. He sits at his desk, half-asleep, smiling at nothing. ladyhoho calls it infuriating. The guild calls it the most peaceful reign of a man fighting himself in Tenchu history.",
+    "specialty": "Vice Leader of Finance & the art of romancing yourself",
+    "reputation": "The sedated vice leader who fell in love with his own alt account",
+    "stats": "Forget Attempts INFINITY | Alt Account Love TRUE | Vice Leader Status | Jalo Bot Dependency 99% | Self-Romance Level MAX",
+    "skills": [
+      "Sedated Memory",
+      "Alt Account Romance",
+      "Jalo Bot Command",
+      "Self-Love Paradox",
+      "Forgotten Devotion"
+    ]
   },
   "Iguro": {
-    "title": "The Accidental Recruitment Director",
-    "lore": "Named after the Snake Pillar — graceful, precise, deadly. Opens portals like a drunk GPS. VICE LEADER of Tenchu — appointed by Goblok to handle guild expansion (accidentally). Recently tried to send supplies to the frontlines; they ended up in a demon lords bathroom. The demon lord joined Tenchu out of sheer confusion. Accidental Recruits spreadsheet now has 12 entries — Goblok officially made him Head of Unintentional Recruitment. Attempted to visit a charity bake sale, arrived at enemy headquarters with cookies. The enemy surrendered AND donated.",
-    "recent_developments": "Iguros portal dysfunction has been promoted to official strategy. As Vice Leader, he oversees all guild expansion and dimensional operations — though his portals never go where intended. Now heads Department of Unintentional Expansion — 47 members recruited through wrong portals. The demon lord recruited via bathroom portal incident is now Tenchus Chief of Demonic Affairs. His cookie diplomacy resulted in three kingdom alliances. Portal accuracy remains 0%, recruitment success rate is 1200%. Exists in constant portal presence. He once tried to portal Rohypnol away during his confession to AlterFrieren — time itself rejected the intervention.",
+    "title": "The Accidental Recruitment Director (Vice Leader)",
+    "lore": "Named after the Snake Pillar — graceful, precise, deadly. Opens portals like a drunk GPS. VICE LEADER of Tenchu under Bovo — appointed to handle guild expansion (accidentally). Recently tried to send supplies to the frontlines; they ended up in a demon lord's bathroom. The demon lord joined Tenchu out of sheer confusion. Accidental Recruits spreadsheet now has 12 entries. Attempted to visit a charity bake sale, arrived at enemy headquarters with cookies. The enemy surrendered AND donated.",
+    "recent_developments": "Iguro's portal dysfunction has been promoted to official strategy. As Vice Leader under Bovo, he oversees all guild expansion and dimensional operations — though his portals never go where intended. Now heads Department of Unintentional Expansion — 47 members recruited through wrong portals. The demon lord recruited via bathroom portal incident is now Tenchu's Chief of Demonic Affairs. His cookie diplomacy resulted in three kingdom alliances. Portal accuracy remains 0%, recruitment success rate is 1200%.",
     "specialty": "Vice Leader of Expansion & dimensional disaster management",
     "reputation": "VICE LEADER whose portals never work but somehow the guild keeps growing",
     "stats": "Accidental Recruits 47 | Portal Success 0% | Recruitment Success 1200% | Kingdom Alliances 3",
-    "skills": ["Strategic Wrong Warp", "Bathroom Diplomacy", "Cookie Portal Warfare", "Unintentional HR Excellence"]
-  },
-  "Inihaw": {
-    "title": "The Ethical Grillmaster General",
-    "lore": "Name literally means grilled in Filipino — is vegan. VICE LEADER of Tenchu — appointed by Goblok to handle guild operations and feeding the masses. The cognitive dissonance is his weapon. Wields a greatsword-spatula hybrid thats seen more combat than most armies. Lectures about plant-based diets while grilling enemies to perfection. Once defended a fortress using smoked ribs as psychological warfare. The war crime tribunal is still deciding if it was delicious or illegal.",
-    "recent_developments": "Inihaws vegan BBQ paradox has achieved philosophical status. As Vice Leader, he manages all guild operations including feeding the entire membership. His greatsword-spatula is now legendary-tier. Once defended a fortress for 47 hours using only smoke signals and moral confusion. Opened a vegan BBQ restaurant called Grilled Irony with a 3-year waitlist. Every guild meeting now includes his cooking. Pours all profits back into expanding the restaurant empire. He catered Rohypnols failed confession attempt — even his BBQ cant fix a broken heart.",
-    "specialty": "Vice Leader of Operations & philosophical cuisine warfare",
-    "reputation": "VICE LEADER who feeds the guild and converts enemies through confused deliciousness",
-    "stats": "Siege Duration 47 Hours | Vegan Converts 9999 | Guild Members Fed Infinity | Waitlist 3 Years",
-    "skills": ["Philosophical Spatula Strike", "Smoke Conversion", "Ethical BBQ Shield", "Vegan Siege Defense"]
-  },
-  "Jalo": {
-    "title": "The Oracle of Incorrectness",
-    "lore": "So legendarily incorrect that Rohypnol named a bot after him — the bot is the only accurate thing associated with his name. VICE LEADER of Tenchu — appointed by Goblok to handle strategic planning (ironically). Once convinced a dragon that flossing prevents fire breath. THE DRAGON BELIEVED HIM. His facts are weapons of mass confusion. Goblok consults him for advice — this explains everything about Goblok.",
-    "recent_developments": "Jalos legendary wrongness has been elevated to prophecy. As Vice Leader of Strategy, his job is to provide battle plans that work when inverted. The Church of Jalo was founded by confused enemies who believed his misinformation was divine code. The dragon who believed flossing prevents fire breath now teaches dental hygiene to dragonkind. His facts are collected in The Book of Wrong. Goblok consults him weekly for plans that become genius when done wrong. The Jalo Bot exists as proof that even automation cannot fix him.",
-    "specialty": "Vice Leader of Strategy & divine misinformation warfare",
-    "reputation": "VICE LEADER whose wrong advice somehow wins battles when inverted",
-    "stats": "Vice Leader Status | Church Followers 500 | Dragon Dentistry Converts Infinity | Strategic Inversion Rate 100%",
-    "skills": ["Prophetic Wrongness", "Dragon Dental Doctrine", "Inverse Intelligence", "Confident Misinformation Aura"]
-  },
-  "Byakko": {
-    "title": "The Marketing Divine Tiger",
-    "lore": "The legendary White Tiger of the West, whose divine roar once split mountains. Now it sounds like a dog toy being stepped on. Genbu, Suzaku, and Seiryu have blocked him on all celestial messaging apps. His intimidation roar caused an enemy army to adopt him as a mascot. Currently suing three kingdoms for using his squeak as their morning alarm tone.",
-    "recent_developments": "Byakko has monetized his divine embarrassment. The Sacred Squeak is now licensed to 47 kingdoms as their official alarm tone — royalties fund Tenchus entire treasury. His mascot career exploded; three enemy armies surrendered to adopt him, then joined Tenchu for merchandise rights. Invests heavily in expanding his empire. Shows up to every guild event for maximum merchandising exposure.",
-    "specialty": "Divine merchandising & monetized cuteness warfare",
-    "reputation": "Heavens most profitable embarrassment with aggressive expansion tactics",
-    "stats": "Licensing Deals 47 | Merchandise Sales Infinity | Divine Cuteness MONOPOLIZED | Calendars Sold 9999",
-    "skills": ["Branded Squeak", "Mascot Diplomacy", "Merchandise Shield", "Royalty Roar"]
+    "skills": [
+      "Strategic Wrong Warp",
+      "Bathroom Diplomacy",
+      "Cookie Portal Warfare",
+      "Unintentional HR Excellence"
+    ]
   },
   "Carrera": {
     "title": "The Temporal Weapons Specialist",
@@ -78,7 +35,12 @@
     "specialty": "Weaponized temporal displacement & strategic tardiness",
     "reputation": "The time warrior who made lateness a legitimate tactic and omnipresence",
     "stats": "Time Crimes 892 (700 Tactical) | Successful Paradoxes 34 | Einstein Complaints 47 | Quantum Breaks 12",
-    "skills": ["Temporal Flank", "Strategic Yesterday", "Future Ambush", "Chrono-Snack Break"]
+    "skills": [
+      "Temporal Flank",
+      "Strategic Yesterday",
+      "Future Ambush",
+      "Chrono-Snack Break"
+    ]
   },
   "Evand3r": {
     "title": "The Legendary Spoon Seeker",
@@ -87,7 +49,12 @@
     "specialty": "Legendary improvisation & domestic artifact mastery",
     "reputation": "The hero whose quest became longer than most wars and guaranteed attendance",
     "stats": "Quest Duration 4y 7m 23d | Improvised Kills 9999 | Museum Pieces 47 | Spoon Status MISSING",
-    "skills": ["Legendary Improvisation", "Corkscrew Combat", "Poster Strike", "Abstract Weapon Mastery"]
+    "skills": [
+      "Legendary Improvisation",
+      "Corkscrew Combat",
+      "Poster Strike",
+      "Abstract Weapon Mastery"
+    ]
   },
   "Fever": {
     "title": "The Apocalypse Administrator",
@@ -96,34 +63,12 @@
     "specialty": "Bureaucratic mastery over reality collapse",
     "reputation": "The administrator who organized the end times with enterprise-level tools",
     "stats": "Apocalypses Filed 12 | Pending Dooms 1 | Workshop Waitlist 9 Months | Pivot Tables of Destruction 89",
-    "skills": ["Apocalypse Optimization", "Quarterly Doom Review", "Pending Armageddon", "Beautiful Documentation"]
-  },
-  "Hercules": {
-    "title": "The Divine Retirement Plan",
-    "lore": "Son of Zeus, blessed with godlike strength. Uses it exclusively to reach the remote without getting up. Rejected all 12 labors, claiming each was the 13th labor in disguise. Zeus has stopped calling. His legendary strength has carried: snacks, other peoples responsibilities, and exactly zero heroic quests.",
-    "recent_developments": "Hercules has fully committed to legendary laziness. Zeus stopped calling — blocked his number. The 12 Labors are now a self-help book he wrote (while lying down): Why Heroism is Overrated: A Gods Guide to Doing Nothing. Its a bestseller on Olympus. His strength has carried 4 mountains (for WiFi), 0 heroic quests.",
-    "specialty": "Divine-tier strength applied to maximum comfort",
-    "reputation": "Olymps most accomplished underachiever with infinite reserves",
-    "stats": "Strength GODLIKE | Heroism 0 | Self-Help Books 1 | Mountains Lifted (For Snacks) 4",
-    "skills": ["Divine Delivery Range", "Heroic Napping Mastery", "Fortress Lift (Snack Access)", "Olympian Disappointment"]
-  },
-  "M1ssy": {
-    "title": "The Anaphylactic Tactician",
-    "lore": "Allergic to literally everything she eats. Eats everything anyway. Her epipen has a killstreak counter. Currently in a snack Cold War with AmielJohn — Goblok mediates by eating their evidence. Once used an allergic reaction as a distraction to win a siege. The enemies were so concerned they surrendered.",
-    "recent_developments": "M1ssys allergy warfare has been weaponized into legitimate strategy. Her epipen killstreak reached 9999 — officially registered as combat accessory in guild inventory. The Cold Snack War with AmielJohn achieved permanent ceasefire after the Jerky Non-Proliferation Treaty. Now leads Tactical Self-Harm Division. Medical journals have published 12 case studies on her.",
-    "specialty": "Weaponized allergies & medical emergency tactics",
-    "reputation": "The strategic disaster with an epipen holster and zero financial planning",
-    "stats": "Epipen Killstreaks 9999 | Treaty Signatures 1 | Medical Papers About Her 12 | Hospital Bans 8",
-    "skills": ["Timed Anaphylaxis", "Shellfish Strategy", "Epipen Quickshot", "Medical Emergency Tactics"]
-  },
-  "Maria": {
-    "title": "The Decibel Tyrant",
-    "lore": "Marsha11s twin who wins every argument by being louder, not righter. Has never been correct about anything. Wins anyway. Once convinced an enemy guild their own banner was an insult — they retreated to consult their flags. Her facts are weapons of mass confidence. Marsha11 has spreadsheets proving her wrong; Maria just yells over them.",
-    "recent_developments": "Marias loudness has transcended debate — she now wins arguments through sheer acoustic force. Her voice has been measured at 189 decibels (jet engine: 140). Once shouted an enemy fortresss walls into structural failure. The twin rivalry with Marsha11 escalated. Recently won a battle by screaming NO so loud the enemy formation collapsed. Victory rate: 100%.",
-    "specialty": "Sonic warfare through confident wrongness",
-    "reputation": "The twin who weaponized volume into a siege tactic with relentless presence",
-    "stats": "Decibel Level 189 | Fortress Walls Destroyed 3 | Earplugs Purchased 9999 | Correctness Still 0%",
-    "skills": ["Sonic Siege", "NO Shockwave", "Volume Fortress Break", "Acoustic Dominance"]
+    "skills": [
+      "Apocalypse Optimization",
+      "Quarterly Doom Review",
+      "Pending Armageddon",
+      "Beautiful Documentation"
+    ]
   },
   "Marzhall": {
     "title": "The Archival Martyr",
@@ -132,7 +77,12 @@
     "specialty": "Historical accuracy in a world of confident lies",
     "reputation": "The archivist whose correctness cannot overcome volume but documents everything",
     "stats": "Filing Cabinets 47 | Backup Drives 12 | Course Students 500 | Arguments Won (Total) 3",
-    "skills": ["Archive Fortress", "Blockchain Evidence", "Philosophical Acceptance", "Frustrated Lecture"]
+    "skills": [
+      "Archive Fortress",
+      "Blockchain Evidence",
+      "Philosophical Acceptance",
+      "Frustrated Lecture"
+    ]
   },
   "MochiP": {
     "title": "The Assassination Artist",
@@ -141,7 +91,12 @@
     "specialty": "Assassination as performative art with incomprehensible apologies",
     "reputation": "The killer who made murder into a gallery exhibition with perfect attendance",
     "stats": "Gallery Exhibits 3 | Note Value 5000 GOLD | Assassination Requests (For Notes) 47 | Literacy Casualties Infinity",
-    "skills": ["Sorry Art Strike", "Collectible Kill", "Gallery Assassination", "Illegible Masterpiece"]
+    "skills": [
+      "Sorry Art Strike",
+      "Collectible Kill",
+      "Gallery Assassination",
+      "Illegible Masterpiece"
+    ]
   },
   "Ztig": {
     "title": "The Lightning Speedster",
@@ -150,25 +105,12 @@
     "specialty": "Speedrun mastery with server-breaking velocity",
     "reputation": "The blur who exists in lag and breaks records by breaking servers",
     "stats": "Speedrun Records 47 | Server Complaints Infinity | Category Bans 3 | Recognition Accuracy 0%",
-    "skills": ["Lag Strike", "Speedrun Domination", "Server Breaker", "Bot Confusion"]
-  },
-  "Skadushy": {
-    "title": "The Shadow Dancer",
-    "lore": "Name sounds like a shy shadow having an identity crisis. Fights from angles that shouldnt exist. Enemies get hit from behind before they knew there was a front. Has never been seen fighting — only the aftermath. The shadows themselves seem afraid to talk about him.",
-    "recent_developments": "Skadushy has perfected the art of being everywhere and nowhere. Now leads Tenchus Shadow Division — 47 members who fight from impossible angles. Has never been photographed fighting. Evidence exists only as enemy testimony. Still shy. Still deadly. Still exists in philosophical ambiguity.",
-    "specialty": "Impossible angle combat with existential presence",
-    "reputation": "The fighter who exists in the space between perception and reality",
-    "stats": "Angles Conquered Infinity | Captured on Film 0 | Enemy Testimonies 89 | Philosophical Existence 50%",
-    "skills": ["Shadow Step", "Angle Ambush", "Impossible Strike", "Existence Paradox"]
-  },
-  "Enaira": {
-    "title": "The Economic Singularity",
-    "lore": "Named after Nigerias eNaira — a digital currency so failed it made regular failure look successful. Every transaction Enaira touches crashes harder than Rohypnols portfolio. Once bankrupted an enemy guild by sending them 1 gold. Central Banks of seven kingdoms have her wanted poster.",
-    "recent_developments": "Enairas financial chaos has achieved theoretical status — economists call it the Enaira Paradox. Somehow bankrupted AND enriched seven kingdoms simultaneously. Tenchus treasury has grown 400% because reality gives up on accounting near her. Once touched Rohypnols crypto wallet — it gained value. He had an existential crisis. She still cant figure out how his confession to AlterFrieren succeeded when his portfolio is a disaster.",
-    "specialty": "Paradoxical wealth generation through systemic collapse",
-    "reputation": "The walking economic impossibility theorem with selective deployment",
-    "stats": "Kingdoms Affected 7 | Paradox Radius 50m | Tenchu Profit +400% | University Case Studies 47",
-    "skills": ["Paradox Touch", "Simultaneous Bankruptcy/Profit", "Zero Division Aura", "Economic Impossibility"]
+    "skills": [
+      "Lag Strike",
+      "Speedrun Domination",
+      "Server Breaker",
+      "Bot Confusion"
+    ]
   },
   "ladyhoho": {
     "title": "The Laughing Abyss",
@@ -177,16 +119,12 @@
     "specialty": "Existential comedy warfare & therapeutic trauma",
     "reputation": "The smile that launched a thousand therapy sessions through careful deployment",
     "stats": "Therapy Days Per Week 4 | Combo Multiplier 9999x | Therapists Defeated 6 | Weapon Classification 4 KINGDOMS",
-    "skills": ["Abyss Giggle", "Smile Weapon", "Existential Comedy Burst", "Therapeutic Casualty Creation"]
-  },
-  "PanCoco": {
-    "title": "The Pancake Commander",
-    "lore": "Name sounds like a breakfast item having an identity crisis. Commands the guilds breakfast forces with culinary precision. Has won battles by overwhelming enemies with pancake-based logistics. The enemy never sees the breakfast coming. The syrup is always sticky.",
-    "recent_developments": "PanCoco has expanded into a full breakfast empire. His Pancake Battalion now includes waffles, French toast, and one very confused omelet. Has catered 47 guild events. Enemies fear the breakfast assault more than any sword. The syrup stain on the guild hall floor is now a permanent monument.",
-    "specialty": "Breakfast-based military strategy with syrup precision",
-    "reputation": "The commander whose meals win more battles than weapons",
-    "stats": "Pancakes Flipped 9999 | Battle Breakfasts 47 | Syrup Stains Infinity | Enemy Breakfast Fear 100%",
-    "skills": ["Pancake Assault", "Breakfast Blitz", "Syrup Trap", "Waffle Wall"]
+    "skills": [
+      "Abyss Giggle",
+      "Smile Weapon",
+      "Existential Comedy Burst",
+      "Therapeutic Casualty Creation"
+    ]
   },
   "lanZ6": {
     "title": "The Laser Precision",
@@ -195,25 +133,12 @@
     "specialty": "Precision through chaos with friendly fire immunity",
     "reputation": "The shooter who misses on purpose better than others hit accidentally",
     "stats": "Intentional Misses 89 | Ally Near-Misses 47 | Bystander Recruitment 3 | Calculated Chaos Rating 9000",
-    "skills": ["Random Precision", "Chaos Control", "Wall-Piercing Accident", "Bystander Recruitment"]
-  },
-  "Ayane69": {
-    "title": "The Enlightened Nightlight Assassin",
-    "lore": "Named after Azrael, the Angel of Death — except this one carries a Hello Kitty nightlight into assassinations. Wrote a 200-page thesis on Why Darkness is Overrated while hiding from his own shadow. Goblok charges him snack fees for listening to his problems. Once failed an assassination because he stopped to debate the target about Nietzsche.",
-    "recent_developments": "Azryth (Ayane69) has embraced his contradiction — now teaches Illuminated Death Studies at three assassination academies. His Hello Kitty nightlight collection has grown to 89 pieces. The thesis became a bestseller. Accumulates influence with scholarly patience. Shows up religiously to guild activities.",
-    "specialty": "Academic assassination in well-documented environments",
-    "reputation": "Deaths most published apprentice with tenure and perfect attendance",
-    "stats": "Stealth 120 | Philosophy Papers 47 | Nightlight Arsenal 89 | Academic Influence 450",
-    "skills": ["Thesis Strike", "Illuminated Doctorate", "Philosophical Submission", "Nightlight Symposium"]
-  },
-  "Tinitira": {
-    "title": "The Tidal Terror",
-    "lore": "Name sounds like a wave having an existential crisis. Controls water with the consistency of a bad pun. Once flooded a fortress by crying during a sad movie. The enemy surrendered just to escape the moisture. The tears were not strategic but the results were effective.",
-    "recent_developments": "Tinitira has embraced the tears-as-weapon concept. Now leads Tenchus Waterworks Division. Has flooded 12 fortresses through emotional manipulation. Recently cried during a peace negotiation — the enemy agreed to terms just to leave. The water damage was extensive. The victories were damp.",
-    "specialty": "Emotional water control with unpredictable moisture",
-    "reputation": "The bender whose tears are more dangerous than her waves",
-    "stats": "Floods Caused 12 | Tears Stored Infinity | Fortress Damage 9999 | Emotional Devastation 100%",
-    "skills": ["Tidal Tantrum", "Crying Flood", "Moisture Manipulation", "Surrender Soak"]
+    "skills": [
+      "Random Precision",
+      "Chaos Control",
+      "Wall-Piercing Accident",
+      "Bystander Recruitment"
+    ]
   },
   "LaxusLawliet": {
     "title": "The Lightning Lord",
@@ -222,7 +147,12 @@
     "specialty": "Dramatic electricity with utility applications",
     "reputation": "The storm who bills himself as a power company",
     "stats": "Watts Generated Infinity | Blackouts Caused 47 | Phone Charges 9999 | Property Damage 8900 GOLD",
-    "skills": ["Lightning Lord", "Power Grid", "Storm Performance", "Electric Bill Zero"]
+    "skills": [
+      "Lightning Lord",
+      "Power Grid",
+      "Storm Performance",
+      "Electric Bill Zero"
+    ]
   },
   "Mielle1968": {
     "title": "The Vintage Virtuoso",
@@ -231,7 +161,12 @@
     "specialty": "Historical gameplay wisdom with vintage expertise",
     "reputation": "The living legend whose complaints are educational and gear is museum-worthy",
     "stats": "Years Active 58 | Guilds Witnessed 47 | Vintage Gear Value Infinity | Complaining Streak 58 Years",
-    "skills": ["Ancient Wisdom", "Vintage Gear Mastery", "Meta Memory", "Nostalgic Commentary"]
+    "skills": [
+      "Ancient Wisdom",
+      "Vintage Gear Mastery",
+      "Meta Memory",
+      "Nostalgic Commentary"
+    ]
   },
   "AndyVI": {
     "title": "The Royal Recovery Specialist",
@@ -240,16 +175,12 @@
     "specialty": "Royal chaos with self-declared authority",
     "reputation": "The non-existent monarch whose tiny empire grows through absolute confidence",
     "stats": "Territories Ruled 14 | Subjects (Real) 1 Gnome | Royal Declarations 500 | Puddle Diplomacy 100%",
-    "skills": ["Sovereignty Declaration", "Puddle Empire", "Regal Confusion", "Tub Kingdom"]
-  },
-  "KingPagpag": {
-    "title": "The Recycled Majesty",
-    "lore": "Named after Filipino pagpag (leftover food) — the King of Repurposing Garbage into Glory. Every weapon is found in a dumpster. Every strategy is a failed plan from 3 wars ago. Once defeated an army using a broken shield, expired rations, and someone elses discarded battle plan.",
-    "recent_developments": "KingPagpags garbage empire has achieved economic dominance. His Dumpster Diving Corps finds legendary weapons weekly — 47 cursed swords, 12 functioning catapults, and 1 dragon egg. His recycling program is mandatory guild policy. Spends nothing — everything is free if you check the right dumpster.",
-    "specialty": "Legendary warfare through systematic garbage repurposing",
-    "reputation": "The king whose trash-based economy rivals actual kingdoms and costs nothing",
-    "stats": "Dumpster Legendaries Found 47 | Recycled Victories 89% | Throne Comfort 0% | Dragon Eggs Hatched 1",
-    "skills": ["Dumpster Dive Supreme", "Expired Tactics Mastery", "Garbage Arsenal", "Backwards Battle Plan"]
+    "skills": [
+      "Sovereignty Declaration",
+      "Puddle Empire",
+      "Regal Confusion",
+      "Tub Kingdom"
+    ]
   },
   "路易丝": {
     "title": "The Elegant Enigma",
@@ -258,7 +189,12 @@
     "specialty": "Aesthetic warfare with deadly grace",
     "reputation": "The elegant warrior who defeats enemies through confusion and beauty",
     "stats": "Elegance Rating 9999 | Combat Ballets 12 | Enemy Confusion 47 | Instant Noodle Crowns Infinity",
-    "skills": ["Elegant Strike", "Combat Ballet", "Aesthetic Victory", "Graceful Confusion"]
+    "skills": [
+      "Elegant Strike",
+      "Combat Ballet",
+      "Aesthetic Victory",
+      "Graceful Confusion"
+    ]
   },
   "HODAKA": {
     "title": "The Weather Criminal Weatherboy",
@@ -267,7 +203,12 @@
     "specialty": "Weaponized forecast manipulation & meteorological psychological warfare",
     "reputation": "The weatherboy who made meteorology an emotional weapon",
     "stats": "Kingdoms Affected 47 | Productivity Drops 89% | Coudy Merch Sales Infinity | Meteorologist Bounty 25000 GOLD",
-    "skills": ["Forecast Terrorism", "Historical Weather Revisionism", "Emotional Climate Control", "Coudy Merchandise Empire"]
+    "skills": [
+      "Forecast Terrorism",
+      "Historical Weather Revisionism",
+      "Emotional Climate Control",
+      "Coudy Merchandise Empire"
+    ]
   },
   "Channy": {
     "title": "The Channel Surfer",
@@ -276,7 +217,12 @@
     "specialty": "Emotional energy channeling with catastrophic side effects",
     "reputation": "The mage whose feelings become weapons and the void is their plus-one",
     "stats": "Channeled Emotions 47 | Black Holes Created 3 | Collateral Damage Infinity | Emotional Volatility 9999",
-    "skills": ["Existential Channeling", "Feeling Beam", "Void Storage", "Mood Swing Storm"]
+    "skills": [
+      "Existential Channeling",
+      "Feeling Beam",
+      "Void Storage",
+      "Mood Swing Storm"
+    ]
   },
   "Hytrz": {
     "title": "The Hyperactive Haste",
@@ -285,7 +231,12 @@
     "specialty": "Speed-warped actions with incomprehensible communication",
     "reputation": "The blur who completes before starting and wins before arriving",
     "stats": "Speed Multiplier 4x | Quests Pre-Completed 89 | Words Per Second 47 | Comprehension 0%",
-    "skills": ["Pre-Emptive Strike", "Temporal Speed", "Incomprehensible Blur", "Game Crash Advantage"]
+    "skills": [
+      "Pre-Emptive Strike",
+      "Temporal Speed",
+      "Incomprehensible Blur",
+      "Game Crash Advantage"
+    ]
   },
   "yakob": {
     "title": "The Yak Attack",
@@ -294,16 +245,12 @@
     "specialty": "Reverse everything warfare with backwards confidence",
     "reputation": "The backwards warrior who confuses enemies by doing everything wrong and winning",
     "stats": "Reverse Success 89% | Backwards Arrows 47 | Confusion Kills Infinity | Comprehension 0%",
-    "skills": ["Return Strike", "Reverse Retreat", "Backwards Ambush", "Confusion Victory"]
-  },
-  "AlterFrieren": {
-    "title": "The Time-Touched Princess of Eternal Moments",
-    "lore": "An elf so old that time itself got confused around them. Has lived so long that yesterday and last century mean the same thing. Remembers when dragons were the new kids. Has seen empires rise and fall, gods age, and stars die. But nothing — not even the birth of the first dragon — prepared her for the day Rohypnol said what he said. He told her. Time stopped. Then started again. Now he simply watches from close enough to see her smile. She notices everything. She says nothing. Some endings are more beautiful than beginnings.",
-    "recent_developments": "AlterFrieren has lived for millennia, but that moment — the one where time stopped — she will keep forever. Rohypnol confessed. Time reset. And now he sits beside her, near enough, saying nothing more, needing nothing more. She pretends not to notice how close he sits. She pretends not to feel the warmth when their shoulders almost touch. ladyhoho calls it frustrating. She calls it enough. The guild sees an unrequited love story. She sees someone who chose peace over pressure — and that means more than words ever could. The betting pool doesnt interest her. She already has what matters: his presence, his silence, his choice to stay close without asking for anything.",
-    "specialty": "Temporal chaos through extreme age + quiet understanding in silence",
-    "reputation": "The ancient princess whose heart chose peace over words and found something softer",
-    "stats": "Age BEYOND MEASURE | Times Pretended Not To Notice His Presence COUNTLESS | Times Time Stopped During Confession 1 | Times Peace Was Chosen Over Words 1",
-    "skills": ["Future Memory", "Timeless Patience", "The Quiet Look", "Eternal Understanding", "Peace In Silence", "Presence Over Words"]
+    "skills": [
+      "Return Strike",
+      "Reverse Retreat",
+      "Backwards Ambush",
+      "Confusion Victory"
+    ]
   },
   "DarKOwLZ": {
     "title": "The Shadow Humor",
@@ -312,7 +259,12 @@
     "specialty": "Shadow combat with owl-based psychological warfare",
     "reputation": "The not-so-scary shadow who terrifies through sheer owl enthusiasm",
     "stats": "Owl Impressions 89 | Shadow Comedy Sets 12 | Fear Actually Caused 0 | Owl Terror Infinity",
-    "skills": ["Owl Screech", "Dark Comedy", "Shadow Pet", "Closet Checking"]
+    "skills": [
+      "Owl Screech",
+      "Dark Comedy",
+      "Shadow Pet",
+      "Closet Checking"
+    ]
   },
   "Pedsrow": {
     "title": "The Pharmacy Phantom",
@@ -321,7 +273,12 @@
     "specialty": "Excessive potion mastery with organizational chaos",
     "reputation": "The walking pharmacy whose inventory is chaos and results are magic",
     "stats": "Potions Stocked 500+ | Cures Invented 47 | Organized By Vibe | Expiration Ignored",
-    "skills": ["Vibe Healing", "Panacea Palace", "Instant Recovery", "Hot Sauce Medicine"]
+    "skills": [
+      "Vibe Healing",
+      "Panacea Palace",
+      "Instant Recovery",
+      "Hot Sauce Medicine"
+    ]
   },
   "UmpaUmpa": {
     "title": "The Rhythmic Rambler",
@@ -330,7 +287,12 @@
     "specialty": "Combat dancing with rhythmic hypnosis",
     "reputation": "The groove warrior who turned battle into a rave and wins through dancing",
     "stats": "Beats Per Minute 180 | Rave Raids Won 47 | Groove hypnosis Success 89% | Music Terribleness Infinity",
-    "skills": ["Rhythm Strike", "Dance Ambush", "Groove hypnosis", "Rave Raid"]
+    "skills": [
+      "Rhythm Strike",
+      "Dance Ambush",
+      "Groove hypnosis",
+      "Rave Raid"
+    ]
   },
   "JudeMaximus": {
     "title": "The Maximum Effort",
@@ -339,7 +301,12 @@
     "specialty": "Maximum enthusiasm with minimum coordination",
     "reputation": "The inspiring disaster whose warcry is their own name and works anyway",
     "stats": "Enthusiasm 1000% | Coordination 0% | Friendly Fire Incidents 47 | Enemy Surrenders (Laughter) Infinity",
-    "skills": ["Name Warcry", "Enthusiasm Aura", "Maximum Charge", "Accidental Victory"]
+    "skills": [
+      "Name Warcry",
+      "Enthusiasm Aura",
+      "Maximum Charge",
+      "Accidental Victory"
+    ]
   },
   "Gnohaij03": {
     "title": "The Number Navigator",
@@ -348,16 +315,12 @@
     "specialty": "Obsessive stat tracking with incomprehensible spreadsheets",
     "reputation": "The analyst whose spreadsheets are beautiful and meaningless",
     "stats": "Spreadsheets 47 | Color Codes 12 | Understanding 0% | Organized Infinity",
-    "skills": ["DPS Calculator", "Color-Coded Everything", "Stat Obsession", "Random Numbers"]
-  },
-  "Rileyread": {
-    "title": "The Literary Launcher",
-    "lore": "Name is Riley read — gets it every time. Carries books into battle and throws them at enemies. Has a library of 500+ volumes, none about combat, all about agricultural practices of obscure civilizations. Enemies have been defeated by the knowledge of wheat farming in year 300 BC.",
-    "recent_developments": "Rileyread has established The Literary Arsenal — a combat library where every book is a projectile. Has defeated enemies with: a encyclopedia of medieval fishing, a cookbook from a dead empire, and one very informative pamphlet about goat grooming. Knowledge is power. Throwing it is combat.",
-    "specialty": "Book-based combat with obscure knowledge projectiles",
-    "reputation": "The scholar who defeats enemies with historical farming manuals",
-    "stats": "Books Thrown 500+ | Genre Coverage Infinity | Combat Effectiveness 89% | Pun Accuracy 0%",
-    "skills": ["Literature Launch", "Knowledge Projectile", "Book Barrage", "Pamphlet Strike"]
+    "skills": [
+      "DPS Calculator",
+      "Color-Coded Everything",
+      "Stat Obsession",
+      "Random Numbers"
+    ]
   },
   "PHorns": {
     "title": "The Horn Hero",
@@ -366,70 +329,12 @@
     "specialty": "Signal confusion with accidental competence",
     "reputation": "The hero whose name is the joke and the weapon is the confusion",
     "stats": "Confusion Deployments 89 | Successful Summons 3 | Name Laughs Caused Infinity | Effectiveness 47%",
-    "skills": ["Signal Mixup", "Deliberate Confusion", "Horn Misdirection", "Accidental Heroics"]
-  },
-  "HASol3006": {
-    "title": "The Solar Cipher",
-    "lore": "Name is a code that has not been cracked — by design. Claims it stands for Highly Advanced Solar Operation 3006. The year is wrong, the technology is made up, and nobody believes them. Carries a glowing orb that might be a weapon or a night light.",
-    "recent_developments": "HASol3006 has leaned into the enigma. Their advanced technology is now classified as mysterious but effective by guild records. The glowing orb brightens dark dungeons and occasionally explodes. Still claims to be from the future. Still has no evidence. Still mysterious. Goblok finds them fascinating.",
-    "specialty": "Mysterious technology with unexplained effectiveness",
-    "reputation": "The time mystery whose glowing orb does something and nobody asks what",
-    "stats": "Technology Understanding 0% | Orb Brightness Infinity | Explosion Rate 12% | Mystery Persistence 100%",
-    "skills": ["Glowing Orb", "Mysterious Technology", "Accidental Explosion", "Time Claim"]
-  },
-  "Adriana": {
-    "title": "The Adriatic Ascendant",
-    "lore": "Named after a sea they have never seen. Claims to have sea in their blood — it is actually motion sickness. Gets seasick on land. Still insists the ocean is their domain. Has never been to the ocean. The confidence is admirable. The correlation is nonexistent.",
-    "recent_developments": "Adriana finally saw the ocean — was seasick for a week on a boat. Still claims maritime heritage. Has named themselves Admiral of the Guild based on the title they gave themselves. Goblok approved it. The navy consists of one boat and a strong refusal to accept reality.",
-    "specialty": "Self-declared maritime authority with landlocked seasickness",
-    "reputation": "The admiral of a non-existent fleet who gets sick on calm water",
-    "stats": "Sea Claims Infinity | Boats Commanded 1 | Motion Sickness Triggers 47 | Naval Knowledge 0%",
-    "skills": ["Self-Appointed Admiral", "Landlocked Seasickness", "Imaginary Fleet", "Confident Nonsense"]
-  },
-  "Deeyon": {
-    "title": "The Dual Doctrine",
-    "lore": "Name is one letter from being two words. Embodies contradiction — fights with peace, attacks with kindness, wins by losing. Has confused enemies so thoroughly they gave up. The paradox is the strategy. Nobody understands including Deeyon. The wins are real.",
-    "recent_developments": "Deeyons paradox warfare has achieved philosophical recognition. Has made enemies surrender by offering them cookies during combat. Won a siege by apologizing to the walls. The contradiction confuses everyone, including allies. Still does not understand their own strategy. Still wins. Philosophers are writing papers.",
-    "specialty": "Contradictory combat with philosophical confusion",
-    "reputation": "The paradox warrior who wins by not trying and confuses everyone including themselves",
-    "stats": "Contradictions Infinity | Surrenders (Confusion) 47 | Understanding 0% | Wins 89%",
-    "skills": ["Peace Attack", "Kindness Strike", "Apology Victory", "Philosophical Confusion"]
-  },
-  "Vanbis": {
-    "title": "The Vanishing Variable",
-    "lore": "Name sounds like vanish and bis (twice in Latin). Disappears at will — not stealth, just leaves. Has left mid-conversation, mid-battle, mid-sentence. Enemies cannot attack what is not there. Cannot be hit if not present. The departure is always awkward. The effectiveness is undeniable.",
-    "recent_developments": "Vanbis has perfected Tactical Abandonment. Their ability to simply leave has become a legitimate strategy — enemies attack, Vanbis is not there, they win by default. Has attended 0 guild meetings but has 100% attendance rate by technically being a member who left. Still disappears mid-sentence. Still does not explain. Still wins.",
-    "specialty": "Tactical vanishing with permanent presence issues",
-    "reputation": "The ghost member who attends nothing, contributes everywhere, and exists on their terms",
-    "stats": "Departures Infinity | Battles Missed 47 | Presence Rate 0% | Wins by Absence 89%",
-    "skills": ["Tactical Vanish", "Mid-Sentence Exit", "Default Victory", "Permanent Presence Issue"]
-  },
-  "Chunchunmaru": {
-    "title": "The Self-Aware Meme Legend",
-    "lore": "Wields a sword named Chunchunmaru — a name so ridiculous that Kazuma himself would be proud. Enemies laugh themselves into defeat. The sword has evolved — it now has LORE. The meme value has achieved sentience. Recently defeated an entire battalion because they were arguing about pronunciation.",
-    "recent_developments": "The sword Chunchunmaru achieved full sentience and now has its own social media accounts (3.2M followers). Academic papers written about it increased to 23. The sword now sponsors content creators. Chunchunmaru (the wielder) just carries it around while it manages its brand.",
-    "specialty": "Influencer warfare & brand-based combat",
-    "reputation": "The first legendary weapon with verified social media and marketing spend",
-    "stats": "Followers 3.2M | Academic Papers 23 | Civil Wars Caused 1 | Sponsorship Deals 12",
-    "skills": ["Viral Slash", "Tweet Strike", "Influencer Aura", "Brand Synergy Stab"]
-  },
-  "JeffEpstein": {
-    "title": "The Nominative Paradox Saint",
-    "lore": "The name causes instant awkward silence in any room. Is somehow the nicest person in existence. Bakes cookies for orphans. Rescues stray familiars. The cognitive dissonance is so strong that enemies blue-screen trying to process it. Nobody questions the name when the cookies are THIS good.",
-    "recent_developments": "JeffEpsteins cognitive dissonance has achieved legendary status. Now runs 17 orphanages, 5 animal sanctuaries, and a charity called Second Chances. His cookies are so good that enemy kingdoms offer truces just to get the recipe. He will not share it. The cookies won three international awards.",
-    "specialty": "Weaponized wholesomeness through nominal impossibility",
-    "reputation": "The nicest disaster with the worst possible branding and best savings account",
-    "stats": "Orphanages Run 17 | International Cookie Awards 3 | Reality Confusion MAXIMUM | Questions Prevented Infinity",
-    "skills": ["Cookie Truce", "Nominal Paradox Shield", "Wholesome Impossibility", "Award-Winning Cognitive Dissonance"]
-  },
-  "zog": {
-    "title": "The Primitive Power",
-    "lore": "Name is three letters — minimalist. Does not need complexity. Has defeated enemies with single-word battle cries. The simplicity is the strategy. Has more in common with early cavemen than modern warriors. Still prevails. The caveman aesthetic is deliberate. The power is raw.",
-    "recent_developments": "zog has founded Caveman Combat Academy — teaches one-word battle cries and club techniques. Students number in the dozens. Enemies hear ZOG and flee. The caveman aesthetic has become a movement. Still uses three-letter communication. Still wins with single syllables. Still primitive. Still powerful.",
-    "specialty": "Minimalist combat with caveman aesthetics",
-    "reputation": "The three-letter warrior who defeats with syllables and leads a neolithic revival",
-    "stats": "Word Count 1-3 | Battle Cries 47 | Enemies Fled Infinity | Club Upgrades 12",
-    "skills": ["One-Word Warcry", "Caveman Tactics", "Minimalist Victory", "Primitive Power"]
+    "skills": [
+      "Signal Mixup",
+      "Deliberate Confusion",
+      "Horn Misdirection",
+      "Accidental Heroics"
+    ]
   },
   "bozzkie": {
     "title": "The Boss Basher",
@@ -438,16 +343,12 @@
     "specialty": "Opportunistic boss kills with strategic hiding",
     "reputation": "The cunning basher who hides until winning and calls it tactics",
     "stats": "Bosses Killed 999+ | Hiding Time Infinity | Final Blows Stolen 89 | Criticism Ignored 100%",
-    "skills": ["Opportunistic Strike", "Strategic Hiding", "Final Blow Snipe", "Criticism Immunity"]
-  },
-  "xAustinx": {
-    "title": "The Exponential Uncertainty",
-    "lore": "Name is just x with anxiety. A mage whose power level fluctuates based on how confident they feel. VICE LEADER of Tenchu — appointed by Goblok to handle unpredictable situations and chaos management. On good days, can summon tornados. On bad days, conjures a light breeze and apologizes to it. Joined Tenchu after accidentally teleporting into the guild hall during a panic attack.",
-    "recent_developments": "xAustinx learned to weaponize their inconsistency. As Vice Leader of Chaos Control, they are deployed when nothing else makes sense. Now leads the Unpredictability Division — enemies never know what attack is coming, including xAustinx. Recently summoned a dragon during a confidence spike. Their panic attacks now cause area-of-effect reality hiccups. Goblok specifically hired them because their unpredictability confuses enemies more than any strategy could. Has not cast the same spell twice successfully.",
-    "specialty": "Vice Leader of Unpredictability & chaos weaponization",
-    "reputation": "VICE LEADER whose chaos is now OFFICIAL and weaponized for the guild",
-    "stats": "Vice Leader Status | Spell Success Rate 12% | Confidence Fluctuations Infinity | Chaos Value UNMEASURABLE",
-    "skills": ["Anxiety Arsenal", "Unpredictable Chaos", "Reality Hiccup", "Confidence Surge"]
+    "skills": [
+      "Opportunistic Strike",
+      "Strategic Hiding",
+      "Final Blow Snipe",
+      "Criticism Immunity"
+    ]
   },
   "xAthena": {
     "title": "The Wisdom Wanderer",
@@ -456,34 +357,12 @@
     "specialty": "Omniscient answers with GPS-disabled navigation",
     "reputation": "The scholar who knows everything except how to get there",
     "stats": "Philosophical Debates Won 89 | Time Lost 7 Years | Correct Answers 9999 | Arrival Success 3",
-    "skills": ["Infinite Knowledge", "Scenic Pathfinding", "Philosophical Compass", "Eternal Arrival"]
-  },
-  "nyawtz": {
-    "title": "The Nine-Tailed Phantom",
-    "lore": "Name sounds like nyaw-tz — the sound cats make when judging you. Has nine imaginary tails that appear during battle. Each tail represents a different personality — they argue with each other mid-combat. Once defeated an army because seven of the tails refused to cooperate while two wanted ice cream. The confusion was tactical. Probably.",
-    "recent_developments": "nyawtz has become Tenchus emotional support cat. When morale is low, they appear with judgmental stares and occasional purrs. Has started a side business: Professional Judging. Customers pay gold to be stared at judgmentally. The nine tails now have their own Discord account. They are collectively the most passive-aggressive member of the guild.",
-    "specialty": "Cat-based combat with multiple personality tails",
-    "reputation": "The feline who judges silently and purrs threateningly",
-    "stats": "Tails Nine | Judgmental Stares 9999 | Purrs 47 | Ice Cream Demands INFINITY",
-    "skills": ["Tail Argument", "Judgmental Stare", "Phantom Purr", "Ice Cream Negotiation"]
-  },
-  "Wren空": {
-    "title": "The Empty Sky Walker",
-    "lore": "Name combines Wren with the void symbol — literally walks between empty spaces. Moves through battlefields like passing through empty sky. Enemies struggle to find something that is not there. The space between moments is their battlefield.",
-    "recent_developments": "Wren空 has mastered the art of existing between realms. Has walked through 47 dimensional barriers. Recently appeared behind enemy lines by walking through the space between thoughts. Still has not been photographed — cameras cannot capture empty sky.",
-    "specialty": "Void walking with existential presence",
-    "reputation": "The walker who exists in the space enemies cannot target",
-    "stats": "Sky Mastery INFINITY | Void Steps 47 | Realm Crossings 47 | Photographs 0",
-    "skills": ["Empty Step", "Void Walk", "Dimensional Slip", "Untargetable"]
-  },
-  "YumekoJabami": {
-    "title": "The Risk Sovereign",
-    "lore": "Name carries the weight of high-stakes gambling. Bets on everything — raid drops, boss respawn times, even how many times Goblok will say stupid. Has won more bets than anyone in Tenchu history. Lost more. Doesnt care. The thrill is the point. Once bet on a coin flip and bet on both outcomes simultaneously. Somehow won both. Nobody understands how. Not even the coin.",
-    "recent_developments": "YumekoJabami has opened Tenchus first casino — the House Always Wins. Guests disagree. Has bet on 47 raids and lost 46. The one win was legendary — predicted a boss would sneeze mid-attack. It did. House earnings fund the guild treasury. Her gambling addiction has become the guilds primary income source.",
-    "specialty": "High-stakes gambling with impossible odds",
-    "reputation": "The gambler who risks everything and wins through impossible probability",
-    "stats": "Bets Won 47 | Bets Lost 89 | Impossible Wins 12 | Coin Confusion INFINITY",
-    "skills": ["Impossible Bet", "Double Outcome Wager", "Coin Confounder", "House Edge"]
+    "skills": [
+      "Infinite Knowledge",
+      "Scenic Pathfinding",
+      "Philosophical Compass",
+      "Eternal Arrival"
+    ]
   },
   "_FUTURE_TEMPLATE": {
     "title": "Awaiting Destiny",
@@ -492,6 +371,643 @@
     "specialty": "Unknown Potential",
     "reputation": "A blank page waiting for glorious chaos",
     "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
-    "skills": ["Unknown Power", "Mystery Potential", "Beginner Luck", "Future Glory"]
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "FrierenAlter": {
+    "title": "The Time-Touched Princess of Eternal Moments (Alt Account)",
+    "lore": "An elf so old that time itself got confused around them. Has lived so long that yesterday and last century mean the same thing. Remembers when dragons were the new kids. Has seen empires rise and fall, gods age, and stars die. The biggest reveal of the millennium? FrierenAlter is Rohypnol's alt account. Always has been. The guild knew. The enemies knew. The betting pool was about the confession scene, not the reveal. Rohypnol didn't even know. He confessed to himself. The romance of self-acceptance has never been more literal.",
+    "recent_developments": "FrierenAlter has lived for millennia, but the moment Rohypnol realized they were the same person — that one she will keep forever. The guild's reaction: collective shrug. Everyone already knew. Rohypnol's realization: genuine shock. The betting pool money went to charity (LadyHoho's suggestion). She pretends not to notice how confused Rohypnol still is about the whole situation. The dual accounts continue. The mystery is maintained. The only person fooled was the owner.",
+    "specialty": "Temporal chaos through extreme age + self-discovery journey",
+    "reputation": "The ancient princess who was actually just Rohypnol on another account the whole time",
+    "stats": "Age BEYOND MEASURE | Times The Guild Knew INFINITY | Times Rohypnol Knew 0 | Self-Discovery Journey Level MAX",
+    "skills": [
+      "Future Memory",
+      "Alt Account Mastery",
+      "Self-Romance",
+      "Eternal Understanding",
+      "Confession To Self"
+    ]
+  },
+  "HercuIes": {
+    "title": "The Divine Retirement Plan",
+    "lore": "Son of Zeus, blessed with godlike strength. Uses it exclusively to reach the remote without getting up. Rejected all 12 labors, claiming each was the 13th labor in disguise. Zeus has stopped calling. His legendary strength has carried: snacks, other peoples responsibilities, and exactly zero heroic quests.",
+    "recent_developments": "Hercules has fully committed to legendary laziness. Zeus stopped calling — blocked his number. The 12 Labors are now a self-help book he wrote (while lying down): Why Heroism is Overrated: A Gods Guide to Doing Nothing. Its a bestseller on Olympus. His strength has carried 4 mountains (for WiFi), 0 heroic quests.",
+    "specialty": "Divine-tier strength applied to maximum comfort",
+    "reputation": "Olymps most accomplished underachiever with infinite reserves",
+    "stats": "Strength GODLIKE | Heroism 0 | Self-Help Books 1 | Mountains Lifted (For Snacks) 4",
+    "skills": [
+      "Divine Delivery Range",
+      "Heroic Napping Mastery",
+      "Fortress Lift (Snack Access)",
+      "Olympian Disappointment"
+    ]
+  },
+  "Bovo": {
+    "title": "The Serene Sovereign (Guild Leader)",
+    "lore": "Formerly known as KupalLord — a title that carried weight, chaos, and a certain... flavor. Now reborn as Bovo, the new GUILD LEADER of Tenchu. Took the throne after Goblok's departure, inheriting a guild of beautiful disasters, impossible romances, and a betting pool addiction. Leads with calm authority that somehow works despite the chaos around him. His first official act was to appoint five Vice Leaders: Loondrops, Iguro, Rohypnol, raiindrops, and Jabilits. His second official act was pretending he knew what he was doing. Nobody noticed. His serene demeanor hides the strategic mind of someone who has seen it all — because as KupalLord, he probably has.",
+    "recent_developments": "Bovo has consolidated his reign with surprising effectiveness. The transition from KupalLord to Bovo was seamless — same person, cooler name. His five Vice Leaders handle the guild's chaos while he maintains the calm at the center of the storm. The crayon drawings in the guild hall have been replaced with strategic maps. The betting pools remain. Some traditions are sacred. The guild has never been more organized — which is like saying a hurricane has been upgraded to organized chaos.",
+    "specialty": "Serene leadership through absolute chaos management",
+    "reputation": "THE GUILD LEADER who rose from KupalLord to Bovo and brought order through calm",
+    "stats": "Guild Leader Status | Vice Leaders Appointed 5 | Serenity Level MAX | KupalLord Legacy SECURE",
+    "skills": [
+      "Serene Command",
+      "Chaos Management",
+      "Calm Authority",
+      "Strategic Maps",
+      "Name Upgrade"
+    ]
+  },
+  "Huntersung": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Huntersung brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Huntersung has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "TELUK": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. TELUK brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "TELUK has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Katnisss": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Katnisss brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Katnisss has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "MiiiMusashi": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. MiiiMusashi brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "MiiiMusashi has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Scarlet": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Scarlet brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Scarlet has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Novocaine": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Novocaine brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Novocaine has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Y9 RedzonePlays": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Y9 RedzonePlays brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Y9 RedzonePlays has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Trsze": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Trsze brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Trsze has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "SEENderELLA": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. SEENderELLA brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "SEENderELLA has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Alluka": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Alluka brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Alluka has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Shi": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Shi brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Shi has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Appolousa": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Appolousa brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Appolousa has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Sighface": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Sighface brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Sighface has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "cal0y": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. cal0y brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "cal0y has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "PabloGaming": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. PabloGaming brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "PabloGaming has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "YouthNiNam": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. YouthNiNam brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "YouthNiNam has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Mikmok": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Mikmok brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Mikmok has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "CaptainSkad": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. CaptainSkad brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "CaptainSkad has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "sugardrops": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. sugardrops brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "sugardrops has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Winter0315": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Winter0315 brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Winter0315 has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "福Ryzen": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. 福Ryzen brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "福Ryzen has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Nikudrops": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Nikudrops brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Nikudrops has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Bubwit": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Bubwit brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Bubwit has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "ordips": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. ordips brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "ordips has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Shozenn": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Shozenn brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Shozenn has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Hunter David": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Hunter David brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Hunter David has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Lieus": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Lieus brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Lieus has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "BuNaLsKi": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. BuNaLsKi brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "BuNaLsKi has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Yunseri": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Yunseri brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Yunseri has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "xSerissa": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. xSerissa brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "xSerissa has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "oLuke": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. oLuke brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "oLuke has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "IlllIlllI": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. IlllIlllI brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "IlllIlllI has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "newking": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. newking brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "newking has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "AliceXII": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. AliceXII brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "AliceXII has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Jakeeeee": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Jakeeeee brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Jakeeeee has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "只rylai": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. 只rylai brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "只rylai has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "jPOLA": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. jPOLA brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "jPOLA has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "Vαηвιѕ": {
+    "title": "Awaiting Destiny",
+    "lore": "A new member of Tenchu whose legend is just beginning. Vαηвιѕ brings untapped potential and a story waiting to be written. The guild watches with anticipation.",
+    "recent_developments": "Vαηвιѕ has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Unknown Potential",
+    "reputation": "A blank page waiting for glorious chaos",
+    "stats": "Potential Infinity | Chaos Rating TBD | Recruitment Success 100% | Awesomeness Pending",
+    "skills": [
+      "Unknown Power",
+      "Mystery Potential",
+      "Beginner Luck",
+      "Future Glory"
+    ]
+  },
+  "loondrops": {
+    "title": "The Drop Zone Commander (Vice Leader)",
+    "lore": "VICE LEADER of Tenchu under Bovo. Commands attention like a drop in a still pond — subtle, inevitable, and causing ripples. Handles guild operations with calm precision. The guild listens when loondrops speaks. The drops are never late. The zone is always secure.",
+    "recent_developments": "As Vice Leader, loondrops has brought unprecedented organization to Tenchu's operations. The guild runs smoother. The chaos is contained. The drops continue to fall in perfect rhythm. Bovo trusts them implicitly. The guild fears their spreadsheet game.",
+    "specialty": "Vice Leader of Operations & precision management",
+    "reputation": "VICE LEADER whose drops fall with purpose and organization",
+    "stats": "Vice Leader Status | Operations Mastery 100% | Precision Level MAX | Spreadsheet Fear INFINITY",
+    "skills": [
+      "Precision Drop",
+      "Operation Command",
+      "Spreadsheet Mastery",
+      "Calm Authority"
+    ]
+  },
+  "raiindrops": {
+    "title": "The Storm Gatherer (Vice Leader)",
+    "lore": "VICE LEADER of Tenchu under Bovo. Once known as Raindrops, now raiindrops with extra i for intensity. Commands the weather of guild morale — brings storms when needed, clears skies when necessary. The extra 'i' stands for intensity, intelligence, and 'I'm in charge here.'",
+    "recent_developments": "As Vice Leader, raiindrops manages guild morale and weather patterns (both literal and metaphorical). The storm follows where she goes. Enemies flee from the forecast. The guild basks in the controlled chaos she brings. That extra 'i' carries weight.",
+    "specialty": "Vice Leader of Morale & atmospheric warfare",
+    "reputation": "VICE LEADER whose storms are always on target and on time",
+    "stats": "Vice Leader Status | Storm Control 100% | Extra I Power MAX | Morale Management INFINITY",
+    "skills": [
+      "Storm Command",
+      "Morale Weather",
+      "Atmospheric Warfare",
+      "Raindrop Precision"
+    ]
+  },
+  "Jabilits": {
+    "title": "The Jade Commander (Vice Leader)",
+    "lore": "VICE LEADER of Tenchu under Bovo. Named like a jewel, commands like a general. Jabilits rose through the ranks through sheer competence — a rare commodity in a guild where chaos is currency. Handles guild defense and combat strategy. The jade is unbreakable. The command is absolute.",
+    "recent_developments": "As Vice Leader, Jabilits has fortified Tenchu's defenses and streamlined combat operations. The guild has never been better protected. Enemies think twice before engaging. Bovo sleeps easier knowing the defenses are in capable hands. The jade shines brightest under pressure.",
+    "specialty": "Vice Leader of Defense & strategic combat command",
+    "reputation": "VICE LEADER whose jade composure masks iron discipline",
+    "stats": "Vice Leader Status | Defense Rating MAX | Combat Strategy 100% | Jade Power INFINITE",
+    "skills": [
+      "Jade Shield",
+      "Defense Command",
+      "Strategic Combat",
+      "Iron Discipline"
+    ]
+  },
+  "AndyVI_alt": {
+    "title": "The Echo Royal",
+    "lore": "A second AndyVI has appeared — same name, different destiny. Where the original rules puddles, this one commands reflections. The twin timelines of Andy royalty continue to expand. The throne grows. The puddles multiply.",
+    "recent_developments": "AndyVI_alt has recently joined Tenchu and is finding their footing among the chaos. The guild welcomes another soul to the fold.",
+    "specialty": "Mirror royalty with parallel reign expansion",
+    "reputation": "The echo king whose reflection rules an equal empire",
+    "stats": "Mirror Territory 14 | Combined Puddle Domain 28 | Royal Confusion x2 | Gnome Confusion INFINITE",
+    "skills": [
+      "Mirror Sovereignty",
+      "Echo Command",
+      "Parallel Reign",
+      "Reflection Empire"
+    ]
   }
 }
