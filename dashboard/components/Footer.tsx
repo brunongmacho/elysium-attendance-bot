@@ -96,7 +96,7 @@ export default function Footer() {
           <p>Managed by Goblok's Crayon Intelligence | Powered by the Jalo Bot | Where Chaos Meets Strategy</p>
         </div>
         <div className="text-xs text-gray-500 font-game">
-          <p>© 2025 Elysium Guild. All rights reserved.</p>
+          <p>© 2025 Tenchu Guild. All rights reserved.</p>
           <p className="mt-1">Built with ❤️ for the guild</p>
         </div>
       </div>

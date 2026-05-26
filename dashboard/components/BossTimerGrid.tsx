@@ -198,7 +198,7 @@ const BossTimerGrid = memo(function BossTimerGrid({
             )}
             {elysiumFilter && (
               <FilterChip
-                label="Elysium's Turn"
+                label="Tenchu's Turn"
                 onRemove={() => onElysiumFilterChange?.(false)}
                 color="primary"
                 icon={<span>⚔️</span>}

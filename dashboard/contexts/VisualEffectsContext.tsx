@@ -14,8 +14,8 @@ interface VisualEffectsContextType {
 
 const VisualEffectsContext = createContext<VisualEffectsContextType | undefined>(undefined);
 
-const STORAGE_KEY = "elysium-visual-effects";
-const ANIMATIONS_STORAGE_KEY = "elysium-animations-enabled";
+const STORAGE_KEY = "tenchu-visual-effects";
+const ANIMATIONS_STORAGE_KEY = "tenchu-animations-enabled";
 
 export function VisualEffectsProvider({ children }: { children: ReactNode }) {
   const [effectMode, setEffectModeState] = useState<EffectMode>("glow");

@@ -21,10 +21,10 @@ const cinzelDecorative = Cinzel_Decorative({
 });
 
 export const metadata: Metadata = {
-  title: "Elysium Dashboard - Guild Management",
-  description: "Real-time guild management and member tracking for Elysium guild members",
-  keywords: "Elysium, guild, leaderboard, dashboard",
-  authors: [{ name: "Elysium Guild" }],
+  title: "Tenchu Dashboard - Guild Management",
+  description: "Real-time guild management and member tracking for Tenchu guild members",
+  keywords: "Tenchu, guild, leaderboard, dashboard",
+  authors: [{ name: "Tenchu Guild" }],
   icons: {
     icon: [
       { url: '/favicon.ico' },

@@ -298,7 +298,7 @@ const themes: Record<ThemeName, Theme> = {
     name: 'chaoscoin',
     label: 'Financial Paradox',
     colors: THEME_COLORS.chaoscoin,
-    description: 'Kingdoms Affected: 7 | Elysium Profit: +400%',
+    description: 'Kingdoms Affected: 7 | Tenchu Profit: +400%',
     icon: '💸',
   },
 
