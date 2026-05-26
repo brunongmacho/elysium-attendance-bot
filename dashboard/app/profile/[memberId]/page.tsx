@@ -211,7 +211,7 @@ export default function MemberProfilePage() {
                       <span className="text-primary-bright font-semibold">To get added:</span>
                     </p>
                     <ul className="list-disc list-inside space-y-2 ml-4">
-                      <li>Join the Elysium Discord server using the button below</li>
+                      <li>Join the Tenchu Discord server using the button below</li>
                       <li>Contact a guild admin or officer</li>
                       <li>Participate in guild activities to get registered in the system</li>
                       <li>Your attendance and points will start tracking automatically once added</li>

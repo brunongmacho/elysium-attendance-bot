@@ -34,7 +34,7 @@ export default function Home() {
           <div className="text-4xl mb-4">🔒</div>
           <Typography variant="h2" className="text-red-400 mb-2">Access Denied</Typography>
           <Typography variant="body" className="text-gray-400">
-            You need an Elysium, Core, Neto, Elite, Leader, or Admin role to view boss timers.
+            You need a Tenchu, Core, Neto, Elite, Leader, or Admin role to view boss timers.
           </Typography>
         </div>
       </div>
@@ -159,7 +159,7 @@ export default function Home() {
         </Stack>
 
         <div className="flex items-center gap-3">
-          {/* Elysium Filter Toggle */}
+          {/* Tenchu Filter Toggle */}
           <button
             onClick={() => setElysiumFilter(!elysiumFilter)}
             className={`group flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-200 ${
@@ -167,14 +167,14 @@ export default function Home() {
                 ? 'bg-primary/20 border-primary text-primary' 
                 : 'bg-gray-800/50 border-gray-700 text-gray-300 hover:border-primary/50 hover:text-primary'
             }`}
-            title={elysiumFilter ? "Show all bosses" : "Show only Elysium's turn"}
-            aria-label={elysiumFilter ? "Show all bosses" : "Show only Elysium's turn"}
+            title={elysiumFilter ? "Show all bosses" : "Show only Tenchu's turn"}
+            aria-label={elysiumFilter ? "Show all bosses" : "Show only Tenchu's turn"}
           >
             <span className="text-sm font-medium">
-              {elysiumFilter ? "⚔️ Elysium" : "⚔️"}
+              {elysiumFilter ? "⚔️ Tenchu" : "⚔️"}
             </span>
             <span className="hidden sm:inline text-xs">
-              {elysiumFilter ? "Filtered" : "Elysium Turn"}
+              {elysiumFilter ? "Filtered" : "Tenchu Turn"}
             </span>
           </button>
 

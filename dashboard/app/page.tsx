@@ -484,7 +484,7 @@ export default function GuildHomePage() {
     const fallbackStats: GuildStat[] = [
       { value: "100%", label: "Jalo Bot Financial Accuracy", sublabel: "(Rohypnol: 0%)", color: "primary" },
       { value: "∞/0", label: "Rohypnol's Net Worth", sublabel: "(Sedated State)", color: "accent" },
-      { value: "50", label: "Elysium's Active Members", sublabel: "(All Legendary)", color: "success" },
+      { value: "50", label: "Tenchu's Active Members", sublabel: "(All Legendary)", color: "success" },
       { value: "9999", label: "Ztig's Ally Precision Score", sublabel: "", color: "danger" }
     ];
 
@@ -1227,7 +1227,7 @@ export default function GuildHomePage() {
             whileHover={{ scale: 1.01 }}
           >
             <Typography variant="h2" className="text-xl sm:text-2xl md:text-3xl text-gold mb-6">
-              About Elysium
+              About Tenchu
             </Typography>
             <Stack gap="md" className="text-gray-300 text-sm sm:text-base">
               <Typography variant="body" className="leading-relaxed">
