@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const fs = require('fs');
 const { execSync } = require('child_process');
 const path = require('path');
@@ -12,9 +13,9 @@ const tokenMatch = content.match(/DISCORD_TOKEN:\s*'([^']+)'/);
 // Generate NEXTAUTH_SECRET
 let nextauthSecret = 'your_nextauth_secret';
 try {
-  nextauthSecret = execSync('openssl rand -base64 32').toString().trim();
+  nextauthSecret = crypto.randomBytes(32).toString('base64');
 } catch(e) {
-  // fallback - openssl might not be available
+  // fallback
 }
 
 const dashboardEntry = [
@@ -47,20 +48,23 @@ const dashboardEntry = [
   '  }',
 ].join('\n');
 
-// Replace the closing of the apps array
-// Find: the last occurrence of "}]" that's followed by optional whitespace and "};"
-const result = content.replace(/(\s*\}\s*\]\s*;\s*)$/, dashboardEntry + '\n$1');
-
-if (result === content) {
+// Find the last occurrence of '}]' in the file
+const lastBracket = content.lastIndexOf('}]');
+if (lastBracket === -1) {
   console.error('❌ Could not find apps array closing bracket');
   process.exit(1);
 }
 
+// Insert the dashboard entry before the last '}]'
+const before = content.slice(0, lastBracket);
+const after = content.slice(lastBracket);
+const result = before + dashboardEntry + '\n' + after;
+
 fs.writeFileSync(ECO_PATH, result);
 console.log('✅ Dashboard entry added to ecosystem.config.js');
 console.log('');
+console.log('💡 To fill in remaining values: nano ecosystem.config.js');
 console.log('🔑 Still need to fill in these 3 values:');
-console.log('   Run: nano ecosystem.config.js');
 console.log('   Then find "YOUR_DISCORD_CLIENT_ID" and replace with your real values');
 console.log('   (Client ID, Client Secret, Guild ID from Discord Developer Portal)');
 console.log('');
