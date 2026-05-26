@@ -410,12 +410,12 @@ export const SPECIAL_USERS: Record<string, SpecialUserConfig> = {
     customGreeting: '💸 Financial Paradox 💸',
     subtitle: 'The Economic Singularity',
     badge: 'Economy',
-    message: 'Kingdoms Affected: 7 | Elysium Profit: +400%',
+    message: 'Kingdoms Affected: 7 | Tenchu Profit: +400%',
     quotes: {
       homeAbout: 'Kingdoms Affected: 7 | Paradox Radius: 50m',
       floatingBanner: 'The Enaira Paradox: Broke AND rich simultaneously',
       profile: 'The walking economic impossibility theorem',
-      footer: 'Elysium Profit: +400% | University Case Studies: 47',
+      footer: 'Tenchu Profit: +400% | University Case Studies: 47',
     },
   },
 
@@ -591,7 +591,7 @@ export const SPECIAL_USERS: Record<string, SpecialUserConfig> = {
     quotes: {
       homeAbout: 'Watts Generated: INFINITY | Blackouts Caused: 47',
       floatingBanner: 'The storm who bills himself as a power company',
-      profile: 'Elysiums official power grid',
+      profile: "Tenchu's official power grid",
       footer: 'Phone Charges: 9999 | Property Damage: 8900 GOLD',
     },
   },

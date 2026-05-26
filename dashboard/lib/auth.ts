@@ -93,7 +93,7 @@ export const authOptions: NextAuthOptions = {
                   ? adminRoleIds.split(',').some((id: string) => member.roles.includes(id.trim()))
                   : false;
 
-                // Check if can access boss timers (Elysium, Core, Neto, Elite, Leader, XXX, or admin)
+                // Check if can access boss timers (Tenchu, Core, Neto, Elite, Leader, XXX, or admin)
                 const eliteRoleId = process.env.DISCORD_ELITE_ROLE_ID;
                 const specialAdminRoleId = process.env.DISCORD_SPECIAL_ADMIN_ROLE_ID;
                 const netoRoleId = process.env.DISCORD_NETO_ROLE_ID;
@@ -117,13 +117,13 @@ export const authOptions: NextAuthOptions = {
                 token.cachedCanAccessBossTimers = canAccessBossTimers;
 
                 if (leaderRoleId && member.roles.includes(leaderRoleId)) {
-                  token.cachedRoleBadge = "Elysium Leader";
+                  token.cachedRoleBadge = "Tenchu Leader";
                 } else if (viceLeaderRoleId && member.roles.includes(viceLeaderRoleId)) {
-                  token.cachedRoleBadge = "Elysium Vice Leader";
+                  token.cachedRoleBadge = "Tenchu Vice Leader";
                 } else if (coreRoleId && member.roles.includes(coreRoleId)) {
-                  token.cachedRoleBadge = "Elysium Core";
+                  token.cachedRoleBadge = "Tenchu Core";
                 } else if (hasElysiumRole) {
-                  token.cachedRoleBadge = "Elysium Member";
+                  token.cachedRoleBadge = "Tenchu Member";
                 }
 
                 token.lastFetched = now;

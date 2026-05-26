@@ -45,7 +45,7 @@ if (process.env.NODE_ENV === "development") {
 export async function getDatabase(): Promise<Db> {
   const client = await clientPromise;
   // Extract database name from connection string or use default
-  const dbName = process.env.MONGODB_DB_NAME || "elysium-bot";
+  const dbName = process.env.MONGODB_DB_NAME || "tenchu-bot";
   return client.db(dbName);
 }
 

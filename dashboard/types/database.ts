@@ -1,6 +1,6 @@
 /**
  * MongoDB Database Type Definitions
- * Based on Elysium Bot MongoDB Schema
+ * Based on Tenchu Bot MongoDB Schema
  */
 
 import { ObjectId } from "mongodb";

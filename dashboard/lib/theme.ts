@@ -57,7 +57,7 @@ export const guildTheme = {
 
   // Guild name and branding
   branding: {
-    name: 'ELYSIUM',
+    name: 'TENCHU',
     tagline: 'Guild Dashboard',
     logo: '/icon.png', // Your guild icon
   },
