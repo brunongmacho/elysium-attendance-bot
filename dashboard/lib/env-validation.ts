@@ -11,7 +11,7 @@ interface EnvConfig {
   DISCORD_CLIENT_ID: string;
   DISCORD_CLIENT_SECRET: string;
   DISCORD_BOT_TOKEN: string;
-  DISCORD_GUILD_ID: string;
+  DISCORD_GUILD_ID?: string;
 
   // Optional public variables
   NEXT_PUBLIC_TIMEZONE?: string;
@@ -29,7 +29,6 @@ export function validateEnv(): EnvConfig {
     'DISCORD_CLIENT_ID',
     'DISCORD_CLIENT_SECRET',
     'DISCORD_BOT_TOKEN',
-    'DISCORD_GUILD_ID',
   ] as const;
 
   const missing: string[] = [];
@@ -54,7 +53,7 @@ export function validateEnv(): EnvConfig {
     DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID!,
     DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET!,
     DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN!,
-    DISCORD_GUILD_ID: process.env.DISCORD_GUILD_ID!,
+    DISCORD_GUILD_ID: process.env.DISCORD_GUILD_ID || "",
     NEXT_PUBLIC_TIMEZONE: process.env.NEXT_PUBLIC_TIMEZONE,
   };
 }

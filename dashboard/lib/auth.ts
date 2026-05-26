@@ -7,6 +7,8 @@ import { NextAuthOptions } from "next-auth";
 import DiscordProvider from "next-auth/providers/discord";
 import type { DiscordProfile, DiscordGuild, DiscordMember } from "@/types/api";
 import { AUTH } from "@/lib/constants";
+import path from "path";
+import fs from "fs";
 
 // Discord OAuth scopes needed for guild membership and roles
 const DISCORD_SCOPES = ["identify", "guilds", "guilds.members.read"].join(" ");
@@ -45,7 +47,19 @@ export const authOptions: NextAuthOptions = {
       if (shouldRefresh && token.accessToken) {
         try {
           // Fetch and cache Discord guild/member data
-          const guildId = process.env.DISCORD_GUILD_ID!;
+          // Read guild ID from bot's config.json (co-located in parent directory), fallback to env var
+          let guildId = process.env.DISCORD_GUILD_ID || "";
+          if (!guildId) {
+            try {
+              const configPath = path.resolve(process.cwd(), "../config.json");
+              const botConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+              guildId = botConfig.main_guild_id;
+              console.log(`[auth] Read guild ID from config.json: ${guildId}`);
+            } catch (err) {
+              console.warn("[auth] Could not read config.json, DISCORD_GUILD_ID env var not set");
+              // Guild ID will be empty — API routes will handle gracefully
+            }
+          }
 
           const guildsResponse = await fetch("https://discord.com/api/users/@me/guilds", {
             headers: { Authorization: `Bearer ${token.accessToken}` },
