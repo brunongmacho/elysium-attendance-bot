@@ -16,7 +16,7 @@ const { MongoClient } = require('mongodb');
 require('dotenv').config({ path: '.env.local' });
 
 const MONGODB_URI = process.env.MONGODB_URI;
-const DB_NAME = process.env.MONGODB_DB_NAME || process.env.DB_NAME || 'elysium-dashboard';
+const DB_NAME = process.env.MONGODB_DB_NAME || process.env.DB_NAME || 'tenchu-dashboard';
 
 if (!MONGODB_URI) {
   console.error('❌ Error: MONGODB_URI not found in environment variables');

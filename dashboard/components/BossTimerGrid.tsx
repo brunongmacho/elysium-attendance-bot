@@ -14,8 +14,8 @@ interface BossTimerGridProps {
   userName?: string;
   externalFilterStatus?: string | null;
   onFilterStatusChange?: (status: string | null) => void;
-  elysiumFilter?: boolean;
-  onElysiumFilterChange?: (enabled: boolean) => void;
+  tenchuFilter?: boolean;
+  onTenchuFilterChange?: (enabled: boolean) => void;
 }
 
 const BossTimerGrid = memo(function BossTimerGrid({
@@ -27,8 +27,8 @@ const BossTimerGrid = memo(function BossTimerGrid({
   userName = "",
   externalFilterStatus,
   onFilterStatusChange,
-  elysiumFilter = false,
-  onElysiumFilterChange,
+  tenchuFilter = false,
+  onTenchuFilterChange,
 }: BossTimerGridProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "timer" | "schedule">("all");
@@ -68,14 +68,14 @@ const BossTimerGrid = memo(function BossTimerGrid({
         return false;
       }
 
-      // Elysium filter - only show rotating bosses where it's Elysium's turn
-      if (elysiumFilter && (!boss.rotation?.isRotating || !boss.rotation.isOurTurn)) {
+      // Tenchu filter - only show rotating bosses where it's Tenchu's turn
+      if (tenchuFilter && (!boss.rotation?.isRotating || !boss.rotation.isOurTurn)) {
         return false;
       }
 
       return true;
     });
-  }, [bosses, searchQuery, filterType, filterStatus, elysiumFilter]);
+  }, [bosses, searchQuery, filterType, filterStatus, tenchuFilter]);
 
   // Count by status - optimized single pass
   const statusCounts = useMemo(() => {
@@ -153,7 +153,7 @@ const BossTimerGrid = memo(function BossTimerGrid({
         </div>
 
 {/* Active Filters Chips */}
-        {(searchQuery || filterType !== "all" || filterStatus !== "all" || elysiumFilter) && (
+        {(searchQuery || filterType !== "all" || filterStatus !== "all" || tenchuFilter) && (
           <div className="mt-4 flex flex-wrap gap-2">
             {searchQuery && (
               <FilterChip
@@ -196,10 +196,10 @@ const BossTimerGrid = memo(function BossTimerGrid({
                 }
               />
             )}
-            {elysiumFilter && (
+            {tenchuFilter && (
               <FilterChip
                 label="Tenchu's Turn"
-                onRemove={() => onElysiumFilterChange?.(false)}
+                onRemove={() => onTenchuFilterChange?.(false)}
                 color="primary"
                 icon={<span>⚔️</span>}
               />

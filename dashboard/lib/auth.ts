@@ -82,13 +82,13 @@ export const authOptions: NextAuthOptions = {
                 token.cachedNickname = member.nick || token.displayName;
 
                 // Calculate role badge
-                const elysiumRoleId = process.env.DISCORD_ELYSIUM_ROLE_ID;
+                const tenchuRoleId = process.env.DISCORD_TENCHU_ROLE_ID;
                 const adminRoleIds = process.env.DISCORD_ADMIN_ROLE_ID;
                 const leaderRoleId = process.env.DISCORD_LEADER_ROLE_ID;
                 const viceLeaderRoleId = process.env.DISCORD_VICE_LEADER_ROLE_ID;
                 const coreRoleId = process.env.DISCORD_CORE_ROLE_ID;
 
-                const hasElysiumRole = elysiumRoleId && member.roles.includes(elysiumRoleId);
+                const hasTenchuRole = tenchuRoleId && member.roles.includes(tenchuRoleId);
                 const hasAdminRole = adminRoleIds
                   ? adminRoleIds.split(',').some((id: string) => member.roles.includes(id.trim()))
                   : false;
@@ -108,11 +108,11 @@ export const authOptions: NextAuthOptions = {
                 const hasSpecialAdminRole = specialAdminRoleId && member.roles.includes(specialAdminRoleId);
                 
                 const canAccessBossTimers = !isVisitorOnly && (
-                  hasElysiumRole || hasCoreRole || hasNetoRole || hasEliteRole || 
+                  hasTenchuRole || hasCoreRole || hasNetoRole || hasEliteRole || 
                   hasLeaderRole || hasSpecialAdminRole || hasAdminRole
                 );
 
-                token.cachedCanMarkAsKilled = hasElysiumRole || hasAdminRole;
+                token.cachedCanMarkAsKilled = hasTenchuRole || hasAdminRole;
                 token.cachedIsAdmin = hasAdminRole;
                 token.cachedCanAccessBossTimers = canAccessBossTimers;
 
@@ -122,7 +122,7 @@ export const authOptions: NextAuthOptions = {
                   token.cachedRoleBadge = "Tenchu Vice Leader";
                 } else if (coreRoleId && member.roles.includes(coreRoleId)) {
                   token.cachedRoleBadge = "Tenchu Core";
-                } else if (hasElysiumRole) {
+                } else if (hasTenchuRole) {
                   token.cachedRoleBadge = "Tenchu Member";
                 }
 

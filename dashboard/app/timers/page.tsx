@@ -24,7 +24,7 @@ export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [elysiumFilter, setElysiumFilter] = useState(false);
+  const [tenchuFilter, setTenchuFilter] = useState(false);
 
   // Access check - redirect if not allowed
   if (session && !session.canAccessBossTimers) {
@@ -161,20 +161,20 @@ export default function Home() {
         <div className="flex items-center gap-3">
           {/* Tenchu Filter Toggle */}
           <button
-            onClick={() => setElysiumFilter(!elysiumFilter)}
+            onClick={() => setTenchuFilter(!tenchuFilter)}
             className={`group flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-200 ${
-              elysiumFilter 
+              tenchuFilter 
                 ? 'bg-primary/20 border-primary text-primary' 
                 : 'bg-gray-800/50 border-gray-700 text-gray-300 hover:border-primary/50 hover:text-primary'
             }`}
-            title={elysiumFilter ? "Show all bosses" : "Show only Tenchu's turn"}
-            aria-label={elysiumFilter ? "Show all bosses" : "Show only Tenchu's turn"}
+            title={tenchuFilter ? "Show all bosses" : "Show only Tenchu's turn"}
+            aria-label={tenchuFilter ? "Show all bosses" : "Show only Tenchu's turn"}
           >
             <span className="text-sm font-medium">
-              {elysiumFilter ? "⚔️ Tenchu" : "⚔️"}
+              {tenchuFilter ? "⚔️ Tenchu" : "⚔️"}
             </span>
             <span className="hidden sm:inline text-xs">
-              {elysiumFilter ? "Filtered" : "Tenchu Turn"}
+              {tenchuFilter ? "Filtered" : "Tenchu Turn"}
             </span>
           </button>
 
@@ -293,8 +293,8 @@ export default function Home() {
           userName={session?.user?.name || ""}
           externalFilterStatus={statusFilter}
           onFilterStatusChange={setStatusFilter}
-          elysiumFilter={elysiumFilter}
-          onElysiumFilterChange={setElysiumFilter}
+          tenchuFilter={tenchuFilter}
+          onTenchuFilterChange={setTenchuFilter}
         />
       )}
 
