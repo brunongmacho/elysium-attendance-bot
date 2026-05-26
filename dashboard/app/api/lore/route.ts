@@ -5,12 +5,17 @@
  */
 
 import { NextResponse } from 'next/server';
-import memberLoreData from '@/member-lore.json';
+import fs from 'fs';
+import path from 'path';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
+    const lorePath = path.resolve(process.cwd(), '../member-lore.json');
+    const rawData = fs.readFileSync(lorePath, 'utf-8');
+    const memberLoreData = JSON.parse(rawData);
+
     return NextResponse.json(memberLoreData, {
       headers: {
         'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200',
