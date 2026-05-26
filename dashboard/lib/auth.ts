@@ -47,18 +47,31 @@ export const authOptions: NextAuthOptions = {
       if (shouldRefresh && token.accessToken) {
         try {
           // Fetch and cache Discord guild/member data
-          // Read guild ID from bot's config.json (co-located in parent directory), fallback to env var
+          // Read guild and role config from bot's config.json (co-located in parent directory), fallback to env vars
           let guildId = process.env.DISCORD_GUILD_ID || "";
-          if (!guildId) {
-            try {
-              const configPath = path.resolve(process.cwd(), "../config.json");
-              const botConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+          let tenchuRoleId = process.env.DISCORD_TENCHU_ROLE_ID || "";
+          let adminRoleIds = process.env.DISCORD_ADMIN_ROLE_ID || "";
+
+          try {
+            const configPath = path.resolve(process.cwd(), "../config.json");
+            const botConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+
+            if (!guildId && botConfig.main_guild_id) {
               guildId = botConfig.main_guild_id;
               console.log(`[auth] Read guild ID from config.json: ${guildId}`);
-            } catch (err) {
-              console.warn("[auth] Could not read config.json, DISCORD_GUILD_ID env var not set");
-              // Guild ID will be empty — API routes will handle gracefully
             }
+
+            if (!tenchuRoleId && botConfig.tenchu_role_id) {
+              tenchuRoleId = botConfig.tenchu_role_id;
+              console.log(`[auth] Read tenchu role ID from config.json`);
+            }
+
+            if (!adminRoleIds && botConfig.admin_roles && Array.isArray(botConfig.admin_roles) && botConfig.admin_roles.length > 0) {
+              adminRoleIds = botConfig.admin_roles.join(',');
+              console.log(`[auth] Read ${botConfig.admin_roles.length} admin role(s) from config.json`);
+            }
+          } catch (err) {
+            console.warn("[auth] Could not read config.json, falling back to env vars");
           }
 
           const guildsResponse = await fetch("https://discord.com/api/users/@me/guilds", {
@@ -82,8 +95,7 @@ export const authOptions: NextAuthOptions = {
                 token.cachedNickname = member.nick || token.displayName;
 
                 // Calculate role badge
-                const tenchuRoleId = process.env.DISCORD_TENCHU_ROLE_ID;
-                const adminRoleIds = process.env.DISCORD_ADMIN_ROLE_ID;
+                // tenchuRoleId and adminRoleIds already loaded above from config.json or env
                 const leaderRoleId = process.env.DISCORD_LEADER_ROLE_ID;
                 const viceLeaderRoleId = process.env.DISCORD_VICE_LEADER_ROLE_ID;
                 const coreRoleId = process.env.DISCORD_CORE_ROLE_ID;
