@@ -1,254 +1,1094 @@
 [
   [
-    { "value": "100%", "label": "Jalo Bot Financial Accuracy", "sublabel": "(Rohypnol: 0%)", "color": "primary" },
-    { "value": "∞/0", "label": "Rohypnol's Net Worth", "sublabel": "(Sedated State)", "color": "accent" },
-    { "value": "50", "label": "Tenchu's Active Members", "sublabel": "(All Legendary)", "color": "success" },
-    { "value": "9999", "label": "Ztig's Ally Precision Score", "sublabel": "", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Marzhall's Archive Fortress Rating",
+      "sublabel": "(The Archival Martyr)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Marzhall's Blockchain Evidence Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Marzhall's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "50",
+      "label": "Tenchu's Active Members",
+      "sublabel": "(All Legendary)",
+      "color": "success"
+    }
   ],
   [
-    { "value": "12,000", "label": "AmielJohn's Hunger Level", "sublabel": "(Tactical Snacking)", "color": "primary" },
-    { "value": "47", "label": "Goblok's Crayon Strategy Plans", "sublabel": "(All Genius)", "color": "accent" },
-    { "value": "89", "label": "Azryth's Nightlight Collection", "sublabel": "(Hello Kitty)", "color": "success" },
-    { "value": "47", "label": "HODAKA's Kingdoms Affected", "sublabel": "(Forecast Terrorism)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "MochiP's Sorry Art Strike Rating",
+      "sublabel": "(The Assassination Artist)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "MochiP's Collectible Kill Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "MochiP's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "MochiP's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "892", "label": "Carrera's Time Crimes", "sublabel": "(700 Tactical)", "color": "primary" },
-    { "value": "50,000", "label": "Coconuts Thrown by PanCoco", "sublabel": "(Zero Eaten)", "color": "accent" },
-    { "value": "3.2M", "label": "Chunchunmaru Sword Followers", "sublabel": "(Influencer)", "color": "success" },
-    { "value": "0%", "label": "Daleee's Spell Accuracy", "sublabel": "(Perfectly Wrong)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Mielle1968's Ancient Wisdom Rating",
+      "sublabel": "(The Vintage Virtuoso)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Mielle1968's Vintage Gear Mastery Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Mielle1968's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Mielle1968's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "189db", "label": "Maria's Volume Level", "sublabel": "(Jet Engine: 140)", "color": "primary" },
-    { "value": "47", "label": "Marsha11's Filing Cabinets", "sublabel": "(Still Loses)", "color": "accent" },
-    { "value": "1.2M", "label": "Miang's Words Spoken", "sublabel": "(Never Silent)", "color": "success" },
-    { "value": "0", "label": "erwarrr's Verbal Communication", "sublabel": "(Aggressive Silence)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "AndyVI's Sovereignty Declaration Rating",
+      "sublabel": "(The Royal Recovery Specialist)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "AndyVI's Puddle Empire Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "AndyVI's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "AndyVI's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "5000g", "label": "Munchyy's Apology Note Value", "sublabel": "(Illegible)", "color": "primary" },
-    { "value": "17", "label": "JeffEpstein's Orphanages", "sublabel": "(Cookies: ∞)", "color": "accent" },
-    { "value": "12", "label": "惡1ce's Evil Charity Franchises", "sublabel": "(Guilt Empire)", "color": "success" },
-    { "value": "50m", "label": "Enaira's Economic Chaos Radius", "sublabel": "(Paradox Zone)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Channy's Existential Channeling Rating",
+      "sublabel": "(The Channel Surfer)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Channy's Feeling Beam Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Channy's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Channy's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "9999", "label": "Evand3r's Non-Spoon Weapons Used", "sublabel": "(Still No Spoon)", "color": "primary" },
-    { "value": "∞", "label": "HODAKA's Coudy Merch Sales", "sublabel": "(Typo Empire)", "color": "accent" },
-    { "value": "89", "label": "Cutie's Cookie Defections", "sublabel": "(Moral Paralysis)", "color": "success" },
-    { "value": "∞", "label": "Jayzzzzzzz's Sleep Debt", "sublabel": "(Caffeinated Death)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Hytrz's Pre-Emptive Strike Rating",
+      "sublabel": "(The Hyperactive Haste)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Hytrz's Temporal Speed Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Hytrz's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Hytrz's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "47", "label": "Iguro's Wrong Portal Recruits", "sublabel": "(1200% Success)", "color": "primary" },
-    { "value": "47", "label": "erwarrr's Silent Choir Members", "sublabel": "(Judging You)", "color": "accent" },
-    { "value": "14", "label": "CheeseCakee's Geneva Clauses", "sublabel": "(Dairy WMDs)", "color": "success" },
-    { "value": "12", "label": "Fever's Filed Apocalypses", "sublabel": "(1 Pending)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "yakob's Return Strike Rating",
+      "sublabel": "(The Yak Attack)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "yakob's Reverse Retreat Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "yakob's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "yakob's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "60%", "label": "Varys' Rumor Accuracy", "sublabel": "(40% Fabricated)", "color": "primary" },
-    { "value": "9999x", "label": "ladyhoho's Tragic Giggle Combo", "sublabel": "(Send Therapist)", "color": "accent" },
-    { "value": "9999", "label": "Cutie's Adoption Requests", "sublabel": "(Must Protecc)", "color": "success" },
-    { "value": "+400%", "label": "Guild Treasury Growth", "sublabel": "(Enaira's Fault)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "DarKOwLZ's Owl Screech Rating",
+      "sublabel": "(The Shadow Humor)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "DarKOwLZ's Dark Comedy Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "DarKOwLZ's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "+400%",
+      "label": "Guild Treasury Growth",
+      "sublabel": "(Enaira's Fault)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "100%", "label": "Byakko's Squeak Monetization", "sublabel": "(47 Kingdoms)", "color": "primary" },
-    { "value": "3 Years", "label": "Inihaw's Restaurant Waitlist", "sublabel": "(Vegan BBQ)", "color": "accent" },
-    { "value": "89", "label": "Cogwind's Safety Violations", "sublabel": "(All Profitable)", "color": "success" },
-    { "value": "100%", "label": "Guild's Legendary Status", "sublabel": "(Chaos Perfected)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Pedsrow's Vibe Healing Rating",
+      "sublabel": "(The Pharmacy Phantom)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Pedsrow's Panacea Palace Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Pedsrow's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "100%",
+      "label": "Guild's Legendary Status",
+      "sublabel": "(Chaos Perfected)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "0-9999", "label": "Ace's Gambling Record", "sublabel": "(Battle: 9999-0)", "color": "primary" },
-    { "value": "47", "label": "Hayacinth's Barriers Destroyed", "sublabel": "(Via Sneeze)", "color": "accent" },
-    { "value": "∞", "label": "Ayane69's Trip-Based Wins", "sublabel": "(Grace: 0)", "color": "success" },
-    { "value": "100m", "label": "Cutie's Moral Paralysis Radius", "sublabel": "(Must Protecc)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "UmpaUmpa's Rhythm Strike Rating",
+      "sublabel": "(The Rhythmic Rambler)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "UmpaUmpa's Dance Ambush Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "UmpaUmpa's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "UmpaUmpa's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "4y 7m", "label": "Evand3r's Spoon Quest Duration", "sublabel": "(Still Missing)", "color": "primary" },
-    { "value": "100%", "label": "Hercules' God-Tier Laziness", "sublabel": "(Zeus Blocked)", "color": "accent" },
-    { "value": "50", "label": "Guild's Total Legendary Members", "sublabel": "(Every One Unique)", "color": "success" },
-    { "value": "9999", "label": "M1ssy's Epipen Killstreak", "sublabel": "(Medical Legend)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "JudeMaximus's Name Warcry Rating",
+      "sublabel": "(The Maximum Effort)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "JudeMaximus's Enthusiasm Aura Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "JudeMaximus's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "50",
+      "label": "Guild's Total Legendary Members",
+      "sublabel": "(Every One Unique)",
+      "color": "success"
+    }
   ],
   [
-    { "value": "200", "label": "erwarrr's Eyebrow Dictionary Pages", "sublabel": "(Mute Translation)", "color": "primary" },
-    { "value": "47", "label": "Goblok's Battle Strategies", "sublabel": "(All Work Somehow)", "color": "accent" },
-    { "value": "147", "label": "Rohypnol's Spiritual NFTs Sold", "sublabel": "(Analog Blockchain)", "color": "success" },
-    { "value": "∞", "label": "PotatoCheese's Tears Bottled", "sublabel": "(Keto Suffering)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Gnohaij03's DPS Calculator Rating",
+      "sublabel": "(The Number Navigator)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Gnohaij03's Color-Coded Everything Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Gnohaij03's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Gnohaij03's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "12", "label": "惡1ce's Guilt Empire Branches", "sublabel": "(Wholesome Evil)", "color": "primary" },
-    { "value": "∞", "label": "Guild's Impossible Victories", "sublabel": "(Daily Occurrence)", "color": "accent" },
-    { "value": "89", "label": "Helvenica's Kerning Kills", "sublabel": "(Comic Sans)", "color": "success" },
-    { "value": "47", "label": "Onirgerep's Backwards Victories", "sublabel": "(Time Crimes)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "PHorns's Signal Mixup Rating",
+      "sublabel": "(The Horn Hero)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "PHorns's Deliberate Confusion Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "PHorns's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Guild's Impossible Victories",
+      "sublabel": "(Daily Occurrence)",
+      "color": "accent"
+    }
   ],
   [
-    { "value": "50000", "label": "Varys' Subscribers to Whisper Web", "sublabel": "(60% Wrong)", "color": "primary" },
-    { "value": "100%", "label": "JolsQ's Confession Rate", "sublabel": "(Pun Protocol)", "color": "accent" },
-    { "value": "23", "label": "Chunchunmaru's Academic Papers", "sublabel": "(Sword PhD)", "color": "success" },
-    { "value": "500", "label": "Marsha11's Course Students", "sublabel": "(Being Right)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "bozzkie's Opportunistic Strike Rating",
+      "sublabel": "(The Boss Basher)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "bozzkie's Strategic Hiding Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "bozzkie's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "bozzkie's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "0", "label": "LaxusLawliet's L-Position Effectiveness", "sublabel": "(No Brain Power)", "color": "primary" },
-    { "value": "3", "label": "JeffEpstein's Cookie Awards", "sublabel": "(Awkward Ceremony)", "color": "accent" },
-    { "value": "47", "label": "Fever's Color-Coded Apocalypses", "sublabel": "(Beautifully Filed)", "color": "success" },
-    { "value": "12", "label": "Cogwind's Sentient Machine Army", "sublabel": "(Chose Violence)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "xAthena's Infinite Knowledge Rating",
+      "sublabel": "(The Wisdom Wanderer)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "xAthena's Scenic Pathfinding Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "xAthena's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "xAthena's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "7", "label": "Universities Teaching Daleee Method", "sublabel": "(Backwards Magic)", "color": "primary" },
-    { "value": "89", "label": "lanZ6's Butterfly Council", "sublabel": "(Vibes Only)", "color": "accent" },
-    { "value": "∞", "label": "Skadushy's Physics Laws Broken", "sublabel": "(Impossibility Constant)", "color": "success" },
-    { "value": "47", "label": "Tinitira's Staring Contest Wins", "sublabel": "(Blind Supremacy)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "FrierenAlter's Future Memory Rating",
+      "sublabel": "(The Time-Touched Princess of Eternal Moments)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "FrierenAlter's Timeless Patience Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "FrierenAlter's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "FrierenAlter's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "1", "label": "Fever's Pending Apocalypse", "sublabel": "(Incomplete Paperwork)", "color": "primary" },
-    { "value": "1.2M", "label": "Miang's Monologue Word Count", "sublabel": "(Never Silent)", "color": "accent" },
-    { "value": "5000g", "label": "Munchyy's Gallery Note Value", "sublabel": "(Art Crime)", "color": "success" },
-    { "value": "3", "label": "Iguro's Cookie Diplomacy Alliances", "sublabel": "(Wrong Portal)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "HercuIes's Divine Delivery Range Rating",
+      "sublabel": "(The Divine Retirement Plan)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "HercuIes's Heroic Napping Mastery Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "HercuIes's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "HercuIes's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "3 Yrs", "label": "Inihaw's Grilled Irony Waitlist", "sublabel": "(Vegan Paradox)", "color": "primary" },
-    { "value": "89", "label": "PanCoco's Geneva Convention Clauses", "sublabel": "(Coconut Warfare)", "color": "accent" },
-    { "value": "47", "label": "Byakko's Licensed Kingdoms", "sublabel": "(Sacred Squeak)", "color": "success" },
-    { "value": "100k", "label": "Ztig's Helmet Fund Balance", "sublabel": "(Friendly Fire)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Bovo's Serene Command Rating",
+      "sublabel": "(The Serene Sovereign)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Bovo's Chaos Management Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Bovo's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Bovo's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "500", "label": "PotatoCheese's Church Followers", "sublabel": "(Saint Status)", "color": "primary" },
-    { "value": "1200", "label": "Jalo's Church of Wrong Followers", "sublabel": "(Divine Misinformation)", "color": "accent" },
-    { "value": "100%", "label": "Jalo Bot's Treasury Management", "sublabel": "(Sentient AI)", "color": "success" },
-    { "value": "34", "label": "Carrera's Successful Paradoxes", "sublabel": "(Einstein's Ghost Joined)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Huntersung's Combat Aria Rating",
+      "sublabel": "(The Sonic Stalker)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Huntersung's Vocal Ambush Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Huntersung's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Huntersung's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "8", "label": "Jayzzzzzzz's Z Count in Name", "sublabel": "(Medical Intervention Failed)", "color": "primary" },
-    { "value": "3", "label": "xSelah's Retired Villains", "sublabel": "(Ruined Monologues)", "color": "accent" },
-    { "value": "247", "label": "JolsQ's Puns Per Session", "sublabel": "(Geneva Limit: 50)", "color": "success" },
-    { "value": "4", "label": "ladyhoho's Weekly Therapy Sessions", "sublabel": "(Emergency Tuesdays)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "TELUK's Acronym Mystery Rating",
+      "sublabel": "(The Acronym Enigma)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "TELUK's The Guessing Game Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "TELUK's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "TELUK's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "47", "label": "Goblok's Retroactive Strategies", "sublabel": "(All Became Correct)", "color": "primary" },
-    { "value": "12", "label": "Azryth's Published Philosophy Papers", "sublabel": "(Nightlight Academia)", "color": "accent" },
-    { "value": "3", "label": "Skadushy's Eclipse Consumption", "sublabel": "(Both Shadow & Light)", "color": "success" },
-    { "value": "47", "label": "AmielJohn's Snack Diplomacy Treaties", "sublabel": "(Jerky Peace)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Katnisss's Snack Procurement Rating",
+      "sublabel": "(The Disappointed District)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Katnisss's Mockingjay Disappointment Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Katnisss's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Katnisss's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "9 Mos", "label": "Fever's Apocalypse Admin Waitlist", "sublabel": "(Color-Coded Doom)", "color": "primary" },
-    { "value": "12", "label": "Kingdoms Under Enaira Paradox", "sublabel": "(Simultaneous Rich/Broke)", "color": "accent" },
-    { "value": "47", "label": "M1ssy's Tactical Allergic Reactions", "sublabel": "(Strategic Anaphylaxis)", "color": "success" },
-    { "value": "∞", "label": "Hercules' Mountains Lifted for WiFi", "sublabel": "(Worth It)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "MiiiMusashi's Stick Mastery Rating",
+      "sublabel": "(The Stick Saint)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "MiiiMusashi's Steve the Stick Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "MiiiMusashi's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "MiiiMusashi's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "23", "label": "Byakko's Merchandising Calendar Sales", "sublabel": "(9999 Units)", "color": "primary" },
-    { "value": "47", "label": "惡1ce's Animal Shelter Donations", "sublabel": "(Guilt-Based)", "color": "accent" },
-    { "value": "89", "label": "Chunchunmaru's Sponsorship Deals", "sublabel": "(Sword Influencer)", "color": "success" },
-    { "value": "12", "label": "Helvenica's Bad Design Brigade", "sublabel": "(Font Warriors)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Scarlet's Chromatic Embarrassment Rating",
+      "sublabel": "(The Chromatic Confessional)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Scarlet's Mood Display Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Scarlet's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Scarlet's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "100%", "label": "Byakko's Merchandising Success", "sublabel": "(Sacred Squeak Empire)", "color": "primary" },
-    { "value": "∞", "label": "Cutie's Adoption Requests", "sublabel": "(Moral Paralysis)", "color": "accent" },
-    { "value": "100%", "label": "Ace's Cosmic Spite Effectiveness", "sublabel": "(Universe Hates His Bets)", "color": "success" },
-    { "value": "∞", "label": "Evand3r's Spoon Quest Dedication", "sublabel": "(Never Giving Up)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Novocaine's Emotional Void Rating",
+      "sublabel": "(The Numb Neutral)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Novocaine's Tactical Indifference Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Novocaine's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Novocaine's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "12", "label": "Jalo's Dragon Dentistry Converts", "sublabel": "(Floss Prevents Fire)", "color": "primary" },
-    { "value": "500", "label": "Jalo's Church Followers", "sublabel": "(Divine Misinformation)", "color": "accent" },
-    { "value": "47", "label": "CheeseCakee's Sponsorship Deals", "sublabel": "(Epipen Companies)", "color": "success" },
-    { "value": "14", "label": "Geneva Clauses Named After CheeseCakee", "sublabel": "(Dairy Crimes)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Y9 RedzonePlays's System Glitch Rating",
+      "sublabel": "(The Error Code)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Y9 RedzonePlays's Accidental Teleport Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Y9 RedzonePlays's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Y9 RedzonePlays's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "100%", "label": "Ayane69's Faceplant Success Rate", "sublabel": "(Grace: Still 0)", "color": "primary" },
-    { "value": "3", "label": "Ninja Academies Teaching Ayane Style", "sublabel": "(Tactical Faceplant)", "color": "accent" },
-    { "value": "50m", "label": "Tinitira's Guilt Detection Range", "sublabel": "(Heard From 3 Rooms)", "color": "success" },
-    { "value": "3 Hrs", "label": "erwarrr's Silence Record", "sublabel": "(Cleared Castle)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Trsze's Silent Nod Rating",
+      "sublabel": "(The Unpronounceable)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Trsze's Name Ambiguity Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Trsze's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Trsze's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "47", "label": "Hayacinth's Weaponized Pollen Kits", "sublabel": "(Strategic Allergen)", "color": "primary" },
-    { "value": "4", "label": "Hayacinth's Sneeze Permits", "sublabel": "(AOE Damage License)", "color": "accent" },
-    { "value": "47", "label": "LaxusLawliet's Desk Hiding Survivals", "sublabel": "(Assassination Avoidance)", "color": "success" },
-    { "value": "∞", "label": "LaxusLawliet's Sweet Consumption", "sublabel": "(Diabetes Warning)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "SEENderELLA's Conditional Existence Rating",
+      "sublabel": "(The Observed Princess)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "SEENderELLA's Wardrobe Quantum State Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "SEENderELLA's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "SEENderELLA's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "12", "label": "Cogwind's Sentient HR Bots", "sublabel": "(Chose Violence)", "color": "primary" },
-    { "value": "3", "label": "Economic Collapses Via Tax Bot", "sublabel": "(Cogwind's Creation)", "color": "accent" },
-    { "value": "∞", "label": "Cogwind's Safety Regulations Violated", "sublabel": "(Exception Clause)", "color": "success" },
-    { "value": "89", "label": "Chunchunmaru's Social Media Posts", "sublabel": "(Sword Influencer)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Alluka's Polite Request Rating",
+      "sublabel": "(The Smiling Cataclysm)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Alluka's Smiling Intimidation Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Alluka's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Alluka's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "5", "label": "erwarrr's Years of Silence", "sublabel": "(Aggressive Staring)", "color": "primary" },
-    { "value": "12", "label": "Helvenica's Font War Victories", "sublabel": "(Comic Sans Terror)", "color": "accent" },
-    { "value": "847", "label": "路易丝's Etiquette Violations", "sublabel": "(Fake Nobility)", "color": "success" },
-    { "value": "3", "label": "路易丝's Burping Languages", "sublabel": "(Alphabet Mastery)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Shi's Ironic Healing Rating",
+      "sublabel": "(The Ironic Healer)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Shi's Name Confusion Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Shi's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Shi's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "24", "label": "AmielJohn's Cooking Show Episodes", "sublabel": "(Motivational Munching)", "color": "primary" },
-    { "value": "1", "label": "AmielJohn's Cold Snack War Treaties", "sublabel": "(Jerky Non-Proliferation)", "color": "accent" },
-    { "value": "89", "label": "惡1ce's Retired Villains Via Guilt", "sublabel": "(Wholesomeness Weapon)", "color": "success" },
-    { "value": "100m", "label": "惡1ce's Guilt Cycle Radius", "sublabel": "(Popsicle Manipulation)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Appolousa's Corporate Smiting Rating",
+      "sublabel": "(The Corporate Deity)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Appolousa's Scheduled Prophecy Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Appolousa's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Appolousa's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "89", "label": "Varys' Memoir 'I Think I Remember'", "sublabel": "(90% Fabricated)", "color": "primary" },
-    { "value": "30000", "label": "Varys' Premium Tier Enemy Spies", "sublabel": "(Getting Wrong Intel)", "color": "accent" },
-    { "value": "47", "label": "Onirgerep's Time Warrants", "sublabel": "(Convicted Next Year)", "color": "success" },
-    { "value": "∞", "label": "Onirgerep's Confusion Level", "sublabel": "(Omnidirectional)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Sighface's Sigh Magic Rating",
+      "sublabel": "(The Exhalation Evoker)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Sighface's Exhalation Evocation Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Sighface's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Sighface's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "25000g", "label": "HODAKA's Meteorologist Bounty", "sublabel": "(Digital Climate Terrorism)", "color": "primary" },
-    { "value": "12", "label": "路易丝's Monthly Royal Galas", "sublabel": "(Instant Ramen Cuisine)", "color": "accent" },
-    { "value": "1000g", "label": "PotatoCheese's Sacrifice Seasoning", "sublabel": "(Bottled Tears)", "color": "success" },
-    { "value": "0", "label": "PotatoCheese's Carb Consumption (4y)", "sublabel": "(Eternal Martyrdom)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "cal0y's Silent Threat Rating",
+      "sublabel": "(The Silent Zero)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "cal0y's Zero Mystery Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "cal0y's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "cal0y's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "89", "label": "Munchyy's Gallery Exhibits", "sublabel": "(Apologetic Murder)", "color": "primary" },
-    { "value": "47", "label": "Munchyy's Assassination Requests", "sublabel": "(For The Note)", "color": "accent" },
-    { "value": "∞", "label": "Munchyy's Literacy Casualties", "sublabel": "(Illegible Art)", "color": "success" },
-    { "value": "500%", "label": "Miang's Conversational Void Filling", "sublabel": "(Never Stops)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "PabloGaming's Chaos Genre Mastery Rating",
+      "sublabel": "(The Genre Gatekeeper)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "PabloGaming's Niche Domination Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "PabloGaming's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "PabloGaming's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "0", "label": "Miang's Silent Moments (4 Years)", "sublabel": "(The Quiet One)", "color": "primary" },
-    { "value": "89", "label": "Miang's Monologue Novel Length", "sublabel": "(1.2M Words)", "color": "accent" },
-    { "value": "1", "label": "Miang vs erwarrr Staring Contest", "sublabel": "(erwarrr Won)", "color": "success" },
-    { "value": "2 Hrs", "label": "Miang's Silence Explanation", "sublabel": "(Ironic)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "YouthNiNam's Premature Nostalgia Rating",
+      "sublabel": "(The Youthful Elder)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "YouthNiNam's Ancient Soul Young Body Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "YouthNiNam's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "YouthNiNam's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "6", "label": "ladyhoho's Therapists Defeated", "sublabel": "(Needed Therapy)", "color": "primary" },
-    { "value": "4", "label": "Kingdoms With ladyhoho Weapon Ban", "sublabel": "(Classified: Smile)", "color": "accent" },
-    { "value": "9999x", "label": "ladyhoho's Maximum Combo Multiplier", "sublabel": "(Tragic Giggle)", "color": "success" },
-    { "value": "∞", "label": "Maria's Wrongness Maintained", "sublabel": "(100% Win Rate)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Mikmok's Mik Strike Rating",
+      "sublabel": "(The Onomatopoeic Avenger)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Mikmok's Mok Follow-Up Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Mikmok's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Mikmok's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "9999", "label": "Maria's Earplugs Purchased (Guild)", "sublabel": "(Bulk Order)", "color": "primary" },
-    { "value": "3", "label": "Maria's Fortress Walls Destroyed", "sublabel": "(Sonic Siege)", "color": "accent" },
-    { "value": "12", "label": "Marsha11's Backup Drives", "sublabel": "(Truth Preservation)", "color": "success" },
-    { "value": "3", "label": "Marsha11's Total Arguments Won", "sublabel": "(Maria Asleep)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "CaptainSkad's Metaphorical Command Rating",
+      "sublabel": "(The Backwards Captain)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "CaptainSkad's Ship of Imagination Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "CaptainSkad's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "CaptainSkad's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "47", "label": "Iguro's Accidental Empire Members", "sublabel": "(Portal Chaos)", "color": "primary" },
-    { "value": "1200%", "label": "Iguro's Recruitment Success Rate", "sublabel": "(Portal Wrong 100%)", "color": "accent" },
-    { "value": "0%", "label": "Iguro's Portal Accuracy", "sublabel": "(Omnipresent Anyway)", "color": "success" },
-    { "value": "∞", "label": "Inihaw's Ethical Dilemmas Created", "sublabel": "(Delicious)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "sugardrops's Sugar Rush Rating",
+      "sublabel": "(The Sweet Saboteur)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "sugardrops's Confectionery Bombardment Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "sugardrops's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "sugardrops's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "9999", "label": "Inihaw's Vegan Converts (Mid-Siege)", "sublabel": "(Moral Confusion)", "color": "primary" },
-    { "value": "7", "label": "Inihaw's Tactics Banned in Kingdoms", "sublabel": "(Deliciously Illegal)", "color": "accent" },
-    { "value": "47", "label": "Inihaw's Fortress Defense Hours", "sublabel": "(Smoke & Ethics)", "color": "success" },
-    { "value": "∞", "label": "PanCoco's Coconuts Thrown", "sublabel": "(Never Ate One)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Winter0315's Date Memory Rating",
+      "sublabel": "(The Date Keeper)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Winter0315's Annual Vigil Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Winter0315's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Winter0315's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "9999", "label": "PanCoco's Resort Visitors", "sublabel": "(Allergic Paradise)", "color": "primary" },
-    { "value": "∞", "label": "PanCoco's Hospital Bills", "sublabel": "(Vacation Bioweapon)", "color": "accent" },
-    { "value": "1", "label": "PanCoco's Geneva Convention Clause", "sublabel": "(Allergic Projectile)", "color": "success" },
-    { "value": "47", "label": "xSelah's Jazz Hands Per Minute", "sublabel": "(Tension Murdered)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "福Ryzen's Luck Overclock Rating",
+      "sublabel": "(The Lucky Processor)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "福Ryzen's Fortune Processing Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "福Ryzen's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "福Ryzen's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "∞", "label": "xSelah's Dramatic Moments Ruined", "sublabel": "(Pause Impossible)", "color": "primary" },
-    { "value": "12", "label": "xSelah's Philosophical Papers", "sublabel": "(Toe-Tapping Enlightenment)", "color": "accent" },
-    { "value": "3", "label": "xSelah's Villains Who Quit", "sublabel": "(Frustration)", "color": "success" },
-    { "value": "89", "label": "Ztig's Raids Banned From", "sublabel": "(Shows Up Anyway)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Nikudrops's Meat Meteor Rating",
+      "sublabel": "(The Meat Meteor)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Nikudrops's A5 Critical Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Nikudrops's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Nikudrops's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "+400%", "label": "Ztig's Guild Insurance Premium", "sublabel": "(Ztig Clause)", "color": "primary" },
-    { "value": "7", "label": "Ztig's Enemy Hits (Career)", "sublabel": "(Ally: 9999)", "color": "accent" },
-    { "value": "∞", "label": "Goblok's Stupidity Singularities", "sublabel": "(With Jalo)", "color": "success" },
-    { "value": "7", "label": "Goblok's Lecture Invitations", "sublabel": "(Will Draw Crayons)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "Bubwit's Cute Camouflage Rating",
+      "sublabel": "(The Kitten Bomb)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "Bubwit's Adorable Explosion Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "Bubwit's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Bubwit's Chaos Index",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ],
   [
-    { "value": "???", "label": "Goblok's IQ", "sublabel": "(Possibly Negative)", "color": "primary" },
-    { "value": "34", "label": "Goblok's Retroactively Correct Plans", "sublabel": "(Transcendent Idiocy)", "color": "accent" },
-    { "value": "1", "label": "Military Theories Named After Goblok", "sublabel": "(Goblokian Paradox)", "color": "success" },
-    { "value": "∞", "label": "Guild's Total Chaos Level", "sublabel": "(Tenchu Standard)", "color": "danger" }
+    {
+      "value": "∞",
+      "label": "ordips's Reverse Strike Rating",
+      "sublabel": "(The Reversal Specialist)",
+      "color": "primary"
+    },
+    {
+      "value": "9999",
+      "label": "ordips's Backwards Advance Score",
+      "sublabel": "(Unmatched)",
+      "color": "accent"
+    },
+    {
+      "value": "100%",
+      "label": "ordips's Guild Synergy",
+      "sublabel": "(Peak Performance)",
+      "color": "success"
+    },
+    {
+      "value": "∞",
+      "label": "Guild's Total Chaos Level",
+      "sublabel": "(Tenchu Standard)",
+      "color": "danger"
+    }
   ]
 ]
