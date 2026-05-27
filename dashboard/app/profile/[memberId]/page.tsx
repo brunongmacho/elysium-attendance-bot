@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, useState } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { formatInGMT8 } from "@/lib/timezone";
@@ -12,6 +12,7 @@ import { Stack, Grid } from "@/components/layout";
 import { Icon } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useSpecialUser } from "@/hooks/useSpecialUser";
+import { getThemeColors } from "@/lib/theme-colors";
 
 // SWR fetcher
 const swrFetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -47,6 +48,7 @@ interface MemberLoreData {
   reputation: string;
   stats: string;
   skills: string[];
+  theme?: string;
 }
 
 export default function MemberProfilePage() {
@@ -152,6 +154,11 @@ export default function MemberProfilePage() {
     if (!memberLoreData || !profile) return null;
     return memberLoreData[profile.username];
   }, [memberLoreData, profile]);
+
+  // Derive member theme from lore for profile page theming
+  const memberThemeColors = useMemo(() => {
+    return lore ? getThemeColors(lore.theme || 'default') : null;
+  }, [lore]);
 
   // Show loading state during SSR to prevent hydration errors
   if (!isMounted || isLoading) {
@@ -302,7 +309,11 @@ export default function MemberProfilePage() {
   }
 
   return (
-    <Stack gap="xl">
+    <Stack gap="xl" style={memberThemeColors ? {
+      '--color-accent': memberThemeColors.accent,
+      '--color-accent-dark': memberThemeColors.accentDark,
+      '--color-accent-light': memberThemeColors.accentLight,
+    } as React.CSSProperties : undefined}>
         {/* Breadcrumb */}
         <Breadcrumb
           items={[
