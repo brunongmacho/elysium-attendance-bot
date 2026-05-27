@@ -93,7 +93,7 @@ export default function Footer() {
           </a>
         </div>
         <div className="text-xs text-gray-600 font-game mb-1">
-          <p>Managed by Goblok's Crayon Intelligence | Powered by the Jalo Bot | Where Chaos Meets Strategy</p>
+          <p>Managed by Bovo's Leadership | Powered by the Tenchu Bot | Where Chaos Meets Strategy</p>
         </div>
         <div className="text-xs text-gray-500 font-game">
           <p>© 2025 Tenchu Guild. All rights reserved.</p>

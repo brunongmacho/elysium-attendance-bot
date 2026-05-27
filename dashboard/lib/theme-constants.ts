@@ -241,34 +241,6 @@ export const THEME_COLORS: Record<string, ThemeColors> = {
     info: '#a855f7',
   },
 
-  // Chaos theme for Goblok
-  chaos: {
-    primary: '#f97316',      // Orange
-    primaryDark: '#ea580c',
-    primaryLight: '#fdba74',
-    accent: '#eab308',        // Yellow
-    accentDark: '#ca8a04',
-    accentLight: '#fde047',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#f97316',
-  },
-
-  // Unstable theme for xAustinx
-  unstable: {
-    primary: '#14b8a6',      // Teal
-    primaryDark: '#0d9488',
-    primaryLight: '#5eead4',
-    accent: '#2dd4bf',        // Light Teal
-    accentDark: '#0f766e',
-    accentLight: '#99f6e4',
-    success: '#10b981',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#14b8a6',
-  },
-
   // Portal theme for Iguro
   portal: {
     primary: '#6366f1',      // Indigo
@@ -281,34 +253,6 @@ export const THEME_COLORS: Record<string, ThemeColors> = {
     warning: '#f59e0b',
     danger: '#ef4444',
     info: '#6366f1',
-  },
-
-  // Grill theme for Inihaw - fiery red/orange BBQ
-  grill: {
-    primary: '#dc2626',      // Red Fire
-    primaryDark: '#991b1b',
-    primaryLight: '#f87171',
-    accent: '#fbbf24',        // Fire Gold
-    accentDark: '#f59e0b',
-    accentLight: '#fcd34d',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#dc2626',
-  },
-
-  // Wrong theme for Jalo
-  wrong: {
-    primary: '#eab308',      // Yellow
-    primaryDark: '#ca8a04',
-    primaryLight: '#fde047',
-    accent: '#f97316',        // Orange
-    accentDark: '#ea580c',
-    accentLight: '#fdba74',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#eab308',
   },
 
   // Chrono theme for Carrera
@@ -325,48 +269,6 @@ export const THEME_COLORS: Record<string, ThemeColors> = {
     info: '#3b82f6',
   },
 
-  // Nightlight theme for Azryth
-  nightlight: {
-    primary: '#f472b6',      // Pink
-    primaryDark: '#db2777',
-    primaryLight: '#f9a8d4',
-    accent: '#fde047',        // Yellow
-    accentDark: '#eab308',
-    accentLight: '#fef08a',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#f472b6',
-  },
-
-  // Ocean theme for Adriana
-  ocean: {
-    primary: '#0ea5e9',      // Sky Blue
-    primaryDark: '#0284c7',
-    primaryLight: '#7dd3fc',
-    accent: '#06b6d4',        // Cyan
-    accentDark: '#0891b2',
-    accentLight: '#67e8f9',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#0ea5e9',
-  },
-
-  // Snack theme for AmielJohn - rose/red hunger
-  snack: {
-    primary: '#e11d48',      // Rose Red
-    primaryDark: '#be123c',
-    primaryLight: '#fb7185',
-    accent: '#f43f5e',        // Pink Red
-    accentDark: '#e11d48',
-    accentLight: '#fda4af',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#e11d48',
-  },
-
   // Royal theme for AndyVI
   royal: {
     primary: '#7c3aed',      // Purple
@@ -379,34 +281,6 @@ export const THEME_COLORS: Record<string, ThemeColors> = {
     warning: '#f59e0b',
     danger: '#ef4444',
     info: '#7c3aed',
-  },
-
-  // Blade theme for Ayane69
-  blade: {
-    primary: '#be123c',      // Rose Red
-    primaryDark: '#9f1239',
-    primaryLight: '#f43f5e',
-    accent: '#fb7185',        // Pink Rose
-    accentDark: '#e11d48',
-    accentLight: '#fda4af',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#be123c',
-  },
-
-  // Tiger theme for Byakko
-  tiger: {
-    primary: '#ea580c',      // Orange
-    primaryDark: '#c2410c',
-    primaryLight: '#fb923c',
-    accent: '#fbbf24',        // Gold
-    accentDark: '#f59e0b',
-    accentLight: '#fde047',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#ea580c',
   },
 
   // Boss theme for bozzkie
@@ -437,20 +311,6 @@ export const THEME_COLORS: Record<string, ThemeColors> = {
     info: '#4c1d95',
   },
 
-  // Meme theme for Chunchunmaru
-  meme: {
-    primary: '#06b6d4',      // Cyan
-    primaryDark: '#0891b2',
-    primaryLight: '#67e8f9',
-    accent: '#f472b6',        // Pink
-    accentDark: '#db2777',
-    accentLight: '#f9a8d4',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#06b6d4',
-  },
-
   // Shadow theme for DarKOwLZ - dark gray/blue comedy
   shadow: {
     primary: '#334155',      // Slate Medium
@@ -463,34 +323,6 @@ export const THEME_COLORS: Record<string, ThemeColors> = {
     warning: '#f59e0b',
     danger: '#ef4444',
     info: '#334155',
-  },
-
-  // Neon theme for Deeyon
-  neon: {
-    primary: '#22c55e',      // Green
-    primaryDark: '#16a34a',
-    primaryLight: '#4ade80',
-    accent: '#14b8a6',        // Teal
-    accentDark: '#0d9488',
-    accentLight: '#2dd4bf',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#22c55e',
-  },
-
-  // Chaoscoin theme for Enaira - emerald/green financial
-  chaoscoin: {
-    primary: '#059669',      // Emerald
-    primaryDark: '#047857',
-    primaryLight: '#34d399',
-    accent: '#10b981',        // Green
-    accentDark: '#059669',
-    accentLight: '#6ee7b7',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#059669',
   },
 
   // Spoon theme for Evand3r
@@ -591,20 +423,6 @@ export const THEME_COLORS: Record<string, ThemeColors> = {
     info: '#f472b6',
   },
 
-  // Recycle theme for KingPagpag
-  recycle: {
-    primary: '#65a30d',      // Olive Green
-    primaryDark: '#4d7c0f',
-    primaryLight: '#a3e635',
-    accent: '#84cc16',        // Lime
-    accentDark: '#65a30d',
-    accentLight: '#bef264',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#65a30d',
-  },
-
   // Abyss theme for ladyhoho
   abyss: {
     primary: '#7c3aed',      // Purple
@@ -647,21 +465,7 @@ export const THEME_COLORS: Record<string, ThemeColors> = {
     info: '#fbbf24',
   },
 
-  // Sonic theme for Maria
-  sonic: {
-    primary: '#f43f5e',      // Rose
-    primaryDark: '#e11d48',
-    primaryLight: '#fb7185',
-    accent: '#fb923c',        // Orange
-    accentDark: '#f97316',
-    accentLight: '#fdba74',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#f43f5e',
-  },
-
-  // Archive theme for Marsha11
+  // Archive theme for Marzhall
   archive: {
     primary: '#78716c',      // Stone
     primaryDark: '#57534e',
@@ -689,7 +493,7 @@ export const THEME_COLORS: Record<string, ThemeColors> = {
     info: '#b45309',
   },
 
-  // Art theme for Munchyy
+  // Art theme for MochiP
   art: {
     primary: '#ec4899',      // Pink
     primaryDark: '#db2777',
@@ -701,20 +505,6 @@ export const THEME_COLORS: Record<string, ThemeColors> = {
     warning: '#f59e0b',
     danger: '#ef4444',
     info: '#ec4899',
-  },
-
-  // Pancake theme for PanCoco - warm orange/brown breakfast
-  pancake: {
-    primary: '#ea580c',      // Burnt Orange
-    primaryDark: '#c2410c',
-    primaryLight: '#fb923c',
-    accent: '#fed7aa',        // Peach
-    accentDark: '#fb923c',
-    accentLight: '#ffedd5',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#ea580c',
   },
 
   // Pharmacy theme for Pedsrow
@@ -745,48 +535,6 @@ export const THEME_COLORS: Record<string, ThemeColors> = {
     info: '#e879f9',
   },
 
-  // Book theme for Rileyread
-  book: {
-    primary: '#78350f',      // Brown
-    primaryDark: '#451a03',
-    primaryLight: '#92400e',
-    accent: '#d97706',        // Amber
-    accentDark: '#b45309',
-    accentLight: '#fbbf24',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#78350f',
-  },
-
-  // Shadowdance theme for Skadushy - dark blue and yellow
-  shadowdance: {
-    primary: '#1e3a8a',      // Dark Blue
-    primaryDark: '#1e40af',
-    primaryLight: '#3b82f6',
-    accent: '#fbbf24',        // Yellow
-    accentDark: '#f59e0b',
-    accentLight: '#fcd34d',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#1e3a8a',
-  },
-
-  // Tidal theme for Tinitira - teal/ocean based
-  tidal: {
-    primary: '#0d9488',      // Teal
-    primaryDark: '#0f766e',
-    primaryLight: '#2dd4bf',
-    accent: '#14b8a6',        // Light Teal
-    accentDark: '#0d9488',
-    accentLight: '#5eead4',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#0d9488',
-  },
-
   // Rhythm theme for UmpaUmpa
   rhythm: {
     primary: '#d946ef',      // Fuchsia
@@ -799,20 +547,6 @@ export const THEME_COLORS: Record<string, ThemeColors> = {
     warning: '#f59e0b',
     danger: '#ef4444',
     info: '#d946ef',
-  },
-
-  // Vanish theme for Vanbis
-  vanish: {
-    primary: '#94a3b8',      // Slate Gray
-    primaryDark: '#64748b',
-    primaryLight: '#cbd5e1',
-    accent: '#6366f1',        // Indigo
-    accentDark: '#4f46e5',
-    accentLight: '#818cf8',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#94a3b8',
   },
 
   // Wisdom theme for xAthena
@@ -843,20 +577,6 @@ export const THEME_COLORS: Record<string, ThemeColors> = {
     info: '#22c55e',
   },
 
-  // Dragon theme for zog - emerald/fiery green
-  dragon: {
-    primary: '#16a34a',      // Green Dragon
-    primaryDark: '#15803d',
-    primaryLight: '#4ade80',
-    accent: '#f97316',        // Orange Fire
-    accentDark: '#ea580c',
-    accentLight: '#fdba74',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#16a34a',
-  },
-
   // Blur theme for Ztig - violet/pink speed theme
   blur: {
     primary: '#c084fc',      // Purple Light
@@ -883,47 +603,5 @@ export const THEME_COLORS: Record<string, ThemeColors> = {
     warning: '#f59e0b',
     danger: '#ef4444',
     info: '#f9a8d4',
-  },
-
-  // Cat theme for nyawtz - purple/lavender feline
-  cat: {
-    primary: '#a855f7',      // Purple
-    primaryDark: '#7c3aed',
-    primaryLight: '#c4b5fd',
-    accent: '#f472b6',        // Pink
-    accentDark: '#db2777',
-    accentLight: '#f9a8d4',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#a855f7',
-  },
-
-  // Casino theme for YumekoJabami - gold/red gambling
-  casino: {
-    primary: '#dc2626',      // Red
-    primaryDark: '#991b1b',
-    primaryLight: '#fca5a5',
-    accent: '#fbbf24',        // Gold
-    accentDark: '#f59e0b',
-    accentLight: '#fcd34d',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#dc2626',
-    info: '#dc2626',
-  },
-
-  // Sky theme for Wren空
-  sky: {
-    primary: '#38bdf8',      // Sky Blue
-    primaryDark: '#0ea5e9',
-    primaryLight: '#7dd3fc',
-    accent: '#818cf8',        // Indigo Light
-    accentDark: '#6366f1',
-    accentLight: '#a5b4fc',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    info: '#38bdf8',
   },
 };

@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { THEME_COLORS, type ThemeColors } from '@/lib/theme-constants';
 
-export type ThemeName = 'crimson' | 'wine' | 'magenta' | 'peach' | 'sunset' | 'golden' | 'lime' | 'olive' | 'emerald' | 'forest' | 'mint' | 'default' | 'navy' | 'arctic' | 'cyber' | 'purple' | 'quantum' | 'starlight' | 'chaos' | 'unstable' | 'portal' | 'grill' | 'wrong' | 'chrono' | 'nightlight' | 'ocean' | 'snack' | 'royal' | 'blade' | 'tiger' | 'boss' | 'void' | 'meme' | 'shadow' | 'neon' | 'chaoscoin' | 'spoon' | 'bureaucracy' | 'stats' | 'olympus' | 'weather' | 'speed' | 'morale' | 'recycle' | 'abyss' | 'chaosgun' | 'lightning' | 'sonic' | 'archive' | 'vintage' | 'art' | 'pancake' | 'pharmacy' | 'horn' | 'book' | 'shadowdance' | 'tidal' | 'rhythm' | 'vanish' | 'wisdom' | 'reverse' | 'dragon' | 'blur' | 'elegance' | 'sky';
+export type ThemeName = 'crimson' | 'wine' | 'magenta' | 'peach' | 'sunset' | 'golden' | 'lime' | 'olive' | 'emerald' | 'forest' | 'mint' | 'default' | 'navy' | 'arctic' | 'cyber' | 'purple' | 'quantum' | 'starlight' | 'portal' | 'chrono' | 'royal' | 'boss' | 'void' | 'shadow' | 'spoon' | 'bureaucracy' | 'stats' | 'olympus' | 'weather' | 'speed' | 'morale' | 'abyss' | 'chaosgun' | 'lightning' | 'archive' | 'vintage' | 'art' | 'pharmacy' | 'horn' | 'rhythm' | 'wisdom' | 'reverse' | 'blur' | 'elegance';
 
 interface Theme {
   name: ThemeName;
@@ -155,44 +155,12 @@ const themes: Record<ThemeName, Theme> = {
     icon: '✨',
   },
 
-  chaos: {
-    name: 'chaos',
-    label: 'Goblokian Chaos',
-    colors: THEME_COLORS.chaos,
-    description: 'The stupider the plan, the more genius it becomes',
-    icon: '🖍️',
-  },
-
-  unstable: {
-    name: 'unstable',
-    label: 'Exponential Uncertainty',
-    colors: THEME_COLORS.unstable,
-    description: 'Has not cast the same spell twice successfully',
-    icon: '❓',
-  },
-
   portal: {
     name: 'portal',
     label: 'Dimensional Chaos',
     colors: THEME_COLORS.portal,
     description: 'Portals never go where intended — but the guild keeps growing',
     icon: '🌀',
-  },
-
-  grill: {
-    name: 'grill',
-    label: 'Ethical BBQ',
-    colors: THEME_COLORS.grill,
-    description: 'Vegan BBQ paradox: The more you grill, the more you convert',
-    icon: '🔥',
-  },
-
-  wrong: {
-    name: 'wrong',
-    label: 'Oracle of Wrongness',
-    colors: THEME_COLORS.wrong,
-    description: 'Strategic inversion rate: 100%',
-    icon: '🔮',
   },
 
   chrono: {
@@ -203,31 +171,6 @@ const themes: Record<ThemeName, Theme> = {
     icon: '⏰',
   },
 
-  nightlight: {
-    name: 'nightlight',
-    label: 'Illuminated Assassin',
-    colors: THEME_COLORS.nightlight,
-    description: 'Academic assassination with Hello Kitty',
-    icon: '🌟',
-  },
-
-  ocean: {
-    name: 'ocean',
-    label: 'Admiral of None',
-    colors: THEME_COLORS.ocean,
-    description: 'Sea claims: Infinity | Naval Knowledge: 0%',
-    icon: '⚓',
-  },
-
-  // Batch 1: New Themes
-  snack: {
-    name: 'snack',
-    label: 'Caloric Warlord',
-    colors: THEME_COLORS.snack,
-    description: 'Hunger 12000 | Strategic Digestion Active',
-    icon: '🍖',
-  },
-
   royal: {
     name: 'royal',
     label: 'Puddle Empire',
@@ -236,23 +179,6 @@ const themes: Record<ThemeName, Theme> = {
     icon: '👑',
   },
 
-  blade: {
-    name: 'blade',
-    label: 'Thorned Blade',
-    colors: THEME_COLORS.blade,
-    description: 'Elegance meets lethality in perfect harmony',
-    icon: '⚔️',
-  },
-
-  tiger: {
-    name: 'tiger',
-    label: 'Divine Squeak',
-    colors: THEME_COLORS.tiger,
-    description: 'Divine cuteness MONOPOLIZED',
-    icon: '🐯',
-  },
-
-  // Batch 2: New Themes
   boss: {
     name: 'boss',
     label: 'Boss Basher',
@@ -269,37 +195,12 @@ const themes: Record<ThemeName, Theme> = {
     icon: '🕳️',
   },
 
-  meme: {
-    name: 'meme',
-    label: 'Meme Legend',
-    colors: THEME_COLORS.meme,
-    description: 'Followers: 3.2M | Sword has its own social media',
-    icon: '📱',
-  },
-
   shadow: {
     name: 'shadow',
     label: 'Dark Comedy',
     colors: THEME_COLORS.shadow,
     description: 'Owl Impressions: 89 | Fear Actually Caused: 0',
     icon: '🌑',
-  },
-
-  // Batch 3: New Themes
-  neon: {
-    name: 'neon',
-    label: 'Neon Glow',
-    colors: THEME_COLORS.neon,
-    description: 'Neon aesthetics: MAX | Visibility: 100%',
-    icon: '💚',
-  },
-
-  chaoscoin: {
-    name: 'chaoscoin',
-    label: 'Financial Paradox',
-    colors: THEME_COLORS.chaoscoin,
-    description: 'Kingdoms Affected: 7 | Tenchu Profit: +400%',
-    icon: '💸',
   },
 
   spoon: {
@@ -318,7 +219,6 @@ const themes: Record<ThemeName, Theme> = {
     icon: '📋',
   },
 
-  // Batch 4: New Themes
   stats: {
     name: 'stats',
     label: 'Number Navigator',
@@ -351,21 +251,12 @@ const themes: Record<ThemeName, Theme> = {
     icon: '⚡',
   },
 
-  // Batch 5: New Themes
   morale: {
     name: 'morale',
     label: 'Maximum Effort',
     colors: THEME_COLORS.morale,
     description: 'Enthusiasm: 1000% | Coordination: 0%',
     icon: '💪',
-  },
-
-  recycle: {
-    name: 'recycle',
-    label: 'Dumpster King',
-    colors: THEME_COLORS.recycle,
-    description: 'Dumpster Legendaries: 47 | Recycled Victories: 89%',
-    icon: '♻️',
   },
 
   abyss: {
@@ -376,7 +267,6 @@ const themes: Record<ThemeName, Theme> = {
     icon: '😈',
   },
 
-  // Batch 6: New Themes
   chaosgun: {
     name: 'chaosgun',
     label: 'Calculated Chaos',
@@ -391,14 +281,6 @@ const themes: Record<ThemeName, Theme> = {
     colors: THEME_COLORS.lightning,
     description: 'Watts Generated: INFINITY | Property Damage: 8900 GOLD',
     icon: '⚡',
-  },
-
-  sonic: {
-    name: 'sonic',
-    label: 'Decibel Tyrant',
-    colors: THEME_COLORS.sonic,
-    description: 'Decibel Level: 189 | Victory Rate: 100%',
-    icon: '🔊',
   },
 
   archive: {
@@ -425,14 +307,6 @@ const themes: Record<ThemeName, Theme> = {
     icon: '🎨',
   },
 
-  pancake: {
-    name: 'pancake',
-    label: 'Pancake Commander',
-    colors: THEME_COLORS.pancake,
-    description: 'Pancakes Flipped: 9999 | Battle Breakfasts: 47',
-    icon: '🥞',
-  },
-
   pharmacy: {
     name: 'pharmacy',
     label: 'Pharmacy Phantom',
@@ -449,44 +323,12 @@ const themes: Record<ThemeName, Theme> = {
     icon: '📯',
   },
 
-  book: {
-    name: 'book',
-    label: 'Literary Launcher',
-    colors: THEME_COLORS.book,
-    description: 'Books Thrown: 500+ | Genre Coverage: INFINITY',
-    icon: '📚',
-  },
-
-  shadowdance: {
-    name: 'shadowdance',
-    label: 'Shadow Dancer',
-    colors: THEME_COLORS.shadowdance,
-    description: 'Angles Conquered: INFINITY | Captured on Film: 0',
-    icon: '🌑',
-  },
-
-  tidal: {
-    name: 'tidal',
-    label: 'Tidal Terror',
-    colors: THEME_COLORS.tidal,
-    description: 'Floods Caused: 12 | Tears Stored: INFINITY',
-    icon: '🌊',
-  },
-
   rhythm: {
     name: 'rhythm',
     label: 'Rhythmic Rambler',
     colors: THEME_COLORS.rhythm,
     description: 'Beats Per Minute: 180 | Rave Raids Won: 47',
     icon: '🎵',
-  },
-
-  vanish: {
-    name: 'vanish',
-    label: 'Instant Escape',
-    colors: THEME_COLORS.vanish,
-    description: 'Tactical Disappearances: 89 | Presence Issues: PERMANENT',
-    icon: '💨',
   },
 
   wisdom: {
@@ -505,14 +347,6 @@ const themes: Record<ThemeName, Theme> = {
     icon: '🔄',
   },
 
-  dragon: {
-    name: 'dragon',
-    label: 'Dragon Warrior',
-    colors: THEME_COLORS.dragon,
-    description: 'Dragon Flames: 89 | Scales Forged: 47',
-    icon: '🐉',
-  },
-
   blur: {
     name: 'blur',
     label: 'Lightning Speedster',
@@ -527,15 +361,6 @@ const themes: Record<ThemeName, Theme> = {
     colors: THEME_COLORS.elegance,
     description: 'Elegance Rating: 9999 | Combat Ballets: 12',
     icon: '🌸',
-  },
-
-  // Sky theme for Wren空
-  sky: {
-    name: 'sky',
-    label: 'Empty Sky Walker',
-    colors: THEME_COLORS.sky,
-    description: 'Sky Mastery: INFINITY | Void Steps: 47',
-    icon: '🌌',
   },
 };
 

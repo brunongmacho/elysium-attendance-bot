@@ -59,56 +59,23 @@ function getTextColorClass(index: number, variant: 'icon' | 'text'): string {
   return textColors[index % 5];
 }
 
-// Helper to get an icon/emoji based on member specialty
-function getIconForMember(name: string, data: MemberLoreData): string {
-  // Member-specific icon mapping (prevents duplicates)
-  const memberIcons: Record<string, string> = {
-    'AmielJohn': '🍖',       // Caloric Warlord - meat/food consumption
-    'Azryth': '💡',          // Nightlight Assassin
-    'Byakko': '🐯',          // Marketing Divine Tiger
-    'Carrera': '⏰',         // Temporal Weapons Specialist
-    'CheeseCakee': '🧀',     // Lactose Weapons Engineer
-    'Chunchunmaru': '📱',    // Self-Aware Meme Legend (social media)
-    'Daleee': '🎓',          // Professor of Wrongness
-    'Enaira': '💸',          // Economic Singularity
-    'erwarrr': '🔇',         // Militant Silence
-    'Evand3r': '🥄',         // Legendary Spoon Seeker
-    'Fever': '📋',           // Apocalypse Administrator
-    'Goblok': '🖍️',          // Transcendent Fool Emperor (crayon)
-    'Helvenica': '🔤',       // Font War Criminal
-    'Hercules': '💪',        // Divine Retirement Plan
-    'HODAKA': '⛅',          // Weather Criminal Weatherboy (forecast)
-    'Hesucrypto': '💰',      // Quantum Financier
-    'Iguro': '🌀',           // Accidental Recruitment Director (portals)
-    'Inihaw': '🥗',          // Ethical Grillmaster General (vegan)
-    'Jalo': '🤡',            // Oracle of Incorrectness
-    'Jayzzzzzzz': '😴',      // Wakeful Nightmare
-    'JolsQ': '🃏',           // Jester Inquisitor (dad jokes)
-    'JeffEpstein': '🍪',     // Nominative Paradox Saint (cookies)
-    'ladyhoho': '😂',        // Laughing Abyss
-    'M1ssy': '💉',           // Anaphylactic Tactician (epipen)
-    'Maria': '📢',           // Decibel Tyrant (loud)
-    'Marsha11': '📁',        // Archival Martyr (files)
-    'Miang': '🗣️',           // Infinite Narrator (talking)
-    'Munchyy': '🗡️',         // Assassination Artist
-    'Onirgerep': '⏪',       // Temporal Reversal Anomaly (backwards)
-    'PotatoCheese': '🥔',    // Carbohydrate Martyr Saint
-    'Skadushy': '🌓',        // Thermodynamic Heretic (shadow/light)
-    'Varys': '🕵️',          // Rumor Industrialist (spy)
-    'xSelah': '💃',          // Perpetual Motion Disaster
-    'Ztig': '🎯',            // Friendly Fire Legend
-    'PanCoco': '🥥',         // Tropical Hazmat Warrior
-    'Ace': '🎲',             // Cosmic Spite Champion (gambling)
-    'lanZ6': '🦋',           // Vibes Prophet Chancellor (butterfly)
-    'Ayane69': '🍂',         // Catastrophic Ninja Legend (falling)
-    'Tinitira': '👁️',        // Sightless Oracle
-    'Hayacinth': '🌸',       // Biological Artillery Commander
-    'LaxusLawliet': '🍬',    // Disappointed Namesake (sweets)
-    'Cogwind': '⚙️',         // Mad Engineer Laureate
-    '惡1ce': '🧊',           // Benevolent Evil Overlord (ice)
-    'Cutie': '🌺',           // Weaponized Adorableness
-    '路易丝': '👑',          // Aristocratic Chaos Lord (fake nobility)
-  };
+  // Helper to get an icon/emoji based on member specialty
+  function getIconForMember(name: string, data: MemberLoreData): string {
+    // Member-specific icon mapping (prevents duplicates)
+    const memberIcons: Record<string, string> = {
+      'Carrera': '⏰',         // Temporal Weapons Specialist
+      'Evand3r': '🥄',         // Legendary Spoon Seeker
+      'Fever': '📋',           // Apocalypse Administrator
+      'Hercules': '💪',        // Divine Retirement Plan
+      'HODAKA': '⛅',          // Weather Criminal Weatherboy (forecast)
+      'Iguro': '🌀',           // Accidental Recruitment Director (portals)
+      'ladyhoho': '😂',        // Laughing Abyss
+      'lanZ6': '🦋',           // Vibes Prophet Chancellor (butterfly)
+      'LaxusLawliet': '🍬',   // Disappointed Namesake (sweets)
+      'Marsha11': '📁',        // Archival Martyr (files)
+      'Ztig': '🎯',            // Friendly Fire Legend
+      '路易丝': '👑',          // Aristocratic Chaos Lord (fake nobility)
+    };
 
   // Check for member-specific icon first
   if (memberIcons[name]) {
@@ -482,7 +449,7 @@ export default function GuildHomePage() {
   const guildStatsRotation = useMemo((): GuildStat[] => {
     // Fallback stat set in case of loading or data issues
     const fallbackStats: GuildStat[] = [
-      { value: "100%", label: "Jalo Bot Financial Accuracy", sublabel: "(Rohypnol: 0%)", color: "primary" },
+      { value: "100%", label: "Bovo Leadership Approval", sublabel: "(Unanimous)", color: "primary" },
       { value: "∞/0", label: "Rohypnol's Net Worth", sublabel: "(Sedated State)", color: "accent" },
       { value: "50", label: "Tenchu's Active Members", sublabel: "(All Legendary)", color: "success" },
       { value: "9999", label: "Ztig's Ally Precision Score", sublabel: "", color: "danger" }
@@ -851,7 +818,7 @@ export default function GuildHomePage() {
               "Where stupidity becomes genius and friendly fire is tactical."
             </Typography>
             <Typography variant="small" className="text-xs sm:text-sm text-gray-400 px-4">
-              Led by Goblok's Crayon Intelligence | Powered by Organized Apocalypse | Where Chaos Meets Strategy
+              Led by Bovo's Vision | Powered by Organized Chaos | Where Legends Are Made
             </Typography>
           </Stack>
         </div>
@@ -1235,7 +1202,7 @@ export default function GuildHomePage() {
                 a vegan grillmaster defends fortresses, and our Chrono-Tactician wins battles by showing up late to yesterday.
               </Typography>
               <Typography variant="body" className="leading-relaxed">
-                Led by Goblok's crayon-drawn battle plans (somehow they work), managed by organized chaos
+                Led by Bovo's bold leadership (somehow they work), managed by organized chaos
                 and powered by members who turn their failures into legendary victories.
               </Typography>
               <Typography variant="small" className="italic text-primary-bright leading-relaxed">
