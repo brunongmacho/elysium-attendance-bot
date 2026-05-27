@@ -59,7 +59,7 @@ export const guildTheme = {
   branding: {
     name: 'TENCHU',
     tagline: 'Guild Dashboard',
-    logo: '/icon.png', // Your guild icon
+    logo: '/icon-tenchu.png', // Your guild icon
   },
 
   // Typography

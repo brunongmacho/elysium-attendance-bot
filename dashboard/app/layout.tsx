@@ -28,10 +28,10 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: '/favicon.ico' },
-      { url: '/icon.png', type: 'image/png', sizes: '256x256' },
+      { url: '/icon-tenchu.png', type: 'image/png', sizes: '256x256' },
     ],
     apple: [
-      { url: '/icon.png', sizes: '256x256', type: 'image/png' },
+      { url: '/icon-tenchu.png', sizes: '256x256', type: 'image/png' },
     ],
   },
 };
