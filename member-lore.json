@@ -13,7 +13,8 @@
       "The Rohypnol Paradox",
       "Forgotten Devotion",
       "Forgotten Love"
-    ]
+    ],
+    "theme": "quantum"
   },
   "Iguro": {
     "title": "The Accidental Recruitment Director (Vice Leader)",
@@ -27,7 +28,8 @@
       "Bathroom Diplomacy",
       "Cookie Portal Warfare",
       "Unintentional HR Excellence"
-    ]
+    ],
+    "theme": "portal"
   },
   "Carrera": {
     "title": "The Temporal Weapons Specialist",
@@ -41,7 +43,8 @@
       "Strategic Yesterday",
       "Future Ambush",
       "Chrono-Snack Break"
-    ]
+    ],
+    "theme": "chrono"
   },
   "Evand3r": {
     "title": "The Legendary Spoon Seeker",
@@ -55,7 +58,8 @@
       "Corkscrew Combat",
       "Poster Strike",
       "Abstract Weapon Mastery"
-    ]
+    ],
+    "theme": "spoon"
   },
   "Fever": {
     "title": "The Apocalypse Administrator",
@@ -69,7 +73,8 @@
       "Quarterly Doom Review",
       "Pending Armageddon",
       "Beautiful Documentation"
-    ]
+    ],
+    "theme": "bureaucracy"
   },
   "Marzhall": {
     "title": "The Archival Martyr",
@@ -83,7 +88,8 @@
       "Blockchain Evidence",
       "Philosophical Acceptance",
       "Frustrated Lecture"
-    ]
+    ],
+    "theme": "archive"
   },
   "MochiP": {
     "title": "The Assassination Artist",
@@ -97,7 +103,8 @@
       "Collectible Kill",
       "Gallery Assassination",
       "Illegible Masterpiece"
-    ]
+    ],
+    "theme": "art"
   },
   "Ztig": {
     "title": "The Lightning Speedster",
@@ -111,7 +118,8 @@
       "Speedrun Domination",
       "Server Breaker",
       "Bot Confusion"
-    ]
+    ],
+    "theme": "blur"
   },
   "ladyhoho": {
     "title": "The Laughing Abyss",
@@ -125,7 +133,8 @@
       "Smile Weapon",
       "Existential Comedy Burst",
       "Therapeutic Casualty Creation"
-    ]
+    ],
+    "theme": "abyss"
   },
   "lanZ6": {
     "title": "The Laser Precision",
@@ -139,7 +148,8 @@
       "Chaos Control",
       "Wall-Piercing Accident",
       "Bystander Recruitment"
-    ]
+    ],
+    "theme": "chaosgun"
   },
   "LaxusLawliet": {
     "title": "The Lightning Lord",
@@ -153,7 +163,8 @@
       "Power Grid",
       "Storm Performance",
       "Electric Bill Zero"
-    ]
+    ],
+    "theme": "lightning"
   },
   "Mielle1968": {
     "title": "The Vintage Virtuoso",
@@ -167,7 +178,8 @@
       "Vintage Gear Mastery",
       "Meta Memory",
       "Nostalgic Commentary"
-    ]
+    ],
+    "theme": "vintage"
   },
   "AndyVI": {
     "title": "The Royal Recovery Specialist",
@@ -181,7 +193,8 @@
       "Puddle Empire",
       "Regal Confusion",
       "Tub Kingdom"
-    ]
+    ],
+    "theme": "royal"
   },
   "路易丝": {
     "title": "The Elegant Enigma",
@@ -195,7 +208,8 @@
       "Combat Ballet",
       "Aesthetic Victory",
       "Graceful Confusion"
-    ]
+    ],
+    "theme": "elegance"
   },
   "HODAKA": {
     "title": "The Weather Criminal Weatherboy",
@@ -209,7 +223,8 @@
       "Historical Weather Revisionism",
       "Emotional Climate Control",
       "Coudy Merchandise Empire"
-    ]
+    ],
+    "theme": "weather"
   },
   "Channy": {
     "title": "The Channel Surfer",
@@ -223,7 +238,8 @@
       "Feeling Beam",
       "Void Storage",
       "Mood Swing Storm"
-    ]
+    ],
+    "theme": "void"
   },
   "Hytrz": {
     "title": "The Hyperactive Haste",
@@ -237,7 +253,8 @@
       "Temporal Speed",
       "Incomprehensible Blur",
       "Game Crash Advantage"
-    ]
+    ],
+    "theme": "speed"
   },
   "yakob": {
     "title": "The Yak Attack",
@@ -251,7 +268,8 @@
       "Reverse Retreat",
       "Backwards Ambush",
       "Confusion Victory"
-    ]
+    ],
+    "theme": "reverse"
   },
   "DarKOwLZ": {
     "title": "The Shadow Humor",
@@ -265,7 +283,8 @@
       "Dark Comedy",
       "Shadow Pet",
       "Closet Checking"
-    ]
+    ],
+    "theme": "shadow"
   },
   "Pedsrow": {
     "title": "The Pharmacy Phantom",
@@ -279,7 +298,8 @@
       "Panacea Palace",
       "Instant Recovery",
       "Hot Sauce Medicine"
-    ]
+    ],
+    "theme": "pharmacy"
   },
   "UmpaUmpa": {
     "title": "The Rhythmic Rambler",
@@ -293,7 +313,8 @@
       "Dance Ambush",
       "Groove hypnosis",
       "Rave Raid"
-    ]
+    ],
+    "theme": "rhythm"
   },
   "JudeMaximus": {
     "title": "The Maximum Effort",
@@ -307,7 +328,8 @@
       "Enthusiasm Aura",
       "Maximum Charge",
       "Accidental Victory"
-    ]
+    ],
+    "theme": "morale"
   },
   "Gnohaij03": {
     "title": "The Number Navigator",
@@ -321,7 +343,8 @@
       "Color-Coded Everything",
       "Stat Obsession",
       "Random Numbers"
-    ]
+    ],
+    "theme": "stats"
   },
   "PHorns": {
     "title": "The Horn Hero",
@@ -335,7 +358,8 @@
       "Deliberate Confusion",
       "Horn Misdirection",
       "Accidental Heroics"
-    ]
+    ],
+    "theme": "horn"
   },
   "bozzkie": {
     "title": "The Boss Basher",
@@ -349,7 +373,8 @@
       "Strategic Hiding",
       "Final Blow Snipe",
       "Criticism Immunity"
-    ]
+    ],
+    "theme": "boss"
   },
   "xAthena": {
     "title": "The Wisdom Wanderer",
@@ -363,7 +388,8 @@
       "Scenic Pathfinding",
       "Philosophical Compass",
       "Eternal Arrival"
-    ]
+    ],
+    "theme": "wisdom"
   },
   "_FUTURE_TEMPLATE": {
     "title": "Awaiting Destiny",
@@ -393,7 +419,8 @@
       "Eternal Understanding",
       "Peace In Silence",
       "Presence Over Words"
-    ]
+    ],
+    "theme": "starlight"
   },
   "HercuIes": {
     "title": "The Divine Retirement Plan",
@@ -407,7 +434,8 @@
       "Heroic Napping Mastery",
       "Fortress Lift (Snack Access)",
       "Olympian Disappointment"
-    ]
+    ],
+    "theme": "olympus"
   },
   "Bovo": {
     "title": "The Serene Sovereign (Guild Leader)",
@@ -422,7 +450,8 @@
       "Calm Authority",
       "Strategic Maps",
       "Crown of Serenity"
-    ]
+    ],
+    "theme": "royal"
   },
   "Huntersung": {
     "title": "The Sonic Stalker",
@@ -436,7 +465,8 @@
       "Vocal Ambush",
       "Showtune Stealth",
       "Hunter's Melody"
-    ]
+    ],
+    "theme": "tiger"
   },
   "TELUK": {
     "title": "The Acronym Enigma",
@@ -450,7 +480,8 @@
       "The Guessing Game",
       "Meaning Expansion",
       "Perpetual Confusion"
-    ]
+    ],
+    "theme": "ocean"
   },
   "Katnisss": {
     "title": "The Disappointed District",
@@ -464,7 +495,8 @@
       "Mockingjay Disappointment",
       "Pantry Depletion",
       "District Confusion"
-    ]
+    ],
+    "theme": "cat"
   },
   "MiiiMusashi": {
     "title": "The Stick Saint",
@@ -478,7 +510,8 @@
       "Steve the Stick",
       "Emotional Support Swords",
       "Twig Technique"
-    ]
+    ],
+    "theme": "blade"
   },
   "Scarlet": {
     "title": "The Chromatic Confessional",
@@ -492,7 +525,8 @@
       "Mood Display",
       "Red Alert (Default)",
       "Color-Coded Shame"
-    ]
+    ],
+    "theme": "chaos"
   },
   "Novocaine": {
     "title": "The Numb Neutral",
@@ -506,7 +540,8 @@
       "Tactical Indifference",
       "Neutral Presence",
       "Unshakeable Calm"
-    ]
+    ],
+    "theme": "pharmacy"
   },
   "Y9 RedzonePlays": {
     "title": "The Error Code",
@@ -520,7 +555,8 @@
       "Accidental Teleport",
       "Patch Testing",
       "Chair Transformation"
-    ]
+    ],
+    "theme": "chaosgun"
   },
   "Trsze": {
     "title": "The Unpronounceable",
@@ -534,7 +570,8 @@
       "Name Ambiguity",
       "Vowel Conservation",
       "Pronunciation Resistance"
-    ]
+    ],
+    "theme": "chaos"
   },
   "SEENderELLA": {
     "title": "The Observed Princess",
@@ -548,7 +585,8 @@
       "Wardrobe Quantum State",
       "Blink Defense",
       "Photographer Torment"
-    ]
+    ],
+    "theme": "snack"
   },
   "Alluka": {
     "title": "The Smiling Cataclysm",
@@ -562,7 +600,8 @@
       "Smiling Intimidation",
       "Cataclysmic Patience",
       "Innocent Menace"
-    ]
+    ],
+    "theme": "void"
   },
   "Shi": {
     "title": "The Ironic Healer",
@@ -576,7 +615,8 @@
       "Name Confusion",
       "Death Misunderstanding",
       "Restorative Pranks"
-    ]
+    ],
+    "theme": "nightlight"
   },
   "Appolousa": {
     "title": "The Corporate Deity",
@@ -590,7 +630,8 @@
       "Scheduled Prophecy",
       "Lunch Break Miracles",
       "Divine Timesheet"
-    ]
+    ],
+    "theme": "olympus"
   },
   "Sighface": {
     "title": "The Exhalation Evoker",
@@ -604,7 +645,8 @@
       "Exhalation Evocation",
       "Sadness Summoning",
       "Depression Spellcasting"
-    ]
+    ],
+    "theme": "morale"
   },
   "cal0y": {
     "title": "The Silent Zero",
@@ -618,7 +660,8 @@
       "Zero Mystery",
       "Unspoken Menace",
       "Numerical Intimidation"
-    ]
+    ],
+    "theme": "neon"
   },
   "PabloGaming": {
     "title": "The Genre Gatekeeper",
@@ -632,7 +675,8 @@
       "Niche Domination",
       "Impossible Speedrun",
       "Viewer Confusion"
-    ]
+    ],
+    "theme": "casino"
   },
   "YouthNiNam": {
     "title": "The Youthful Elder",
@@ -646,7 +690,8 @@
       "Ancient Soul Young Body",
       "Gardening Wisdom",
       "Youthful Grumbling"
-    ]
+    ],
+    "theme": "speed"
   },
   "Mikmok": {
     "title": "The Onomatopoeic Avenger",
@@ -661,7 +706,8 @@
       "Bweeu Knockback",
       "Krrrsh Armor Break",
       "Fweee Distraction"
-    ]
+    ],
+    "theme": "pancake"
   },
   "CaptainSkad": {
     "title": "The Backwards Captain",
@@ -675,7 +721,8 @@
       "Ship of Imagination",
       "Mutiny Confusion",
       "Backwards Authority"
-    ]
+    ],
+    "theme": "ocean"
   },
   "sugardrops": {
     "title": "The Sweet Saboteur",
@@ -689,7 +736,8 @@
       "Confectionery Bombardment",
       "Rave Warfare",
       "Hyperactive Chaos"
-    ]
+    ],
+    "theme": "pancake"
   },
   "Winter0315": {
     "title": "The Date Keeper",
@@ -703,7 +751,8 @@
       "Annual Vigil",
       "Temporal Secret",
       "Calendar Mystique"
-    ]
+    ],
+    "theme": "weather"
   },
   "福Ryzen": {
     "title": "The Lucky Processor",
@@ -717,7 +766,8 @@
       "Fortune Processing",
       "Blue Screen of Luck",
       "Luck Management Protocol"
-    ]
+    ],
+    "theme": "chaoscoin"
   },
   "Nikudrops": {
     "title": "The Meat Meteor",
@@ -732,7 +782,8 @@
       "Bacon Area Denial",
       "Recipe Interrogation",
       "Perfect Sear"
-    ]
+    ],
+    "theme": "grill"
   },
   "Bubwit": {
     "title": "The Kitten Bomb",
@@ -746,7 +797,8 @@
       "Adorable Explosion",
       "Squeak Trigger",
       "Aww-Boom Strategy"
-    ]
+    ],
+    "theme": "snack"
   },
   "ordips": {
     "title": "The Reversal Specialist",
@@ -760,7 +812,8 @@
       "Backwards Advance",
       "Inverse Healing",
       "Interpretive Dance Communications"
-    ]
+    ],
+    "theme": "reverse"
   },
   "Shozenn": {
     "title": "The Aesthetic Appropriator",
@@ -774,7 +827,8 @@
       "Anime Pronunciation",
       "Decorative Katana",
       "Small Town Mystery"
-    ]
+    ],
+    "theme": "void"
   },
   "Hunter David": {
     "title": "The Specific Stalker",
@@ -788,7 +842,8 @@
       "David Identification",
       "Non-David Pacifism",
       "Targeted Hunting"
-    ]
+    ],
+    "theme": "tiger"
   },
   "Lieus": {
     "title": "The Plural Mystery",
@@ -802,7 +857,8 @@
       "Count Evasion",
       "Ambiguity Mastery",
       "Where's Lieus Game"
-    ]
+    ],
+    "theme": "shadow"
   },
   "BuNaLsKi": {
     "title": "The Capital Chaos",
@@ -817,7 +873,8 @@
       "Ninja Vanish",
       "Letter Salad Combo",
       "Keyboard Smash Offense"
-    ]
+    ],
+    "theme": "pancake"
   },
   "Yunseri": {
     "title": "The Eternal Tease",
@@ -831,7 +888,8 @@
       "Promise Deferral",
       "Anticipation Maintenance",
       "Delivery Avoidance"
-    ]
+    ],
+    "theme": "sky"
   },
   "xSerissa": {
     "title": "The Moving Mark",
@@ -845,7 +903,8 @@
       "Spatial Misdirection",
       "x Pattern",
       "Location Evasion"
-    ]
+    ],
+    "theme": "recycle"
   },
   "oLuke": {
     "title": "The Essential Prefix",
@@ -859,7 +918,8 @@
       "O Battle Cry",
       "Oxygen Appreciation",
       "Prefix Preservation"
-    ]
+    ],
+    "theme": "chaosgun"
   },
   "IlllIlllI": {
     "title": "The Unreadable",
@@ -873,7 +933,8 @@
       "Typographical Confusion",
       "Illegible Presence",
       "Hey You Response"
-    ]
+    ],
+    "theme": "blur"
   },
   "newking": {
     "title": "The Sand Sovereign",
@@ -887,7 +948,8 @@
       "Granular Governance",
       "Castle Construction",
       "Sand-Based Foreign Policy"
-    ]
+    ],
+    "theme": "royal"
   },
   "AliceXII": {
     "title": "The Clone Chronicles",
@@ -901,7 +963,8 @@
       "Inherited Technique",
       "Personality Switching",
       "Collective Consciousness"
-    ]
+    ],
+    "theme": "casino"
   },
   "Jakeeeee": {
     "title": "The Exponential E",
@@ -915,7 +978,8 @@
       "Exponential Growth",
       "E-Based Combat",
       "Name Expansion"
-    ]
+    ],
+    "theme": "speed"
   },
   "只rylai": {
     "title": "The Hidden Translation",
@@ -929,7 +993,8 @@
       "Character Deception",
       "Hidden Meaning",
       "Linguistic Misdirection"
-    ]
+    ],
+    "theme": "tidal"
   },
   "jPOLA": {
     "title": "The Volume Balance",
@@ -943,7 +1008,8 @@
       "POLA Impact",
       "Volume Equilibrium",
       "Case-Sensitive Combat"
-    ]
+    ],
+    "theme": "weather"
   },
   "Vαηвιѕ": {
     "title": "The Font Phantom",
@@ -957,7 +1023,8 @@
       "Alphabetical Ambiguity",
       "Vanishing Act",
       "Partial Translation"
-    ]
+    ],
+    "theme": "vanish"
   },
   "loondrops": {
     "title": "The Drop Zone Commander (Vice Leader)",
@@ -971,7 +1038,8 @@
       "Operation Command",
       "Spreadsheet Mastery",
       "Calm Authority"
-    ]
+    ],
+    "theme": "nightlight"
   },
   "raiindrops": {
     "title": "The Storm Gatherer (Vice Leader)",
@@ -985,7 +1053,8 @@
       "Morale Weather",
       "Atmospheric Warfare",
       "Raindrop Precision"
-    ]
+    ],
+    "theme": "ocean"
   },
   "Jabilits": {
     "title": "The Jade Commander (Vice Leader)",
@@ -999,7 +1068,8 @@
       "Defense Command",
       "Strategic Combat",
       "Iron Discipline"
-    ]
+    ],
+    "theme": "blade"
   },
   "AndyVI_alt": {
     "title": "The Alt Identity Crisis",
@@ -1013,6 +1083,7 @@
       "Succession Dispute",
       "Puddle Politics",
       "Identity Crisis Management"
-    ]
+    ],
+    "theme": "royal"
   }
 }
