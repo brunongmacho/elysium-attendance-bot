@@ -14,10 +14,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   request: Request,
-  { params }: { params: { memberId: string } }
+  { params }: { params: Promise<{ memberId: string }> }
 ) {
   try {
-    const { memberId } = params;
+    const { memberId } = await params;
 
     if (!memberId) {
       return NextResponse.json(

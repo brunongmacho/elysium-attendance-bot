@@ -14,7 +14,7 @@ import { bossNameSchema, bossKillSchema, validateInput } from "@/lib/validation"
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { name: string } }
+  { params }: { params: Promise<{ name: string }> }
 ) {
   try {
     // Check authentication and permissions
@@ -51,7 +51,8 @@ export async function POST(
     }
 
     // Validate boss name parameter
-    const bossName = decodeURIComponent(params.name);
+    const { name } = await params;
+    const bossName = decodeURIComponent(name);
     const bossNameValidation = validateInput(bossNameSchema, bossName);
     if (!bossNameValidation.success) {
       return NextResponse.json(
@@ -164,7 +165,7 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { name: string } }
+  { params }: { params: Promise<{ name: string }> }
 ) {
   try {
     // Check authentication and permissions
@@ -202,7 +203,8 @@ export async function DELETE(
     }
 
     // Validate boss name parameter
-    const bossName = decodeURIComponent(params.name);
+    const { name } = await params;
+    const bossName = decodeURIComponent(name);
     const bossNameValidation = validateInput(bossNameSchema, bossName);
     if (!bossNameValidation.success) {
       return NextResponse.json(
