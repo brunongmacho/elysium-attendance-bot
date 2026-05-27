@@ -1,18 +1,18 @@
 {
   "Rohypnol": {
-    "title": "The Amnesiac Adorer (Vice Leader)",
-    "lore": "Named after the sedative that makes you forget everything — except he can't forget FrierenAlter. Tried every method to forget her: meditation, distraction, even tried his own namesake. Nothing works. His memory of her gets stronger the more he tries to erase it. VICE LEADER of Tenchu under Bovo — appointed to handle finances because even his wallet has forgotten its own balance. His portfolio is sedated. His judgment is sedated. Everything is sedated — except his feelings for her.",
-    "recent_developments": "Rohypnol has achieved a state of permanent chemical serenity. His feelings for FrierenAlter have outlasted every sedative, every attempt to suppress, every mental block. As Vice Leader under Bovo, he now manages guild finances — all while half-asleep, smiling at nothing. ladyhoho calls it infuriating. The guild calls it the most peaceful unrequited love in Tenchu history. The betting pool reached 25,000 gold — he forgot to care. Some memories aren't meant to be erased. Some feelings are the only thing keeping him awake.",
+    "title": "The Sedated Vice Leader Who Finally Found Peace",
+    "lore": "Named after the sedative that makes you forget everything — and one day, it finally worked. Not dramatically. Not with a bang. The feelings for FrierenAlter just... faded. Quietly. Like morning mist burning off under an indifferent sun. VICE LEADER of Tenchu under Bovo — appointed to handle finances because even his wallet has forgotten its own balance. His portfolio is sedated. His heart is finally sedated too. The one thing he couldn't forget, he simply stopped remembering. Not because he wanted to. Because the sedative finally did its job.",
+    "recent_developments": "Rohypnol woke up one morning and realized: the ache was gone. Not replaced. Not suppressed. Just... absent. For the first time in years, he didn't think about FrierenAlter. He didn't try not to think about her either. He simply didn't. The betting pool hit 50,000 gold before anyone noticed — he donated it all to guild funds without a second thought. ladyhoho keeps watching him suspiciously, waiting for the other shoe to drop. Iguro says he looks lighter. Bovo just nodded and said \"good.\" Some battles aren't won. They're just outlived. Rohypnol outlived his own heart. The sedative finally worked — and it wasn't anyone's fault. It was just time.",
     "specialty": "Vice Leader of Finance & the art of forgotten devotion",
-    "reputation": "The sedated vice leader who remembers what he's supposed to forget",
-    "stats": "Forget Attempts INFINITY | Memory of Her STRONGER | Vice Leader Status | Jalo Bot Dependency 99%",
+    "reputation": "The sedated vice leader who finally forgot what he was holding onto",
+    "stats": "Days Since He Last Thought of Her 0... 1... 7... 30... | Vice Leader Status | Guild Funds Donated 50,000g | Peace ACHIEVED",
     "skills": [
       "Sedated Memory",
       "Chemical Serenity",
       "Jalo Bot Command",
       "The Rohypnol Paradox",
       "Forgotten Devotion",
-      "Forgotten Love"
+      "Peace At Last"
     ],
     "theme": "quantum"
   },
@@ -408,10 +408,10 @@
   "FrierenAlter": {
     "title": "The Time-Touched Princess of Eternal Moments",
     "lore": "An elf so old that time itself got confused around them. Has lived so long that yesterday and last century mean the same thing. Remembers when dragons were the new kids. Has seen empires rise and fall, gods age, and stars die. But nothing — not even the birth of the first dragon — prepared her for the day Rohypnol said what he said. He told her. Time stopped. Then started again. Now he simply watches from close enough to see her smile. She notices everything. She says nothing. Some endings are more beautiful than beginnings.",
-    "recent_developments": "FrierenAlter has lived for millennia, but that moment — the one where time stopped — she will keep forever. Rohypnol confessed. Time reset. And now he sits beside her, near enough, saying nothing more, needing nothing more. She pretends not to notice how close he sits. She pretends not to feel the warmth when their shoulders almost touch. ladyhoho calls it frustrating. She calls it enough. The guild sees an unrequited love story. She sees someone who chose peace over pressure — and that means more than words ever could. The betting pool doesn't interest her. She already has what matters: his presence, his silence, his choice to stay close without asking for anything.",
+    "recent_developments": "FrierenAlter has lived for millennia, watched empires crumble, and seen stars gutter out. She noticed when Rohypnol stopped sitting quite so close. She noticed when his gaze no longer lingered. And she understood — not with hurt, but with the quiet wisdom of someone who has outlived a thousand such moments. He didn't stop because of her. He didn't stop because he was told to. He simply... finished. Like a song that reached its natural end. She holds no blame, no regret, no unanswered questions. Some stories don't end because someone failed. They end because they were always meant to. She wishes him peace — the same peace she has carried for millennia. The guild still whispers about what happened. She says nothing. She never needed to say anything.",
     "specialty": "Temporal chaos through extreme age + quiet understanding in silence",
-    "reputation": "The ancient princess whose heart chose peace over words and found something softer",
-    "stats": "Age BEYOND MEASURE | Times Pretended Not To Notice His Presence COUNTLESS | Times Time Stopped During Confession 1 | Times Peace Was Chosen Over Words 1",
+    "reputation": "The ancient princess who held space for a story to end the way it was always meant to",
+    "stats": "Age BEYOND MEASURE | Stories That Ended Peacefully COUNTLESS | Times She Felt His Absence 0 | Times She Wished Him Well 1",
     "skills": [
       "Future Memory",
       "Timeless Patience",
