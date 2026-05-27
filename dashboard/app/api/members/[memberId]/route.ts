@@ -58,8 +58,8 @@ export async function GET(
     const allMembers = await db
       .collection(COLLECTIONS.members)
       .find({})
-      .project({ _id: 1, pointsAvailable: 1, username: 1 })
-      .sort({ pointsAvailable: -1 })
+      .project({ _id: 1, pointsEarned: 1, username: 1 })
+      .sort({ pointsEarned: -1 })
       .toArray();
 
     const loreFiltered = allMembers.filter(m => loreMemberNames.has(m.username?.toLowerCase() || ''));
@@ -213,17 +213,19 @@ export async function GET(
 
     const thisMonth = thisMonthResult.length > 0 ? thisMonthResult[0].total : 0;
 
-    // Get member rank (based on points available)
-    const membersAbove = await db
-      .collection(COLLECTIONS.members)
-      .countDocuments({
-        pointsAvailable: { $gt: member.pointsAvailable }
-      });
-
-    const rank = membersAbove + 1;
-
-    // Find current member's position in the filtered list
+    // Find current member's position in the lore-filtered points leaderboard (sorted by pointsEarned like the leaderboard)
     const currentIdx = loreFiltered.findIndex(m => m._id === memberId);
+
+    // Rank based on position in the lore-filtered leaderboard (matching the leaderboard page)
+    // Members above = those with higher pointsEarned in the filtered list
+    let rank = 1;
+    if (currentIdx >= 0) {
+      rank = currentIdx + 1;
+    } else {
+      // If somehow not in the filtered list, fall back to raw position
+      const rawIdx = allMembers.findIndex(m => m._id === memberId);
+      rank = rawIdx >= 0 ? rawIdx + 1 : loreFiltered.length + 1;
+    }
 
     let prevMemberId: string | undefined = undefined;
     let nextMemberId: string | undefined = undefined;
