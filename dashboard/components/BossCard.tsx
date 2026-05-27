@@ -49,7 +49,7 @@ function BossCard({
   const { currentTime } = useTimer();
 
   // Get boss image path (convert boss name to lowercase and replace spaces with hyphens)
-  const imagePath = `/bosses/${boss.bossName.toLowerCase().replace(/\s+/g, "-")}.webp`;
+  const imagePath = `/bosses/${boss.bossName.toLowerCase().replace(/\s+/g, "-")}.png`;
   const [imgSrc, setImgSrc] = useState(imagePath);
 
   // Reset image src when boss changes
