@@ -6,6 +6,8 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { COLLECTIONS } from "@/lib/collections";
+import fs from "fs";
+import path from "path";
 import type { Member, AttendanceRecord } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +39,31 @@ export async function GET(
         { status: 404 }
       );
     }
+
+    // Read lore to filter non-lore members
+    const lorePath = path.resolve(process.cwd(), '../member-lore.json');
+    const rawData = fs.readFileSync(lorePath, 'utf-8');
+    const memberLore = JSON.parse(rawData);
+    const loreMemberNames = new Set(Object.keys(memberLore).map(k => k.toLowerCase()));
+
+    // If member doesn't have lore, they don't exist on the website
+    if (member && !loreMemberNames.has(member.username?.toLowerCase())) {
+      return NextResponse.json(
+        { success: false, error: "Member not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get all members sorted for prev/next navigation (filtered to lore-only)
+    const allMembers = await db
+      .collection(COLLECTIONS.members)
+      .find({})
+      .project({ _id: 1, pointsAvailable: 1, username: 1 })
+      .sort({ pointsAvailable: -1 })
+      .toArray();
+
+    const loreFiltered = allMembers.filter(m => loreMemberNames.has(m.username?.toLowerCase() || ''));
+    const totalMembers = loreFiltered.length;
 
     // Calculate actual attendance totals from attendance collection
     // Total attendance (all time) - count unique boss kills
@@ -193,38 +220,21 @@ export async function GET(
         pointsAvailable: { $gt: member.pointsAvailable }
       });
 
-    const totalMembers = await db.collection(COLLECTIONS.members).countDocuments({});
-
     const rank = membersAbove + 1;
 
-    // Find previous member (rank - 1)
-    let prevMemberId: string | undefined = undefined;
-    if (rank > 1) {
-      const prevMember = await db
-        .collection<Member>(COLLECTIONS.members)
-        .findOne(
-          { pointsAvailable: { $gt: member.pointsAvailable } },
-          {
-            sort: { pointsAvailable: 1 },
-            projection: { _id: 1 }
-          }
-        );
-      prevMemberId = prevMember?._id;
-    }
+    // Find current member's position in the filtered list
+    const currentIdx = loreFiltered.findIndex(m => m._id === memberId);
 
-    // Find next member (rank + 1)
+    let prevMemberId: string | undefined = undefined;
     let nextMemberId: string | undefined = undefined;
-    if (rank < totalMembers) {
-      const nextMember = await db
-        .collection<Member>(COLLECTIONS.members)
-        .findOne(
-          { pointsAvailable: { $lt: member.pointsAvailable } },
-          {
-            sort: { pointsAvailable: -1 },
-            projection: { _id: 1 }
-          }
-        );
-      nextMemberId = nextMember?._id;
+
+    if (currentIdx >= 0) {
+      if (currentIdx > 0) {
+        prevMemberId = loreFiltered[currentIdx - 1]._id;
+      }
+      if (currentIdx < loreFiltered.length - 1) {
+        nextMemberId = loreFiltered[currentIdx + 1]._id;
+      }
     }
 
     // Build profile response with calculated attendance values

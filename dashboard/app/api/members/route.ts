@@ -9,6 +9,8 @@ import { leaderboardQuerySchema, validateInput } from "@/lib/validation";
 import { buildAttendancePipeline, buildTotalBossKillsPipeline, buildDateFilter } from "@/lib/mongodb-utils";
 import { LEADERBOARD } from "@/lib/constants";
 import { COLLECTIONS } from "@/lib/collections";
+import fs from "fs";
+import path from "path";
 import type {
   AttendanceLeaderboardEntry,
   PointsLeaderboardEntry
@@ -47,6 +49,12 @@ export async function GET(request: Request) {
     const { type, period, limit, search, month: monthParam, week: weekParam } = validation.data;
 
     const db = await getDatabase();
+
+    // Read lore member names for filtering (only show members who have lore entries)
+    const lorePath = path.resolve(process.cwd(), '../member-lore.json');
+    const rawData = fs.readFileSync(lorePath, 'utf-8');
+    const memberLore = JSON.parse(rawData);
+    const loreMemberNames = new Set(Object.keys(memberLore).map(k => k.toLowerCase()));
 
     if (type === "attendance") {
       // Build date filter using reusable utility
@@ -100,6 +108,9 @@ export async function GET(request: Request) {
           member.username.toLowerCase().includes(searchLower)
         );
       }
+
+      // Only show members who have lore entries
+      leaderboard = leaderboard.filter(m => loreMemberNames.has(m.username.toLowerCase()));
 
       // Apply limit
       if (limit > 0) {
@@ -171,6 +182,9 @@ export async function GET(request: Request) {
           member.username.toLowerCase().includes(searchLower)
         );
       }
+
+      // Only show members who have lore entries
+      leaderboard = leaderboard.filter(m => loreMemberNames.has(m.username.toLowerCase()));
 
       // Apply limit
       if (limit > 0) {
