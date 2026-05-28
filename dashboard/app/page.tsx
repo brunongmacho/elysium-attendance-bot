@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import useSWR from "swr";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSession } from "next-auth/react";
 import { Section, Stack, Grid } from "@/components/layout";
 import { Typography } from "@/components/ui";
@@ -26,40 +26,7 @@ interface MemberLoreData {
   skills: string[];
 }
 
-interface GuildStat {
-  value: string;
-  label: string;
-  sublabel: string;
-  color: string;
-}
-
-type GuildStatsData = GuildStat[][];
-
-// Helper to get color-specific classes (avoids dynamic Tailwind class generation issues)
-function getColorClasses(color: string) {
-  const colorMap: Record<string, { border: string; text: string; glow: string }> = {
-    primary: { border: 'border-primary/30', text: 'text-primary-bright', glow: 'glow-primary' },
-    accent: { border: 'border-accent/30', text: 'text-accent-bright', glow: 'glow-accent' },
-    danger: { border: 'border-danger/30', text: 'text-danger-bright', glow: 'glow-danger' },
-    success: { border: 'border-success/30', text: 'text-success-bright', glow: 'glow-success' },
-    warning: { border: 'border-warning/30', text: 'text-warning-bright', glow: 'glow-warning' },
-    info: { border: 'border-info/30', text: 'text-info-bright', glow: 'glow-info' },
-  };
-  return colorMap[color] || colorMap.primary;
-}
-
-// Helper to get text color class for rotating content
-function getTextColorClass(index: number, variant: 'icon' | 'text'): string {
-  const iconColors = ['text-success', 'text-primary', 'text-accent', 'text-danger', 'text-success', 'text-primary'];
-  const textColors = ['text-primary-bright', 'text-accent-bright', 'text-danger-bright', 'text-success-bright', 'text-primary-bright'];
-
-  if (variant === 'icon') {
-    return iconColors[index % 6];
-  }
-  return textColors[index % 5];
-}
-
-  // Helper to get an icon/emoji based on member specialty
+// Helper to get an icon/emoji based on member specialty
   function getIconForMember(name: string, data: MemberLoreData): string {
     // Member-specific icon mapping (prevents duplicates)
     const memberIcons: Record<string, string> = {
@@ -85,7 +52,6 @@ function getTextColorClass(index: number, variant: 'icon' | 'text'): string {
   // Fallback to keyword-based matching
   const specialty = data.specialty.toLowerCase();
   const title = data.title.toLowerCase();
-  const reputation = data.reputation.toLowerCase();
 
   // Time & Prophecy
   if (specialty.includes('time') || title.includes('temporal') || specialty.includes('chrono')) return '🔮';
@@ -314,12 +280,172 @@ function QuickStats() {
   );
 }
 
+// Guild Pulse component — cycles between 3 content types every 30s
+function PulseCycle({ memberLore, pulseCycle }: {
+  memberLore: Record<string, MemberLoreData> | undefined;
+  pulseCycle: number;
+}) {
+  // Shuffled member list that re-shuffles each rotation
+  const [shuffledMembers, setShuffledMembers] = useState<string[]>([]);
+
+  // Reshuffle when pulseCycle changes (or memberLore loads)
+  useEffect(() => {
+    if (!memberLore) return;
+    const names = Object.keys(memberLore);
+    const shuffled = [...names].sort(() => Math.random() - 0.5);
+    setShuffledMembers(shuffled);
+  }, [memberLore, pulseCycle]);
+
+  // Curated guild-wide stat groups for Cycle B
+  const guildWideStats: { value: string; label: string; sublabel: string; color: string }[][] = [
+    [
+      { value: "∞", label: "Bovo Leadership Approval", sublabel: "(Unanimous)", color: "primary" },
+      { value: "70", label: "Active Members", sublabel: "(All Legendary)", color: "success" },
+      { value: "↑∞", label: "Guild Treasury", sublabel: "(Growing)", color: "accent" },
+      { value: "MAX", label: "Chaos Level", sublabel: "(Operational)", color: "danger" },
+    ],
+    [
+      { value: "99%", label: "Attendance Rate", sublabel: "(This Month)", color: "success" },
+      { value: "0", label: "Diplomatic Incidents", sublabel: "(This Week)", color: "primary" },
+      { value: "∞", label: "Boss Slay Count", sublabel: "(Cumulative)", color: "danger" },
+      { value: "100%", label: "Meme Quality", sublabel: "(Guild Standard)", color: "accent" },
+    ],
+  ];
+
+  // Pick current stat group based on cycle
+  const currentStatGroup = guildWideStats[pulseCycle % guildWideStats.length];
+
+  // Get visible members for Cycles A and C
+  const visibleMembers = useMemo(() => {
+    if (!memberLore || shuffledMembers.length < 2) return [];
+    return shuffledMembers.slice(0, 2).map(name => ({
+      name,
+      data: memberLore[name],
+    }));
+  }, [shuffledMembers, memberLore]);
+
+  const cycleLabels = [
+    { heading: "\uD83D\uDDE3 Voices of Tenchu", subtitle: "What the guild is saying..." },
+    { heading: "\uD83D\uDCCA Guild Pulse Stats", subtitle: "Live guild-wide metrics" },
+    { heading: "\uD83C\uDFC6 Guild Legends", subtitle: "Members who shape the guild's story" },
+  ];
+
+  const currentLabel = cycleLabels[pulseCycle];
+
+  return (
+    <motion.div
+      className="glass backdrop-blur-sm rounded-lg border border-primary/20 p-4 sm:p-6 card-3d"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.6 }}
+    >
+      <Typography variant="h2" className="text-xl sm:text-2xl md:text-3xl text-gold mb-2">
+        {currentLabel.heading}
+      </Typography>
+      <Typography variant="caption" className="text-gray-400 italic mb-6 block">
+        {currentLabel.subtitle}
+      </Typography>
+
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={pulseCycle}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.5 }}
+        >
+          {/* Cycle A: Voices of Tenchu */}
+          {pulseCycle === 0 && (
+            <Grid columns={{ xs: 1, md: 2 }} gap="md">
+              {visibleMembers.map(({ name, data }) => (
+                <div key={name} className="flex items-start gap-3 p-3 rounded-lg bg-gray-800/30">
+                  <span className="text-2xl flex-shrink-0">{getIconForMember(name, data)}</span>
+                  <div>
+                    <a
+                      href={`/profile/${name}`}
+                      className="text-accent-bright font-medium hover:text-accent hover:underline transition-all duration-200"
+                    >
+                      {name}
+                    </a>
+                    <p className="text-gray-400 text-sm mt-1 italic">
+                      &ldquo;{data.reputation}&rdquo;
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {visibleMembers.length === 0 && (
+                <p className="text-gray-500 italic text-sm">Loading guild voices...</p>
+              )}
+            </Grid>
+          )}
+
+          {/* Cycle B: Guild Pulse Stats */}
+          {pulseCycle === 1 && (
+            <Grid columns={{ xs: 2, md: 4 }} gap="md">
+              {currentStatGroup.map((stat, idx) => {
+                const colorMap: Record<string, string> = {
+                  primary: 'border-primary/30 text-primary-bright',
+                  danger: 'border-danger/30 text-danger-bright',
+                  success: 'border-success/30 text-success-bright',
+                  accent: 'border-accent/30 text-accent-bright',
+                };
+                const colorClasses = colorMap[stat.color] || colorMap.primary;
+                return (
+                  <div
+                    key={idx}
+                    className={`glass backdrop-blur-sm rounded-lg border ${colorClasses} p-3 text-center`}
+                  >
+                    <div className={`text-2xl sm:text-3xl font-bold ${colorClasses} mb-1 font-game-decorative`}>
+                      {stat.value}
+                    </div>
+                    <div className="text-xs sm:text-sm text-gray-400 font-game">{stat.label}</div>
+                    {stat.sublabel && (
+                      <div className="text-xs text-gray-500 font-game mt-1">{stat.sublabel}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </Grid>
+          )}
+
+          {/* Cycle C: Titles of Renown */}
+          {pulseCycle === 2 && (
+            <Grid columns={{ xs: 1, md: 2 }} gap="md">
+              {visibleMembers.map(({ name, data }) => (
+                <div key={name} className="flex items-start gap-3 p-3 rounded-lg bg-gray-800/30">
+                  <span className="text-2xl flex-shrink-0">{getIconForMember(name, data)}</span>
+                  <div className="min-w-0">
+                    <a
+                      href={`/profile/${name}`}
+                      className="text-accent-bright font-medium hover:text-accent hover:underline transition-all duration-200"
+                    >
+                      {name}
+                    </a>
+                    <p className="text-gold text-xs font-semibold mt-0.5">{data.title}</p>
+                    <p className="text-gray-400 text-xs mt-1 line-clamp-2">
+                      {data.lore.length > 120 ? data.lore.substring(0, 120) + '...' : data.lore}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {visibleMembers.length === 0 && (
+                <p className="text-gray-500 italic text-sm">Loading guild legends...</p>
+              )}
+            </Grid>
+          )}
+        </motion.div>
+      </AnimatePresence>
+
+      <Typography variant="caption" className="mt-4 text-center italic block">
+        Rotating every 30 seconds &bull; Pulse cycle {pulseCycle + 1}/3
+      </Typography>
+    </motion.div>
+  );
+}
+
 export default function GuildHomePage() {
   const { data: session } = useSession();
-  const [seed, setSeed] = useState(0);
-  const [memberIdMap, setMemberIdMap] = useState<Record<string, string>>({});
-  const [shuffledIndices, setShuffledIndices] = useState<number[]>([]);
-  const [currentShuffleIndex, setCurrentShuffleIndex] = useState(0);
+  const [pulseCycle, setPulseCycle] = useState(0);
 
   // Check for special user
   const { isSpecialUser, specialConfig } = useSpecialUser();
@@ -382,133 +508,23 @@ export default function GuildHomePage() {
     { refreshInterval: 60000 }
   );
 
-  const { data: guildStats } = useSWR<GuildStatsData>(
-    '/api/guild-stats',
-    swrFetcher,
-    { refreshInterval: 60000 }
-  );
+
 
   // Scroll animation hooks
   const quickAccessAnim = useScrollAnimation({ threshold: 0.2 });
   const quickStatsAnim = useScrollAnimation({ threshold: 0.2 });
-  const guildStatsAnim = useScrollAnimation({ threshold: 0.2 });
-  const activitiesAnim = useScrollAnimation({ threshold: 0.2 });
-  const guildInfoAnim = useScrollAnimation({ threshold: 0.2 });
 
-  // Initialize shuffled indices on mount
-  useEffect(() => {
-    const indices = Array.from({ length: 50 }, (_, i) => i);
-    const shuffled = indices.sort(() => Math.random() - 0.5);
-    setShuffledIndices(shuffled);
-  }, []);
-
-  // Fetch member data to map usernames to Discord IDs
-  useEffect(() => {
-    async function fetchMemberIds() {
-      try {
-        const response = await fetch('/api/members?type=attendance&limit=0');
-        const data = await response.json();
-
-        if (data.success && data.data) {
-          // Create username -> memberId mapping
-          const mapping: Record<string, string> = {};
-          data.data.forEach((member: any) => {
-            mapping[member.username] = member.memberId;
-          });
-          setMemberIdMap(mapping);
-        }
-      } catch (error) {
-        console.error('Failed to fetch member IDs:', error);
-      }
-    }
-
-    fetchMemberIds();
-  }, []);
-
-  // Rotate content every 30 seconds
+  // Rotate Guild Pulse cycle every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentShuffleIndex(prev => {
-        const next = prev + 1;
-        // If we've shown all items, reshuffle and start over
-        if (next >= 50) {
-          const indices = Array.from({ length: 50 }, (_, i) => i);
-          const shuffled = indices.sort(() => Math.random() - 0.5);
-          setShuffledIndices(shuffled);
-          setSeed(s => s + 1);
-          return 0;
-        }
-        setSeed(s => s + 1);
-        return next;
-      });
+      setPulseCycle(prev => (prev + 1) % 3);
     }, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  // Guild stats rotation data
-  const guildStatsRotation = useMemo((): GuildStat[] => {
-    // Fallback stat set in case of loading or data issues
-    const fallbackStats: GuildStat[] = [
-      { value: "100%", label: "Bovo Leadership Approval", sublabel: "(Unanimous)", color: "primary" },
-      { value: "∞/0", label: "Rohypnol's Net Worth", sublabel: "(Sedated State)", color: "accent" },
-      { value: "50", label: "Tenchu's Active Members", sublabel: "(All Legendary)", color: "success" },
-      { value: "9999", label: "Ztig's Ally Precision Score", sublabel: "", color: "danger" }
-    ];
 
-    // Safety check for guildStats (data may be undefined while loading)
-    if (!guildStats || !Array.isArray(guildStats) || guildStats.length === 0) {
-      return fallbackStats;
-    }
 
-    // Use shuffled index to select stat set (shuffle with repeat all)
-    if (shuffledIndices.length === 0) {
-      const firstStats = guildStats[0];
-      return (Array.isArray(firstStats) && firstStats.length > 0) ? firstStats : fallbackStats;
-    }
 
-    const currentIndex = shuffledIndices[currentShuffleIndex];
-    const selectedStats = guildStats[currentIndex];
-    return (Array.isArray(selectedStats) && selectedStats.length > 0) ? selectedStats : fallbackStats;
-  }, [guildStats, shuffledIndices, currentShuffleIndex]);
-
-  // Get random members for activities and achievements
-  const { currentActivities, legendaryAchievements } = useMemo(() => {
-    // Return empty arrays if data hasn't loaded yet
-    if (!memberLore) {
-      return { currentActivities: [], legendaryAchievements: [] };
-    }
-
-    const members = Object.entries(memberLore);
-
-    // Truly random shuffle using current seed
-    const shuffled = [...members].sort(() => Math.random() - 0.5);
-
-    // Extract current activities (6 items)
-    const activities = shuffled.slice(0, 6).map(([name, data]) => {
-      // Use reputation field as it's already a good summary
-      const text = data.reputation || data.specialty || 'Causing legendary chaos';
-
-      return {
-        name,
-        text,
-        icon: getIconForMember(name, data)
-      };
-    });
-
-    // Extract legendary achievements (5 items)
-    const achievements = shuffled.slice(6, 11).map(([name, data]) => {
-      const specialty = data.specialty?.trim() || 'Master of legendary feats';
-
-      return {
-        name,
-        title: data.title || 'The Legendary One',
-        specialty,
-        icon: getIconForMember(name, data)
-      };
-    });
-
-    return { currentActivities: activities, legendaryAchievements: achievements };
-  }, [memberLore, seed]);
 
   return (
     <Stack gap="xl" className="pb-32">
@@ -1045,153 +1061,30 @@ export default function GuildHomePage() {
         </Section>
       </motion.div>
 
-      {/* Guild Stats Overview - Dynamic */}
+      {/* Guild Pulse — Rotating Content Block */}
       <motion.div
-        ref={guildStatsAnim.ref as any}
         initial={{ opacity: 0, y: 50 }}
-        animate={guildStatsAnim.isVisible ? { opacity: 1, y: 0 } : {}}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
         <Section>
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            animate={guildStatsAnim.isVisible ? { opacity: 1, x: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.2 }}
-          >
-            <Typography variant="h1" className="text-2xl sm:text-3xl md:text-4xl text-gold mb-6">
-              Guild Stats (Mostly Accurate)
-            </Typography>
-          </motion.div>
-
-          <Grid columns={{ xs: 1, sm: 2, xl: 4 }} gap="md">
-          {guildStatsRotation.map((stat, index) => {
-            const colorClasses = getColorClasses(stat.color);
-            return (
-              <div
-                key={`${stat.label}-${seed}-${index}`}
-                className={`glass backdrop-blur-sm rounded-lg border ${colorClasses.border} p-3 sm:p-4 text-center card-3d hover:scale-105 transition-all duration-500 ${colorClasses.glow}`}
-                style={{
-                  animation: `fadeInOutScale 30s ease-in-out ${index * 0.1}s both`,
-                }}
-              >
-                <div className={`text-2xl sm:text-3xl md:text-4xl font-bold ${colorClasses.text} mb-2 font-game-decorative transition-all duration-500`}>
-                  {stat.value}
-                </div>
-              <div className="text-xs sm:text-sm text-gray-400 font-game transition-all duration-500">
-                {stat.label}
-              </div>
-              {stat.sublabel && (
-                <div className={`text-xs ${stat.sublabel.includes('∞') || stat.sublabel.includes('All') ? 'text-accent-bright' : 'text-gray-500'} font-game mt-1 transition-all duration-500`}>
-                  {stat.sublabel}
-                </div>
-              )}
-            </div>
-            );
-          })}
-        </Grid>
-
-          <Typography variant="caption" className="mt-4 text-center italic">
-            Rotating every 30 seconds • Live guild statistics
-          </Typography>
-
-          <style jsx>{`
-            @keyframes fadeInOutScale {
-              0% {
-                opacity: 0;
-                transform: scale(0.85) translateY(20px);
-              }
-              3% {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-              }
-              93% {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-              }
-              100% {
-                opacity: 0;
-                transform: scale(0.85) translateY(-20px);
-              }
-            }
-
-            @media (prefers-reduced-motion: reduce) {
-              @keyframes fadeInOutScale {
-                0% {
-                  opacity: 0;
-                }
-                3% {
-                  opacity: 1;
-                }
-                93% {
-                  opacity: 1;
-                }
-                100% {
-                  opacity: 0;
-                }
-              }
-            }
-          `}</style>
+          <PulseCycle memberLore={memberLore} pulseCycle={pulseCycle} />
         </Section>
       </motion.div>
 
-      {/* Current Guild Activities - Dynamic */}
-      <motion.div
-        ref={activitiesAnim.ref as any}
-        initial={{ opacity: 0, y: 50 }}
-        animate={activitiesAnim.isVisible ? { opacity: 1, y: 0 } : {}}
-        transition={{ duration: 0.6 }}
-      >
-        <Section>
-          <motion.div
-            className="glass backdrop-blur-sm rounded-lg border border-primary/20 p-4 sm:p-6 card-3d"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={activitiesAnim.isVisible ? { opacity: 1, scale: 1 } : {}}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            whileHover={{ scale: 1.01 }}
-          >
-            <Typography variant="h2" className="text-xl sm:text-2xl md:text-3xl text-gold mb-6">
-              📜 Guild Member Chronicles
-            </Typography>
-          <Grid columns={{ xs: 1, md: 2, lg: 3 }} gap="md" className="text-xs sm:text-sm font-game">
-            {currentActivities.map((activity, index) => (
-              <div key={activity.name + index} className="flex items-start gap-2">
-                <span className={getTextColorClass(index, 'icon')}>
-                  {activity.icon}
-                </span>
-                <span className="text-gray-300">
-                  <a
-                    href={`/profile/${memberIdMap[activity.name] || activity.name}`}
-                    className="text-accent-bright font-medium hover:text-accent hover:underline transition-all duration-200"
-                  >
-                    {activity.name}
-                  </a>: {activity.text}
-                </span>
-              </div>
-            ))}
-          </Grid>
-            <Typography variant="caption" className="mt-4 text-center italic">
-              Rotating every 30 seconds • Member reputations and current status
-            </Typography>
-          </motion.div>
-        </Section>
-      </motion.div>
-
-      {/* Guild Info */}
+      {/* About Tenchu — Single Column */}
       <motion.section
-        ref={guildInfoAnim.ref as any}
-        className="py-6 sm:py-8 md:py-10 bg-gray-900/30 backdrop-blur-sm rounded-lg"
+        className="py-6 sm:py-8 md:py-10"
         initial={{ opacity: 0 }}
-        animate={guildInfoAnim.isVisible ? { opacity: 1 } : {}}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
       >
-        <Grid columns={{ xs: 1, md: 2 }} gap="lg">
-          {/* About the Guild */}
+        <Section>
           <motion.div
             className="glass backdrop-blur-sm rounded-lg border border-primary/30 p-4 sm:p-6 card-3d"
-            initial={{ opacity: 0, x: -50 }}
-            animate={guildInfoAnim.isVisible ? { opacity: 1, x: 0 } : {}}
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            whileHover={{ scale: 1.01 }}
           >
             <Typography variant="h2" className="text-xl sm:text-2xl md:text-3xl text-gold mb-6">
               About Tenchu
@@ -1202,106 +1095,24 @@ export default function GuildHomePage() {
                 a vegan grillmaster defends fortresses, and our Chrono-Tactician wins battles by showing up late to yesterday.
               </Typography>
               <Typography variant="body" className="leading-relaxed">
-                Led by Bovo's bold leadership (somehow they work), managed by organized chaos
+                Led by Bovo&apos;s bold leadership (somehow they work), managed by organized chaos
                 and powered by members who turn their failures into legendary victories.
               </Typography>
               <Typography variant="small" className="italic text-primary-bright leading-relaxed">
-                "The guild where being wrong becomes being right, allergies become weapons, and friendly fire is just tactical positioning."
+                &ldquo;The guild where being wrong becomes being right, allergies become weapons, and friendly fire is just tactical positioning.&rdquo;
               </Typography>
               {/* QUOTE OPTION 1: About Section Quote - only for logged-in special user */}
               {isSpecialUser && specialConfig?.quotes?.homeAbout && (
                 <Typography variant="small" className={`italic mt-4 text-xs sm:text-sm px-2 ${
                   isStarlight ? 'text-purple-300/70' :
-                  isChaos ? 'text-orange-400/70' :
-                  isUnstable ? 'text-teal-400/70' :
-                  isPortal ? 'text-indigo-400/70' :
-                  isGrill ? 'text-red-400/70' :
-                  isWrong ? 'text-yellow-400/70' :
-                  isChrono ? 'text-blue-400/70' :
-                  isNightlight ? 'text-pink-400/70' :
-                  isOcean ? 'text-sky-400/70' :
-                  isSnack ? 'text-rose-400/70' :
-                  isRoyal ? 'text-violet-400/70' :
-                  isBlade ? 'text-rose-400/70' :
-                  isTiger ? 'text-orange-400/70' :
-                  isBoss ? 'text-red-400/70' :
-                  isVoid ? 'text-purple-400/70' :
-                  isMeme ? 'text-cyan-400/70' :
-                  isShadow ? 'text-slate-400/70' :
-                  isNeon ? 'text-green-400/70' :
-                  isChaoscoin ? 'text-emerald-400/70' :
-                  isSpoon ? 'text-slate-400/70' :
-                  isBureaucracy ? 'text-slate-400/70' :
-                  isStats ? 'text-cyan-400/70' :
-                  isOlympus ? 'text-yellow-400/70' :
-                  isWeather ? 'text-sky-400/70' :
-                  isSpeed ? 'text-purple-400/70' :
-                  isMorale ? 'text-pink-400/70' :
-                  isRecycle ? 'text-lime-400/70' :
-                  isAbyss ? 'text-purple-400/70' :
-                  isChaosgun ? 'text-violet-400/70' :
-                  isLightning ? 'text-yellow-400/70' :
-                  isSonic ? 'text-rose-400/70' :
-                  isArchive ? 'text-stone-400/70' :
-                  isVintage ? 'text-amber-400/70' :
-                  isArt ? 'text-pink-400/70' :
-                  isPancake ? 'text-orange-400/70' :
-                  isPharmacy ? 'text-cyan-400/70' :
-                  isHorn ? 'text-fuchsia-400/70' :
-                  isBook ? 'text-amber-400/70' :
-                  isShadowdance ? 'text-blue-400/70' :
-                  isTidal ? 'text-teal-400/70' :
-                  isRhythm ? 'text-fuchsia-400/70' :
-                  isVanish ? 'text-slate-400/70' :
-                  isWisdom ? 'text-indigo-400/70' :
-                  isReverse ? 'text-green-400/70' :
-                  isDragon ? 'text-green-400/70' :
-                  isBlur ? 'text-purple-400/70' :
-                  isElegance ? 'text-pink-400/70' :
-                  isSky ? 'text-sky-400/70' :
-                  isCat ? 'text-purple-400/70' :
-                  isCasino ? 'text-red-400/70' :
                   isQuantum ? 'text-cyan-400/70' : 'text-cyan-400/70'
                 }`}>
-                  &quot;{specialConfig.quotes.homeAbout}&quot;
+                  &ldquo;{specialConfig.quotes.homeAbout}&rdquo;
                 </Typography>
               )}
             </Stack>
           </motion.div>
-
-          {/* Guild Legends - Dynamic */}
-          <motion.div
-            className="glass backdrop-blur-sm rounded-lg border border-accent/30 p-4 sm:p-6 card-3d"
-            initial={{ opacity: 0, x: 50 }}
-            animate={guildInfoAnim.isVisible ? { opacity: 1, x: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            whileHover={{ scale: 1.01 }}
-          >
-            <Typography variant="h2" className="text-xl sm:text-2xl md:text-3xl text-gold mb-6">
-              ⚔️ Legendary Specialties
-            </Typography>
-            <ul className="space-y-4 text-gray-300 text-xs sm:text-sm">
-              {legendaryAchievements.map((achievement, index) => (
-                <li key={achievement.name + index} className="flex items-start gap-2 leading-relaxed">
-                  <span className={`${getTextColorClass(index, 'text')} font-bold text-base sm:text-lg flex-shrink-0`}>
-                    {achievement.icon}
-                  </span>
-                  <span className="text-gray-300">
-                    <a
-                      href={`/profile/${memberIdMap[achievement.name] || achievement.name}`}
-                      className="text-accent-bright font-medium hover:text-accent hover:underline transition-all duration-200"
-                    >
-                      {achievement.name}
-                    </a> - {achievement.specialty}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <Typography variant="caption" className="mt-4 text-center italic">
-              Rotating every 30 seconds • Showcasing unique member abilities
-            </Typography>
-          </motion.div>
-        </Grid>
+        </Section>
       </motion.section>
     </Stack>
   );
