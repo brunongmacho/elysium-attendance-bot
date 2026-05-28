@@ -47,6 +47,7 @@ if (fs.existsSync(envPath)) {
 
 const dbAPI = require('../utils/database-api');
 const { SheetAPI } = require('../utils/sheet-api');
+const https = require('https');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -93,6 +94,78 @@ try {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const MAX_PREVIEW_ITEMS = 5; // Limit preview to avoid Discord 2000 char limit
+
+/**
+ * Make a GET request to the Discord REST API with bot authentication
+ */
+function discordApiGet(url, token) {
+  return new Promise((resolve, reject) => {
+    https.get(url, {
+      headers: {
+        'Authorization': `Bot ${token}`,
+        'Accept': 'application/json'
+      }
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode === 429) {
+          const retryAfter = parseInt(res.headers['retry-after'] || '1') * 1000;
+          console.log(`⏳ Discord API rate limited, waiting ${retryAfter}ms...`);
+          setTimeout(() => discordApiGet(url, token).then(resolve).catch(reject), retryAfter);
+          return;
+        }
+        if (res.statusCode !== 200) {
+          reject(new Error(`Discord API returned ${res.statusCode}: ${data.slice(0, 200)}`));
+          return;
+        }
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(new Error(`Failed to parse Discord API response: ${e.message}`));
+        }
+      });
+    }).on('error', reject);
+  });
+}
+
+/**
+ * Fetch all Discord guild members via REST API
+ * Builds nickname → Discord ID mapping to eliminate temp_ IDs
+ */
+async function fetchDiscordMemberMap(token, guildId) {
+  if (!token || !guildId) {
+    console.log('ℹ️ No DISCORD_TOKEN or guild ID available for Discord member fetch');
+    return {};
+  }
+
+  console.log('🌐 Fetching Discord guild members via API...');
+
+  const allMembers = [];
+  let after = '0';
+
+  while (true) {
+    const url = `https://discord.com/api/v10/guilds/${guildId}/members?limit=1000&after=${after}`;
+    const members = await discordApiGet(url, token);
+    if (!Array.isArray(members) || members.length === 0) break;
+    allMembers.push(...members);
+    after = members[members.length - 1].user.id;
+    console.log(`⏳ Fetched ${allMembers.length} Discord members so far...`);
+  }
+
+  // Build nickname → Discord ID map (lowercased for case-insensitive matching)
+  const map = {};
+  for (const member of allMembers) {
+    if (member.user?.bot) continue;
+    const nickname = member.nick || member.user?.global_name || member.user?.username || '';
+    if (nickname) {
+      map[nickname.toLowerCase()] = member.user.id;
+    }
+  }
+
+  console.log(`✅ Fetched ${Object.keys(map).length} Discord members via API`);
+  return map;
+}
 
 function hasModuleFlag() {
   return process.argv.includes('--members') ||
@@ -375,7 +448,7 @@ async function syncMembers(db, sheetAPI) {
           if (discordId) {
             log('🎯', `Created member ${username} with Discord ID: ${discordId}`);
           } else {
-            log('➕', `Created new member: ${username} with temp ID (will migrate to Discord ID on first interaction)`);
+            log('➕', `Created new member: ${username} (no Discord nickname match — will migrate on first interaction)`);
           }
         }
       } catch (error) {
@@ -841,6 +914,24 @@ async function main() {
     db = await dbAPI.connect();
     log('✅', 'MongoDB connected');
     console.log('');
+
+    // Try to fetch Discord members via API for real Discord IDs
+    // This eliminates temp_ IDs for members who are in the Discord server
+    const discordToken = process.env.DISCORD_TOKEN;
+    if (discordToken && config.main_guild_id) {
+      try {
+        const discordMemberMap = await fetchDiscordMemberMap(discordToken, config.main_guild_id);
+        const oldCount = Object.keys(discordIdMap).length;
+        discordIdMap = { ...discordIdMap, ...discordMemberMap };
+        const newCount = Object.keys(discordIdMap).length;
+        console.log(`📋 Discord ID mappings: ${newCount} total (${newCount - oldCount} from API, ${oldCount} from file)`);
+      } catch (error) {
+        console.log(`⚠️ Failed to fetch Discord members: ${error.message}`);
+        console.log('ℹ️ Will use static mapping + temp IDs as fallback');
+      }
+    } else {
+      console.log('ℹ️ DISCORD_TOKEN not found in environment — will use temp IDs for members without mapping');
+    }
 
     const results = {};
 
