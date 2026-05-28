@@ -987,7 +987,7 @@ export default function GuildHomePage() {
             {/* Discord Link */}
             <Tooltip content="Join our Discord community server" position="top" fullWidth>
               <motion.a
-                href="https://discord.gg/EUWXd5tPa7"
+                href={LINKS.DISCORD_INVITE}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block w-full group glass backdrop-blur-sm rounded-lg border border-primary/30 p-4 sm:p-6 hover:border-primary transition-all duration-200 card-3d hover:scale-105 glow-primary"

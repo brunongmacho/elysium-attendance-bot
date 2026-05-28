@@ -66,7 +66,7 @@ export const UI = {
 // External links
 export const LINKS = {
   APK_DOWNLOAD: 'https://github.com/brunongmacho/elysium-guild/releases/download/v2.0.4/app-debug.apk',
-  DISCORD_INVITE: 'https://discord.gg/EUWXd5tPa7',
+  DISCORD_INVITE: 'https://discord.gg/GD3pKqpnF',
 } as const;
 
 // Special user theme assignments - each user gets a unique theme based on their lore

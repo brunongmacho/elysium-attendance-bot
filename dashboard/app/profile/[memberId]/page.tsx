@@ -12,6 +12,7 @@ import { Stack, Grid } from "@/components/layout";
 import { Icon } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useSpecialUser } from "@/hooks/useSpecialUser";
+import { LINKS } from "@/lib/constants";
 import { getThemeColors } from "@/lib/theme-colors";
 
 // SWR fetcher
@@ -227,7 +228,7 @@ export default function MemberProfilePage() {
 
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <a
-                      href="https://discord.gg/EUWXd5tPa7"
+                      href={LINKS.DISCORD_INVITE}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="group glass-strong backdrop-blur-sm rounded-lg border border-primary/30 px-6 py-3 hover:border-primary transition-all duration-200 card-3d hover:scale-105 glow-primary inline-flex items-center justify-center gap-3"

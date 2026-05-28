@@ -544,7 +544,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 - **Issues:** [GitHub Issues](https://github.com/brunongmacho/elysium-dashboard/issues)
-- **Discord:** [Join Elysium Guild](https://discord.gg/EUWXd5tPa7)
+- **Discord:** [Join Elysium Guild](https://discord.gg/GD3pKqpnF)
 - **Documentation:** Check the `/docs` folder
 
 ## 🔮 Roadmap
@@ -582,6 +582,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ⚔️ Where Chaos Becomes Strategy ⚔️
 
-[Discord](https://discord.gg/EUWXd5tPa7) • [Report Bug](https://github.com/brunongmacho/elysium-dashboard/issues) • [Request Feature](https://github.com/brunongmacho/elysium-dashboard/issues)
+[Discord](https://discord.gg/GD3pKqpnF) • [Report Bug](https://github.com/brunongmacho/elysium-dashboard/issues) • [Request Feature](https://github.com/brunongmacho/elysium-dashboard/issues)
 
 </div>
