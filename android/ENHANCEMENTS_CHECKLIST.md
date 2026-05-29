@@ -1,11 +1,11 @@
-# Elysium Guild App Enhancement Checklist
+# Tenchu Guild App Enhancement Checklist
 
 This document tracks planned UI/UX enhancements and code fixes to improve the application's polish, performance, and maintainability.
 
 ## 🏆 Core & Global Enhancements
 - [x] **Centralized Haptics:** Move vibration logic to a `HapticManager` utility.
 - [x] **Shimmer UI:** Replace generic loaders with skeleton/shimmer layouts for all screens.
-- [x] **Parallax Polish:** Refine `DynamicElysiumBackground` to respond more fluidly to scroll offsets.
+- [x] **Parallax Polish:** Refine `DynamicTenchuBackground` to respond more fluidly to scroll offsets.
 - [x] **Transition Safety:** Audit all `sharedElement` keys for global uniqueness.
 - [x] **Permission Handling:** Consolidate permission-checking logic into `PermissionUtils.kt`.
 
@@ -59,4 +59,4 @@ This document tracks planned UI/UX enhancements and code fixes to improve the ap
 - [x] **Null Safety:** Audit `kotlinx.datetime` parsing across all repositories.
 
 ---
-*Generated for the Elysium Guild Development Team*
+*Generated for the Tenchu Guild Development Team*

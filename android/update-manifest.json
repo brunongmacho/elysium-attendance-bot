@@ -1,7 +1,7 @@
 {
-  "latestVersionCode": 39,
-  "latestVersionName": "2.1.3",
-  "apkUrl": "https://github.com/brunongmacho/elysium-guild/releases/download/v2.1.3/app-debug.apk",
-  "releaseNotes": "- Update: Temporarily disabled Ancient Citadel events.\n- Update: Internal version bump to 2.1.3.",
+  "latestVersionCode": 40,
+  "latestVersionName": "2.2.0",
+  "apkUrl": "https://github.com/brunongmacho/tenchu-guild/releases/download/v2.2.0/app-debug.apk",
+  "releaseNotes": "- Rebrand: Full Tenchu Guild migration.\n- Update: Internal version bump to 2.2.0.",
   "isForceUpdate": false
 }

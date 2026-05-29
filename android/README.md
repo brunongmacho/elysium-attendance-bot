@@ -1,10 +1,10 @@
-# ⚔️ Elysium Guild Mobile App
+# ⚔️ Tenchu Guild Mobile App
 
-[![Version](https://img.shields.io/badge/Version-2.1.2-gold.svg?style=for-the-badge)](https://github.com/brunongmacho/elysium-guild/releases)
+[![Version](https://img.shields.io/badge/Version-2.2.0-gold.svg?style=for-the-badge)](https://github.com/brunongmacho/tenchu-guild/releases)
 [![Platform](https://img.shields.io/badge/Platform-Android_8.0+-000000.svg?style=for-the-badge&logo=android)](https://developer.android.com)
 [![Engine](https://img.shields.io/badge/UI-Jetpack_Compose-4285F4.svg?style=for-the-badge&logo=jetpackcompose)](https://developer.android.com)
 
-A premium, high-performance Android utility built for the **Elysium Guild**. This application serves as a real-time tactical hub, integrating world boss tracking, guild event scheduling, and competitive performance metrics into a single, cohesive experience.
+A premium, high-performance Android utility built for the **Tenchu Guild**. This application serves as a real-time tactical hub, integrating world boss tracking, guild event scheduling, and competitive performance metrics into a single, cohesive experience.
 
 ## ✨ Premium Visuals: Glassmorphism 2.0
 The app features a custom-built **Glassmorphism Design System**, utilizing:
@@ -30,7 +30,7 @@ The app features a custom-built **Glassmorphism Design System**, utilizing:
 *   **Auto-Validation**: Intelligent level clamping (1-100) and range correction.
 
 ### 3. Guild Events & Schedule
-*   **Automated Sync**: Fetches the latest guild activities directly from the Elysium API.
+*   **Automated Sync**: Fetches the latest guild activities directly from the Tenchu API.
 *   **Alarm Integration**: One-tap scheduling of Exact Alarms (Android 14 compliant) to notify you 10 minutes before an event starts.
 *   **Glassy Visuals**: Shared component architecture ensures events look as premium as boss cards.
 
@@ -61,12 +61,12 @@ The app features a custom-built **Glassmorphism Design System**, utilizing:
 
 ### Project Structure
 ```bash
-com.elysium.guild/
+com.tenchu.guild/
 ├── di/                  # Hilt modules (Network, Database, Preference)
 ├── ui/
 │   ├── components/      # Glassy UI, Legendary Orbs, Custom SearchBars
 │   ├── screens/         # BossTimers, Leaderboard, Events, Profile, Onboarding, Relic
-│   └── theme/           # Elysium Gold & Deep Sea color schemes
+│   └── theme/           # Tenchu Gold & Deep Sea color schemes
 ├── viewmodel/           # State management with StateFlow
 ├── repository/          # SSOT (Single Source of Truth) data management
 ├── network/             # Retrofit interfaces and Update Manifest API
@@ -90,8 +90,8 @@ The app uses a fully automated **GitHub Actions** CI/CD pipeline:
 2.  **Manifest Update**: Synchronize `update-manifest.json` at the root.
 3.  **Deploy**: 
     ```bash
-    git tag v2.1.2
-    git push origin v2.1.2
+    git tag v2.2.0
+    git push origin v2.2.0
     ```
 4.  **Result**: GitHub automatically builds the signed APK and attaches it to a new Release.
 
@@ -105,4 +105,4 @@ To ensure 100% notification reliability on modern Android versions, the app requ
 *   **REQUEST_IGNORE_BATTERY_OPTIMIZATIONS**: Prevents the system from killing the background timer service.
 
 ---
-**Built with ❤️ for the Elysium Guild**
+**Built with ❤️ for the Tenchu Guild**

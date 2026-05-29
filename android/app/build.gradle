@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace 'com.elysium.guild'
+    namespace 'com.tenchu.guild'
     compileSdk 35
 
     signingConfigs {
@@ -21,11 +21,11 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.elysium.guild"
+        applicationId "com.tenchu.guild"
         minSdk 24
         targetSdk 34
-        versionCode 39
-        versionName "2.1.3"
+        versionCode 40
+        versionName "2.2.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

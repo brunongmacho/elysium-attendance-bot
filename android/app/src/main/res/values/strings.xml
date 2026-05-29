@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Elysium Guild</string>
+    <string name="app_name">Tenchu Guild</string>
     <string name="dashboard_title">Guild Dashboard</string>
     <string name="boss_timers">Boss Timers</string>
     <string name="attendance">Attendance</string>

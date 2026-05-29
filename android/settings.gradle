@@ -17,5 +17,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Elysium Guild"
+rootProject.name = "Tenchu Guild"
 include ':app'

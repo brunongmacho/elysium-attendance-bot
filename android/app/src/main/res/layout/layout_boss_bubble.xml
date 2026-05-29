@@ -14,7 +14,7 @@
         android:src="@drawable/zoomed_logo"
         android:background="@color/black_background"
         android:elevation="8dp"
-        android:contentDescription="Elysium Bubble"
+        android:contentDescription="Tenchu Bubble"
         android:scaleType="centerCrop"
         android:padding="0dp"
         app:shapeAppearanceOverlay="@style/CircleAppearance"

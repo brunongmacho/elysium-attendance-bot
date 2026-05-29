@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
-    <style name="Theme.ElysiumGuild" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.TenchuGuild" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Primary brand color. -->
         <item name="colorPrimary">@color/primary</item>
         <item name="colorOnPrimary">@color/on_primary</item>
@@ -24,11 +24,11 @@
     </style>
     
     <!-- Splash screen theme. -->
-    <style name="Theme.ElysiumGuild.Splash" parent="Theme.SplashScreen">
+    <style name="Theme.TenchuGuild.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/surface</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_rotating</item>
         <item name="windowSplashScreenAnimationDuration">1000</item>
-        <item name="postSplashScreenTheme">@style/Theme.ElysiumGuild</item>
+        <item name="postSplashScreenTheme">@style/Theme.TenchuGuild</item>
     </style>
 
     <style name="CircleAppearance">
