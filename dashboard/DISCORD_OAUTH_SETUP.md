@@ -44,6 +44,7 @@ This guide will help you set up Discord OAuth2 authentication for your Elysium D
 3. Click **Add Redirect**
 4. Add these URLs:
    - For local development: `http://localhost:3000/api/auth/callback/discord`
+   - For production (self-hosted via tunnel): `https://tenchu-guild.org/api/auth/callback/discord`
    - For production (Vercel): `https://your-domain.vercel.app/api/auth/callback/discord`
 5. Click **Save Changes**
 

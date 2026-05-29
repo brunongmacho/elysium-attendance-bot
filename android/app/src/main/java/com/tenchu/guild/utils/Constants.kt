@@ -5,7 +5,7 @@ import androidx.compose.ui.graphics.Color
 object Constants {
     
     // API Configuration
-    const val BASE_URL = "https://export-pope-salt-jose.trycloudflare.com/"
+    const val BASE_URL = "https://tenchu-guild.org/"
     const val API_TIMEOUT = 30L
     
     // Database Configuration
