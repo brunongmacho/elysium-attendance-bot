@@ -246,11 +246,11 @@
       "schedules": [
         {
           "day": "Saturday",
-          "time": "14:00",
+          "time": "22:00",
           "dayOfWeek": 6
         }
       ],
-      "description": "Spawns Saturday 14:00"
+      "description": "Spawns Saturday 22:00"
     },
     "Rakajeth": {
       "schedules": [

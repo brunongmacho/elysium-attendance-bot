@@ -286,8 +286,9 @@ async function auctionNextItem(client, config, channel) {
     }
   }
 
-  // Set currentItem to null (using threadItems instead)
-  state.auctionState.currentItem = null;
+  // Set currentItem to the first item in the current batch
+  // This enables admin commands, pause/resume, and crash recovery
+  state.auctionState.currentItem = batch.items[0] || null;
 }
 
 module.exports = {

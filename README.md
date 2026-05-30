@@ -351,7 +351,7 @@ index2.js (entry point)
 | Tumier | Sun 19:00 |
 | Libitina | Mon 21:00, Sat 21:00 |
 | Rakajeth | Tue 22:00, Sun 19:00 |
-| Lucus | Sat 14:00 |
+| Lucus | Sat 22:00 |
 | Icaruthia | Tue 21:00, Fri 21:00 |
 | Motti | Wed 19:00, Sat 19:00 |
 | Nevaeh | Sun 22:00 |

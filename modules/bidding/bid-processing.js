@@ -41,7 +41,19 @@ const { normalizeUsername } = require('./utilities');
  */
 async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   const itemFromThread = msg.channel?.id ? auctState.threadItems?.[msg.channel.id] : null;
-  const currentItem = itemFromThread || auctState.currentItem;
+  let currentItem = itemFromThread || auctState.currentItem;
+
+  // Fallback: If no currentItem found from thread or direct reference,
+  // find the first active item from threadItems (e.g. when bidding from bidding channel)
+  if (!currentItem && auctState.threadItems) {
+    const threadItems = Object.values(auctState.threadItems);
+    const activeItems = threadItems.filter(i => i && i.status !== "ended");
+    if (activeItems.length > 0) {
+      currentItem = activeItems.reduce((a, b) =>
+        (a.endTime || 0) > (b.endTime || 0) ? a : b
+      );
+    }
+  }
 
   // Safety check: Ensure currentItem and currentSession exist
   if (!currentItem) {
@@ -233,7 +245,10 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     }
 
     // STEP 1: Clear ALL timers IMMEDIATELY to prevent old itemEnd from firing
-    auctRef.safelyClearItemTimers(msg.channel.id);
+    // Use item's thread ID for timer keys (handles bidding from non-thread channels)
+    const timerThreadId = currentItem.threadId || msg.channel.id;
+    const timerChannel = currentItem.thread || msg.channel;
+    auctRef.safelyClearItemTimers(timerThreadId);
     state.logger.info(`🛑 Cleared timers to prevent race condition`);
 
     // STEP 2: Update endTime (now safe since timers are cleared)
@@ -253,8 +268,8 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
     auctRef.rescheduleItemTimers(
       msg.client,
       config,
-      msg.channel,
-      msg.channel.id
+      timerChannel,
+      timerThreadId
     );
     state.logger.info(`✅ Timers rescheduled with new endTime`);
   }
@@ -378,7 +393,7 @@ async function procBid(msg, amt, cfg) {
   // CRITICAL FIX: Check if auctioneering is active first
   if (state.auctioneering && typeof state.auctioneering.getAuctionState === "function") {
     const auctState = state.auctioneering.getAuctionState();
-    if (auctState && auctState.active && auctState.currentItem) {
+    if (auctState && auctState.active) {
       return await procBidAuctioneering(
         msg,
         amt,
