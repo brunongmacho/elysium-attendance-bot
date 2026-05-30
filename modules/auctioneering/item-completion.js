@@ -11,7 +11,7 @@
 const { EmbedBuilder } = require("discord.js");
 const { state } = require('./state');
 const { COLORS, EMOJI } = require('./constants');
-const { createPaginatedEmbeds } = require('./utilities');
+const { createPaginatedEmbeds, sendPaginatedResults } = require('./utilities');
 const { logAuctionResult, saveAuctionState } = require('./persistence');
 const { safelyCleanupTimers } = require('./timer-mgmt');
 const { normalizeUsername } = require("../../utils/common");
@@ -194,6 +194,14 @@ async function itemEnd(client, config, channel) {
           state.logger.info(`🔒 Locked thread for ${item.item}`);
         }
 
+        // Rename thread to (CLOSED) prefix so users know bidding is done
+        if (typeof refreshedThread.setName === "function") {
+          const closedName = `(CLOSED) ${refreshedThread.name}`;
+          await refreshedThread.setName(closedName.substring(0, 100)).catch(err => {
+            state.logger.warn(`⚠️ Failed to rename thread:`, err.message);
+          });
+        }
+
         await new Promise((resolve) => setTimeout(resolve, 500));
 
         if (typeof refreshedThread.setArchived === "function") {
@@ -324,9 +332,7 @@ async function finalizeSession(client, config, channel) {
 
     summaryEmbeds[0].setDescription(`**${soldItems.length}** item(s) sold`);
 
-    for (const embed of summaryEmbeds) {
-      await channel.send({ embeds: [embed] });
-    }
+    await sendPaginatedResults(channel, summaryEmbeds);
 
     // Build combined results for tally
     const combinedResults = await buildCombinedResults(config);
@@ -364,7 +370,9 @@ async function finalizeSession(client, config, channel) {
           (r) => r.totalSpent > 0
         );
         if (winnersWithSpending.length > 0) {
-          const sortedWinners = winnersWithSpending.sort((a, b) => b.totalSpent - a.totalSpent);
+          const sortedWinners = winnersWithSpending
+            .filter(r => r.member && r.member.trim()) // Filter out blank/missing member names
+            .sort((a, b) => b.totalSpent - a.totalSpent);
           const winnerStrings = sortedWinners.map((r, i) => `${i + 1}. **${r.member}** - ${r.totalSpent} pts`);
           const totalSpent = winnersWithSpending.reduce((sum, r) => sum + r.totalSpent, 0);
 
@@ -377,9 +385,7 @@ async function finalizeSession(client, config, channel) {
 
           tallyEmbeds[0].setDescription(`**Points spent this session:**`);
 
-          for (const embed of tallyEmbeds) {
-            await channel.send({ embeds: [embed] });
-          }
+          await sendPaginatedResults(channel, tallyEmbeds);
         }
       }
       } catch (err) {

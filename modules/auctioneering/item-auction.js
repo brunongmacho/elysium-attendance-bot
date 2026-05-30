@@ -95,8 +95,8 @@ async function auctionNextItem(client, config, channel) {
 
   // Send single preview per batch
   const previewText = batchSize > 1
-    ? `**${batchSize}x ${batch.name}** auctions starting in 30 seconds!`
-    : `**${batch.name}** auction starting in 30 seconds!`;
+    ? `**${batchSize}x ${batch.name}** auctions starting in 15 seconds!`
+    : `**${batch.name}** auction starting in 15 seconds!`;
 
   const remainingItems = state.auctionState.sessionItems.length - state.auctionState.currentItemIndex;
   const previewEmbed = new EmbedBuilder()
@@ -129,8 +129,10 @@ async function auctionNextItem(client, config, channel) {
     });
   }
 
+  const futureTimestamp = Math.floor((Date.now() + TIMEOUTS.PREVIEW_DELAY) / 1000);
+
   previewEmbed
-    .setFooter({ text: "Auction starts in 30 seconds" })
+    .setFooter({ text: `Auction starts <t:${futureTimestamp}:R>` })
     .setTimestamp();
 
   await channel.send({
@@ -138,9 +140,9 @@ async function auctionNextItem(client, config, channel) {
     embeds: [previewEmbed],
   });
 
-  state.logger.info(`${EMOJI.CLOCK} 30-second preview for batch: ${batchSize}x ${batch.name}`);
+  state.logger.info(`${EMOJI.CLOCK} 15-second preview for batch: ${batchSize}x ${batch.name}`);
 
-  // Wait 30 seconds before starting
+  // Wait for the preview delay — Discord handles the live countdown client-side via <t:timestamp:R>
   await new Promise((resolve) => setTimeout(resolve, TIMEOUTS.PREVIEW_DELAY));
 
   // Check thread capacity before creating threads

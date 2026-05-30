@@ -9,7 +9,7 @@
  * @module modules/auctioneering/utilities
  */
 
-const { EmbedBuilder, ButtonBuilder, ActionRowBuilder } = require("discord.js");
+const { EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle } = require("discord.js");
 const { state } = require('./state');
 const { COLORS } = require('./constants');
 const { SheetAPI: SheetAPIClass } = require('../../utils/sheet-api');
@@ -50,6 +50,82 @@ function createPaginatedEmbeds(title, items, itemsPerPage = 20, options = {}) {
   }
 
   return embeds;
+}
+
+/**
+ * Sends a paginated embed with Previous/Next buttons.
+ * Instead of sending multiple separate embeds, this sends a single embed
+ * with interactive pagination via Discord message components.
+ *
+ * @param {TextChannel|ThreadChannel} channel - Discord channel to send to
+ * @param {Array<EmbedBuilder>} embeds - Array of embed pages
+ * @param {number} [timeout=180000] - How long to keep buttons active (ms)
+ */
+async function sendPaginatedResults(channel, embeds, timeout = 180000) {
+  if (!embeds || embeds.length === 0) return;
+  if (embeds.length === 1) {
+    await channel.send({ embeds });
+    return;
+  }
+
+  let currentPage = 0;
+
+  const prevBtn = new ButtonBuilder()
+    .setCustomId('results_prev')
+    .setLabel('◀ Previous')
+    .setStyle(ButtonStyle.Primary)
+    .setDisabled(true); // Disabled on first page
+
+  const nextBtn = new ButtonBuilder()
+    .setCustomId('results_next')
+    .setLabel('Next ▶')
+    .setStyle(ButtonStyle.Primary);
+
+  if (embeds.length === 1) nextBtn.setDisabled(true);
+
+  const row = new ActionRowBuilder().addComponents(prevBtn, nextBtn);
+
+  const msg = await channel.send({
+    embeds: [embeds[0]],
+    components: [row],
+  });
+
+  const collector = msg.createMessageComponentCollector({
+    time: timeout,
+    filter: (i) => i.customId === 'results_prev' || i.customId === 'results_next',
+  });
+
+  collector.on('collect', async (interaction) => {
+    try {
+      if (interaction.customId === 'results_prev') {
+        currentPage = Math.max(0, currentPage - 1);
+      } else if (interaction.customId === 'results_next') {
+        currentPage = Math.min(embeds.length - 1, currentPage + 1);
+      }
+
+      const newPrevBtn = ButtonBuilder.from(prevBtn).setDisabled(currentPage === 0);
+      const newNextBtn = ButtonBuilder.from(nextBtn).setDisabled(currentPage >= embeds.length - 1);
+
+      await interaction.update({
+        embeds: [embeds[currentPage]],
+        components: [new ActionRowBuilder().addComponents(newPrevBtn, newNextBtn)],
+      });
+    } catch (err) {
+      state.logger.warn(`⚠️ Pagination interaction error:`, err.message);
+    }
+  });
+
+  collector.on('end', async () => {
+    try {
+      const disabledPrev = ButtonBuilder.from(prevBtn).setDisabled(true);
+      const disabledNext = ButtonBuilder.from(nextBtn).setDisabled(true);
+      await msg.edit({
+        components: [new ActionRowBuilder().addComponents(disabledPrev, disabledNext)],
+      });
+    } catch (err) {
+      // Message might have been deleted already
+    }
+  });
 }
 
 /**
@@ -120,6 +196,7 @@ function initialize(config, isAdminFunc, biddingModuleRef, cache = null, intelli
 
 module.exports = {
   createPaginatedEmbeds,
+  sendPaginatedResults,
   createDisabledRow,
   clearAllAuctionTimers,
   initialize,
