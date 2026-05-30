@@ -34,14 +34,21 @@ function clearAllTimers() {
  * @returns {Promise<boolean>} True if successfully stopped, false otherwise
  */
 async function stopCurrentItem(client, config, channel) {
-  if (!state.auctionState.active || !state.auctionState.currentItem) {
-    state.logger.warn("⚠️ No active item to stop.");
+  if (!state.auctionState.active) {
+    state.logger.warn("⚠️ No active auction to stop.");
     return false;
   }
 
-  safelyCleanupTimers(null, "itemEnd", "go1", "go2", "go3");
+  // Resolve the correct item from the thread context
+  const threadId = channel?.id;
+  const item = state.auctionState.threadItems?.[threadId] || state.auctionState.currentItem;
+  if (!item) {
+    state.logger.warn("⚠️ No active item found for this channel.");
+    return false;
+  }
 
-  const item = state.auctionState.currentItem;
+  // Use correct timer prefix for parallel items
+  safelyCleanupTimers(threadId && state.auctionState.threadItems?.[threadId] ? threadId : null, "itemEnd", "go1", "go2", "go3");
 
   if (item.status === "ended") {
     state.logger.warn("⚠️ Item already ended — skipping force stop.");
@@ -91,7 +98,7 @@ async function stopCurrentItem(client, config, channel) {
   try {
     item.status = "ended";
     const { itemEnd } = require('./item-completion');
-    await itemEnd(client, config, channel);
+    await itemEnd(client, config, channel || item.thread);
   } catch (err) {
     state.logger.error("❌ Error finalizing forced stop:", err);
   }
@@ -105,15 +112,21 @@ async function stopCurrentItem(client, config, channel) {
  * @param {number} minutes - Number of minutes to extend
  * @returns {boolean} True if successfully extended, false if no active item
  */
-function extendCurrentItem(minutes) {
-  if (!state.auctionState.active || !state.auctionState.currentItem) return false;
+function extendCurrentItem(minutes, channel) {
+  if (!state.auctionState.active) return false;
+
+  // Resolve the correct item from the thread context
+  const threadId = channel?.id;
+  const item = state.auctionState.threadItems?.[threadId] || state.auctionState.currentItem;
+  if (!item) return false;
+
   if (state.cfg && state.cfg.sheet_webhook_url) {
     const { saveAuctionState } = require('./persistence');
     saveAuctionState().catch(err => console.error('Failed to save auction state on extend:', err.message));
   }
 
-  state.auctionState.currentItem.endTime += minutes * 60000;
-  state.logger.info(`${EMOJI.TIME} Extended by ${minutes}m`);
+  item.endTime += minutes * 60000;
+  state.logger.info(`${EMOJI.TIME} Extended ${item.item} by ${minutes}m`);
   return true;
 }
 

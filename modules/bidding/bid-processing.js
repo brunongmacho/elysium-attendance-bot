@@ -91,8 +91,8 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
 
   // Attendance check removed - all guild members can now bid freely
   const now = Date.now();
-  if (state.st.lb[uid] && now - state.st.lb[uid] < 3000) {
-    const wait = Math.ceil((3000 - (now - state.st.lb[uid])) / 1000);
+  if (state.st.lb[msg.channel.id + '_' + uid] && now - state.st.lb[msg.channel.id + '_' + uid] < 3000) {
+    const wait = Math.ceil((3000 - (now - state.st.lb[msg.channel.id + '_' + uid])) / 1000);
     await msg.reply(`${EMOJI.CLOCK} Wait ${wait}s (rate limit)`);
     return { ok: false, msg: "Rate limited" };
   }
@@ -177,7 +177,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   // ==========================================
 
   // Update rate limit immediately to prevent rapid-fire bids
-  state.st.lb[uid] = now;
+  state.st.lb[msg.channel.id + '_' + uid] = now;
 
   // Handle previous winner (unlock their points)
   if (currentItem.curWin && !isSelf) {
@@ -419,8 +419,8 @@ async function procBid(msg, amt, cfg) {
 
   // Rate limit
   const now = Date.now();
-  if (state.st.lb[uid] && now - state.st.lb[uid] < RL) {
-    const wait = Math.ceil((RL - (now - state.st.lb[uid])) / 1000);
+  if (state.st.lb[msg.channel.id + '_' + uid] && now - state.st.lb[msg.channel.id + '_' + uid] < RL) {
+    const wait = Math.ceil((RL - (now - state.st.lb[msg.channel.id + '_' + uid])) / 1000);
     await msg.reply(`${EMOJI.CLOCK} Wait ${wait}s (rate limit)`);
     return { ok: false, msg: "Rate limited" };
   }
@@ -476,7 +476,7 @@ async function procBid(msg, amt, cfg) {
   // ==========================================
 
   // Update rate limit immediately to prevent rapid-fire bids
-  state.st.lb[uid] = now;
+  state.st.lb[msg.channel.id + '_' + uid] = now;
 
   // Handle previous winner (unlock their points)
   if (a.curWin && !isSelf) {

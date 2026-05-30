@@ -168,10 +168,35 @@ async function saveAuctionState() {
         }
       : null;
 
+  // Save all parallel thread items too
+  const cleanThreadItems = {};
+  if (state.auctionState.threadItems) {
+    Object.entries(state.auctionState.threadItems).forEach(([tid, item]) => {
+      if (item && item !== state.auctionState.currentItem) {
+        cleanThreadItems[tid] = {
+          item: item.item,
+          startPrice: item.startPrice,
+          duration: item.duration,
+          curBid: item.curBid,
+          curWin: item.curWin,
+          curWinId: item.curWinId,
+          status: item.status,
+          source: item.source,
+          sheetIndex: item.sheetIndex,
+          bossName: item.bossName,
+          _id: item._id
+        };
+      }
+    });
+  }
+
   const stateToSave = {
     auctionState: {
       active: state.auctionState.active,
       currentItem: cleanItem,
+      threadItems: cleanThreadItems,
+      activeThreadCount: state.auctionState.activeThreadCount,
+      currentBatchSize: state.auctionState.currentBatchSize,
       sessionItems: state.auctionState.sessionItems,
       currentItemIndex: state.auctionState.currentItemIndex,
       paused: state.auctionState.paused,

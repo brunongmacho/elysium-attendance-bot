@@ -24,9 +24,21 @@ function pauseSession() {
   state.auctionState.paused = true;
   state.auctionState.pausedTime = Date.now();
 
-  // Store remaining time for accurate display during pause
+  // Store remaining time for ALL active items
+  const now = Date.now();
+  state.auctionState.currentItemEndTimes = {};
   if (state.auctionState.currentItem) {
-    state.auctionState.currentItem.remainingTime = Math.max(0, state.auctionState.currentItem.endTime - Date.now());
+    state.auctionState.currentItem.remainingTime = Math.max(0, state.auctionState.currentItem.endTime - now);
+    state.auctionState.currentItemEndTimes['_current'] = state.auctionState.currentItem.endTime;
+  }
+  // Save ALL thread items' endTimes for pause restore
+  if (state.auctionState.threadItems) {
+    Object.entries(state.auctionState.threadItems).forEach(([tid, item]) => {
+      if (item) {
+        item.remainingTime = Math.max(0, item.endTime - now);
+        state.auctionState.currentItemEndTimes[tid] = item.endTime;
+      }
+    });
   }
 
   clearAllAuctionTimers();
@@ -49,18 +61,33 @@ function resumeSession(client, config, channel) {
   if (!state.auctionState.active || !state.auctionState.paused) return false;
   state.auctionState.paused = false;
 
-  if (!state.auctionState.currentItem) {
-    state.logger.warn('No current item to resume');
-    return true; // session resumed but no item to adjust
+  const pausedDuration = Date.now() - state.auctionState.pausedTime;
+
+  // Adjust endTime for ALL items
+  if (state.auctionState.currentItem) {
+    state.auctionState.currentItem.endTime += pausedDuration;
+    delete state.auctionState.currentItem.remainingTime;
+    // Schedule timers for currentItem's thread
+    if (state.auctionState.currentItem.thread) {
+      scheduleItemTimers(client, config, state.auctionState.currentItem.thread);
+    } else {
+      scheduleItemTimers(client, config, channel);
+    }
   }
 
-  const pausedDuration = Date.now() - state.auctionState.pausedTime;
-  state.auctionState.currentItem.endTime += pausedDuration;
+  // Adjust endTime and schedule timers for ALL parallel thread items
+  if (state.auctionState.threadItems) {
+    Object.entries(state.auctionState.threadItems).forEach(([tid, item]) => {
+      if (item && item !== state.auctionState.currentItem) {
+        item.endTime += pausedDuration;
+        delete item.remainingTime;
+        if (item.thread) {
+          scheduleItemTimers(client, config, item.thread);
+        }
+      }
+    });
+  }
 
-  // Clean up remainingTime field after resume
-  delete state.auctionState.currentItem.remainingTime;
-
-  scheduleItemTimers(client, config, channel);
   state.logger.info(`${EMOJI.PLAY} Session resumed`);
   return true;
 }

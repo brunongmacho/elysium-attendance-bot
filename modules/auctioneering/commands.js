@@ -291,8 +291,15 @@ async function handleQueueList(message, biddingState) {
  * Handles the !cancelitem command to remove an item from the queue.
  */
 async function handleCancelItem(message) {
-  if (!state.auctionState.active || !state.auctionState.currentItem) {
+  if (!state.auctionState.active) {
     return await message.reply(`${EMOJI.ERROR} No active auction`);
+  }
+
+  // Resolve the correct item from the thread context
+  const threadId = message.channel.id;
+  const item = state.auctionState.threadItems?.[threadId] || state.auctionState.currentItem;
+  if (!item) {
+    return await message.reply(`${EMOJI.ERROR} No active item found in this channel`);
   }
 
   const cancelConfirmBtn = new ButtonBuilder()
@@ -313,7 +320,7 @@ async function handleCancelItem(message) {
         .setColor(0xffa500)
         .setTitle(`${EMOJI.WARNING} Cancel Item?`)
         .setDescription(
-          `**${state.auctionState.currentItem.item}**\n\nRefund all locked points?`
+          `**${item.item}**\n\nRefund all locked points?`
         )
         .setFooter({ text: 'Click a button below to confirm' }),
     ],
@@ -331,16 +338,18 @@ async function handleCancelItem(message) {
     const disabledCancelRow = createDisabledRow(cancelConfirmBtn, cancelCancelBtn);
 
     if (isConfirm) {
+      // Refund points using Discord ID key (curWinId), not display name (curWin)
       const biddingState = state.biddingModule.getBiddingState();
-      if (state.auctionState.currentItem && state.auctionState.currentItem.curWin) {
-        const amt = biddingState.lp[state.auctionState.currentItem.curWin] || 0;
-        biddingState.lp[state.auctionState.currentItem.curWin] = 0;
+      if (item.curWinId && biddingState.lp[item.curWinId]) {
+        delete biddingState.lp[item.curWinId];
         state.biddingModule.saveBiddingState();
       }
 
-      const itemName = state.auctionState.currentItem ? state.auctionState.currentItem.item : "Unknown Item";
+      const itemName = item.item;
+      item.status = "cancelled";
       await message.channel.send(`${EMOJI.ERROR} **${itemName}** canceled. Points refunded.`);
 
+      // Archive the correct thread
       const thread = message.channel;
       if (thread && (thread.type === 11 || thread.type === 12)) {
         try {
@@ -367,13 +376,31 @@ async function handleCancelItem(message) {
         }
       }
 
-      const parentChannel = thread.parent || message.channel;
-      state.auctionState.currentItem = null;
-      state.auctionState.currentItemIndex++;
-      const { auctionNextItem } = require('./item-auction');
-      state.auctionState.timers.nextItem = setTimeout(async () => {
-        await auctionNextItem(message.client, state.cfg, parentChannel);
-      }, 20000);
+      // Clean up thread and timer state
+      const { safelyCleanupTimers } = require('./timer-mgmt');
+      if (threadId && state.auctionState.threadItems?.[threadId]) {
+        delete state.auctionState.threadItems[threadId];
+        state.auctionState.activeThreadCount--;
+        safelyCleanupTimers(threadId, "itemEnd", "go1", "go2", "go3");
+      }
+      if (item === state.auctionState.currentItem) {
+        state.auctionState.currentItem = null;
+      }
+
+      // Only advance batch if ALL items in this batch are done
+      if (!state.auctionState.currentItem && state.auctionState.activeThreadCount <= 0) {
+        const parentChannel = thread.parent || message.channel;
+        state.auctionState.currentItemIndex++;
+        // Actually, batch advancement should be by currentBatchSize, not 1
+        // But if we cancelled all items, we need some advancement
+        // Check if sessionItems still have remaining items
+        if (state.auctionState.currentItemIndex < state.auctionState.sessionItems.length) {
+          const { auctionNextItem } = require('./item-auction');
+          state.auctionState.timers.nextItem = setTimeout(async () => {
+            await auctionNextItem(message.client, state.cfg, parentChannel);
+          }, 20000);
+        }
+      }
 
       const successEmbed = new EmbedBuilder()
         .setColor(0x00ff00)
@@ -417,8 +444,14 @@ async function handleCancelItem(message) {
  * Handles the !skipitem command to skip the current item without recording a winner.
  */
 async function handleSkipItem(message) {
-  if (!state.auctionState.active || !state.auctionState.currentItem) {
+  if (!state.auctionState.active) {
     return await message.reply(`${EMOJI.ERROR} No active auction`);
+  }
+
+  const threadId = message.channel.id;
+  const item = state.auctionState.threadItems?.[threadId] || state.auctionState.currentItem;
+  if (!item) {
+    return await message.reply(`${EMOJI.ERROR} No active item found in this channel`);
   }
 
   const skipConfirmBtn = new ButtonBuilder()
@@ -439,7 +472,7 @@ async function handleSkipItem(message) {
         .setColor(0xffa500)
         .setTitle(`${EMOJI.WARNING} Skip Item?`)
         .setDescription(
-          `**${state.auctionState.currentItem.item}**\n\nMark as no sale, move to next?`
+          `**${item.item}**\n\nMark as no sale, move to next?`
         )
         .setFooter({ text: 'Click a button below to confirm' }),
     ],
@@ -457,16 +490,18 @@ async function handleSkipItem(message) {
     const disabledSkipRow = createDisabledRow(skipConfirmBtn, skipCancelBtn);
 
     if (isConfirm) {
+      // Refund any locked points (if there's a winning bid)
       const biddingState = state.biddingModule.getBiddingState();
-      if (state.auctionState.currentItem && state.auctionState.currentItem.curWin) {
-        const amt = biddingState.lp[state.auctionState.currentItem.curWin] || 0;
-        biddingState.lp[state.auctionState.currentItem.curWin] = 0;
+      if (item.curWinId && biddingState.lp[item.curWinId]) {
+        delete biddingState.lp[item.curWinId];
         state.biddingModule.saveBiddingState();
       }
 
-      const itemName = state.auctionState.currentItem ? state.auctionState.currentItem.item : "Unknown Item";
+      const itemName = item.item;
+      item.status = "cancelled";
       await message.channel.send(`⭐️ **${itemName}** skipped (no sale).`);
 
+      // Archive the correct thread
       const thread = message.channel;
       if (thread && (thread.type === 11 || thread.type === 12)) {
         try {
@@ -493,13 +528,28 @@ async function handleSkipItem(message) {
         }
       }
 
-      const parentChannel = thread.parent || message.channel;
-      state.auctionState.currentItem = null;
-      state.auctionState.currentItemIndex++;
-      const { auctionNextItem } = require('./item-auction');
-      state.auctionState.timers.nextItem = setTimeout(async () => {
-        await auctionNextItem(message.client, state.cfg, parentChannel);
-      }, 20000);
+      // Clean up thread and timer state
+      const { safelyCleanupTimers } = require('./timer-mgmt');
+      if (threadId && state.auctionState.threadItems?.[threadId]) {
+        delete state.auctionState.threadItems[threadId];
+        state.auctionState.activeThreadCount--;
+        safelyCleanupTimers(threadId, "itemEnd", "go1", "go2", "go3");
+      }
+      if (item === state.auctionState.currentItem) {
+        state.auctionState.currentItem = null;
+      }
+
+      // Only advance batch if ALL items in this batch are done
+      if (!state.auctionState.currentItem && state.auctionState.activeThreadCount <= 0) {
+        const parentChannel = thread.parent || message.channel;
+        state.auctionState.currentItemIndex++;
+        if (state.auctionState.currentItemIndex < state.auctionState.sessionItems.length) {
+          const { auctionNextItem } = require('./item-auction');
+          state.auctionState.timers.nextItem = setTimeout(async () => {
+            await auctionNextItem(message.client, state.cfg, parentChannel);
+          }, 20000);
+        }
+      }
 
       const successEmbed = new EmbedBuilder()
         .setColor(0x00ff00)
@@ -510,13 +560,13 @@ async function handleSkipItem(message) {
       await interaction.update({ embeds: [successEmbed], components: [disabledSkipRow] });
       skipCollector.stop();
     } else {
-      const continueEmbed = new EmbedBuilder()
-        .setColor(0x00ff00)
-        .setTitle(`${EMOJI.SUCCESS} Continuing`)
-        .setDescription('Item skip cancelled')
+      const cancelEmbed = new EmbedBuilder()
+        .setColor(0xff0000)
+        .setTitle(`${EMOJI.ERROR} Skip Cancelled`)
+        .setDescription('Skip action aborted')
         .setTimestamp();
 
-      await interaction.update({ embeds: [continueEmbed], components: [disabledSkipRow] });
+      await interaction.update({ embeds: [cancelEmbed], components: [disabledSkipRow] });
       skipCollector.stop();
     }
   });
@@ -678,6 +728,8 @@ function updateCurrentItemState(updates, threadId) {
 
   if (threadId && state.auctionState.threadItems?.[threadId]) {
     Object.assign(state.auctionState.threadItems[threadId], updates);
+    state.logger.info(`${EMOJI.SUCCESS} Item state updated:`, Object.keys(updates));
+    return true;
   }
   if (state.auctionState.currentItem) {
     Object.assign(state.auctionState.currentItem, updates);
@@ -697,31 +749,36 @@ async function endAuctionSession(client, config, channel) {
     return;
   }
 
-  // Clear all timers
+  // Clear all timers first
   clearAllAuctionTimers();
 
-  // If there's a current item, mark it as cancelled
-  if (state.auctionState.currentItem && state.auctionState.currentItem.status === "active") {
-    state.auctionState.currentItem.status = "cancelled";
+  // Cancel ALL active items in parallel threads
+  const allItems = [...Object.values(state.auctionState.threadItems || {})];
+  if (state.auctionState.currentItem && !allItems.includes(state.auctionState.currentItem)) {
+    allItems.push(state.auctionState.currentItem);
+  }
 
-    try {
-      const currentThread = state.auctionState.currentItem.thread;
-      if (currentThread && typeof currentThread.send === "function") {
-        await currentThread.send({
-          embeds: [
-            new EmbedBuilder()
-              .setColor(COLORS.ERROR)
-              .setTitle(`${EMOJI.ERROR} Auction Cancelled`)
-              .setDescription(`This auction was ended by an administrator.`),
-          ],
-        });
-
-        if (typeof currentThread.setArchived === "function") {
-          await currentThread.setArchived(true, "Session ended by admin").catch(state.errorHandler.safeCatch('archive thread on session end'));
+  for (const item of allItems) {
+    if (item && item.status === "active") {
+      item.status = "cancelled";
+      try {
+        const currentThread = item.thread;
+        if (currentThread && typeof currentThread.send === "function") {
+          await currentThread.send({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(COLORS.ERROR)
+                .setTitle(`${EMOJI.ERROR} Auction Cancelled`)
+                .setDescription(`This auction was ended by an administrator.`),
+            ],
+          });
+          if (typeof currentThread.setArchived === "function") {
+            await currentThread.setArchived(true, "Session ended by admin").catch(state.errorHandler.safeCatch('archive thread on session end'));
+          }
         }
+      } catch (err) {
+        state.logger.warn(`⚠️ Could not notify item thread:`, err.message);
       }
-    } catch (err) {
-      state.logger.warn(`⚠️ Could not notify current item thread:`, err.message);
     }
   }
 
@@ -731,7 +788,7 @@ async function endAuctionSession(client, config, channel) {
     state.logger.info(`✅ Auction session ended successfully`);
   } catch (err) {
     state.logger.error(`Failed to finalize auction session:`, err.message);
-    state.auctionState.sessionItems = []; // Still clear on failure
+    state.auctionState.sessionItems = [];
     state.auctionState.active = false;
   }
 }
