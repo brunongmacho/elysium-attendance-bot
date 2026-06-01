@@ -69,7 +69,7 @@ async function procBidAuctioneering(msg, amt, auctState, auctRef, config) {
   }
 
   // Check if item has already ended (force-stopped)
-  if (currentItem.status === "ended") {
+  if (currentItem.status === "ended" || currentItem.status === "cancelled") {
     await msg.reply(`${EMOJI.ERROR} **Auction Ended** - This item is no longer accepting bids.`);
     return { ok: false, msg: "Ended" };
   }

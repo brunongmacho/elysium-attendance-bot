@@ -107,7 +107,7 @@ class BackgroundSync {
 
     // Get attendance from last 7 days (recent changes only)
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const recentAttendance = await db.collection('attendance')
+    const recentAttendance = await db.collection(mongoHelpers.getCollectionName('attendance'))
       .find({ timestamp: { $gte: sevenDaysAgo } })
       .sort({ timestamp: -1 })
       .toArray();
@@ -171,7 +171,7 @@ class BackgroundSync {
    */
   async syncRotationToSheets() {
     const db = await dbAPI.connect();
-    const rotations = await db.collection('bossRotation').find({}).toArray();
+    const rotations = await db.collection(mongoHelpers.getCollectionName('bossRotation')).find({}).toArray();
 
     if (rotations.length === 0) {
       return { synced: 0 };

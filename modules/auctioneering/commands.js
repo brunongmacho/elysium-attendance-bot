@@ -749,6 +749,9 @@ async function endAuctionSession(client, config, channel) {
     return;
   }
 
+  // Set active flag to false FIRST — prevents new bids from routing to procBidAuctioneering
+  state.auctionState.active = false;
+
   // Clear all timers first
   clearAllAuctionTimers();
 

@@ -147,7 +147,7 @@ async function refreshRotationCache() {
 
       try {
         const db = await dbAPI.connect();
-        const rotationCollection = db.collection('bossRotation');
+        const rotationCollection = db.collection(mongoHelpers.getCollectionName('bossRotation'));
         const bossId = boss.toLowerCase().replace(/\s+/g, '_');
         await rotationCollection.deleteOne({ _id: bossId });
         removedCount++;
@@ -180,7 +180,7 @@ async function refreshRotationCache() {
 async function syncRotationToMongoDB(bossName, rotationData, options = {}) {
   try {
     const db = await dbAPI.connect();
-    const rotationCollection = db.collection('bossRotation');
+    const rotationCollection = db.collection(mongoHelpers.getCollectionName('bossRotation'));
 
     const doc = {
       _id: bossName.toLowerCase().replace(/\s+/g, '_'),
@@ -213,7 +213,7 @@ async function syncRotationToMongoDB(bossName, rotationData, options = {}) {
 async function getRotationFromMongoDB(bossName) {
   try {
     const db = await dbAPI.connect();
-    const rotationCollection = db.collection('bossRotation');
+    const rotationCollection = db.collection(mongoHelpers.getCollectionName('bossRotation'));
 
     const doc = await rotationCollection.findOne({
       _id: bossName.toLowerCase().replace(/\s+/g, '_')
@@ -522,7 +522,7 @@ async function deleteRotationWarning(bossName) {
 async function cleanupOldSchedules() {
   try {
     const db = await dbAPI.connect();
-    const scheduleCollection = db.collection('dailyRotationSchedule');
+    const scheduleCollection = db.collection(mongoHelpers.getCollectionName('dailyRotationSchedule'));
 
     const now = new Date();
     const manilaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
@@ -587,7 +587,7 @@ async function restoreDailyScheduleFromMongoDB() {
     const todayDate = startOfDay.toISOString().split('T')[0];
 
     const db = await dbAPI.connect();
-    const scheduleCollection = db.collection('dailyRotationSchedule');
+    const scheduleCollection = db.collection(mongoHelpers.getCollectionName('dailyRotationSchedule'));
     const existingSchedule = await scheduleCollection.findOne({ _id: todayDate });
 
     if (existingSchedule) {
@@ -684,7 +684,7 @@ async function postDailyRotationSchedule() {
     console.log(`📅 [DAILY-SCHEDULE] Checking rotations from ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
 
     const db = await dbAPI.connect();
-    const scheduleCollection = db.collection('dailyRotationSchedule');
+    const scheduleCollection = db.collection(mongoHelpers.getCollectionName('dailyRotationSchedule'));
 
     const existingSchedule = await scheduleCollection.findOne({ _id: todayDate });
     if (existingSchedule) {
@@ -966,7 +966,7 @@ async function deleteDailySchedule() {
 
     try {
       const db = await dbAPI.connect();
-      const scheduleCollection = db.collection('dailyRotationSchedule');
+      const scheduleCollection = db.collection(mongoHelpers.getCollectionName('dailyRotationSchedule'));
       await scheduleCollection.deleteOne({ _id: scheduleDate });
       console.log(`🗑️ Removed daily schedule from MongoDB (${scheduleDate})`);
     } catch (err) {
@@ -995,7 +995,7 @@ async function checkAndDeleteDailySchedule(bossName) {
 
     try {
       const db = await dbAPI.connect();
-      const scheduleCollection = db.collection('dailyRotationSchedule');
+      const scheduleCollection = db.collection(mongoHelpers.getCollectionName('dailyRotationSchedule'));
       await scheduleCollection.updateOne(
         { _id: state.dailyScheduleMessage.date },
         { $set: { bosses: updatedBosses } }

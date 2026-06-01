@@ -6,6 +6,7 @@ const { EmbedBuilder } = require('discord.js');
 const { addGuildThumbnail } = require('../../utils/embed-branding');
 const dbAPI = require('../../utils/database-api');
 const { USE_MONGODB_ATTENDANCE } = require('./constants');
+const { getCollectionName } = require('../../utils/mongodb-helpers');
 const state = require('./state');
 
 // ============================================================================
@@ -26,7 +27,7 @@ async function fetchAttendanceLeaderboard() {
     try {
       const db = await dbAPI.connect();
 
-      const attendanceStats = await db.collection('attendance')
+      const attendanceStats = await db.collection(getCollectionName('attendance'))
         .aggregate([
           {
             $group: {

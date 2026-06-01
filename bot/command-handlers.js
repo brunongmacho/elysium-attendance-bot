@@ -36,7 +36,7 @@ function createCommandHandlers(deps) {
     memberLore, bossPoints, bossSpawnConfig,
 
     // Service modules
-    reports, mongoHelpers, dbAPI,
+    reports, mongoHelpers, dbAPI, eventReminders,
 
     // Functions
     isAdmin,
@@ -1261,7 +1261,7 @@ function createCommandHandlers(deps) {
               const timestampDate = new Date(parsed.timestamp);
 
               // Get all attendance records for this boss + timestamp
-              const attendanceRecords = await db.collection('attendance')
+              const attendanceRecords = await db.collection(mongoHelpers.getCollectionName('attendance'))
                 .find({
                   bossName: bossName,
                   timestamp: timestampDate
@@ -2156,6 +2156,10 @@ function createCommandHandlers(deps) {
           fileConfig.reminders_channel_id = channelId;
           config.reminders_channel_id = channelId;
           await message.reply(`✅ **Reminders channel configured!** <#${channelId}> will now receive event reminders.`);
+          // Immediately create reminders in MongoDB so they start firing
+          eventReminders.syncEventScheduleToMongoDB(config, true).catch(err => {
+            console.error('❌ Failed to sync event schedule after reminders setup:', err.message);
+          });
           break;
 
         case 'view':
@@ -2915,6 +2919,38 @@ function createCommandHandlers(deps) {
         console.log(`✅ Registry sync: ${registryMembers.length} members synced`);
       } catch (error) {
         console.error('❌ Registry sync error:', error);
+        await statusMsg.edit(`❌ Sync failed: ${error.message}`);
+      }
+    },
+
+    // =========================================================================
+    // SYNC-REMINDERS - Manually sync event schedule to MongoDB
+    // =========================================================================
+    'sync-reminders': async (message, member) => {
+      if (!isAdmin(member)) {
+        await message.reply('❌ Admin-only command.');
+        return;
+      }
+
+      const statusMsg = await message.reply('🔄 Syncing event schedule to MongoDB...');
+
+      try {
+        const result = await eventReminders.syncEventScheduleToMongoDB(config, true);
+
+        if (result.error) {
+          await statusMsg.edit(`❌ Sync failed: ${result.error}`);
+          return;
+        }
+
+        await statusMsg.edit(
+          `✅ **Sync Complete!**\n\n` +
+          `Created: ${result.created}\n` +
+          `Skipped: ${result.skipped}`
+        );
+
+        console.log(`✅ Event schedule sync: ${result.created} created, ${result.skipped} skipped`);
+      } catch (error) {
+        console.error('❌ Event schedule sync error:', error);
         await statusMsg.edit(`❌ Sync failed: ${error.message}`);
       }
     },

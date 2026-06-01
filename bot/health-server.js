@@ -27,6 +27,7 @@
 
 const http = require('http');
 const { createLogger } = require('../utils/logger');
+const { getCollectionName } = require('../utils/mongodb-helpers');
 
 const mainLogger = createLogger('health');
 
@@ -116,13 +117,14 @@ function createHealthServer(client, config, deps = {}) {
             'event_reminders',
             'boss_timers',
           ]) {
-            if (collectionNames.includes(collName)) {
+            const suffixedName = getCollectionName(collName);
+            if (collectionNames.includes(suffixedName)) {
               try {
                 const count = await dbAPI.db
-                  .collection(collName)
+                  .collection(suffixedName)
                   .estimatedDocumentCount();
-                const stats = await dbAPI.db.collection(collName).stats();
-                collectionStats[collName] = {
+                const stats = await dbAPI.db.collection(suffixedName).stats();
+                collectionStats[suffixedName] = {
                   documents: count,
                   sizeBytes: stats.size,
                   avgDocSize: stats.avgObjSize || 0,

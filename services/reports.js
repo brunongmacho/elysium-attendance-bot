@@ -29,6 +29,7 @@
 const { EmbedBuilder } = require('discord.js');
 const dbAPI = require('../utils/database-api');
 const mongoHelpers = require('../utils/mongodb-helpers');
+const { getCollectionName } = mongoHelpers;
 const errorHandler = require('../utils/error-handler');
 const LRUCache = require('../utils/lru-cache');
 const { createPaginatedEmbeds } = require('../utils/ui-helpers');
@@ -314,7 +315,7 @@ async function generateWeeklyReport() {
  */
 async function getWeekData(db, startDate, endDate) {
   // Get unique boss spawns (timestamp + boss combination = 1 spawn)
-  const spawns = await db.collection('attendance')
+  const spawns = await db.collection(getCollectionName('attendance'))
     .aggregate([
       {
         $match: {
@@ -347,7 +348,7 @@ async function getWeekData(db, startDate, endDate) {
 
   // Member attendance (how many UNIQUE spawns each member attended)
   // First deduplicate by memberName + timestamp + boss to count unique spawns only
-  const memberAttendance = await db.collection('attendance')
+  const memberAttendance = await db.collection(getCollectionName('attendance'))
     .aggregate([
       {
         $match: {
@@ -383,7 +384,7 @@ async function getWeekData(db, startDate, endDate) {
   const uniqueMembers = memberAttendance.length;
 
   // Calculate participation rate (avg attendance / total active members)
-  const totalActiveMembers = await db.collection('members')
+  const totalActiveMembers = await db.collection(getCollectionName('members'))
     .countDocuments({ isActive: true });
   const participationRate = totalActiveMembers > 0
     ? Math.round((averageAttendancePerSpawn / totalActiveMembers) * 100 * 10) / 10
@@ -645,7 +646,7 @@ async function generateMonthlyReport(date = new Date()) {
 
     // Get all spawns for the month with retry logic
     const spawns = await retryOperation(
-      () => db.collection('attendance')
+      () => db.collection(getCollectionName('attendance'))
         .aggregate([
           {
             $match: {
@@ -674,7 +675,7 @@ async function generateMonthlyReport(date = new Date()) {
     // Member leaderboard (count UNIQUE spawns only) with retry logic
     // First deduplicate by memberName + timestamp + boss to count unique spawns only
     const memberStats = await retryOperation(
-      () => db.collection('attendance')
+      () => db.collection(getCollectionName('attendance'))
         .aggregate([
           {
             $match: {

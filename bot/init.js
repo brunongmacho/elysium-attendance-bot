@@ -245,6 +245,11 @@ async function onClientReady(client, config, modules) {
   mongoEventReminders.start();
   console.log('✅ MongoDB Event reminder service started - checking for due reminders every 60 seconds');
 
+  // Sync event schedule to MongoDB reminders
+  mongoEventReminders.syncEventScheduleToMongoDB(config, false).catch(err => {
+    console.error('❌ Failed to sync event schedule:', err.message);
+  });
+
   // BACKGROUND SYNC SERVICE DISABLED (Phase 7)
   // Reason: Redundant after implementing parallel dual-write (Phase 7)
   // All MongoDB writes now have simultaneous Sheets writes via Promise.all()

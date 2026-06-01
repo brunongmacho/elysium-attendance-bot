@@ -1074,6 +1074,44 @@ async function getRemindersByType(eventType) {
   return await db.collection(getCollectionName('eventReminders')).find({ eventType, active: true }).toArray();
 }
 
+/**
+ * Delete all reminders of a specific type
+ * @param {string} eventType - Event type to delete
+ * @returns {Promise<Object>} - Delete result
+ */
+async function deleteRemindersByType(eventType) {
+  const db = await dbAPI.connect();
+  return await db.collection(getCollectionName('eventReminders')).deleteMany({ eventType });
+}
+
+/**
+ * Find a reminder by event name and trigger time (for dedup)
+ * @param {string} eventName - Event name
+ * @param {Date} triggerTime - Trigger time to match
+ * @returns {Promise<Object|null>} - Reminder or null
+ */
+async function getReminderByEventTime(eventName, triggerTime) {
+  const db = await dbAPI.connect();
+  return await db.collection(getCollectionName('eventReminders')).findOne({
+    eventName,
+    reminderTime: triggerTime,
+    active: true,
+  });
+}
+
+/**
+ * Clean up past reminders that are past their trigger time
+ * @returns {Promise<Object>} - Delete result
+ */
+async function cleanupPastReminders() {
+  const db = await dbAPI.connect();
+  return await db.collection(getCollectionName('eventReminders')).deleteMany({
+    nextTrigger: { $lt: new Date() },
+    recurring: false,
+    active: true,
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // UTILITIES
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1437,6 +1475,9 @@ module.exports = {
   deleteReminder,
   deactivateReminder,
   getRemindersByType,
+  deleteRemindersByType,
+  getReminderByEventTime,
+  cleanupPastReminders,
 
   // Utilities
   getCollectionName,

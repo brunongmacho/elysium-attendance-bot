@@ -417,7 +417,7 @@ function schedulePreAuctionSync(sheetAPI, bossRotation) {
         state.logger.info(`${EMOJI.RESET} [PRE-AUCTION SYNC] Starting 1-hour pre-auction sync (Sheets → MongoDB)...`);
         const startTime = Date.now();
 
-        const mongoHelpers = require('../../utils/mongodb-helpers');
+        const { getCollectionName } = require('../../utils/mongodb-helpers');
         const dbAPI = require('../../utils/database-api');
 
         try {
@@ -428,7 +428,7 @@ function schedulePreAuctionSync(sheetAPI, bossRotation) {
             state.logger.warn(`${EMOJI.WARNING} [PRE-AUCTION SYNC] No points data received from Sheets`);
           } else {
             const db = await dbAPI.connect();
-            const membersCollection = db.collection('members');
+            const membersCollection = db.collection(getCollectionName('members'));
             let syncedCount = 0;
 
             for (const member of members) {
