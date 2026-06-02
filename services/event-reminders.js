@@ -41,6 +41,8 @@ let client = null;
 let checkTimer = null;
 let isRunning = false;
 let config = null;
+let lastAutoRefreshTime = 0;
+const MIN_AUTO_REFRESH_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours
 
 // ============================================================================
 // INITIALIZATION
@@ -72,10 +74,18 @@ function start(botConfig) {
   // Check immediately
   checkDueReminders();
 
+  // Clean up old messages on startup
+  cleanupOldReminderMessages();
+
   // Then check periodically
   checkTimer = setInterval(() => {
     checkDueReminders();
   }, CHECK_INTERVAL);
+
+  // Periodic cleanup of old reminder messages (every 6 hours)
+  setInterval(() => {
+    cleanupOldReminderMessages();
+  }, 6 * 60 * 60 * 1000);
 }
 
 /**
@@ -124,14 +134,22 @@ async function checkDueReminders() {
 /**
  * Auto-refresh reminders when they're running low
  * Triggers a re-sync when fewer than 5 upcoming reminders remain
+ * Uses force:true (clean slate) to prevent any dedup issues
+ * Debounced to max once per 6 hours
  */
 async function checkAndAutoRefresh() {
+  // Debounce: don't refresh more than once per 6 hours
+  if (Date.now() - lastAutoRefreshTime < MIN_AUTO_REFRESH_INTERVAL) {
+    return;
+  }
+
   try {
     const count = await mongoHelpers.countUpcomingReminders();
     if (count < 5) {
       console.log(`📅 [Auto-Refresh] Only ${count} upcoming reminders left, refreshing event schedule...`);
       if (config) {
-        await syncEventScheduleToMongoDB(config, false);
+        lastAutoRefreshTime = Date.now();
+        await syncEventScheduleToMongoDB(config, true); // force: true = clean slate
       }
     }
   } catch (err) {
@@ -198,8 +216,19 @@ async function sendReminderNotification(reminder) {
 
     // Send notification with error handling
     try {
-      await channel.send({ embeds: [embed] });
+      const sentMessage = await channel.send({ embeds: [embed] });
       console.log(`✅ Sent reminder: ${reminder.eventName}`);
+
+      // Auto-delete reminder message after 30 minutes to keep channel clean
+      setTimeout(async () => {
+        try {
+          await sentMessage.delete();
+          console.log(`🗑️ Auto-deleted reminder message for: ${reminder.eventName}`);
+        } catch (err) {
+          // Message might already be deleted or channel gone
+          console.log(`🗑️ Reminder message already gone for: ${reminder.eventName}`);
+        }
+      }, 30 * 60 * 1000);
     } catch (sendError) {
       console.error(`❌ Failed to send message for reminder "${reminder.eventName}":`, sendError.message);
 
@@ -222,6 +251,50 @@ async function sendReminderNotification(reminder) {
     console.error(`❌ Unexpected error in reminder "${reminder.eventName}":`, error.message);
     // Don't deactivate on unexpected errors - log and continue
     // This prevents accidental deactivation of working reminders
+  }
+}
+
+/**
+ * Clean up old reminder messages from the reminders channel
+ * Deletes bot messages older than 1 hour using bulkDelete
+ * Runs on startup and periodically to keep the channel clean
+ */
+async function cleanupOldReminderMessages() {
+  if (!config || !client) return;
+
+  const channelId = config.reminders_channel_id;
+  if (!channelId) {
+    console.log('🧹 [Cleanup] No reminders channel configured, skipping cleanup');
+    return;
+  }
+
+  try {
+    const channel = await client.channels.fetch(channelId);
+    if (!channel || !channel.isTextBased()) {
+      console.log(`🧹 [Cleanup] Channel ${channelId} not found or not text-based, skipping`);
+      return;
+    }
+
+    // Fetch last 100 messages
+    const messages = await channel.messages.fetch({ limit: 100 });
+    const ONE_HOUR = 60 * 60 * 1000;
+    const now = Date.now();
+
+    // Filter for bot messages older than 1 hour
+    const toDelete = messages.filter(msg =>
+      msg.author.id === client.user.id &&
+      now - msg.createdTimestamp > ONE_HOUR
+    );
+
+    if (toDelete.size > 0) {
+      await channel.bulkDelete(toDelete, true);
+      console.log(`🧹 [Cleanup] Deleted ${toDelete.size} old reminder message(s) from ${channel.name}`);
+    } else {
+      console.log(`🧹 [Cleanup] No old reminder messages to clean up`);
+    }
+  } catch (err) {
+    // bulkDelete fails if messages are >14 days old or missing perms
+    console.error(`❌ [Cleanup] Error cleaning up reminder messages:`, err.message);
   }
 }
 
@@ -432,7 +505,7 @@ async function syncEventScheduleToMongoDB(config, force = false) {
         reminderTime: triggerTime, // When the reminder fires (createReminder sets nextTrigger = reminderTime)
         notifyBefore: occ.reminderOffsetMinutes * 60 * 1000,
         channelId: channelId,
-        message: `⏰ **${event.name}** starts in **${occ.reminderOffsetMinutes} minutes**!`,
+        message: `@everyone ⏰ **${event.name}** starts in **${occ.reminderOffsetMinutes} minutes**!`,
         recurring: false,
         createdBy: 'system',
       });
@@ -440,12 +513,9 @@ async function syncEventScheduleToMongoDB(config, force = false) {
     }
   }
 
-  // Clean up past reminders
-  try {
-    await mongoHelpers.cleanupPastReminders();
-  } catch (err) {
-    console.warn('⚠️ [Event Schedule Sync] Failed to clean up past reminders:', err.message);
-  }
+  // Past reminders cleanup handled via force mode in auto-refresh
+  // cleanupPastReminders removed because it deletes just-created reminders
+  // that have trigger times slightly in the past (within grace period)
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`✅ [Event Schedule Sync] Complete: ${created} created, ${skipped} skipped (${elapsed}s)`);
@@ -467,6 +537,7 @@ module.exports = {
   deactivateReminder,
   getRemindersByType,
   checkDueReminders, // For manual testing
+  cleanupOldReminderMessages,
   generateEventOccurrences,
   syncEventScheduleToMongoDB,
 };
