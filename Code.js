@@ -2024,35 +2024,106 @@ function saveAttendanceState(data) {
 
 function updateTotalAttendanceAndMembers() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheets = ss.getSheets().filter(s => s.getName().startsWith(CONFIG.SHEET_NAME_PREFIX));
+  const sheets = ss.getSheets()
+    .filter(s => s.getName().startsWith(CONFIG.SHEET_NAME_PREFIX))
+    .sort((a, b) => a.getName().localeCompare(b.getName())); // Sort by date ascending
   const totalSheetName = "TOTAL ATTENDANCE";
   const totalSheet = ss.getSheetByName(totalSheetName);
-  const memberTotals = {};
+  if (!totalSheet) return;
 
-  // --- Step 1: Gather all members + count TRUE checkboxes from all weekly sheets ---
+  // --- Step 1: Collect per-week attendance for all members ---
+  // weekData[sheetName] = { memberName: count, __members: Set }
+  // allMembers: Set of unique member names across all weeks
+  const weekData = {};
+  const allMembers = new Set();
+  const weekNames = []; // Ordered list of week sheet names
+
   sheets.forEach(sheet => {
+    const sheetName = sheet.getName();
+    weekNames.push(sheetName);
     const data = sheet.getDataRange().getValues();
-    for (let i = 2; i < data.length; i++) { // Start from row 3 (index 2) to skip headers
-      const name = data[i][0];
+    const weekAttendance = {};
+    const membersInWeek = new Set();
+
+    for (let i = 2; i < data.length; i++) { // Start from row 3 (index 2)
+      const name = (data[i][0] || '').toString().trim();
       if (!name) continue;
-      const attendance = data[i].slice(4).filter(v => v === true).length;
-      memberTotals[name] = (memberTotals[name] || 0) + attendance;
+      membersInWeek.add(name);
+      allMembers.add(name);
+      // Count TRUE checkboxes in spawn columns (index 4+)
+      const count = data[i].slice(4).filter(v => v === true).length;
+      weekAttendance[name] = count;
     }
+    // Track which members exist in this week (for blank vs 0 distinction)
+    weekAttendance.__members = membersInWeek;
+    weekData[sheetName] = weekAttendance;
   });
 
-  // --- Step 2: Update TOTAL ATTENDANCE sheet ONLY ---
-  const result = [["Member", "Total Attendance (Days)"]];
-  Object.keys(memberTotals)
-    .sort((a, b) => a.localeCompare(b))
-    .forEach(name => result.push([name, memberTotals[name]]));
+  // --- Step 2: Build the result matrix ---
+  // Headers: Member | Total Attendance (Days) | MM/DD/YYYY | MM/DD/YYYY | ...
+  const dateHeaders = weekNames.map(name => {
+    // Convert WEEK_yyyyMMdd to MM/dd/yyyy
+    const dateStr = name.replace(CONFIG.SHEET_NAME_PREFIX, '');
+    if (dateStr.length === 8) {
+      const y = dateStr.substring(0, 4);
+      const m = dateStr.substring(4, 6);
+      const d = dateStr.substring(6, 8);
+      return `${m}/${d}/${y}`;
+    }
+    return name; // Fallback
+  });
 
+  const headers = ['Member', 'Total Attendance (Days)', ...dateHeaders];
+  const result = [headers];
+
+  // Sort members alphabetically
+  const sortedMembers = Array.from(allMembers).sort((a, b) => a.localeCompare(b));
+
+  sortedMembers.forEach(member => {
+    let total = 0;
+    const row = [member];
+
+    // Per-week cells
+    weekNames.forEach((sheetName) => {
+      const week = weekData[sheetName];
+      if (week.__members.has(member)) {
+        const count = week[member] || 0;
+        total += count;
+      }
+      // If member NOT in week.__members, leave count as 0 (will be blank)
+    });
+    row.push(total);
+
+    // Per-week cells
+    weekNames.forEach((sheetName) => {
+      const week = weekData[sheetName];
+      if (week.__members.has(member)) {
+        row.push(week[member] || 0); // Existed but 0 attendance
+      } else {
+        row.push(''); // Blank — member didn't exist in this week
+      }
+    });
+
+    result.push(row);
+  });
+
+  // --- Step 3: Write to TOTAL ATTENDANCE sheet ---
   totalSheet.clearContents();
-  totalSheet.getRange(1, 1, result.length, 2).setValues(result);
+  
+  const numRows = result.length;
+  const numCols = headers.length;
+  const range = totalSheet.getRange(1, 1, numRows, numCols);
+  range.setValues(result);
 
-  Logger.log(`✅ Updated TOTAL ATTENDANCE sheet with ${result.length - 1} members`);
+  // Format header row
+  totalSheet.getRange(1, 1, 1, numCols)
+    .setFontWeight('bold')
+    .setBackground('#4a86e8')
+    .setFontColor('#ffffff');
+  totalSheet.setFrozenRows(1);
+  totalSheet.setColumnWidth(1, 200); // Member column
 
-  // NOTE: This function does NOT modify weekly sheets
-  // New members are added to weekly sheets automatically by handleSubmitAttendance() when attendance is submitted
+  Logger.log(`✅ Updated TOTAL ATTENDANCE sheet with ${sortedMembers.length} members across ${weekNames.length} weeks`);
 }
 // ==========================================
 // LEADERBOARD & WEEKLY REPORT FUNCTIONS
