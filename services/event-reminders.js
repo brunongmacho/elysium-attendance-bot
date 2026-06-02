@@ -40,6 +40,7 @@ const CHECK_INTERVAL = 60 * 1000; // Check every 1 minute for due reminders
 let client = null;
 let checkTimer = null;
 let isRunning = false;
+let config = null;
 
 // ============================================================================
 // INITIALIZATION
@@ -56,13 +57,15 @@ function initialize(discordClient) {
 
 /**
  * Start reminder checking service
+ * @param {Object} botConfig - Bot configuration
  */
-function start() {
+function start(botConfig) {
   if (isRunning) {
     console.log('⚠️ Event reminder service already running');
     return;
   }
 
+  config = botConfig;
   isRunning = true;
   console.log(`✅ Event reminder service started (checking every ${CHECK_INTERVAL / 1000}s)`);
 
@@ -103,17 +106,36 @@ async function checkDueReminders() {
   try {
     const dueReminders = await mongoHelpers.getDueReminders();
 
-    if (dueReminders.length === 0) {
-      return;
+    if (dueReminders.length > 0) {
+      console.log(`📅 Found ${dueReminders.length} due reminder(s)`);
+      for (const reminder of dueReminders) {
+        await sendReminderNotification(reminder);
+      }
     }
 
-    console.log(`📅 Found ${dueReminders.length} due reminder(s)`);
+    // Auto-refresh: if reminders are running low, re-sync
+    await checkAndAutoRefresh();
 
-    for (const reminder of dueReminders) {
-      await sendReminderNotification(reminder);
-    }
   } catch (error) {
     console.error('❌ Error checking due reminders:', error.message);
+  }
+}
+
+/**
+ * Auto-refresh reminders when they're running low
+ * Triggers a re-sync when fewer than 5 upcoming reminders remain
+ */
+async function checkAndAutoRefresh() {
+  try {
+    const count = await mongoHelpers.countUpcomingReminders();
+    if (count < 5) {
+      console.log(`📅 [Auto-Refresh] Only ${count} upcoming reminders left, refreshing event schedule...`);
+      if (config) {
+        await syncEventScheduleToMongoDB(config, false);
+      }
+    }
+  } catch (err) {
+    console.error('❌ [Auto-Refresh] Error:', err.message);
   }
 }
 

@@ -1418,6 +1418,18 @@ async function syncDiscordIds(guild) {
   return { updated, failed, skipped };
 }
 
+/**
+ * Count upcoming reminders (active + future trigger time)
+ * @returns {Promise<number>} Count of upcoming reminders
+ */
+async function countUpcomingReminders() {
+  const db = await dbAPI.connect();
+  return await db.collection(getCollectionName('eventReminders')).countDocuments({
+    active: true,
+    nextTrigger: { $gt: new Date() }
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1478,6 +1490,7 @@ module.exports = {
   deleteRemindersByType,
   getReminderByEventTime,
   cleanupPastReminders,
+  countUpcomingReminders,
 
   // Utilities
   getCollectionName,

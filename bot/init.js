@@ -242,7 +242,7 @@ async function onClientReady(client, config, modules) {
   // EVENT REMINDER SERVICE (Phase 10) - MongoDB-powered reminder system
   const mongoEventReminders = require(path.join(rootDir, 'services', 'event-reminders'));
   mongoEventReminders.initialize(client);
-  mongoEventReminders.start();
+  mongoEventReminders.start(config);
   console.log('✅ MongoDB Event reminder service started - checking for due reminders every 60 seconds');
 
   // Sync event schedule to MongoDB reminders
